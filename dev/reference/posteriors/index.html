@@ -1828,7 +1828,18 @@ trained network to deal with these cases.</p>
 <span class="normal">566</span>
 <span class="normal">567</span>
 <span class="normal">568</span>
-<span class="normal">569</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DirectPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DirectPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior based on neural networks that directly estimate the posterior (NPE).</span>
 
 <span class="sd">    NPE trains a neural network to directly approximate the posterior distribution.</span>
@@ -1944,6 +1955,7 @@ trained network to deal with these cases.</p>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior distribution $p(\theta|x)$.</span>
 
@@ -1963,6 +1975,10 @@ trained network to deal with these cases.</p>
 <span class="sd">                If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">                applies when `reject_outside_prior=True` (no effect otherwise since</span>
 <span class="sd">                direct sampling is fast).</span>
+<span class="sd">            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">                return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">                A warning will be issued. Only applies when `reject_outside_prior=True`</span>
+<span class="sd">                (default).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
@@ -1995,6 +2011,7 @@ trained network to deal with these cases.</p>
                 <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;condition&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">},</span>
                 <span class="n">alternative_method</span><span class="o">=</span><span class="s2">&quot;build_posterior(..., sample_with=&#39;mcmc&#39;)&quot;</span><span class="p">,</span>
                 <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
             <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Bypass rejection sampling entirely.</span>
@@ -2014,6 +2031,7 @@ trained network to deal with these cases.</p>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the posteriors for a batch of different xs.</span>
 
@@ -2034,6 +2052,9 @@ trained network to deal with these cases.</p>
 <span class="sd">            max_sampling_time: Optional maximum allowed sampling time in seconds.</span>
 <span class="sd">                If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">                applies when `reject_outside_prior=True`.</span>
+<span class="sd">            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">                return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">                A warning will be issued. Only applies when `reject_outside_prior=True`.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Samples from the posteriors of shape (*sample_shape, B, *input_shape)</span>
@@ -2080,6 +2101,7 @@ trained network to deal with these cases.</p>
                 <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;condition&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">},</span>
                 <span class="n">alternative_method</span><span class="o">=</span><span class="s2">&quot;build_posterior(..., sample_with=&#39;mcmc&#39;)&quot;</span><span class="p">,</span>
                 <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
             <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Bypass rejection sampling entirely.</span>
@@ -2732,18 +2754,7 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">456</span>
 <span class="normal">457</span>
 <span class="normal">458</span>
 <span class="normal">459</span>
@@ -2789,7 +2800,18 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
 <span class="normal">499</span>
 <span class="normal">500</span>
 <span class="normal">501</span>
-<span class="normal">502</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">leakage_correction</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -2993,18 +3015,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">301</span>
 <span class="normal">302</span>
 <span class="normal">303</span>
 <span class="normal">304</span>
@@ -3071,7 +3082,18 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 <span class="normal">365</span>
 <span class="normal">366</span>
 <span class="normal">367</span>
-<span class="normal">368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -3302,18 +3324,7 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">370</span>
-<span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
-<span class="normal">381</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">381</span>
 <span class="normal">382</span>
 <span class="normal">383</span>
 <span class="normal">384</span>
@@ -3375,7 +3386,18 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 <span class="normal">440</span>
 <span class="normal">441</span>
 <span class="normal">442</span>
-<span class="normal">443</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob_batched</span><span class="p">(</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -3691,18 +3713,7 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">504</span>
-<span class="normal">505</span>
-<span class="normal">506</span>
-<span class="normal">507</span>
-<span class="normal">508</span>
-<span class="normal">509</span>
-<span class="normal">510</span>
-<span class="normal">511</span>
-<span class="normal">512</span>
-<span class="normal">513</span>
-<span class="normal">514</span>
-<span class="normal">515</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">515</span>
 <span class="normal">516</span>
 <span class="normal">517</span>
 <span class="normal">518</span>
@@ -3756,7 +3767,18 @@ have a cached value.</p>
 <span class="normal">566</span>
 <span class="normal">567</span>
 <span class="normal">568</span>
-<span class="normal">569</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -3832,7 +3854,7 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.direct_posterior.DirectPosterior.sample" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.direct_posterior.DirectPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -3958,6 +3980,25 @@ direct sampling is fast).</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>return_partial_on_timeout</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If True and <code>max_sampling_time</code> is exceeded,
+return the samples collected so far instead of raising a RuntimeError.
+A warning will be issued. Only applies when <code>reject_outside_prior=True</code>
+(default).</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -4032,7 +4073,13 @@ direct sampling is fast).</p>
 <span class="normal">200</span>
 <span class="normal">201</span>
 <span class="normal">202</span>
-<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -4040,6 +4087,7 @@ direct sampling is fast).</p>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior distribution $p(\theta|x)$.</span>
 
@@ -4059,6 +4107,10 @@ direct sampling is fast).</p>
 <span class="sd">            If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">            applies when `reject_outside_prior=True` (no effect otherwise since</span>
 <span class="sd">            direct sampling is fast).</span>
+<span class="sd">        return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">            return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">            A warning will be issued. Only applies when `reject_outside_prior=True`</span>
+<span class="sd">            (default).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
     <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
@@ -4091,6 +4143,7 @@ direct sampling is fast).</p>
             <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;condition&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">},</span>
             <span class="n">alternative_method</span><span class="o">=</span><span class="s2">&quot;build_posterior(..., sample_with=&#39;mcmc&#39;)&quot;</span><span class="p">,</span>
             <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+            <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
         <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Bypass rejection sampling entirely.</span>
@@ -4111,7 +4164,7 @@ direct sampling is fast).</p>
 
 
 <h3 id="sbi.inference.posteriors.direct_posterior.DirectPosterior.sample_batched" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample_batched</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample_batched</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.direct_posterior.DirectPosterior.sample_batched" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -4237,6 +4290,24 @@ applies when <code>reject_outside_prior=True</code>.</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>return_partial_on_timeout</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If True and <code>max_sampling_time</code> is exceeded,
+return the samples collected so far instead of raising a RuntimeError.
+A warning will be issued. Only applies when <code>reject_outside_prior=True</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -4266,13 +4337,7 @@ applies when <code>reject_outside_prior=True</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">211</span>
 <span class="normal">212</span>
 <span class="normal">213</span>
 <span class="normal">214</span>
@@ -4349,7 +4414,18 @@ applies when <code>reject_outside_prior=True</code>.</p>
 <span class="normal">285</span>
 <span class="normal">286</span>
 <span class="normal">287</span>
-<span class="normal">288</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -4357,6 +4433,7 @@ applies when <code>reject_outside_prior=True</code>.</p>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the posteriors for a batch of different xs.</span>
 
@@ -4377,6 +4454,9 @@ applies when <code>reject_outside_prior=True</code>.</p>
 <span class="sd">        max_sampling_time: Optional maximum allowed sampling time in seconds.</span>
 <span class="sd">            If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">            applies when `reject_outside_prior=True`.</span>
+<span class="sd">        return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">            return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">            A warning will be issued. Only applies when `reject_outside_prior=True`.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Samples from the posteriors of shape (*sample_shape, B, *input_shape)</span>
@@ -4423,6 +4503,7 @@ applies when <code>reject_outside_prior=True</code>.</p>
             <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;condition&quot;</span><span class="p">:</span> <span class="n">x</span><span class="p">},</span>
             <span class="n">alternative_method</span><span class="o">=</span><span class="s2">&quot;build_posterior(..., sample_with=&#39;mcmc&#39;)&quot;</span><span class="p">,</span>
             <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+            <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
         <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Bypass rejection sampling entirely.</span>
@@ -11655,7 +11736,13 @@ parameter generation and mcmc sampling.</p>
 <span class="normal">295</span>
 <span class="normal">296</span>
 <span class="normal">297</span>
-<span class="normal">298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RejectionPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RejectionPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Provides rejection sampling to sample from the posterior.</span>
 
 <span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).</span>
@@ -11777,6 +11864,7 @@ parameter generation and mcmc sampling.</p>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior via rejection sampling.</span>
 
@@ -11803,6 +11891,10 @@ parameter generation and mcmc sampling.</p>
 <span class="sd">                If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">                applies when `reject_outside_prior=True` (no effect otherwise since</span>
 <span class="sd">                direct sampling from the proposal is fast).</span>
+<span class="sd">            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">                return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">                A warning will be issued. Only applies when `reject_outside_prior=True`</span>
+<span class="sd">                (default).</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Samples from posterior.</span>
@@ -11842,6 +11934,7 @@ parameter generation and mcmc sampling.</p>
                 <span class="n">num_iter_to_find_max</span><span class="o">=</span><span class="n">num_iter_to_find_max</span><span class="p">,</span>
                 <span class="n">m</span><span class="o">=</span><span class="n">m</span><span class="p">,</span>
                 <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
                 <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
@@ -12615,13 +12708,7 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/rejection_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
 <span class="normal">242</span>
@@ -12680,7 +12767,13 @@ have a cached value.</p>
 <span class="normal">295</span>
 <span class="normal">296</span>
 <span class="normal">297</span>
-<span class="normal">298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -12756,7 +12849,7 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.rejection_posterior.RejectionPosterior.sample" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_samples_to_find_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_iter_to_find_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">m</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_samples_to_find_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_iter_to_find_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">m</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.rejection_posterior.RejectionPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -12934,6 +13027,25 @@ direct sampling from the proposal is fast).</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>return_partial_on_timeout</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If True and <code>max_sampling_time</code> is exceeded,
+return the samples collected so far instead of raising a RuntimeError.
+A warning will be issued. Only applies when <code>reject_outside_prior=True</code>
+(default).</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -13050,7 +13162,13 @@ direct sampling from the proposal is fast).</p>
 <span class="normal">215</span>
 <span class="normal">216</span>
 <span class="normal">217</span>
-<span class="normal">218</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -13061,6 +13179,7 @@ direct sampling from the proposal is fast).</p>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Draw samples from the approximate posterior via rejection sampling.</span>
 
@@ -13087,6 +13206,10 @@ direct sampling from the proposal is fast).</p>
 <span class="sd">            If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">            applies when `reject_outside_prior=True` (no effect otherwise since</span>
 <span class="sd">            direct sampling from the proposal is fast).</span>
+<span class="sd">        return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">            return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">            A warning will be issued. Only applies when `reject_outside_prior=True`</span>
+<span class="sd">            (default).</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Samples from posterior.</span>
@@ -13126,6 +13249,7 @@ direct sampling from the proposal is fast).</p>
             <span class="n">num_iter_to_find_max</span><span class="o">=</span><span class="n">num_iter_to_find_max</span><span class="p">,</span>
             <span class="n">m</span><span class="o">=</span><span class="n">m</span><span class="p">,</span>
             <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+            <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
             <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
@@ -13923,7 +14047,20 @@ the ODE to compute the log-probability.</p>
 <span class="normal">659</span>
 <span class="normal">660</span>
 <span class="normal">661</span>
-<span class="normal">662</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VectorFieldPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span>
+<span class="normal">666</span>
+<span class="normal">667</span>
+<span class="normal">668</span>
+<span class="normal">669</span>
+<span class="normal">670</span>
+<span class="normal">671</span>
+<span class="normal">672</span>
+<span class="normal">673</span>
+<span class="normal">674</span>
+<span class="normal">675</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VectorFieldPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior based on flow- or score-matching estimators.</span>
 
 <span class="sd">    This posterior samples from the vector field model - typically a score-based or a</span>
@@ -14054,6 +14191,7 @@ the ODE to compute the log-probability.</p>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution $p(\theta|x)$.</span>
 
@@ -14099,6 +14237,10 @@ the ODE to compute the log-probability.</p>
 <span class="sd">                If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">                applies when `reject_outside_prior=True` (no effect otherwise since</span>
 <span class="sd">                direct sampling does not use rejection).</span>
+<span class="sd">            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">                return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">                A warning will be issued. Only applies when `reject_outside_prior=True`</span>
+<span class="sd">                (default).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -14125,6 +14267,7 @@ the ODE to compute the log-probability.</p>
                     <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
                     <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
                     <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                    <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># Bypass rejection sampling entirely.</span>
@@ -14149,6 +14292,7 @@ the ODE to compute the log-probability.</p>
                     <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
                     <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="n">proposal_sampling_kwargs</span><span class="p">,</span>
                     <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                    <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># Bypass rejection sampling entirely.</span>
@@ -14349,6 +14493,7 @@ the ODE to compute the log-probability.</p>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Given a batch of observations [x_1, ..., x_B] this function samples from</span>
 <span class="sd">        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)</span>
@@ -14378,6 +14523,9 @@ the ODE to compute the log-probability.</p>
 <span class="sd">            max_sampling_time: Optional maximum allowed sampling time in seconds.</span>
 <span class="sd">                If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">                applies when `reject_outside_prior=True`.</span>
+<span class="sd">            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">                return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">                A warning will be issued. Only applies when `reject_outside_prior=True`.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Samples from the posteriors of shape (*sample_shape, B, *input_shape)</span>
@@ -14415,6 +14563,7 @@ the ODE to compute the log-probability.</p>
                     <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
                     <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
                     <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                    <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># Bypass rejection sampling.</span>
@@ -14443,6 +14592,7 @@ the ODE to compute the log-probability.</p>
                     <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
                     <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="n">proposal_sampling_kwargs</span><span class="p">,</span>
                     <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                    <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># Bypass rejection sampling.</span>
@@ -14963,14 +15113,7 @@ consumption.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">414</span>
-<span class="normal">415</span>
-<span class="normal">416</span>
-<span class="normal">417</span>
-<span class="normal">418</span>
-<span class="normal">419</span>
-<span class="normal">420</span>
-<span class="normal">421</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">421</span>
 <span class="normal">422</span>
 <span class="normal">423</span>
 <span class="normal">424</span>
@@ -14995,7 +15138,14 @@ consumption.</p>
 <span class="normal">443</span>
 <span class="normal">444</span>
 <span class="normal">445</span>
-<span class="normal">446</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -15254,20 +15404,7 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">571</span>
-<span class="normal">572</span>
-<span class="normal">573</span>
-<span class="normal">574</span>
-<span class="normal">575</span>
-<span class="normal">576</span>
-<span class="normal">577</span>
-<span class="normal">578</span>
-<span class="normal">579</span>
-<span class="normal">580</span>
-<span class="normal">581</span>
-<span class="normal">582</span>
-<span class="normal">583</span>
-<span class="normal">584</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">584</span>
 <span class="normal">585</span>
 <span class="normal">586</span>
 <span class="normal">587</span>
@@ -15345,7 +15482,20 @@ have a cached value.</p>
 <span class="normal">659</span>
 <span class="normal">660</span>
 <span class="normal">661</span>
-<span class="normal">662</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span>
+<span class="normal">666</span>
+<span class="normal">667</span>
+<span class="normal">668</span>
+<span class="normal">669</span>
+<span class="normal">670</span>
+<span class="normal">671</span>
+<span class="normal">672</span>
+<span class="normal">673</span>
+<span class="normal">674</span>
+<span class="normal">675</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
@@ -15447,7 +15597,7 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior.sample" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s1">&#39;euler_maruyama&#39;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">corrector_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">steps</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">ts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">iid_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">iid_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s1">&#39;euler_maruyama&#39;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">corrector_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">steps</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">ts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">iid_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">iid_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -15719,6 +15869,25 @@ direct sampling does not use rejection).</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>return_partial_on_timeout</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If True and <code>max_sampling_time</code> is exceeded,
+return the samples collected so far instead of raising a RuntimeError.
+A warning will be issued. Only applies when <code>reject_outside_prior=True</code>
+(default).</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -15857,7 +16026,14 @@ direct sampling does not use rejection).</p>
 <span class="normal">277</span>
 <span class="normal">278</span>
 <span class="normal">279</span>
-<span class="normal">280</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -15876,6 +16052,7 @@ direct sampling does not use rejection).</p>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return samples from posterior distribution $p(\theta|x)$.</span>
 
@@ -15921,6 +16098,10 @@ direct sampling does not use rejection).</p>
 <span class="sd">            If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">            applies when `reject_outside_prior=True` (no effect otherwise since</span>
 <span class="sd">            direct sampling does not use rejection).</span>
+<span class="sd">        return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">            return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">            A warning will be issued. Only applies when `reject_outside_prior=True`</span>
+<span class="sd">            (default).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">if</span> <span class="n">sample_with</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -15947,6 +16128,7 @@ direct sampling does not use rejection).</p>
                 <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
                 <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
                 <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Bypass rejection sampling entirely.</span>
@@ -15971,6 +16153,7 @@ direct sampling does not use rejection).</p>
                 <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
                 <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="n">proposal_sampling_kwargs</span><span class="p">,</span>
                 <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Bypass rejection sampling entirely.</span>
@@ -16000,7 +16183,7 @@ direct sampling does not use rejection).</p>
 
 
 <h3 id="sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior.sample_batched" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample_batched</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s1">&#39;euler_maruyama&#39;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">corrector_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">steps</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">ts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample_batched</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s1">&#39;euler_maruyama&#39;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">corrector_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">steps</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">ts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior.sample_batched" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -16226,6 +16409,24 @@ applies when <code>reject_outside_prior=True</code>.</p>
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>return_partial_on_timeout</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If True and <code>max_sampling_time</code> is exceeded,
+return the samples collected so far instead of raising a RuntimeError.
+A warning will be issued. Only applies when <code>reject_outside_prior=True</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -16255,14 +16456,7 @@ applies when <code>reject_outside_prior=True</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">455</span>
 <span class="normal">456</span>
 <span class="normal">457</span>
 <span class="normal">458</span>
@@ -16376,7 +16570,20 @@ applies when <code>reject_outside_prior=True</code>.</p>
 <span class="normal">566</span>
 <span class="normal">567</span>
 <span class="normal">568</span>
-<span class="normal">569</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -16390,6 +16597,7 @@ applies when <code>reject_outside_prior=True</code>.</p>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">reject_outside_prior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">max_sampling_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">return_partial_on_timeout</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Given a batch of observations [x_1, ..., x_B] this function samples from</span>
 <span class="sd">    posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)</span>
@@ -16419,6 +16627,9 @@ applies when <code>reject_outside_prior=True</code>.</p>
 <span class="sd">        max_sampling_time: Optional maximum allowed sampling time in seconds.</span>
 <span class="sd">            If exceeded, sampling is aborted and a RuntimeError is raised. Only</span>
 <span class="sd">            applies when `reject_outside_prior=True`.</span>
+<span class="sd">        return_partial_on_timeout: If True and `max_sampling_time` is exceeded,</span>
+<span class="sd">            return the samples collected so far instead of raising a RuntimeError.</span>
+<span class="sd">            A warning will be issued. Only applies when `reject_outside_prior=True`.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Samples from the posteriors of shape (*sample_shape, B, *input_shape)</span>
@@ -16456,6 +16667,7 @@ applies when <code>reject_outside_prior=True</code>.</p>
                 <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
                 <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
                 <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Bypass rejection sampling.</span>
@@ -16484,6 +16696,7 @@ applies when <code>reject_outside_prior=True</code>.</p>
                 <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="n">max_sampling_batch_size</span><span class="p">,</span>
                 <span class="n">proposal_sampling_kwargs</span><span class="o">=</span><span class="n">proposal_sampling_kwargs</span><span class="p">,</span>
                 <span class="n">max_sampling_time</span><span class="o">=</span><span class="n">max_sampling_time</span><span class="p">,</span>
+                <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="n">return_partial_on_timeout</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Bypass rejection sampling.</span>
@@ -16593,14 +16806,7 @@ depend on the used ODE backend.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">386</span>
-<span class="normal">387</span>
-<span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span>
-<span class="normal">392</span>
-<span class="normal">393</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">393</span>
 <span class="normal">394</span>
 <span class="normal">395</span>
 <span class="normal">396</span>
@@ -16619,7 +16825,14 @@ depend on the used ODE backend.</p>
 <span class="normal">409</span>
 <span class="normal">410</span>
 <span class="normal">411</span>
-<span class="normal">412</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_via_ode</span><span class="p">(</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_via_ode</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
