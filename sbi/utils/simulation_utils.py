@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 
 from sbi.utils.sbiutils import seed_all_backends
 
-X = Tensor | np.ndarray | List[str]
+X = Tensor | np.ndarray | List[str] | str
 Theta = Tensor | np.ndarray | List[Any]
 
 
@@ -29,7 +29,7 @@ def simulate_for_sbi(
     simulation_batch_size: Union[int, None] = 1,
     seed: Optional[int] = None,
     show_progress_bar: bool = True,
-) -> Tuple[Tensor, Tensor | List[str]]:
+) -> Tuple[Tensor, Tensor | List[str] | str]:
     r"""Returns pairs :math:`(\theta, x)` by sampling proposal and running simulations.
 
     This function performs two steps:
