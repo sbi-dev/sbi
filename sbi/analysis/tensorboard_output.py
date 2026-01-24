@@ -28,15 +28,17 @@ _NeuralInference = Any
 
 def plot_summary(
     inference: Union[_NeuralInference, Path],
-    tags: Optional[List[str]] = None,
+    tags: Optional[List[Union[str, List[str]]]] = None,
     disable_tensorboard_prompt: bool = False,
     tensorboard_scalar_limit: int = 10_000,
-    figsize: Sequence[int] = (20, 6),
+    figsize: Optional[Sequence[int]] = None,
     fontsize: float = 12,
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     xlabel: str = "epochs_trained",
-    ylabel: Optional[List[str]] = None,
+    ylabel: Optional[List[Union[str, List[str]]]] = None,
+    title: Optional[str] = None,
+    titles: Optional[List[str]] = None,
     plot_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Figure, Axes]:
     """Plots data logged by the tensorboard summary writer of an inference object.
@@ -54,6 +56,8 @@ def plot_summary(
         axes: optional existing axes instance.
         xlabel: x-axis label describing 'steps' attribute of tensorboards ScalarEvent.
         ylabel: list of alternative ylabels for items in tags. Optional.
+        title: optional title for the figure.
+        titles: optional list of titles for each subplot.
         plot_kwargs: will be passed to ax.plot.
 
     Returns a tuple of Figure and Axes objects.
@@ -88,9 +92,19 @@ def plot_summary(
         )
         logger.warning(f"Valid tags are: {sorted(list(scalars.keys()))}.")
 
-    _check_tags(scalars, tags)
+    # Flatten tags for checking
+    flat_tags = []
+    for tag in tags:
+        if isinstance(tag, list):
+            flat_tags.extend(tag)
+        else:
+            flat_tags.append(tag)
 
-    if len(scalars[tags[0]]["step"]) == tensorboard_scalar_limit:
+    _check_tags(scalars, flat_tags)
+
+    # Check limits on the first tag (arbitrary choice, but consistent with old behavior)
+    first_tag = flat_tags[0]
+    if len(scalars[first_tag]["step"]) == tensorboard_scalar_limit:
         logger.warning(
             (
                 "Event data as large as the chosen limit for tensorboard scalars."
@@ -101,6 +115,9 @@ def plot_summary(
         )
 
     plot_options = _get_default_opts()
+
+    if figsize is None:
+        figsize = (6 * len(tags), 6)
 
     plot_options.update(figsize=figsize, fontsize=fontsize)
     if fig is None or axes is None:
@@ -114,15 +131,46 @@ def plot_summary(
 
     ylabel = ylabel or tags
 
-    for i, ax in enumerate(axes):  # type: ignore
-        ax.plot(
-            scalars[tags[i]]["step"], scalars[tags[i]]["value"], **plot_kwargs or {}
-        )
+    if title is not None:
+        fig.suptitle(title, fontsize=fontsize)
 
-        ax.set_ylabel(ylabel[i], fontsize=fontsize)
+    for i, ax in enumerate(axes):  # type: ignore
+        current_tags = tags[i]
+
+        # Handle both single string and list of strings
+        if isinstance(current_tags, str):
+            current_tags = [current_tags]
+
+        for tag in current_tags:
+             ax.plot(
+                scalars[tag]["step"],
+                scalars[tag]["value"],
+                label=tag,
+                **plot_kwargs or {}
+            )
+
+        if len(current_tags) > 1:
+            ax.legend(fontsize=fontsize)
+
+        # Set ylabel. If it was provided by user, use it.
+        # If it's a list (from tags) and has multiple items, join them or leave empty?
+        # The logic `ylabel = ylabel or tags` above sets ylabel to tags if not provided.
+        # If tags[i] is a list, str(tags[i]) might be ugly "['a', 'b']".
+        # Let's clean it up if it defaults to the list.
+
+        current_ylabel = ylabel[i]
+        if isinstance(current_ylabel, list):
+             current_ylabel = ", ".join(current_ylabel)
+
+        ax.set_ylabel(current_ylabel, fontsize=fontsize)
         ax.set_xlabel(xlabel, fontsize=fontsize)
+
+        if titles is not None and i < len(titles):
+            ax.set_title(titles[i], fontsize=fontsize)
+
         ax.xaxis.set_tick_params(labelsize=fontsize)
         ax.yaxis.set_tick_params(labelsize=fontsize)
+        ax.grid(True, alpha=0.3)
 
     plt.subplots_adjust(wspace=0.3)
 
