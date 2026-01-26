@@ -252,9 +252,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
         if density_estimator is None:
-            density_estimator = deepcopy(
-                self._neural_net
-            )  # PosteriorEstimator.train() also returns a deepcopy, mimic this here
+            density_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
         else:
@@ -324,7 +322,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             prior=prior,
             **kwargs,
         )
-        return deepcopy(self._posterior)  # type: ignore
+        return self._posterior
 
     def _log_prob_proposal_posterior(
         self,
