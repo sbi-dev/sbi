@@ -255,7 +255,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         # Sample times from the Markov chain, use batch dimension
         if times is None:
-            times = self.times_schedule(input.shape[0])
+            times = self.train_schedule(input.shape[0])
 
         # Sample noise.
         eps = torch.randn_like(input)
@@ -402,14 +402,11 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
     def noise_schedule(self, times: Tensor) -> Tensor:
         """
-        Generate a beta schedule in stochastic differential equations (SDEs).
-        This will be used for sampling.
+        Create a mapping from time to noise magnitude (beta/sigma).
 
         This method acts as a fallback in case derivative classes do not
-        implement it on their own. It calculates a linear beta schedule defined
+        implement it on their own. We implement here a linear beta schedule defined
         by the input `times`, which represents the normalized time steps t ∈ [0, 1].
-
-        We implement a linear noise schedule here.
 
         Args:
             times (Tensor):
@@ -422,18 +419,16 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         """
         return self.beta_min + (self.beta_max - self.beta_min) * times
 
-    def times_schedule(
+    def train_schedule(
         self,
         num_samples: int,
         t_min: Optional[float] = None,
         t_max: Optional[float] = None,
     ) -> Tensor:
         """
-        Time samples for evaluating the diffusion model.
-        Perform uniform sampling of time variables within the range [t_min, t_max].
+        Return diffusion times used for training. Can be overriden by subclasses.
+        We implement here a uniform sampling of time within the range [t_min, t_max].
         The `times` tensor will be put on the same device as the stored network.
-
-        We implement a uniformly sampled time stepping here.
 
         Args:
             num_samples (int): Number of samples to generate.
@@ -450,6 +445,41 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         times = (
             torch.rand(num_samples, device=self._mean_base.device) * (t_max - t_min)
+            + t_min
+        )
+
+        # t_min and t_max need to be part of the sequence
+        times[0, ...] = t_min
+        times[-1, ...] = t_max
+
+        return torch.sort(times).values
+
+    def solve_schedule(
+        self,
+        num_steps: int,
+        t_min: Optional[float] = None,
+        t_max: Optional[float] = None,
+    ) -> Tensor:
+        """
+        Return a deterministic monotonic time grid used for evaluation/solving steps.
+        We implement here a uniform sampling of time within the range [t_min, t_max].
+        The `times` tensor will be put on the same device as the stored network.
+
+        Args:
+            num_samples (int): Number of samples to generate.
+            t_min (float, optional): The minimum time value. Defaults to self.t_min.
+            t_max (float, optional): The maximum time value. Defaults to self.t_max.
+
+        Returns:
+            Tensor: A tensor of sampled time variables scaled and shifted to the
+                    range [0,1].
+
+        """
+        t_min = self.t_min if isinstance(t_min, type(None)) else t_min
+        t_max = self.t_max if isinstance(t_max, type(None)) else t_max
+
+        times = (
+            torch.rand(num_steps, device=self._mean_base.device) * (t_max - t_min)
             + t_min
         )
 
