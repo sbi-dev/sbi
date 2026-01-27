@@ -479,6 +479,15 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         """
         raise NotImplementedError("Diffusion is not implemented for this estimator.")
 
+    def solve_schedule(self, steps: int) -> Tensor:
+        r"""Time schedule used during sampling. Can be overriden by subclasses.
+        Return by a default a uniform time stepping between t_max and t_min.
+
+        Args:
+            steps : number of discretization steps
+        """
+        return torch.linspace(self.t_max, self.t_min, steps)
+
 
 class UnconditionalEstimator(nn.Module, ABC):
     r"""Base class for unconditional estimators that estimate properties of
