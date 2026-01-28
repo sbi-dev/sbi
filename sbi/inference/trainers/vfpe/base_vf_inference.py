@@ -313,11 +313,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         )
 
         if isinstance(validation_times, int):
-            validation_times = torch.linspace(
-                self._neural_net.t_min + validation_times_nugget,
-                self._neural_net.t_max - validation_times_nugget,
-                validation_times,
-            )
+            validation_times = self._neural_net.solve_schedule(validation_times)
 
         loss_args = LossArgsVF(
             proposal=proposal,
