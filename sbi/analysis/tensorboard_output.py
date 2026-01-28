@@ -36,7 +36,7 @@ def plot_summary(
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     xlabel: str = "epochs_trained",
-    ylabel: Optional[List[str]] = None,
+    ylabel: Optional[str] = None,                   #single ylabel for joint plot
     plot_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Figure, Axes]:
     """Plots data logged by the tensorboard summary writer of an inference object.
@@ -66,6 +66,8 @@ def plot_summary(
     size_guidance = deepcopy(DEFAULT_SIZE_GUIDANCE)
     size_guidance.update(scalars=tensorboard_scalar_limit)
 
+    
+    # Resolve log directory
     if isinstance(inference, NeuralInference):
         log_dir = inference._summary_writer.log_dir
     elif isinstance(inference, Path):
@@ -80,51 +82,37 @@ def plot_summary(
         logger.warning(
             (
                 "For an interactive, detailed view of the summary, launch tensorboard "
-                f" with 'tensorboard --logdir={log_dir}' from a"
-                " terminal on your machine, visit http://127.0.0.1:6006 afterwards."
-                " Requires port forwarding if tensorboard runs on a remote machine, as"
-                " e.g. https://stackoverflow.com/a/42445070/7770835 explains.\n"
+                f" with 'tensorboard --logdir={log_dir}'.\n"
             )
         )
         logger.warning(f"Valid tags are: {sorted(list(scalars.keys()))}.")
 
     _check_tags(scalars, tags)
 
-    if len(scalars[tags[0]]["step"]) == tensorboard_scalar_limit:
-        logger.warning(
-            (
-                "Event data as large as the chosen limit for tensorboard scalars."
-                "Tensorboard might be subsampling your data, as "
-                "https://stackoverflow.com/a/65564389/7770835 explains."
-                " Consider increasing tensorboard_scalar_limit to see all data.\n"
-            )
-        )
-
-    plot_options = _get_default_opts()
-
-    plot_options.update(figsize=figsize, fontsize=fontsize)
+    # single axis instead of multiple subplots
     if fig is None or axes is None:
-        fig, axes = plt.subplots(  # pyright: ignore[reportAssignmentType]
-            1,
-            len(tags),
-            figsize=plot_options["figsize"],
-            **plot_options["subplots"],
-        )
-    axes = np.atleast_1d(axes)  # type: ignore
+        fig, axes = plt.subplots(figsize=figsize)
 
-    ylabel = ylabel or tags
+    ax = axes  # use a single axis
 
-    for i, ax in enumerate(axes):  # type: ignore
+    plot_kwargs = plot_kwargs or {}
+
+    for tag in tags:
         ax.plot(
-            scalars[tags[i]]["step"], scalars[tags[i]]["value"], **plot_kwargs or {}
+            scalars[tag]["step"],
+            scalars[tag]["value"],
+            label=tag.replace("_", " ").title(),  # clean legend names
+            **plot_kwargs,
         )
 
-        ax.set_ylabel(ylabel[i], fontsize=fontsize)
-        ax.set_xlabel(xlabel, fontsize=fontsize)
-        ax.xaxis.set_tick_params(labelsize=fontsize)
-        ax.yaxis.set_tick_params(labelsize=fontsize)
+    # Labels and styling
+    ax.set_ylabel(ylabel or "Value", fontsize=fontsize)
+    ax.set_xlabel(xlabel, fontsize=fontsize)
+    ax.tick_params(axis="both", labelsize=fontsize)
 
-    plt.subplots_adjust(wspace=0.3)
+    ax.legend(fontsize=fontsize)  # legend for UX
+    ax.grid(True, alpha=0.3)      # grid improves readability
+
 
     return fig, axes  # type: ignore
 
