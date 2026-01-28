@@ -401,11 +401,7 @@ def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    raises=ValueError,
-    reason="Padding with NaNs causes error in new NaN check on x_o, see #1701, #1717",
-    strict=True,
-)
+
 def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     """Test inference accuracy with embeddings for varying number of trials.
 
@@ -455,7 +451,7 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(
         training_batch_size=100
     )
-    posterior = inference.build_posterior()
+    posterior = inference.build_posterior(check_finite_x=False)
 
     num_samples = 1000
     # test different number of trials
