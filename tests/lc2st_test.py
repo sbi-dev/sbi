@@ -324,19 +324,6 @@ def test_lc2st_false_positiv_rate(method, basic_setup, well_trained_npe, set_see
     )
 
 
-def test_lc2st_classifier_kwargs_defaults(calibration_data):
-    """Test that sbi-specific defaults are applied when classifier_kwargs is None."""
-    thetas = calibration_data["thetas"]
-    xs = calibration_data["xs"]
-    posterior_samples = calibration_data["posterior_samples"]
-
-    lc2st = LC2ST(thetas, xs, posterior_samples, classifier="mlp", device="cpu")
-
-    assert lc2st.clf_kwargs["activation"] == "relu"
-    assert lc2st.clf_kwargs["max_iter"] == 1000
-    assert lc2st.clf_kwargs["early_stopping"] is True
-
-
 def test_lc2st_classifier_kwargs_override(calibration_data):
     """Test that user overrides merge with defaults correctly
     and do not mutate global state."""

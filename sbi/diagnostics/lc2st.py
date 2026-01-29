@@ -10,7 +10,7 @@ from sklearn.base import BaseEstimator, clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.neural_network import MLPClassifier
-from skorch import NeuralNetClassifier
+from skorch import NeuralNetBinaryClassifier
 from skorch.callbacks import EarlyStopping
 from torch import Tensor
 from tqdm import tqdm
@@ -85,8 +85,13 @@ class LC2ST:
             classifier: Classification architecture to use, can be one of the following:
                     - "random_forest" or "mlp", defaults to "mlp" or
                     - A classifier class (e.g., RandomForestClassifier, MLPClassifier)
-            classifier_kwargs: Custom kwargs for the sklearn classifier,
-                defaults to None.
+                    Note:
+                        For the "mlp" case , if a GPU or MPS device is passed and
+                        available, the implementation will use
+                        'skorch.NeuralNetBinaryClassifier', and corresponding kwargs
+                        can be passed via the 'classifier_kwargs' argument.
+            classifier_kwargs: Custom kwargs for the sklearn classifier or skorch
+                classifier (depending on device argument), defaults to None.
             num_trials_null: Number of trials to estimate the null distribution,
                 defaults to 100.
             permutation: Whether to use the permutation method for the null hypothesis,
@@ -135,7 +140,7 @@ class LC2ST:
                     self.device.lower() == 'mps' and torch.backends.mps.is_available()
                 )
                 if use_gpu:
-                    classifier = NeuralNetClassifier
+                    classifier = NeuralNetBinaryClassifier
                 else:
                     if self.device.lower() in ("cuda", "mps"):
                         warnings.warn(
@@ -179,16 +184,18 @@ class LC2ST:
                 "early_stopping": True,
                 "n_iter_no_change": 50,
             }
-        elif self.clf_class == NeuralNetClassifier:
+        elif self.clf_class == NeuralNetBinaryClassifier:
             ndim = thetas.shape[-1]
             input_dim = thetas.shape[-1] + xs.shape[-1]
             self.clf_kwargs = {
                 "module": MLPClassifierModule,
                 "module__input_dim": input_dim,
+                "module__output_dim": 1,
                 "module__hidden_layer_sizes": (10 * ndim, 10 * ndim),
-                "criterion": torch.nn.CrossEntropyLoss,
+                "criterion": torch.nn.BCEWithLogitsLoss,
                 "optimizer": torch.optim.Adam,
                 "max_epochs": 1000,
+                "batch_size": 200,
                 "callbacks": [
                     (
                         'es',
