@@ -478,11 +478,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         t_min = self.t_min if isinstance(t_min, type(None)) else t_min
         t_max = self.t_max if isinstance(t_max, type(None)) else t_max
 
-        times = (
-            torch.linspace(0, 1, num_steps, device=self._mean_base.device)
-            * (t_max - t_min)
-            + t_min
-        )
+        times = torch.linspace(t_max, t_min, num_steps, device=self._mean_base.device)
 
         return times
 
