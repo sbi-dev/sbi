@@ -118,8 +118,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         # Now that input_shape and mean_0, std_0 is set, we can compute the proper mean
         # and std for the "base" distribution.
-        mean_t = self.approx_marginal_mean(torch.tensor([t_max]))
-        std_t = self.approx_marginal_std(torch.tensor([t_max]))
+        # Create t on the correct device to avoid CPU/GPU mismatch
+        t_tensor = torch.as_tensor([t_max], device=self.mean_0.device)
+        mean_t = self.approx_marginal_mean(t_tensor)
+        std_t = self.approx_marginal_std(t_tensor)
         mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
         std_t = torch.broadcast_to(std_t, (1, *input_shape))
 
@@ -399,20 +401,27 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
                 - a custom function that returns a Callable.
         """
         if weight_fn == "identity":
-            self.weight_fn = lambda times: 1
+            self.weight_fn = self._identity_weight_fn
         elif weight_fn == "max_likelihood":
-            self.weight_fn = (
-                lambda times: self.diffusion_fn(
-                    torch.ones((1,), device=times.device), times
-                )
-                ** 2
-            )
+            self.weight_fn = self._max_likelihood_weight_fn
         elif weight_fn == "variance":
-            self.weight_fn = lambda times: self.std_fn(times) ** 2
+            self.weight_fn = self._variance_weight_fn
         elif callable(weight_fn):
             self.weight_fn = weight_fn
         else:
             raise ValueError(f"Weight function {weight_fn} not recognized.")
+
+    def _identity_weight_fn(self, times):
+        """Return ones for any time t."""
+        return 1
+
+    def _max_likelihood_weight_fn(self, times):
+        """Return weights proportional to the diffusion function."""
+        return self.diffusion_fn(torch.ones((1,), device=times.device), times) ** 2
+
+    def _variance_weight_fn(self, times):
+        """Return weights as the variance."""
+        return self.std_fn(times) ** 2
 
     def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
         """ODE flow function of the score estimator.

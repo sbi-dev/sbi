@@ -65,8 +65,8 @@ class PyMCPotential(pt.Op):  # type: ignore
         # call the potential function
         energy = self.potential_fn(params, track_gradients=self.track_gradients)
 
-        # output the log-likelihood
-        outputs[0][0] = tensor2numpy(energy).astype(np.float64)
+        # output the log-likelihood, PyMC requires a scalar for the energy
+        outputs[0][0] = tensor2numpy(energy.squeeze()).astype(np.float64)
 
         # compute and record gradients if desired
         if self.track_gradients:

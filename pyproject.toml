@@ -32,7 +32,6 @@ dependencies = [
     "arviz",
     "joblib>=1.0.0",
     "matplotlib",
-    "notebook <= 6.4.12",
     "numpy",
     "pillow",
     "pyknos>=0.16.0",
@@ -44,10 +43,13 @@ dependencies = [
     "tqdm",
     "pymc>=5.0.0",
     "zuko>=1.2.0",
+    "ipywidgets>=8.1.7",
 ]
 
 [project.optional-dependencies]
+notebook = ["notebook<=6.4.12"]
 doc = [
+    "sbi[notebook]",
     # Documentation
     "ipython <= 8.9.0",
     "jupyter_contrib_nbextensions",
@@ -79,10 +81,12 @@ dev = [
     # Test
     "pytest",
     "pytest-cov",
+    "pytest-harvest",
+	"pytest-mock",
+    "pytest-split",
     "pytest-testmon",
     "pytest-xdist",
-    "pytest-harvest",
-    "pytest-split",
+    "sbi[notebook]",  # for tutorial tests.
     "torchtestcase",
 ]
 
@@ -153,7 +157,7 @@ xfail_strict = true
 [tool.pyright]
 include = ["sbi"]
 exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "mkdocs", "tests"]
-python_version = "3.10"
+pythonVersion = "3.10"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
 reportInvalidTypeForm = false

@@ -106,7 +106,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         self._ran_final_round = False
 
         # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
-        # requiring the signature to have `num_atoms`, save it for use below, and
+        # requiring the signature to have `num_components`, save it for use below, and
         # continue. It's sneaky because we are using the object (self) as a namespace
         # to pass arguments between functions, and that's implicit state management.
         kwargs = del_entries(
@@ -160,9 +160,6 @@ class NPE_A(PosteriorEstimatorTrainer):
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
                 be restored from the last time `.train()` was called.
-            force_first_round_loss: If `True`, train with maximum likelihood,
-                i.e., potentially ignoring the correction for using a proposal
-                distribution different from the prior.
             retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round. Not supported for
                 SNPE-A.

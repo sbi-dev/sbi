@@ -22,6 +22,21 @@ coverage:
         threshold: 2% # allow the coverage to drop by X%, and posting a success status
         if_ci_failed: error # will set the status to success only if the CI is successful, alternative: success
 
+# Flag configuration for carryforward
+# - 'fast': coverage from fast tests (run on every PR)
+# - 'full': coverage from full test suite including slow tests (run on main)
+#   carryforward ensures slow test coverage from main is included in PR reports
+flag_management:
+  individual_flags:
+    - name: fast
+      paths:
+        - sbi/
+      carryforward: false
+    - name: full
+      paths:
+        - sbi/
+      carryforward: true
+
 comment:
   layout: "diff, flags, files"
   behavior: default # update if exists, otherwise post new

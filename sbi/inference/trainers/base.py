@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -11,17 +12,22 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generic,
     List,
     Literal,
     Optional,
+    Sequence,
     Tuple,
     Union,
+    overload,
 )
 from warnings import warn
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from torch.nn.utils.clip_grad import clip_grad_norm_
+from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -44,9 +50,11 @@ from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.trainers._contracts import LossArgs, StartIndexContext, TrainConfig
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
+    ConditionalEstimatorType,
     ConditionalVectorFieldEstimator,
 )
 from sbi.sbi_types import TorchTransform
@@ -158,7 +166,7 @@ def infer(
     return posterior
 
 
-class NeuralInference(ABC):
+class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     """Abstract base class for neural inference methods."""
 
     def __init__(
@@ -208,6 +216,8 @@ class NeuralInference(ABC):
 
         self._round = 0
         self._val_loss = float("Inf")
+        self._best_val_loss = float("Inf")
+        self._epochs_since_last_improvement = 0
 
         self._summary_writer = (
             self._default_summary_writer() if summary_writer is None else summary_writer
@@ -307,7 +317,39 @@ class NeuralInference(ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-    ) -> NeuralPosterior: ...
+    ) -> ConditionalEstimatorType: ...
+
+    @abstractmethod
+    def _initialize_neural_network(
+        self, retrain_from_scratch: bool, start_idx: int
+    ) -> None:
+        """Initialize (or reinitialize) the neural network for the current round."""
+        ...
+
+    @abstractmethod
+    def _get_start_index(self, context: StartIndexContext) -> int:
+        """Get the starting index for the current round."""
+        ...
+
+    @overload
+    def _get_losses(self, batch: Sequence[Tensor]) -> Tensor:
+        """
+        Called when the trainer does not require additional loss arguments
+        (e.g., NLE).
+        """
+        ...
+
+    @overload
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Called when the trainer requires additional loss parameters via loss_args."""
+        ...
+
+    @abstractmethod
+    def _get_losses(
+        self, batch: Sequence[Tensor], loss_args: LossArgs | None = None
+    ) -> Tensor:
+        """Return per-sample loss tensor for a training/validation batch."""
+        ...
 
     @abstractmethod
     def _get_potential_function(
@@ -316,6 +358,11 @@ class NeuralInference(ABC):
         estimator: ConditionalEstimator,
     ) -> Tuple[BasePotential, TorchTransform]:
         """Subclass-specific potential creation"""
+        ...
+
+    @abstractmethod
+    def _loss(self, *args, **kwargs) -> Tensor:
+        """Compute scalar loss given subclass-specific inputs."""
         ...
 
     def get_simulations(
@@ -872,6 +919,189 @@ class NeuralInference(ABC):
                 )
         return posterior
 
+    def _run_training_loop(
+        self,
+        train_loader: data.DataLoader,
+        val_loader: data.DataLoader,
+        train_config: TrainConfig,
+        loss_args: LossArgs | None = None,
+        summarization_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> ConditionalEstimatorType:
+        """
+        Run the main training loop for the neural network, including epoch-wise
+        training, validation, and convergence checking.
+
+        Args:
+            train_loader: Dataloader for training.
+            val_loader: Dataloader for validation.
+            train_config: TrainConfig dataclass configuration for the core training
+                path.
+            loss_args: Additional arguments passed to self._loss fn.
+            summarization_kwargs: Additional kwargs passed to self._summarize_epoch fn.
+        """
+
+        if summarization_kwargs is None:
+            summarization_kwargs = {}
+
+        assert self._neural_net is not None
+
+        # Move entire net to device for training.
+        self._neural_net.to(self._device)
+
+        if not train_config.resume_training:
+            self.optimizer = Adam(
+                list(self._neural_net.parameters()),
+                lr=train_config.learning_rate,
+            )
+            self.epoch, self.val_loss = 0, float("Inf")
+
+        while self.epoch <= train_config.max_num_epochs and not self._converged(
+            self.epoch, train_config.stop_after_epochs
+        ):
+            # Train for a single epoch.
+            self._neural_net.train()
+            epoch_start_time = time.time()
+            train_loss = self._train_epoch(
+                train_loader, train_config.clip_max_norm, loss_args
+            )
+
+            # Calculate validation performance.
+            self._neural_net.eval()
+
+            self._val_loss = self._validate_epoch(val_loader, loss_args)
+
+            self._summarize_epoch(
+                train_loss, self._val_loss, epoch_start_time, summarization_kwargs
+            )
+
+            self.epoch += 1
+            self._maybe_show_progress(self._show_progress_bars, self.epoch)
+
+        self._report_convergence_at_end(
+            self.epoch, train_config.stop_after_epochs, train_config.max_num_epochs
+        )
+
+        # Update summary.
+        self._summary["epochs_trained"].append(self.epoch)
+        self._summary["best_validation_loss"].append(self._best_val_loss)
+
+        # Update TensorBoard and summary dict.
+        self._summarize(round_=self._round)
+
+        # Update description for progress bar.
+        if train_config.show_train_summary:
+            print(self._describe_round(self._round, self._summary))
+
+        # Avoid keeping the gradients in the resulting network, which can
+        # cause memory leakage when benchmarking.
+        self._neural_net.zero_grad(set_to_none=True)
+
+        return deepcopy(self._neural_net)
+
+    def _train_epoch(
+        self,
+        train_loader: data.DataLoader,
+        clip_max_norm: Optional[float],
+        loss_args: LossArgs | None,
+    ) -> float:
+        """
+        Perform a single training epoch over the provided training data.
+
+        Args:
+            train_loader: Dataloader for training.
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
+            loss_args: Additional arguments passed to self._loss fn.
+
+        Returns:
+            The average training loss over all samples in the epoch.
+        """
+
+        assert self._neural_net is not None
+
+        train_loss_sum = 0
+        for batch in train_loader:
+            self.optimizer.zero_grad()
+            if loss_args is None:
+                train_losses = self._get_losses(batch=batch)
+            else:
+                train_losses = self._get_losses(batch=batch, loss_args=loss_args)
+            train_loss = torch.mean(train_losses)
+            train_loss_sum += train_losses.sum().item()
+
+            train_loss.backward()
+            if clip_max_norm is not None:
+                clip_grad_norm_(
+                    self._neural_net.parameters(),
+                    max_norm=clip_max_norm,
+                )
+            self.optimizer.step()
+
+        train_loss_average = train_loss_sum / (
+            len(train_loader) * train_loader.batch_size  # type: ignore
+        )
+
+        return train_loss_average
+
+    def _validate_epoch(
+        self,
+        val_loader: data.DataLoader,
+        loss_args: LossArgs | None,
+    ) -> float:
+        """
+        Perform a single validation epoch over the provided validation data.
+
+        Args:
+            val_loader: Dataloader for validation.
+            loss_args: Additional arguments passed to self._loss fn.
+
+        Returns:
+            The average validation loss over all samples in the epoch.
+        """
+
+        val_loss_sum = 0
+        with torch.no_grad():
+            for batch in val_loader:
+                if loss_args is None:
+                    val_losses = self._get_losses(batch=batch)
+                else:
+                    val_losses = self._get_losses(batch=batch, loss_args=loss_args)
+                val_loss_sum += val_losses.sum().item()
+
+        # Take mean over all validation samples.
+        val_loss = val_loss_sum / (
+            len(val_loader) * val_loader.batch_size  # type: ignore
+        )
+
+        return val_loss
+
+    def _summarize_epoch(
+        self,
+        train_loss: float,
+        val_loss: float,
+        epoch_start_time: float,
+        summarization_kwargs: Dict[str, Any],
+    ) -> None:
+        """
+        Update internal summaries after a single training epoch.
+
+        Records training and validation losses, as well as the duration of the epoch,
+        in `self._summary` dictionary.
+
+        Args:
+            train_loss: The average training loss for the epoch.
+            val_loss: The average validation loss for the epoch.
+            epoch_start_time: Timestamp when the epoch started, used to compute
+                duration.
+            summarization_kwargs: Additional keyword arguments for customizing
+                the summarization.
+        """
+
+        self._summary["training_loss"].append(train_loss)
+        # Log validation loss for every epoch.
+        self._summary["validation_loss"].append(val_loss)
+        self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
+
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
@@ -1058,7 +1288,7 @@ class NeuralInference(ABC):
             state_dict: State to be restored.
         """
         state_dict["_summary_writer"] = self._default_summary_writer()
-        self.__dict__ = state_dict
+        vars(self).update(state_dict)
 
 
 def check_if_proposal_has_default_x(proposal: Any):

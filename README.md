@@ -10,7 +10,7 @@
 ## `sbi`: Simulation-Based Inference
 
 [Getting Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html) |
-[Documentation](https://sbi.readthedocs.io/en/latest/) | [Discord Server](https://discord.gg/eEeVPSvWKy)
+[Documentation](https://sbi.readthedocs.io/en/latest/) | [Discord Server](https://discord.gg/VPkV7XPj7k)
 
 `sbi` is a Python package for simulation-based inference, designed to meet the needs of
 both researchers and practitioners. Whether you need fine-grained control or an
@@ -136,6 +136,8 @@ You can also access and run these tutorials directly in your browser by opening
 “Code” button on the GitHub repository and select “Open with Codespaces.” This provides
 a fully functional environment where you can explore `sbi` through Jupyter notebooks.
 
+You might also find this tutorial paper useful: [Deistler, M., Boelts, J., Steinbach, P., Moss, G., Moreau, T., Gloeckler, M., ... & Macke, J. H. (2025). Simulation-based inference: A practical guide. arXiv preprint arXiv:2508.12939.](https://arxiv.org/abs/2508.12939). It describes the SBI workflow and offers practical guidelines and diagnostic tools for every stage of the process: from setting up the simulator and prior, choosing and training inference networks, to performing inference and validating the results. It also includes several worked examples.
+
 ## Inference Algorithms
 
 The following inference algorithms are currently available. You can find instructions on
@@ -228,7 +230,7 @@ Conduct](CODE_OF_CONDUCT.md).
 `sbi` is the successor (using PyTorch) of the
 [`delfi`](https://github.com/mackelab/delfi) package. It started as a fork of Conor M.
 Durkan's `lfi`. `sbi` runs as a community project. See also
-[credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
+[credits](https://github.com/sbi-dev/sbi/blob/master/docs/credits.md).
 
 ## Support
 

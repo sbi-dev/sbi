@@ -19,6 +19,17 @@ from sbi.analysis.plot import (
     pp_plot_lc2st,
     sbc_rank_plot,
 )
+from sbi.analysis.plotting_classes import (
+    ContourOffDiagOptions,
+    FigOptions,
+    HistDiagOptions,
+    HistOffDiagOptions,
+    KdeDiagOptions,
+    KdeOffDiagOptions,
+    PlotOffDiagOptions,
+    ScatterDiagOptions,
+    ScatterOffDiagOptions,
+)
 from sbi.analysis.sensitivity_analysis import ActiveSubspace
 from sbi.analysis.tensorboard_output import list_all_logs, plot_summary
 
