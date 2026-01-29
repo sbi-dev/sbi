@@ -479,15 +479,12 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         t_max = self.t_max if isinstance(t_max, type(None)) else t_max
 
         times = (
-            torch.rand(num_steps, device=self._mean_base.device) * (t_max - t_min)
+            torch.linspace(0, 1, num_steps, device=self._mean_base.device)
+            * (t_max - t_min)
             + t_min
         )
 
-        # t_min and t_max need to be part of the sequence
-        times[0, ...] = t_min
-        times[-1, ...] = t_max
-
-        return torch.sort(times).values
+        return times
 
     def _set_weight_fn(self, weight_fn: Union[str, Callable]):
         """Set the weight function.
