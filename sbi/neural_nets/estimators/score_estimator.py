@@ -856,8 +856,6 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             Noise magnitude (sigma) at a given time.
         """
         std = self.sigma_min * (self.sigma_max / self.sigma_min) ** times
-        for _ in range(len(self.input_shape)):
-            std = std.unsqueeze(-1)
         return std
 
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
@@ -888,5 +886,5 @@ class VEScoreEstimator(ConditionalScoreEstimator):
 
         while len(g.shape) < len(input.shape):
             g = g.unsqueeze(-1)
-
+        print("g", g.shape)
         return g.to(input.device)
