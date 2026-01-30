@@ -479,16 +479,31 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         """
         raise NotImplementedError("Diffusion is not implemented for this estimator.")
 
-    def solve_schedule(self, steps: int) -> Tensor:
-        r"""Deterministic time schedule used during sampling.
+    def solve_schedule(
+        self,
+        steps: int,
+        t_min: Optional[float] = None,
+        t_max: Optional[float] = None,
+    ) -> Tensor:
+        """
+        Deterministic time schedule used during sampling.
         Can be overriden by subclasses.
         Return by default a uniform time stepping between t_max and t_min.
 
         Args:
             steps : number of discretization steps
+            t_min (float, optional): The minimum time value. Defaults to self.t_min.
+            t_max (float, optional): The maximum time value. Defaults to self.t_max.
+
+        Returns:
+            Tensor: A tensor of time steps within the range [t_max, t_min].
         """
-        # TODO : which device to choose here ?
-        return torch.linspace(self.t_max, self.t_min, steps)
+        t_min = self.t_min if isinstance(t_min, type(None)) else t_min
+        t_max = self.t_max if isinstance(t_max, type(None)) else t_max
+
+        times = torch.linspace(t_max, t_min, steps, device=self.mean_base.device)
+
+        return times
 
 
 class UnconditionalEstimator(nn.Module, ABC):
