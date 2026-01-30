@@ -313,7 +313,11 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         )
 
         if isinstance(validation_times, int):
-            validation_times = self._neural_net.solve_schedule(validation_times)
+            validation_times = self._neural_net.solve_schedule(
+                validation_times,
+                t_min=self._neural_net.t_min + validation_times_nugget,
+                t_max=self._neural_net.t_max - validation_times_nugget,
+            )
 
         loss_args = LossArgsVF(
             proposal=proposal,
