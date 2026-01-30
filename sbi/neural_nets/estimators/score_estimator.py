@@ -397,7 +397,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
     def noise_schedule(self, times: Tensor) -> Tensor:
         """
-        Create a mapping from time to noise magnitude (beta/sigma).
+        Create a mapping from time to noise magnitude (beta/sigma) used in the SDE.
 
         This method acts as a fallback in case derivative classes do not
         implement it on their own. We implement here a linear beta schedule defined
@@ -844,6 +844,22 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             std = std.unsqueeze(-1)
         return std
 
+    def noise_schedule(self, times: Tensor) -> Tensor:
+        """Define the noise schedule used in the SDE drift and
+        diffusion coefficients.
+        Note that for VE, this method returns the same as std_fn()
+
+        Args:
+            times: SDE time variable in [0,1].
+
+        Returns:
+            Noise magnitude (sigma) at a given time.
+        """
+        std = self.sigma_min * (self.sigma_max / self.sigma_min) ** times
+        for _ in range(len(self.input_shape)):
+            std = std.unsqueeze(-1)
+        return std
+
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Drift function for variance exploding SDEs.
 
@@ -867,7 +883,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             Diffusion function at a given time.
         """
         sigma_scale = self.sigma_max / self.sigma_min
-        sigmas = self.sigma_min * (sigma_scale) ** times
+        sigmas = self.noise_schedule(times)
         g = sigmas * math.sqrt((2 * math.log(sigma_scale)))
 
         while len(g.shape) < len(input.shape):
