@@ -886,5 +886,4 @@ class VEScoreEstimator(ConditionalScoreEstimator):
 
         while len(g.shape) < len(input.shape):
             g = g.unsqueeze(-1)
-        print("g", g.shape)
         return g.to(input.device)
