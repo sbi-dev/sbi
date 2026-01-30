@@ -113,9 +113,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             t_max=t_max,
         )
 
-        # Store device of this module
-        self.device = net.device if hasattr(net, "device") else torch.device("cpu")
-
         # Min/max values for noise variance beta
         self.beta_min = beta_min
         self.beta_max = beta_max
@@ -250,12 +247,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             MSE between target score and network output, scaled by the weight function.
 
         """
-        # update device if required
-        self.device = input.device if self.device != input.device else self.device
-
         # Sample times from the Markov chain, use batch dimension
         if times is None:
             times = self.train_schedule(input.shape[0])
+        times.to(input.device)
 
         # Sample noise.
         eps = torch.randn_like(input)
@@ -410,8 +405,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         Args:
             times (Tensor):
-                SDE times in [0, 1]. This tensor will be regenerated from
-                self.times_schedule
+                SDE times in [0, 1].
 
         Returns:
             Tensor: Generated beta schedule at a given time.
@@ -437,22 +431,16 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         Returns:
             Tensor: A tensor of sampled time variables scaled and shifted to the
-                    range [0,1].
+                    range [t_min,t_max].
 
         """
         t_min = self.t_min if isinstance(t_min, type(None)) else t_min
         t_max = self.t_max if isinstance(t_max, type(None)) else t_max
 
-        times = (
+        return (
             torch.rand(num_samples, device=self._mean_base.device) * (t_max - t_min)
             + t_min
         )
-
-        # t_min and t_max need to be part of the sequence
-        times[0, ...] = t_min
-        times[-1, ...] = t_max
-
-        return torch.sort(times).values
 
     def solve_schedule(
         self,
@@ -462,17 +450,16 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     ) -> Tensor:
         """
         Return a deterministic monotonic time grid used for evaluation/solving steps.
-        We implement here a uniform sampling of time within the range [t_min, t_max].
+        We implement here a uniform time stepping within the range [t_max, t_min].
         The `times` tensor will be put on the same device as the stored network.
 
         Args:
-            num_samples (int): Number of samples to generate.
+            num_stesp (int): Number of time steps to generate.
             t_min (float, optional): The minimum time value. Defaults to self.t_min.
             t_max (float, optional): The maximum time value. Defaults to self.t_max.
 
         Returns:
-            Tensor: A tensor of sampled time variables scaled and shifted to the
-                    range [0,1].
+            Tensor: A tensor of time steps within the range [t_max, t_min].
 
         """
         t_min = self.t_min if isinstance(t_min, type(None)) else t_min
