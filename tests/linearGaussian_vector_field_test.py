@@ -69,7 +69,7 @@ def test_c2st_vector_field_on_linearGaussian(
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 2500
+    num_simulations = 2600 if vector_field_type == "ve" else 2500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)

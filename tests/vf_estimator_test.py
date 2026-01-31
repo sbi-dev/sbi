@@ -185,3 +185,78 @@ def _build_vector_field_estimator_and_tensors(
     )
     condition = condition
     return estimator, inputs, condition
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+@pytest.mark.parametrize(
+    "estimator_type,sde_type",
+    [
+        ("score", "vp"),
+        ("score", "subvp"),
+        ("score", "ve"),
+        ("flow", None),
+    ],
+)
+def test_train_schedule(device, estimator_type, sde_type):
+    """Test on shapes, bounds and devices for train and solve schedules
+    of vector field estimators (flow or score)
+    """
+    embedding_net = torch.nn.Identity()
+    t_min = torch.tensor([0.0], device=device)
+    t_max = torch.tensor([1.0], device=device)
+
+    if estimator_type == "flow":
+        estimator = build_flow_matching_estimator(
+            torch.randn(100, 1),
+            torch.randn(100, 1),
+            embedding_net=embedding_net,
+        )
+        estimator.to(device)
+
+    else:
+        estimator = build_score_matching_estimator(
+            torch.randn(100, 1),
+            torch.randn(100, 1),
+            embedding_net=embedding_net,
+            sde_type=sde_type,
+        )
+        estimator.to(device)
+        # Train schedule only defined for score estimators
+        # Schedule with default bounds
+        train_schedule_default = estimator.train_schedule(300)
+        assert train_schedule_default.shape == torch.Size((300,))
+        assert train_schedule_default.max() <= estimator.t_max
+        assert train_schedule_default.min() >= estimator.t_min
+        assert str(train_schedule_default.device).split(":")[0] == device.split(":")[0]
+
+        # Schedule with given bounds
+        train_schedule = estimator.train_schedule(300, t_min, t_max)
+        assert train_schedule.shape == torch.Size((300,))
+        assert train_schedule.max() <= t_max.item()
+        assert train_schedule.min() >= t_min.item()
+        assert str(train_schedule.device).split(":")[0] == device.split(":")[0]
+
+    # Solve schedule with default bounds
+    solve_schedule_default = estimator.solve_schedule(
+        300, t_max=estimator.t_max, t_min=estimator.t_min
+    )
+    assert torch.allclose(
+        solve_schedule_default[0], torch.tensor([estimator.t_max], device=device)
+    )
+    assert torch.allclose(
+        solve_schedule_default[-1], torch.tensor([estimator.t_min], device=device)
+    )
+    assert solve_schedule_default.shape == torch.Size((300,))
+    assert torch.all(solve_schedule_default[:-1] - solve_schedule_default[1:] >= 0)
+    assert str(solve_schedule_default.device).split(":")[0] == device.split(":")[0]
+
+    # Solve schedule with given bounds
+    solve_schedule = estimator.solve_schedule(
+        300, t_max=t_max.item(), t_min=t_min.item()
+    )
+    assert torch.allclose(solve_schedule[0], t_max)
+    assert torch.allclose(solve_schedule[-1], t_min)
+    assert solve_schedule_default.shape == torch.Size((300,))
+    assert torch.all(solve_schedule[:-1] - solve_schedule[1:] >= 0)
+    assert str(solve_schedule.device).split(":")[0] == device.split(":")[0]
