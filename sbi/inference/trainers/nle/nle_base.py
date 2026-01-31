@@ -180,6 +180,12 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
 
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
+
         start_idx = self._get_start_index(
             context=StartIndexContext(discard_prior_samples=discard_prior_samples)
         )
