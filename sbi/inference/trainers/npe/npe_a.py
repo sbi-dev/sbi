@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from copy import deepcopy
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
@@ -322,7 +321,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             prior=prior,
             **kwargs,
         )
-        return self._posterior
+        return self._posterior  # type: ignore
 
     def _log_prob_proposal_posterior(
         self,
