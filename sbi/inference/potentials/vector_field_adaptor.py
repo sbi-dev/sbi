@@ -13,18 +13,14 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
+from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.vector_field_utils import (
     add_diag_or_dense,
     denoise,
+    fit_gmm_ratio,
     marginalize,
     mv_diag_or_dense,
     solve_diag_or_dense,
-)
-from sbi.utils.torchutils import ensure_theta_batched
-from sbi.utils.vector_field_utils import (
-    _diag_gaussian_log_prob,
-    _full_gaussian_log_prob,
-    fit_gmm_ratio,
 )
 
 IID_METHODS = {}
@@ -390,7 +386,6 @@ class PriorGuide(ScoreAdaptation):
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
 
-        track_grad = torch.is_grad_enabled()
         input_ = input.detach()
         score = self.vf_estimator(input=input_, condition=condition, time=time)
         m = self.vf_estimator.mean_t_fn(time)
@@ -417,9 +412,7 @@ class PriorGuide(ScoreAdaptation):
             diff_col = diff[..., None]
             solve = torch.cholesky_solve(diff_col, chol)
             quad = (diff_col * solve).sum(-2).squeeze(-1)
-            log_det = 2.0 * torch.log(
-                torch.diagonal(chol, dim1=-2, dim2=-1)
-            ).sum(-1)
+            log_det = 2.0 * torch.log(torch.diagonal(chol, dim1=-2, dim2=-1)).sum(-1)
             d = diff.shape[-1]
             log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
 
@@ -432,7 +425,8 @@ class PriorGuide(ScoreAdaptation):
         if self.cfg.covariance_type == "diag":
             v_i = diff / cov_e
         else:
-            # Solve per-component for full covariance; support shared or per-component cov.
+            # Solve per-component for full covariance; support shared or
+            # per-component cov.
             v_i = torch.linalg.solve(cov_e, diff.unsqueeze(-1)).squeeze(-1)
 
         v = torch.sum(w_tilde[..., None] * v_i, dim=-2)
