@@ -380,6 +380,10 @@ class PriorGuide(ScoreAdaptation):
 
     def _sigma0_t2(self, std: Tensor) -> Tensor:
         # From PriorGuide Eq. (12): sigma(t)^2 / (1 + sigma(t)^2)
+        # NOTE: This can be improved similar to the AutoGauss or
+        # JAC methods for IIDScoreFunctions i.e. this assumes
+        # identity covariance but one can also use an estimator
+        # of the posterior covaraince.
         return std**2 / (1.0 + std**2)
 
     def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
