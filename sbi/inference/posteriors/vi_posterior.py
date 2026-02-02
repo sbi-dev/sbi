@@ -13,6 +13,8 @@ from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
+from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
+from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
 from sbi.samplers.vi.vi_pyro_flows import get_flow_builder
 from sbi.samplers.vi.vi_quality_control import get_quality_metric
@@ -31,6 +33,15 @@ from sbi.sbi_types import (
 )
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
+
+# Mapping from VIPosterior flow names to Zuko flow types
+_VI_FLOW_TO_ZUKO = {
+    "maf": "MAF",      # Masked Autoregressive Flow
+    "nsf": "NSF",      # Neural Spline Flow (autoregressive)
+    "mcf": "NICE",     # Coupling flow (affine)
+    "scf": "NCSF",     # Neural Spline Flow (coupling)
+    # gaussian and gaussian_diag handled separately
+}
 
 
 class VIPosterior(NeuralPosterior):
@@ -139,6 +150,9 @@ class VIPosterior(NeuralPosterior):
         move_all_tensor_to_device(self._prior, device)
         self._optimizer = None
 
+        # Mode tracking: None (not trained), "single_x", or "amortized"
+        self._mode: Optional[Literal["single_x", "amortized"]] = None
+
         # In contrast to MCMC we want to project into constrained space.
         if theta_transform is None:
             self.link_transform = mcmc_transform(self._prior).inv
@@ -193,6 +207,59 @@ class VIPosterior(NeuralPosterior):
             self.link_transform = self.theta_transform.inv
 
         return self
+
+    def _build_zuko_flow(
+        self,
+        flow_type: str,
+        num_transforms: int = 5,
+        hidden_features: int = 50,
+        **kwargs,
+    ) -> ZukoUnconditionalFlow:
+        """Build a Zuko unconditional flow for variational inference.
+
+        Args:
+            flow_type: Type of flow, one of ["maf", "nsf", "mcf", "scf"].
+            num_transforms: Number of flow transforms.
+            hidden_features: Number of hidden features per layer.
+            **kwargs: Additional arguments passed to flow constructor.
+
+        Returns:
+            ZukoUnconditionalFlow: The constructed flow.
+
+        Raises:
+            ValueError: If flow_type is not supported or is gaussian/gaussian_diag.
+        """
+        if flow_type in ("gaussian", "gaussian_diag"):
+            raise ValueError(
+                f"Flow type '{flow_type}' is not supported with Zuko. "
+                f"Use Pyro flows for Gaussian variational families or switch to "
+                f"a normalizing flow type like 'maf', 'nsf', 'mcf', or 'scf'."
+            )
+
+        if flow_type not in _VI_FLOW_TO_ZUKO:
+            raise ValueError(
+                f"Unknown flow type '{flow_type}'. "
+                f"Supported types: {list(_VI_FLOW_TO_ZUKO.keys())}."
+            )
+
+        zuko_flow_type = _VI_FLOW_TO_ZUKO[flow_type]
+
+        # Sample from prior to get batch for dimensionality inference
+        # We apply link_transform to map to unconstrained space
+        with torch.no_grad():
+            prior_samples = self._prior.sample((1000,))
+            batch_theta = self.link_transform(prior_samples)
+
+        flow = build_zuko_unconditional_flow(
+            which_nf=zuko_flow_type,
+            batch_x=batch_theta,
+            z_score_x="independent",  # z-score for stable training
+            hidden_features=hidden_features,
+            num_transforms=num_transforms,
+            **kwargs,
+        )
+
+        return flow.to(self._device)
 
     @property
     def q(self) -> Distribution:
@@ -267,7 +334,13 @@ class VIPosterior(NeuralPosterior):
         if modules is None:
             modules = []
         self._q_arg = (q, parameters, modules)
-        if isinstance(q, Distribution):
+        if isinstance(q, ZukoUnconditionalFlow):
+            # Zuko flow passed directly (e.g., from _q_build_fn during retrain)
+            # Keep existing _q_build_fn and _zuko_flow_type, just use the flow
+            make_object_deepcopy_compatible(q)
+            self._trained_on = None
+            # Note: Don't overwrite _q_build_fn/_zuko_flow_type - set earlier
+        elif isinstance(q, Distribution):
             q = adapt_variational_distribution(
                 q,
                 self._prior,
@@ -279,22 +352,43 @@ class VIPosterior(NeuralPosterior):
             self_custom_q_init_cache = deepcopy(q)
             self._q_build_fn = lambda *args, **kwargs: self_custom_q_init_cache
             self._trained_on = None
+            self._zuko_flow_type = None
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
-                self._q_build_fn = get_flow_builder(q)
+                if q in _VI_FLOW_TO_ZUKO:
+                    # Use Zuko flows for normalizing flow types
+                    q_flow = self._build_zuko_flow(q)
+                    # Store flow type for retraining. Use default arg to capture value.
+                    self._zuko_flow_type = q
+                    self._q_build_fn = lambda *args, ft=q, **kwargs: (
+                        self._build_zuko_flow(ft)
+                    )
+                    q = q_flow
+                else:
+                    # Use Pyro flows for gaussian/gaussian_diag
+                    self._zuko_flow_type = None
+                    self._q_build_fn = get_flow_builder(q)
+                    q = self._q_build_fn(
+                        self._prior.event_shape,
+                        self.link_transform,
+                        device=self._device,
+                    )
             else:
+                # Callable provided - use as-is
+                self._zuko_flow_type = None
                 self._q_build_fn = q
-
-            q = self._q_build_fn(
-                self._prior.event_shape,
-                self.link_transform,
-                device=self._device,
-            )
+                q = self._q_build_fn(
+                    self._prior.event_shape,
+                    self.link_transform,
+                    device=self._device,
+                )
             make_object_deepcopy_compatible(q)
             self._trained_on = None
         elif isinstance(q, VIPosterior):
             self._q_build_fn = q._q_build_fn
             self._trained_on = q._trained_on
+            self._mode = getattr(q, "_mode", None)  # Copy mode from source
+            self._zuko_flow_type = getattr(q, "_zuko_flow_type", None)
             self.vi_method = q.vi_method  # type: ignore
             self._device = q._device
             self._prior = q._prior
@@ -303,11 +397,18 @@ class VIPosterior(NeuralPosterior):
             make_object_deepcopy_compatible(q.q)
             q = deepcopy(q.q)
         move_all_tensor_to_device(q, self._device)
-        assert isinstance(
-            q, Distribution
-        ), """Something went wrong when initializing the variational distribution.
-            Please create an issue on github https://github.com/mackelab/sbi/issues"""
-        check_variational_distribution(q, self._prior)
+        # Validate the variational distribution
+        if isinstance(q, ZukoUnconditionalFlow):
+            # Zuko flows are validated in _build_zuko_flow, no additional checks needed
+            pass
+        elif isinstance(q, Distribution):
+            check_variational_distribution(q, self._prior)
+        else:
+            raise ValueError(
+                "Variational distribution must be a Distribution or "
+                f"ZukoUnconditionalFlow, got {type(q)}. Please create an issue "
+                "on github https://github.com/mackelab/sbi/issues"
+            )
         self._q = q
 
     @property
@@ -528,6 +629,7 @@ class VIPosterior(NeuralPosterior):
                 break
         # Training finished:
         self._trained_on = x
+        self._mode = "single_x"
 
         # Evaluate quality
         if quality_control:
