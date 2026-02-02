@@ -1133,16 +1133,20 @@ class VIPosterior(NeuralPosterior):
         result = cls.__new__(cls)
         # Add to memo
         memo[id(self)] = result
-        # Copy attributes
+        # Copy attributes, handling non-picklable objects
         for k, v in self.__dict__.items():
-            setattr(result, k, copy.deepcopy(v, memo))
+            if k == "_set_x_lock":
+                # Lock objects cannot be deepcopied; create a new one
+                setattr(result, k, Lock())
+            else:
+                setattr(result, k, copy.deepcopy(v, memo))
         return result
 
     def __getstate__(self) -> Dict:
         """This method is called when pickling the object.
 
         It defines what is pickled. We need to overwrite this method, since some parts
-        due not support pickle protocols (e.g. due to local functions, etc.).
+        do not support pickle protocols (e.g. due to local functions, locks, etc.).
 
         Returns:
             Dict: All attributes of the VIPosterior.
@@ -1151,7 +1155,10 @@ class VIPosterior(NeuralPosterior):
         self.__deepcopy__ = None  # type: ignore
         self._q_build_fn = None
         self._q.__deepcopy__ = None  # type: ignore
-        return self.__dict__
+        # Create a copy of __dict__ without the lock (not picklable)
+        state = self.__dict__.copy()
+        state.pop("_set_x_lock", None)
+        return state
 
     def __setstate__(self, state_dict: Dict):
         """This method is called when unpickling the object.
@@ -1163,6 +1170,8 @@ class VIPosterior(NeuralPosterior):
             state_dict: Given state dictionary, we will restore the object from it.
         """
         self.__dict__ = state_dict
+        # Restore the lock immediately (not picklable, so we create a new one)
+        self._set_x_lock = Lock()
         q = deepcopy(self._q)
         # Restore removed attributes
         self.set_q(*self._q_arg)

@@ -225,16 +225,26 @@ def test_deepcopy_support(q: str):
     )
 
     # Try if they are the same
+    # Use sample() for Zuko flows, rsample() for Pyro flows
     torch.manual_seed(0)
-    s1 = posterior._q.rsample()
+    if hasattr(posterior._q, "rsample"):
+        s1 = posterior._q.rsample()
+    else:
+        s1 = posterior._q.sample((1,)).squeeze(0)
     torch.manual_seed(0)
-    s2 = posterior_copy._q.rsample()
+    if hasattr(posterior_copy._q, "rsample"):
+        s2 = posterior_copy._q.rsample()
+    else:
+        s2 = posterior_copy._q.sample((1,)).squeeze(0)
     assert torch.allclose(s1, s2), (
         "Samples from original and unpickled VIPosterior must be close."
     )
 
     # Produces nonleaf tensors in the cache... -> Can lead to failure of deepcopy.
-    posterior.q.rsample()
+    if hasattr(posterior.q, "rsample"):
+        posterior.q.rsample()
+    else:
+        posterior.q.sample((1,))
     posterior_copy = deepcopy(posterior)
 
 
@@ -267,10 +277,17 @@ def test_pickle_support(q: str):
         )
 
     # Try if they are the same
+    # Use sample() for Zuko flows, rsample() for Pyro flows
     torch.manual_seed(0)
-    s1 = posterior._q.rsample()
+    if hasattr(posterior._q, "rsample"):
+        s1 = posterior._q.rsample()
+    else:
+        s1 = posterior._q.sample((1,)).squeeze(0)
     torch.manual_seed(0)
-    s2 = posterior_loaded._q.rsample()
+    if hasattr(posterior_loaded._q, "rsample"):
+        s2 = posterior_loaded._q.rsample()
+    else:
+        s2 = posterior_loaded._q.sample((1,)).squeeze(0)
 
     assert torch.allclose(s1, s2), "Mhh, something with the pickled is strange"
 
@@ -291,9 +308,13 @@ def test_vi_posterior_inferface():
     posterior2 = VIPosterior(potential_fn)
 
     # Raising errors if untrained
-    assert isinstance(posterior.q.support, type(posterior2.q.support)), (
-        "The support indicated by 'theta_transform' is different than that of 'prior'."
-    )
+    # Note: Zuko flows don't expose a .support attribute like Pyro flows do.
+    # For Zuko flows, we skip this check since the transform handling is different.
+    if hasattr(posterior.q, "support") and hasattr(posterior2.q, "support"):
+        assert isinstance(posterior.q.support, type(posterior2.q.support)), (
+            "The support indicated by 'theta_transform' is different than that of "
+            "'prior'."
+        )
 
     with pytest.raises(Exception) as execinfo:
         posterior.sample()
