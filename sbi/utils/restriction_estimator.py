@@ -688,7 +688,9 @@ class RestrictedPrior(Distribution):
 
         if sample_with == "rejection":
             samples, acceptance_rate = rejection.accept_reject_sample(
-                proposal=self._prior.sample,
+                proposal=lambda sample_shape, **kwargs: self._prior.sample(
+                    sample_shape
+                ),
                 accept_reject_fn=self._accept_reject_fn,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
