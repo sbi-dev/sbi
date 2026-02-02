@@ -637,6 +637,64 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("vector_field_type", ["ve", "vp", "fmpe"])
+@pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
+@pytest.mark.parametrize(
+    "covariance_type,K",
+    [
+        pytest.param("diag", 2, id="diag-K2"),
+        pytest.param("full", 2, id="full-K2"),
+    ],
+)
+def test_prior_guide(vector_field_type, prior_type, covariance_type, K):
+    num_samples = 1000
+    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+
+    score_estimator = vector_field_trained_model["estimator"]
+    inference = vector_field_trained_model["inference"]
+    num_dim = vector_field_trained_model["num_dim"]
+    train_prior = vector_field_trained_model["prior"]
+
+    x_o = zeros(1, num_dim)
+    posterior = inference.build_posterior(score_estimator)
+    posterior.set_default_x(x_o)
+
+    test_prior_mean = zeros(num_dim) + 0.1
+    test_prior_cov = eye(num_dim) * 0.5  # In train priors
+    test_prior = MultivariateNormal(
+        loc=test_prior_mean, covariance_matrix=test_prior_cov
+    )
+    guidance_params = {
+        "train_prior": train_prior,
+        "test_prior": test_prior,
+        "K": K,
+        "covariance_type": covariance_type,
+    }
+
+    samples = posterior.sample(
+        (num_samples,), guidance_method="prior_guide", guidance_params=guidance_params
+    )
+
+    assert samples.shape == (num_samples, num_dim), (
+        f"Expected shape {(num_samples, num_dim)}, got {samples.shape}"
+    )
+    assert torch.isfinite(samples).all(), "Output contains non-finite values"
+
+    likelihood_shift = vector_field_trained_model["likelihood_shift"]
+    likelihood_cov = vector_field_trained_model["likelihood_cov"]
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, test_prior_mean, test_prior_cov
+    )
+    target_samples = true_posterior.sample((num_samples,))
+    check_c2st(
+        samples,
+        target_samples,
+        alg=f"prior_guide-{vector_field_type}-{prior_type}-{covariance_type}-K{K}",
+        tol=0.2,
+    )
+
+
+@pytest.mark.slow
 @pytest.mark.parametrize("vector_field_type", ["ve", "vp"])
 @pytest.mark.parametrize("prior_type", ["gaussian"])
 @pytest.mark.parametrize(

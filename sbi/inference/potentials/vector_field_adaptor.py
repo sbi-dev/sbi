@@ -13,7 +13,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
-from sbi.utils.score_utils import (
+from sbi.utils.vector_field_utils import (
     add_diag_or_dense,
     denoise,
     marginalize,
@@ -21,6 +21,11 @@ from sbi.utils.score_utils import (
     solve_diag_or_dense,
 )
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.vector_field_utils import (
+    _diag_gaussian_log_prob,
+    _full_gaussian_log_prob,
+    fit_gmm_ratio,
+)
 
 IID_METHODS = {}
 GUIDANCE_METHODS = {}
@@ -317,6 +322,124 @@ class IntervalGuidance(UniversalGuidance):
             UniversalGuidanceCfg(guidance_fn=interval_fn),
             device=device,
         )
+
+
+@dataclass
+class PriorGuideCfg:
+    train_prior: Distribution
+    test_prior: Distribution
+    K: int = 5
+    num_steps: int = 10_000
+    batch_size: int = 1_000
+    lr: float = 1e-2
+    covariance_type: str = "diag"
+    min_cov: float = 1e-4
+    max_log_ratio: float = 50.0
+
+
+@register_guidance_method("prior_guide", PriorGuideCfg)
+class PriorGuide(ScoreAdaptation):
+    def __init__(
+        self,
+        vf_estimator: ConditionalVectorFieldEstimator,
+        prior: Optional[Distribution],
+        cfg: PriorGuideCfg,
+        device: str = "cpu",
+    ):
+        """Prior guidance via a GMM approximation of the prior ratio and
+        leveraging the backward kernel of the diffusion process to
+        accurately compute the marginal adjusted posterior score [1].
+
+        Args:
+            vf_estimator: The score estimator.
+            prior: The training prior distribution.
+            cfg: PriorGuide configuration, including train/test priors and K.
+            device: The device on which to evaluate the potential.
+
+        References:
+        - [1] "Prior Guidance for Diffusion Models" (arXiv:2510.13763)
+        """
+        if prior is None:
+            raise ValueError(
+                "Prior is required for PriorGuide to match the training distribution."
+            )
+        if not vf_estimator.MARGINALS_DEFINED:
+            raise ValueError(
+                "Marginals are not defined for this vector field estimator."
+            )
+        self.cfg = cfg
+        self.weights, self.means, self.cov = fit_gmm_ratio(
+            cfg.train_prior,
+            cfg.test_prior,
+            int(cfg.K),
+            num_steps=cfg.num_steps,
+            batch_size=cfg.batch_size,
+            lr=cfg.lr,
+            covariance_type=cfg.covariance_type,
+            min_cov=cfg.min_cov,
+            max_log_ratio=cfg.max_log_ratio,
+            device=device,
+        )
+        super().__init__(vf_estimator, prior, device)
+
+    def _sigma0_t2(self, std: Tensor) -> Tensor:
+        # From PriorGuide Eq. (12): sigma(t)^2 / (1 + sigma(t)^2)
+        return std**2 / (1.0 + std**2)
+
+    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
+        if time is None:
+            time = torch.tensor([self.vf_estimator.t_min])
+
+        track_grad = torch.is_grad_enabled()
+        input_ = input.detach()
+        score = self.vf_estimator(input=input_, condition=condition, time=time)
+        m = self.vf_estimator.mean_t_fn(time)
+        std = self.vf_estimator.std_fn(time)
+        # Standard Tweedie's formula for denoising
+        mu0 = (input_ + std**2 * score) / m
+
+        # Prior adjustment
+        sigma0_t2 = self._sigma0_t2(std)
+        sigma0_t2 = sigma0_t2.reshape(-1)
+        if sigma0_t2.numel() == 1:
+            sigma0_t2 = sigma0_t2.expand(mu0.shape[-1])
+        if self.cfg.covariance_type == "diag":
+            cov_e = self.cov + sigma0_t2
+            diff = mu0[..., None, :] - self.means
+            log_det = torch.log(cov_e).sum(-1)
+            quad = (diff**2 / cov_e).sum(-1)
+            d = diff.shape[-1]
+            log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
+        else:
+            cov_e = self.cov + torch.diag_embed(sigma0_t2)
+            diff = mu0[..., None, :] - self.means
+            chol = torch.linalg.cholesky(cov_e)
+            diff_col = diff[..., None]
+            solve = torch.cholesky_solve(diff_col, chol)
+            quad = (diff_col * solve).sum(-2).squeeze(-1)
+            log_det = 2.0 * torch.log(
+                torch.diagonal(chol, dim1=-2, dim2=-1)
+            ).sum(-1)
+            d = diff.shape[-1]
+            log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
+
+        numerator = self.weights[None, :] * torch.exp(log_comp)
+        denom = numerator.sum(dim=1, keepdim=True)
+        denom = torch.where(denom.abs() < 1e-12, torch.full_like(denom, 1e-12), denom)
+        w_tilde = numerator / denom
+
+        diff = self.means - mu0[..., None, :]
+        if self.cfg.covariance_type == "diag":
+            v_i = diff / cov_e
+        else:
+            # Solve per-component for full covariance; support shared or per-component cov.
+            v_i = torch.linalg.solve(cov_e, diff.unsqueeze(-1)).squeeze(-1)
+
+        v = torch.sum(w_tilde[..., None] * v_i, dim=-2)
+        mu0_adjusted = mu0 + std**2 * v
+        score_adjusted = (mu0_adjusted * m - input_) / (std**2)
+
+        return score_adjusted
 
 
 class IIDScoreFunction(ABC):
