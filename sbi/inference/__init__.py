@@ -34,7 +34,6 @@ _abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 
 
 from sbi.inference.posteriors import (
-    AmortizedVIPosterior,
     DirectPosterior,
     EnsemblePosterior,
     ImportanceSamplingPosterior,
@@ -61,7 +60,6 @@ __all__ = (
         "FMPE",
         "MarginalTrainer",
         "NPSE",
-        "AmortizedVIPosterior",
         "DirectPosterior",
         "EnsemblePosterior",
         "ImportanceSamplingPosterior",
