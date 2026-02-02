@@ -14,7 +14,8 @@ import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import NLE, AmortizedVIPosterior, ZukoFlowType
+from sbi.inference import NLE, AmortizedVIPosterior
+from sbi.inference.posteriors import ZukoFlowType
 from sbi.inference.potentials.likelihood_based_potential import (
     likelihood_estimator_based_potential,
 )

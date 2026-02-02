@@ -52,7 +52,6 @@ from sbi.inference.potentials import (
     ratio_estimator_based_potential,
     vector_field_estimator_based_potential,
 )
-from sbi.neural_nets.factory import ZukoFlowType
 from sbi.utils.simulation_utils import simulate_for_sbi
 
 __all__ = [
@@ -62,6 +61,5 @@ __all__ = [
     "NPE",
     "NPSE",
     "NRE",
-    "ZukoFlowType",
     "simulate_for_sbi",
 ]

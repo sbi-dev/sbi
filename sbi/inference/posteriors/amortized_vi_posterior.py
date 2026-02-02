@@ -191,6 +191,16 @@ class AmortizedVIPosterior(NeuralPosterior):
         if not torch.isfinite(x).all():
             raise ValueError("x contains NaN or Inf values.")
 
+        # Validate theta dimension matches prior
+        prior_event_shape = self._prior.event_shape
+        if len(prior_event_shape) > 0:
+            expected_theta_dim = prior_event_shape[0]
+            if theta.shape[1] != expected_theta_dim:
+                raise ValueError(
+                    f"theta dimension {theta.shape[1]} does not match prior "
+                    f"event shape {expected_theta_dim}."
+                )
+
         # Validate hyperparameters
         if not 0 < validation_fraction < 1:
             raise ValueError(
