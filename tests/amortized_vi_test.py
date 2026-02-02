@@ -2,11 +2,14 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 """
-Tests for AmortizedVIPosterior.
+Tests for amortized variational inference using VIPosterior.train_amortized().
 
 These tests validate the amortized variational inference implementation where
 a conditional flow q(θ|x) is trained by optimizing ELBO against a potential
 function from NLE.
+
+Note: These tests originally used the separate AmortizedVIPosterior class,
+which has been merged into the unified VIPosterior class.
 """
 
 import pytest
@@ -14,11 +17,12 @@ import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import NLE, AmortizedVIPosterior
-from sbi.inference.posteriors import ZukoFlowType
+from sbi.inference import NLE
+from sbi.inference.posteriors import VIPosterior
 from sbi.inference.potentials.likelihood_based_potential import (
     likelihood_estimator_based_potential,
 )
+from sbi.neural_nets.factory import ZukoFlowType
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -69,47 +73,47 @@ def linear_gaussian_setup():
 
 @pytest.mark.slow
 def test_amortized_vi_posterior_training(linear_gaussian_setup):
-    """Test that AmortizedVIPosterior trains successfully."""
+    """Test that VIPosterior.train_amortized() trains successfully."""
     setup = linear_gaussian_setup
 
-    posterior = AmortizedVIPosterior(
+    posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
+    )
+
+    # Train amortized
+    posterior.train_amortized(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=500,
+        show_progress_bar=False,
         flow_type=ZukoFlowType.NSF,
         num_transforms=2,
         hidden_features=32,
     )
 
-    # Train
-    posterior.train(
-        theta=setup["theta"],
-        x=setup["x"],
-        max_num_iters=500,
-        show_progress_bar=False,
-    )
-
-    # Should be marked as trained
-    assert posterior._trained
+    # Should be in amortized mode
+    assert posterior._mode == "amortized"
 
 
 @pytest.mark.slow
 def test_amortized_vi_posterior_accuracy(linear_gaussian_setup):
-    """Test that AmortizedVIPosterior produces accurate posteriors."""
+    """Test that VIPosterior.train_amortized() produces accurate posteriors."""
     setup = linear_gaussian_setup
 
-    posterior = AmortizedVIPosterior(
+    posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        flow_type=ZukoFlowType.NSF,
-        num_transforms=2,
-        hidden_features=32,
     )
 
-    posterior.train(
+    posterior.train_amortized(
         theta=setup["theta"],
         x=setup["x"],
         max_num_iters=500,
         show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
     )
 
     # Test on multiple observations
@@ -142,22 +146,22 @@ def test_amortized_vi_posterior_accuracy(linear_gaussian_setup):
 
 @pytest.mark.slow
 def test_amortized_vi_posterior_batched_sampling(linear_gaussian_setup):
-    """Test batched sampling from AmortizedVIPosterior."""
+    """Test batched sampling from amortized VIPosterior."""
     setup = linear_gaussian_setup
 
-    posterior = AmortizedVIPosterior(
+    posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        flow_type=ZukoFlowType.NSF,
-        num_transforms=2,
-        hidden_features=32,
     )
 
-    posterior.train(
+    posterior.train_amortized(
         theta=setup["theta"],
         x=setup["x"],
         max_num_iters=500,
         show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
     )
 
     # Test batched sampling
@@ -176,19 +180,19 @@ def test_amortized_vi_posterior_log_prob(linear_gaussian_setup):
     """Test log_prob evaluation."""
     setup = linear_gaussian_setup
 
-    posterior = AmortizedVIPosterior(
+    posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        flow_type=ZukoFlowType.NSF,
-        num_transforms=2,
-        hidden_features=32,
     )
 
-    posterior.train(
+    posterior.train_amortized(
         theta=setup["theta"],
         x=setup["x"],
         max_num_iters=500,
         show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
     )
 
     # Evaluate log prob
@@ -206,20 +210,20 @@ def test_amortized_vi_posterior_log_prob(linear_gaussian_setup):
 
 @pytest.mark.slow
 def test_amortized_vi_requires_x_for_sampling(linear_gaussian_setup):
-    """Test that sampling without x raises an error."""
+    """Test that sampling without x uses default_x when set."""
     setup = linear_gaussian_setup
 
-    posterior = AmortizedVIPosterior(
+    posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        flow_type=ZukoFlowType.NSF,
     )
 
-    posterior.train(
+    posterior.train_amortized(
         theta=setup["theta"],
         x=setup["x"],
         max_num_iters=100,
         show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
     )
 
     posterior.set_default_x(zeros(1, setup["num_dim"]))
@@ -232,39 +236,36 @@ def test_amortized_vi_requires_training_before_sampling(linear_gaussian_setup):
     """Test that sampling before training raises an error."""
     setup = linear_gaussian_setup
 
-    posterior = AmortizedVIPosterior(
+    posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        flow_type=ZukoFlowType.NSF,
     )
 
     posterior.set_default_x(zeros(1, setup["num_dim"]))
-    # Should raise RuntimeError when not trained
-    with pytest.raises(RuntimeError, match="must be trained"):
+    # Should raise ValueError when not trained
+    with pytest.raises(ValueError):
         posterior.sample((100,))
 
 
 @pytest.mark.slow
 def test_amortized_vi_vs_single_x_vi(linear_gaussian_setup):
-    """Compare AmortizedVIPosterior against standard VIPosterior."""
-    from sbi.inference.posteriors.vi_posterior import VIPosterior
-
+    """Compare amortized VI (train_amortized) against single-x VI (train)."""
     setup = linear_gaussian_setup
 
     # Train amortized VI
-    amortized_posterior = AmortizedVIPosterior(
+    amortized_posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        flow_type=ZukoFlowType.NSF,
-        num_transforms=2,
-        hidden_features=32,
     )
 
-    amortized_posterior.train(
+    amortized_posterior.train_amortized(
         theta=setup["theta"],
         x=setup["x"],
         max_num_iters=500,
         show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
     )
 
     # Train single-x VI for a specific observation
@@ -318,40 +319,40 @@ def test_gradient_flow_through_elbo(linear_gaussian_setup):
 
     setup = linear_gaussian_setup
 
-    posterior = AmortizedVIPosterior(
+    posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
+    )
+
+    # Build the flow manually (normally done in train_amortized())
+    theta = setup["theta"][:500].to("cpu")
+    x = setup["x"][:500].to("cpu")
+    posterior._amortized_q = posterior._build_conditional_flow(
+        theta[:100],
+        x[:100],
         flow_type=ZukoFlowType.NSF,
         num_transforms=2,
         hidden_features=32,
     )
-
-    # Build the flow manually (normally done in train())
-    theta = setup["theta"][:500].to("cpu")
-    x = setup["x"][:500].to("cpu")
-    posterior._variational_distribution = posterior._build_variational_distribution(
-        theta[:100], x[:100]
-    )
-    posterior._variational_distribution.to("cpu")
+    posterior._amortized_q.to("cpu")
+    posterior._mode = "amortized"
 
     # Store initial parameters
-    initial_params = [
-        p.clone() for p in posterior._variational_distribution.parameters()
-    ]
+    initial_params = [p.clone() for p in posterior._amortized_q.parameters()]
 
     # Compute ELBO loss
-    optimizer = Adam(posterior._variational_distribution.parameters(), lr=1e-3)
+    optimizer = Adam(posterior._amortized_q.parameters(), lr=1e-3)
     optimizer.zero_grad()
 
     # Use small batch for quick test
     x_batch = x[:8]
-    loss = posterior._compute_elbo_loss(x_batch, n_particles=16)
+    loss = posterior._compute_amortized_elbo_loss(x_batch, n_particles=16)
 
     # Backward pass
     loss.backward()
 
     # Verify gradients exist and are non-zero for all parameters
-    for i, p in enumerate(posterior._variational_distribution.parameters()):
+    for i, p in enumerate(posterior._amortized_q.parameters()):
         assert p.grad is not None, f"Gradient is None for parameter {i}"
         assert torch.isfinite(p.grad).all(), f"Gradient has NaN/Inf for parameter {i}"
         # At least some gradients should be non-trivial
@@ -362,7 +363,7 @@ def test_gradient_flow_through_elbo(linear_gaussian_setup):
 
     # Verify parameters actually changed
     changed_count = 0
-    params = posterior._variational_distribution.parameters()
+    params = posterior._amortized_q.parameters()
     for p_init, p_new in zip(initial_params, params, strict=True):
         if not torch.allclose(p_init, p_new.detach(), atol=1e-8):
             changed_count += 1
@@ -375,19 +376,19 @@ def test_amortized_vi_map(linear_gaussian_setup):
     """Test that MAP estimation returns high-density region."""
     setup = linear_gaussian_setup
 
-    posterior = AmortizedVIPosterior(
+    posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
         prior=setup["prior"],
-        flow_type=ZukoFlowType.NSF,
-        num_transforms=2,
-        hidden_features=32,
     )
 
-    posterior.train(
+    posterior.train_amortized(
         theta=setup["theta"],
         x=setup["x"],
         max_num_iters=500,
         show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
     )
 
     # Test MAP for a specific observation

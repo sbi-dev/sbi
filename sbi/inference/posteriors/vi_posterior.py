@@ -45,10 +45,10 @@ from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
 # Mapping from VIPosterior flow names to Zuko flow types
 _VI_FLOW_TO_ZUKO = {
-    "maf": "MAF",      # Masked Autoregressive Flow
-    "nsf": "NSF",      # Neural Spline Flow (autoregressive)
-    "mcf": "NICE",     # Coupling flow (affine)
-    "scf": "NCSF",     # Neural Spline Flow (coupling)
+    "maf": "MAF",  # Masked Autoregressive Flow
+    "nsf": "NSF",  # Neural Spline Flow (autoregressive)
+    "mcf": "NICE",  # Coupling flow (affine)
+    "scf": "NCSF",  # Neural Spline Flow (coupling)
     # gaussian and gaussian_diag handled separately
 }
 
@@ -503,30 +503,39 @@ class VIPosterior(NeuralPosterior):
             sample_shape: Shape of samples.
             x: Observation. In single-x mode, must match trained x_o (or be None).
                 In amortized mode, required and can be any observation.
+                For batched observations, shape should be (batch_size, x_dim).
 
         Returns:
-            Samples from posterior with shape (*sample_shape, θ_dim).
+            Samples from posterior with shape (*sample_shape, θ_dim) for single x,
+            or (*sample_shape, batch_size, θ_dim) for batched observations in
+            amortized mode.
 
         Raises:
             ValueError: If mode requirements are not met.
         """
         if self._mode == "amortized":
             # Amortized mode: sample from conditional flow q(θ|x)
+            x = self._x_else_default_x(x)
             if x is None:
                 raise ValueError(
-                    "x is required for amortized mode. Provide an observation."
+                    "x is required for amortized mode. Provide an observation or "
+                    "set a default x with set_default_x()."
                 )
             x = atleast_2d_float32_tensor(x).to(self._device)
             assert self._amortized_q is not None
+            # samples shape from flow: (*sample_shape, batch_size, θ_dim)
             samples = self._amortized_q.sample(torch.Size(sample_shape), condition=x)
-            return samples.reshape((*sample_shape, samples.shape[-1]))
+            # Match base posterior behavior: drop singleton x batch dimension
+            if x.shape[0] == 1:
+                samples = samples.squeeze(-2)
+            return samples
         else:
             # Single-x mode: sample from unconditional flow q(θ)
             x = self._x_else_default_x(x)
             if self._trained_on is None or (x != self._trained_on).any():
-                raise AttributeError(
+                raise ValueError(
                     f"The variational posterior was not fit on the specified "
-                    f"observation {x}. Please train using `posterior.train()`."
+                    f"observation {x}. Please train using posterior.train()."
                 )
             samples = self.q.sample(torch.Size(sample_shape))
             return samples.reshape((*sample_shape, samples.shape[-1]))
@@ -538,11 +547,35 @@ class VIPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        raise NotImplementedError(
-            "Batched sampling is not implemented for VIPosterior. "
-            "Alternatively you can use `sample` in a loop "
-            "[posterior.sample(theta, x_o) for x_o in x]."
-        )
+        """Sample from posterior for a batch of observations.
+
+        In amortized mode, this is efficient as all x values are processed in
+        parallel through the conditional flow.
+
+        In single-x mode, this raises NotImplementedError since the unconditional
+        flow is trained for a specific x_o.
+
+        Args:
+            sample_shape: Number of samples per observation.
+            x: Batch of observations (num_obs, x_dim).
+            max_sampling_batch_size: Unused for amortized mode (no batching needed).
+            show_progress_bars: Unused for amortized mode.
+
+        Returns:
+            Samples of shape (*sample_shape, num_obs, θ_dim).
+
+        Raises:
+            NotImplementedError: If called in single-x mode.
+        """
+        if self._mode == "amortized":
+            # In amortized mode, sample() handles batched x directly
+            return self.sample(sample_shape, x=x, show_progress_bars=show_progress_bars)
+        else:
+            raise NotImplementedError(
+                "Batched sampling is not implemented for single-x VI mode. "
+                "Use train_amortized() to train an amortized posterior, or "
+                "call sample() in a loop: [posterior.sample(shape, x_o) for x_o in x]."
+            )
 
     def log_prob(
         self,
@@ -556,15 +589,20 @@ class VIPosterior(NeuralPosterior):
         For amortized mode: returns log q(θ|x).
 
         Args:
-            theta: Parameters to evaluate.
+            theta: Parameters to evaluate, shape (batch_theta, θ_dim).
             x: Observation. In single-x mode, must match trained x_o (or be None).
                 In amortized mode, required and can be any observation.
+                For single x, shape (1, x_dim) or (x_dim,).
+                For batched x, shape (batch_x, x_dim).
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis but increases memory
                 consumption.
 
         Returns:
-            Log-probability with shape (batch_size,).
+            Log-probability. Shape depends on input:
+            - Single x: (batch_theta,)
+            - Batched x in amortized mode: depends on flow's broadcasting behavior,
+              typically (batch_theta,) if batch_theta == batch_x (paired evaluation).
 
         Raises:
             ValueError: If mode requirements are not met.
@@ -574,9 +612,11 @@ class VIPosterior(NeuralPosterior):
 
             if self._mode == "amortized":
                 # Amortized mode: evaluate log q(θ|x)
+                x = self._x_else_default_x(x)
                 if x is None:
                     raise ValueError(
-                        "x is required for amortized mode. Provide an observation."
+                        "x is required for amortized mode. Provide an observation or "
+                        "set a default x with set_default_x()."
                     )
                 x = atleast_2d_float32_tensor(x).to(self._device)
                 assert self._amortized_q is not None
@@ -585,9 +625,9 @@ class VIPosterior(NeuralPosterior):
                 # Single-x mode: evaluate log q(θ)
                 x = self._x_else_default_x(x)
                 if self._trained_on is None or (x != self._trained_on).any():
-                    raise AttributeError(
+                    raise ValueError(
                         f"The variational posterior was not fit on the specified "
-                        f"observation {x}. Please train using `posterior.train()`."
+                        f"observation {x}. Please train using posterior.train()."
                     )
                 return self.q.log_prob(theta)
 
