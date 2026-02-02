@@ -518,7 +518,7 @@ class VIPosterior(NeuralPosterior):
             if show_progress_bar:
                 assert isinstance(iters, tqdm)
                 iters.set_description(  # type: ignore
-                    f"Loss: {np.round(float(mean_loss), 2)}"
+                    f"Loss: {np.round(float(mean_loss), 2)}, "
                     f"Std: {np.round(float(std_loss), 2)}"
                 )
             # Check for convergence

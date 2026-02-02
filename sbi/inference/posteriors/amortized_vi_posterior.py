@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from copy import deepcopy
+from threading import Lock
 from typing import Callable, Optional, Union
 
 import torch
@@ -84,6 +85,9 @@ class AmortizedVIPosterior(NeuralPosterior):
         # Will be set during training
         self._variational_distribution: Optional[ConditionalDensityEstimator] = None
         self._trained = False
+
+        # Thread-safety lock for set_x() calls
+        self._set_x_lock = Lock()
 
         self._purpose = (
             "It provides amortized variational inference to .sample() from the "
@@ -375,8 +379,10 @@ class AmortizedVIPosterior(NeuralPosterior):
         x_expanded = x_batch.repeat(n_particles, 1)
 
         # Set x_o for batched evaluation (x_is_iid=False: each θ paired with its x)
-        self.potential_fn.set_x(x_expanded, x_is_iid=False)
-        log_potential_flat = self.potential_fn(theta_flat)
+        # Use lock to ensure thread-safety when modifying potential_fn state
+        with self._set_x_lock:
+            self.potential_fn.set_x(x_expanded, x_is_iid=False)
+            log_potential_flat = self.potential_fn(theta_flat)
 
         # Reshape: (n_particles * batch_size,) -> (n_particles, batch_size)
         log_potential = log_potential_flat.reshape(n_particles, batch_size)

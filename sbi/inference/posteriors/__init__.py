@@ -17,11 +17,9 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.neural_nets.factory import ZukoFlowType
 
 __all__ = [
     "AmortizedVIPosterior",
-    "ZukoFlowType",
     "DirectPosterior",
     "EnsemblePosterior",
     "ImportanceSamplingPosterior",
