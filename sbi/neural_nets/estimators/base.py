@@ -486,20 +486,23 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         t_max: Optional[float] = None,
     ) -> Tensor:
         """
-        Deterministic time schedule used during sampling.
-        Can be overriden by subclasses.
+        Time grid used during sampling (solving steps) and loss evaluation steps.
+
+        This grid is deterministic and decreasing. Can be overriden by subclasses.
         Return by default a uniform time stepping between t_max and t_min.
 
         Args:
-            steps : number of discretization steps
-            t_min (float, optional): The minimum time value. Defaults to self.t_min.
-            t_max (float, optional): The maximum time value. Defaults to self.t_max.
+            steps: number of discretization steps
+            t_min: The minimum time value. Defaults to self.t_min.
+            t_max: The maximum time value. Defaults to self.t_max.
 
         Returns:
             Tensor: A tensor of time steps within the range [t_max, t_min].
         """
-        t_min = self.t_min if isinstance(t_min, type(None)) else t_min
-        t_max = self.t_max if isinstance(t_max, type(None)) else t_max
+        if t_min is None:
+            t_min = self.t_min
+        if t_max is None:
+            t_max = self.t_max
 
         times = torch.linspace(t_max, t_min, steps, device=self._mean_base.device)
 

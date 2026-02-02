@@ -234,8 +234,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Input variable i.e. theta.
             condition: Conditioning variable.
-            times: SDE time variable in [t_min, t_max].
-                if None, will be filled by calling the time_schedule method
+            times: SDE time variable in [t_min, t_max]. If None, call the train_schedule
+                method specific to the score estimator.
             control_variate: Whether to use a control variate to reduce the variance of
                 the stochastic loss estimator.
             control_variate_threshold: Threshold for the control variate. If the std
@@ -250,7 +250,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # Sample times from the Markov chain, use batch dimension
         if times is None:
             times = self.train_schedule(input.shape[0])
-        times.to(input.device)
+        times = times.to(input.device)
 
         # Sample noise.
         eps = torch.randn_like(input)
@@ -404,8 +404,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         by the input `times`, which represents the normalized time steps t ∈ [0, 1].
 
         Args:
-            times (Tensor):
-                SDE times in [0, 1].
+            times: SDE times in [0, 1].
 
         Returns:
             Tensor: Generated beta schedule at a given time.
@@ -420,22 +419,25 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         t_max: Optional[float] = None,
     ) -> Tensor:
         """
-        Return diffusion times used for training. Can be overriden by subclasses.
-        We implement here a uniform sampling of time within the range [t_min, t_max].
-        The `times` tensor will be put on the same device as the stored network.
+        Sample diffusion times used during training.
+
+        Can be overriden by subclasses. We implement here a uniform sampling of
+        time within the range [t_min, t_max]. The `times` tensor will be put on
+        the same device as the stored network.
 
         Args:
-            num_samples (int): Number of samples to generate.
-            t_min (float, optional): The minimum time value. Defaults to self.t_min.
-            t_max (float, optional): The maximum time value. Defaults to self.t_max.
+            num_samples: Number of samples to generate.
+            t_min: The minimum time value. Defaults to self.t_min.
+            t_max: The maximum time value. Defaults to self.t_max.
 
         Returns:
-            Tensor: A tensor of sampled time variables scaled and shifted to the
-                    range [t_min,t_max].
+            Tensor: A tensor of time variables sampled in the range [t_min,t_max].
 
         """
-        t_min = self.t_min if isinstance(t_min, type(None)) else t_min
-        t_max = self.t_max if isinstance(t_max, type(None)) else t_max
+        if t_min is None:
+            t_min = self.t_min
+        if t_max is None:
+            t_max = self.t_max
 
         return (
             torch.rand(num_samples, device=self._mean_base.device) * (t_max - t_min)
@@ -449,21 +451,25 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         t_max: Optional[float] = None,
     ) -> Tensor:
         """
-        Return a deterministic monotonic time grid used for evaluation/solving steps.
-        We implement here a uniform time stepping within the range [t_max, t_min].
-        The `times` tensor will be put on the same device as the stored network.
+        Time grid used to solve the reverse SDE and evaluate the loss function.
+
+        This grid is deterministic and decreasing. We implement here a uniform time
+        stepping within the range [t_max, t_min]. The `times` tensor will be put on
+        the same device as the stored network.
 
         Args:
-            num_stesp (int): Number of time steps to generate.
-            t_min (float, optional): The minimum time value. Defaults to self.t_min.
-            t_max (float, optional): The maximum time value. Defaults to self.t_max.
+            num_steps: Number of time steps to generate.
+            t_min: The minimum time value. Defaults to self.t_min.
+            t_max: The maximum time value. Defaults to self.t_max.
 
         Returns:
             Tensor: A tensor of time steps within the range [t_max, t_min].
 
         """
-        t_min = self.t_min if isinstance(t_min, type(None)) else t_min
-        t_max = self.t_max if isinstance(t_max, type(None)) else t_max
+        if t_min is None:
+            t_min = self.t_min
+        if t_max is None:
+            t_max = self.t_max
 
         times = torch.linspace(t_max, t_min, num_steps, device=self._mean_base.device)
 
@@ -845,9 +851,8 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         return std
 
     def noise_schedule(self, times: Tensor) -> Tensor:
-        """Define the noise schedule used in the SDE drift and
-        diffusion coefficients.
-        Note that for VE, this method returns the same as std_fn()
+        """Noise schedule used in the SDE drift and diffusion coefficients.
+        Note that for VE, this method returns the same as std_fn().
 
         Args:
             times: SDE time variable in [0,1].

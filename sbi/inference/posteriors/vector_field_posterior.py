@@ -307,7 +307,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 [None].
             steps: Number of steps to take for the Euler-Maruyama method.
             ts: Time points at which to evaluate the diffusion process. If None, call
-            the solve schedule specific to the score estimator.
+                the solve schedule specific to the score estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
