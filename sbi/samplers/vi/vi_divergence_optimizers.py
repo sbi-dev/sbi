@@ -28,6 +28,7 @@ from torch.optim.lr_scheduler import (
 from torch.optim.rmsprop import RMSprop
 from torch.optim.sgd import SGD
 
+from sbi.neural_nets.estimators import ZukoUnconditionalFlow
 from sbi.samplers.vi.vi_utils import (
     filter_kwrags_for_func,
     make_object_deepcopy_compatible,
@@ -35,6 +36,9 @@ from sbi.samplers.vi.vi_utils import (
 )
 from sbi.sbi_types import Array, PyroTransformedDistribution
 from sbi.utils.user_input_checks import check_prior
+
+# Type alias for variational distributions that can be either Pyro or Zuko flows
+VariationalDistribution = Union[PyroTransformedDistribution, ZukoUnconditionalFlow]
 
 _VI_method = {}
 
@@ -50,7 +54,7 @@ class DivergenceOptimizer(ABC):
     def __init__(
         self,
         potential_fn: 'BasePotential',  # noqa: F821 # type: ignore
-        q: PyroTransformedDistribution,
+        q: VariationalDistribution,
         prior: Optional[Distribution] = None,
         n_particles: int = 256,
         clip_value: float = 5.0,
@@ -76,7 +80,8 @@ class DivergenceOptimizer(ABC):
         Args:
             potential_fn: Potential function of the target i.e. the posterior density up
                 to normalization constant.
-            q: Variational distribution
+            q: Variational distribution. Can be either a Pyro TransformedDistribution
+                or a Zuko-based unconditional flow (ZukoUnconditionalFlow).
             prior: Prior distribution, which will be used within the warmup, if given.
                 Note that this will not affect the potential_fn, so make sure to have
                 the same prior within it.
@@ -109,13 +114,21 @@ class DivergenceOptimizer(ABC):
         self.retain_graph = kwargs.get("retain_graph", False)
         self._kwargs = kwargs
 
-        # This prevents error that would stop optimization.
-        self.q.set_default_validate_args(False)
+        # Detect flow type: Zuko flows are nn.Module-based, Pyro flows have base_dist
+        self._is_zuko = isinstance(q, ZukoUnconditionalFlow)
+
+        # This prevents error that would stop optimization (Pyro-specific).
+        if not self._is_zuko:
+            self.q.set_default_validate_args(False)
         if prior is not None:
             self.prior.set_default_validate_args(False)  # type: ignore
 
         # Manage modules if present.
-        if hasattr(self.q, "modules"):
+        # Zuko flows are nn.Module, Pyro flows may have a modules() method
+        if self._is_zuko:
+            # ZukoUnconditionalFlow is an nn.Module, use its modules directly
+            self.modules = nn.ModuleList([self.q])
+        elif hasattr(self.q, "modules"):
             self.modules = nn.ModuleList(self.q.modules())
         else:
             self.modules = nn.ModuleList()
