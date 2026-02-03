@@ -134,7 +134,7 @@ def build_vector_field_estimator(
     if z_score_x_bool:
         mean_0, std_0 = z_standardization(batch_x, structured_x)
     else:
-        mean_0, std_0 = 0, 1
+        mean_0, std_0 = 0.0, 1.0
 
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
     embedding_net_y = (
@@ -149,6 +149,8 @@ def build_vector_field_estimator(
             input_shape=batch_x[0].shape,
             condition_shape=batch_y[0].shape,
             embedding_net=embedding_net_y,
+            mean_1=mean_0,
+            std_1=std_0,
         )
     elif estimator_type == "score":
         # Choose the appropriate score estimator based on SDE type
