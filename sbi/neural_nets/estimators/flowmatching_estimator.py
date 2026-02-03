@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 import torch.nn as nn
@@ -56,6 +56,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         noise_scale: float = 1e-3,
+        mean_1: Union[Tensor, float] = 0.0,
+        std_1: Union[Tensor, float] = 1.0,
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -67,6 +69,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             embedding_net: Embedding network for the condition.
             noise_scale: Scale of the noise added to the vector field
                 (:math:`\sigma_{min}` in [2]_).
+            mean_1: Mean of the data at t=1 (used for z-scoring).
+            std_1: Standard deviation of the data at t=1 (used for z-scoring).
             zscore_transform_input: Whether to z-score the input.
                 This is ignored and will be removed.
         """
@@ -87,6 +91,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             embedding_net=embedding_net,
         )
         self.noise_scale = noise_scale
+
+        self.register_buffer("mean_1", torch.as_tensor(mean_1))
+        self.register_buffer("std_1", torch.as_tensor(std_1))
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         """Forward pass of the FlowMatchingEstimator.
@@ -127,8 +134,15 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         )
         time = time.reshape(-1)
 
-        # call the network to get the estimated vector field
-        v = self.net(input, condition_emb, time)
+        t_view = time.view(-1, *([1] * (input.ndim - 1)))
+        mu_t = t_view * self.mean_1
+        var_t = (t_view * self.std_1) ** 2 + (1 - t_view) ** 2
+
+        std_t = torch.sqrt(var_t)
+        input_norm = (input - mu_t) / std_t
+
+        v_out = self.net(input_norm, condition_emb, time)
+        v = v_out * std_t
         v = v.reshape(*batch_shape + self.input_shape)
 
         return v
