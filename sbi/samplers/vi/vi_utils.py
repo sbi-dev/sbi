@@ -152,6 +152,7 @@ class LearnableGaussian(nn.Module):
         dim: int,
         full_covariance: bool = True,
         link_transform: Optional[TorchTransform] = None,
+        device: Union[str, torch.device] = "cpu",
     ):
         """Initialize the learnable Gaussian.
 
@@ -161,20 +162,21 @@ class LearnableGaussian(nn.Module):
                 diagonal covariance (faster, fewer parameters).
             link_transform: Optional transform to apply to samples. Maps from
                 unconstrained to constrained space (matching prior support).
+            device: Device to create parameters on.
         """
         super().__init__()
         self._dim = dim
         self._full_cov = full_covariance
         self._link_transform = link_transform
 
-        # Learnable parameters
-        self.loc = nn.Parameter(torch.zeros(dim))
+        # Learnable parameters - create on correct device from the start
+        self.loc = nn.Parameter(torch.zeros(dim, device=device))
         if full_covariance:
             # Lower triangular matrix for Cholesky parameterization
-            self.scale_tril = nn.Parameter(torch.eye(dim))
+            self.scale_tril = nn.Parameter(torch.eye(dim, device=device))
         else:
             # Log scale for numerical stability
-            self.log_scale = nn.Parameter(torch.zeros(dim))
+            self.log_scale = nn.Parameter(torch.zeros(dim, device=device))
 
     def _base_dist(self) -> Distribution:
         """Get the base Gaussian distribution with current parameters."""

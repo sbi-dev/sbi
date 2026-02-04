@@ -1,6 +1,14 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+"""
+Tests for Variational Inference (VI) using VIPosterior.
+
+This module tests both:
+- Single-x VI mode: train() - trains q(θ) for a specific observation x_o
+- Amortized VI mode: train_amortized() - trains q(θ|x) across observations
+"""
+
 from __future__ import annotations
 
 import tempfile
@@ -16,12 +24,21 @@ from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 from sbi.inference import NLE, likelihood_estimator_based_potential
 from sbi.inference.posteriors import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
+from sbi.neural_nets.factory import ZukoFlowType
+from sbi.simulators.linear_gaussian import (
+    linear_gaussian,
+    true_posterior_linear_gaussian_mvn_prior,
+)
 from sbi.utils import MultipleIndependent
-from sbi.utils.metrics import check_c2st
+from sbi.utils.metrics import c2st, check_c2st
 
 # Supported variational families for VI
 FLOWS = ["maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"]
+
+
+# =============================================================================
+# Shared Test Utilities
+# =============================================================================
 
 
 class FakePotential(BasePotential):
@@ -32,11 +49,84 @@ class FakePotential(BasePotential):
     """
 
     def __call__(self, theta, **kwargs):
-        # Return prior log_prob so the posterior equals the prior
         return self.prior.log_prob(theta)
 
     def allow_iid_x(self) -> bool:
         return True
+
+
+def make_tractable_potential(target_distribution, prior):
+    """Create a potential function from a known target distribution."""
+
+    class TractablePotential(BasePotential):
+        def __call__(self, theta, **kwargs):
+            return target_distribution.log_prob(
+                torch.as_tensor(theta, dtype=torch.float32)
+            )
+
+        def allow_iid_x(self) -> bool:
+            return True
+
+    return TractablePotential(prior=prior)
+
+
+# =============================================================================
+# Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def linear_gaussian_setup():
+    """Setup for linear Gaussian test problem with trained NLE.
+
+    Returns a dict with:
+    - prior: MultivariateNormal prior
+    - potential_fn: Trained NLE-based potential function
+    - theta, x: Simulation data
+    - likelihood_shift, likelihood_cov: Likelihood parameters
+    - num_dim: Dimensionality
+    """
+    torch.manual_seed(42)
+
+    num_dim = 2
+    num_simulations = 5000
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.25 * eye(num_dim)
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    # Generate simulation data
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
+    # Train NLE
+    trainer = NLE(prior=prior, show_progress_bars=False, density_estimator="nsf")
+    trainer.append_simulations(theta, x)
+    likelihood_estimator = trainer.train(max_num_epochs=200)
+
+    # Create potential function
+    potential_fn, _ = likelihood_estimator_based_potential(
+        likelihood_estimator=likelihood_estimator,
+        prior=prior,
+        x_o=None,
+    )
+
+    return {
+        "prior": prior,
+        "potential_fn": potential_fn,
+        "theta": theta,
+        "x": x,
+        "likelihood_shift": likelihood_shift,
+        "likelihood_cov": likelihood_cov,
+        "num_dim": num_dim,
+    }
+
+
+# =============================================================================
+# Single-x VI Tests: train() method
+# =============================================================================
 
 
 @pytest.mark.slow
@@ -44,20 +134,11 @@ class FakePotential(BasePotential):
 @pytest.mark.parametrize("vi_method", ("rKL", "fKL", "IW", "alpha"))
 @pytest.mark.parametrize("sampling_method", ("naive", "sir"))
 def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str, sampling_method: str):
-    """Test VI on Gaussian, comparing to ground truth target via c2st.
-
-    Args:
-        num_dim: parameter dimension of the gaussian model
-        vi_method: different vi methods
-        sampling_method: Different sampling methods
-
-    """
-
+    """Test single-x VI on Gaussian, comparing to ground truth via c2st."""
     if sampling_method == "naive" and vi_method == "IW":
-        return  # This is not meant to perform goood ...
+        return  # This combination is not meant to perform well
 
     num_samples = 2000
-
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
     prior_mean = zeros(num_dim)
@@ -69,17 +150,8 @@ def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str, sampling_method: str)
     )
     target_samples = target_distribution.sample((num_samples,))
 
-    class TractablePotential(BasePotential):
-        def __call__(self, theta, **kwargs):
-            return target_distribution.log_prob(
-                torch.as_tensor(theta, dtype=torch.float32)
-            )
-
-        def allow_iid_x(self) -> bool:
-            return True
-
     prior = MultivariateNormal(prior_mean, prior_cov)
-    potential_fn = TractablePotential(prior=prior)
+    potential_fn = make_tractable_potential(target_distribution, prior)
     theta_transform = torch_tf.identity_transform
 
     # Use 'gaussian' for 1D (normalizing flows are unstable in 1D with Zuko)
@@ -98,21 +170,12 @@ def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str, sampling_method: str)
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("q", FLOWS)
 def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str):
-    """Test VI on Gaussian, comparing to ground truth target via c2st.
-
-    Args:
-        num_dim: parameter dimension of the gaussian model
-        vi_method: different vi methods
-        sampling_method: Different sampling methods
-
-    """
-    # All normalizing flows (except gaussian families) are unstable in 1D with Zuko
-    # due to autoregressive architecture requiring >= 2 dimensions
+    """Test different flow types on Gaussian via c2st."""
+    # Normalizing flows (except gaussian families) are unstable in 1D with Zuko
     if num_dim == 1 and q not in ["gaussian", "gaussian_diag"]:
         return
 
     num_samples = 2000
-
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
     prior_mean = zeros(num_dim)
@@ -124,17 +187,8 @@ def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str):
     )
     target_samples = target_distribution.sample((num_samples,))
 
-    class TractablePotential(BasePotential):
-        def __call__(self, theta, **kwargs):
-            return target_distribution.log_prob(
-                torch.as_tensor(theta, dtype=torch.float32)
-            )
-
-        def allow_iid_x(self) -> bool:
-            return True
-
     prior = MultivariateNormal(prior_mean, prior_cov)
-    potential_fn = TractablePotential(prior=prior)
+    potential_fn = make_tractable_potential(target_distribution, prior)
     theta_transform = torch_tf.identity_transform
 
     posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
@@ -149,16 +203,8 @@ def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str):
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int):
-    """Test VI on Gaussian, comparing to ground truth target via c2st.
-
-    Args:
-        num_dim: parameter dimension of the gaussian model
-        vi_method: different vi methods
-        sampling_method: Different sampling methods
-
-    """
+    """Test VI with user-provided external distribution."""
     num_samples = 2000
-
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
     prior_mean = zeros(num_dim)
@@ -170,17 +216,8 @@ def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int):
     )
     target_samples = target_distribution.sample((num_samples,))
 
-    class TractablePotential(BasePotential):
-        def __call__(self, theta, **kwargs):
-            return target_distribution.log_prob(
-                torch.as_tensor(theta, dtype=torch.float32)
-            )
-
-        def allow_iid_x(self) -> bool:
-            return True
-
     prior = MultivariateNormal(prior_mean, prior_cov)
-    potential_fn = TractablePotential(prior=prior)
+    potential_fn = make_tractable_potential(target_distribution, prior)
     theta_transform = torch_tf.identity_transform
 
     mu = zeros(num_dim, requires_grad=True)
@@ -204,37 +241,21 @@ def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int):
 
 @pytest.mark.parametrize("q", FLOWS)
 def test_deepcopy_support(q: str):
-    """Tests if the variational does support deepcopy.
-
-    Args:
-        q: Different variational posteriors.
-    """
-
+    """Test that VIPosterior supports deepcopy for all flow types."""
     num_dim = 2
-
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     potential_fn = FakePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
 
-    posterior = VIPosterior(
-        potential_fn,
-        prior,
-        theta_transform=theta_transform,
-        q=q,
-    )
+    posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
     posterior_copy = deepcopy(posterior)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    assert posterior._x != posterior_copy._x, (
-        "Default x attributed of original and copied but modified VIPosterior must be\
-        the different, on change (otherwise it is not a deep copy)."
-    )
-    posterior_copy = deepcopy(posterior)
-    assert (posterior._x == posterior_copy._x).all(), (
-        "Default x attributed of original and copied VIPosterior must be the same."
-    )
+    assert posterior._x != posterior_copy._x, "Deepcopy should create independent copy"
 
-    # Try if they are the same
-    # Use sample() for Zuko flows, rsample() for Pyro flows
+    posterior_copy = deepcopy(posterior)
+    assert (posterior._x == posterior_copy._x).all(), "Deepcopy should preserve values"
+
+    # Verify samples are reproducible
     torch.manual_seed(0)
     if hasattr(posterior._q, "rsample"):
         s1 = posterior._q.rsample()
@@ -245,48 +266,33 @@ def test_deepcopy_support(q: str):
         s2 = posterior_copy._q.rsample()
     else:
         s2 = posterior_copy._q.sample((1,)).squeeze(0)
-    assert torch.allclose(s1, s2), (
-        "Samples from original and unpickled VIPosterior must be close."
-    )
+    assert torch.allclose(s1, s2), "Samples should match after deepcopy"
 
-    # Produces nonleaf tensors in the cache... -> Can lead to failure of deepcopy.
+    # Test deepcopy after sampling (can produce nonleaf tensors in cache)
     if hasattr(posterior.q, "rsample"):
         posterior.q.rsample()
     else:
         posterior.q.sample((1,))
-    posterior_copy = deepcopy(posterior)
+    deepcopy(posterior)  # Should not raise
 
 
 @pytest.mark.parametrize("q", FLOWS)
 def test_pickle_support(q: str):
-    """Tests if the VIPosterior can be saved and loaded via pickle.
-
-    Args:
-        q: Different variational posteriors.
-    """
+    """Test that VIPosterior can be saved and loaded via pickle."""
     num_dim = 2
-
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     potential_fn = FakePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
 
-    posterior = VIPosterior(
-        potential_fn,
-        prior,
-        theta_transform=theta_transform,
-        q=q,
-    )
+    posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
 
     with tempfile.NamedTemporaryFile(suffix=".pt") as f:
         torch.save(posterior, f.name)
         posterior_loaded = torch.load(f.name, weights_only=False)
-        assert (posterior._x == posterior_loaded._x).all(), (
-            "Mhh, something with the pickled is strange"
-        )
+        assert (posterior._x == posterior_loaded._x).all()
 
-    # Try if they are the same
-    # Use sample() for Zuko flows, rsample() for Pyro flows
+    # Verify samples are reproducible
     torch.manual_seed(0)
     if hasattr(posterior._q, "rsample"):
         s1 = posterior._q.rsample()
@@ -298,82 +304,59 @@ def test_pickle_support(q: str):
     else:
         s2 = posterior_loaded._q.sample((1,)).squeeze(0)
 
-    assert torch.allclose(s1, s2), "Mhh, something with the pickled is strange"
+    assert torch.allclose(s1, s2), "Samples should match after unpickling"
 
 
-def test_vi_posterior_inferface():
+def test_vi_posterior_interface():
+    """Test VIPosterior interface: hyperparameters, training, evaluation."""
     num_dim = 2
-
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     potential_fn = FakePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
 
-    posterior = VIPosterior(
-        potential_fn,
-        theta_transform=theta_transform,
-    )
+    posterior = VIPosterior(potential_fn, theta_transform=theta_transform)
     posterior.set_default_x(torch.zeros((1, num_dim)))
 
     posterior2 = VIPosterior(potential_fn)
 
-    # Raising errors if untrained
-    # Note: Zuko flows don't expose a .support attribute like Pyro flows do.
-    # For Zuko flows, we skip this check since the transform handling is different.
+    # Check support compatibility (if available)
     if hasattr(posterior.q, "support") and hasattr(posterior2.q, "support"):
-        assert isinstance(posterior.q.support, type(posterior2.q.support)), (
-            "The support indicated by 'theta_transform' is different than that of "
-            "'prior'."
-        )
+        assert isinstance(posterior.q.support, type(posterior2.q.support))
 
+    # Should raise if not trained
     with pytest.raises(Exception) as execinfo:
         posterior.sample()
-
-    assert "The variational posterior was not fit" in execinfo.value.args[0], (
-        "An expected error was raised but the error message is different than expected."
-    )
+    assert "The variational posterior was not fit" in execinfo.value.args[0]
 
     with pytest.raises(Exception) as execinfo:
         posterior.log_prob(prior.sample())
+    assert "The variational posterior was not fit" in execinfo.value.args[0]
 
-    assert "The variational posterior was not fit" in execinfo.value.args[0], (
-        "An expected error was raised but the error message is different than expected."
-    )
-
-    # Passing Hyperparameters in train
+    # Test training hyperparameters
     posterior.train(max_num_iters=20)
 
     posterior.train(max_num_iters=20, optimizer=torch.optim.SGD)
-    assert isinstance(posterior._optimizer._optimizer, torch.optim.SGD), (
-        "Assert chaning the optimizer base class did not work"
-    )
-    posterior.train(max_num_iters=20, stick_the_landing=True)
+    assert isinstance(posterior._optimizer._optimizer, torch.optim.SGD)
 
-    assert posterior._optimizer.stick_the_landing, (
-        "The sticking_the_landing argument is not correctly passed."
-    )
+    posterior.train(max_num_iters=20, stick_the_landing=True)
+    assert posterior._optimizer.stick_the_landing
 
     posterior.vi_method = "alpha"
     posterior.train(max_num_iters=20)
     posterior.train(max_num_iters=20, alpha=0.9)
-
-    assert posterior._optimizer.alpha == 0.9, (
-        "The Hyperparameter alpha is not passed to the corresponding optmizer"
-    )
+    assert posterior._optimizer.alpha == 0.9
 
     posterior.vi_method = "IW"
     posterior.train(max_num_iters=20)
     posterior.train(max_num_iters=20, K=32)
+    assert posterior._optimizer.K == 32
 
-    assert posterior._optimizer.K == 32, (
-        "The Hyperparameter K is not passed to the corresponding optmizer"
-    )
-
-    # Passing Hyperparameters in sample
+    # Test sampling hyperparameters
     posterior.sample()
     posterior.sample(method="sir")
     posterior.sample(method="sir", K=128)
 
-    # Testing evaluate - FakePotential returns prior log_prob so metrics work
+    # Test evaluation
     posterior.evaluate()
     posterior.evaluate("prop")
     posterior.evaluate("prop_prior")
@@ -384,6 +367,7 @@ def test_vi_posterior_inferface():
 
 
 def test_vi_with_multiple_independent_prior():
+    """Test VI with MultipleIndependent prior (mixed distributions)."""
     prior = MultipleIndependent(
         [
             Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
@@ -404,16 +388,13 @@ def test_vi_with_multiple_independent_prior():
     potential, transform = likelihood_estimator_based_potential(nle, prior, x[0])
     posterior = VIPosterior(
         potential,
-        prior=prior,  # type: ignore
-        theta_transform=transform,
+        prior=prior,
+        theta_transform=transform,  # type: ignore
     )
     posterior.set_default_x(x[0])
     posterior.train()
 
-    posterior.sample(
-        sample_shape=(10,),
-        show_progress_bars=False,
-    )
+    posterior.sample(sample_shape=(10,), show_progress_bars=False)
 
 
 @pytest.mark.parametrize("num_dim", (1, 2, 3, 4, 5, 10, 25, 33))
@@ -424,13 +405,10 @@ def test_vi_flow_builders(num_dim: int, q_type: str):
     if num_dim == 1 and q_type not in ("gaussian", "gaussian_diag"):
         return
 
-    # Create a simple prior and potential for testing
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-
     potential_fn = FakePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
 
-    # Build the posterior with the specified variational family
     posterior = VIPosterior(
         potential_fn, prior, theta_transform=theta_transform, q=q_type
     )
@@ -449,3 +427,331 @@ def test_vi_flow_builders(num_dim: int, q_type: str):
     assert sample_batch.shape == expected_shape, f"Shape mismatch: {sample_batch.shape}"
     log_prob_batch = q.log_prob(sample_batch)
     assert log_prob_batch.shape == (10,), f"Shape mismatch: {log_prob_batch.shape}"
+
+
+# =============================================================================
+# Amortized VI Tests: train_amortized() method
+# =============================================================================
+
+
+@pytest.mark.slow
+def test_amortized_vi_training(linear_gaussian_setup):
+    """Test that VIPosterior.train_amortized() trains successfully."""
+    setup = linear_gaussian_setup
+
+    posterior = VIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+    )
+
+    posterior.train_amortized(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=500,
+        show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
+    )
+
+    assert posterior._mode == "amortized"
+
+
+@pytest.mark.slow
+def test_amortized_vi_accuracy(linear_gaussian_setup):
+    """Test that amortized VI produces accurate posteriors across observations."""
+    setup = linear_gaussian_setup
+
+    posterior = VIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+    )
+
+    posterior.train_amortized(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=500,
+        show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
+    )
+
+    # Test on multiple observations
+    test_x_os = [
+        zeros(1, setup["num_dim"]),
+        ones(1, setup["num_dim"]),
+        -ones(1, setup["num_dim"]),
+    ]
+
+    for x_o in test_x_os:
+        true_posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o.squeeze(0),
+            setup["likelihood_shift"],
+            setup["likelihood_cov"],
+            zeros(setup["num_dim"]),
+            eye(setup["num_dim"]),
+        )
+        true_samples = true_posterior.sample((1000,))
+        vi_samples = posterior.sample((1000,), x=x_o)
+
+        c2st_score = c2st(true_samples, vi_samples).item()
+        assert c2st_score < 0.6, f"C2ST too high for x_o={x_o.squeeze().tolist()}"
+
+
+@pytest.mark.slow
+def test_amortized_vi_batched_sampling(linear_gaussian_setup):
+    """Test batched sampling from amortized VIPosterior."""
+    setup = linear_gaussian_setup
+
+    posterior = VIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+    )
+
+    posterior.train_amortized(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=500,
+        show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
+    )
+
+    num_obs = 10
+    num_samples = 100
+    x_batch = torch.randn(num_obs, setup["num_dim"])
+    samples = posterior.sample_batched((num_samples,), x=x_batch)
+
+    assert samples.shape == (num_samples, num_obs, setup["num_dim"])
+
+
+@pytest.mark.slow
+def test_amortized_vi_log_prob(linear_gaussian_setup):
+    """Test log_prob evaluation in amortized mode."""
+    setup = linear_gaussian_setup
+
+    posterior = VIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+    )
+
+    posterior.train_amortized(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=500,
+        show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
+    )
+
+    x_o = zeros(1, setup["num_dim"])
+    theta_test = torch.randn(10, setup["num_dim"])
+
+    log_probs = posterior.log_prob(theta_test, x=x_o)
+
+    assert log_probs.shape == (10,)
+    assert torch.isfinite(log_probs).all()
+
+
+@pytest.mark.slow
+def test_amortized_vi_default_x(linear_gaussian_setup):
+    """Test that amortized mode uses default_x when x not provided."""
+    setup = linear_gaussian_setup
+
+    posterior = VIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+    )
+
+    posterior.train_amortized(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=100,
+        show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+    )
+
+    posterior.set_default_x(zeros(1, setup["num_dim"]))
+    samples = posterior.sample((100,))
+    assert samples.shape == (100, setup["num_dim"])
+
+
+@pytest.mark.slow
+def test_amortized_vi_requires_training(linear_gaussian_setup):
+    """Test that sampling before training raises an error."""
+    setup = linear_gaussian_setup
+
+    posterior = VIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+    )
+
+    posterior.set_default_x(zeros(1, setup["num_dim"]))
+    with pytest.raises(ValueError):
+        posterior.sample((100,))
+
+
+@pytest.mark.slow
+def test_amortized_vs_single_x_vi(linear_gaussian_setup):
+    """Compare amortized VI against single-x VI for the same observation."""
+    setup = linear_gaussian_setup
+
+    # Train amortized VI
+    amortized_posterior = VIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+    )
+    amortized_posterior.train_amortized(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=500,
+        show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
+    )
+
+    # Train single-x VI for a specific observation
+    x_o = torch.tensor([[0.5, 0.5]])
+    potential_fn_single, _ = likelihood_estimator_based_potential(
+        likelihood_estimator=setup["potential_fn"].likelihood_estimator,
+        prior=setup["prior"],
+        x_o=x_o,
+    )
+
+    single_x_posterior = VIPosterior(
+        potential_fn=potential_fn_single,
+        prior=setup["prior"],
+        q="maf",
+    )
+    single_x_posterior.set_default_x(x_o)
+    single_x_posterior.train(max_num_iters=500, show_progress_bar=False)
+
+    # Get ground truth
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o.squeeze(0),
+        setup["likelihood_shift"],
+        setup["likelihood_cov"],
+        zeros(setup["num_dim"]),
+        eye(setup["num_dim"]),
+    )
+    true_samples = true_posterior.sample((1000,))
+
+    # Compare
+    amortized_samples = amortized_posterior.sample((1000,), x=x_o)
+    single_x_samples = single_x_posterior.sample((1000,))
+
+    c2st_amortized = c2st(true_samples, amortized_samples).item()
+    c2st_single_x = c2st(true_samples, single_x_samples).item()
+
+    assert c2st_amortized < 0.6, f"Amortized VI C2ST too high: {c2st_amortized:.3f}"
+    assert abs(c2st_amortized - c2st_single_x) < 0.15, (
+        f"Amortized ({c2st_amortized:.3f}) much worse than "
+        f"single-x ({c2st_single_x:.3f})"
+    )
+
+
+@pytest.mark.slow
+def test_amortized_vi_gradient_flow(linear_gaussian_setup):
+    """Verify gradients flow through ELBO to flow parameters."""
+    from torch.optim import Adam
+
+    setup = linear_gaussian_setup
+
+    posterior = VIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+    )
+
+    # Build the flow manually
+    theta = setup["theta"][:500].to("cpu")
+    x = setup["x"][:500].to("cpu")
+    posterior._amortized_q = posterior._build_conditional_flow(
+        theta[:100],
+        x[:100],
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
+    )
+    posterior._amortized_q.to("cpu")
+    posterior._mode = "amortized"
+
+    initial_params = [p.clone() for p in posterior._amortized_q.parameters()]
+
+    # Compute ELBO loss and backprop
+    optimizer = Adam(posterior._amortized_q.parameters(), lr=1e-3)
+    optimizer.zero_grad()
+
+    x_batch = x[:8]
+    loss = posterior._compute_amortized_elbo_loss(x_batch, n_particles=16)
+    loss.backward()
+
+    # Verify gradients exist and are non-zero
+    for i, p in enumerate(posterior._amortized_q.parameters()):
+        assert p.grad is not None, f"Gradient is None for parameter {i}"
+        assert torch.isfinite(p.grad).all(), f"Gradient has NaN/Inf for param {i}"
+        assert p.grad.abs().max() > 1e-10, f"Gradient is zero for parameter {i}"
+
+    # Verify parameters change after optimization step
+    optimizer.step()
+    changed_count = sum(
+        1
+        for p_init, p_new in zip(
+            initial_params, posterior._amortized_q.parameters(), strict=True
+        )
+        if not torch.allclose(p_init, p_new.detach(), atol=1e-8)
+    )
+    assert changed_count > 0, "No parameters changed after optimization step"
+
+
+@pytest.mark.slow
+def test_amortized_vi_map(linear_gaussian_setup):
+    """Test that MAP estimation returns high-density region."""
+    setup = linear_gaussian_setup
+
+    posterior = VIPosterior(
+        potential_fn=setup["potential_fn"],
+        prior=setup["prior"],
+    )
+
+    posterior.train_amortized(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=500,
+        show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=32,
+    )
+
+    x_o = zeros(1, setup["num_dim"])
+    posterior.set_default_x(x_o)
+    map_estimate = posterior.map(num_iter=500, num_to_optimize=50)
+
+    # For linear Gaussian, MAP equals posterior mean
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o.squeeze(0),
+        setup["likelihood_shift"],
+        setup["likelihood_cov"],
+        zeros(setup["num_dim"]),
+        eye(setup["num_dim"]),
+    )
+    true_mean = true_posterior.mean
+    map_estimate_flat = map_estimate.squeeze(0)
+
+    assert torch.allclose(map_estimate_flat, true_mean, atol=0.3), (
+        f"MAP {map_estimate_flat.tolist()} not close to true mean {true_mean.tolist()}"
+    )
+
+    # MAP should have higher potential than random samples
+    map_log_prob = posterior.potential(map_estimate)
+    random_samples = posterior.sample((100,), x=x_o)
+    random_log_probs = posterior.potential(random_samples)
+
+    assert map_log_prob > random_log_probs.median(), (
+        f"MAP log_prob {map_log_prob.item():.3f} not better than "
+        f"median random {random_log_probs.median().item():.3f}"
+    )

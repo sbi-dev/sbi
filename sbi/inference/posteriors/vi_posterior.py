@@ -437,13 +437,15 @@ class VIPosterior(NeuralPosterior):
                         dim=dim,
                         full_covariance=full_cov,
                         link_transform=self.link_transform,
-                    ).to(self._device)
+                        device=self._device,
+                    )
                     self._q_build_fn = lambda *args, fc=full_cov, d=dim, **kwargs: (
                         LearnableGaussian(
                             dim=d,
                             full_covariance=fc,
                             link_transform=self.link_transform,
-                        ).to(self._device)
+                            device=self._device,
+                        )
                     )
                     q = q_dist
                 else:
@@ -1245,18 +1247,21 @@ class VIPosterior(NeuralPosterior):
         """
         if memo is None:
             memo = {}
-        # Create a new instance of the class
-        cls = self.__class__
-        result = cls.__new__(cls)
-        # Add to memo
-        memo[id(self)] = result
-        # Copy attributes, handling non-picklable objects
-        for k, v in self.__dict__.items():
-            if k == "_set_x_lock":
-                # Lock objects cannot be deepcopied; create a new one
-                setattr(result, k, Lock())
-            else:
-                setattr(result, k, copy.deepcopy(v, memo))
+
+        # Acquire lock to ensure consistent state during copy
+        with self._set_x_lock:
+            # Create a new instance of the class
+            cls = self.__class__
+            result = cls.__new__(cls)
+            # Add to memo
+            memo[id(self)] = result
+            # Copy attributes, handling non-picklable objects
+            for k, v in self.__dict__.items():
+                if k == "_set_x_lock":
+                    # Lock objects cannot be deepcopied; create a new one
+                    setattr(result, k, Lock())
+                else:
+                    setattr(result, k, copy.deepcopy(v, memo))
         return result
 
     def __getstate__(self) -> Dict:
@@ -1268,13 +1273,15 @@ class VIPosterior(NeuralPosterior):
         Returns:
             Dict: All attributes of the VIPosterior.
         """
-        self._optimizer = None
-        self.__deepcopy__ = None  # type: ignore
-        self._q_build_fn = None
-        self._q.__deepcopy__ = None  # type: ignore
-        # Create a copy of __dict__ without the lock (not picklable)
-        state = self.__dict__.copy()
-        state.pop("_set_x_lock", None)
+        # Acquire lock to ensure consistent state during pickling
+        with self._set_x_lock:
+            self._optimizer = None
+            self.__deepcopy__ = None  # type: ignore
+            self._q_build_fn = None
+            self._q.__deepcopy__ = None  # type: ignore
+            # Create a copy of __dict__ without the lock (not picklable)
+            state = self.__dict__.copy()
+            state.pop("_set_x_lock", None)
         return state
 
     def __setstate__(self, state_dict: Dict):
