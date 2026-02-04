@@ -313,8 +313,8 @@ class VectorFieldPosterior(NeuralPosterior):
             corrector: The corrector for the diffusion-based sampler. Either of
                 [None].
             steps: Number of steps to take for the Euler-Maruyama method.
-            ts: Time points at which to evaluate the diffusion process. If None, a
-                linear grid between t_max and t_min is used.
+            ts: Time points at which to evaluate the diffusion process. If None, call
+                the solve schedule specific to the score estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
@@ -340,11 +340,8 @@ class VectorFieldPosterior(NeuralPosterior):
         # Ensure we don't use larger batches than total samples needed
         effective_batch_size = min(effective_batch_size, total_samples_needed)
 
-        # TODO: the time schedule should be provided by the estimator, see issue #1437
         if ts is None:
-            t_max = self.vector_field_estimator.t_max
-            t_min = self.vector_field_estimator.t_min
-            ts = torch.linspace(t_max, t_min, steps)
+            ts = self.vector_field_estimator.solve_schedule(steps)
         ts = ts.to(self.device)
 
         # Initialize the diffusion sampler
