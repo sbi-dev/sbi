@@ -30,6 +30,8 @@ from torch.optim.sgd import SGD
 
 from sbi.neural_nets.estimators import ZukoUnconditionalFlow
 from sbi.samplers.vi.vi_utils import (
+    LearnableGaussian,
+    TransformedZukoFlow,
     filter_kwrags_for_func,
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
@@ -37,8 +39,13 @@ from sbi.samplers.vi.vi_utils import (
 from sbi.sbi_types import Array, PyroTransformedDistribution
 from sbi.utils.user_input_checks import check_prior
 
-# Type alias for variational distributions that can be either Pyro or Zuko flows
-VariationalDistribution = Union[PyroTransformedDistribution, ZukoUnconditionalFlow]
+# Type alias for variational distributions (nn.Module-based or PyTorch distributions)
+VariationalDistribution = Union[
+    PyroTransformedDistribution,
+    ZukoUnconditionalFlow,
+    TransformedZukoFlow,
+    LearnableGaussian,
+]
 
 _VI_method = {}
 
@@ -114,8 +121,10 @@ class DivergenceOptimizer(ABC):
         self.retain_graph = kwargs.get("retain_graph", False)
         self._kwargs = kwargs
 
-        # Detect flow type: Zuko flows are nn.Module-based, Pyro flows have base_dist
-        self._is_zuko = isinstance(q, ZukoUnconditionalFlow)
+        # Detect if q is nn.Module-based (Zuko/LearnableGaussian) vs Pyro distribution
+        self._is_zuko = isinstance(
+            q, (ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian)
+        )
 
         # This prevents error that would stop optimization (Pyro-specific).
         if not self._is_zuko:
@@ -217,7 +226,7 @@ class DivergenceOptimizer(ABC):
             if self._is_zuko:
                 # Zuko flows: use sample_and_log_prob for efficient reparameterized
                 # sampling
-                samples, logq = self.q.sample_and_log_prob((32,))
+                samples, logq = self.q.sample_and_log_prob(torch.Size((32,)))
                 logp = initial_target.log_prob(samples)
                 loss = -torch.mean(logp - logq)
             elif self.q.has_rsample:
@@ -229,6 +238,7 @@ class DivergenceOptimizer(ABC):
             else:
                 # Pyro flows without rsample: sample from target
                 samples = initial_target.sample((256,))  # type: ignore
+                assert samples is not None  # Type narrowing for pyright
                 loss = -torch.mean(self.q.log_prob(samples))
 
             loss.backward(retain_graph=self.retain_graph)

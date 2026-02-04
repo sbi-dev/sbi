@@ -25,16 +25,16 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unconditional_flow,
 )
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
-from sbi.samplers.vi.vi_pyro_flows import get_flow_builder
 from sbi.samplers.vi.vi_quality_control import get_quality_metric
 from sbi.samplers.vi.vi_utils import (
+    LearnableGaussian,
+    TransformedZukoFlow,
     adapt_variational_distribution,
     check_variational_distribution,
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
 from sbi.sbi_types import (
-    PyroTransformedDistribution,
     Shape,
     TorchDistribution,
     TorchTensor,
@@ -43,14 +43,24 @@ from sbi.sbi_types import (
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
-# Mapping from VIPosterior flow names to Zuko flow types
-_VI_FLOW_TO_ZUKO = {
-    "maf": "MAF",  # Masked Autoregressive Flow
-    "nsf": "NSF",  # Neural Spline Flow (autoregressive)
-    "mcf": "NICE",  # Coupling flow (affine)
-    "scf": "NCSF",  # Neural Spline Flow (coupling)
-    # gaussian and gaussian_diag handled separately
+# Mapping from VI flow names to Zuko flow types.
+# "gaussian" and "gaussian_diag" are handled separately as simple distributions.
+_VI_FLOW_TO_ZUKO: dict[str, str] = {
+    "maf": "MAF",
+    "nsf": "NSF",
+    "naf": "NAF",
+    "unaf": "UNAF",
+    "nice": "NICE",
+    "sospf": "SOSPF",
 }
+
+# Type for supported variational family strings
+VariationalFamily = Literal[
+    "maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"
+]
+
+# Type for the q parameter in VIPosterior
+QType = Union[VariationalFamily, Distribution, "VIPosterior", Callable]
 
 
 class VIPosterior(NeuralPosterior):
@@ -80,12 +90,7 @@ class VIPosterior(NeuralPosterior):
         self,
         potential_fn: Union[BasePotential, CustomPotential],
         prior: Optional[TorchDistribution] = None,  # type: ignore
-        q: Union[
-            Literal["nsf", "scf", "maf", "mcf", "gaussian", "gaussian_diag"],
-            PyroTransformedDistribution,
-            "VIPosterior",
-            Callable,
-        ] = "maf",
+        q: QType = "maf",
         theta_transform: Optional[TorchTransform] = None,
         vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         device: Union[str, torch.device] = "cpu",
@@ -102,18 +107,16 @@ class VIPosterior(NeuralPosterior):
                 quality metrics. Please make sure that this matches with the prior
                 within the potential_fn. If `None` is given, we will try to infer it
                 from potential_fn or q, if this fails we raise an Error.
-            q: Variational distribution, either string, `TransformedDistribution`, or a
+            q: Variational distribution, either string, `Distribution`, or a
                 `VIPosterior` object. This specifies a parametric class of distribution
                 over which the best possible posterior approximation is searched. For
-                string input, we currently support [nsf, scf, maf, mcf, gaussian,
-                gaussian_diag]. You can also specify your own variational family by
-                passing a pyro `TransformedDistribution`.
-                Additionally, we allow a `Callable`, which allows you the pass a
-                `builder` function, which if called returns a distribution. This may be
-                useful for setting the hyperparameters e.g. `num_transfroms` within the
-                `get_flow_builder` method specifying the number of transformations
-                within a normalizing flow. If q is already a `VIPosterior`, then the
-                arguments will be copied from it (relevant for multi-round training).
+                string input, we support normalizing flows [maf, nsf, naf, unaf, nice,
+                sospf] via Zuko, and Gaussian families [gaussian, gaussian_diag].
+                You can also specify your own variational family by passing a
+                `torch.distributions.Distribution`. Additionally, we allow a `Callable`
+                that returns a distribution, useful for custom flow configurations.
+                If q is already a `VIPosterior`, then the arguments will be copied from
+                it (relevant for multi-round training).
             theta_transform: Maps form prior support to unconstrained space. The
                 inverse is used here to ensure that the posterior support is equal to
                 that of the prior.
@@ -226,42 +229,61 @@ class VIPosterior(NeuralPosterior):
         flow_type: str,
         num_transforms: int = 5,
         hidden_features: int = 50,
-        **kwargs,
-    ) -> ZukoUnconditionalFlow:
+    ) -> TransformedZukoFlow:
         """Build a Zuko unconditional flow for variational inference.
 
+        The flow is wrapped with TransformedZukoFlow to handle the transformation
+        between unconstrained (flow) space and constrained (prior) space. This ensures
+        that samples from the flow match the prior's support and log_prob accounts
+        for the Jacobian of the transformation.
+
         Args:
-            flow_type: Type of flow, one of ["maf", "nsf", "mcf", "scf"].
+            flow_type: Type of flow, one of ["maf", "nsf", "naf", "unaf", "nice",
+                "sospf"]. For "gaussian" or "gaussian_diag", use LearnableGaussian.
             num_transforms: Number of flow transforms.
             hidden_features: Number of hidden features per layer.
-            **kwargs: Additional arguments passed to flow constructor.
 
         Returns:
-            ZukoUnconditionalFlow: The constructed flow.
+            TransformedZukoFlow: The constructed flow wrapped with link_transform.
 
         Raises:
-            ValueError: If flow_type is not supported or is gaussian/gaussian_diag.
+            ValueError: If flow_type is not supported.
         """
         if flow_type in ("gaussian", "gaussian_diag"):
             raise ValueError(
-                f"Flow type '{flow_type}' is not supported with Zuko. "
-                f"Use Pyro flows for Gaussian variational families or switch to "
-                f"a normalizing flow type like 'maf', 'nsf', 'mcf', or 'scf'."
+                f"Flow type '{flow_type}' uses LearnableGaussian, not Zuko flows. "
+                f"This is handled automatically in set_q()."
             )
 
         if flow_type not in _VI_FLOW_TO_ZUKO:
             raise ValueError(
                 f"Unknown flow type '{flow_type}'. "
-                f"Supported types: {list(_VI_FLOW_TO_ZUKO.keys())}."
+                f"Supported types: {list(_VI_FLOW_TO_ZUKO.keys())} + "
+                f"['gaussian', 'gaussian_diag']."
             )
 
         zuko_flow_type = _VI_FLOW_TO_ZUKO[flow_type]
 
-        # Sample from prior to get batch for dimensionality inference
-        # We apply link_transform to map to unconstrained space
+        # Get prior dimensionality
+        prior_dim = self._prior.event_shape[0] if self._prior.event_shape else 1
+
+        # Warn about 1D limitation
+        if prior_dim == 1:
+            warnings.warn(
+                f"Using {flow_type.upper()} flow for 1D parameter space. "
+                f"Normalizing flows may be unstable for 1D VI optimization. "
+                f"Consider using q='gaussian' for better results in 1D.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        # Sample from prior to get batch for dimensionality inference and z-scoring
+        # We apply link_transform.inv to map constrained prior samples to unconstrained
+        # space (link_transform.forward maps unconstrained -> constrained)
         with torch.no_grad():
             prior_samples = self._prior.sample((1000,))
-            batch_theta = self.link_transform(prior_samples)
+            batch_theta = self.link_transform.inv(prior_samples)
+            assert isinstance(batch_theta, Tensor)  # Type narrowing for pyright
 
         flow = build_zuko_unconditional_flow(
             which_nf=zuko_flow_type,
@@ -269,10 +291,17 @@ class VIPosterior(NeuralPosterior):
             z_score_x="independent",  # z-score for stable training
             hidden_features=hidden_features,
             num_transforms=num_transforms,
-            **kwargs,
         )
 
-        return flow.to(self._device)
+        # Wrap flow with link_transform to ensure samples are in constrained space
+        # The flow operates in unconstrained space, but we want samples/log_probs
+        # in constrained space (matching the prior's support)
+        transformed_flow = TransformedZukoFlow(
+            flow=flow.to(self._device),
+            link_transform=self.link_transform,
+        )
+
+        return transformed_flow.to(self._device)
 
     def _build_conditional_flow(
         self,
@@ -316,43 +345,26 @@ class VIPosterior(NeuralPosterior):
         ).to(self._device)
 
     @property
-    def q(self) -> Distribution:
+    def q(
+        self,
+    ) -> Union[
+        Distribution, ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian
+    ]:
         """Returns the variational posterior."""
         return self._q
 
     @q.setter
-    def q(
-        self,
-        q: Union[str, Distribution, "VIPosterior", Callable],
-    ) -> None:
-        """Sets the variational distribution. If the distribution does not admit access
-        through `parameters` and `modules` function, please use `set_q` if you want to
-        explicitly specify the parameters and modules.
+    def q(self, q: QType) -> None:
+        """Sets the variational distribution.
 
-
-        Args:
-            q: Variational distribution, either string, distribution, or a VIPosterior
-                object. This specifies a parametric class of distribution over which
-                the best possible posterior approximation is searched. For string input,
-                we currently support [nsf, scf, maf, mcf, gaussian, gaussian_diag]. Of
-                course, you can also specify your own variational family by passing a
-                `parameterized` distribution object i.e. a torch.distributions
-                Distribution with methods `parameters` returning an iterable of all
-                parameters (you can pass them within the paramters/modules attribute).
-                Additionally, we allow a `Callable`, which allows you the pass a
-                `builder` function, which if called returns an distribution. This may be
-                useful for setting the hyperparameters e.g. `num_transfroms:int` by
-                using the `get_flow_builder` method specifying the hyperparameters. If q
-                is already a `VIPosterior`, then the arguments will be copied from it
-                (relevant for multi-round training).
-
-
+        If the distribution does not admit access through `parameters` and `modules`
+        function, please use `set_q` to explicitly specify the parameters and modules.
         """
         self.set_q(q)
 
     def set_q(
         self,
-        q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable],
+        q: QType,
         parameters: Optional[Iterable] = None,
         modules: Optional[Iterable] = None,
     ) -> None:
@@ -368,17 +380,19 @@ class VIPosterior(NeuralPosterior):
             q: Variational distribution, either string, distribution, or a VIPosterior
                 object. This specifies a parametric class of distribution over which
                 the best possible posterior approximation is searched. For string input,
-                we currently support [nsf, scf, maf, mcf, gaussian, gaussian_diag]. Of
-                course, you can also specify your own variational family by passing a
+                we support normalizing flows [maf, nsf, naf, unaf, nice, sospf] via
+                Zuko, and simple Gaussian families [gaussian, gaussian_diag] via pure
+                PyTorch. You can also specify your own variational family by passing a
                 `parameterized` distribution object i.e. a torch.distributions
                 Distribution with methods `parameters` returning an iterable of all
-                parameters (you can pass them within the paramters/modules attribute).
-                Additionally, we allow a `Callable`, which allows you the pass a
-                `builder` function, which if called returns an distribution. This may be
-                useful for setting the hyperparameters e.g. `num_transfroms:int` by
-                using the `get_flow_builder` method specifying the hyperparameters. If q
+                parameters (you can pass them within the parameters/modules attribute).
+                Additionally, we allow a `Callable`, which allows you to pass a
+                `builder` function, which if called returns a distribution. If q
                 is already a `VIPosterior`, then the arguments will be copied from it
                 (relevant for multi-round training).
+
+                Note: For 1D parameter spaces, normalizing flows may be unstable.
+                Consider using `q='gaussian'` for 1D problems.
             parameters: List of parameters associated with the distribution object.
             modules: List of modules associated with the distribution object.
 
@@ -388,12 +402,11 @@ class VIPosterior(NeuralPosterior):
         if modules is None:
             modules = []
         self._q_arg = (q, parameters, modules)
-        if isinstance(q, ZukoUnconditionalFlow):
-            # Zuko flow passed directly (e.g., from _q_build_fn during retrain)
-            # Keep existing _q_build_fn and _zuko_flow_type, just use the flow
+        _flow_types = (ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian)
+        if isinstance(q, _flow_types):
+            # Flow/Gaussian passed directly (e.g., from _q_build_fn during retrain)
             make_object_deepcopy_compatible(q)
             self._trained_on = None
-            # Note: Don't overwrite _q_build_fn/_zuko_flow_type - set earlier
         elif isinstance(q, Distribution):
             q = adapt_variational_distribution(
                 q,
@@ -410,22 +423,35 @@ class VIPosterior(NeuralPosterior):
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
                 if q in _VI_FLOW_TO_ZUKO:
-                    # Use Zuko flows for normalizing flow types
                     q_flow = self._build_zuko_flow(q)
-                    # Store flow type for retraining. Use default arg to capture value.
                     self._zuko_flow_type = q
                     self._q_build_fn = lambda *args, ft=q, **kwargs: (
                         self._build_zuko_flow(ft)
                     )
                     q = q_flow
-                else:
-                    # Use Pyro flows for gaussian/gaussian_diag
+                elif q in ("gaussian", "gaussian_diag"):
                     self._zuko_flow_type = None
-                    self._q_build_fn = get_flow_builder(q)
-                    q = self._q_build_fn(
-                        self._prior.event_shape,
-                        self.link_transform,
-                        device=self._device,
+                    full_cov = q == "gaussian"
+                    dim = self._prior.event_shape[0]
+                    q_dist = LearnableGaussian(
+                        dim=dim,
+                        full_covariance=full_cov,
+                        link_transform=self.link_transform,
+                    ).to(self._device)
+                    self._q_build_fn = lambda *args, fc=full_cov, d=dim, **kwargs: (
+                        LearnableGaussian(
+                            dim=d,
+                            full_covariance=fc,
+                            link_transform=self.link_transform,
+                        ).to(self._device)
+                    )
+                    q = q_dist
+                else:
+                    supported = list(_VI_FLOW_TO_ZUKO.keys())
+                    supported += ["gaussian", "gaussian_diag"]
+                    raise ValueError(
+                        f"Unknown variational family '{q}'. "
+                        f"Supported options: {supported}"
                     )
             else:
                 # Callable provided - use as-is
@@ -452,16 +478,14 @@ class VIPosterior(NeuralPosterior):
             q = deepcopy(q.q)
         move_all_tensor_to_device(q, self._device)
         # Validate the variational distribution
-        if isinstance(q, ZukoUnconditionalFlow):
-            # Zuko flows are validated in _build_zuko_flow, no additional checks needed
-            pass
+        if isinstance(q, _flow_types):
+            pass  # These are validated during construction
         elif isinstance(q, Distribution):
             check_variational_distribution(q, self._prior)
         else:
             raise ValueError(
-                "Variational distribution must be a Distribution or "
-                f"ZukoUnconditionalFlow, got {type(q)}. Please create an issue "
-                "on github https://github.com/mackelab/sbi/issues"
+                f"Variational distribution must be a Distribution, got {type(q)}. "
+                "Please create an issue on github https://github.com/mackelab/sbi/issues"
             )
         self._q = q
 
@@ -599,13 +623,13 @@ class VIPosterior(NeuralPosterior):
                 consumption.
 
         Returns:
-            Log-probability. Shape depends on input:
-            - Single x: (batch_theta,)
-            - Batched x in amortized mode: depends on flow's broadcasting behavior,
-              typically (batch_theta,) if batch_theta == batch_x (paired evaluation).
+            Log-probability of shape (batch,) where batch is:
+            - batch_theta if x has batch size 1 (broadcast x)
+            - batch_x if theta has batch size 1 (broadcast theta)
+            - batch_theta if batch_theta == batch_x (paired evaluation)
 
         Raises:
-            ValueError: If mode requirements are not met.
+            ValueError: If mode requirements are not met or batch sizes incompatible.
         """
         with torch.set_grad_enabled(track_gradients):
             theta = ensure_theta_batched(torch.as_tensor(theta)).to(self._device)
@@ -620,7 +644,31 @@ class VIPosterior(NeuralPosterior):
                     )
                 x = atleast_2d_float32_tensor(x).to(self._device)
                 assert self._amortized_q is not None
-                return self._amortized_q.log_prob(theta, condition=x)
+
+                # Handle broadcasting between theta and x
+                batch_theta = theta.shape[0]
+                batch_x = x.shape[0]
+
+                if batch_theta != batch_x:
+                    if batch_x == 1:
+                        # Broadcast x to match theta
+                        x = x.expand(batch_theta, -1)
+                    elif batch_theta == 1:
+                        # Broadcast theta to match x
+                        theta = theta.expand(batch_x, -1)
+                    else:
+                        raise ValueError(
+                            f"Batch sizes of theta ({batch_theta}) and x ({batch_x}) "
+                            f"are incompatible. They must be equal, or one must be 1."
+                        )
+
+                # ZukoFlow expects input shape (sample_dim, batch_dim, *event_shape)
+                # Add sample dimension, compute log_prob, then squeeze back
+                theta_with_sample_dim = theta.unsqueeze(0)
+                log_probs = self._amortized_q.log_prob(
+                    theta_with_sample_dim, condition=x
+                )
+                return log_probs.squeeze(0)
             else:
                 # Single-x mode: evaluate log q(θ)
                 x = self._x_else_default_x(x)
@@ -686,7 +734,24 @@ class VIPosterior(NeuralPosterior):
                 weight_transform: Callable applied to importance weights (only for fKL)
         Returns:
             VIPosterior: `VIPosterior` (can be used to chain calls).
+
+        Raises:
+            ValueError: If hyperparameters are invalid.
         """
+        # Validate hyperparameters
+        if n_particles <= 0:
+            raise ValueError(f"n_particles must be positive, got {n_particles}")
+        if learning_rate <= 0:
+            raise ValueError(f"learning_rate must be positive, got {learning_rate}")
+        if not 0 < gamma <= 1:
+            raise ValueError(f"gamma must be in (0, 1], got {gamma}")
+        if max_num_iters <= 0:
+            raise ValueError(f"max_num_iters must be positive, got {max_num_iters}")
+        if min_num_iters < 0:
+            raise ValueError(f"min_num_iters must be non-negative, got {min_num_iters}")
+        if clip_value <= 0:
+            raise ValueError(f"clip_value must be positive, got {clip_value}")
+
         # Update optimizer with current arguments.
         if self._optimizer is not None:
             self._optimizer.update({**locals(), **kwargs})
@@ -725,6 +790,8 @@ class VIPosterior(NeuralPosterior):
         x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(  # type: ignore
             self._device
         )
+        if not torch.isfinite(x).all():
+            raise ValueError("x contains NaN or Inf values.")
 
         already_trained = self._trained_on is not None and (x == self._trained_on).all()
 
@@ -881,6 +948,16 @@ class VIPosterior(NeuralPosterior):
             raise ValueError(f"n_particles must be positive, got {n_particles}")
         if batch_size <= 0:
             raise ValueError(f"batch_size must be positive, got {batch_size}")
+
+        # Validate flow_type early to fail fast
+        if isinstance(flow_type, str):
+            try:
+                flow_type = ZukoFlowType[flow_type.upper()]
+            except KeyError:
+                raise ValueError(
+                    f"Unknown flow type '{flow_type}'. "
+                    f"Supported types: {[t.name for t in ZukoFlowType]}."
+                ) from None
 
         if validation_batch_size is None:
             validation_batch_size = batch_size
@@ -1218,3 +1295,6 @@ class VIPosterior(NeuralPosterior):
         self._q = q
         make_object_deepcopy_compatible(self)
         make_object_deepcopy_compatible(self.q)
+        # Handle amortized mode
+        if self._mode == "amortized" and self._amortized_q is not None:
+            make_object_deepcopy_compatible(self._amortized_q)
