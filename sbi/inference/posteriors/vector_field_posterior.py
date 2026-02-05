@@ -164,6 +164,7 @@ class VectorFieldPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
@@ -209,6 +210,10 @@ class VectorFieldPosterior(NeuralPosterior):
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True` (no effect otherwise since
                 direct sampling does not use rejection).
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`
+                (default).
         """
 
         if sample_with is None:
@@ -235,6 +240,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     show_progress_bars=show_progress_bars,
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -259,6 +265,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -306,8 +313,8 @@ class VectorFieldPosterior(NeuralPosterior):
             corrector: The corrector for the diffusion-based sampler. Either of
                 [None].
             steps: Number of steps to take for the Euler-Maruyama method.
-            ts: Time points at which to evaluate the diffusion process. If None, a
-                linear grid between t_max and t_min is used.
+            ts: Time points at which to evaluate the diffusion process. If None, call
+                the solve schedule specific to the score estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
@@ -333,11 +340,8 @@ class VectorFieldPosterior(NeuralPosterior):
         # Ensure we don't use larger batches than total samples needed
         effective_batch_size = min(effective_batch_size, total_samples_needed)
 
-        # TODO: the time schedule should be provided by the estimator, see issue #1437
         if ts is None:
-            t_max = self.vector_field_estimator.t_max
-            t_min = self.vector_field_estimator.t_min
-            ts = torch.linspace(t_max, t_min, steps)
+            ts = self.vector_field_estimator.solve_schedule(steps)
         ts = ts.to(self.device)
 
         # Initialize the diffusion sampler
@@ -459,6 +463,7 @@ class VectorFieldPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
         r"""Given a batch of observations [x_1, ..., x_B] this function samples from
         posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
@@ -488,6 +493,9 @@ class VectorFieldPosterior(NeuralPosterior):
             max_sampling_time: Optional maximum allowed sampling time in seconds.
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True`.
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`.
 
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
@@ -525,6 +533,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     show_progress_bars=show_progress_bars,
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling.
@@ -553,6 +562,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling.

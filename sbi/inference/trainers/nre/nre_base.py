@@ -203,6 +203,12 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
+
         train_config = TrainConfig(
             max_num_epochs=max_num_epochs,
             stop_after_epochs=stop_after_epochs,
