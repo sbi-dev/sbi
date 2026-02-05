@@ -8,10 +8,8 @@ from math import ceil
 from typing import Any, Callable, Dict, Literal, Optional, Union
 from warnings import warn
 
-import arviz as az
 import torch
 import torch.distributions.transforms as torch_tf
-from arviz.data import InferenceData
 from joblib import Parallel, delayed
 from numpy import ndarray
 from pyro.infer.mcmc import HMC, NUTS
@@ -1008,64 +1006,6 @@ class MCMCPosterior(NeuralPosterior):
             force_update=force_update,
         )
 
-    def get_arviz_inference_data(self) -> InferenceData:
-        """Returns arviz InferenceData object constructed most recent samples.
-
-        Note: the InferenceData is constructed using the posterior samples generated in
-        most recent call to `.sample(...)`.
-
-        For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for
-        sbi slice samplers, only the samples are added.
-
-        Returns:
-            inference_data: Arviz InferenceData object.
-        """
-        assert self._posterior_sampler is not None, (
-            """No samples have been generated, call .sample() first."""
-        )
-
-        sampler: Union[
-            MCMC, SliceSamplerSerial, SliceSamplerVectorized, PyMCSampler
-        ] = self._posterior_sampler
-
-        # If Pyro sampler and samples not transformed, use arviz' from_pyro.
-        if isinstance(sampler, (HMC, NUTS)) and isinstance(
-            self.theta_transform, torch_tf.IndependentTransform
-        ):
-            inference_data = az.from_pyro(sampler)
-        # If PyMC sampler and samples not transformed, get cached InferenceData.
-        elif isinstance(sampler, PyMCSampler) and isinstance(
-            self.theta_transform, torch_tf.IndependentTransform
-        ):
-            inference_data = sampler.get_inference_data()
-
-        # otherwise get samples from sampler and transform to original space.
-        else:
-            transformed_samples = sampler.get_samples(group_by_chain=True)
-            # Pyro samplers returns dicts, get values.
-            if isinstance(transformed_samples, Dict):
-                # popitem gets last items, [1] get the values as tensor.
-                transformed_samples = transformed_samples.popitem()[1]
-            # Our slice samplers return numpy arrays.
-            elif isinstance(transformed_samples, ndarray):
-                transformed_samples = torch.from_numpy(transformed_samples).type(
-                    torch.float32
-                )
-            # For MultipleIndependent priors transforms first dim must be batch dim.
-            # thus, reshape back and forth to have batch dim in front.
-            samples_shape = transformed_samples.shape
-            samples = self.theta_transform.inv(  # type: ignore
-                transformed_samples.reshape(-1, samples_shape[-1])
-            ).reshape(  # type: ignore
-                *samples_shape
-            )
-
-            inference_data = az.convert_to_inference_data({
-                f"{self.param_name}": samples
-            })
-
-        return inference_data
-
     def __getstate__(self) -> Dict:
         """Get state of MCMCPosterior.
 
@@ -1092,12 +1032,6 @@ def _process_thin_default(thin: int) -> int:
     """
     if thin == -1:
         thin = 1
-        warn(
-            "The default value for thinning in MCMC sampling has been changed from "
-            "10 to 1. This might cause the results differ from the last benchmark.",
-            UserWarning,
-            stacklevel=2,
-        )
 
     return thin
 

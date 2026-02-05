@@ -7,7 +7,6 @@ import numpy as np
 import pymc
 import pytensor.tensor as pt
 import torch
-from arviz.data import InferenceData
 
 from sbi.utils.torchutils import tensor2numpy
 
@@ -206,7 +205,7 @@ class PyMCSampler:
         else:
             return samples[-num_samples:, :]
 
-    def get_inference_data(self) -> InferenceData:
+    def get_inference_data(self) -> Any:
         """Returns InferenceData from last call to self.run,
         which contains diagnostic information in addition to samples
 
