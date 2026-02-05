@@ -634,3 +634,150 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
         f"Probs diff: {diff.mean()} too big "
         f"for number of samples {num_posterior_samples}"
     )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("vector_field_type", ["ve", "vp", "fmpe"])
+@pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
+@pytest.mark.parametrize(
+    "covariance_type,K",
+    [
+        pytest.param("diag", 2, id="diag-K2"),
+        pytest.param("full", 2, id="full-K2"),
+    ],
+)
+def test_prior_guide(vector_field_type, prior_type, covariance_type, K):
+    num_samples = 1000
+    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+
+    score_estimator = vector_field_trained_model["estimator"]
+    inference = vector_field_trained_model["inference"]
+    num_dim = vector_field_trained_model["num_dim"]
+    train_prior = vector_field_trained_model["prior"]
+
+    x_o = zeros(1, num_dim)
+    posterior = inference.build_posterior(score_estimator)
+    posterior.set_default_x(x_o)
+
+    test_prior_mean = zeros(num_dim) + 0.1
+    test_prior_cov = eye(num_dim) * 0.5  # In train priors
+    test_prior = MultivariateNormal(
+        loc=test_prior_mean, covariance_matrix=test_prior_cov
+    )
+    guidance_params = {
+        "train_prior": train_prior,
+        "test_prior": test_prior,
+        "K": K,
+        "covariance_type": covariance_type,
+    }
+
+    samples = posterior.sample(
+        (num_samples,), guidance_method="prior_guide", guidance_params=guidance_params
+    )
+
+    assert samples.shape == (num_samples, num_dim), (
+        f"Expected shape {(num_samples, num_dim)}, got {samples.shape}"
+    )
+    assert torch.isfinite(samples).all(), "Output contains non-finite values"
+
+    likelihood_shift = vector_field_trained_model["likelihood_shift"]
+    likelihood_cov = vector_field_trained_model["likelihood_cov"]
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, test_prior_mean, test_prior_cov
+    )
+    target_samples = true_posterior.sample((num_samples,))
+    check_c2st(
+        samples,
+        target_samples,
+        alg=f"prior_guide-{vector_field_type}-{prior_type}-{covariance_type}-K{K}",
+        tol=0.2,
+    )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("vector_field_type", ["ve", "vp"])
+@pytest.mark.parametrize("prior_type", ["gaussian"])
+@pytest.mark.parametrize(
+    "guidance_params",
+    [
+        pytest.param({"lower_bound": 0.0, "upper_bound": 1.0}, id="upper and lower"),
+        pytest.param({"lower_bound": None, "upper_bound": 1.5}, id="only upper"),
+        pytest.param({"lower_bound": 1.0, "upper_bound": None}, id="only lower"),
+    ],
+)
+def test_npse_interval_guidance(vector_field_type, prior_type, guidance_params):
+    """Test whether NPSE infers well a simple example with available ground truth."""
+    num_samples = 1000
+    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+
+    # Extract data from fixture
+    score_estimator = vector_field_trained_model["estimator"]
+    inference = vector_field_trained_model["inference"]
+    num_dim = vector_field_trained_model["num_dim"]
+
+    x_o = zeros(1, num_dim)
+    posterior = inference.build_posterior(score_estimator)
+    posterior.set_default_x(x_o)
+    samples = posterior.sample(
+        (num_samples,), guidance_method="interval", guidance_params=guidance_params
+    )
+    samples_soft_lower = torch.min(samples, dim=0).values + 1e-1
+    samples_soft_upper = torch.max(samples, dim=0).values - 1e-1
+
+    if guidance_params["lower_bound"] is not None:
+        assert (samples_soft_lower >= guidance_params["lower_bound"]).all()
+    if guidance_params["upper_bound"] is not None:
+        assert (samples_soft_upper <= guidance_params["upper_bound"]).all()
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("vector_field_type", ["ve", "vp"])
+@pytest.mark.parametrize("prior_type", ["gaussian"])
+@pytest.mark.parametrize(
+    "guidance_params",
+    [
+        pytest.param({"likelihood_scale": 1.2}, id="increase_likelihood"),
+        pytest.param({"likelihood_scale": 0.8}, id="decrease likelihood"),
+    ],
+)
+def test_npse_affine_classifier_free(vector_field_type, prior_type, guidance_params):
+    """Test whether NPSE infers well a simple example with available ground truth."""
+    num_samples = 1000
+    vf_trained_model = train_vector_field_model(vector_field_type, prior_type)
+
+    # Extract data from fixture
+    score_estimator = vf_trained_model["estimator"]
+    inference = vf_trained_model["inference"]
+    num_dim = vf_trained_model["num_dim"]
+    likelihood_shift = vf_trained_model["likelihood_shift"]
+    likelihood_cov = vf_trained_model["likelihood_cov"]
+    prior_mean = vf_trained_model["prior_mean"]
+    prior_cov = vf_trained_model["prior_cov"]
+    prior = vf_trained_model["prior"]
+    if not isinstance(prior, MultivariateNormal):
+        return
+
+    x_o = zeros(1, num_dim)
+    posterior = inference.build_posterior(score_estimator)
+    posterior.set_default_x(x_o)
+    samples = posterior.sample(
+        (num_samples,),
+        guidance_method="affine_classifier_free",
+        guidance_params=guidance_params,
+    )
+
+    if "likelihood_scale" in guidance_params:
+        adapted_likelihood_shift = (
+            likelihood_shift * 1 / guidance_params["likelihood_scale"]
+        )
+        posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o, adapted_likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        target_samples = posterior.sample((num_samples,))
+        # Compute the c2st and assert it is near chance level of 0.5.
+        check_c2st(
+            samples,
+            target_samples,
+            tol=0.1,
+            alg=f"npse-gaussian-{num_dim}-affine_classifier_free",
+        )
