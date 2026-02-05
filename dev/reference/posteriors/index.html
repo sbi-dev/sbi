@@ -806,17 +806,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.get_arviz_inference_data" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;get_arviz_inference_data
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.log_prob" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6777,7 +6766,9 @@ proposal at every iteration.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  41</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  39</span>
+<span class="normal">  40</span>
+<span class="normal">  41</span>
 <span class="normal">  42</span>
 <span class="normal">  43</span>
 <span class="normal">  44</span>
@@ -7756,67 +7747,7 @@ proposal at every iteration.</p>
 <span class="normal">1017</span>
 <span class="normal">1018</span>
 <span class="normal">1019</span>
-<span class="normal">1020</span>
-<span class="normal">1021</span>
-<span class="normal">1022</span>
-<span class="normal">1023</span>
-<span class="normal">1024</span>
-<span class="normal">1025</span>
-<span class="normal">1026</span>
-<span class="normal">1027</span>
-<span class="normal">1028</span>
-<span class="normal">1029</span>
-<span class="normal">1030</span>
-<span class="normal">1031</span>
-<span class="normal">1032</span>
-<span class="normal">1033</span>
-<span class="normal">1034</span>
-<span class="normal">1035</span>
-<span class="normal">1036</span>
-<span class="normal">1037</span>
-<span class="normal">1038</span>
-<span class="normal">1039</span>
-<span class="normal">1040</span>
-<span class="normal">1041</span>
-<span class="normal">1042</span>
-<span class="normal">1043</span>
-<span class="normal">1044</span>
-<span class="normal">1045</span>
-<span class="normal">1046</span>
-<span class="normal">1047</span>
-<span class="normal">1048</span>
-<span class="normal">1049</span>
-<span class="normal">1050</span>
-<span class="normal">1051</span>
-<span class="normal">1052</span>
-<span class="normal">1053</span>
-<span class="normal">1054</span>
-<span class="normal">1055</span>
-<span class="normal">1056</span>
-<span class="normal">1057</span>
-<span class="normal">1058</span>
-<span class="normal">1059</span>
-<span class="normal">1060</span>
-<span class="normal">1061</span>
-<span class="normal">1062</span>
-<span class="normal">1063</span>
-<span class="normal">1064</span>
-<span class="normal">1065</span>
-<span class="normal">1066</span>
-<span class="normal">1067</span>
-<span class="normal">1068</span>
-<span class="normal">1069</span>
-<span class="normal">1070</span>
-<span class="normal">1071</span>
-<span class="normal">1072</span>
-<span class="normal">1073</span>
-<span class="normal">1074</span>
-<span class="normal">1075</span>
-<span class="normal">1076</span>
-<span class="normal">1077</span>
-<span class="normal">1078</span>
-<span class="normal">1079</span>
-<span class="normal">1080</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MCMCPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">1020</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MCMCPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Provides MCMC to sample from the posterior.</span>
 
 <span class="sd">    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).</span>
@@ -8786,64 +8717,6 @@ proposal at every iteration.</p>
             <span class="n">force_update</span><span class="o">=</span><span class="n">force_update</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_arviz_inference_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InferenceData</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns arviz InferenceData object constructed most recent samples.</span>
-
-<span class="sd">        Note: the InferenceData is constructed using the posterior samples generated in</span>
-<span class="sd">        most recent call to `.sample(...)`.</span>
-
-<span class="sd">        For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for</span>
-<span class="sd">        sbi slice samplers, only the samples are added.</span>
-
-<span class="sd">        Returns:</span>
-<span class="sd">            inference_data: Arviz InferenceData object.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
-<span class="w">            </span><span class="sd">&quot;&quot;&quot;No samples have been generated, call .sample() first.&quot;&quot;&quot;</span>
-        <span class="p">)</span>
-
-        <span class="n">sampler</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-            <span class="n">MCMC</span><span class="p">,</span> <span class="n">SliceSamplerSerial</span><span class="p">,</span> <span class="n">SliceSamplerVectorized</span><span class="p">,</span> <span class="n">PyMCSampler</span>
-        <span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span>
-
-        <span class="c1"># If Pyro sampler and samples not transformed, use arviz&#39; from_pyro.</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sampler</span><span class="p">,</span> <span class="p">(</span><span class="n">HMC</span><span class="p">,</span> <span class="n">NUTS</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span> <span class="n">torch_tf</span><span class="o">.</span><span class="n">IndependentTransform</span>
-        <span class="p">):</span>
-            <span class="n">inference_data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">from_pyro</span><span class="p">(</span><span class="n">sampler</span><span class="p">)</span>
-        <span class="c1"># If PyMC sampler and samples not transformed, get cached InferenceData.</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sampler</span><span class="p">,</span> <span class="n">PyMCSampler</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span> <span class="n">torch_tf</span><span class="o">.</span><span class="n">IndependentTransform</span>
-        <span class="p">):</span>
-            <span class="n">inference_data</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">get_inference_data</span><span class="p">()</span>
-
-        <span class="c1"># otherwise get samples from sampler and transform to original space.</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">transformed_samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">get_samples</span><span class="p">(</span><span class="n">group_by_chain</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-            <span class="c1"># Pyro samplers returns dicts, get values.</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">transformed_samples</span><span class="p">,</span> <span class="n">Dict</span><span class="p">):</span>
-                <span class="c1"># popitem gets last items, [1] get the values as tensor.</span>
-                <span class="n">transformed_samples</span> <span class="o">=</span> <span class="n">transformed_samples</span><span class="o">.</span><span class="n">popitem</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
-            <span class="c1"># Our slice samplers return numpy arrays.</span>
-            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">transformed_samples</span><span class="p">,</span> <span class="n">ndarray</span><span class="p">):</span>
-                <span class="n">transformed_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">transformed_samples</span><span class="p">)</span><span class="o">.</span><span class="n">type</span><span class="p">(</span>
-                    <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
-                <span class="p">)</span>
-            <span class="c1"># For MultipleIndependent priors transforms first dim must be batch dim.</span>
-            <span class="c1"># thus, reshape back and forth to have batch dim in front.</span>
-            <span class="n">samples_shape</span> <span class="o">=</span> <span class="n">transformed_samples</span><span class="o">.</span><span class="n">shape</span>
-            <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
-                <span class="n">transformed_samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">samples_shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-            <span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
-                <span class="o">*</span><span class="n">samples_shape</span>
-            <span class="p">)</span>
-
-            <span class="n">inference_data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">convert_to_inference_data</span><span class="p">({</span>
-                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">param_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">samples</span>
-            <span class="p">})</span>
-
-        <span class="k">return</span> <span class="n">inference_data</span>
-
     <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get state of MCMCPosterior.</span>
 
@@ -8957,18 +8830,18 @@ proposal at every iteration.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1069</span>
-<span class="normal">1070</span>
-<span class="normal">1071</span>
-<span class="normal">1072</span>
-<span class="normal">1073</span>
-<span class="normal">1074</span>
-<span class="normal">1075</span>
-<span class="normal">1076</span>
-<span class="normal">1077</span>
-<span class="normal">1078</span>
-<span class="normal">1079</span>
-<span class="normal">1080</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1009</span>
+<span class="normal">1010</span>
+<span class="normal">1011</span>
+<span class="normal">1012</span>
+<span class="normal">1013</span>
+<span class="normal">1014</span>
+<span class="normal">1015</span>
+<span class="normal">1016</span>
+<span class="normal">1017</span>
+<span class="normal">1018</span>
+<span class="normal">1019</span>
+<span class="normal">1020</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get state of MCMCPosterior.</span>
 
 <span class="sd">    Removes the posterior sampler from the state, as it may not be picklable.</span>
@@ -9266,7 +9139,9 @@ faster than <code>"spawn"</code> but is only supported on POSIX-based systems
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 48</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
 <span class="normal"> 49</span>
 <span class="normal"> 50</span>
 <span class="normal"> 51</span>
@@ -9381,9 +9256,7 @@ faster than <code>"spawn"</code> but is only supported on POSIX-based systems
 <span class="normal">160</span>
 <span class="normal">161</span>
 <span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">163</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">potential_fn</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">BasePotential</span><span class="p">],</span>
     <span class="n">proposal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -9510,168 +9383,6 @@ faster than <code>"spawn"</code> but is only supported on POSIX-based systems
 <div class="doc doc-object doc-function">
 
 
-<h3 id="sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.get_arviz_inference_data" class="doc doc-heading">
-            <code class=" language-python"><span class="n">get_arviz_inference_data</span><span class="p">()</span></code>
-
-<a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.get_arviz_inference_data" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Returns arviz InferenceData object constructed most recent samples.</p>
-<p>Note: the InferenceData is constructed using the posterior samples generated in
-most recent call to <code>.sample(...)</code>.</p>
-<p>For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for
-sbi slice samplers, only the samples are added.</p>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-<th>Name</th>          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-<td><code>inference_data</code></td>            <td>
-                  <code><span title="arviz.data.InferenceData">InferenceData</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Arviz InferenceData object.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1011</span>
-<span class="normal">1012</span>
-<span class="normal">1013</span>
-<span class="normal">1014</span>
-<span class="normal">1015</span>
-<span class="normal">1016</span>
-<span class="normal">1017</span>
-<span class="normal">1018</span>
-<span class="normal">1019</span>
-<span class="normal">1020</span>
-<span class="normal">1021</span>
-<span class="normal">1022</span>
-<span class="normal">1023</span>
-<span class="normal">1024</span>
-<span class="normal">1025</span>
-<span class="normal">1026</span>
-<span class="normal">1027</span>
-<span class="normal">1028</span>
-<span class="normal">1029</span>
-<span class="normal">1030</span>
-<span class="normal">1031</span>
-<span class="normal">1032</span>
-<span class="normal">1033</span>
-<span class="normal">1034</span>
-<span class="normal">1035</span>
-<span class="normal">1036</span>
-<span class="normal">1037</span>
-<span class="normal">1038</span>
-<span class="normal">1039</span>
-<span class="normal">1040</span>
-<span class="normal">1041</span>
-<span class="normal">1042</span>
-<span class="normal">1043</span>
-<span class="normal">1044</span>
-<span class="normal">1045</span>
-<span class="normal">1046</span>
-<span class="normal">1047</span>
-<span class="normal">1048</span>
-<span class="normal">1049</span>
-<span class="normal">1050</span>
-<span class="normal">1051</span>
-<span class="normal">1052</span>
-<span class="normal">1053</span>
-<span class="normal">1054</span>
-<span class="normal">1055</span>
-<span class="normal">1056</span>
-<span class="normal">1057</span>
-<span class="normal">1058</span>
-<span class="normal">1059</span>
-<span class="normal">1060</span>
-<span class="normal">1061</span>
-<span class="normal">1062</span>
-<span class="normal">1063</span>
-<span class="normal">1064</span>
-<span class="normal">1065</span>
-<span class="normal">1066</span>
-<span class="normal">1067</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_arviz_inference_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InferenceData</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns arviz InferenceData object constructed most recent samples.</span>
-
-<span class="sd">    Note: the InferenceData is constructed using the posterior samples generated in</span>
-<span class="sd">    most recent call to `.sample(...)`.</span>
-
-<span class="sd">    For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for</span>
-<span class="sd">    sbi slice samplers, only the samples are added.</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        inference_data: Arviz InferenceData object.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;No samples have been generated, call .sample() first.&quot;&quot;&quot;</span>
-    <span class="p">)</span>
-
-    <span class="n">sampler</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
-        <span class="n">MCMC</span><span class="p">,</span> <span class="n">SliceSamplerSerial</span><span class="p">,</span> <span class="n">SliceSamplerVectorized</span><span class="p">,</span> <span class="n">PyMCSampler</span>
-    <span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior_sampler</span>
-
-    <span class="c1"># If Pyro sampler and samples not transformed, use arviz&#39; from_pyro.</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sampler</span><span class="p">,</span> <span class="p">(</span><span class="n">HMC</span><span class="p">,</span> <span class="n">NUTS</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span> <span class="n">torch_tf</span><span class="o">.</span><span class="n">IndependentTransform</span>
-    <span class="p">):</span>
-        <span class="n">inference_data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">from_pyro</span><span class="p">(</span><span class="n">sampler</span><span class="p">)</span>
-    <span class="c1"># If PyMC sampler and samples not transformed, get cached InferenceData.</span>
-    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sampler</span><span class="p">,</span> <span class="n">PyMCSampler</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="p">,</span> <span class="n">torch_tf</span><span class="o">.</span><span class="n">IndependentTransform</span>
-    <span class="p">):</span>
-        <span class="n">inference_data</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">get_inference_data</span><span class="p">()</span>
-
-    <span class="c1"># otherwise get samples from sampler and transform to original space.</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">transformed_samples</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">get_samples</span><span class="p">(</span><span class="n">group_by_chain</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="c1"># Pyro samplers returns dicts, get values.</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">transformed_samples</span><span class="p">,</span> <span class="n">Dict</span><span class="p">):</span>
-            <span class="c1"># popitem gets last items, [1] get the values as tensor.</span>
-            <span class="n">transformed_samples</span> <span class="o">=</span> <span class="n">transformed_samples</span><span class="o">.</span><span class="n">popitem</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
-        <span class="c1"># Our slice samplers return numpy arrays.</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">transformed_samples</span><span class="p">,</span> <span class="n">ndarray</span><span class="p">):</span>
-            <span class="n">transformed_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">transformed_samples</span><span class="p">)</span><span class="o">.</span><span class="n">type</span><span class="p">(</span>
-                <span class="n">torch</span><span class="o">.</span><span class="n">float32</span>
-            <span class="p">)</span>
-        <span class="c1"># For MultipleIndependent priors transforms first dim must be batch dim.</span>
-        <span class="c1"># thus, reshape back and forth to have batch dim in front.</span>
-        <span class="n">samples_shape</span> <span class="o">=</span> <span class="n">transformed_samples</span><span class="o">.</span><span class="n">shape</span>
-        <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">theta_transform</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
-            <span class="n">transformed_samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">samples_shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-        <span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
-            <span class="o">*</span><span class="n">samples_shape</span>
-        <span class="p">)</span>
-
-        <span class="n">inference_data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">convert_to_inference_data</span><span class="p">({</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">param_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">samples</span>
-        <span class="p">})</span>
-
-    <span class="k">return</span> <span class="n">inference_data</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.log_prob" class="doc doc-heading">
             <code class=" language-python"><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">track_gradients</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
@@ -9757,7 +9468,9 @@ consumption.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">222</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
 <span class="normal">223</span>
 <span class="normal">224</span>
 <span class="normal">225</span>
@@ -9781,9 +9494,7 @@ consumption.</p>
 <span class="normal">243</span>
 <span class="normal">244</span>
 <span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">246</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">track_gradients</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the log-probability of theta under the posterior.</span>
@@ -10052,7 +9763,9 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 944</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 942</span>
+<span class="normal"> 943</span>
+<span class="normal"> 944</span>
 <span class="normal"> 945</span>
 <span class="normal"> 946</span>
 <span class="normal"> 947</span>
@@ -10115,9 +9828,7 @@ have a cached value.</p>
 <span class="normal">1004</span>
 <span class="normal">1005</span>
 <span class="normal">1006</span>
-<span class="normal">1007</span>
-<span class="normal">1008</span>
-<span class="normal">1009</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">1007</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
@@ -10432,7 +10143,9 @@ uses the value specified at initialization.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">250</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
 <span class="normal">251</span>
 <span class="normal">252</span>
 <span class="normal">253</span>
@@ -10549,9 +10262,7 @@ uses the value specified at initialization.</p>
 <span class="normal">364</span>
 <span class="normal">365</span>
 <span class="normal">366</span>
-<span class="normal">367</span>
-<span class="normal">368</span>
-<span class="normal">369</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">367</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -10916,7 +10627,9 @@ parameter generation and mcmc sampling.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">371</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
 <span class="normal">372</span>
 <span class="normal">373</span>
 <span class="normal">374</span>
@@ -11060,9 +10773,7 @@ parameter generation and mcmc sampling.</p>
 <span class="normal">512</span>
 <span class="normal">513</span>
 <span class="normal">514</span>
-<span class="normal">515</span>
-<span class="normal">516</span>
-<span class="normal">517</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+<span class="normal">515</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -11285,7 +10996,9 @@ parameter generation and mcmc sampling.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">210</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
 <span class="normal">213</span>
@@ -11293,9 +11006,7 @@ parameter generation and mcmc sampling.</p>
 <span class="normal">215</span>
 <span class="normal">216</span>
 <span class="normal">217</span>
-<span class="normal">218</span>
-<span class="normal">219</span>
-<span class="normal">220</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_mcmc_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NeuralPosterior&quot;</span><span class="p">:</span>
+<span class="normal">218</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_mcmc_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NeuralPosterior&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Sets sampling method to for MCMC and returns `NeuralPosterior`.</span>
 
 <span class="sd">    Args:</span>
@@ -11360,7 +11071,9 @@ parameter generation and mcmc sampling.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/mcmc_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
 <span class="normal">170</span>
@@ -11384,9 +11097,7 @@ parameter generation and mcmc sampling.</p>
 <span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Moves potential_fn, proposal, x_o and theta_transform to the</span>
 
 <span class="sd">    specified device. Reinstantiates the posterior and resets the default x_o.</span>
