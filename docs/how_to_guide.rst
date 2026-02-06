@@ -43,6 +43,7 @@ Neural nets
 Training
 --------
 
+- :doc:`how_to_guide/24_abstraction_levels`
 - :doc:`how_to_guide/06_choosing_inference_method`
 - :doc:`how_to_guide/02_multiround_inference`
 - :doc:`how_to_guide/07_gpu_training`
