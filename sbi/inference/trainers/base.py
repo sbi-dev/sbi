@@ -209,7 +209,6 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._theta_roundwise = []
         self._x_roundwise = []
         self._prior_masks = []
-        self._model_bank = []
 
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
@@ -499,6 +498,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         prior = self._resolve_prior(prior)
         estimator, device = self._resolve_estimator(estimator)
+        estimator = deepcopy(estimator)
 
         posterior_parameters = self._resolve_posterior_parameters(
             sample_with, posterior_parameters, **kwargs
@@ -512,10 +512,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             posterior_parameters,
         )
 
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
+        return self._posterior
 
     def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
         """
@@ -996,7 +993,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         # cause memory leakage when benchmarking.
         self._neural_net.zero_grad(set_to_none=True)
 
-        return deepcopy(self._neural_net)
+        return self._neural_net
 
     def _train_epoch(
         self,
