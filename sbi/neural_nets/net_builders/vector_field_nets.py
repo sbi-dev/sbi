@@ -65,7 +65,10 @@ def build_vector_field_estimator(
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
             "transformer_cross_attention" or a custom network following the
             VectorFieldNet protocol.
-        **kwargs: Additional arguments for the network.
+        **kwargs: Additional arguments for the network. For score estimators:
+            - VP/SubVP: beta_min, beta_max (control noise schedule strength)
+            - VE: train_schedule, solve_schedule, lognormal_mean, lognormal_std,
+              power_law_exponent (control training and sampling discretization)
 
     Returns:
         A vector field estimator (either FlowMatchingEstimator or
@@ -161,6 +164,25 @@ def build_vector_field_estimator(
         else:
             raise ValueError(f"Unknown SDE type: {sde_type}")
 
+        # Extract estimator-specific kwargs based on SDE type
+        estimator_kwargs = {}
+        if sde_type == "ve":
+            # VE-specific parameters: sigma bounds and EDM-style schedules
+            ve_keys = [
+                "sigma_min",
+                "sigma_max",
+                "train_schedule",
+                "solve_schedule",
+                "lognormal_mean",
+                "lognormal_std",
+                "power_law_exponent",
+            ]
+            estimator_kwargs = {k: kwargs[k] for k in ve_keys if k in kwargs}
+        elif sde_type in ("vp", "subvp"):
+            # VP/SubVP-specific beta parameters
+            vp_keys = ["beta_min", "beta_max"]
+            estimator_kwargs = {k: kwargs[k] for k in vp_keys if k in kwargs}
+
         return estimator_cls(
             net=vectorfield_net,
             input_shape=batch_x[0].shape,
@@ -168,6 +190,7 @@ def build_vector_field_estimator(
             embedding_net=embedding_net_y,
             mean_0=mean_0,
             std_0=std_0,
+            **estimator_kwargs,
         )
     else:
         raise ValueError(f"Unknown estimator type: {estimator_type}")
