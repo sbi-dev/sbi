@@ -15,7 +15,6 @@ from typing import (
 )
 
 import torch
-from pyro.distributions.torch_transform import TransformModule
 from torch import Tensor, nn
 from torch.distributions import (
     Distribution,
@@ -28,7 +27,7 @@ from torch.distributions.transforms import ComposeTransform, IndependentTransfor
 from torch.nn import Module
 
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
-from sbi.sbi_types import PyroTransformedDistribution, Shape, TorchTransform
+from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
 
 
 class TransformedZukoFlow(nn.Module):
@@ -143,8 +142,6 @@ class LearnableGaussian(nn.Module):
 
     A simple parametric variational family with learnable mean and covariance.
     Supports both full covariance (gaussian) and diagonal covariance (gaussian_diag).
-
-    This replaces the Pyro-based Gaussian implementations with pure PyTorch.
     """
 
     def __init__(
@@ -262,7 +259,7 @@ def filter_kwrags_for_func(f: Callable, kwargs: Dict) -> Dict:
     return new_kwargs
 
 
-def get_parameters(t: Union[TorchTransform, TransformModule]) -> Iterable:
+def get_parameters(t: Union[TorchTransform, Module]) -> Iterable:
     """Recursive helper function which can be used to extract parameters from
     TransformedDistributions.
 
@@ -283,7 +280,7 @@ def get_parameters(t: Union[TorchTransform, TransformModule]) -> Iterable:
         pass
 
 
-def get_modules(t: Union[TorchTransform, TransformModule]) -> Iterable:
+def get_modules(t: Union[TorchTransform, Module]) -> Iterable:
     """Recursive helper function which can be used to extract modules from
     TransformedDistributions.
 
@@ -291,7 +288,7 @@ def get_modules(t: Union[TorchTransform, TransformModule]) -> Iterable:
         t: A TorchTransform object, which is scanned for the "modules" attribute.
 
     Yields:
-        Iterator[Iterable]: Generator of TransformModules
+        Iterator[Iterable]: Generator of Modules
     """
     if isinstance(t, Module):
         yield t
@@ -304,7 +301,7 @@ def get_modules(t: Union[TorchTransform, TransformModule]) -> Iterable:
         pass
 
 
-def check_parameters_modules_attribute(q: PyroTransformedDistribution) -> None:
+def check_parameters_modules_attribute(q: VariationalDistribution) -> None:
     """Checks a parameterized distribution object for valid `parameters` and `modules`.
 
     Args:
@@ -417,7 +414,7 @@ def add_parameters_module_attributes(
 
 
 def add_parameter_attributes_to_transformed_distribution(
-    q: PyroTransformedDistribution,
+    q: VariationalDistribution,
 ) -> None:
     """A function that will add `parameters` and `modules` to q automatically, if q is a
     TransformedDistribution.
@@ -446,7 +443,7 @@ def add_parameter_attributes_to_transformed_distribution(
 
 
 def adapt_variational_distribution(
-    q: PyroTransformedDistribution,
+    q: VariationalDistribution,
     prior: Distribution,
     link_transform: Callable,
     parameters: Optional[Iterable] = None,

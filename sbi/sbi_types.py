@@ -32,7 +32,7 @@ transform_types = Optional[
 TensorBoardSummaryWriter: TypeAlias = SummaryWriter
 TorchDistribution: TypeAlias = Distribution
 TorchTransform: TypeAlias = Transform
-PyroTransformedDistribution: TypeAlias = TransformedDistribution
+VariationalDistribution: TypeAlias = TransformedDistribution
 TorchTensor: TypeAlias = Tensor
 
 __all__ = [
@@ -44,6 +44,6 @@ __all__ = [
     "TorchTransform",
     "transform_types",
     "TorchDistribution",
-    "PyroTransformedDistribution",
+    "VariationalDistribution",
     "TorchTensor",
 ]

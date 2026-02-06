@@ -4,8 +4,7 @@
 import copy
 import warnings
 from copy import deepcopy
-from threading import Lock
-from typing import Callable, Dict, Iterable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -16,6 +15,9 @@ from torch.optim.lr_scheduler import ExponentialLR
 from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+
+if TYPE_CHECKING:
+    from sbi.inference.posteriors.posterior_parameters import VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
@@ -43,16 +45,8 @@ from sbi.sbi_types import (
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
-# Mapping from VI flow names to Zuko flow types.
-# "gaussian" and "gaussian_diag" are handled separately as simple distributions.
-_VI_FLOW_TO_ZUKO: dict[str, str] = {
-    "maf": "MAF",
-    "nsf": "NSF",
-    "naf": "NAF",
-    "unaf": "UNAF",
-    "nice": "NICE",
-    "sospf": "SOSPF",
-}
+# Supported Zuko flow types for VI (lowercase names)
+_ZUKO_FLOW_TYPES = {"maf", "nsf", "naf", "unaf", "nice", "sospf"}
 
 # Type for supported variational family strings
 VariationalFamily = Literal[
@@ -114,9 +108,12 @@ class VIPosterior(NeuralPosterior):
                 sospf] via Zuko, and Gaussian families [gaussian, gaussian_diag].
                 You can also specify your own variational family by passing a
                 `torch.distributions.Distribution`. Additionally, we allow a `Callable`
-                that returns a distribution, useful for custom flow configurations.
-                If q is already a `VIPosterior`, then the arguments will be copied from
-                it (relevant for multi-round training).
+                with signature `(event_shape: torch.Size, link_transform:
+                TorchTransform, device: str) -> Distribution` for custom flow
+                configurations. The
+                callable should return a distribution with `sample()` and `log_prob()`
+                methods. If q is already a `VIPosterior`, then the arguments will be
+                copied from it (relevant for multi-round training).
             theta_transform: Maps form prior support to unconstrained space. The
                 inverse is used here to ensure that the posterior support is equal to
                 that of the prior.
@@ -165,9 +162,8 @@ class VIPosterior(NeuralPosterior):
         # Mode tracking: None (not trained), "single_x", or "amortized"
         self._mode: Optional[Literal["single_x", "amortized"]] = None
 
-        # Amortized mode: conditional flow q(θ|x) and thread-safety lock
+        # Amortized mode: conditional flow q(θ|x)
         self._amortized_q: Optional[ConditionalDensityEstimator] = None
-        self._set_x_lock = Lock()
 
         # In contrast to MCMC we want to project into constrained space.
         if theta_transform is None:
@@ -229,6 +225,9 @@ class VIPosterior(NeuralPosterior):
         flow_type: str,
         num_transforms: int = 5,
         hidden_features: int = 50,
+        z_score_x: Literal[
+            "none", "independent", "structured", "transform_to_unconstrained"
+        ] = "independent",
     ) -> TransformedZukoFlow:
         """Build a Zuko unconditional flow for variational inference.
 
@@ -242,6 +241,8 @@ class VIPosterior(NeuralPosterior):
                 "sospf"]. For "gaussian" or "gaussian_diag", use LearnableGaussian.
             num_transforms: Number of flow transforms.
             hidden_features: Number of hidden features per layer.
+            z_score_x: Method for z-scoring input. One of "independent", "structured",
+                or "none". Use "structured" for data with correlations (e.g., images).
 
         Returns:
             TransformedZukoFlow: The constructed flow wrapped with link_transform.
@@ -255,14 +256,14 @@ class VIPosterior(NeuralPosterior):
                 f"This is handled automatically in set_q()."
             )
 
-        if flow_type not in _VI_FLOW_TO_ZUKO:
+        if flow_type not in _ZUKO_FLOW_TYPES:
             raise ValueError(
                 f"Unknown flow type '{flow_type}'. "
-                f"Supported types: {list(_VI_FLOW_TO_ZUKO.keys())} + "
+                f"Supported types: {sorted(_ZUKO_FLOW_TYPES)} + "
                 f"['gaussian', 'gaussian_diag']."
             )
 
-        zuko_flow_type = _VI_FLOW_TO_ZUKO[flow_type]
+        zuko_flow_type = flow_type.upper()
 
         # Get prior dimensionality
         prior_dim = self._prior.event_shape[0] if self._prior.event_shape else 1
@@ -288,7 +289,7 @@ class VIPosterior(NeuralPosterior):
         flow = build_zuko_unconditional_flow(
             which_nf=zuko_flow_type,
             batch_x=batch_theta,
-            z_score_x="independent",  # z-score for stable training
+            z_score_x=z_score_x,
             hidden_features=hidden_features,
             num_transforms=num_transforms,
         )
@@ -310,6 +311,12 @@ class VIPosterior(NeuralPosterior):
         flow_type: Union[ZukoFlowType, str] = ZukoFlowType.NSF,
         num_transforms: int = 2,
         hidden_features: int = 32,
+        z_score_theta: Literal[
+            "none", "independent", "structured"
+        ] = "independent",
+        z_score_x: Literal[
+            "none", "independent", "structured"
+        ] = "independent",
     ) -> ConditionalDensityEstimator:
         """Build a conditional Zuko flow for amortized variational inference.
 
@@ -319,6 +326,11 @@ class VIPosterior(NeuralPosterior):
             flow_type: Type of flow. Can be a ZukoFlowType enum or string.
             num_transforms: Number of flow transforms.
             hidden_features: Number of hidden features per layer.
+            z_score_theta: Method for z-scoring θ (the parameters being modeled).
+                One of "none", "independent", "structured".
+            z_score_x: Method for z-scoring x (the conditioning variable).
+                One of "none", "independent", "structured". Use "structured" for
+                structured data like images.
 
         Returns:
             ConditionalDensityEstimator: The constructed conditional flow q(θ|x).
@@ -340,6 +352,8 @@ class VIPosterior(NeuralPosterior):
             flow_type.value.upper(),
             batch_x=theta,  # θ is what we model
             batch_y=x,  # x is the condition
+            z_score_x=z_score_theta,  # z-score for θ (naming mismatch)
+            z_score_y=z_score_x,  # z-score for x condition
             num_transforms=num_transforms,
             hidden_features=hidden_features,
         ).to(self._device)
@@ -386,10 +400,11 @@ class VIPosterior(NeuralPosterior):
                 `parameterized` distribution object i.e. a torch.distributions
                 Distribution with methods `parameters` returning an iterable of all
                 parameters (you can pass them within the parameters/modules attribute).
-                Additionally, we allow a `Callable`, which allows you to pass a
-                `builder` function, which if called returns a distribution. If q
-                is already a `VIPosterior`, then the arguments will be copied from it
-                (relevant for multi-round training).
+                Additionally, we allow a `Callable` with signature
+                `(event_shape: torch.Size, link_transform: TorchTransform, device: str)
+                -> Distribution`, which builds a custom distribution. If q is already
+                a `VIPosterior`, then the arguments will be copied from it (relevant
+                for multi-round training).
 
                 Note: For 1D parameter spaces, normalizing flows may be unstable.
                 Consider using `q='gaussian'` for 1D problems.
@@ -422,7 +437,7 @@ class VIPosterior(NeuralPosterior):
             self._zuko_flow_type = None
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
-                if q in _VI_FLOW_TO_ZUKO:
+                if q in _ZUKO_FLOW_TYPES:
                     q_flow = self._build_zuko_flow(q)
                     self._zuko_flow_type = q
                     self._q_build_fn = lambda *args, ft=q, **kwargs: (
@@ -449,8 +464,7 @@ class VIPosterior(NeuralPosterior):
                     )
                     q = q_dist
                 else:
-                    supported = list(_VI_FLOW_TO_ZUKO.keys())
-                    supported += ["gaussian", "gaussian_diag"]
+                    supported = sorted(_ZUKO_FLOW_TYPES) + ["gaussian", "gaussian_diag"]
                     raise ValueError(
                         f"Unknown variational family '{q}'. "
                         f"Supported options: {supported}"
@@ -699,10 +713,10 @@ class VIPosterior(NeuralPosterior):
         quality_control_metric: str = "psis",
         **kwargs,
     ) -> "VIPosterior":
-        """This method trains the variational posterior.
+        """This method trains the variational posterior for a single observation.
 
         Args:
-            x: The observation.
+            x: The observation, optional, defaults to self._x.
             n_particles: Number of samples to approximate expectations within the
                 variational bounds. The larger the more accurate are gradient
                 estimates, but the computational cost per iteration increases.
@@ -882,6 +896,11 @@ class VIPosterior(NeuralPosterior):
         flow_type: Union[ZukoFlowType, str] = ZukoFlowType.NSF,
         num_transforms: int = 2,
         hidden_features: int = 32,
+        z_score_theta: Literal[
+            "none", "independent", "structured"
+        ] = "independent",
+        z_score_x: Literal["none", "independent", "structured"] = "independent",
+        params: Optional["VIPosteriorParameters"] = None,
     ) -> "VIPosterior":
         """Train a conditional flow q(θ|x) for amortized variational inference.
 
@@ -911,10 +930,26 @@ class VIPosterior(NeuralPosterior):
                 Use ZukoFlowType.NSF, ZukoFlowType.MAF, etc., or a string.
             num_transforms: Number of transforms in the flow.
             hidden_features: Hidden layer size in the flow.
+            z_score_theta: Method for z-scoring θ (the parameters being modeled).
+                One of "none", "independent", "structured".
+            z_score_x: Method for z-scoring x (the conditioning variable).
+                One of "none", "independent", "structured". Use "structured" for
+                structured data like images with spatial correlations.
+            params: Optional VIPosteriorParameters dataclass. If provided, its values
+                for q (as flow_type), num_transforms, hidden_features, z_score_theta,
+                and z_score_x override the individual arguments.
 
         Returns:
             self for method chaining.
         """
+        # Extract parameters from dataclass if provided
+        if params is not None:
+            flow_type = params.q  # VIPosteriorParameters uses 'q' for flow type
+            num_transforms = params.num_transforms
+            hidden_features = params.hidden_features
+            z_score_theta = params.z_score_theta
+            z_score_x = params.z_score_x
+
         theta = atleast_2d_float32_tensor(theta).to(self._device)
         x = atleast_2d_float32_tensor(x).to(self._device)
 
@@ -1013,6 +1048,8 @@ class VIPosterior(NeuralPosterior):
                 flow_type=flow_type,
                 num_transforms=num_transforms,
                 hidden_features=hidden_features,
+                z_score_theta=z_score_theta,
+                z_score_x=z_score_x,
             )
 
         # Setup optimizer
@@ -1130,10 +1167,8 @@ class VIPosterior(NeuralPosterior):
         x_expanded = x_batch.repeat(n_particles, 1)
 
         # Set x_o for batched evaluation (x_is_iid=False: each θ paired with its x)
-        # Use lock to ensure thread-safety when modifying potential_fn state
-        with self._set_x_lock:
-            self.potential_fn.set_x(x_expanded, x_is_iid=False)
-            log_potential_flat = self.potential_fn(theta_flat)
+        self.potential_fn.set_x(x_expanded, x_is_iid=False)
+        log_potential_flat = self.potential_fn(theta_flat)
 
         # Reshape: (n_particles * batch_size,) -> (n_particles, batch_size)
         log_potential = log_potential_flat.reshape(n_particles, batch_size)
@@ -1248,40 +1283,30 @@ class VIPosterior(NeuralPosterior):
         if memo is None:
             memo = {}
 
-        # Acquire lock to ensure consistent state during copy
-        with self._set_x_lock:
-            # Create a new instance of the class
-            cls = self.__class__
-            result = cls.__new__(cls)
-            # Add to memo
-            memo[id(self)] = result
-            # Copy attributes, handling non-picklable objects
-            for k, v in self.__dict__.items():
-                if k == "_set_x_lock":
-                    # Lock objects cannot be deepcopied; create a new one
-                    setattr(result, k, Lock())
-                else:
-                    setattr(result, k, copy.deepcopy(v, memo))
+        # Create a new instance of the class
+        cls = self.__class__
+        result = cls.__new__(cls)
+        # Add to memo
+        memo[id(self)] = result
+        # Copy attributes
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.deepcopy(v, memo))
         return result
 
     def __getstate__(self) -> Dict:
         """This method is called when pickling the object.
 
         It defines what is pickled. We need to overwrite this method, since some parts
-        do not support pickle protocols (e.g. due to local functions, locks, etc.).
+        do not support pickle protocols (e.g. due to local functions).
 
         Returns:
             Dict: All attributes of the VIPosterior.
         """
-        # Acquire lock to ensure consistent state during pickling
-        with self._set_x_lock:
-            self._optimizer = None
-            self.__deepcopy__ = None  # type: ignore
-            self._q_build_fn = None
-            self._q.__deepcopy__ = None  # type: ignore
-            # Create a copy of __dict__ without the lock (not picklable)
-            state = self.__dict__.copy()
-            state.pop("_set_x_lock", None)
+        self._optimizer = None
+        self.__deepcopy__ = None  # type: ignore
+        self._q_build_fn = None
+        self._q.__deepcopy__ = None  # type: ignore
+        state = self.__dict__.copy()
         return state
 
     def __setstate__(self, state_dict: Dict):
@@ -1294,8 +1319,6 @@ class VIPosterior(NeuralPosterior):
             state_dict: Given state dictionary, we will restore the object from it.
         """
         self.__dict__ = state_dict
-        # Restore the lock immediately (not picklable, so we create a new one)
-        self._set_x_lock = Lock()
         q = deepcopy(self._q)
         # Restore removed attributes
         self.set_q(*self._q_arg)

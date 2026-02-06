@@ -36,12 +36,11 @@ from sbi.samplers.vi.vi_utils import (
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
-from sbi.sbi_types import Array, PyroTransformedDistribution
+from sbi.sbi_types import Array
 from sbi.utils.user_input_checks import check_prior
 
-# Type alias for variational distributions (nn.Module-based or PyTorch distributions)
+# Type alias for variational distributions (Zuko-based flows and LearnableGaussian)
 VariationalDistribution = Union[
-    PyroTransformedDistribution,
     ZukoUnconditionalFlow,
     TransformedZukoFlow,
     LearnableGaussian,
@@ -87,8 +86,8 @@ class DivergenceOptimizer(ABC):
         Args:
             potential_fn: Potential function of the target i.e. the posterior density up
                 to normalization constant.
-            q: Variational distribution. Can be either a Pyro TransformedDistribution
-                or a Zuko-based unconditional flow (ZukoUnconditionalFlow).
+            q: Variational distribution. Must be a Zuko-based flow
+                (ZukoUnconditionalFlow, TransformedZukoFlow) or LearnableGaussian.
             prior: Prior distribution, which will be used within the warmup, if given.
                 Note that this will not affect the potential_fn, so make sure to have
                 the same prior within it.
@@ -121,26 +120,11 @@ class DivergenceOptimizer(ABC):
         self.retain_graph = kwargs.get("retain_graph", False)
         self._kwargs = kwargs
 
-        # Detect if q is nn.Module-based (Zuko/LearnableGaussian) vs Pyro distribution
-        self._is_zuko = isinstance(
-            q, (ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian)
-        )
-
-        # This prevents error that would stop optimization (Pyro-specific).
-        if not self._is_zuko:
-            self.q.set_default_validate_args(False)
         if prior is not None:
             self.prior.set_default_validate_args(False)  # type: ignore
 
-        # Manage modules if present.
-        # Zuko flows are nn.Module, Pyro flows may have a modules() method
-        if self._is_zuko:
-            # ZukoUnconditionalFlow is an nn.Module, use its modules directly
-            self.modules = nn.ModuleList([self.q])
-        elif hasattr(self.q, "modules"):
-            self.modules = nn.ModuleList(self.q.modules())
-        else:
-            self.modules = nn.ModuleList()
+        # Manage modules - all supported distributions are nn.Module-based
+        self.modules = nn.ModuleList([self.q])
         self.modules.train()
 
         # Ensure that distribution has parameters and that these are on the right device
@@ -189,57 +173,32 @@ class DivergenceOptimizer(ABC):
             move_all_tensor_to_device(self.prior, self.device)
 
     def warm_up(self, num_steps: int, method: str = "prior") -> None:
-        """This initializes q, either to follow the prior or the base distribution
-        of the flow. This can increase training stability.
+        """This initializes q to follow the prior. This can increase training stability.
 
         Args:
             num_steps: Number of steps to train.
-            method: Method for warmup. For Zuko flows, only "prior" is supported.
-                For Pyro flows, "prior" and "identity" are both supported.
+            method: Method for warmup. Only "prior" is supported.
 
         Raises:
-            NotImplementedError: If an unsupported method is specified, or if
-                "identity" is specified for Zuko flows (which don't expose base_dist).
+            NotImplementedError: If an unsupported method is specified.
 
         """
-        if method == "prior" and self.prior is not None:
-            initial_target = self.prior
-        elif method == "identity":
-            if self._is_zuko:
-                raise NotImplementedError(
-                    "The 'identity' warmup method is not supported for Zuko flows. "
-                    "Zuko flows don't expose base_dist and transforms directly. "
-                    "Use method='prior' instead."
-                )
-            initial_target = torch.distributions.TransformedDistribution(
-                self.q.base_dist, self.q.transforms[-1]
-            )
-        else:
+        if method != "prior":
             raise NotImplementedError(
-                "The only implemented warmup methods are 'prior' and 'identity'. "
-                f"Got: {method}"
+                f"Only 'prior' warmup method is supported. Got: {method}"
             )
+        if self.prior is None:
+            raise ValueError("Prior must be provided for warmup.")
+
+        initial_target = self.prior
 
         for _ in range(num_steps):
             self._optimizer.zero_grad()
 
-            if self._is_zuko:
-                # Zuko flows: use sample_and_log_prob for efficient reparameterized
-                # sampling
-                samples, logq = self.q.sample_and_log_prob(torch.Size((32,)))
-                logp = initial_target.log_prob(samples)
-                loss = -torch.mean(logp - logq)
-            elif self.q.has_rsample:
-                # Pyro flows with rsample: reparameterized sampling
-                samples = self.q.rsample((32,))
-                logq = self.q.log_prob(samples)
-                logp = initial_target.log_prob(samples)  # type: ignore
-                loss = -torch.mean(logp - logq)
-            else:
-                # Pyro flows without rsample: sample from target
-                samples = initial_target.sample((256,))  # type: ignore
-                assert samples is not None  # Type narrowing for pyright
-                loss = -torch.mean(self.q.log_prob(samples))
+            # Use sample_and_log_prob for efficient reparameterized sampling
+            samples, logq = self.q.sample_and_log_prob(torch.Size((32,)))
+            logp = initial_target.log_prob(samples)
+            loss = -torch.mean(logp - logq)
 
             loss.backward(retain_graph=self.retain_graph)
             self._optimizer.step()
@@ -478,15 +437,9 @@ class ElboOptimizer(DivergenceOptimizer):
         self.HYPER_PARAMETERS += ["stick_the_landing"]
 
     def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
-        # Zuko flows always support reparameterized sampling via sample_and_log_prob
-        if self._is_zuko or self.q.has_rsample:
-            return self.loss_rsample(xo)
-        else:
-            raise NotImplementedError(
-                "Currently only reparameterizable distributions are supported."
-            )
+        return self._compute_elbo_loss(xo)
 
-    def loss_rsample(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
+    def _compute_elbo_loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the ELBO"""
         elbo_particles = self.generate_elbo_particles(x_o)
         loss = -elbo_particles.mean()
@@ -499,19 +452,10 @@ class ElboOptimizer(DivergenceOptimizer):
         if num_samples is None:
             num_samples = self.n_particles
 
-        # Zuko flows use sample_and_log_prob, Pyro flows use rsample
-        if self._is_zuko:
-            samples, log_q = self.q.sample_and_log_prob(torch.Size((num_samples,)))
-            if self.stick_the_landing:
-                self.update_surrogate_q()
-                log_q = self._surrogate_q.log_prob(samples)
-        else:
-            samples = self.q.rsample((num_samples,))
-            if self.stick_the_landing:
-                self.update_surrogate_q()
-                log_q = self._surrogate_q.log_prob(samples)
-            else:
-                log_q = self.q.log_prob(samples)
+        samples, log_q = self.q.sample_and_log_prob(torch.Size((num_samples,)))
+        if self.stick_the_landing:
+            self.update_surrogate_q()
+            log_q = self._surrogate_q.log_prob(samples)
 
         self.potential_fn.x_o = x_o
         log_potential = self.potential_fn(samples)
@@ -656,10 +600,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
 
     def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
         # Zuko flows always support reparameterized sampling via sample_and_log_prob
-        if self._is_zuko or self.q.has_rsample:
-            return self._loss_q_proposal(xo)
-        else:
-            raise NotImplementedError("Unknown loss.")
+        return self._loss_q_proposal(xo)
 
     def _loss_q_proposal(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """This gives an importance sampling estimate of the forward KL divergence.
@@ -744,17 +685,11 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             self.stick_the_landing = True
 
     def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
-        assert isinstance(self.alpha, float)
         # Zuko flows always support reparameterized sampling via sample_and_log_prob
-        if self._is_zuko or self.q.has_rsample:
-            if not self.unbiased:
-                return self.loss_alpha(xo)
-            else:
-                return self.loss_alpha_unbiased(xo)
+        if not self.unbiased:
+            return self.loss_alpha(xo)
         else:
-            raise NotImplementedError(
-                "Currently we only support reparameterizable distributions"
-            )
+            return self.loss_alpha_unbiased(xo)
 
     def loss_alpha_unbiased(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Unbiased estimate of a surrogate RVB"""
