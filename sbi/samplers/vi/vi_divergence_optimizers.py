@@ -28,13 +28,23 @@ from torch.optim.lr_scheduler import (
 from torch.optim.rmsprop import RMSprop
 from torch.optim.sgd import SGD
 
+from sbi.neural_nets.estimators import ZukoUnconditionalFlow
 from sbi.samplers.vi.vi_utils import (
+    LearnableGaussian,
+    TransformedZukoFlow,
     filter_kwrags_for_func,
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
-from sbi.sbi_types import Array, PyroTransformedDistribution
+from sbi.sbi_types import Array
 from sbi.utils.user_input_checks import check_prior
+
+# Type alias for variational distributions (Zuko-based flows and LearnableGaussian)
+VariationalDistribution = Union[
+    ZukoUnconditionalFlow,
+    TransformedZukoFlow,
+    LearnableGaussian,
+]
 
 _VI_method = {}
 
@@ -50,7 +60,7 @@ class DivergenceOptimizer(ABC):
     def __init__(
         self,
         potential_fn: 'BasePotential',  # noqa: F821 # type: ignore
-        q: PyroTransformedDistribution,
+        q: VariationalDistribution,
         prior: Optional[Distribution] = None,
         n_particles: int = 256,
         clip_value: float = 5.0,
@@ -76,7 +86,8 @@ class DivergenceOptimizer(ABC):
         Args:
             potential_fn: Potential function of the target i.e. the posterior density up
                 to normalization constant.
-            q: Variational distribution
+            q: Variational distribution. Must be a Zuko-based flow
+                (ZukoUnconditionalFlow, TransformedZukoFlow) or LearnableGaussian.
             prior: Prior distribution, which will be used within the warmup, if given.
                 Note that this will not affect the potential_fn, so make sure to have
                 the same prior within it.
@@ -109,16 +120,11 @@ class DivergenceOptimizer(ABC):
         self.retain_graph = kwargs.get("retain_graph", False)
         self._kwargs = kwargs
 
-        # This prevents error that would stop optimization.
-        self.q.set_default_validate_args(False)
         if prior is not None:
             self.prior.set_default_validate_args(False)  # type: ignore
 
-        # Manage modules if present.
-        if hasattr(self.q, "modules"):
-            self.modules = nn.ModuleList(self.q.modules())
-        else:
-            self.modules = nn.ModuleList()
+        # Manage modules - all supported distributions are nn.Module-based
+        self.modules = nn.ModuleList([self.q])
         self.modules.train()
 
         # Ensure that distribution has parameters and that these are on the right device
@@ -167,37 +173,36 @@ class DivergenceOptimizer(ABC):
             move_all_tensor_to_device(self.prior, self.device)
 
     def warm_up(self, num_steps: int, method: str = "prior") -> None:
-        """This initializes q, either to follow the prior or the base distribution
-        of the flow. This can increase training stability.
+        """This initializes q to follow the prior. This can increase training stability.
 
         Args:
             num_steps: Number of steps to train.
-            method: Method for warmup.
+            method: Method for warmup. Only "prior" is supported.
+
+        Raises:
+            NotImplementedError: If an unsupported method is specified.
 
         """
-        if method == "prior" and self.prior is not None:
-            inital_target = self.prior
-        elif method == "identity":
-            inital_target = torch.distributions.TransformedDistribution(
-                self.q.base_dist, self.q.transforms[-1]
+        if method != "prior":
+            raise NotImplementedError(
+                f"Only 'prior' warmup method is supported. Got: {method}"
             )
-        else:
-            NotImplementedError(
-                "The only implemented methods are `prior` and `identity`."
-            )
+        if self.prior is None:
+            raise ValueError("Prior must be provided for warmup.")
+
+        initial_target = self.prior
 
         for _ in range(num_steps):
             self._optimizer.zero_grad()
-            if self.q.has_rsample:
-                samples = self.q.rsample((32,))
-                logq = self.q.log_prob(samples)
-                logp = inital_target.log_prob(samples)  # type: ignore
-                loss = -torch.mean(logp - logq)
-            else:
-                samples = inital_target.sample((256,))  # type: ignore
-                loss = -torch.mean(self.q.log_prob(samples))
+
+            # Use sample_and_log_prob for efficient reparameterized sampling
+            samples, logq = self.q.sample_and_log_prob(torch.Size((32,)))
+            logp = initial_target.log_prob(samples)
+            loss = -torch.mean(logp - logq)
+
             loss.backward(retain_graph=self.retain_graph)
             self._optimizer.step()
+
         # Denote that warmup was already done
         self.warm_up_was_done = True
 
@@ -432,14 +437,9 @@ class ElboOptimizer(DivergenceOptimizer):
         self.HYPER_PARAMETERS += ["stick_the_landing"]
 
     def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
-        if self.q.has_rsample:
-            return self.loss_rsample(xo)
-        else:
-            raise NotImplementedError(
-                "Currently only reparameterizable distributions are supported."
-            )
+        return self._compute_elbo_loss(xo)
 
-    def loss_rsample(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
+    def _compute_elbo_loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the ELBO"""
         elbo_particles = self.generate_elbo_particles(x_o)
         loss = -elbo_particles.mean()
@@ -451,12 +451,12 @@ class ElboOptimizer(DivergenceOptimizer):
         """Generates individual ELBO particles i.e. logp(theta, x_o) - logq(theta)."""
         if num_samples is None:
             num_samples = self.n_particles
-        samples = self.q.rsample((num_samples,))
+
+        samples, log_q = self.q.sample_and_log_prob(torch.Size((num_samples,)))
         if self.stick_the_landing:
             self.update_surrogate_q()
             log_q = self._surrogate_q.log_prob(samples)
-        else:
-            log_q = self.q.log_prob(samples)
+
         self.potential_fn.x_o = x_o
         log_potential = self.potential_fn(samples)
         elbo = log_potential - log_q
@@ -599,10 +599,8 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         self.eps = 1e-5
 
     def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
-        if self.q.has_rsample:
-            return self._loss_q_proposal(xo)
-        else:
-            raise NotImplementedError("Unknown loss.")
+        # Zuko flows always support reparameterized sampling via sample_and_log_prob
+        return self._loss_q_proposal(xo)
 
     def _loss_q_proposal(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """This gives an importance sampling estimate of the forward KL divergence.
@@ -687,16 +685,11 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             self.stick_the_landing = True
 
     def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
-        assert isinstance(self.alpha, float)
-        if self.q.has_rsample:
-            if not self.unbiased:
-                return self.loss_alpha(xo)
-            else:
-                return self.loss_alpha_unbiased(xo)
+        # Zuko flows always support reparameterized sampling via sample_and_log_prob
+        if not self.unbiased:
+            return self.loss_alpha(xo)
         else:
-            raise NotImplementedError(
-                "Currently we only support reparameterizable distributions"
-            )
+            return self.loss_alpha_unbiased(xo)
 
     def loss_alpha_unbiased(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Unbiased estimate of a surrogate RVB"""
