@@ -292,6 +292,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
+
         train_config = TrainConfig(
             max_num_epochs=max_num_epochs,
             stop_after_epochs=stop_after_epochs,

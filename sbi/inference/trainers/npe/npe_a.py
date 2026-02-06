@@ -199,6 +199,12 @@ class NPE_A(PosteriorEstimatorTrainer):
         kwargs["discard_prior_samples"] = True
         kwargs["force_first_round_loss"] = True
 
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
+
         self._round = max(self._data_round_index)
 
         if final_round:

@@ -37,7 +37,6 @@ inference.
 - [Posterior predictive checks](10_diagnostics_posterior_predictive_checks.md)
 - [Simulation-based calibration](11_diagnostics_simulation_based_calibration.md)
 - [Local-C2ST coverage checks](13_diagnostics_lc2st.md)
-- [Density plots and MCMC diagnostics with ArviZ](14_mcmc_diagnostics_with_arviz.md)
 </div>
 
 ## Analysis

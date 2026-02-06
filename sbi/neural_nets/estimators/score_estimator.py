@@ -66,6 +66,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         weight_fn: Union[str, Callable] = "max_likelihood",
+        beta_min: float = 0.01,
+        beta_max: float = 10.0,
         mean_0: Union[Tensor, float] = 0.0,
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-3,
@@ -110,6 +112,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             t_min=t_min,
             t_max=t_max,
         )
+
+        # Min/max values for noise variance beta
+        self.beta_min = beta_min
+        self.beta_max = beta_max
 
         # Set lambdas (variance weights) function.
         self._set_weight_fn(weight_fn)
@@ -228,7 +234,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Input variable i.e. theta.
             condition: Conditioning variable.
-            times: SDE time variable in [t_min, t_max]. Uniformly sampled if None.
+            times: SDE time variable in [t_min, t_max]. If None, call the train_schedule
+                method specific to the score estimator.
             control_variate: Whether to use a control variate to reduce the variance of
                 the stochastic loss estimator.
             control_variate_threshold: Threshold for the control variate. If the std
@@ -240,13 +247,11 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             MSE between target score and network output, scaled by the weight function.
 
         """
-        # Sample diffusion times.
+        # Sample times from the Markov chain, use batch dimension
         if times is None:
-            times = (
-                torch.rand(input.shape[0], device=input.device)
-                * (self.t_max - self.t_min)
-                + self.t_min
-            )
+            times = self.train_schedule(input.shape[0])
+        times = times.to(input.device)
+
         # Sample noise.
         eps = torch.randn_like(input)
 
@@ -390,6 +395,86 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         """
         raise NotImplementedError
 
+    def noise_schedule(self, times: Tensor) -> Tensor:
+        """
+        Create a mapping from time to noise magnitude (beta/sigma) used in the SDE.
+
+        This method acts as a fallback in case derivative classes do not
+        implement it on their own. We implement here a linear beta schedule defined
+        by the input `times`, which represents the normalized time steps t ∈ [0, 1].
+
+        Args:
+            times: SDE times in [0, 1].
+
+        Returns:
+            Tensor: Generated beta schedule at a given time.
+
+        """
+        return self.beta_min + (self.beta_max - self.beta_min) * times
+
+    def train_schedule(
+        self,
+        num_samples: int,
+        t_min: Optional[float] = None,
+        t_max: Optional[float] = None,
+    ) -> Tensor:
+        """
+        Sample diffusion times used during training.
+
+        Can be overriden by subclasses. We implement here a uniform sampling of
+        time within the range [t_min, t_max]. The `times` tensor will be put on
+        the same device as the stored network.
+
+        Args:
+            num_samples: Number of samples to generate.
+            t_min: The minimum time value. Defaults to self.t_min.
+            t_max: The maximum time value. Defaults to self.t_max.
+
+        Returns:
+            Tensor: A tensor of time variables sampled in the range [t_min,t_max].
+
+        """
+        if t_min is None:
+            t_min = self.t_min
+        if t_max is None:
+            t_max = self.t_max
+
+        return (
+            torch.rand(num_samples, device=self._mean_base.device) * (t_max - t_min)
+            + t_min
+        )
+
+    def solve_schedule(
+        self,
+        num_steps: int,
+        t_min: Optional[float] = None,
+        t_max: Optional[float] = None,
+    ) -> Tensor:
+        """
+        Time grid used to solve the reverse SDE and evaluate the loss function.
+
+        This grid is deterministic and decreasing. We implement here a uniform time
+        stepping within the range [t_max, t_min]. The `times` tensor will be put on
+        the same device as the stored network.
+
+        Args:
+            num_steps: Number of time steps to generate.
+            t_min: The minimum time value. Defaults to self.t_min.
+            t_max: The maximum time value. Defaults to self.t_max.
+
+        Returns:
+            Tensor: A tensor of time steps within the range [t_max, t_min].
+
+        """
+        if t_min is None:
+            t_min = self.t_min
+        if t_max is None:
+            t_max = self.t_max
+
+        times = torch.linspace(t_max, t_min, num_steps, device=self._mean_base.device)
+
+        return times
+
     def _set_weight_fn(self, weight_fn: Union[str, Callable]):
         """Set the weight function.
 
@@ -480,8 +565,6 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         t_min: float = 1e-3,
         t_max: float = 1.0,
     ) -> None:
-        self.beta_min = beta_min
-        self.beta_max = beta_max
         super().__init__(
             net,
             input_shape,
@@ -490,6 +573,8 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             weight_fn=weight_fn,
             mean_0=mean_0,
             std_0=std_0,
+            beta_min=beta_min,
+            beta_max=beta_max,
             t_min=t_min,
             t_max=t_max,
         )
@@ -525,17 +610,6 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             std = std.unsqueeze(-1)
         return torch.sqrt(std)
 
-    def _beta_schedule(self, times: Tensor) -> Tensor:
-        """Linear beta schedule for mean scaling in variance preserving SDEs.
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Beta schedule at a given time.
-        """
-        return self.beta_min + (self.beta_max - self.beta_min) * times
-
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Drift function for variance preserving SDEs.
 
@@ -546,7 +620,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Drift function at a given time.
         """
-        phi = -0.5 * self._beta_schedule(times)
+        phi = -0.5 * self.noise_schedule(times)
         while len(phi.shape) < len(input.shape):
             phi = phi.unsqueeze(-1)
         return phi * input
@@ -561,7 +635,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Drift function at a given time.
         """
-        g = torch.sqrt(self._beta_schedule(times))
+        g = torch.sqrt(self.noise_schedule(times))
         while len(g.shape) < len(input.shape):
             g = g.unsqueeze(-1)
         return g
@@ -604,14 +678,14 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         t_min: float = 1e-2,
         t_max: float = 1.0,
     ) -> None:
-        self.beta_min = beta_min
-        self.beta_max = beta_max
         super().__init__(
             net,
             input_shape,
             condition_shape,
             embedding_net=embedding_net,
             weight_fn=weight_fn,
+            beta_min=beta_min,
+            beta_max=beta_max,
             mean_0=mean_0,
             std_0=std_0,
             t_min=t_min,
@@ -649,18 +723,6 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             std = std.unsqueeze(-1)
         return std
 
-    def _beta_schedule(self, times: Tensor) -> Tensor:
-        """Linear beta schedule for mean scaling in sub-variance preserving SDEs.
-        (Same as for variance preserving SDEs.)
-
-        Args:
-            times: SDE time variable in [0,1].
-
-        Returns:
-            Beta schedule at a given time.
-        """
-        return self.beta_min + (self.beta_max - self.beta_min) * times
-
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Drift function for sub-variance preserving SDEs.
 
@@ -671,7 +733,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Drift function at a given time.
         """
-        phi = -0.5 * self._beta_schedule(times).to(input.device)
+        phi = -0.5 * self.noise_schedule(times)
 
         while len(phi.shape) < len(input.shape):
             phi = phi.unsqueeze(-1)
@@ -690,7 +752,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         """
         g = torch.sqrt(
             torch.abs(
-                self._beta_schedule(times)
+                self.noise_schedule(times)
                 * (
                     1
                     - torch.exp(
@@ -788,16 +850,18 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             std = std.unsqueeze(-1)
         return std
 
-    def _sigma_schedule(self, times: Tensor) -> Tensor:
-        """Geometric sigma schedule for variance exploding SDEs.
+    def noise_schedule(self, times: Tensor) -> Tensor:
+        """Noise schedule used in the SDE drift and diffusion coefficients.
+        Note that for VE, this method returns the same as std_fn().
 
         Args:
             times: SDE time variable in [0,1].
 
         Returns:
-            Sigma schedule at a given time.
+            Noise magnitude (sigma) at a given time.
         """
-        return self.sigma_min * (self.sigma_max / self.sigma_min) ** times
+        std = self.sigma_min * (self.sigma_max / self.sigma_min) ** times
+        return std
 
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
         """Drift function for variance exploding SDEs.
@@ -821,11 +885,10 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Diffusion function at a given time.
         """
-        g = self._sigma_schedule(times) * math.sqrt(
-            (2 * math.log(self.sigma_max / self.sigma_min))
-        )
+        sigma_scale = self.sigma_max / self.sigma_min
+        sigmas = self.noise_schedule(times)
+        g = sigmas * math.sqrt((2 * math.log(sigma_scale)))
 
         while len(g.shape) < len(input.shape):
             g = g.unsqueeze(-1)
-
         return g.to(input.device)

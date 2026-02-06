@@ -169,6 +169,11 @@ class NPE_C(PosteriorEstimatorTrainer):
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
         # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
         # requiring the signature to have `num_atoms`, save it for use below, and
         # continue. It's sneaky because we are using the object (self) as a namespace

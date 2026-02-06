@@ -36,6 +36,26 @@ PyroTransformedDistribution: TypeAlias = TransformedDistribution
 TorchTensor: TypeAlias = Tensor
 
 
+class SampleProposal(Protocol):
+    """Protocol for sample proposal callables used in rejection sampling.
+
+    Any callable that takes a sample shape and optional keyword arguments
+    and returns a Tensor of samples satisfies this protocol.
+    """
+
+    def __call__(self, sample_shape: torch.Size, **kwargs) -> Tensor: ...
+
+
+class AcceptRejectFn(Protocol):
+    """Protocol for accept/reject functions used in rejection sampling.
+
+    Any callable that takes a batch of parameters (theta) and returns a boolean
+    Tensor indicating which samples are accepted satisfies this protocol.
+    """
+
+    def __call__(self, theta: Tensor) -> Tensor: ...
+
+
 class Tracker(Protocol):
     """Protocol for experiment tracking integrations."""
 
@@ -60,9 +80,11 @@ class Tracker(Protocol):
 
 
 __all__ = [
+    "AcceptRejectFn",
     "Array",
     "Shape",
     "OneOrMore",
+    "SampleProposal",
     "ScalarFloat",
     "TensorBoardSummaryWriter",
     "TorchTransform",
