@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Optional, Protocol, Sequence, Tuple, TypeVar, Union
+from typing import Any, Optional, Protocol, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 import torch
@@ -56,6 +56,29 @@ class AcceptRejectFn(Protocol):
     def __call__(self, theta: Tensor) -> Tensor: ...
 
 
+class Tracker(Protocol):
+    """Protocol for experiment tracking integrations."""
+
+    @property
+    def log_dir(self) -> Optional[str]: ...
+
+    def log_metric(
+        self, name: str, value: float, step: Optional[int] = None
+    ) -> None: ...
+
+    def log_metrics(
+        self, metrics: dict[str, float], step: Optional[int] = None
+    ) -> None: ...
+
+    def log_params(self, params: dict[str, Any]) -> None: ...
+
+    def add_figure(
+        self, name: str, figure: Any, step: Optional[int] = None
+    ) -> None: ...
+
+    def flush(self) -> None: ...
+
+
 __all__ = [
     "AcceptRejectFn",
     "Array",
@@ -69,4 +92,5 @@ __all__ = [
     "TorchDistribution",
     "PyroTransformedDistribution",
     "TorchTensor",
+    "Tracker",
 ]

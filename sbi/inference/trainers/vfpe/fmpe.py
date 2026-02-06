@@ -19,6 +19,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalVectorFieldEstimator,
 )
 from sbi.neural_nets.factory import posterior_flow_nn
+from sbi.sbi_types import Tracker
 
 
 class FMPE(VectorFieldTrainer):
@@ -37,6 +38,7 @@ class FMPE(VectorFieldTrainer):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
         **kwargs,
     ) -> None:
@@ -53,7 +55,10 @@ class FMPE(VectorFieldTrainer):
                 warning is raised and the `vf_estimator="mlp"` default is used.
             device: Device to use for training.
             logging_level: Logging level.
-            summary_writer: Summary writer for tensorboard.
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars.
             **kwargs: Additional keyword arguments passed to the default builder if
                 `density_estimator` is a string.
@@ -73,6 +78,7 @@ class FMPE(VectorFieldTrainer):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
             vector_field_estimator_builder=vf_estimator,
             **kwargs,
