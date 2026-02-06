@@ -248,6 +248,33 @@ def test_vfinference_with_different_models(vector_field_type, model):
     check_c2st(samples, target_samples, alg=f"fmpe_{model}")
 
 
+@pytest.mark.parametrize("vector_field_type", ["fmpe"])
+def test_fmpe_time_dependent_z_scoring_integration(vector_field_type):
+    num_dim = 2
+    prior = BoxUniform(9.0 * ones(num_dim), 11.0 * ones(num_dim))
+
+    def simulator(theta):
+        return theta + torch.randn_like(theta) * 0.1
+
+    inference = FMPE(prior, z_score_x='structured', show_progress_bars=False)
+    theta = prior.sample((200,))
+    x = simulator(theta)
+    density_estimator = inference.append_simulations(theta, x).train(max_num_epochs=1)
+
+    assert hasattr(density_estimator, "mean_1")
+    assert hasattr(density_estimator, "std_1")
+    assert torch.all(density_estimator.mean_1 > 8.0)
+
+    batch_size = 10
+    t = torch.rand(batch_size)
+    theta_test = torch.randn(batch_size, num_dim)
+    cond_test = zeros(batch_size, num_dim)
+    v_pred = density_estimator.ode_fn(theta_test, cond_test, t)
+
+    assert v_pred.shape == (batch_size, num_dim)
+    assert not torch.isnan(v_pred).any()
+
+
 # ------------------------------------------------------------------------------
 # -------------------------------- SLOW TESTS ----------------------------------
 # ------------------------------------------------------------------------------
