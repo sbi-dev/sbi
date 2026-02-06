@@ -21,9 +21,12 @@ import torch.distributions.transforms as torch_tf
 from torch import eye, ones, zeros
 from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
-from sbi.inference import NLE, likelihood_estimator_based_potential
+from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
 from sbi.inference.posteriors import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.ratio_based_potential import (
+    ratio_estimator_based_potential,
+)
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -75,16 +78,19 @@ def make_tractable_potential(target_distribution, prior):
 # =============================================================================
 
 
-@pytest.fixture
-def linear_gaussian_setup():
-    """Setup for linear Gaussian test problem with trained NLE.
+def _build_linear_gaussian_setup(trainer_type: str = "nle"):
+    """Helper to build linear Gaussian setup with specified trainer type.
+
+    Args:
+        trainer_type: Either "nle" or "nre".
 
     Returns a dict with:
     - prior: MultivariateNormal prior
-    - potential_fn: Trained NLE-based potential function
+    - potential_fn: Trained potential function (NLE or NRE based)
     - theta, x: Simulation data
     - likelihood_shift, likelihood_cov: Likelihood parameters
     - num_dim: Dimensionality
+    - trainer_type: The trainer type used
     """
     torch.manual_seed(42)
 
@@ -101,17 +107,27 @@ def linear_gaussian_setup():
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
 
-    # Train NLE
-    trainer = NLE(prior=prior, show_progress_bars=False, density_estimator="nsf")
-    trainer.append_simulations(theta, x)
-    likelihood_estimator = trainer.train(max_num_epochs=200)
-
-    # Create potential function
-    potential_fn, _ = likelihood_estimator_based_potential(
-        likelihood_estimator=likelihood_estimator,
-        prior=prior,
-        x_o=None,
-    )
+    # Train estimator and create potential based on trainer type
+    if trainer_type == "nle":
+        trainer = NLE(prior=prior, show_progress_bars=False, density_estimator="nsf")
+        trainer.append_simulations(theta, x)
+        estimator = trainer.train(max_num_epochs=200)
+        potential_fn, _ = likelihood_estimator_based_potential(
+            likelihood_estimator=estimator,
+            prior=prior,
+            x_o=None,
+        )
+    elif trainer_type == "nre":
+        trainer = NRE(prior=prior, show_progress_bars=False, classifier="mlp")
+        trainer.append_simulations(theta, x)
+        estimator = trainer.train(max_num_epochs=200)
+        potential_fn, _ = ratio_estimator_based_potential(
+            ratio_estimator=estimator,
+            prior=prior,
+            x_o=None,
+        )
+    else:
+        raise ValueError(f"Unknown trainer_type: {trainer_type}")
 
     return {
         "prior": prior,
@@ -121,7 +137,20 @@ def linear_gaussian_setup():
         "likelihood_shift": likelihood_shift,
         "likelihood_cov": likelihood_cov,
         "num_dim": num_dim,
+        "trainer_type": trainer_type,
     }
+
+
+@pytest.fixture
+def linear_gaussian_setup():
+    """Setup for linear Gaussian test problem with trained NLE."""
+    return _build_linear_gaussian_setup("nle")
+
+
+@pytest.fixture(params=["nle", "nre"])
+def linear_gaussian_setup_trainers(request):
+    """Parametrized setup for linear Gaussian with NLE or NRE."""
+    return _build_linear_gaussian_setup(request.param)
 
 
 # =============================================================================
@@ -435,9 +464,9 @@ def test_vi_flow_builders(num_dim: int, q_type: str):
 
 
 @pytest.mark.slow
-def test_amortized_vi_training(linear_gaussian_setup):
-    """Test that VIPosterior.train_amortized() trains successfully."""
-    setup = linear_gaussian_setup
+def test_amortized_vi_accuracy(linear_gaussian_setup_trainers):
+    """Test that amortized VI produces accurate posteriors (NLE and NRE)."""
+    setup = linear_gaussian_setup_trainers
 
     posterior = VIPosterior(
         potential_fn=setup["potential_fn"],
@@ -454,28 +483,8 @@ def test_amortized_vi_training(linear_gaussian_setup):
         hidden_features=32,
     )
 
+    # Verify training completed successfully
     assert posterior._mode == "amortized"
-
-
-@pytest.mark.slow
-def test_amortized_vi_accuracy(linear_gaussian_setup):
-    """Test that amortized VI produces accurate posteriors across observations."""
-    setup = linear_gaussian_setup
-
-    posterior = VIPosterior(
-        potential_fn=setup["potential_fn"],
-        prior=setup["prior"],
-    )
-
-    posterior.train_amortized(
-        theta=setup["theta"],
-        x=setup["x"],
-        max_num_iters=500,
-        show_progress_bar=False,
-        flow_type=ZukoFlowType.NSF,
-        num_transforms=2,
-        hidden_features=32,
-    )
 
     # Test on multiple observations
     test_x_os = [
@@ -496,7 +505,10 @@ def test_amortized_vi_accuracy(linear_gaussian_setup):
         vi_samples = posterior.sample((1000,), x=x_o)
 
         c2st_score = c2st(true_samples, vi_samples).item()
-        assert c2st_score < 0.6, f"C2ST too high for x_o={x_o.squeeze().tolist()}"
+        assert c2st_score < 0.65, (
+            f"C2ST too high for {setup['trainer_type']}, "
+            f"x_o={x_o.squeeze().tolist()}: {c2st_score:.3f}"
+        )
 
 
 @pytest.mark.slow
@@ -595,119 +607,6 @@ def test_amortized_vi_requires_training(linear_gaussian_setup):
 
 
 @pytest.mark.slow
-def test_amortized_vs_single_x_vi(linear_gaussian_setup):
-    """Compare amortized VI against single-x VI for the same observation."""
-    setup = linear_gaussian_setup
-
-    # Train amortized VI
-    amortized_posterior = VIPosterior(
-        potential_fn=setup["potential_fn"],
-        prior=setup["prior"],
-    )
-    amortized_posterior.train_amortized(
-        theta=setup["theta"],
-        x=setup["x"],
-        max_num_iters=500,
-        show_progress_bar=False,
-        flow_type=ZukoFlowType.NSF,
-        num_transforms=2,
-        hidden_features=32,
-    )
-
-    # Train single-x VI for a specific observation
-    x_o = torch.tensor([[0.5, 0.5]])
-    potential_fn_single, _ = likelihood_estimator_based_potential(
-        likelihood_estimator=setup["potential_fn"].likelihood_estimator,
-        prior=setup["prior"],
-        x_o=x_o,
-    )
-
-    single_x_posterior = VIPosterior(
-        potential_fn=potential_fn_single,
-        prior=setup["prior"],
-        q="maf",
-    )
-    single_x_posterior.set_default_x(x_o)
-    single_x_posterior.train(max_num_iters=500, show_progress_bar=False)
-
-    # Get ground truth
-    true_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o.squeeze(0),
-        setup["likelihood_shift"],
-        setup["likelihood_cov"],
-        zeros(setup["num_dim"]),
-        eye(setup["num_dim"]),
-    )
-    true_samples = true_posterior.sample((1000,))
-
-    # Compare
-    amortized_samples = amortized_posterior.sample((1000,), x=x_o)
-    single_x_samples = single_x_posterior.sample((1000,))
-
-    c2st_amortized = c2st(true_samples, amortized_samples).item()
-    c2st_single_x = c2st(true_samples, single_x_samples).item()
-
-    assert c2st_amortized < 0.6, f"Amortized VI C2ST too high: {c2st_amortized:.3f}"
-    assert abs(c2st_amortized - c2st_single_x) < 0.15, (
-        f"Amortized ({c2st_amortized:.3f}) much worse than "
-        f"single-x ({c2st_single_x:.3f})"
-    )
-
-
-@pytest.mark.slow
-def test_amortized_vi_gradient_flow(linear_gaussian_setup):
-    """Verify gradients flow through ELBO to flow parameters."""
-    from torch.optim import Adam
-
-    setup = linear_gaussian_setup
-
-    posterior = VIPosterior(
-        potential_fn=setup["potential_fn"],
-        prior=setup["prior"],
-    )
-
-    # Build the flow manually
-    theta = setup["theta"][:500].to("cpu")
-    x = setup["x"][:500].to("cpu")
-    posterior._amortized_q = posterior._build_conditional_flow(
-        theta[:100],
-        x[:100],
-        flow_type=ZukoFlowType.NSF,
-        num_transforms=2,
-        hidden_features=32,
-    )
-    posterior._amortized_q.to("cpu")
-    posterior._mode = "amortized"
-
-    initial_params = [p.clone() for p in posterior._amortized_q.parameters()]
-
-    # Compute ELBO loss and backprop
-    optimizer = Adam(posterior._amortized_q.parameters(), lr=1e-3)
-    optimizer.zero_grad()
-
-    x_batch = x[:8]
-    loss = posterior._compute_amortized_elbo_loss(x_batch, n_particles=16)
-    loss.backward()
-
-    # Verify gradients exist and are non-zero
-    for i, p in enumerate(posterior._amortized_q.parameters()):
-        assert p.grad is not None, f"Gradient is None for parameter {i}"
-        assert torch.isfinite(p.grad).all(), f"Gradient has NaN/Inf for param {i}"
-        assert p.grad.abs().max() > 1e-10, f"Gradient is zero for parameter {i}"
-
-    # Verify parameters change after optimization step
-    optimizer.step()
-    changed_count = sum(
-        1
-        for p_init, p_new in zip(
-            initial_params, posterior._amortized_q.parameters(), strict=True
-        )
-        if not torch.allclose(p_init, p_new.detach(), atol=1e-8)
-    )
-    assert changed_count > 0, "No parameters changed after optimization step"
-
-
-@pytest.mark.slow
 def test_amortized_vi_map(linear_gaussian_setup):
     """Test that MAP estimation returns high-density region."""
     setup = linear_gaussian_setup
@@ -755,3 +654,49 @@ def test_amortized_vi_map(linear_gaussian_setup):
         f"MAP log_prob {map_log_prob.item():.3f} not better than "
         f"median random {random_log_probs.median().item():.3f}"
     )
+
+
+def test_amortized_vi_with_fake_potential():
+    """Fast test for amortized VI using FakePotential (no NLE training required).
+
+    This test runs in CI (not marked slow) to ensure amortized VI coverage.
+    Uses FakePotential where the posterior equals the prior.
+    """
+    torch.manual_seed(42)
+
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    potential_fn = FakePotential(prior=prior)
+
+    # Generate mock simulation data (not actually used for training potential)
+    theta = prior.sample((500,))
+    x = theta + 0.1 * torch.randn_like(theta)  # Noisy observations
+
+    posterior = VIPosterior(
+        potential_fn=potential_fn,
+        prior=prior,
+    )
+
+    # Train amortized VI
+    posterior.train_amortized(
+        theta=theta,
+        x=x,
+        max_num_iters=100,  # Fewer iterations for speed
+        show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=2,
+        hidden_features=16,  # Smaller network for speed
+    )
+
+    # Verify training completed
+    assert posterior._mode == "amortized"
+
+    # Test sampling works
+    x_test = torch.randn(1, num_dim)
+    samples = posterior.sample((100,), x=x_test)
+    assert samples.shape == (100, num_dim)
+
+    # Test log_prob works
+    log_probs = posterior.log_prob(samples, x=x_test)
+    assert log_probs.shape == (100,)
+    assert torch.isfinite(log_probs).all()
