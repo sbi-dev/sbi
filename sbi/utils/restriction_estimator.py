@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from math import floor
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -74,7 +74,9 @@ class RestrictionEstimator:
         hidden_features: int = 100,
         num_blocks: int = 2,
         dropout_probability: float = 0.5,
-        z_score: Optional[str] = "independent",
+        z_score: Optional[
+            Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        ] = "independent",
         embedding_net: nn.Module = nn.Identity(),
     ) -> None:
         r"""
@@ -688,7 +690,9 @@ class RestrictedPrior(Distribution):
 
         if sample_with == "rejection":
             samples, acceptance_rate = rejection.accept_reject_sample(
-                proposal=self._prior.sample,
+                proposal=lambda sample_shape, **kwargs: self._prior.sample(
+                    sample_shape
+                ),
                 accept_reject_fn=self._accept_reject_fn,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,

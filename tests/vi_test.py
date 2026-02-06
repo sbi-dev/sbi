@@ -189,7 +189,7 @@ def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str, sampling_method: str)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
     posterior.vi_method = vi_method
     posterior.train()
-    samples = posterior.sample((num_samples,), method=sampling_method)
+    samples = posterior.sample((num_samples,))
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
     check_c2st(samples, target_samples, alg="slice_np")
@@ -380,10 +380,8 @@ def test_vi_posterior_interface():
     posterior.train(max_num_iters=20, K=32)
     assert posterior._optimizer.K == 32
 
-    # Test sampling hyperparameters
+    # Test sampling from trained posterior
     posterior.sample()
-    posterior.sample(method="sir")
-    posterior.sample(method="sir", K=128)
 
     # Test evaluation
     posterior.evaluate()

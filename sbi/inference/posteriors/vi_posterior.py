@@ -532,18 +532,21 @@ class VIPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
-        **kwargs,
+        show_progress_bars: bool = True,
     ) -> Tensor:
-        """Samples from the variational posterior distribution.
+        r"""Draw samples from the variational posterior distribution $p(\theta|x)$.
 
         For single-x mode (trained via `train()`): samples from q(θ) trained on x_o.
         For amortized mode (trained via `train_amortized()`): samples from q(θ|x).
 
         Args:
-            sample_shape: Shape of samples.
-            x: Observation. In single-x mode, must match trained x_o (or be None).
-                In amortized mode, required and can be any observation.
-                For batched observations, shape should be (batch_size, x_dim).
+            sample_shape: Desired shape of samples that are drawn from the posterior.
+            x: Conditioning observation. In single-x mode, must match trained x_o
+                (or be None to use default). In amortized mode, required and can be
+                any observation. For batched observations, shape should be
+                (batch_size, x_dim).
+            show_progress_bars: Unused for `VIPosterior` since sampling from the
+                variational distribution is fast. Included for API consistency.
 
         Returns:
             Samples from posterior with shape (*sample_shape, θ_dim) for single x,
@@ -944,7 +947,14 @@ class VIPosterior(NeuralPosterior):
         """
         # Extract parameters from dataclass if provided
         if params is not None:
-            flow_type = params.q  # VIPosteriorParameters uses 'q' for flow type
+            # Amortized VI only supports string flow types (not VIPosterior or Callable)
+            if not isinstance(params.q, str):
+                raise ValueError(
+                    "train_amortized() only supports string flow types "
+                    f"(e.g., 'nsf', 'maf'), not {type(params.q).__name__}. "
+                    "Use set_q() to pass custom distributions for single-x VI."
+                )
+            flow_type = params.q
             num_transforms = params.num_transforms
             hidden_features = params.hidden_features
             z_score_theta = params.z_score_theta
