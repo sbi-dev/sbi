@@ -311,12 +311,8 @@ class VIPosterior(NeuralPosterior):
         flow_type: Union[ZukoFlowType, str] = ZukoFlowType.NSF,
         num_transforms: int = 2,
         hidden_features: int = 32,
-        z_score_theta: Literal[
-            "none", "independent", "structured"
-        ] = "independent",
-        z_score_x: Literal[
-            "none", "independent", "structured"
-        ] = "independent",
+        z_score_theta: Literal["none", "independent", "structured"] = "independent",
+        z_score_x: Literal["none", "independent", "structured"] = "independent",
     ) -> ConditionalDensityEstimator:
         """Build a conditional Zuko flow for amortized variational inference.
 
@@ -899,9 +895,7 @@ class VIPosterior(NeuralPosterior):
         flow_type: Union[ZukoFlowType, str] = ZukoFlowType.NSF,
         num_transforms: int = 2,
         hidden_features: int = 32,
-        z_score_theta: Literal[
-            "none", "independent", "structured"
-        ] = "independent",
+        z_score_theta: Literal["none", "independent", "structured"] = "independent",
         z_score_x: Literal["none", "independent", "structured"] = "independent",
         params: Optional["VIPosteriorParameters"] = None,
     ) -> "VIPosterior":

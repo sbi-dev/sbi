@@ -377,7 +377,14 @@ class VIPosteriorParameters(PosteriorParameters):
     def validate(self):
         """Validate VIPosteriorParameters fields."""
         valid_q = {
-            "nsf", "maf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"
+            "nsf",
+            "maf",
+            "naf",
+            "unaf",
+            "nice",
+            "sospf",
+            "gaussian",
+            "gaussian_diag",
         }
 
         if isinstance(self.q, str) and self.q not in valid_q:
