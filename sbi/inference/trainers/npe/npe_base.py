@@ -563,7 +563,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 isinstance(proposal, NeuralPosterior)
                 and hasattr(proposal, "posterior_estimator")
                 and self._neural_net is not None
-                and proposal.posterior_estimator is self._neural_net
+                and proposal.posterior_estimator is self._neural_net  # type: ignore
             ):
                 raise ValueError(
                     "The proposal's posterior_estimator is the same object as the "
