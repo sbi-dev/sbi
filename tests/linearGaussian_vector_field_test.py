@@ -257,7 +257,7 @@ def test_fmpe_time_dependent_z_scoring_integration(vector_field_type):
     def simulator(theta):
         return theta + torch.randn_like(theta) * 0.1
 
-    inference = FMPE(prior, z_score_x='structured', show_progress_bars=False)
+    inference = FMPE(prior, z_score_x="structured", show_progress_bars=False)
     theta = prior.sample((200,))
     x = simulator(theta)
     density_estimator = inference.append_simulations(theta, x).train(max_num_epochs=1)
