@@ -43,6 +43,7 @@ def build_vector_field_estimator(
         Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         VectorFieldNet,
     ] = "mlp",
+    gaussian_baseline: bool = True,
     **kwargs,
 ) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
     """Builds a vector field estimator (flow matching or score matching) with the given
@@ -65,6 +66,7 @@ def build_vector_field_estimator(
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
             "transformer_cross_attention" or a custom network following the
             VectorFieldNet protocol.
+        gaussian_baseline: Whether to use a Gaussian baseline for the flow.
         **kwargs: Additional arguments for the network.
 
     Returns:
@@ -151,6 +153,7 @@ def build_vector_field_estimator(
             embedding_net=embedding_net_y,
             mean_1=mean_0,
             std_1=std_0,
+            gaussian_baseline=gaussian_baseline,
         )
     elif estimator_type == "score":
         # Choose the appropriate score estimator based on SDE type
