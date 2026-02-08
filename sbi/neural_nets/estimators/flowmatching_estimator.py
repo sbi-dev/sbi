@@ -58,6 +58,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         noise_scale: float = 1e-3,
         mean_1: Union[Tensor, float] = 0.0,
         std_1: Union[Tensor, float] = 1.0,
+        gaussian_baseline: bool = True,
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -71,6 +72,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
                 (:math:`\sigma_{min}` in [2]_).
             mean_1: Mean of the data at t=1 (used for z-scoring).
             std_1: Standard deviation of the data at t=1 (used for z-scoring).
+            gaussian_baseline: Whether to use the Gaussian baseline
+                for the vector field.
             zscore_transform_input: Whether to z-score the input.
                 This is ignored and will be removed.
         """
@@ -91,6 +94,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             embedding_net=embedding_net,
         )
         self.noise_scale = noise_scale
+        self.gaussian_baseline = gaussian_baseline
 
         self.register_buffer("mean_1", torch.as_tensor(mean_1))
         self.register_buffer("std_1", torch.as_tensor(std_1))
@@ -142,7 +146,17 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         input_norm = (input - mu_t) / std_t
 
         v_out = self.net(input_norm, condition_emb, time)
-        v = v_out * std_t
+
+        if self.gaussian_baseline:
+            denom = (1 - t_view) + t_view * self.std_1
+            v_affine = (
+                self.mean_1
+                + (self.std_1 - 1.0) * (input - t_view * self.mean_1) / denom
+            )
+            v = v_out * std_t + v_affine
+        else:
+            v = v_out * std_t
+
         v = v.reshape(*batch_shape + self.input_shape)
 
         return v
