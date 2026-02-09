@@ -1485,8 +1485,8 @@ def build_zuko_vi_flow(
     if link_transform is not None:
         # Compose the base flow transforms with the link transform
         # The link transform maps from unconstrained space to the target support
-        transforms = (*base_flow.transform.transforms, link_transform)
-        neural_net = zuko.flows.Flow(transforms, base_flow.base)
+        transforms = [*base_flow.transform.transforms, link_transform]
+        neural_net = zuko.flows.Flow(transforms, base_flow.base)  # type: ignore[arg-type]
         return neural_net
 
     return base_flow
@@ -1562,7 +1562,8 @@ def _build_zuko_gaussian_flow(
                 super().__init__()
                 self.loc = loc
                 self.raw_tril = raw_tril
-                self.register_buffer("_tril_indices", tril_indices)
+                # Store indices directly (not as buffer since Transform isn't nn.Module)
+                self._tril_indices = tril_indices
                 self._features = features
 
             def _get_scale_tril(self) -> torch.Tensor:
@@ -1601,4 +1602,4 @@ def _build_zuko_gaussian_flow(
     # Standard normal base distribution
     base = zuko.distributions.DiagNormal(torch.zeros(features), torch.ones(features))
 
-    return zuko.flows.Flow((transform,), base)
+    return zuko.flows.Flow([transform], base)  # type: ignore[arg-type]
