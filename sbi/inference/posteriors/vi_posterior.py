@@ -91,6 +91,10 @@ class VIPosterior(NeuralPosterior):
         x_shape: Optional[torch.Size] = None,
         parameters: Optional[Iterable] = None,
         modules: Optional[Iterable] = None,
+        num_transforms: int = 5,
+        hidden_features: int = 50,
+        z_score_theta: Literal["none", "independent", "structured"] = "independent",
+        z_score_x: Literal["none", "independent", "structured"] = "independent",
     ):
         """
         Args:
@@ -132,6 +136,16 @@ class VIPosterior(NeuralPosterior):
             modules: List of modules of the variational posterior. This is only
                 required for user-defined q i.e. if q does not have a `modules`
                 attribute.
+            num_transforms: Number of transforms in the normalizing flow. Used for
+                both single-x VI (when q is a string flow type) and amortized VI.
+            hidden_features: Hidden layer size in flow networks. Used for both
+                single-x VI and amortized VI.
+            z_score_theta: Method for z-scoring θ (parameters). One of "none",
+                "independent", "structured". Used for both single-x VI and amortized
+                VI. Use "structured" for parameters with correlations.
+            z_score_x: Method for z-scoring x (conditioning observation). One of
+                "none", "independent", "structured". Only used for amortized VI
+                (train_amortized). Use "structured" for structured data like images.
         """
         super().__init__(potential_fn, theta_transform, device, x_shape=x_shape)
 
@@ -164,6 +178,13 @@ class VIPosterior(NeuralPosterior):
 
         # Amortized mode: conditional flow q(θ|x)
         self._amortized_q: Optional[ConditionalDensityEstimator] = None
+
+        self._num_transforms: int = num_transforms
+        self._hidden_features: int = hidden_features
+        self._z_score_theta: Literal["none", "independent", "structured"] = (
+            z_score_theta
+        )
+        self._z_score_x: Literal["none", "independent", "structured"] = z_score_x
 
         # In contrast to MCMC we want to project into constrained space.
         if theta_transform is None:
@@ -223,11 +244,9 @@ class VIPosterior(NeuralPosterior):
     def _build_zuko_flow(
         self,
         flow_type: str,
-        num_transforms: int = 5,
-        hidden_features: int = 50,
-        z_score_x: Literal[
-            "none", "independent", "structured", "transform_to_unconstrained"
-        ] = "independent",
+        num_transforms: Optional[int] = None,
+        hidden_features: Optional[int] = None,
+        z_score_theta: Optional[Literal["none", "independent", "structured"]] = None,
     ) -> TransformedZukoFlow:
         """Build a Zuko unconditional flow for variational inference.
 
@@ -239,10 +258,12 @@ class VIPosterior(NeuralPosterior):
         Args:
             flow_type: Type of flow, one of ["maf", "nsf", "naf", "unaf", "nice",
                 "sospf"]. For "gaussian" or "gaussian_diag", use LearnableGaussian.
-            num_transforms: Number of flow transforms.
-            hidden_features: Number of hidden features per layer.
-            z_score_x: Method for z-scoring input. One of "independent", "structured",
-                or "none". Use "structured" for data with correlations (e.g., images).
+            num_transforms: Number of flow transforms. If None, uses instance default.
+            hidden_features: Number of hidden features per layer. If None, uses
+                instance default.
+            z_score_theta: Method for z-scoring theta (parameters). One of
+                "independent", "structured", or "none". If None, uses instance default.
+                Use "structured" for parameters with correlations.
 
         Returns:
             TransformedZukoFlow: The constructed flow wrapped with link_transform.
@@ -250,6 +271,14 @@ class VIPosterior(NeuralPosterior):
         Raises:
             ValueError: If flow_type is not supported.
         """
+        # Fall back to instance attributes
+        if num_transforms is None:
+            num_transforms = self._num_transforms
+        if hidden_features is None:
+            hidden_features = self._hidden_features
+        if z_score_theta is None:
+            z_score_theta = self._z_score_theta
+
         if flow_type in ("gaussian", "gaussian_diag"):
             raise ValueError(
                 f"Flow type '{flow_type}' uses LearnableGaussian, not Zuko flows. "
@@ -289,7 +318,7 @@ class VIPosterior(NeuralPosterior):
         flow = build_zuko_unconditional_flow(
             which_nf=zuko_flow_type,
             batch_x=batch_theta,
-            z_score_x=z_score_x,
+            z_score_x=z_score_theta,  # theta z-scoring passed to Zuko's x parameter
             hidden_features=hidden_features,
             num_transforms=num_transforms,
         )
@@ -892,11 +921,11 @@ class VIPosterior(NeuralPosterior):
         stop_after_iters: int = 20,
         show_progress_bar: bool = True,
         retrain_from_scratch: bool = False,
-        flow_type: Union[ZukoFlowType, str] = ZukoFlowType.NSF,
-        num_transforms: int = 2,
-        hidden_features: int = 32,
-        z_score_theta: Literal["none", "independent", "structured"] = "independent",
-        z_score_x: Literal["none", "independent", "structured"] = "independent",
+        flow_type: Optional[Union[ZukoFlowType, str]] = None,
+        num_transforms: Optional[int] = None,
+        hidden_features: Optional[int] = None,
+        z_score_theta: Optional[Literal["none", "independent", "structured"]] = None,
+        z_score_x: Optional[Literal["none", "independent", "structured"]] = None,
         params: Optional["VIPosteriorParameters"] = None,
     ) -> "VIPosterior":
         """Train a conditional flow q(θ|x) for amortized variational inference.
@@ -925,21 +954,26 @@ class VIPosterior(NeuralPosterior):
             retrain_from_scratch: If True, rebuild the flow from scratch.
             flow_type: Flow architecture for the variational distribution.
                 Use ZukoFlowType.NSF, ZukoFlowType.MAF, etc., or a string.
-            num_transforms: Number of transforms in the flow.
-            hidden_features: Hidden layer size in the flow.
+                If None, uses value from params or instance default.
+            num_transforms: Number of transforms in the flow. If None, uses value
+                from params or instance default.
+            hidden_features: Hidden layer size in the flow. If None, uses value
+                from params or instance default.
             z_score_theta: Method for z-scoring θ (the parameters being modeled).
-                One of "none", "independent", "structured".
+                One of "none", "independent", "structured". If None, uses value
+                from params or instance default.
             z_score_x: Method for z-scoring x (the conditioning variable).
                 One of "none", "independent", "structured". Use "structured" for
-                structured data like images with spatial correlations.
-            params: Optional VIPosteriorParameters dataclass. If provided, its values
-                for q (as flow_type), num_transforms, hidden_features, z_score_theta,
-                and z_score_x override the individual arguments.
+                structured data like images with spatial correlations. If None,
+                uses value from params or instance default.
+            params: Optional VIPosteriorParameters dataclass. Values are used as
+                fallbacks when explicit arguments are None. Priority order:
+                explicit args > params > instance attributes (from __init__).
 
         Returns:
             self for method chaining.
         """
-        # Extract parameters from dataclass if provided
+        # Resolve parameters: explicit args > params dataclass > instance attrs
         if params is not None:
             # Amortized VI only supports string flow types (not VIPosterior or Callable)
             if not isinstance(params.q, str):
@@ -948,11 +982,28 @@ class VIPosterior(NeuralPosterior):
                     f"(e.g., 'nsf', 'maf'), not {type(params.q).__name__}. "
                     "Use set_q() to pass custom distributions for single-x VI."
                 )
-            flow_type = params.q
-            num_transforms = params.num_transforms
-            hidden_features = params.hidden_features
-            z_score_theta = params.z_score_theta
-            z_score_x = params.z_score_x
+            if flow_type is None:
+                flow_type = params.q
+            if num_transforms is None:
+                num_transforms = params.num_transforms
+            if hidden_features is None:
+                hidden_features = params.hidden_features
+            if z_score_theta is None:
+                z_score_theta = params.z_score_theta
+            if z_score_x is None:
+                z_score_x = params.z_score_x
+
+        # Fall back to instance attributes (set in __init__ from VIPosteriorParameters)
+        if flow_type is None:
+            flow_type = ZukoFlowType.NSF
+        if num_transforms is None:
+            num_transforms = self._num_transforms
+        if hidden_features is None:
+            hidden_features = self._hidden_features
+        if z_score_theta is None:
+            z_score_theta = self._z_score_theta
+        if z_score_x is None:
+            z_score_x = self._z_score_x
 
         theta = atleast_2d_float32_tensor(theta).to(self._device)
         x = atleast_2d_float32_tensor(x).to(self._device)

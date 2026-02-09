@@ -74,7 +74,16 @@ def get_inference():
         (
             VIPosteriorParameters,
             VIPosterior,
-            {"potential_fn", "prior", "theta_transform", "device"},
+            {
+                # __init__ params not in dataclass
+                "potential_fn",
+                "prior",
+                "theta_transform",
+                "device",
+                "x_shape",  # deprecated
+                "parameters",  # for custom q, use set_q() instead
+                "modules",  # for custom q, use set_q() instead
+            },
         ),
         (
             VectorFieldPosteriorParameters,

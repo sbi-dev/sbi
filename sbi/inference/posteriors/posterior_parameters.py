@@ -15,8 +15,10 @@ from typing import (
     get_origin,
 )
 
+from torch.distributions import Distribution
+
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.sbi_types import TorchTransform, VariationalDistribution
+from sbi.sbi_types import TorchTransform
 from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_float,
@@ -337,23 +339,28 @@ class VIPosteriorParameters(PosteriorParameters):
 
     Fields:
         q: Variational distribution. Either a string specifying the flow type
-            [nsf, maf, naf, unaf, nice, sospf, gaussian, gaussian_diag], a
-            `TransformedDistribution`, a `VIPosterior` object, or a `Callable`
-            builder function. For amortized VI, use string flow types only.
-            If q is already a `VIPosterior`, arguments are copied from it
-            (relevant for multi-round training).
+            [maf, nsf, naf, unaf, nice, sospf, gaussian, gaussian_diag], a
+            `Distribution`, a `VIPosterior` object, or a `Callable`
+            builder function. For amortized VI, only string flow types are
+            supported. If q is already a `VIPosterior`, arguments are copied
+            from it (relevant for multi-round training).
         vi_method: Variational method for fitting q to the posterior. Options:
             [rKL, fKL, IW, alpha]. Some are "mode seeking" (rKL, alpha > 1) and
             some are "mass covering" (fKL, IW, alpha < 1). Currently only used
             for single-x VI; amortized VI uses ELBO (rKL).
-        num_transforms: Number of transforms in the normalizing flow.
-        hidden_features: Hidden layer size in the flow networks.
-        z_score_theta: Method for z-scoring θ (the parameters being modeled).
-            One of "none", "independent", "structured". Use "structured" for
-            parameters with correlations.
-        z_score_x: Method for z-scoring x (the conditioning variable, amortized
-            VI only). One of "none", "independent", "structured". Use
-            "structured" for structured data like images.
+        num_transforms: Number of transforms in the normalizing flow. Used for
+            both single-x VI (via set_q/train) and amortized VI (via
+            train_amortized).
+        hidden_features: Hidden layer size in the flow networks. Used for both
+            single-x VI and amortized VI.
+        z_score_theta: Method for z-scoring θ (the parameters being sampled).
+            One of "none", "independent", "structured". Used for both single-x
+            VI and amortized VI. Use "structured" for parameters with
+            correlations.
+        z_score_x: Method for z-scoring x (the conditioning observation).
+            One of "none", "independent", "structured". Only used for amortized
+            VI (train_amortized). Use "structured" for structured data like
+            images.
 
     Note:
         For custom distributions that lack `parameters()` and `modules()` methods,
@@ -362,9 +369,9 @@ class VIPosteriorParameters(PosteriorParameters):
 
     q: Union[
         Literal[
-            "nsf", "maf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"
+            "maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"
         ],
-        VariationalDistribution,
+        Distribution,
         "VIPosterior",
         Callable,
     ] = "maf"
@@ -389,12 +396,9 @@ class VIPosteriorParameters(PosteriorParameters):
 
         if isinstance(self.q, str) and self.q not in valid_q:
             raise ValueError(f"If `q` is a string, it must be one of {valid_q}")
-        elif not isinstance(
-            self.q, (VariationalDistribution, VIPosterior, Callable, str)
-        ):
+        elif not isinstance(self.q, (Distribution, VIPosterior, Callable, str)):
             raise TypeError(
-                "q must be either of type VariationalDistribution,"
-                " VIPosterior or Callable"
+                "q must be either of type Distribution, VIPosterior, or Callable"
             )
 
         if self.num_transforms < 1:
