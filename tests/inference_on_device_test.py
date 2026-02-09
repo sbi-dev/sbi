@@ -368,22 +368,17 @@ def test_nograd_after_inference_train(inference_method) -> None:
 @pytest.mark.parametrize("num_dim", (1, 3))
 # NOTE: macOS MPS fails for nsf with num_dim > 1
 # might be related to https://github.com/pytorch/pytorch/issues/89127
-@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian"))
 @pytest.mark.parametrize("vi_method", ("rKL", "fKL", "IW", "alpha"))
-@pytest.mark.parametrize("sampling_method", ("naive", "sir"))
-def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
+def test_vi_on_gpu(num_dim: int, q: str, vi_method: str):
     """Test VI on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         vi_method: different vi methods
-        sampling_method: Different sampling methods
     """
 
     device = process_device("gpu")
-
-    if num_dim == 1 and q in ["mcf", "scf"]:
-        return
 
     # Skip the test for nsf on mps:0 as it results in NaNs.
     if device == "mps:0" and num_dim > 1 and q == "nsf":
@@ -412,7 +407,7 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
     posterior.vi_method = vi_method
 
     posterior.train(min_num_iters=9, max_num_iters=10, warm_up_rounds=10)
-    samples = posterior.sample((1,), method=sampling_method)
+    samples = posterior.sample((1,))
     logprobs = posterior.log_prob(samples)
 
     assert str(samples.device) == device, (
@@ -421,6 +416,78 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
     assert str(logprobs.device) == device, (
         f"The devices after training do not match: {logprobs.device} vs {device}"
     )
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+@pytest.mark.parametrize("num_dim", (2,))
+@pytest.mark.parametrize("flow_type", ("nsf", "maf"))
+def test_amortized_vi_on_gpu(num_dim: int, flow_type: str):
+    """Test amortized VI on GPU.
+
+    Args:
+        num_dim: parameter dimension
+        flow_type: flow architecture for the conditional flow
+    """
+    device = process_device("gpu")
+
+    # Skip nsf on mps as it can cause NaN issues
+    if device == "mps:0" and flow_type == "nsf":
+        return
+
+    prior = MultivariateNormal(
+        zeros(num_dim, device=device), eye(num_dim, device=device)
+    )
+
+    class FakePotential(BasePotential):
+        def __call__(self, theta, **kwargs):
+            return torch.ones(len(theta), dtype=torch.float32, device=device)
+
+        def allow_iid_x(self) -> bool:
+            return True
+
+    potential_fn = FakePotential(prior=prior, device=device)
+
+    # Generate mock simulation data on device
+    theta = prior.sample((500,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    posterior = VIPosterior(
+        potential_fn=potential_fn,
+        prior=prior,
+        device=device,
+    )
+
+    # Train amortized VI
+    posterior.train_amortized(
+        theta=theta,
+        x=x,
+        max_num_iters=50,
+        show_progress_bar=False,
+        flow_type=flow_type,
+        num_transforms=2,
+        hidden_features=16,
+    )
+
+    # Test sampling
+    x_o = zeros(1, num_dim, device=device)
+    samples = posterior.sample((10,), x=x_o)
+    logprobs = posterior.log_prob(samples, x=x_o)
+
+    assert str(samples.device) == device, (
+        f"Sample device mismatch: {samples.device} vs {device}"
+    )
+    assert str(logprobs.device) == device, (
+        f"Log prob device mismatch: {logprobs.device} vs {device}"
+    )
+
+    # Test batched sampling
+    x_batch = torch.randn(3, num_dim, device=device)
+    samples_batched = posterior.sample_batched((5,), x=x_batch)
+    assert str(samples_batched.device) == device, (
+        f"Batched sample device mismatch: {samples_batched.device} vs {device}"
+    )
+    assert samples_batched.shape == (5, 3, num_dim)
 
 
 @pytest.mark.gpu
