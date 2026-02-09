@@ -24,7 +24,7 @@ from sbi.inference.trainers._contracts import LossArgsVF, StartIndexContext, Tra
 from sbi.inference.trainers.base import LossArgs
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_estimator_arg,
     handle_invalid_x,
@@ -48,6 +48,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
         **kwargs,
     ):
@@ -68,7 +69,8 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
-            summary_writer: Tensorboard summary writer.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
                 `vector_field_estimator_builder` is a string.
@@ -79,6 +81,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
         )
 
