@@ -205,25 +205,17 @@ def test_average_cond_coeff_matrix():
     assert (torch.abs(gt_matrix - cond_mat) < 1e-3).all()
 
 
-@pytest.mark.skip(
-    reason="Test relies on NPE_C internal methods that need updating for new "
-    "MDN structure. SNPE-A transformation testing is covered by "
-    "linearGaussian_snpe_test.py."
-)
 @pytest.mark.parametrize("snpe_method", ("snpe_c",))
 def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     """
-    Tests whether the the product between proposal and posterior is computed correctly.
+    Tests whether the product between proposal and posterior is computed correctly.
 
-    For NPE-C, this initializes two MoGs with two components each. It then evaluates
+    This test initializes two MoGs with two components each. It then evaluates
     their product by simply multiplying the probabilities of the two. The result is
-    compared to the product of two MoGs as implemented in APT.
-
-    Note: SNPE-A transformation testing is now covered by the comprehensive tests
-    in tests/linearGaussian_snpe_test.py (test_c2st_snpe_on_linearGaussian).
+    compared to the product of two MoGs as implemented in NPE-C (APT).
 
     Args:
-        snpe_method: String indicating whether to test snpe-a or snpe-c.
+        snpe_method: String indicating method to test.
         plot_results: Whether to plot the products of the distributions.
     """
 
@@ -255,7 +247,7 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     covs1 = torch.stack([0.5 * torch.eye(2), torch.eye(2)])
     weights1 = torch.tensor([0.3, 0.7])
 
-    # Only snpe_c is tested here; snpe_a is tested in mixture_density_estimator_test.py
+    # NPE-A uses a different correction mechanism (_CorrectedMDN) and is not tested here.
     means2 = torch.tensor([[2.0, -2.2], [-2.0, 1.9]])
     covs2 = torch.stack([0.6 * torch.eye(2), 0.9 * torch.eye(2)])
     weights2 = torch.tensor([0.6, 0.4])
