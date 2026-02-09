@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -9,10 +10,13 @@ from sklearn.base import BaseEstimator, clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.neural_network import MLPClassifier
+from skorch import NeuralNetBinaryClassifier
+from skorch.callbacks import EarlyStopping
 from torch import Tensor
 from tqdm import tqdm
 
 from sbi.utils.diagnostics_utils import remove_nans_and_infs_in_x
+from sbi.utils.metrics import MLPClassifierModule
 
 
 class LC2ST:
@@ -61,6 +65,7 @@ class LC2ST:
         classifier_kwargs: Optional[Dict[str, Any]] = None,
         num_trials_null: int = 100,
         permutation: bool = True,
+        device: str = "cpu",
     ) -> None:
         """Initialize L-C2ST.
 
@@ -80,12 +85,20 @@ class LC2ST:
             classifier: Classification architecture to use, can be one of the following:
                     - "random_forest" or "mlp", defaults to "mlp" or
                     - A classifier class (e.g., RandomForestClassifier, MLPClassifier)
-            classifier_kwargs: Custom kwargs for the sklearn classifier,
-                defaults to None.
+                    Note:
+                        For the "mlp" case , if a GPU or MPS device is passed and
+                        available, the implementation will use
+                        'skorch.NeuralNetBinaryClassifier', and corresponding kwargs
+                        can be passed via the 'classifier_kwargs' argument.
+            classifier_kwargs: Custom kwargs for the sklearn classifier or skorch
+                classifier (depending on device argument), defaults to None.
             num_trials_null: Number of trials to estimate the null distribution,
                 defaults to 100.
             permutation: Whether to use the permutation method for the null hypothesis,
                 defaults to True.
+            device: The device to use for training the classifier, e.g., "cpu" or
+                "cuda" or "mps". Defaults to "cpu". GPU support is only available for
+                the MLP classifier.
 
         References:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
@@ -116,12 +129,35 @@ class LC2ST:
         self.seed = seed
         self.num_folds = num_folds
         self.num_ensemble = num_ensemble
+        self.device = device
 
         # initialize classifier
         if isinstance(classifier, str):
             if classifier.lower() == 'mlp':
-                classifier = MLPClassifier
+                use_gpu = (
+                    self.device.lower() == 'cuda' and torch.cuda.is_available()
+                ) or (
+                    self.device.lower() == 'mps' and torch.backends.mps.is_available()
+                )
+                if use_gpu:
+                    classifier = NeuralNetBinaryClassifier
+                else:
+                    if self.device.lower() in ("cuda", "mps"):
+                        warnings.warn(
+                            f"The requested device '{self.device}' is not available. "
+                            "For the MLP classifier, computation will proceed on CPU.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                    classifier = MLPClassifier
             elif classifier.lower() == 'random_forest':
+                if self.device.lower() in ("cuda", "mps"):
+                    warnings.warn(
+                        "RandomForestClassifier does not support GPU or MPS training. "
+                        "Computation will proceed on CPU.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
                 classifier = RandomForestClassifier
             else:
                 raise ValueError(
@@ -134,20 +170,52 @@ class LC2ST:
         )
         self.clf_class = classifier
 
-        # for MLPClassifier, set default parameters
-        if classifier_kwargs is None:
-            if self.clf_class == MLPClassifier:
-                ndim = thetas.shape[-1]
-                self.clf_kwargs = {
-                    "activation": "relu",
-                    "hidden_layer_sizes": (10 * ndim, 10 * ndim),
-                    "max_iter": 1000,
-                    "solver": "adam",
-                    "early_stopping": True,
-                    "n_iter_no_change": 50,
-                }
-            else:
-                self.clf_kwargs: Dict[str, Any] = {}
+        # prepare user overrides
+        user_kwargs = classifier_kwargs if classifier_kwargs is not None else {}
+
+        # define Defaults based on classifier type
+        if self.clf_class == MLPClassifier:
+            ndim = thetas.shape[-1]
+            self.clf_kwargs = {
+                "activation": "relu",
+                "hidden_layer_sizes": (10 * ndim, 10 * ndim),
+                "max_iter": 1000,
+                "solver": "adam",
+                "early_stopping": True,
+                "n_iter_no_change": 50,
+            }
+        elif self.clf_class == NeuralNetBinaryClassifier:
+            ndim = thetas.shape[-1]
+            input_dim = thetas.shape[-1] + xs.shape[-1]
+            self.clf_kwargs = {
+                "module": MLPClassifierModule,
+                "module__input_dim": input_dim,
+                "module__output_dim": 1,
+                "module__hidden_layer_sizes": (10 * ndim, 10 * ndim),
+                "criterion": torch.nn.BCEWithLogitsLoss,
+                "optimizer": torch.optim.Adam,
+                "max_epochs": 1000,
+                "batch_size": 200,
+                "callbacks": [
+                    (
+                        'es',
+                        EarlyStopping(
+                            patience=50, monitor='valid_loss', load_best=True
+                        ),
+                    )
+                ],
+                "train_split": 0.1,
+                "optimizer__weight_decay": 1e-4,
+                "device": self.device,
+                "verbose": 0,
+                "iterator_train__shuffle": True,
+            }
+        else:
+            self.clf_kwargs: Dict[str, Any] = {}
+
+        # update with User Overrides (if any)
+        if user_kwargs:
+            self.clf_kwargs.update(user_kwargs)
 
         # initialize classifiers, will be set after training
         self.trained_clfs = None
@@ -705,8 +773,8 @@ def train_lc2st(
     data = np.concatenate((joint_p, joint_q))
     # labels
     target = np.concatenate((
-        np.zeros((joint_p.shape[0],)),
-        np.ones((joint_q.shape[0],)),
+        np.zeros((joint_p.shape[0],), dtype=np.int64),
+        np.ones((joint_q.shape[0],), dtype=np.int64),
     ))
 
     # train classifier

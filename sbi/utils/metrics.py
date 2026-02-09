@@ -3,14 +3,54 @@
 
 import warnings
 from functools import partial
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Union
 
 import numpy as np
 import torch
+import torch.nn as nn
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neural_network import MLPClassifier
 from torch import Tensor
+
+
+class MLPClassifierModule(nn.Module):
+    """PyTorch implementation of a fully-connected multilayer perceptron (MLP)"""
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_layer_sizes: Sequence[int],
+        output_dim: int = 1,
+    ) -> None:
+        """Initialize the MLP classifier.
+
+        Args:
+            input_dim: Number of input features.
+            hidden_layer_sizes: Sequence of the number of hidden units in each
+                layer.
+            output_dim: Size of the output layer. Defaults to 1.
+        """
+        super().__init__()
+        layers = []
+        current_dim = input_dim
+        for hdim in hidden_layer_sizes:
+            layers.append(nn.Linear(current_dim, hdim))
+            layers.append(nn.ReLU())
+            current_dim = hdim
+        layers.append(nn.Linear(current_dim, output_dim))
+        self.sequential = nn.Sequential(*layers)
+
+    def forward(self, X: Tensor) -> Tensor:
+        """Perform a forward pass through the MLP.
+
+        Args:
+            X: Input features tensor of shape `(batch, input_dim)`.
+
+        Returns:
+            Output logits of shape `(batch, output_dim)`.
+        """
+        return self.sequential(X.float())
 
 
 def c2st(
