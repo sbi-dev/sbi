@@ -394,6 +394,41 @@ def test_lc2st_both_thetas_and_prior_samples_error(cal_data):
 # =============================================================================
 
 
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "device",
+    [
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="cuda is not available"
+            ),
+        ),
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not (
+                    hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+                ),
+                reason="mps is not available",
+            ),
+        ),
+    ],
+)
+def test_lc2st_runs_on_requested_device(cal_data, device):
+    """Test that LC2ST runs on cuda/mps (if available)."""
+    lc2st = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.posterior_samples,
+        classifier="mlp",
+        device=device,
+    )
+    lc2st.train_under_null_hypothesis()
+    lc2st.train_on_observed_data()
+    assert len(lc2st.trained_clfs) > 0
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("method", [LC2ST, LC2ST_NF])
 def test_lc2st_true_positive_rate(method, sim_setup, badly_trained_npe):
@@ -498,3 +533,30 @@ def test_lc2st_false_positive_rate(method, sim_setup, well_trained_npe, set_seed
         f"Expected: {expected_rate * 100:.1f}%, Observed: {num_rejections}%, "
         f"p-value: {result.pvalue:.4f}"
     )
+
+
+def test_lc2st_classifier_kwargs_override(cal_data):
+    """Test that user overrides merge with defaults correctly
+    and do not mutate global state."""
+    custom_kwargs = {"max_iter": 50}
+    lc2st_override = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.posterior_samples,
+        classifier="mlp",
+        classifier_kwargs=custom_kwargs,
+        device="cpu",
+    )
+
+    assert lc2st_override.clf_kwargs["max_iter"] == 50
+    assert lc2st_override.clf_kwargs["activation"] == "relu"
+
+    lc2st_clean = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.posterior_samples,
+        classifier="mlp",
+        classifier_kwargs=None,
+        device="cpu",
+    )
+    assert lc2st_clean.clf_kwargs["max_iter"] == 1000

@@ -12,9 +12,13 @@ from sklearn.base import BaseEstimator, clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from sklearn.neural_network import MLPClassifier
+from skorch import NeuralNetBinaryClassifier
+from skorch.callbacks import EarlyStopping
+from skorch.dataset import ValidSplit
 from torch import Tensor
 from tqdm import tqdm
 
+from sbi.utils.metrics import MLPClassifierModule
 from sbi.utils.sbiutils import handle_invalid_x
 
 # Default MLP classifier hyperparameters
@@ -121,6 +125,7 @@ class LC2ST:
         classifier_kwargs: Optional[Dict[str, Any]] = None,
         num_trials_null: int = 100,
         permutation: bool = True,
+        device: str = "cpu",
         *,
         thetas: Optional[Tensor] = None,  # Deprecated, use prior_samples
     ) -> None:
@@ -144,12 +149,20 @@ class LC2ST:
             classifier: Classification architecture to use, can be one of the following:
                     - "random_forest" or "mlp", defaults to "mlp" or
                     - A classifier class (e.g., RandomForestClassifier, MLPClassifier)
-            classifier_kwargs: Custom kwargs for the sklearn classifier,
-                defaults to None.
+                    Note:
+                        For the "mlp" case , if a GPU or MPS device is passed and
+                        available, the implementation will use
+                        'skorch.NeuralNetBinaryClassifier', and corresponding kwargs
+                        can be passed via the 'classifier_kwargs' argument.
+            classifier_kwargs: Custom kwargs for the sklearn classifier or skorch
+                classifier (depending on device argument), defaults to None.
             num_trials_null: Number of trials to estimate the null distribution,
                 defaults to 100.
             permutation: Whether to use the permutation method for the null hypothesis,
                 defaults to True.
+            device: The device to use for training the classifier, e.g., "cpu" or
+                "cuda" or "mps". Defaults to "cpu". GPU support is only available for
+                the MLP classifier.
             thetas: Deprecated. Use prior_samples instead.
 
         References:
@@ -213,6 +226,7 @@ class LC2ST:
         self.seed = seed  # For backward compatibility
         self.num_folds = num_folds
         self.num_ensemble = num_ensemble
+        self.device = device
 
         # Initialize classifier
         self.clf_class = self._resolve_classifier(classifier)
@@ -334,8 +348,30 @@ class LC2ST:
         """
         if isinstance(classifier, str):
             if classifier.lower() == "mlp":
-                return MLPClassifier
+                use_gpu = (
+                    self.device.lower() == "cuda" and torch.cuda.is_available()
+                ) or (
+                    self.device.lower() == "mps" and torch.backends.mps.is_available()
+                )
+                if use_gpu:
+                    return NeuralNetBinaryClassifier
+                else:
+                    if self.device.lower() in ("cuda", "mps"):
+                        warnings.warn(
+                            f"The requested device '{self.device}' is not available. "
+                            "For the MLP classifier, computation will proceed on CPU.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                    return MLPClassifier
             elif classifier.lower() == "random_forest":
+                if self.device.lower() in ("cuda", "mps"):
+                    warnings.warn(
+                        "RandomForestClassifier does not support GPU or MPS training. "
+                        "Computation will proceed on CPU.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
                 return RandomForestClassifier
             else:
                 raise ValueError(
@@ -362,8 +398,9 @@ class LC2ST:
         Returns:
             Dictionary of classifier kwargs.
         """
+        hidden_size = DEFAULT_MLP_HIDDEN_LAYER_MULTIPLIER * ndim
+
         if self.clf_class == MLPClassifier:
-            hidden_size = DEFAULT_MLP_HIDDEN_LAYER_MULTIPLIER * ndim
             defaults = {
                 "activation": DEFAULT_MLP_ACTIVATION,
                 "hidden_layer_sizes": (hidden_size, hidden_size),
@@ -371,6 +408,33 @@ class LC2ST:
                 "solver": DEFAULT_MLP_SOLVER,
                 "early_stopping": DEFAULT_MLP_EARLY_STOPPING,
                 "n_iter_no_change": DEFAULT_MLP_N_ITER_NO_CHANGE,
+            }
+        elif self.clf_class == NeuralNetBinaryClassifier:
+            input_dim = ndim + self.x_p.shape[-1]
+            defaults = {
+                "module": MLPClassifierModule,
+                "module__input_dim": input_dim,
+                "module__output_dim": 1,
+                "module__hidden_layer_sizes": (hidden_size, hidden_size),
+                "criterion": torch.nn.BCEWithLogitsLoss,
+                "optimizer": torch.optim.Adam,
+                "max_epochs": DEFAULT_MLP_MAX_ITER,
+                "batch_size": 200,
+                "callbacks": [
+                    (
+                        "es",
+                        EarlyStopping(
+                            patience=DEFAULT_MLP_N_ITER_NO_CHANGE,
+                            monitor="valid_loss",
+                            load_best=True,
+                        ),
+                    )
+                ],
+                "train_split": ValidSplit(cv=0.1),  # type: ignore[arg-type]
+                "optimizer__weight_decay": 1e-4,
+                "device": self.device,
+                "verbose": 0,
+                "iterator_train__shuffle": True,
             }
         else:
             defaults = {}
@@ -1067,10 +1131,14 @@ def train_lc2st(
 
     # prepare data
     data = np.concatenate((joint_p, joint_q))
-    # labels
+
+    # labels - use float32 for skorch NeuralNetBinaryClassifier (BCEWithLogitsLoss),
+    # int64 for sklearn classifiers
+    is_skorch = isinstance(clf, NeuralNetBinaryClassifier)
+    label_dtype = np.float32 if is_skorch else np.int64
     target = np.concatenate((
-        np.zeros((joint_p.shape[0],)),
-        np.ones((joint_q.shape[0],)),
+        np.zeros((joint_p.shape[0],), dtype=label_dtype),
+        np.ones((joint_q.shape[0],), dtype=label_dtype),
     ))
 
     # train classifier
