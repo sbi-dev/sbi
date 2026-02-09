@@ -256,7 +256,7 @@ def test_fmpe_time_dependent_z_scoring_integration(vector_field_type):
     def simulator(theta):
         return theta + torch.randn_like(theta) * 0.1
 
-    inference = FMPE(prior, z_score_x="structured", show_progress_bars=False)
+    inference = FMPE(prior, z_score_x="independent", show_progress_bars=False)
     theta = prior.sample((200,))
     x = simulator(theta)
     density_estimator = inference.append_simulations(theta, x).train(max_num_epochs=1)
@@ -683,7 +683,7 @@ def test_fmpe_shifted_data_gaussian_baseline():
 
     inference_gauss = FMPE(
         prior,
-        z_score_x="structured",
+        z_score_x="independent",
         show_progress_bars=False,
         density_estimator_kwargs={"gaussian_baseline": True},
     )
@@ -693,7 +693,7 @@ def test_fmpe_shifted_data_gaussian_baseline():
 
     inference_var = FMPE(
         prior,
-        z_score_x="structured",
+        z_score_x="independent",
         show_progress_bars=False,
         density_estimator_kwargs={"gaussian_baseline": False},
     )
