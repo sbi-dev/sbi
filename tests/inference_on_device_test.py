@@ -44,6 +44,7 @@ from sbi.neural_nets.factory import (
     likelihood_nn,
     posterior_nn,
 )
+from sbi.samplers.vi.vi_utils import move_all_tensor_to_device
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils import BoxUniform
 from sbi.utils.torchutils import gpu_available, process_device
@@ -392,6 +393,14 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str):
         def allow_iid_x(self) -> bool:
             return True
 
+        def to(self, device):
+            self.device = device
+            if self.prior:
+                move_all_tensor_to_device(self.prior, device)
+            if self._x_o is not None:
+                self._x_o = self._x_o.to(device)
+            return self
+
     potential_fn = FakePotential(
         prior=MultivariateNormal(
             zeros(num_dim, device=device), eye(num_dim, device=device)
@@ -445,6 +454,14 @@ def test_amortized_vi_on_gpu(num_dim: int, flow_type: str):
 
         def allow_iid_x(self) -> bool:
             return True
+
+        def to(self, device):
+            self.device = device
+            if self.prior:
+                move_all_tensor_to_device(self.prior, device)
+            if self._x_o is not None:
+                self._x_o = self._x_o.to(device)
+            return self
 
     potential_fn = FakePotential(prior=prior, device=device)
 

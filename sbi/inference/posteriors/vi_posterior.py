@@ -188,7 +188,7 @@ class VIPosterior(NeuralPosterior):
 
         # In contrast to MCMC we want to project into constrained space.
         if theta_transform is None:
-            self.link_transform = mcmc_transform(self._prior).inv
+            self.link_transform = mcmc_transform(self._prior, device=device).inv
         else:
             self.link_transform = theta_transform.inv
 
@@ -235,7 +235,7 @@ class VIPosterior(NeuralPosterior):
             self.set_default_x(x_o)
 
         if self.theta_transform is None:
-            self.link_transform = mcmc_transform(self._prior).inv
+            self.link_transform = mcmc_transform(self._prior, device=device).inv
         else:
             self.link_transform = self.theta_transform.inv
 
@@ -1106,6 +1106,9 @@ class VIPosterior(NeuralPosterior):
                 z_score_theta=z_score_theta,
                 z_score_x=z_score_x,
             )
+
+        # Ensure potential_fn is on the correct device for amortized training
+        self.potential_fn.to(self._device)
 
         # Setup optimizer
         optimizer = Adam(self._amortized_q.parameters(), lr=learning_rate)
