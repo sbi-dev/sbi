@@ -2,174 +2,174 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/citation/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/code_of_conduct/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/contribute/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/credits/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/faq/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/install/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/faq/question_01_leakage/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/faq/question_02_nans/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/faq/question_03_pickling_error/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/faq/question_04_gpu/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/faq/question_05_pickling/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/faq/question_06_resume_training/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/faq/question_07_custom_prior/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/reference/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/reference/analysis/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/reference/inference/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/reference/models/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/reference/posteriors/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/reference/potentials/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/00_getting_started/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/01_Bayesian_workflow/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/02_multiround_inference/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/03_density_estimators/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/04_embedding_networks/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/05_conditional_distributions/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/06_restriction_estimator/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/07_sensitivity_analysis/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/09_sampler_interface/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/10_diagnostics_posterior_predictive_checks/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/11_diagnostics_simulation_based_calibration/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/12_iid_data_and_permutation_invariant_embeddings/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/13_diagnostics_lc2st/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/15_importance_sampled_posteriors/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/16_implemented_methods/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/17_plotting_functionality/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/18_training_interface/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/19_flowmatching_and_scorematching/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/20_score_based_methods_new_features/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/21_diagnostics_misspecification_checks/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/Example_00_HodgkinHuxleyModel/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://sbi-dev.github.io/sbi/dev/tutorials/Example_01_DecisionMakingModel/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
 </urlset>
