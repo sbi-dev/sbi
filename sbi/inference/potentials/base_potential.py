@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.samplers.vi.vi_utils import move_all_tensor_to_device
 from sbi.utils.user_input_checks import process_x
 
 
@@ -80,6 +81,24 @@ class BasePotential(metaclass=ABCMeta):
         `self._x_o` is `None`.
         """
         return self._x_o
+
+    def to(self, device: Union[str, torch.device]) -> "BasePotential":
+        """Move prior and x_o to the given device.
+
+        It also sets the device attribute to the given device.
+
+        Args:
+            device: Device to move the prior and x_o to.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.device = device
+        if self.prior:
+            move_all_tensor_to_device(self.prior, device)
+        if self._x_o is not None:
+            self._x_o = self._x_o.to(device)
+        return self
 
 
 class CustomPotential(Protocol):
