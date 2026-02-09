@@ -208,7 +208,7 @@ def test_average_cond_coeff_matrix():
 @pytest.mark.skip(
     reason="Test relies on NPE_C internal methods that need updating for new "
     "MDN structure. SNPE-A transformation testing is covered by "
-    "mixture_density_estimator_test.py."
+    "linearGaussian_snpe_test.py."
 )
 @pytest.mark.parametrize("snpe_method", ("snpe_c",))
 def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
@@ -220,7 +220,7 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     compared to the product of two MoGs as implemented in APT.
 
     Note: SNPE-A transformation testing is now covered by the comprehensive tests
-    in tests/mixture_density_estimator_test.py (TestSNPEACorrection class).
+    in tests/linearGaussian_snpe_test.py (test_c2st_snpe_on_linearGaussian).
 
     Args:
         snpe_method: String indicating whether to test snpe-a or snpe-c.

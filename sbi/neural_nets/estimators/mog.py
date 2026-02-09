@@ -411,9 +411,6 @@ class MoG:
             new_log_weights, dim=-1, keepdim=True
         )
 
-        # Compute sumlogdiag for conditional
-        torch.sum(torch.log(torch.diagonal(cond_precfs, dim1=-2, dim2=-1)), dim=-1)
-
         return MoG(
             logits=new_logits,
             means=cond_means,
@@ -524,7 +521,6 @@ class MoG:
             covariance = covariance.unsqueeze(0)  # (1, dim, dim)
 
         batch_size = mean.shape[0]
-        mean.shape[1]
 
         # Add component dimension
         means = mean.unsqueeze(1)  # (batch_size, 1, dim)

@@ -118,14 +118,13 @@ class MultivariateGaussianMDN(nn.Module):
                     f"match hidden_features ({hidden_features})"
                 )
         else:
-            # Default hidden network: MLP with ReLU and dropout
+            # Default hidden network: MLP with ReLU
             layers = []
             in_features = context_features
             for _ in range(num_hidden_layers):
                 layers.extend([
                     nn.Linear(in_features, hidden_features),
                     nn.ReLU(),
-                    nn.Dropout(p=0.0),  # Can be adjusted
                 ])
                 in_features = hidden_features
             self._hidden_net = nn.Sequential(*layers)
