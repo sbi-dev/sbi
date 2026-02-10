@@ -295,7 +295,7 @@ class MarginalTrainer:
         # cause memory leakage when benchmarking.
         self._neural_net.zero_grad(set_to_none=True)
 
-        return deepcopy(self._neural_net)
+        return self._neural_net
 
     def _default_tracker(self) -> Tracker:
         """Return default tracker logging to a TensorBoard directory."""

@@ -567,7 +567,19 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         """
         if proposal is not None:
             check_if_proposal_has_default_x(proposal)
-
+            if (
+                isinstance(proposal, NeuralPosterior)
+                and hasattr(proposal, "posterior_estimator")
+                and self._neural_net is not None
+                and proposal.posterior_estimator is self._neural_net  # type: ignore
+            ):
+                raise ValueError(
+                    "The proposal's posterior_estimator is the same object as the "
+                    "trainer's neural network. This will cause incorrect training "
+                    "because the proposal's weights will change during optimization. "
+                    "Use `deepcopy(estimator)` when creating the proposal, or use "
+                    "`trainer.build_posterior()` which handles this automatically."
+                )
             if isinstance(proposal, RestrictedPrior):
                 if proposal._prior is not self._prior:
                     warnings.warn(
