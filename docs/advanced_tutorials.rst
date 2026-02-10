@@ -12,74 +12,10 @@ check our `how-to guide <https://sbi.readthedocs.io/en/latest/how_to_guide.html>
 
 .. toctree::
    :maxdepth: 1
-   :caption: Advanced tutorials
 
-
-Prior and simulator
--------------------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Prior and simulator
-
-   advanced_tutorials/06_restriction_estimator.ipynb
-
-Neural nets
------------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Neural nets
-
-   advanced_tutorials/04_embedding_networks.ipynb
-   advanced_tutorials/03_density_estimators.ipynb
-   advanced_tutorials/12_iid_data_and_permutation_invariant_embeddings.ipynb
-   advanced_tutorials/19_flowmatching_and_scorematching.ipynb
-   advanced_tutorials/20_score_based_methods_new_features.ipynb
-
-
-Training
---------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Training
-
-   advanced_tutorials/18_training_interface.ipynb
-   advanced_tutorials/02_multiround_inference.ipynb
-
-
-Sampling
---------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Sampling
-
-   advanced_tutorials/15_importance_sampled_posteriors.ipynb
-
-
-
-Diagnostics
------------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Diagnostics
-
-   advanced_tutorials/10_diagnostics_posterior_predictive_checks.ipynb
-   advanced_tutorials/11_diagnostics_simulation_based_calibration.ipynb
-   advanced_tutorials/13_diagnostics_lc2st.ipynb
-   advanced_tutorials/21_diagnostics_misspecification_checks.ipynb
-
-
-Visualization
--------------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Visualization
-
-   advanced_tutorials/05_conditional_distributions.ipynb
-   advanced_tutorials/17_plotting_functionality.ipynb
-   advanced_tutorials/07_sensitivity_analysis.ipynb
+   advanced_tutorials/prior_and_simulator
+   advanced_tutorials/neural_nets
+   advanced_tutorials/training
+   advanced_tutorials/sampling
+   advanced_tutorials/diagnostics
+   advanced_tutorials/visualization

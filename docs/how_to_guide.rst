@@ -11,91 +11,10 @@ in the ``sbi`` toolbox (e.g., how to choose the inference method?).
 .. toctree::
    :maxdepth: 1
 
-
-Prior and simulator
--------------------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Prior and simulator
-
-   how_to_guide/00_custom_prior.ipynb
-   how_to_guide/01_crafting_summary_statistics.ipynb
-
-
-Neural nets
------------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Neural nets
-
-   how_to_guide/03_choose_neural_net.ipynb
-   how_to_guide/04_embedding_networks.ipynb
-   how_to_guide/20_time_series_embedding.ipynb
-   how_to_guide/08_permutation_invariant_embeddings.ipynb
-   how_to_guide/03_density_estimators.ipynb
-
-
-Training
---------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Training
-
-   how_to_guide/06_choosing_inference_method.ipynb
-   how_to_guide/02_multiround_inference.ipynb
-   how_to_guide/07_gpu_training.ipynb
-   how_to_guide/07_save_and_load.ipynb
-   how_to_guide/07_resume_training.ipynb
-   how_to_guide/21_hyperparameter_tuning.ipynb
-
-
-Sampling
---------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Sampling
-
-   how_to_guide/09_sampler_interface.ipynb
-   how_to_guide/10_refine_posterior_with_importance_sampling.ipynb
-   how_to_guide/11_iid_sampling_with_nle_or_nre.ipynb
-   how_to_guide/12_mcmc_diagnostics_with_arviz.ipynb
-   how_to_guide/23_using_pyro_with_sbi.ipynb
-
-
-Diagnostics
------------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Diagnostics
-
-   how_to_guide/14_choose_diagnostic_tool.ipynb
-   how_to_guide/15_expected_coverage.ipynb
-   how_to_guide/16_sbc.ipynb
-   how_to_guide/13_diagnostics_lc2st.ipynb
-   how_to_guide/17_tarp.ipynb
-   how_to_guide/18_model_misspecification.ipynb
-
-
-Visualization
--------------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Visualization
-
-   how_to_guide/05_conditional_distributions.ipynb
-
-
-Posterior Parameters
---------------------
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Posterior Parameters
-
-   how_to_guide/19_posterior_parameters.ipynb
+   how_to_guide/prior_and_simulator
+   how_to_guide/neural_nets
+   how_to_guide/training
+   how_to_guide/sampling
+   how_to_guide/diagnostics
+   how_to_guide/visualization
+   how_to_guide/posterior_parameters
