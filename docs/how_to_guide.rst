@@ -17,6 +17,7 @@ Prior and simulator
 
 .. toctree::
    :maxdepth: 1
+   :caption: Prior and simulator
 
    how_to_guide/00_custom_prior.ipynb
    how_to_guide/01_crafting_summary_statistics.ipynb
@@ -27,6 +28,7 @@ Neural nets
 
 .. toctree::
    :maxdepth: 1
+   :caption: Neural nets
 
    how_to_guide/03_choose_neural_net.ipynb
    how_to_guide/04_embedding_networks.ipynb
@@ -40,6 +42,7 @@ Training
 
 .. toctree::
    :maxdepth: 1
+   :caption: Training
 
    how_to_guide/06_choosing_inference_method.ipynb
    how_to_guide/02_multiround_inference.ipynb
@@ -54,6 +57,7 @@ Sampling
 
 .. toctree::
    :maxdepth: 1
+   :caption: Sampling
 
    how_to_guide/09_sampler_interface.ipynb
    how_to_guide/10_refine_posterior_with_importance_sampling.ipynb
@@ -67,6 +71,7 @@ Diagnostics
 
 .. toctree::
    :maxdepth: 1
+   :caption: Diagnostics
 
    how_to_guide/14_choose_diagnostic_tool.ipynb
    how_to_guide/15_expected_coverage.ipynb
@@ -81,6 +86,7 @@ Visualization
 
 .. toctree::
    :maxdepth: 1
+   :caption: Visualization
 
    how_to_guide/05_conditional_distributions.ipynb
 
@@ -90,5 +96,6 @@ Posterior Parameters
 
 .. toctree::
    :maxdepth: 1
+   :caption: Posterior Parameters
 
    how_to_guide/19_posterior_parameters.ipynb
