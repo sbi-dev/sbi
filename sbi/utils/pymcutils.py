@@ -32,6 +32,8 @@ class NeuralLikelihoodOp(Op):
 
     This Op evaluates log p(x|θ) using a trained ConditionalDensityEstimator
     and provides gradients for HMC/NUTS sampling.
+
+    Supports scalar, 1D, and 2D theta inputs through automatic shape normalization.
     """
 
     # Input: parameter vector θ; Outputs: scalar log-likelihood and gradient vector
@@ -40,7 +42,11 @@ class NeuralLikelihoodOp(Op):
 
     __props__ = ("estimator_id", "observation_shape", "observation_digest")
 
-    def __init__(self, estimator: ConditionalDensityEstimator, observation: np.ndarray):
+    def __init__(
+        self,
+        estimator: ConditionalDensityEstimator,
+        observation: np.ndarray,
+    ):
         """Initialize the neural likelihood op.
 
         Args:
@@ -74,6 +80,11 @@ class NeuralLikelihoodOp(Op):
     def make_node(self, theta: TensorVariable) -> Apply:
         """Create the Apply node for the computation graph.
 
+        Supports theta with various shapes:
+        - Scalar: shape () - single scalar parameter
+        - 1D: shape (D,) - single vector parameter
+        - 2D: shape (1, D) - single vector parameter with explicit batch dim
+
         Args:
             theta: Parameter tensor variable
 
@@ -102,24 +113,30 @@ class NeuralLikelihoodOp(Op):
             output_storage: List of arrays to store outputs [log_prob, gradients]
         """
         theta_np = inputs[0]
-        # Expected rank based on the provided input array
-        expected_ndim = int(np.ndim(theta_np))
+        # Store original shape info for gradient reshaping
+        original_shape = theta_np.shape
+        original_ndim = int(np.ndim(theta_np))
 
-        # Normalize theta for estimator: allowed shapes are (D,) or (1, D)
-        if np.ndim(theta_np) == 1:
+        # Normalize theta for estimator: target shape is (1, D) for single sample
+        # The estimator expects condition shape (batch_dim, *params)
+        if original_ndim == 0:
+            # Scalar: () -> (1, 1)
+            theta_for_est = theta_np.reshape(1, 1)
+        elif original_ndim == 1:
+            # Vector parameter: (D,) -> (1, D)
             theta_for_est = theta_np[np.newaxis, :]
-        elif np.ndim(theta_np) == 2 and theta_np.shape[0] == 1:
+        elif original_ndim == 2 and theta_np.shape[0] == 1:
+            # Already correct shape: (1, D)
             theta_for_est = theta_np
-        elif np.ndim(theta_np) == 2 and theta_np.shape[0] > 1:
+        elif original_ndim == 2 and theta_np.shape[0] > 1:
             raise ValueError(
-                "NeuralLikelihoodOp received a batch of thetas with batch_dim="
+                f"NeuralLikelihoodOp received a batch of thetas with batch_dim="
                 f"{theta_np.shape[0]}. This Op expects exactly one theta per "
-                "evaluation. If you intend to evaluate multiple thetas, loop over "
-                "them externally."
+                f"evaluation. For multiple thetas, call in a loop."
             )
         else:
             raise ValueError(
-                "NeuralLikelihoodOp expects theta with shape (D,) or (1, D), "
+                f"NeuralLikelihoodOp expects theta with shape (), (D,), or (1, D), "
                 f"got {theta_np.shape}."
             )
 
@@ -152,22 +169,28 @@ class NeuralLikelihoodOp(Op):
                 allow_unused=False,
             )
             grad_t = grad_list[0]
-            # Convert to numpy; currently shape expected (1, D)
+            # Convert to numpy; currently shape is (1, D)
             grad_np = grad_t.detach().cpu().numpy()
         else:
             # Use theta's dtype for numerical outputs if possible
-            grad_np = np.zeros(theta_np.shape, dtype=theta_np.dtype)
+            grad_np = np.zeros(theta_for_est.shape, dtype=theta_np.dtype)
 
-        # Match gradient rank to the input theta's ndim expected by PyTensor
-        if expected_ndim == 1 and grad_np.ndim == 2 and grad_np.shape[0] == 1:
-            grad_np = grad_np[0]
-        elif expected_ndim == 2 and grad_np.ndim == 1:
-            grad_np = grad_np[np.newaxis, :]
-        elif expected_ndim not in (1, 2):
-            raise ValueError(
-                "NeuralLikelihoodOp only supports theta of rank 1 or 2; got "
-                f"rank {expected_ndim}."
-            )
+        # Reshape gradient to match original theta shape
+        # grad_np is currently (1, D), need to match original_shape
+        if original_ndim == 0:
+            # Scalar: (1, 1) -> ()
+            grad_np = grad_np.squeeze()
+        elif original_ndim == 1:
+            # Vector param: (1, D) -> (D,)
+            grad_np = grad_np.squeeze(0)
+        elif original_ndim == 2:
+            # Keep as (1, D)
+            pass
+
+        # Debug assertion to catch internal bugs during development
+        assert grad_np.shape == original_shape, (
+            f"Bug: gradient shape {grad_np.shape} != theta shape {original_shape}"
+        )
 
         # Store outputs using theta dtype (PyMC typically expects floatX)
         out_dtype = (
@@ -204,6 +227,8 @@ def neural_likelihood_to_pymc(
     theta: TensorVariable,
     observed: np.ndarray,
     name: str = "likelihood",
+    dims: tuple[str, ...] | None = None,
+    **kwargs: Any,
 ) -> TensorVariable:
     """Create a PyMC CustomDist from a neural likelihood estimator.
 
@@ -225,6 +250,8 @@ def neural_likelihood_to_pymc(
         observed: Observed data to condition the likelihood on. For multiple
             i.i.d. observations, pass shape (n_obs, *event_shape).
         name: Name for the PyMC distribution
+        dims: PyMC dimension names for the distribution (forwarded to CustomDist)
+        **kwargs: Additional arguments forwarded to pm.CustomDist
 
     Returns:
         PyMC CustomDist representing the neural likelihood
@@ -234,17 +261,30 @@ def neural_likelihood_to_pymc(
         # After training NLE
         likelihood_nn = nle.train()
 
-        # In PyMC model
+        # In PyMC model with vector parameters
         with pm.Model() as model:
-            # Prior
             theta = pm.Normal("theta", mu=0, sigma=1, shape=2)
-
-            # Neural likelihood
             likelihood = neural_likelihood_to_pymc(
                 likelihood_nn, theta, x_observed, "x"
             )
+            trace = pm.sample()
 
-            # Sample posterior
+        # With scalar parameter (shape ())
+        with pm.Model() as model:
+            theta = pm.Normal("theta", mu=0, sigma=1)  # scalar
+            likelihood = neural_likelihood_to_pymc(
+                likelihood_nn, theta, x_observed, "x"
+            )
+            trace = pm.sample()
+
+        # With dims for coordinates
+        coords = {"trial": np.arange(10)}
+        with pm.Model(coords=coords) as model:
+            theta = pm.Normal("theta", mu=0, sigma=1, shape=2)
+            likelihood = neural_likelihood_to_pymc(
+                likelihood_nn, theta, x_observed, "x",
+                dims=("trial",)
+            )
             trace = pm.sample()
         ```
     """
@@ -279,7 +319,7 @@ def neural_likelihood_to_pymc(
 
         Notes:
             - This implementation supports a single unbatched theta per draw.
-              For vectorized/batched theta, wrap over this function externally.
+              For vectorized/batched theta, call this function in a loop.
         """
         # Optionally seed torch from the provided numpy Generator (PyMC default)
         if isinstance(rng, np.random.Generator):
@@ -288,15 +328,27 @@ def neural_likelihood_to_pymc(
 
         # Prepare condition tensor
         # Use estimator's device/dtype as in the Op
-        # Device & dtype for sampling from first parameter (simple and robust)
         p0 = next(likelihood_nn.parameters())  # type: ignore[attr-defined]
         torch_device = p0.device
         torch_dtype = p0.dtype
 
         theta_t = torch.as_tensor(theta_np, dtype=torch_dtype, device=torch_device)
-        if theta_t.dim() == 1:
-            # add batch dim = 1 to match estimator expectation
+
+        # Validate and normalize theta to (batch=1, event_dim) for estimator
+        if theta_t.dim() == 0:
+            # Scalar: () -> (1, 1)
+            theta_t = theta_t.reshape(1, 1)
+        elif theta_t.dim() == 1:
+            # Vector param: (D,) -> (1, D)
             theta_t = theta_t.unsqueeze(0)
+        elif theta_t.dim() == 2 and theta_t.shape[0] == 1:
+            # Already correct: (1, D)
+            pass
+        else:
+            raise ValueError(
+                f"random() expects unbatched theta with shape (), (D,), or (1, D), "
+                f"got {tuple(theta_np.shape)}. For batched sampling, call in a loop."
+            )
 
         # Map PyMC `size` to estimator sample_shape and final output shape
         if size is None:
@@ -324,4 +376,6 @@ def neural_likelihood_to_pymc(
         # reshape from (S, *E) to (*size, *E)
         return np.asarray(x_np).reshape(*out_shape, *x_np.shape[1:])
 
-    return pm.CustomDist(name, theta, logp=logp, random=random, observed=observed)
+    return pm.CustomDist(
+        name, theta, logp=logp, random=random, observed=observed, dims=dims, **kwargs
+    )
