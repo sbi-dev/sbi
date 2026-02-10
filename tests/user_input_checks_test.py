@@ -210,6 +210,21 @@ def test_process_prior(prior):
         (ones(10, 3), torch.Size([10, 3])),  # 2D data / iid NPE
         pytest.param(ones(10, 3), None),  # 2D data / iid NPE without x_shape
         (ones(10, 10), torch.Size([10])),  # iid likelihood based
+        pytest.param(
+            torch.cat([ones(3), torch.tensor([float("nan")]), ones(3)]),  # contains nan
+            torch.Size([7]),
+            marks=pytest.mark.xfail(
+                reason="process_x must raise error if x contains NaNs or Infs."
+            ),
+        ),
+        pytest.param(
+            # contains inf
+            torch.cat([ones(3), torch.tensor([float("inf")]), ones(3)]).expand(10, -1),
+            torch.Size([7]),
+            marks=pytest.mark.xfail(
+                reason="process_x must raise error if x contains NaNs or Infs."
+            ),
+        ),
     ),
 )
 def test_process_x(x, x_shape):
@@ -593,3 +608,21 @@ def test_simulate_for_sbi(
             assert x.shape[0] == num_simulations, "x should have num_simulations rows"
             assert theta.shape[1] == num_dim, "Theta should have num_dim columns"
             assert x.shape[1] == num_dim, "x should have num_dim columns"
+
+
+def test_proposal_sharing_weights_with_trainer_raises():
+    """Test that using proposal without deepcopy raises ValueError."""
+
+    prior = BoxUniform(low=zeros(2), high=ones(2))
+    inference = NPE_C(prior=prior)
+    theta = prior.sample((10,))
+    x = theta + torch.randn_like(theta) * 0.1
+    inference.append_simulations(theta, x)
+
+    net_reference = inference.train(max_num_epochs=1, show_train_summary=False)
+
+    unsafe_proposal = DirectPosterior(posterior_estimator=net_reference, prior=prior)
+    unsafe_proposal.set_default_x(x[0])
+
+    with pytest.raises(ValueError, match="same object"):
+        inference.append_simulations(theta, x, proposal=unsafe_proposal)

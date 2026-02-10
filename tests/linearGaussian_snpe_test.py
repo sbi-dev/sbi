@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict
 
 import numpy as np
@@ -319,7 +320,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
             theta, x, proposal=prior
         ).train()
         posterior1 = DirectPosterior(
-            prior=prior, posterior_estimator=posterior_estimator
+            prior=prior, posterior_estimator=deepcopy(posterior_estimator)
         ).set_default_x(x_o)
         theta = posterior1.sample((1000,))
         x = simulator(theta)
@@ -335,7 +336,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         x = simulator(theta)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
-            prior=prior, posterior_estimator=posterior_estimator
+            prior=prior, posterior_estimator=deepcopy(posterior_estimator)
         ).set_default_x(x_o)
         theta = posterior1.sample((1000,))
         x = simulator(theta)

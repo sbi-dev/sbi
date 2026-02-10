@@ -8,10 +8,8 @@ from math import ceil
 from typing import Any, Callable, Dict, Literal, Optional, Union
 from warnings import warn
 
-import arviz as az
 import torch
 import torch.distributions.transforms as torch_tf
-from arviz.data import InferenceData
 from joblib import Parallel, delayed
 from numpy import ndarray
 from pyro.infer.mcmc import HMC, NUTS
@@ -257,29 +255,36 @@ class MCMCPosterior(NeuralPosterior):
         num_chains: Optional[int] = None,
         init_strategy: Optional[str] = None,
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
-        init_strategy_num_candidates: Optional[int] = None,
-        mcmc_parameters: Optional[Dict] = None,
-        mcmc_method: Optional[str] = None,
-        sample_with: Optional[str] = None,
         num_workers: Optional[int] = None,
         mp_context: Optional[str] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
-
-        Check the `__init__()` method for a description of all arguments as well as
-        their default values.
+        r"""Draw samples from the approximate posterior distribution $p(\theta|x)$.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
-            mcmc_parameters: Dictionary that is passed only to support the API of
-                `sbi` v0.17.2 or older.
-            mcmc_method: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. Please use `method` instead.
-            sample_with: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
+            x: Conditioning observation $x_o$. If not provided, uses the default `x`
+                set via `.set_default_x()`.
+            method: MCMC method to use. One of `slice_np`, `slice_np_vectorized`,
+                `hmc_pyro`, `nuts_pyro`, `slice_pymc`, `hmc_pymc`, `nuts_pymc`.
+                If not provided, uses the method specified at initialization.
+            thin: Thinning factor for the chain. If not provided, uses the value
+                specified at initialization.
+            warmup_steps: Number of warmup steps to discard. If not provided, uses
+                the value specified at initialization.
+            num_chains: Number of MCMC chains to run. If not provided, uses the
+                value specified at initialization.
+            init_strategy: Initialization strategy for chains (`proposal`, `sir`,
+                or `resample`). If not provided, uses the value specified at
+                initialization.
+            init_strategy_parameters: Parameters for the initialization strategy.
+                If not provided, uses the value specified at initialization.
+            num_workers: Number of CPU cores for parallelization. If not provided,
+                uses the value specified at initialization.
+            mp_context: Multiprocessing context (`fork` or `spawn`). If not provided,
+                uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
@@ -301,46 +306,6 @@ class MCMCPosterior(NeuralPosterior):
             if init_strategy_parameters is None
             else init_strategy_parameters
         )
-        if init_strategy_num_candidates is not None:
-            warn(
-                f"Passing `init_strategy_num_candidates` is deprecated as of sbi \
-                v0.19.0. Instead, use e.g., \
-                `init_strategy_parameters={'num_candidate_samples': 1000}`",
-                stacklevel=2,
-            )
-            self.init_strategy_parameters["num_candidate_samples"] = (
-                init_strategy_num_candidates
-            )
-        if sample_with is not None:
-            raise ValueError(
-                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                "`sample_with` is no longer supported. You have to rerun "
-                f"`.build_posterior(sample_with={sample_with}).`"
-            )
-        if mcmc_method is not None:
-            warn(
-                "You passed `mcmc_method` to `.sample()`. As of sbi v0.18.0, this "
-                "is deprecated and will be removed in a future release. Use `method` "
-                "instead of `mcmc_method`.",
-                stacklevel=2,
-            )
-            method = mcmc_method
-        if mcmc_parameters:
-            warn(
-                "You passed `mcmc_parameters` to `.sample()`. As of sbi v0.18.0, this "
-                "is deprecated and will be removed in a future release. Instead, pass "
-                "the variable to `.sample()` directly, e.g. "
-                "`posterior.sample((1,), num_chains=5)`.",
-                stacklevel=2,
-            )
-        # The following lines are only for backwards compatibility with sbi v0.17.2 or
-        # older.
-        m_p = mcmc_parameters or {}  # define to shorten the variable name
-        method = _maybe_use_dict_entry(method, "mcmc_method", m_p)
-        thin = _maybe_use_dict_entry(thin, "thin", m_p)
-        warmup_steps = _maybe_use_dict_entry(warmup_steps, "warmup_steps", m_p)
-        num_chains = _maybe_use_dict_entry(num_chains, "num_chains", m_p)
-        init_strategy = _maybe_use_dict_entry(init_strategy, "init_strategy", m_p)
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
         initial_params = self._get_initial_params(
@@ -415,9 +380,10 @@ class MCMCPosterior(NeuralPosterior):
         mp_context: Optional[str] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        r"""Given a batch of observations [x_1, ..., x_B] this function samples from
-        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
-        manner.
+        r"""Draw samples from the posteriors for a batch of different xs.
+
+        Given a batch of observations `[x_1, ..., x_B]`, this method samples from
+        posteriors $p(\theta|x_1), \ldots, p(\theta|x_B)$ in a vectorized manner.
 
         Check the `__init__()` method for a description of all arguments as well as
         their default values.
@@ -1040,64 +1006,6 @@ class MCMCPosterior(NeuralPosterior):
             force_update=force_update,
         )
 
-    def get_arviz_inference_data(self) -> InferenceData:
-        """Returns arviz InferenceData object constructed most recent samples.
-
-        Note: the InferenceData is constructed using the posterior samples generated in
-        most recent call to `.sample(...)`.
-
-        For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for
-        sbi slice samplers, only the samples are added.
-
-        Returns:
-            inference_data: Arviz InferenceData object.
-        """
-        assert self._posterior_sampler is not None, (
-            """No samples have been generated, call .sample() first."""
-        )
-
-        sampler: Union[
-            MCMC, SliceSamplerSerial, SliceSamplerVectorized, PyMCSampler
-        ] = self._posterior_sampler
-
-        # If Pyro sampler and samples not transformed, use arviz' from_pyro.
-        if isinstance(sampler, (HMC, NUTS)) and isinstance(
-            self.theta_transform, torch_tf.IndependentTransform
-        ):
-            inference_data = az.from_pyro(sampler)
-        # If PyMC sampler and samples not transformed, get cached InferenceData.
-        elif isinstance(sampler, PyMCSampler) and isinstance(
-            self.theta_transform, torch_tf.IndependentTransform
-        ):
-            inference_data = sampler.get_inference_data()
-
-        # otherwise get samples from sampler and transform to original space.
-        else:
-            transformed_samples = sampler.get_samples(group_by_chain=True)
-            # Pyro samplers returns dicts, get values.
-            if isinstance(transformed_samples, Dict):
-                # popitem gets last items, [1] get the values as tensor.
-                transformed_samples = transformed_samples.popitem()[1]
-            # Our slice samplers return numpy arrays.
-            elif isinstance(transformed_samples, ndarray):
-                transformed_samples = torch.from_numpy(transformed_samples).type(
-                    torch.float32
-                )
-            # For MultipleIndependent priors transforms first dim must be batch dim.
-            # thus, reshape back and forth to have batch dim in front.
-            samples_shape = transformed_samples.shape
-            samples = self.theta_transform.inv(  # type: ignore
-                transformed_samples.reshape(-1, samples_shape[-1])
-            ).reshape(  # type: ignore
-                *samples_shape
-            )
-
-            inference_data = az.convert_to_inference_data({
-                f"{self.param_name}": samples
-            })
-
-        return inference_data
-
     def __getstate__(self) -> Dict:
         """Get state of MCMCPosterior.
 
@@ -1124,32 +1032,8 @@ def _process_thin_default(thin: int) -> int:
     """
     if thin == -1:
         thin = 1
-        warn(
-            "The default value for thinning in MCMC sampling has been changed from "
-            "10 to 1. This might cause the results differ from the last benchmark.",
-            UserWarning,
-            stacklevel=2,
-        )
 
     return thin
-
-
-def _maybe_use_dict_entry(default: Any, key: str, dict_to_check: Dict) -> Any:
-    """Returns `default` if `key` is not in the dict and otherwise the dict entry.
-
-    This method exists only to keep backwards compatibility with `sbi` v0.17.2 or
-    older. It allows passing `mcmc_parameters` to `.sample()`.
-
-    Args:
-        default: The default value if `key` is not in `dict_to_check`.
-        key: The key for which to check in `dict_to_check`.
-        dict_to_check: The dictionary to be checked.
-
-    Returns:
-        The potentially replaced value.
-    """
-    attribute = dict_to_check.get(key, default)
-    return attribute
 
 
 def _num_required_args(func):

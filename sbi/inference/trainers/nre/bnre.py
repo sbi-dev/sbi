@@ -1,16 +1,18 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Sequence, Union
 
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
+from sbi.inference.trainers._contracts import LossArgs, LossArgsBNRE
 from sbi.inference.trainers.nre.nre_a import NRE_A
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
@@ -33,7 +35,8 @@ class BNRE(NRE_A):
         classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Balanced neural ratio estimation (BNRE).
@@ -52,8 +55,10 @@ class BNRE(NRE_A):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """
@@ -109,10 +114,15 @@ class BNRE(NRE_A):
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
+
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        kwargs["loss_kwargs"] = {
-            "regularization_strength": kwargs.pop("regularization_strength")
-        }
+
+        # Configure _loss function parameters by initializing LossArgsBNRE
+        # with the given regularization strength.
+        kwargs["loss_kwargs"] = LossArgsBNRE(
+            regularization_strength=kwargs.pop("regularization_strength"),
+        )
+
         return super().train(**kwargs)
 
     def _loss(
@@ -151,3 +161,14 @@ class BNRE(NRE_A):
         loss = bce + regularization_strength * regularizer
         assert_all_finite(loss, "BNRE loss")
         return loss
+
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Overrides the parent class method to check the type of loss_args."""
+
+        if not isinstance(loss_args, LossArgsBNRE):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsBNRE,"
+                f" but got {type(loss_args)}"
+            )
+
+        return super()._get_losses(batch=batch, loss_args=loss_args)

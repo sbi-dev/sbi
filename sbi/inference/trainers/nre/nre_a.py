@@ -1,18 +1,20 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Dict, Optional, Union
+from typing import Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
+from sbi.inference.trainers._contracts import LossArgsNRE_A
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
@@ -30,7 +32,8 @@ class NRE_A(RatioEstimatorTrainer):
         classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NRE_A.
@@ -49,8 +52,10 @@ class NRE_A(RatioEstimatorTrainer):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """
@@ -71,7 +76,7 @@ class NRE_A(RatioEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-        loss_kwargs: Optional[Dict[str, Any]] = None,
+        loss_kwargs: Optional[LossArgsNRE_A] = None,
     ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
@@ -105,10 +110,17 @@ class NRE_A(RatioEstimatorTrainer):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
-        # AALR is defined for `num_atoms=2`.
-        # Proxy to `super().__call__` to ensure right parameter.
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        return super().train(**kwargs, num_atoms=2)
+
+        if loss_kwargs is None:
+            kwargs["loss_kwargs"] = LossArgsNRE_A()
+        elif not issubclass(type(loss_kwargs), LossArgsNRE_A):
+            raise TypeError(
+                "Expected loss_kwargs to be a subclass of LossArgsNRE_A,"
+                f" but got {type(loss_kwargs)}"
+            )
+
+        return super().train(**kwargs)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Returns the binary cross-entropy loss for the trained classifier.

@@ -327,15 +327,13 @@ class DivergenceOptimizer(ABC):
 
     def update(self, kwargs: Dict):
         """Updates the hyperparameters and scheduler/optimizer kwargs"""
-        # print(kwargs)
-        paras = self.__dict__
         for key, val in kwargs.items():
             if key == "retain_graph":
                 self.retain_graph = val
             if key == "learning_rate":
                 self.learning_rate = val
             if key in self.HYPER_PARAMETERS:
-                paras[key] = val
+                setattr(self, key, val)
 
             if key == "self":
                 posterior = kwargs[key]

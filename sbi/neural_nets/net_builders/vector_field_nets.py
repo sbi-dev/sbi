@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from typing import Callable, Literal, Optional, Sequence, Union
+from typing import Literal, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
@@ -18,6 +18,7 @@ from sbi.neural_nets.estimators.score_estimator import (
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
+    z_score_parser,
     z_standardization,
 )
 from sbi.utils.user_input_checks import check_data_device
@@ -129,12 +130,16 @@ def build_vector_field_estimator(
             raise ValueError(f"Unknown architecture: {net}")
 
     # Z-score setup
-    mean_0, std_0 = z_standardization(batch_x, z_score_x == "structured")
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
+        mean_0, std_0 = z_standardization(batch_x, structured_x)
+    else:
+        mean_0, std_0 = 0, 1
+
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
     embedding_net_y = (
-        nn.Sequential(
-            standardizing_net(batch_y, z_score_y == "structured"), embedding_net
-        )
-        if z_score_y
+        nn.Sequential(standardizing_net(batch_y, structured_y), embedding_net)
+        if z_score_y_bool
         else embedding_net
     )
 
@@ -276,7 +281,6 @@ class AdaMLPBlock(nn.Module):
         cond_dim: int,
         mlp_ratio: int = 1,
         activation: type[nn.Module] = nn.GELU,
-        gate_activation: Callable = lambda x: (x + 1.0),
     ):
         super().__init__()
 
@@ -297,8 +301,6 @@ class AdaMLPBlock(nn.Module):
             nn.Linear(hidden_features * mlp_ratio, hidden_features),
         )
 
-        self.gate_activation = gate_activation
-
     def forward(self, x: Tensor, cond: Tensor) -> Tensor:
         """
         Arguments:
@@ -310,7 +312,7 @@ class AdaMLPBlock(nn.Module):
         """
 
         shift_, scale_, gate_ = self.ada_ln(cond).chunk(3, dim=-1)
-        gate_ = self.gate_activation(gate_)
+        gate_ = gate_ + 1.0  # Gate activation: `lambda x: x + 1`.
         y = (scale_ + 1) * x + shift_
         y = self.block(y)
         y = x + gate_ * y
@@ -660,7 +662,6 @@ class DiTBlock(nn.Module):
         num_heads: int,
         mlp_ratio: int = 2,
         activation: type[nn.Module] = nn.GELU,
-        gate_activation: Callable = lambda x: (x + 1.0),
     ):
         """Initialize dit transformer block.
 
@@ -670,7 +671,6 @@ class DiTBlock(nn.Module):
             num_heads: number of attention heads
             mlp_ratio: ratio for mlp hidden dimension
             activation: activation function
-            gate_activation: activation function for the gate
         """
         super().__init__()
 
@@ -700,7 +700,6 @@ class DiTBlock(nn.Module):
             activation(),
             nn.Linear(hidden_features * mlp_ratio, hidden_features),
         )
-        self.gate_activation = gate_activation
 
         # layer norms
         self.norm1 = nn.LayerNorm(hidden_features)
@@ -732,8 +731,8 @@ class DiTBlock(nn.Module):
         mlp_shift = mlp_shift.view(batch_size, 1, -1)
         mlp_gate = mlp_gate.view(batch_size, 1, -1)
 
-        attn_gate = self.gate_activation(attn_gate)
-        mlp_gate = self.gate_activation(mlp_gate)
+        attn_gate = attn_gate + 1.0  # Gate activation: `lambda x: x + 1`.
+        mlp_gate = mlp_gate + 1.0  # Gate activation: `lambda x: x + 1`.
 
         # attention with adaptive ln
         x_norm = self.norm1(x)
@@ -771,7 +770,6 @@ class DiTBlockWithCrossAttention(nn.Module):
         num_heads: int,
         mlp_ratio: int = 4,
         activation: type[nn.Module] = nn.GELU,
-        gate_activation: Callable = lambda x: (x + 1.0),
     ):
         super().__init__()
 
@@ -812,7 +810,6 @@ class DiTBlockWithCrossAttention(nn.Module):
         self.norm1 = nn.LayerNorm(hidden_features)
         self.norm2 = nn.LayerNorm(hidden_features)
         self.norm3 = nn.LayerNorm(hidden_features)
-        self.gate_activation = gate_activation
 
     def forward(
         self, x: Tensor, cross_attention_condition: Tensor, time_condition: Tensor
@@ -841,8 +838,8 @@ class DiTBlockWithCrossAttention(nn.Module):
         mlp_shift = mlp_shift.unsqueeze(1)
         mlp_gate = mlp_gate.unsqueeze(1)
 
-        attn_gate = self.gate_activation(attn_gate)
-        mlp_gate = self.gate_activation(mlp_gate)
+        attn_gate = attn_gate + 1.0  # Gate activation: `lambda x: x + 1`.
+        mlp_gate = mlp_gate + 1.0  # Gate activation: `lambda x: x + 1`.
 
         # self-attention with adaptive ln
         x_norm = self.norm1(x)

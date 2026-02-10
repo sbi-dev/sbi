@@ -85,8 +85,8 @@ class MADEWrapper(made.MADE):
 
     def __init__(
         self,
-        features,
-        hidden_features,
+        features: int,
+        hidden_features: int,
         context_features=None,
         num_blocks=2,
         output_multiplier=1,

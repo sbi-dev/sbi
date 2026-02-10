@@ -58,7 +58,7 @@ def _build_mixed_density_estimator(
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     flow_model: str = "nsf",
-    num_categorical_columns: Optional[Tensor] = None,
+    num_categories_per_variable: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),
     combined_embedding_net: Optional[nn.Module] = None,
     num_transforms: int = 2,
@@ -109,8 +109,8 @@ def _build_mixed_density_estimator(
             as z_score_x.
         flow_model: type of flow model to use for the continuous part of the
             data.
-        num_categorical_columns: number of categorical columns of each variable in the
-            input data. If None, the function will infer this from the data.
+        num_categories_per_variable: number of categorical columns of each variable in
+            the input data. If None, the function will infer this from the data.
         embedding_net: Optional embedding network for y, required if y is > 1D.
         combined_embedding_net: Optional embedding for combining the discrete
             part of the input and the embedded condition into a joined
@@ -132,18 +132,17 @@ def _build_mixed_density_estimator(
     check_data_device(batch_x, batch_y)
 
     warnings.warn(
-        "The mixed neural density estimator assumes that x contains "
-        "continuous data in the first n-k columns (e.g., reaction times) and "
-        "categorical data in the last k columns (e.g., corresponding choices). If "
-        "this is not the case for the passed `x` do not use this function.",
+        "The mixed neural density estimator assumes that inferred variable contains "
+        "continuous data in the first n-k columns and "
+        "categorical data in the last k columns.",
         stacklevel=2,
     )
 
     # Separate continuous and discrete data.
-    if num_categorical_columns is None:
+    if num_categories_per_variable is None:
         num_disc = int(torch.sum(_is_discrete(batch_x)))
     else:
-        num_disc = len(num_categorical_columns)
+        num_disc = len(num_categories_per_variable)
     cont_x, disc_x = _separate_input(batch_x, num_discrete_columns=num_disc)
 
     # The embeedding net is applied to the continuous part of the inputs
@@ -168,7 +167,7 @@ def _build_mixed_density_estimator(
         num_hidden=hidden_features,
         num_layers=hidden_layers,
         embedding_net=embedding_net,
-        num_categories=num_categorical_columns,
+        num_categories_per_variable=num_categories_per_variable,
     )
 
     if combined_embedding_net is None:

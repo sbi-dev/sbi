@@ -7,12 +7,13 @@ import pytest
 import torch
 
 from sbi import utils as utils
-from sbi.inference import NLE, NPE, NRE
+from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
     VIPosteriorParameters,
+    VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 
@@ -21,6 +22,8 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
     "inference_method, posterior_parameters",
     (
         (NPE, DirectPosteriorParameters),
+        (NPSE, VectorFieldPosteriorParameters),
+        (FMPE, VectorFieldPosteriorParameters),
         pytest.param(NLE, MCMCPosteriorParameters, marks=pytest.mark.mcmc),
         pytest.param(NRE, MCMCPosteriorParameters, marks=pytest.mark.mcmc),
         pytest.param(NRE, VIPosteriorParameters, marks=pytest.mark.mcmc),

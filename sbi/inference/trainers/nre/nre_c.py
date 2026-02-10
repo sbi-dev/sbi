@@ -1,18 +1,20 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
+from sbi.inference.trainers._contracts import LossArgs, LossArgsNRE_C
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
@@ -44,7 +46,8 @@ class NRE_C(RatioEstimatorTrainer):
         classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NRE-C.
@@ -63,8 +66,10 @@ class NRE_C(RatioEstimatorTrainer):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """
@@ -129,9 +134,12 @@ class NRE_C(RatioEstimatorTrainer):
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
+
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        kwargs["num_atoms"] = kwargs.pop("num_classes") + 1
-        kwargs["loss_kwargs"] = {"gamma": kwargs.pop("gamma")}
+        kwargs["loss_kwargs"] = LossArgsNRE_C(
+            num_atoms=kwargs.pop("num_classes") + 1, gamma=kwargs.pop("gamma")
+        )
+
         return super().train(**kwargs)
 
     def _loss(
@@ -215,3 +223,14 @@ class NRE_C(RatioEstimatorTrainer):
         p_joint = gamma / (1 + gamma)
         p_marginal = 1 / (1 + gamma)
         return p_marginal, p_joint
+
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Overrides the parent class method to check the type of loss_args."""
+
+        if not isinstance(loss_args, LossArgsNRE_C):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsNRE_C,"
+                f" but got {type(loss_args)}"
+            )
+
+        return super()._get_losses(batch=batch, loss_args=loss_args)

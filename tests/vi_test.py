@@ -36,19 +36,13 @@ class FakePotential(BasePotential):
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("vi_method", ("rKL", "fKL", "IW", "alpha"))
-@pytest.mark.parametrize("sampling_method", ("naive", "sir"))
-def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str, sampling_method: str):
+def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str):
     """Test VI on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         vi_method: different vi methods
-        sampling_method: Different sampling methods
-
     """
-
-    if sampling_method == "naive" and vi_method == "IW":
-        return  # This is not meant to perform goood ...
 
     num_samples = 2000
 
@@ -80,7 +74,7 @@ def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str, sampling_method: str)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
     posterior.vi_method = vi_method
     posterior.train()
-    samples = posterior.sample((num_samples,), method=sampling_method)
+    samples = posterior.sample((num_samples,))
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
     check_c2st(samples, target_samples, alg="slice_np")
@@ -338,10 +332,8 @@ def test_vi_posterior_inferface():
         "The Hyperparameter K is not passed to the corresponding optmizer"
     )
 
-    # Passing Hyperparameters in sample
+    # Test sampling from trained posterior
     posterior.sample()
-    posterior.sample(method="sir")
-    posterior.sample(method="sir", K=128)
 
     # Testing evaluate
     posterior.evaluate()

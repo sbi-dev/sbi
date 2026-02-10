@@ -17,9 +17,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 )
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import (
-    ImproperEmpirical,
     mcmc_transform,
-    warn_empirical_prior_memory_risk,
     within_support,
 )
 from sbi.utils.torchutils import ensure_theta_batched
@@ -102,9 +100,6 @@ class PosteriorBasedPotential(BasePotential):
         self.device = device
         self.posterior_estimator.to(device)
         if self.prior is not None:
-            is_empirical = isinstance(self.prior, ImproperEmpirical)
-            if is_empirical and torch.device(device).type == "cuda":
-                warn_empirical_prior_memory_risk("moving empirical prior to CUDA")
             self.prior.to(device)  # type: ignore
         if self._x_o is not None:
             self._x_o = self._x_o.to(device)

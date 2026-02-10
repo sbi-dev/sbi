@@ -101,9 +101,10 @@ def simulate_for_sbi(
                 ]
             except TypeError as err:
                 raise TypeError(
-                    "For multiprocessing, we switch to numpy arrays. Make sure to "
-                    "preprocess your simulator with `process_simulator` to handle numpy"
-                    " arrays."
+                    "There is a TypeError error in your simulator function. Note: For"
+                    " multiprocessing, we switch to numpy arrays. Besides confirming"
+                    " your simulator works correctly, make sure to preprocess your"
+                    " simulator with `process_simulator` to handle numpy arrays."
                 ) from err
 
         else:

@@ -332,12 +332,16 @@ class VIPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
-        **kwargs,
+        show_progress_bars: bool = True,
     ) -> Tensor:
-        """Samples from the variational posterior distribution.
+        r"""Draw samples from the variational posterior distribution $p(\theta|x)$.
 
         Args:
-            sample_shape: Shape of samples
+            sample_shape: Desired shape of samples that are drawn from the posterior.
+            x: Conditioning observation $x_o$. If not provided, uses the default `x`
+                set via `.set_default_x()`.
+            show_progress_bars: Unused for `VIPosterior` since sampling from the
+                variational distribution is fast. Included for API consistency.
 
         Returns:
             Samples from posterior.

@@ -19,6 +19,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    overload,
 )
 from warnings import warn
 
@@ -49,13 +50,14 @@ from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.trainers._contracts import LossArgs, StartIndexContext, TrainConfig
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
     ConditionalEstimatorType,
     ConditionalVectorFieldEstimator,
 )
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -68,6 +70,7 @@ from sbi.utils import (
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
 from sbi.utils.torchutils import check_if_prior_on_device, process_device
+from sbi.utils.tracking import TensorBoardTracker
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
@@ -173,6 +176,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Base class for inference methods.
@@ -185,8 +189,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 perform all posterior operations, e.g. gpu or cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
-            summary_writer: A `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """
@@ -207,19 +213,28 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._theta_roundwise = []
         self._x_roundwise = []
         self._prior_masks = []
-        self._model_bank = []
 
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
 
         self._round = 0
         self._val_loss = float("Inf")
+        self._best_val_loss = float("Inf")
+        self._epochs_since_last_improvement = 0
 
-        self._summary_writer = (
-            self._default_summary_writer() if summary_writer is None else summary_writer
-        )
+        if summary_writer is not None:
+            warn(
+                "summary_writer is deprecated. Use tracker instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            if tracker is not None:
+                raise ValueError("Pass only one of summary_writer or tracker.")
+            tracker = TensorBoardTracker(summary_writer)
 
-        # Logging during training (by SummaryWriter).
+        self._tracker = self._default_tracker() if tracker is None else tracker
+
+        # Logging during training.
         self._summary = dict(
             epochs_trained=[],
             best_validation_loss=[],
@@ -318,15 +333,34 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     @abstractmethod
     def _initialize_neural_network(
         self, retrain_from_scratch: bool, start_idx: int
-    ) -> None: ...
+    ) -> None:
+        """Initialize (or reinitialize) the neural network for the current round."""
+        ...
 
     @abstractmethod
-    def _get_start_index(self, discard_prior_samples: bool) -> int: ...
+    def _get_start_index(self, context: StartIndexContext) -> int:
+        """Get the starting index for the current round."""
+        ...
+
+    @overload
+    def _get_losses(self, batch: Sequence[Tensor]) -> Tensor:
+        """
+        Called when the trainer does not require additional loss arguments
+        (e.g., NLE).
+        """
+        ...
+
+    @overload
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Called when the trainer requires additional loss parameters via loss_args."""
+        ...
 
     @abstractmethod
     def _get_losses(
-        self, batch: Sequence[Tensor], loss_kwargs: Dict[str, Any]
-    ) -> Tensor: ...
+        self, batch: Sequence[Tensor], loss_args: LossArgs | None = None
+    ) -> Tensor:
+        """Return per-sample loss tensor for a training/validation batch."""
+        ...
 
     @abstractmethod
     def _get_potential_function(
@@ -335,6 +369,11 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         estimator: ConditionalEstimator,
     ) -> Tuple[BasePotential, TorchTransform]:
         """Subclass-specific potential creation"""
+        ...
+
+    @abstractmethod
+    def _loss(self, *args, **kwargs) -> Tensor:
+        """Compute scalar loss given subclass-specific inputs."""
         ...
 
     def get_simulations(
@@ -471,6 +510,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         prior = self._resolve_prior(prior)
         estimator, device = self._resolve_estimator(estimator)
+        estimator = deepcopy(estimator)
 
         posterior_parameters = self._resolve_posterior_parameters(
             sample_with, posterior_parameters, **kwargs
@@ -484,10 +524,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             posterior_parameters,
         )
 
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
-        return deepcopy(self._posterior)
+        return self._posterior
 
     def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
         """
@@ -895,13 +932,8 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self,
         train_loader: data.DataLoader,
         val_loader: data.DataLoader,
-        max_num_epochs: int,
-        stop_after_epochs: int,
-        learning_rate: float,
-        resume_training: bool,
-        clip_max_norm: Optional[float],
-        show_train_summary: bool,
-        loss_kwargs: Optional[Dict[str, Any]] = None,
+        train_config: TrainConfig,
+        loss_args: LossArgs | None = None,
         summarization_kwargs: Optional[Dict[str, Any]] = None,
     ) -> ConditionalEstimatorType:
         """
@@ -911,26 +943,11 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         Args:
             train_loader: Dataloader for training.
             val_loader: Dataloader for validation.
-            learning_rate: Learning rate for Adam optimizer.
-            stop_after_epochs: The number of epochs to wait for improvement on the
-                validation set before terminating training.
-            max_num_epochs: Maximum number of epochs to run. If reached, we stop
-                training even when the validation loss is still decreasing. Otherwise,
-                we train until validation loss increases (see also `stop_after_epochs`).
-            clip_max_norm: Value at which to clip the total gradient norm in order to
-                prevent exploding gradients. Use None for no clipping.
-            resume_training: Can be used in case training time is limited, e.g. on a
-                cluster. If `True`, the split between train and validation set, the
-                optimizer, the number of epochs, and the best validation log-prob will
-                be restored from the last time `.train()` was called.
-            show_train_summary: Whether to print the number of epochs and validation
-                loss after the training.
-            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+            train_config: TrainConfig dataclass configuration for the core training
+                path.
+            loss_args: Additional arguments passed to self._loss fn.
             summarization_kwargs: Additional kwargs passed to self._summarize_epoch fn.
         """
-
-        if loss_kwargs is None:
-            loss_kwargs = {}
 
         if summarization_kwargs is None:
             summarization_kwargs = {}
@@ -940,25 +957,27 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         # Move entire net to device for training.
         self._neural_net.to(self._device)
 
-        if not resume_training:
+        if not train_config.resume_training:
             self.optimizer = Adam(
                 list(self._neural_net.parameters()),
-                lr=learning_rate,
+                lr=train_config.learning_rate,
             )
             self.epoch, self.val_loss = 0, float("Inf")
 
-        while self.epoch <= max_num_epochs and not self._converged(
-            self.epoch, stop_after_epochs
+        while self.epoch <= train_config.max_num_epochs and not self._converged(
+            self.epoch, train_config.stop_after_epochs
         ):
             # Train for a single epoch.
             self._neural_net.train()
             epoch_start_time = time.time()
-            train_loss = self._train_epoch(train_loader, clip_max_norm, loss_kwargs)
+            train_loss = self._train_epoch(
+                train_loader, train_config.clip_max_norm, loss_args
+            )
 
             # Calculate validation performance.
             self._neural_net.eval()
 
-            self._val_loss = self._validate_epoch(val_loader, loss_kwargs)
+            self._val_loss = self._validate_epoch(val_loader, loss_args)
 
             self._summarize_epoch(
                 train_loss, self._val_loss, epoch_start_time, summarization_kwargs
@@ -967,7 +986,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             self.epoch += 1
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
+        self._report_convergence_at_end(
+            self.epoch, train_config.stop_after_epochs, train_config.max_num_epochs
+        )
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
@@ -977,20 +998,20 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._summarize(round_=self._round)
 
         # Update description for progress bar.
-        if show_train_summary:
+        if train_config.show_train_summary:
             print(self._describe_round(self._round, self._summary))
 
         # Avoid keeping the gradients in the resulting network, which can
         # cause memory leakage when benchmarking.
         self._neural_net.zero_grad(set_to_none=True)
 
-        return deepcopy(self._neural_net)
+        return self._neural_net
 
     def _train_epoch(
         self,
         train_loader: data.DataLoader,
         clip_max_norm: Optional[float],
-        loss_kwargs: Dict[str, Any],
+        loss_args: LossArgs | None,
     ) -> float:
         """
         Perform a single training epoch over the provided training data.
@@ -999,7 +1020,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             train_loader: Dataloader for training.
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
-            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+            loss_args: Additional arguments passed to self._loss fn.
 
         Returns:
             The average training loss over all samples in the epoch.
@@ -1010,7 +1031,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         train_loss_sum = 0
         for batch in train_loader:
             self.optimizer.zero_grad()
-            train_losses = self._get_losses(batch=batch, loss_kwargs=loss_kwargs)
+            if loss_args is None:
+                train_losses = self._get_losses(batch=batch)
+            else:
+                train_losses = self._get_losses(batch=batch, loss_args=loss_args)
             train_loss = torch.mean(train_losses)
             train_loss_sum += train_losses.sum().item()
 
@@ -1031,14 +1055,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     def _validate_epoch(
         self,
         val_loader: data.DataLoader,
-        loss_kwargs: Dict[str, Any],
+        loss_args: LossArgs | None,
     ) -> float:
         """
         Perform a single validation epoch over the provided validation data.
 
         Args:
             val_loader: Dataloader for validation.
-            loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
+            loss_args: Additional arguments passed to self._loss fn.
 
         Returns:
             The average validation loss over all samples in the epoch.
@@ -1047,7 +1071,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         val_loss_sum = 0
         with torch.no_grad():
             for batch in val_loader:
-                val_losses = self._get_losses(batch=batch, loss_kwargs=loss_kwargs)
+                if loss_args is None:
+                    val_losses = self._get_losses(batch=batch)
+                else:
+                    val_losses = self._get_losses(batch=batch, loss_args=loss_args)
                 val_loss_sum += val_losses.sum().item()
 
         # Take mean over all validation samples.
@@ -1116,14 +1143,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         return converged
 
-    def _default_summary_writer(self) -> SummaryWriter:
-        """Return summary writer logging to method- and simulator-specific directory."""
+    def _default_tracker(self) -> Tracker:
+        """Return default tracker logging to a TensorBoard directory."""
 
         method = self.__class__.__name__
         logdir = Path(
             get_log_root(), method, datetime.now().isoformat().replace(":", "_")
         )
-        return SummaryWriter(logdir)
+        return TensorBoardTracker(SummaryWriter(logdir))
 
     def _report_convergence_at_end(
         self, epoch: int, stop_after_epochs: int, max_num_epochs: int
@@ -1145,11 +1172,11 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self,
         round_: int,
     ) -> None:
-        """Update the summary_writer with statistics for a given round.
+        """Update the tracker with statistics for a given round.
 
         During training several performance statistics are added to the summary, e.g.,
         using `self._summary['key'].append(value)`. This function writes these values
-        into summary writer object.
+        into the tracker.
 
         Args:
             round: index of round
@@ -1168,17 +1195,17 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         """
 
-        # Add most recent training stats to summary writer.
-        self._summary_writer.add_scalar(
-            tag="epochs_trained",
-            scalar_value=self._summary["epochs_trained"][-1],
-            global_step=round_ + 1,
+        # Add most recent training stats to tracker.
+        self._tracker.log_metric(
+            name="epochs_trained",
+            value=self._summary["epochs_trained"][-1],
+            step=round_ + 1,
         )
 
-        self._summary_writer.add_scalar(
-            tag="best_validation_loss",
-            scalar_value=self._summary["best_validation_loss"][-1],
-            global_step=round_ + 1,
+        self._tracker.log_metric(
+            name="best_validation_loss",
+            value=self._summary["best_validation_loss"][-1],
+            step=round_ + 1,
         )
 
         # Add validation loss for every epoch.
@@ -1189,27 +1216,27 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             .item()
         )
         for i, vlp in enumerate(self._summary["validation_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="validation_loss",
-                scalar_value=vlp,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="validation_loss",
+                value=vlp,
+                step=int(offset + i),
             )
 
         for i, tlp in enumerate(self._summary["training_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="training_loss",
-                scalar_value=tlp,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="training_loss",
+                value=tlp,
+                step=int(offset + i),
             )
 
         for i, eds in enumerate(self._summary["epoch_durations_sec"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="epoch_durations_sec",
-                scalar_value=eds,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="epoch_durations_sec",
+                value=eds,
+                step=int(offset + i),
             )
 
-        self._summary_writer.flush()
+        self._tracker.flush()
 
     @staticmethod
     def _describe_round(round_: int, summary: Dict[str, list]) -> str:
@@ -1248,11 +1275,11 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             "changes in the following two ways: "
             "1) `.train(..., retrain_from_scratch=True)` is not supported. "
             "2) When the loaded object calls the `.train()` method, it generates a new "
-            "tensorboard summary writer (instead of appending to the current one).",
+            "tracker instance (instead of appending to the current one).",
             stacklevel=2,
         )
         dict_to_save = {}
-        unpicklable_attributes = ["_summary_writer", "_build_neural_net"]
+        unpicklable_attributes = ["_tracker", "_build_neural_net"]
         for key in self.__dict__:
             if key in unpicklable_attributes:
                 dict_to_save[key] = None
@@ -1263,14 +1290,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
 
-        Also creates a new summary writer (because the previous one was set to `None`
+        Also creates a new tracker (because the previous one was set to `None`
         during serializing, see `__get_state__()`).
 
         Args:
             state_dict: State to be restored.
         """
-        state_dict["_summary_writer"] = self._default_summary_writer()
-        self.__dict__ = state_dict
+        state_dict["_tracker"] = self._default_tracker()
+        vars(self).update(state_dict)
 
 
 def check_if_proposal_has_default_x(proposal: Any):

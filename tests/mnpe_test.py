@@ -71,6 +71,46 @@ def test_mnpe_on_device(
     assert samples.shape == (num_samples, 3)
 
 
+def test_mnpe_indices(
+    num_simulations: int = 100,
+    dim_x: int = 50,
+    discrete_low: int = 10,
+    discrete_high: int = 20,
+    dim_theta_discrete: int = 2,
+    dim_theta_continuous: int = 2,
+    num_samples: int = 10,
+):
+    """Test MNPE API with indices not at zero."""
+    num_sim = num_simulations + 1  # plus one because of test point
+
+    discrete_theta = torch.randint(
+        low=discrete_low, high=discrete_high, size=(num_sim, dim_theta_discrete)
+    )
+    continuous_theta = torch.randn((num_sim, dim_theta_continuous))
+    theta_all = torch.cat([continuous_theta, discrete_theta], dim=1)
+    x_all = torch.randn((num_sim, dim_x))
+
+    theta = theta_all[:-1]
+    x = x_all[:-1]
+    x_o = x_all[-1]
+
+    net_builder = posterior_nn("mnpe")
+    inference = MNPE(density_estimator=net_builder)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+
+    # Test sampling on device
+    posterior = inference.build_posterior()
+    samples = posterior.sample(
+        sample_shape=(num_samples,),
+        x=x_o,
+        show_progress_bars=False,
+    )
+    assert samples.shape == (num_samples, dim_theta_continuous + dim_theta_discrete)
+    # check if discrete theta samples are in the correct range
+    assert samples[:, dim_theta_continuous:].max() <= discrete_high
+    assert samples[:, dim_theta_continuous:].min() >= discrete_low
+
+
 def test_batched_sampling(num_simulations: int = 100):
     """Test MNPE API with batched sampling."""
     batch_size = 5

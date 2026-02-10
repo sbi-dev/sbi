@@ -65,6 +65,7 @@ class VectorFieldBasedPotential(BasePotential):
             self.vector_field_estimator.net,
             self.vector_field_estimator.mean_base,
             self.vector_field_estimator.std_base,
+            self.vector_field_estimator.condition_shape,
             backend=neural_ode_backend,
             t_min=self.vector_field_estimator.t_min,
             t_max=self.vector_field_estimator.t_max,

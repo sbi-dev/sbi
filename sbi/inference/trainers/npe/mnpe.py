@@ -4,6 +4,7 @@
 from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -16,17 +17,50 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 
 
 class MNPE(NPE_C):
-    r"""Mixed Neural Posterior Estimation (MNPE).
+    r"""Method that can infer discrete and continuous parameters (Mixed NPE).
 
-    Like NPE-C, but designed to be applied to data with mixed types, e.g.,
-    continuous parameters and discrete parameters like they occur in models with
-    switching components. The emebedding net will only operate on the continuous
-    parameters, note this to design the dimension of the embedding net.
+    MNPE (Mixed Neural Posterior Estimation) is similar to NPE: it directly
+    estimates a distribution over parameters given data. Unlike NPE, it is designed to
+    be applied to parmaeters with mixed types, i.e., continuous and discrete parameters.
+    This can occur, for example, in models with switching components. The emebedding
+    net will only operate on the continuous parameters, note this to design the
+    dimension of the embedding net.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import MNPE
+
+        dim_theta_discrete = 3
+        dim_theta_continuous = 2
+        dim_theta = 5
+        dim_x = 50
+
+        num_sims = 100
+
+        discrete_theta = torch.randint(low=0, high=2, size=(100, dim_theta_discrete))
+        continuous_theta = torch.randn((num_sims, dim_theta_discrete))
+
+        # Important: the theta must have all continuous paramters first, and
+        # discrete parameters after this.
+        theta = torch.cat([continuous_theta, discrete_theta], dim=1)
+        x = torch.randn((num_sims, dim_x))
+
+        inference = MNPE()
+        _ = inference.append_simulations(theta, x).train()
+
+        posterior = inference.build_posterior()
+
+        x_o = torch.randn((1, dim_x))
+        samples = posterior.sample((100,), x=x_o)
     """
 
     def __init__(
@@ -38,7 +72,8 @@ class MNPE(NPE_C):
         ] = "mnpe",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize Mixed Neural Posterior Estimation (MNPE).
@@ -58,8 +93,10 @@ class MNPE(NPE_C):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """
