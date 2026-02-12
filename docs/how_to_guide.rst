@@ -41,6 +41,7 @@ Training
 .. toctree::
    :maxdepth: 1
 
+   how_to_guide/22_abstraction_levels.ipynb
    how_to_guide/06_choosing_inference_method.ipynb
    how_to_guide/02_multiround_inference.ipynb
    how_to_guide/07_gpu_training.ipynb
