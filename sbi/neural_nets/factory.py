@@ -62,9 +62,11 @@ class ZukoFlowType(Enum):
     """Enumeration of Zuko flow types."""
 
     BPF = "bpf"
+    GF = "gf"
     MAF = "maf"
     NAF = "naf"
     NCSF = "ncsf"
+    NICE = "nice"
     NSF = "nsf"
     SOSPF = "sospf"
     UNAF = "unaf"

@@ -7,7 +7,6 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Iterable,
     Literal,
     Optional,
     Union,
@@ -16,8 +15,10 @@ from typing import (
     get_origin,
 )
 
+from torch.distributions import Distribution
+
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.sbi_types import PyroTransformedDistribution, TorchTransform
+from sbi.sbi_types import TorchTransform
 from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_float,
@@ -334,61 +335,75 @@ class VectorFieldPosteriorParameters(PosteriorParameters):
 @dataclass(frozen=True)
 class VIPosteriorParameters(PosteriorParameters):
     """
-    Parameters for initializing VIPosterior.
+    Parameters for VIPosterior, supporting both single-x and amortized VI.
 
     Fields:
-        q: Variational distribution, either string, `TransformedDistribution`, or a
-            `VIPosterior` object. This specifies a parametric class of distribution
-            over which the best possible posterior approximation is searched. For
-            string input, we currently support [nsf, scf, maf, mcf, gaussian,
-            gaussian_diag]. You can also specify your own variational family by
-            passing a pyro `TransformedDistribution`.
-            Additionally, we allow a `Callable`, which allows you the pass a
-            `builder` function, which if called returns a distribution. This may be
-            useful for setting the hyperparameters e.g. `num_transfroms` within the
-            `get_flow_builder` method specifying the number of transformations
-            within a normalizing flow. If q is already a `VIPosterior`, then the
-            arguments will be copied from it (relevant for multi-round training).
-        vi_method: This specifies the variational methods which are used to fit q to
-            the posterior. We currently support [rKL, fKL, IW, alpha]. Note that
-            some of the divergences are `mode seeking` i.e. they underestimate
-            variance and collapse on multimodal targets (`rKL`, `alpha` for alpha >
-            1) and some are `mass covering` i.e. they overestimate variance but
-            typically cover all modes (`fKL`, `IW`, `alpha` for alpha < 1).
-        parameters: List of parameters of the variational posterior. This is only
-            required for user-defined q i.e. if q does not have a `parameters`
-            attribute.
-        modules: List of modules of the variational posterior. This is only
-            required for user-defined q i.e. if q does not have a `modules`
-            attribute.
+        q: Variational distribution. Either a string specifying the flow type
+            [maf, nsf, naf, unaf, nice, sospf, gaussian, gaussian_diag], a
+            `Distribution`, a `VIPosterior` object, or a `Callable`
+            builder function. For amortized VI, only string flow types are
+            supported. If q is already a `VIPosterior`, arguments are copied
+            from it (relevant for multi-round training).
+        vi_method: Variational method for fitting q to the posterior. Options:
+            [rKL, fKL, IW, alpha]. Some are "mode seeking" (rKL, alpha > 1) and
+            some are "mass covering" (fKL, IW, alpha < 1). Currently only used
+            for single-x VI; amortized VI uses ELBO (rKL).
+        num_transforms: Number of transforms in the normalizing flow. Used for
+            both single-x VI (via set_q/train) and amortized VI (via
+            train_amortized).
+        hidden_features: Hidden layer size in the flow networks. Used for both
+            single-x VI and amortized VI.
+        z_score_theta: Method for z-scoring θ (the parameters being sampled).
+            One of "none", "independent", "structured". Used for both single-x
+            VI and amortized VI. Use "structured" for parameters with
+            correlations.
+        z_score_x: Method for z-scoring x (the conditioning observation).
+            One of "none", "independent", "structured". Only used for amortized
+            VI (train_amortized). Use "structured" for structured data like
+            images.
+
+    Note:
+        For custom distributions that lack `parameters()` and `modules()` methods,
+        pass these via `VIPosterior.set_q(q, parameters=..., modules=...)` instead.
     """
 
     q: Union[
-        Literal["nsf", "scf", "maf", "mcf", "gaussian", "gaussian_diag"],
-        PyroTransformedDistribution,
+        Literal[
+            "maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"
+        ],
+        Distribution,
         "VIPosterior",
         Callable,
     ] = "maf"
     vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL"
-    parameters: Optional[Iterable] = None
-    modules: Optional[Iterable] = None
+    num_transforms: int = 5
+    hidden_features: int = 50
+    z_score_theta: Literal["none", "independent", "structured"] = "independent"
+    z_score_x: Literal["none", "independent", "structured"] = "independent"
 
     def validate(self):
         """Validate VIPosteriorParameters fields."""
-
-        valid_q = {"nsf", "scf", "maf", "mcf", "gaussian", "gaussian_diag"}
+        valid_q = {
+            "nsf",
+            "maf",
+            "naf",
+            "unaf",
+            "nice",
+            "sospf",
+            "gaussian",
+            "gaussian_diag",
+        }
 
         if isinstance(self.q, str) and self.q not in valid_q:
             raise ValueError(f"If `q` is a string, it must be one of {valid_q}")
-        elif not isinstance(
-            self.q, (PyroTransformedDistribution, VIPosterior, Callable, str)
-        ):
+        elif not isinstance(self.q, (Distribution, VIPosterior, Callable, str)):
             raise TypeError(
-                "q must be either of typr PyroTransformedDistribution,"
-                " VIPosterioror or Callable"
+                "q must be either of type Distribution, VIPosterior, or Callable"
             )
 
-        if self.parameters is not None and not isinstance(self.parameters, Iterable):
-            raise TypeError("parameters must be iterable or None.")
-        if self.modules is not None and not isinstance(self.modules, Iterable):
-            raise TypeError("modules must be iterable or None.")
+        if self.num_transforms < 1:
+            raise ValueError(f"num_transforms must be >= 1, got {self.num_transforms}")
+        if self.hidden_features < 1:
+            raise ValueError(
+                f"hidden_features must be >= 1, got {self.hidden_features}"
+            )

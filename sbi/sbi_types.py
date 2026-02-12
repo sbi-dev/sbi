@@ -5,7 +5,6 @@ from typing import Any, Optional, Protocol, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 import torch
-from pyro.distributions import TransformedDistribution  # type: ignore
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.distributions.transforms import Transform
@@ -32,7 +31,7 @@ transform_types = Optional[
 TensorBoardSummaryWriter: TypeAlias = SummaryWriter
 TorchDistribution: TypeAlias = Distribution
 TorchTransform: TypeAlias = Transform
-PyroTransformedDistribution: TypeAlias = TransformedDistribution
+VariationalDistribution: TypeAlias = Distribution
 TorchTensor: TypeAlias = Tensor
 
 
@@ -90,7 +89,7 @@ __all__ = [
     "TorchTransform",
     "transform_types",
     "TorchDistribution",
-    "PyroTransformedDistribution",
+    "VariationalDistribution",
     "TorchTensor",
     "Tracker",
 ]

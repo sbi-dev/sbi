@@ -69,21 +69,18 @@ class RatioBasedPotential(BasePotential):
         self.ratio_estimator = ratio_estimator
         self.ratio_estimator.eval()
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Moves ratio_estimator and prior and the x_o to the given device.
-
-        It also sets the device attribute to the given device.
+    def to(self, device: Union[str, torch.device]) -> "RatioBasedPotential":
+        """Move ratio estimator, prior and x_o to the given device.
 
         Args:
             device: Device to move the ratio_estimator, prior and x_o to.
 
+        Returns:
+            Self for method chaining.
         """
-        self.device = device
+        super().to(device)
         self.ratio_estimator.to(device)
-        self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
+        return self
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for likelihood-ratio-based methods.
