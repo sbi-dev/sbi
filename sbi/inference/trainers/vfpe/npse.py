@@ -15,6 +15,7 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.factory import posterior_score_nn
+from sbi.sbi_types import Tracker
 
 
 class NPSE(VectorFieldTrainer):
@@ -45,6 +46,7 @@ class NPSE(VectorFieldTrainer):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
         **kwargs,
     ):
@@ -64,7 +66,10 @@ class NPSE(VectorFieldTrainer):
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
-            summary_writer: Tensorboard summary writer.
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
                 `score_estimator` is a string.
@@ -90,6 +95,7 @@ class NPSE(VectorFieldTrainer):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
             sde_type=sde_type,
             **kwargs,

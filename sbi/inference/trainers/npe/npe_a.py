@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, Literal, Optional, Union
 import torch
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.trainers.npe.npe_base import (
@@ -21,7 +22,7 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
 from sbi.neural_nets.estimators.mog import MoG
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import BoxUniform
 
@@ -63,7 +64,8 @@ class NPE_A(PosteriorEstimatorTrainer):
         num_components: int = 10,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NPE-A [1].
@@ -89,8 +91,10 @@ class NPE_A(PosteriorEstimatorTrainer):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during training.
         """
 
@@ -181,6 +185,12 @@ class NPE_A(PosteriorEstimatorTrainer):
         # SNPE-A always discards the prior samples.
         kwargs["discard_prior_samples"] = True
         kwargs["force_first_round_loss"] = True
+
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
 
         self._round = max(self._data_round_index)
 

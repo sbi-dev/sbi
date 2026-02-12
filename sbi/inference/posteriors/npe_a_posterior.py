@@ -113,16 +113,17 @@ class NPE_A_Posterior(DirectPosterior):
         assert self._proposal_mog is not None
         return _correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
 
-    def _corrected_sample(self, sample_shape: torch.Size, condition: Tensor) -> Tensor:
+    def _corrected_sample(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
         """Sample from the corrected MoG distribution.
 
         Args:
             sample_shape: Shape of samples to draw.
-            condition: Conditioning observation.
+            **kwargs: Must contain 'condition' key with conditioning observation.
 
         Returns:
             Samples from corrected distribution, shape (*sample_shape, batch, dim).
         """
+        condition = kwargs["condition"]
         corrected_mog = self._get_corrected_mog(condition)
         samples = corrected_mog.sample(sample_shape)
 

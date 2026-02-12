@@ -46,6 +46,8 @@ Training
    how_to_guide/07_gpu_training.ipynb
    how_to_guide/07_save_and_load.ipynb
    how_to_guide/07_resume_training.ipynb
+   how_to_guide/21_hyperparameter_tuning.ipynb
+   how_to_guide/22_experiment_tracking.ipynb
 
 
 Sampling
@@ -57,6 +59,8 @@ Sampling
    how_to_guide/09_sampler_interface.ipynb
    how_to_guide/10_refine_posterior_with_importance_sampling.ipynb
    how_to_guide/11_iid_sampling_with_nle_or_nre.ipynb
+   how_to_guide/12_mcmc_diagnostics_with_arviz.ipynb
+   how_to_guide/23_using_pyro_with_sbi.ipynb
 
 
 Diagnostics
