@@ -3,11 +3,9 @@
 
 from __future__ import annotations
 
-import sys
 from dataclasses import asdict
 from typing import Tuple, Union
 
-import pymc
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
@@ -76,19 +74,7 @@ pytestmark = pytest.mark.skipif(
         pytest.param(NRE_B, "resnet", "slice_np", marks=pytest.mark.mcmc),
         (NRE_C, "resnet", "rejection"),
         (NRE_C, "resnet", "importance"),
-        pytest.param(
-            NRE_C,
-            "resnet",
-            "nuts_pymc",
-            marks=(
-                pytest.mark.mcmc,
-                pytest.mark.skipif(
-                    condition=sys.version_info >= (3, 10)
-                    and pymc.__version__ >= "5.20.1",
-                    reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
-                ),
-            ),
-        ),
+        pytest.param(NRE_C, "resnet", "nuts_pymc", marks=pytest.mark.mcmc),
     ],
 )
 @pytest.mark.parametrize(

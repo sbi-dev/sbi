@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from copy import deepcopy
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
@@ -11,6 +10,7 @@ from pyknos.mdn.mdn import MultivariateGaussianMDN
 from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.trainers.npe.npe_base import (
@@ -20,7 +20,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuilder,
 )
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils import torchutils
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
@@ -59,7 +59,8 @@ class NPE_A(PosteriorEstimatorTrainer):
         num_components: int = 10,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NPE-A [1].
@@ -89,8 +90,10 @@ class NPE_A(PosteriorEstimatorTrainer):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during training.
         """
 
@@ -195,6 +198,12 @@ class NPE_A(PosteriorEstimatorTrainer):
         kwargs["discard_prior_samples"] = True
         kwargs["force_first_round_loss"] = True
 
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
+
         self._round = max(self._data_round_index)
 
         if final_round:
@@ -252,9 +261,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
         if density_estimator is None:
-            density_estimator = deepcopy(
-                self._neural_net
-            )  # PosteriorEstimator.train() also returns a deepcopy, mimic this here
+            density_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
         else:
@@ -324,7 +331,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             prior=prior,
             **kwargs,
         )
-        return deepcopy(self._posterior)  # type: ignore
+        return self._posterior  # type: ignore
 
     def _log_prob_proposal_posterior(
         self,

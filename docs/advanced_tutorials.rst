@@ -66,7 +66,6 @@ Diagnostics
    advanced_tutorials/11_diagnostics_simulation_based_calibration.ipynb
    advanced_tutorials/13_diagnostics_lc2st.ipynb
    advanced_tutorials/21_diagnostics_misspecification_checks.ipynb
-   advanced_tutorials/14_mcmc_diagnostics_with_arviz.ipynb
 
 
 Visualization

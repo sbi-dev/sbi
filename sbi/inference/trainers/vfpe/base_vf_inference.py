@@ -31,7 +31,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalEstimatorBuilder,
     MaskedConditionalEstimatorBuilder,
 )
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_estimator_arg,
     handle_invalid_x,
@@ -64,6 +64,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
         **kwargs,
     ):
@@ -84,7 +85,8 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
-            summary_writer: Tensorboard summary writer.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
                 `vector_field_estimator_builder` is a string.
@@ -95,6 +97,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
         )
 
@@ -329,10 +332,10 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
         )
 
         if isinstance(validation_times, int):
-            validation_times = torch.linspace(
-                self._neural_net.t_min + validation_times_nugget,
-                self._neural_net.t_max - validation_times_nugget,
+            validation_times = self._neural_net.solve_schedule(
                 validation_times,
+                t_min=self._neural_net.t_min + validation_times_nugget,
+                t_max=self._neural_net.t_max - validation_times_nugget,
             )
 
         loss_args = LossArgsVF(

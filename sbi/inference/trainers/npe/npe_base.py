@@ -39,7 +39,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
@@ -68,6 +68,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
@@ -94,6 +95,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
         )
 
@@ -289,6 +291,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
+
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
 
         train_config = TrainConfig(
             max_num_epochs=max_num_epochs,
@@ -561,7 +569,19 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
         """
         if proposal is not None:
             check_if_proposal_has_default_x(proposal)
-
+            if (
+                isinstance(proposal, NeuralPosterior)
+                and hasattr(proposal, "posterior_estimator")
+                and self._neural_net is not None
+                and proposal.posterior_estimator is self._neural_net  # type: ignore
+            ):
+                raise ValueError(
+                    "The proposal's posterior_estimator is the same object as the "
+                    "trainer's neural network. This will cause incorrect training "
+                    "because the proposal's weights will change during optimization. "
+                    "Use `deepcopy(estimator)` when creating the proposal, or use "
+                    "`trainer.build_posterior()` which handles this automatically."
+                )
             if isinstance(proposal, RestrictedPrior):
                 if proposal._prior is not self._prior:
                     warnings.warn(
@@ -608,19 +628,21 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
         # Load data from most recent round.
         self._round = max(self._data_round_index)
 
-        if self._round == 0 and self._neural_net is not None:
-            assert context.force_first_round_loss or context.resume_training, (
-                "You have already trained this neural network. After you had trained "
-                "the network, you again appended simulations with `append_simulations"
-                "(theta, x)`, but you did not provide a proposal. If the new "
-                "simulations are sampled from the prior, you can set "
-                "`.train(..., force_first_round_loss=True`). However, if the new "
-                "simulations were not sampled from the prior, you should pass the "
-                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
-                "your samples are not sampled from the prior and you do not pass a "
-                "proposal and you set `force_first_round_loss=True`, the result of "
-                "SNPE will not be the true posterior. Instead, it will be the proposal "
-                "posterior, which (usually) is more narrow than the true posterior."
+        if (
+            self._round == 0
+            and self._neural_net is not None
+            and not (context.force_first_round_loss or context.resume_training)
+        ):
+            raise ValueError(
+                "This neural network has already been trained. "
+                "If you want to continue training without adding new simulations, "
+                "set resume_training=True. "
+                "If you appended new simulations, you must either provide a proposal "
+                "in append_simulations(), or set force_first_round_loss=True for "
+                "simulations drawn from the prior. "
+                "Warning: Setting force_first_round_loss=True with simulations not "
+                "drawn from the prior will produce the proposal posterior instead of "
+                "the true posterior, which is typically more narrow."
             )
 
         # Starting index for the training set (1 = discard round-0 samples).

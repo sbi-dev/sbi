@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple, Union
+from warnings import warn
 
 import torch
 from torch import Tensor
@@ -20,8 +21,10 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
 from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
+from sbi.sbi_types import Tracker
 from sbi.utils import check_estimator_arg, get_log_root
 from sbi.utils.torchutils import assert_all_finite, process_device
+from sbi.utils.tracking import TensorBoardTracker
 
 DensityEstimatorType = Union[ZukoFlowType, str, Callable[[Tensor], Any]]
 
@@ -38,6 +41,7 @@ class MarginalTrainer:
         density_estimator: DensityEstimatorType = ZukoFlowType.NSF,
         device: str = "cpu",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         """Initialize the marginal trainer.
@@ -55,8 +59,10 @@ class MarginalTrainer:
                 If a callable, it must be a function that returns a neural network
                 that inherits from `UnconditionalDensityEstimator`.
             device: Device to use for training. Can be "cpu" or "cuda".
-            summary_writer: Summary writer for logging training progress. If None,
-                a new writer is created.
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training progress. If None,
+                a TensorBoard tracker is created.
             show_progress_bars: Whether to show progress bars during training.
         """
 
@@ -66,11 +72,19 @@ class MarginalTrainer:
         self._show_progress_bars = show_progress_bars
         self._val_loss = float("Inf")
 
-        self._summary_writer = (
-            self._default_summary_writer() if summary_writer is None else summary_writer
-        )
+        if summary_writer is not None:
+            warn(
+                "summary_writer is deprecated. Use tracker instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            if tracker is not None:
+                raise ValueError("Pass only one of summary_writer or tracker.")
+            tracker = TensorBoardTracker(summary_writer)
 
-        # Logging during training (by SummaryWriter).
+        self._tracker = self._default_tracker() if tracker is None else tracker
+
+        # Logging during training.
         self._summary = dict(
             epochs_trained=[],
             best_validation_loss=[],
@@ -281,16 +295,16 @@ class MarginalTrainer:
         # cause memory leakage when benchmarking.
         self._neural_net.zero_grad(set_to_none=True)
 
-        return deepcopy(self._neural_net)
+        return self._neural_net
 
-    def _default_summary_writer(self) -> SummaryWriter:
-        """Return summary writer logging to method- and simulator-specific directory."""
+    def _default_tracker(self) -> Tracker:
+        """Return default tracker logging to a TensorBoard directory."""
 
         method = self.__class__.__name__
         logdir = Path(
             get_log_root(), method, datetime.now().isoformat().replace(":", "_")
         )
-        return SummaryWriter(logdir)
+        return TensorBoardTracker(SummaryWriter(logdir))
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
@@ -328,11 +342,11 @@ class MarginalTrainer:
         self,
         round_: int,
     ) -> None:
-        """Update the summary_writer with statistics for a given round.
+        """Update the tracker with statistics for a given round.
 
         During training several performance statistics are added to the summary, e.g.,
         using `self._summary['key'].append(value)`. This function writes these values
-        into summary writer object.
+        into the tracker.
 
         Args:
             round: index of round
@@ -351,17 +365,17 @@ class MarginalTrainer:
 
         """
 
-        # Add most recent training stats to summary writer.
-        self._summary_writer.add_scalar(
-            tag="epochs_trained",
-            scalar_value=self._summary["epochs_trained"][-1],
-            global_step=round_ + 1,
+        # Add most recent training stats to tracker.
+        self._tracker.log_metric(
+            name="epochs_trained",
+            value=self._summary["epochs_trained"][-1],
+            step=round_ + 1,
         )
 
-        self._summary_writer.add_scalar(
-            tag="best_validation_loss",
-            scalar_value=self._summary["best_validation_loss"][-1],
-            global_step=round_ + 1,
+        self._tracker.log_metric(
+            name="best_validation_loss",
+            value=self._summary["best_validation_loss"][-1],
+            step=round_ + 1,
         )
 
         # Add validation loss for every epoch.
@@ -372,27 +386,27 @@ class MarginalTrainer:
             .item()
         )
         for i, vlp in enumerate(self._summary["validation_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="validation_loss",
-                scalar_value=vlp,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="validation_loss",
+                value=vlp,
+                step=int(offset + i),
             )
 
         for i, tlp in enumerate(self._summary["training_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="training_loss",
-                scalar_value=tlp,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="training_loss",
+                value=tlp,
+                step=int(offset + i),
             )
 
         for i, eds in enumerate(self._summary["epoch_durations_sec"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="epoch_durations_sec",
-                scalar_value=eds,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="epoch_durations_sec",
+                value=eds,
+                step=int(offset + i),
             )
 
-        self._summary_writer.flush()
+        self._tracker.flush()
 
     @staticmethod
     def _maybe_show_progress(show: bool, epoch: int) -> None:

@@ -26,7 +26,7 @@ from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 from sbi.utils.torchutils import assert_all_finite
 
@@ -42,6 +42,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Base class for `Neural Likelihood Estimation` methods.
@@ -68,6 +69,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
         )
 
@@ -178,6 +180,12 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
         Returns:
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
+
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
 
         start_idx = self._get_start_index(
             context=StartIndexContext(discard_prior_samples=discard_prior_samples)

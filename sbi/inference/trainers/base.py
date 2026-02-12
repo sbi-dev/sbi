@@ -60,7 +60,7 @@ from sbi.neural_nets.estimators.base import (
     MaskedConditionalEstimatorType,
     MaskedConditionalVectorFieldEstimator,
 )
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -73,6 +73,7 @@ from sbi.utils import (
 from sbi.utils.sbiutils import NoPrior, get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
 from sbi.utils.torchutils import check_if_prior_on_device, process_device
+from sbi.utils.tracking import TensorBoardTracker
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
@@ -200,6 +201,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Base class for inference methods.
@@ -212,8 +214,10 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                 perform all posterior operations, e.g. gpu or cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
-            summary_writer: A `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """
@@ -231,7 +235,6 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         # Initialize roundwise prior_masks for storage of masks
         # indicating if simulations came from prior.
         self._prior_masks = []
-        self._model_bank = []
 
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
@@ -241,11 +244,19 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self._best_val_loss = float("Inf")
         self._epochs_since_last_improvement = 0
 
-        self._summary_writer = (
-            self._default_summary_writer() if summary_writer is None else summary_writer
-        )
+        if summary_writer is not None:
+            warn(
+                "summary_writer is deprecated. Use tracker instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            if tracker is not None:
+                raise ValueError("Pass only one of summary_writer or tracker.")
+            tracker = TensorBoardTracker(summary_writer)
 
-        # Logging during training (by SummaryWriter).
+        self._tracker = self._default_tracker() if tracker is None else tracker
+
+        # Logging during training.
         self._summary = dict(
             epochs_trained=[],
             best_validation_loss=[],
@@ -849,7 +860,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         # cause memory leakage when benchmarking.
         self._neural_net.zero_grad(set_to_none=True)
 
-        return deepcopy(self._neural_net)
+        return self._neural_net
 
     def _train_epoch(
         self,
@@ -1029,6 +1040,15 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
 
         return converged
 
+    def _default_tracker(self) -> Tracker:
+        """Return default tracker logging to a TensorBoard directory."""
+
+        method = self.__class__.__name__
+        logdir = Path(
+            get_log_root(), method, datetime.now().isoformat().replace(":", "_")
+        )
+        return TensorBoardTracker(SummaryWriter(logdir))
+
     def _report_convergence_at_end(
         self, epoch: int, stop_after_epochs: int, max_num_epochs: int
     ) -> None:
@@ -1062,11 +1082,11 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self,
         round_: int,
     ) -> None:
-        """Update the summary_writer with statistics for a given round.
+        """Update the tracker with statistics for a given round.
 
         During training several performance statistics are added to the summary, e.g.,
         using `self._summary['key'].append(value)`. This function writes these values
-        into summary writer object.
+        into the tracker.
 
         Args:
             round: index of round
@@ -1085,48 +1105,49 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
 
         """
 
-        # Add most recent training stats to summary writer.
-        self._summary_writer.add_scalar(
-            tag="epochs_trained",
-            scalar_value=self._summary["epochs_trained"][-1],
-            global_step=round_ + 1,
+        # Add most recent training stats to tracker.
+        self._tracker.log_metric(
+            name="epochs_trained",
+            value=self._summary["epochs_trained"][-1],
+            step=round_ + 1,
         )
 
-        self._summary_writer.add_scalar(
-            tag="best_validation_loss",
-            scalar_value=self._summary["best_validation_loss"][-1],
-            global_step=round_ + 1,
+        self._tracker.log_metric(
+            name="best_validation_loss",
+            value=self._summary["best_validation_loss"][-1],
+            step=round_ + 1,
         )
 
         # Add validation loss for every epoch.
         # Offset with all previous epochs.
         offset = (
-            torch.tensor(self._summary["epochs_trained"][:-1], dtype=torch.int)
+            torch
+            .tensor(self._summary["epochs_trained"][:-1], dtype=torch.int)
             .sum()
             .item()
         )
         for i, vlp in enumerate(self._summary["validation_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="validation_loss",
-                scalar_value=vlp,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="validation_loss",
+                value=vlp,
+                step=int(offset + i),
             )
 
         for i, tlp in enumerate(self._summary["training_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="training_loss",
-                scalar_value=tlp,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="training_loss",
+                value=tlp,
+                step=int(offset + i),
             )
 
         for i, eds in enumerate(self._summary["epoch_durations_sec"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="epoch_durations_sec",
-                scalar_value=eds,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="epoch_durations_sec",
+                value=eds,
+                step=int(offset + i),
             )
 
-        self._summary_writer.flush()
+        self._tracker.flush()
 
     @staticmethod
     def _describe_round(round_: int, summary: Dict[str, list]) -> str:
@@ -1165,11 +1186,11 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             "changes in the following two ways: "
             "1) `.train(..., retrain_from_scratch=True)` is not supported. "
             "2) When the loaded object calls the `.train()` method, it generates a new "
-            "tensorboard summary writer (instead of appending to the current one).",
+            "tracker instance (instead of appending to the current one).",
             stacklevel=2,
         )
         dict_to_save = {}
-        unpicklable_attributes = ["_summary_writer", "_build_neural_net"]
+        unpicklable_attributes = ["_tracker", "_build_neural_net"]
         for key in self.__dict__:
             if key in unpicklable_attributes:
                 dict_to_save[key] = None
@@ -1180,14 +1201,14 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
 
-        Also creates a new summary writer (because the previous one was set to `None`
+        Also creates a new tracker (because the previous one was set to `None`
         during serializing, see `__get_state__()`).
 
         Args:
             state_dict: State to be restored.
         """
-        state_dict["_summary_writer"] = self._default_summary_writer()
-        self.__dict__ = state_dict
+        state_dict["_tracker"] = self._default_tracker()
+        vars(self).update(state_dict)
 
 
 class NeuralInference(

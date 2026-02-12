@@ -1158,6 +1158,35 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
 
         return latent_part.reshape_as(original_latent_tensor)
 
+    def solve_schedule(
+        self,
+        steps: int,
+        t_min: Optional[float] = None,
+        t_max: Optional[float] = None,
+    ) -> Tensor:
+        """
+        Time grid used during sampling (solving steps) and loss evaluation steps.
+
+        This grid is deterministic and decreasing. Can be overriden by subclasses.
+        Return by default a uniform time stepping between t_max and t_min.
+
+        Args:
+            steps: number of discretization steps
+            t_min: The minimum time value. Defaults to self.t_min.
+            t_max: The maximum time value. Defaults to self.t_max.
+
+        Returns:
+            Tensor: A tensor of time steps within the range [t_max, t_min].
+        """
+        if t_min is None:
+            t_min = self.t_min
+        if t_max is None:
+            t_max = self.t_max
+
+        times = torch.linspace(t_max, t_min, steps, device=self._mean_base.device)
+
+        return times
+
 
 class UnconditionalEstimator(nn.Module, ABC):
     r"""Base class for unconditional estimators that estimate properties of

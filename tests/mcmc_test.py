@@ -3,37 +3,22 @@
 
 from __future__ import annotations
 
-import sys
-from dataclasses import asdict
-
 import numpy as np
-import pymc
 import pytest
 import torch
 from torch import eye, ones, zeros
-from torch.distributions import Uniform
 
-from sbi.inference import (
-    NLE,
-    MCMCPosterior,
-    likelihood_estimator_based_potential,
-)
 from sbi.inference.posteriors.mcmc_posterior import build_from_potential
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
-from sbi.neural_nets import likelihood_nn
 from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,
     SliceSamplerVectorized,
 )
-from sbi.simulators.linear_gaussian import (
-    diagonal_linear_gaussian,
-    true_posterior_linear_gaussian_mvn_prior,
-)
+from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
-from sbi.utils.user_input_checks import process_prior
 
 
 @pytest.mark.mcmc
@@ -185,82 +170,6 @@ def test_c2st_pymc_sampler_on_Gaussian(
     alg = f"pymc_{step}"
 
     check_c2st(samples, target_samples, alg=alg)
-
-
-@pytest.mark.mcmc
-@pytest.mark.parametrize(
-    "method",
-    (
-        "nuts_pyro",
-        "hmc_pyro",
-        pytest.param(
-            "nuts_pymc",
-            marks=pytest.mark.skipif(
-                condition=sys.version_info >= (3, 10) and pymc.__version__ >= "5.20.1",
-                reason="Inconsistent behaviour with pymc>=5.20.1 and python>=3.10",
-            ),
-        ),
-        "hmc_pymc",
-        "slice_pymc",
-        "slice_np",
-        "slice_np_vectorized",
-    ),
-)
-def test_getting_inference_diagnostics(
-    method, mcmc_params_fast: MCMCPosteriorParameters
-):
-    num_simulations = 100
-    num_samples = 10
-    num_dim = 2
-
-    # Use composed prior to test MultipleIndependent case.
-    prior = [
-        Uniform(low=-ones(1), high=ones(1)),
-        Uniform(low=-ones(1), high=ones(1)),
-    ]
-
-    simulator = diagonal_linear_gaussian
-    density_estimator = likelihood_nn("maf", num_transforms=3)
-    inference = NLE(density_estimator=density_estimator, show_progress_bars=False)
-    prior, *_ = process_prior(prior)
-    theta = prior.sample((num_simulations,))
-    x = simulator(theta)
-    likelihood_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=num_simulations, max_num_epochs=2
-    )
-
-    x_o = zeros((1, num_dim))
-    potential_fn, theta_transform = likelihood_estimator_based_potential(
-        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
-    )
-    posterior = MCMCPosterior(
-        proposal=prior,
-        potential_fn=potential_fn,
-        theta_transform=theta_transform,
-        **asdict(mcmc_params_fast),
-    )
-    posterior.sample(
-        sample_shape=(num_samples,),
-        method=method,
-    )
-    idata = posterior.get_arviz_inference_data()
-
-    assert hasattr(idata, "posterior"), (
-        f"`MCMCPosterior.get_arviz_inference_data()` for method {method} "
-        f"returned invalid InferenceData. Must contain key 'posterior', "
-        f"but found only {list(idata.keys())}"
-    )
-    samples = getattr(idata.posterior, posterior.param_name).data
-    samples = samples.reshape(-1, samples.shape[-1])[:: mcmc_params_fast.thin][
-        :num_samples
-    ]
-    assert samples.shape == (
-        num_samples,
-        num_dim,
-    ), (
-        f"MCMC samples for method {method} have incorrect shape (n_samples, n_dims). "
-        f"Expected {(num_samples, num_dim)}, got {samples.shape}"
-    )
 
 
 @pytest.mark.mcmc

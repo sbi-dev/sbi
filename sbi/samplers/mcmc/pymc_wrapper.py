@@ -7,7 +7,6 @@ import numpy as np
 import pymc
 import pytensor.tensor as pt
 import torch
-from arviz.data import InferenceData
 
 from sbi.utils.torchutils import tensor2numpy
 
@@ -65,8 +64,8 @@ class PyMCPotential(pt.Op):  # type: ignore
         # call the potential function
         energy = self.potential_fn(params, track_gradients=self.track_gradients)
 
-        # output the log-likelihood
-        outputs[0][0] = tensor2numpy(energy).astype(np.float64)
+        # output the log-likelihood, PyMC requires a scalar for the energy
+        outputs[0][0] = tensor2numpy(energy.squeeze()).astype(np.float64)
 
         # compute and record gradients if desired
         if self.track_gradients:
@@ -206,7 +205,7 @@ class PyMCSampler:
         else:
             return samples[-num_samples:, :]
 
-    def get_inference_data(self) -> InferenceData:
+    def get_inference_data(self) -> Any:
         """Returns InferenceData from last call to self.run,
         which contains diagnostic information in addition to samples
 

@@ -78,8 +78,12 @@ embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
 
 def classifier_nn(
     model: str,
-    z_score_theta: Optional[str] = "independent",
-    z_score_x: Optional[str] = "independent",
+    z_score_theta: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     hidden_features: int = 50,
     embedding_net_theta: nn.Module = nn.Identity(),
     embedding_net_x: nn.Module = nn.Identity(),
@@ -153,8 +157,12 @@ def classifier_nn(
 
 def likelihood_nn(
     model: str,
-    z_score_theta: Optional[str] = "independent",
-    z_score_x: Optional[str] = "independent",
+    z_score_theta: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -228,8 +236,12 @@ def likelihood_nn(
 
 def posterior_nn(
     model: str,
-    z_score_theta: Optional[str] = "independent",
-    z_score_x: Optional[str] = "independent",
+    z_score_theta: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -336,8 +348,12 @@ def posterior_score_nn(
         VectorFieldNet,
     ] = "mlp",
     sde_type: str = "ve",
-    z_score_theta: Optional[str] = "independent",
-    z_score_x: Optional[str] = "independent",
+    z_score_theta: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -438,8 +454,12 @@ def posterior_score_nn(
 # TODO: remove this function on next release
 def flowmatching_nn(
     model: str,
-    z_score_theta: Optional[str] = "independent",
-    z_score_x: Optional[str] = "independent",
+    z_score_theta: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     hidden_features: int = 64,
     num_layers: int = 5,
     num_blocks: int = 5,
@@ -512,8 +532,12 @@ def posterior_flow_nn(
         Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         VectorFieldNet,
     ] = "mlp",
-    z_score_theta: Optional[str] = None,
-    z_score_x: Optional[str] = "independent",
+    z_score_theta: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = None,
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -784,7 +808,9 @@ def simformer_flow_nn(
 
 def marginal_nn(
     model: ZukoFlowType,
-    z_score_x: Optional[str] = "independent",
+    z_score_x: Optional[
+        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+    ] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,

@@ -33,7 +33,7 @@ from sbi.inference.trainers.base import (
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_estimator_arg,
     clamp_and_warn,
@@ -49,6 +49,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator]):
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Neural Ratio Estimation.
@@ -85,6 +86,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator]):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
         )
 
@@ -202,6 +204,12 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator]):
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
+
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
 
         train_config = TrainConfig(
             max_num_epochs=max_num_epochs,

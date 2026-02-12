@@ -1,6 +1,9 @@
 name: Continuous Integration
 
-on: [pull_request, workflow_dispatch]
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 defaults:
   run:
@@ -61,7 +64,7 @@ jobs:
       with:
         env_vars: OS,PYTHON
         file: ./coverage.xml
-        flags: unittests
+        flags: fast
         name: codecov-sbi-fast-cpu
         token: ${{ secrets.CODECOV_TOKEN }}
 

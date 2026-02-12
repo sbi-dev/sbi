@@ -1595,6 +1595,7 @@ def _sbc_rank_plot(
     if num_bins is None:
         # Recommendation from Talts et al.
         num_bins = num_sbc_runs // 20
+    assert isinstance(num_bins, int)
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
     if params_in_subplots:
