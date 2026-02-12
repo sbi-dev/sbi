@@ -247,7 +247,6 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     covs1 = torch.stack([0.5 * torch.eye(2), torch.eye(2)])
     weights1 = torch.tensor([0.3, 0.7])
 
-    # NPE-A uses a different correction mechanism (_CorrectedMDN) and is not tested here.
     means2 = torch.tensor([[2.0, -2.2], [-2.0, 1.9]])
     covs2 = torch.stack([0.6 * torch.eye(2), 0.9 * torch.eye(2)])
     weights2 = torch.tensor([0.6, 0.4])

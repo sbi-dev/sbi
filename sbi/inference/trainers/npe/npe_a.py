@@ -9,7 +9,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
 )
@@ -24,10 +24,6 @@ from sbi.neural_nets.estimators.mog import MoG
 from sbi.sbi_types import TensorBoardSummaryWriter
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import BoxUniform
-
-# =============================================================================
-# SNPE-A Correction Functions
-# =============================================================================
 
 # Small constant for numerical stability in matrix operations
 _CORRECTION_EPSILON: float = 1e-6
@@ -195,107 +191,72 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         return super().train(**kwargs)
 
-    def correct_for_proposal(
+    def _get_proposal_mog(
         self,
-        density_estimator: Optional[ConditionalDensityEstimator] = None,
-    ) -> ConditionalDensityEstimator:
-        r"""Build mixture of Gaussians that approximates the posterior.
+        proposal: Union["NPE_A_Posterior", MultivariateNormal, MoG, Any],
+    ) -> MoG:
+        """Extract MoG parameters from a proposal distribution.
 
-        Applies the SNPE-A post-hoc correction to the density estimator and
-        returns a wrapped estimator. For round 0 (when proposal is prior), no
-        correction is needed and the original estimator is returned.
-        For later rounds, the correction compensates for training on samples from
-        the proposal distribution rather than the prior.
+        Supports multiple proposal types:
+        - NPE_A_Posterior: extracts corrected MoG via get_mog_params()
+        - MultivariateNormal: converts to single-component MoG
+        - MoG: uses directly
+        - Any object with get_mog_params(x) method
 
         Args:
-            density_estimator: The density estimator that the posterior is based on.
-                If `None`, use the latest neural density estimator that was trained.
+            proposal: The proposal distribution from the previous round.
 
         Returns:
-            ConditionalDensityEstimator with correction applied (if needed).
-            For first round, returns the original MixtureDensityEstimator.
-            For later rounds, returns a _CorrectedMDN wrapper.
+            MoG parameters from the proposal.
 
         Raises:
-            TypeError: If density_estimator is not a MixtureDensityEstimator or
-                if the prior/proposal types are not supported.
-            ValueError: If the proposal posterior doesn't have default_x set or
-                if default_x has batch size != 1.
+            ValueError: If NPE_A_Posterior proposal doesn't have default_x set.
+            TypeError: If proposal type is not supported.
         """
-        if density_estimator is None:
-            density_estimator = deepcopy(self._neural_net)
-
-        # Validate density estimator type
-        if not isinstance(density_estimator, MixtureDensityEstimator):
-            raise TypeError(
-                "NPE_A requires MixtureDensityEstimator, "
-                f"got {type(density_estimator).__name__}. "
-                "Use density_estimator='mdn_snpe_a' when initializing NPE_A."
-            )
-
-        # Determine the proposal for this round
-        if (
-            self._proposal_roundwise[-1] is self._prior
-            or self._proposal_roundwise[-1] is None
-        ):
-            proposal = self._prior
-            if not isinstance(proposal, (MultivariateNormal, BoxUniform)):
-                raise TypeError(
-                    "Prior must be `torch.distributions.MultivariateNormal` or "
-                    f"`sbi.utils.BoxUniform`, got {type(proposal).__name__}"
+        # Case 1: NPE_A_Posterior - use get_mog_params with default_x
+        if isinstance(proposal, NPE_A_Posterior):
+            default_x = proposal.default_x
+            if default_x is None:
+                raise ValueError(
+                    "Proposal posterior must have a default_x set for SNPE-A "
+                    "correction. Call posterior.set_default_x(x_o) before using "
+                    "as proposal."
                 )
-        else:
-            if not isinstance(self._proposal_roundwise[-1], DirectPosterior):
-                proposal_type = type(self._proposal_roundwise[-1]).__name__
-                raise TypeError(
-                    "The proposal you passed to `append_simulations` is neither the "
-                    "prior nor a `DirectPosterior`. SNPE-A currently only supports "
-                    f"these scenarios. Got {proposal_type}"
+            if default_x.shape[0] != 1:
+                raise ValueError(
+                    f"SNPE-A requires default_x batch size of 1, got "
+                    f"{default_x.shape[0]}. SNPE-A only supports single "
+                    "observations for correction."
                 )
-            proposal = self._proposal_roundwise[-1]
+            return proposal.get_mog_params(default_x)
 
-        # First round: proposal is prior, no correction needed
-        if isinstance(proposal, (MultivariateNormal, BoxUniform)):
-            return density_estimator
+        # Case 2: MultivariateNormal - convert to single-component MoG
+        if isinstance(proposal, MultivariateNormal):
+            mean: Tensor = proposal.mean  # type: ignore[assignment]
+            cov: Tensor = proposal.covariance_matrix  # type: ignore[assignment]
+            return MoG.from_gaussian(mean.unsqueeze(0), cov.unsqueeze(0))
 
-        # Later rounds: proposal is DirectPosterior from previous round
-        # Get the default_x from the proposal (needed to evaluate the proposal MoG)
-        default_x = proposal.default_x
-        if default_x is None:
-            raise ValueError(
-                "Proposal posterior must have a default_x set for SNPE-A correction."
-            )
+        # Case 3: MoG - use directly
+        if isinstance(proposal, MoG):
+            return proposal
 
-        # Validate batch size - SNPE-A only supports single observation
-        if default_x.shape[0] != 1:
-            raise ValueError(
-                f"SNPE-A requires default_x batch size of 1, got {default_x.shape[0]}. "
-                "SNPE-A only supports single observations for correction."
-            )
+        # Case 4: Any object with get_mog_params method
+        if hasattr(proposal, "get_mog_params"):
+            # Try to get default_x if available
+            default_x = getattr(proposal, "default_x", None)
+            if default_x is None:
+                raise ValueError(
+                    "Proposal has get_mog_params() but no default_x set. "
+                    "Call proposal.set_default_x(x_o) before using as proposal."
+                )
+            return proposal.get_mog_params(default_x)
 
-        # Get the proposal MoG from the previous round's posterior
-        proposal_estimator = proposal.posterior_estimator
-        if isinstance(proposal_estimator, MixtureDensityEstimator):
-            # Round 2: proposal is raw MDN from round 1
-            proposal_mog = proposal_estimator.get_uncorrected_mog(default_x)
-        elif isinstance(proposal_estimator, _CorrectedMDN):
-            # Round 3+: proposal is corrected MDN from previous round
-            proposal_mog = proposal_estimator.get_corrected_mog(default_x)
-        else:
-            raise TypeError(
-                f"Proposal posterior estimator must be MixtureDensityEstimator, "
-                f"got {type(proposal_estimator).__name__}. Multi-round SNPE-A "
-                "requires consistent use of MixtureDensityEstimator across rounds."
-            )
-
-        # Compute the z-scored prior as a MoG (or None for uniform priors)
-        prior_mog = self._compute_z_scored_prior_mog(density_estimator)
-
-        # Return wrapped estimator with correction
-        return _CorrectedMDN(
-            estimator=density_estimator,
-            proposal_mog=proposal_mog,
-            prior_mog=prior_mog,
+        # Unsupported type
+        raise TypeError(
+            f"For multi-round SNPE-A, proposal must be one of: NPE_A_Posterior, "
+            f"MultivariateNormal, MoG, or an object with get_mog_params() method. "
+            f"Got {type(proposal).__name__}. For custom proposals, construct "
+            f"NPE_A_Posterior directly with your proposal_mog parameter."
         )
 
     def _compute_z_scored_prior_mog(
@@ -390,37 +351,64 @@ class NPE_A(PosteriorEstimatorTrainer):
         density_estimator: Optional[torch.nn.Module] = None,
         prior: Optional[Distribution] = None,
         **kwargs,
-    ) -> "DirectPosterior":
+    ) -> "NPE_A_Posterior":
         r"""Build posterior from the neural density estimator.
 
-        This method first corrects the estimated density with `correct_for_proposal`
-        and then returns a `DirectPosterior`.
+        Returns an NPE_A_Posterior that applies the SNPE-A correction formula
+        when sampling or evaluating log probabilities.
 
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
+            **kwargs: Additional arguments passed to NPE_A_Posterior.
 
         Returns:
-            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
+            NPE_A_Posterior with `.sample()` and `.log_prob()` methods.
         """
         if prior is None:
-            assert (
-                self._prior is not None
-            ), """You did not pass a prior. You have to pass the prior either at
-                initialization `inference = SNPE_A(prior)` or to `.build_posterior
-                (prior=prior)`."""
+            assert self._prior is not None, (
+                "You did not pass a prior. You have to pass the prior either at "
+                "initialization `inference = NPE_A(prior)` or to "
+                "`.build_posterior(prior=prior)`."
+            )
             prior = self._prior
 
-        wrapped_density_estimator = self.correct_for_proposal(
-            density_estimator=density_estimator  # type: ignore[arg-type]
-        )
-        self._posterior = super().build_posterior(
-            density_estimator=wrapped_density_estimator,
+        if density_estimator is None:
+            density_estimator = deepcopy(self._neural_net)
+
+        # Validate density estimator type
+        if not isinstance(density_estimator, MixtureDensityEstimator):
+            raise TypeError(
+                "NPE_A requires MixtureDensityEstimator, "
+                f"got {type(density_estimator).__name__}. "
+                "Use density_estimator='mdn_snpe_a' when initializing NPE_A."
+            )
+
+        # Determine proposal and whether correction is needed
+        proposal = self._proposal_roundwise[-1]
+        is_first_round = proposal is self._prior or proposal is None
+
+        if is_first_round:
+            # First round: no correction needed
+            proposal_mog = None
+            prior_mog = None
+        else:
+            # Multi-round: extract proposal MoG and compute prior MoG
+            proposal_mog = self._get_proposal_mog(proposal)
+            prior_mog = self._compute_z_scored_prior_mog(density_estimator)
+
+        # Build the posterior
+        self._posterior = NPE_A_Posterior(
+            posterior_estimator=density_estimator,
             prior=prior,
+            proposal_mog=proposal_mog,
+            prior_mog=prior_mog,
+            device=self._device,
             **kwargs,
         )
-        return deepcopy(self._posterior)  # type: ignore
+
+        return self._posterior
 
     def _log_prob_proposal_posterior(
         self,
@@ -669,147 +657,3 @@ def _batched_vmv(matrix: Tensor, vector: Tensor) -> Tensor:
     """
     mv = torch.einsum("bcij,bcj->bci", matrix, vector)
     return torch.einsum("bci,bci->bc", vector, mv)
-
-
-# =============================================================================
-# Corrected MDN Wrapper
-# =============================================================================
-
-
-class _CorrectedMDN(ConditionalDensityEstimator):
-    """Wrapper that applies SNPE-A correction to a MixtureDensityEstimator.
-
-    This class wraps a trained MixtureDensityEstimator and applies the SNPE-A
-    post-hoc correction on every call to log_prob() and sample(). The correction
-    compensates for training on samples from a proposal distribution rather than
-    the prior.
-
-    This class is internal to NPE_A and should not be used directly.
-
-    Note:
-        This class intentionally accesses private methods of the wrapped
-        MixtureDensityEstimator (e.g., _transform_input, _inverse_transform_input)
-        to apply the same z-score transforms. This tight coupling is by design:
-        _CorrectedMDN is specifically built to wrap MixtureDensityEstimator and
-        needs intimate knowledge of its internals to apply corrections correctly.
-    """
-
-    def __init__(
-        self,
-        estimator: MixtureDensityEstimator,
-        proposal_mog: MoG,
-        prior_mog: Optional[MoG],
-    ) -> None:
-        """Initialize the corrected MDN wrapper.
-
-        Args:
-            estimator: The trained MixtureDensityEstimator to wrap.
-            proposal_mog: MoG from previous round's posterior (the proposal).
-            prior_mog: MoG representation of the (z-scored) prior, or None for
-                uniform priors.
-        """
-        # Initialize base class with the wrapped estimator's properties
-        super().__init__(
-            net=estimator.net,
-            input_shape=estimator.input_shape,
-            condition_shape=estimator.condition_shape,
-        )
-        self._estimator = estimator
-        self._proposal_mog = proposal_mog.detach()
-        self._prior_mog = prior_mog.detach() if prior_mog is not None else None
-
-    def _get_corrected_mog(self, condition: Tensor) -> MoG:
-        """Get corrected MoG for the given condition."""
-        density_mog = self._estimator.get_uncorrected_mog(condition)
-        return _correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
-
-    def get_corrected_mog(self, condition: Tensor) -> MoG:
-        """Get the corrected MoG for the given condition.
-
-        This method is needed for multi-round SNPE-A where a corrected estimator
-        becomes the proposal for subsequent rounds.
-
-        Args:
-            condition: Conditioning input, shape (batch_dim, *condition_shape).
-
-        Returns:
-            Corrected MoG for the given condition.
-        """
-        return self._get_corrected_mog(condition)
-
-    def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        """Compute corrected log probability.
-
-        Args:
-            input: Inputs to evaluate, shape (sample_dim, batch_dim, *input_shape)
-                or (batch_dim, *input_shape).
-            condition: Conditions, shape (batch_dim, *condition_shape).
-
-        Returns:
-            Log probabilities with same shape convention as input.
-        """
-        self._check_condition_shape(condition)
-        self._check_input_shape(input)
-
-        # Handle input with or without sample dimension
-        has_sample_dim = input.dim() > len(self.input_shape) + 1
-        if not has_sample_dim:
-            input = input.unsqueeze(0)
-
-        # Apply z-score transform if the estimator has one
-        if self._estimator.has_input_transform:
-            transformed_input = self._estimator._transform_input(input)
-        else:
-            transformed_input = input
-
-        # Get corrected MoG and compute log prob
-        corrected_mog = self._get_corrected_mog(condition)
-        log_probs = corrected_mog.log_prob(transformed_input)
-
-        # Add log det jacobian for z-score transform
-        log_probs = log_probs + self._estimator._log_det_jacobian_forward(input)
-
-        if not has_sample_dim:
-            log_probs = log_probs.squeeze(0)
-
-        return log_probs
-
-    def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        """Training loss is not supported for corrected estimators.
-
-        Raises:
-            NotImplementedError: Always raised. Corrected estimators are meant
-                for inference only, not for training.
-        """
-        raise NotImplementedError(
-            "_CorrectedMDN is a post-hoc corrected estimator for inference only. "
-            "It cannot be used for training. Use the underlying "
-            "MixtureDensityEstimator for training instead."
-        )
-
-    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
-        """Sample from the corrected distribution.
-
-        Args:
-            sample_shape: Shape prefix for samples.
-            condition: Conditions, shape (batch_dim, *condition_shape).
-
-        Returns:
-            Samples, shape (*sample_shape, batch_dim, *input_shape).
-        """
-        self._check_condition_shape(condition)
-
-        # Get corrected MoG and sample
-        corrected_mog = self._get_corrected_mog(condition)
-        samples = corrected_mog.sample(sample_shape)
-
-        # Apply inverse z-score transform if needed
-        if self._estimator.has_input_transform:
-            samples = self._estimator._inverse_transform_input(samples)
-
-        return samples
-
-    @property
-    def embedding_net(self) -> torch.nn.Module:
-        """Return the embedding network from the wrapped estimator."""
-        return self._estimator.embedding_net

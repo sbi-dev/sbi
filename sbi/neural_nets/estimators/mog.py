@@ -10,7 +10,7 @@ for evaluation (log_prob), sampling, and conditioning.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import numpy as np
 import torch
@@ -460,7 +460,7 @@ class MoG:
 
         return log_component_probs  # (batch_size, num_components)
 
-    def to(self, device: torch.device) -> MoG:
+    def to(self, device: Union[str, torch.device]) -> MoG:
         """Move all tensors to the specified device.
 
         Args:

@@ -348,7 +348,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         inference = NPE_A(**snpe_a_args)
         proposal = prior
         num_rounds = 2
-        for r in range(num_rounds):
+        for _ in range(num_rounds):
             theta = proposal.sample((1000,))
             x = simulator(theta)
             inference = inference.append_simulations(theta, x, proposal=proposal)
@@ -693,22 +693,14 @@ def test_example_posterior(npe_method: type):
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    extra_kwargs = dict()
-
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = npe_method(prior, show_progress_bars=False)
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
-    posterior_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2, **extra_kwargs
-    )
-    if npe_method == NPE_A:
-        posterior_estimator = inference.correct_for_proposal()
-    posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator
-    ).set_default_x(x_o)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = inference.build_posterior().set_default_x(x_o)
     assert posterior is not None
 
 
