@@ -20,24 +20,33 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_C(RatioEstimatorTrainer):
-    r"""NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.
+    r"""Contrastive Neural Ratio Estimation (NRE-C) as in Miller et al. (2022) [1].
 
-    NRE-C:
-    (1) Like NRE_B, features a "multiclass" loss function where several marginally
-    drawn parameter-data pairs are contrasted against a jointly drawn pair.
+    NRE-C combines the multi-class loss of NRE-B with the exact ratio property of
+    NRE-A. It uses contrastive learning to estimate the likelihood-to-evidence ratio
+    while ensuring the ratio is exact at optimum in the first round.
 
-    (2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages
-    the approximate ratio :math:`p(\theta,x)/p(\theta)p(x)`, accessed through
-    `.potential()` within `sbi`, to be exact at optimum. This addresses the
-    issue that NRE_B estimates this ratio only up to an arbitrary function
-    (normalizing constant) of the data :math:`x`.
-
-    Just like for all ratio estimation algorithms, the sequential version of NRE_C
-    will be estimated only up to a function (normalizing constant) of the data
-    :math:`x` in rounds after the first.
-
-    [1] *Contrastive Neural Ratio Estimation*, Benajmin Kurt Miller, et. al.,
+    [1] *Contrastive Neural Ratio Estimation*, Benjamin Kurt Miller, et al.,
         NeurIPS 2022, https://arxiv.org/abs/2210.06170
+
+    Example:
+    --------
+
+    .. code-block:: python
+
+        import torch
+        from sbi.inference import NRE_C
+        from sbi.utils import BoxUniform
+
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = torch.randn(100, 10)
+
+        inference = NRE_C(prior=prior)
+        ratio_estimator = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(ratio_estimator)
+
+        samples = posterior.sample((100,), x=x[0])
     """
 
     def __init__(

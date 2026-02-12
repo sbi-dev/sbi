@@ -23,7 +23,29 @@ from sbi.sbi_types import Tracker
 
 
 class FMPE(VectorFieldTrainer):
-    """Flow Matching Posterior Estimation (FMPE)."""
+    r"""Flow Matching Posterior Estimation (FMPE).
+
+    FMPE trains a neural network to estimate a vector field that transforms samples
+    from a base distribution to the posterior $p(\theta|x)$. Sampling is performed
+    by solving an ODE.
+
+    Example:
+    --------
+
+    .. code-block:: python
+
+        import torch
+        from sbi.inference import FMPE
+
+        theta = torch.randn(100, 3)
+        x = torch.randn(100, 10)
+
+        inference = FMPE()
+        vf_estimator = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(vf_estimator)
+
+        samples = posterior.sample((100,), x=x[0])
+    """
 
     def __init__(
         self,

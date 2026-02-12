@@ -16,11 +16,34 @@ from sbi.utils.sbiutils import del_entries
 
 
 class NLE_A(LikelihoodEstimatorTrainer):
-    """Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].
+    r"""Neural Likelihood Estimation (NLE-A) as in Papamakarios et al. (2019) [1].
 
-    [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
-        Autoregressive Flows, Papamakarios et al., AISTATS 2019,
+    NLE-A trains a neural network to estimate the likelihood $p(x|\theta)$ using
+    normalizing flows. Posterior sampling is performed via MCMC (e.g., slice
+    sampling) or rejection sampling.
+
+    [1] *Sequential Neural Likelihood: Fast Likelihood-free Inference with
+        Autoregressive Flows*, Papamakarios et al., AISTATS 2019,
         https://arxiv.org/abs/1805.07226
+
+    Example:
+    --------
+
+    .. code-block:: python
+
+        import torch
+        from sbi.inference import NLE_A
+        from sbi.utils import BoxUniform
+
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = torch.randn(100, 10)
+
+        inference = NLE_A(prior=prior)
+        density_estimator = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(density_estimator)
+
+        samples = posterior.sample((100,), x=x[0])
     """
 
     def __init__(

@@ -24,17 +24,29 @@ from sbi.utils.sbiutils import del_entries
 class NPE_B(PosteriorEstimatorTrainer):
     r"""Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].
 
+    NPE-B trains a neural network to directly estimate the posterior $p(\theta|x)$.
+    It uses importance weighting in sequential rounds to converge directly to the
+    true posterior, without the Gaussian limitations of NPE-A.
+
     [1] *Flexible statistical inference for mechanistic models of neural
-        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/171
+        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/1711.01861
 
-    Like all NPE methods, this method trains a deep neural density estimator to
-    directly approximate the posterior. Also like all other NPE methods, in the
-    first round, this density estimator is trained with a maximum-likelihood loss.
+    Example:
+    --------
 
-    This class implements NPE-B. NPE-B trains across multiple rounds with a
-    an importance-weighted log-loss. Unlike NPE-A the loss will make training
-    directly converge to the true posterior.
-    Thus, SNPE-B is not limited to Gaussian proposal.
+    .. code-block:: python
+
+        import torch
+        from sbi.inference import NPE_B
+
+        theta = torch.randn(100, 3)
+        x = torch.randn(100, 10)
+
+        inference = NPE_B()
+        density_estimator = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(density_estimator)
+
+        samples = posterior.sample((100,), x=x[0])
     """
 
     def __init__(

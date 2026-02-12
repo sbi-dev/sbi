@@ -19,15 +19,34 @@ from sbi.sbi_types import Tracker
 
 
 class NPSE(VectorFieldTrainer):
-    """Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.
+    r"""Neural Posterior Score Estimation (NPSE) as in Geffner et al. and Sharrock et al.
 
-    Instead of performing conditonal *density* estimation, NPSE methods perform
-    conditional *score* estimation i.e. they estimate the gradient of the log
-    density using denoising score matching loss.
+    NPSE estimates the score (gradient of the log density) $\nabla_\theta \log p(\theta|x)$
+    using denoising score matching. Sampling is performed via SDE-based diffusion.
 
-    NOTE: NPSE does not support multi-round inference with flexible proposals yet.
-    You can try to run multi-round with truncated proposals, but note that this is
-    not tested yet."""
+    Note: NPSE does not support multi-round inference with flexible proposals yet.
+
+    References:
+        - Geffner et al., *Score modeling for simulation-based inference*, ICML 2023.
+        - Sharrock et al., *Sequential neural score estimation*, ICML 2024.
+
+    Example:
+    --------
+
+    .. code-block:: python
+
+        import torch
+        from sbi.inference import NPSE
+
+        theta = torch.randn(100, 3)
+        x = torch.randn(100, 10)
+
+        inference = NPSE()
+        score_estimator = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(score_estimator)
+
+        samples = posterior.sample((100,), x=x[0])
+    """
 
     def __init__(
         self,

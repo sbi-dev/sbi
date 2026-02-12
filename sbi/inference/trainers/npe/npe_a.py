@@ -32,22 +32,33 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 
 
 class NPE_A(PosteriorEstimatorTrainer):
-    r"""Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].
+    r"""Neural Posterior Estimation algorithm (NPE-A) as in Papamakarios et al. (2016) [1].
+
+    NPE-A trains a neural network to directly estimate the posterior $p(\theta|x)$.
+    It uses a Mixture of Gaussians and applies a post-hoc correction to account
+    for the proposal distribution in sequential rounds.
 
     [1] *Fast epsilon-free Inference of Simulation Models with Bayesian
         Conditional Density Estimation*, Papamakarios et al., NeurIPS 2016.
         https://arxiv.org/abs/1605.06376
 
-    Like all NPE methods, this method trains a deep neural density estimator to
-    directly approximate the posterior. Also like all other NPE methods, in the
-    first round, this density estimator is trained with a maximum-likelihood loss.
+    Example:
+    --------
 
-    This class implements NPE-A. NPE-A trains across multiple rounds with a
-    maximum-likelihood-loss. This will make training converge to the proposal
-    posterior instead of the true posterior. To correct for this, SNPE-A applies a
-    post-hoc correction after training. This correction has to be performed
-    analytically. Thus, NPE-A is limited to Gaussian distributions for all but the
-    last round. In the last round, NPE-A can use a Mixture of Gaussians."""
+    .. code-block:: python
+
+        import torch
+        from sbi.inference import NPE_A
+
+        theta = torch.randn(100, 3)
+        x = torch.randn(100, 10)
+
+        inference = NPE_A()
+        density_estimator = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(density_estimator)
+
+        samples = posterior.sample((100,), x=x[0])
+    """
 
     def __init__(
         self,

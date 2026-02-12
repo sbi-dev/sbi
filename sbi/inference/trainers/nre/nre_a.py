@@ -20,10 +20,33 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_A(RatioEstimatorTrainer):
-    """AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].
+    r"""Neural Ratio Estimation (NRE-A) as in Hermans et al. (2020) [1].
+
+    NRE-A trains a classifier to estimate the likelihood-to-evidence ratio
+    $r(\theta, x) = p(\theta, x) / [p(\theta)p(x)]$ by distinguishing joint
+    samples from marginal samples. Posterior sampling requires MCMC or rejection.
 
     [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans
         et al., ICML 2020, https://arxiv.org/abs/1903.04057
+
+    Example:
+    --------
+
+    .. code-block:: python
+
+        import torch
+        from sbi.inference import NRE_A
+        from sbi.utils import BoxUniform
+
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = torch.randn(100, 10)
+
+        inference = NRE_A(prior=prior)
+        ratio_estimator = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(ratio_estimator)
+
+        samples = posterior.sample((100,), x=x[0])
     """
 
     def __init__(

@@ -36,38 +36,31 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite
 
 
 class NPE_C(PosteriorEstimatorTrainer):
-    """Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]
+    r"""Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019) [1].
+
+    NPE-C trains a neural network to directly estimate the posterior $p(\theta|x)$.
+    It implements both atomic and non-atomic loss variants, automatically selecting
+    the appropriate one based on the network type and prior.
 
     [1] *Automatic Posterior Transformation for Likelihood-free Inference*,
         Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
-    Like all NPE methods, this method trains a deep neural density estimator to
-    directly approximate the posterior. Also like all other NPE methods, in the
-    first round, this density estimator is trained with a maximum-likelihood loss.
+    Example:
+    --------
 
-    For the sequential mode in which the density estimator is trained across rounds,
-    this class implements two loss variants of NPE-C: the non-atomic and the atomic
-    version. The atomic loss of NPE-C can be used for any density estimator,
-    i.e. also for normalizing flows. However, it suffers from leakage issues. On
-    the other hand, the non-atomic loss can only be used only if the proposal
-    distribution is a mixture of Gaussians, the density estimator is a mixture of
-    Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from
-    leakage issues. At the beginning of each round, we print whether the non-atomic
-    or the atomic version is used.
+    .. code-block:: python
 
-    In this codebase, we will automatically switch to the non-atomic loss if the
-    following criteria are fulfilled:
+        import torch
+        from sbi.inference import NPE_C
 
-    - proposal is a `DirectPosterior` with density_estimator `mdn`, as built with
-      `sbi.neural_nets.posterior_nn()`.
-    - the density estimator is a `mdn`, as built with
-      `sbi.neural_nets.posterior_nn()`.
-    - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or
-      ``isinstance(prior, sbi.utils.BoxUniform)``
+        theta = torch.randn(100, 3)
+        x = torch.randn(100, 10)
 
-    Note that custom implementations of any of these densities (or estimators) will
-    not trigger the non-atomic loss, and the algorithm will fall back onto using
-    the atomic loss.
+        inference = NPE_C()
+        density_estimator = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(density_estimator)
+
+        samples = posterior.sample((100,), x=x[0])
     """
 
     def __init__(

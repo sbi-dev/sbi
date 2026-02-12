@@ -21,15 +21,34 @@ from sbi.utils.sbiutils import del_entries
 
 
 class MNLE(LikelihoodEstimatorTrainer):
-    """Method that can infer parameters given discrete and continuous data (Mixed NLE).
+    r"""Method that can infer parameters given discrete and continuous data (Mixed NLE).
 
     Like NLE, but designed to be applied to data with mixed types, e.g., continuous
     data and discrete data like they occur in decision-making experiments
-    (reation times and choices).
+    (reaction times and choices).
 
     Flexible and efficient simulation-based inference for models of
     decision-making, Boelts et al. 2021,
     https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
+
+    Example:
+    --------
+
+    .. code-block:: python
+
+        import torch
+        from sbi.inference import MNLE
+        from sbi.utils import BoxUniform
+
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = torch.randn(100, 10)
+
+        inference = MNLE(prior=prior)
+        density_estimator = inference.append_simulations(theta, x).train()
+        posterior = inference.build_posterior(density_estimator)
+
+        samples = posterior.sample((100,), x=x[0])
     """
 
     def __init__(
