@@ -10,7 +10,6 @@ from torch.distributions import Independent, MultivariateNormal, Uniform
 
 from sbi.inference import (
     FMPE,
-    FlowMatchingSimformer,
     NLE_A,
     NPE,
     NPE_A,
@@ -21,6 +20,7 @@ from sbi.inference import (
     NRE_B,
     NRE_C,
     DirectPosterior,
+    FlowMatchingSimformer,
     Simformer,
 )
 from sbi.inference.posteriors.posterior_parameters import (

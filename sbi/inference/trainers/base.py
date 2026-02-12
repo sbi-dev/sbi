@@ -1121,8 +1121,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         # Add validation loss for every epoch.
         # Offset with all previous epochs.
         offset = (
-            torch
-            .tensor(self._summary["epochs_trained"][:-1], dtype=torch.int)
+            torch.tensor(self._summary["epochs_trained"][:-1], dtype=torch.int)
             .sum()
             .item()
         )

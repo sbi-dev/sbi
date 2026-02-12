@@ -25,7 +25,12 @@ from sbi.samplers.score.diffuser import Diffuser
 from sbi.samplers.score.predictors import Predictor
 from sbi.sbi_types import Shape
 from sbi.utils import check_prior
-from sbi.utils.sbiutils import gradient_ascent, handle_invalid_x, within_support
+from sbi.utils.sbiutils import (
+    gradient_ascent,
+    handle_invalid_x,
+    warn_if_outside_prior_support,
+    within_support,
+)
 from sbi.utils.torchutils import ensure_theta_batched
 
 

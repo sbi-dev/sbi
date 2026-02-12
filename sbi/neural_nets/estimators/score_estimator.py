@@ -777,8 +777,6 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             MSE between target score and network output, scaled by the weight function.
 
         """
-        device = input.device
-
         input_shape = input.shape
         B = input_shape[0]  # Batch size
         T = input_shape[1]  # Variables (nodes)
