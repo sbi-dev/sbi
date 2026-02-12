@@ -330,6 +330,8 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
             retrain_from_scratch=train_config.retrain_from_scratch,
             start_idx=start_idx,
         )
+        if self._neural_net is None:
+            raise AttributeError("Initialize self._neural_net.")
 
         if isinstance(validation_times, int):
             validation_times = self._neural_net.solve_schedule(
@@ -422,6 +424,8 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
         cls_name = self.__class__.__name__
         if self._round == 0 or force_first_round_loss:
             # First round loss.
+            if self._neural_net is None:
+                raise AttributeError("Initialize self._neural_net.")
             loss = self._neural_net.loss(theta, x, times=times)
         else:
             raise NotImplementedError(
@@ -824,6 +828,7 @@ class MaskedVectorFieldTrainer(
         calibration_kernel: Optional[Callable] = None,
         ema_loss_decay: float = 0.1,
         validation_times: Union[Tensor, int] = 10,
+        validation_times_nugget: float = 0.05,
         resume_training: bool = False,
         force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
@@ -862,6 +867,9 @@ class MaskedVectorFieldTrainer(
                 training and validation losses.
             validation_times: Diffusion times at which to evaluate the validation loss
                 to reduce variance of validation loss.
+            validation_times_nugget: As both diffusion and flow matching losses often
+                have high variance losses at the end, we add a small nugget to compute
+                the validation loss. Default is 0.05 i.e. t_min + 0.05 or t_max - 0.5.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
@@ -931,15 +939,14 @@ class MaskedVectorFieldTrainer(
             retrain_from_scratch=train_config.retrain_from_scratch,
             start_idx=start_idx,
         )
+        if self._neural_net is None:
+            raise AttributeError("Initialize self._neural_net.")
 
         if isinstance(validation_times, int):
-            # NOTE: We add a nugget to t_min as t_min is the boundary of the training
-            # domain and hence can be "unstable" and is not a good choice for
-            # evaluation. Same for flow mathching but with t_max
-            validation_times = torch.linspace(
-                self._neural_net.t_min + 0.1,
-                self._neural_net.t_max - 0.1,
+            validation_times = self._neural_net.solve_schedule(
                 validation_times,
+                t_min=self._neural_net.t_min + validation_times_nugget,
+                t_max=self._neural_net.t_max - validation_times_nugget,
             )
 
         loss_args = LossArgsVF(
@@ -1124,6 +1131,8 @@ class MaskedVectorFieldTrainer(
         cls_name = self.__class__.__name__
         if self._round == 0 or force_first_round_loss:
             # First round loss.
+            if self._neural_net is None:
+                raise AttributeError("Initialize self._neural_net.")
             loss = self._neural_net.loss(
                 inputs, condition_masks, edge_masks, times=times
             )

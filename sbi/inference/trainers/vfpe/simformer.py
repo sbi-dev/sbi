@@ -12,6 +12,7 @@ from sbi.neural_nets.estimators.base import (
     MaskedConditionalVectorFieldEstimator,
 )
 from sbi.neural_nets.factory import simformer_flow_nn, simformer_score_nn
+from sbi.sbi_types import Tracker
 
 
 class Simformer(MaskedVectorFieldTrainer):
@@ -58,6 +59,7 @@ class Simformer(MaskedVectorFieldTrainer):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
         **kwargs,
     ):
@@ -94,6 +96,7 @@ class Simformer(MaskedVectorFieldTrainer):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
             sde_type=sde_type,
             **kwargs,
@@ -133,6 +136,7 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
         **kwargs,
     ):
@@ -168,6 +172,7 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
             **kwargs,
         )

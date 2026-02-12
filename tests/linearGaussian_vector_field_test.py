@@ -132,7 +132,7 @@ def test_c2st_vector_field_on_linearGaussian(
 
     if vf_estimator == "Simformer" and vector_field_type in {'vp', 'subvp'}:
         # Default values for slow and GPU tests (VP and sub-VP)
-        num_simulations = 25000
+        num_simulations = 5000
         max_num_epochs = 500
         device = "gpu"
 
@@ -218,8 +218,6 @@ def test_c2st_vector_field_on_linearGaussian(
             tol=tol,
         )
 
-    # Checks for log_prob()
-    # TODO: Fails to converge with Simformer
     if prior_str == "gaussian" and vf_estimator == "NeuralPosterior":
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior.

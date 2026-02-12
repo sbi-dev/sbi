@@ -192,7 +192,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
     _val_loss: float
     _prior: Distribution
     _device: str
-    _summary_writer: SummaryWriter
+    _tracker: Tracker
     _summary: Dict[str, list]
 
     def __init__(
@@ -1222,12 +1222,18 @@ class NeuralInference(
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         # Initialize roundwise (theta, x) for storage of parameters,
         # and simulations.
         super().__init__(
-            prior, device, logging_level, summary_writer, show_progress_bars
+            prior=prior,
+            device=device,
+            logging_level=logging_level,
+            summary_writer=summary_writer,
+            tracker=tracker,
+            show_progress_bars=show_progress_bars,
         )
         self._theta_roundwise = []
         self._x_roundwise = []
@@ -1378,9 +1384,6 @@ class NeuralInference(
             posterior_parameters,
         )
 
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-
         return deepcopy(self._posterior)
 
     def _resolve_estimator(
@@ -1422,6 +1425,7 @@ class MaskedNeuralInference(
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Base class for masked inference methods.
@@ -1441,7 +1445,12 @@ class MaskedNeuralInference(
         """
 
         super().__init__(
-            None, device, logging_level, summary_writer, show_progress_bars
+            prior=None,
+            device=device,
+            logging_level=logging_level,
+            summary_writer=summary_writer,
+            tracker=tracker,
+            show_progress_bars=show_progress_bars,
         )
 
         # Initialize roundwise inputs for storage of parameters and
@@ -1739,9 +1748,6 @@ class MaskedNeuralInference(
             device,
             conditional_parameters,
         )
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
 
         return deepcopy(self._posterior)
 
