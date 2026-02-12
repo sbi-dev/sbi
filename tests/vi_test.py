@@ -95,7 +95,7 @@ def _build_linear_gaussian_setup(trainer_type: str = "nle"):
     torch.manual_seed(42)
 
     num_dim = 2
-    num_simulations = 5000
+    num_simulations = 6000
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.25 * eye(num_dim)
@@ -197,7 +197,7 @@ def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str, sampling_method: str)
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
-@pytest.mark.parametrize("q", FLOWS)
+@pytest.mark.parametrize("q", ["maf", "nsf", "nice", "gaussian", "gaussian_diag"])
 def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str):
     """Test different flow types on Gaussian via c2st."""
     # Normalizing flows (except gaussian families) are unstable in 1D with Zuko
@@ -220,13 +220,20 @@ def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str):
     potential_fn = make_tractable_potential(target_distribution, prior)
     theta_transform = torch_tf.identity_transform
 
-    posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
+    posterior = VIPosterior(
+        potential_fn,
+        prior,
+        theta_transform=theta_transform,
+        q=q,
+        num_transforms=2,
+        hidden_features=32,
+    )
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
     posterior.train(n_particles=1000, eps=1e-8)
     samples = posterior.sample((num_samples,))
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
-    check_c2st(samples, target_samples, alg="slice_np")
+    check_c2st(samples, target_samples, alg=f"vi with {q}")
 
 
 @pytest.mark.slow

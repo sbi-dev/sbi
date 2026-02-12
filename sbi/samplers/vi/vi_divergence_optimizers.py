@@ -174,7 +174,8 @@ class DivergenceOptimizer(ABC):
 
         self.device = device
         self.potential_fn.to(self.device)
-        self.q.to(self.device)
+        if hasattr(self.q, "to"):
+            self.q.to(self.device)
         if self.prior is not None:
             self.prior = move_distribution_to_device(self.prior, self.device)
 
