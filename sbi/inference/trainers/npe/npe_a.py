@@ -34,20 +34,42 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 class NPE_A(PosteriorEstimatorTrainer):
     r"""Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].
 
+    NPE-A (also known as SNPE-A) trains a neural network to directly approximate
+    the posterior $p(\theta|x)$ using a Mixture of Gaussians. In multi-round
+    inference, it applies a post-hoc analytical correction to account for training
+    with proposal distributions. This correction requires Gaussian proposal
+    distributions in all rounds except the last, where a Mixture of Gaussians can
+    be used.
+
     [1] *Fast epsilon-free Inference of Simulation Models with Bayesian
         Conditional Density Estimation*, Papamakarios et al., NeurIPS 2016.
         https://arxiv.org/abs/1605.06376
 
-    Like all NPE methods, this method trains a deep neural density estimator to
-    directly approximate the posterior. Also like all other NPE methods, in the
-    first round, this density estimator is trained with a maximum-likelihood loss.
+    Example:
+    --------
 
-    This class implements NPE-A. NPE-A trains across multiple rounds with a
-    maximum-likelihood-loss. This will make training converge to the proposal
-    posterior instead of the true posterior. To correct for this, SNPE-A applies a
-    post-hoc correction after training. This correction has to be performed
-    analytically. Thus, NPE-A is limited to Gaussian distributions for all but the
-    last round. In the last round, NPE-A can use a Mixture of Gaussians."""
+    ::
+
+        import torch
+        from sbi.inference import NPE_A
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train posterior estimator
+        inference = NPE_A(prior=prior, num_components=5)
+        density_estimator = inference.append_simulations(theta, x).train()
+
+        # 3. Build posterior with post-hoc correction
+        posterior = inference.build_posterior(density_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.randn(1, 3)
+        samples = posterior.sample((1000,), x=x_o)
+    """
 
     def __init__(
         self,

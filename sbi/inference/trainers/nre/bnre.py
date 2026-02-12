@@ -18,15 +18,44 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class BNRE(NRE_A):
-    r"""Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].
+    r"""Balanced Neural Ratio Estimation (BNRE) as in Delaunoy et al. (2022) [1].
 
-    BNRE is a variation of NRE aiming to produce more conservative posterior
-    approximations.
+    BNRE is a variation of NRE-A that adds a balancing regularizer to the binary
+    cross-entropy loss. This regularizer encourages the classifier to predict equal
+    probabilities for joint and marginal samples on average, which can lead to more
+    conservative and reliable posterior approximations. BNRE is particularly useful
+    when robustness is prioritized over tightness of the posterior.
 
-    [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
-    Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
-    Estimation.
-    NeurIPS 2022. https://arxiv.org/abs/2208.13624
+    [1] Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
+        Estimation, Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G.,
+        NeurIPS 2022. https://arxiv.org/abs/2208.13624
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import BNRE
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train balanced ratio estimator
+        inference = BNRE(prior=prior)
+        ratio_estimator = inference.append_simulations(theta, x).train(
+            regularization_strength=100.0
+        )
+
+        # 3. Build posterior
+        posterior = inference.build_posterior(ratio_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.randn(1, 3)
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(

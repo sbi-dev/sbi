@@ -19,15 +19,46 @@ from sbi.sbi_types import Tracker
 
 
 class NPSE(VectorFieldTrainer):
-    """Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.
+    r"""Neural Posterior Score Estimation (NPSE) [1, 2].
 
-    Instead of performing conditonal *density* estimation, NPSE methods perform
-    conditional *score* estimation i.e. they estimate the gradient of the log
-    density using denoising score matching loss.
+    NPSE trains a neural network to estimate the score function (gradient of the log
+    density) $\nabla_\theta \log p(\theta|x)$ using denoising score matching. Instead
+    of directly estimating the density, NPSE learns the score of a diffusion process
+    that transforms the prior into the posterior. Sampling is performed using SDE
+    solvers (e.g., Langevin dynamics) or ODE solvers.
 
     NOTE: NPSE does not support multi-round inference with flexible proposals yet.
-    You can try to run multi-round with truncated proposals, but note that this is
-    not tested yet."""
+    You can try multi-round with truncated proposals, but this is not tested.
+
+    [1] Score modeling for simulation-based inference, Geffner et al., ICML 2023.
+    [2] Sequential neural score estimation: Likelihood-free inference with conditional
+        score based diffusion models, Sharrock et al., ICML 2024.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import NPSE
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train score estimator
+        inference = NPSE(prior=prior, sde_type="ve")
+        score_estimator = inference.append_simulations(theta, x).train()
+
+        # 3. Build posterior (uses SDE solver by default)
+        posterior = inference.build_posterior(score_estimator)
+
+        # 4. Sample from posterior using Langevin dynamics
+        x_o = torch.randn(1, 3)
+        samples = posterior.sample((1000,), x=x_o)
+    """
 
     def __init__(
         self,

@@ -20,10 +20,41 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_B(RatioEstimatorTrainer):
-    """SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].
+    r"""Neural Ratio Estimation (NRE-B / SRE) as in Durkan et al. (2020) [1].
+
+    NRE-B trains a neural classifier using a contrastive (1-out-of-K) loss to estimate
+    the likelihood-to-evidence ratio. Instead of binary classification, it contrasts
+    one sample from the joint $p(\theta, x)$ against $K-1$ samples from the marginals
+    $p(\theta)p(x)$. This multi-class formulation can improve training stability and
+    performance.
 
     [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,
         ICML 2020, https://arxiv.org/pdf/2002.03712
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import NRE_B
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train ratio estimator with contrastive loss
+        inference = NRE_B(prior=prior)
+        ratio_estimator = inference.append_simulations(theta, x).train(num_atoms=10)
+
+        # 3. Build posterior
+        posterior = inference.build_posterior(ratio_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.randn(1, 3)
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(

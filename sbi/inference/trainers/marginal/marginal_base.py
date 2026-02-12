@@ -30,11 +30,33 @@ DensityEstimatorType = Union[ZukoFlowType, str, Callable[[Tensor], Any]]
 
 
 class MarginalTrainer:
-    """Utility class for training a marginal density estimator.
+    r"""Utility class for training a marginal density estimator $p(x)$.
 
-    The Marginal density estimator can, in principle, be used for many things. In
-    the ``sbi`` toolbox, we usually use it only to detect misspecification (see the
-    how-to guide on the documentation website)."""
+    The marginal density estimator learns the distribution of simulation outputs $x$
+    without conditioning on parameters. In the sbi toolbox, it is primarily used for
+    misspecification diagnostics by comparing the estimated marginal $p(x)$ to the
+    observed data distribution.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import MarginalTrainer
+
+        # 1. Simulate data
+        theta = torch.randn(100, 3)
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train marginal density estimator
+        marginal_trainer = MarginalTrainer(density_estimator="nsf")
+        marginal_estimator = marginal_trainer.append_samples(x).train()
+
+        # 3. Evaluate log probability of new observations
+        x_new = torch.randn(10, 3)
+        log_prob = -marginal_estimator.loss(x_new)
+    """
 
     def __init__(
         self,
