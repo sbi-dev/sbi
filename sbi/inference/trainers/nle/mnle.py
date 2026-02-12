@@ -21,15 +21,44 @@ from sbi.utils.sbiutils import del_entries
 
 
 class MNLE(LikelihoodEstimatorTrainer):
-    """Method that can infer parameters given discrete and continuous data (Mixed NLE).
+    r"""Mixed Neural Likelihood Estimation for discrete and continuous data [1].
 
-    Like NLE, but designed to be applied to data with mixed types, e.g., continuous
-    data and discrete data like they occur in decision-making experiments
-    (reation times and choices).
+    MNLE extends NLE to handle data with mixed types, such as continuous reaction
+    times and discrete choices in decision-making experiments. It trains a neural
+    network to approximate the likelihood $p(x|\theta)$ where $x$ contains both
+    discrete and continuous components.
 
-    Flexible and efficient simulation-based inference for models of
-    decision-making, Boelts et al. 2021,
-    https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
+    [1] Flexible and efficient simulation-based inference for models of
+        decision-making, Boelts et al., eLife 2022,
+        https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import MNLE
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate mixed-type data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        # First 5 dims continuous, last 3 dims discrete
+        x_continuous = torch.randn(100, 5)
+        x_discrete = torch.randint(0, 3, (100, 3))
+        x = torch.cat([x_continuous, x_discrete.float()], dim=1)
+
+        # 2. Train likelihood estimator
+        inference = MNLE(prior=prior)
+        likelihood_estimator = inference.append_simulations(theta, x).train()
+
+        # 3. Build posterior
+        posterior = inference.build_posterior(likelihood_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.cat([torch.randn(1, 5), torch.tensor([[1., 0., 2.]])], dim=1)
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(

@@ -23,7 +23,42 @@ from sbi.sbi_types import Tracker
 
 
 class FMPE(VectorFieldTrainer):
-    """Flow Matching Posterior Estimation (FMPE)."""
+    r"""Flow Matching Posterior Estimation (FMPE) [1].
+
+    FMPE trains a continuous normalizing flow (CNF) to transform samples from the
+    prior distribution to the posterior distribution using flow matching. Instead of
+    maximum likelihood, it trains a vector field to match the marginal vector field
+    of a conditional flow that interpolates between the prior and posterior. Sampling
+    is performed by solving an ODE.
+
+    [1] Flow Matching for Generative Modeling, Lipman et al., ICLR 2023,
+        https://arxiv.org/abs/2210.02747
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import FMPE
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train flow matching estimator
+        inference = FMPE(prior=prior)
+        flow_estimator = inference.append_simulations(theta, x).train()
+
+        # 3. Build posterior (uses ODE solver for sampling)
+        posterior = inference.build_posterior(flow_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.randn(1, 3)
+        samples = posterior.sample((1000,), x=x_o)
+    """
 
     def __init__(
         self,
