@@ -135,21 +135,17 @@ class CustomPotentialWrapper(BasePotential):
 
         self.potential_fn = potential_fn
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move prior and x_o to the given device.
-
-        It also set the device attribute to the given device.
+    def to(self, device: Union[str, torch.device]) -> "CustomPotentialWrapper":
+        """Move prior and x_o to the given device.
 
         Args:
             device: Device to move the prior and x_o to.
+
+        Returns:
+            Self for method chaining.
         """
-        self.device = device
-        if self.prior:
-            self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
-        super().__init__(self.prior, self._x_o, device)
+        super().to(device)
+        return self
 
     def __call__(self, theta, track_gradients: bool = True):
         """Calls the custom potential function on given theta.

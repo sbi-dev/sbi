@@ -242,7 +242,7 @@ class LearnableGaussian(nn.Module):
         return z, log_prob_z
 
 
-def filter_kwrags_for_func(f: Callable, kwargs: Dict) -> Dict:
+def filter_kwargs_for_func(f: Callable, kwargs: Dict) -> Dict:
     """This function will filter a dictionary of possible arguments for arguments the
     function can use.
 

@@ -32,7 +32,7 @@ from sbi.neural_nets.estimators import ZukoUnconditionalFlow
 from sbi.samplers.vi.vi_utils import (
     LearnableGaussian,
     TransformedZukoFlow,
-    filter_kwrags_for_func,
+    filter_kwargs_for_func,
     make_object_deepcopy_compatible,
 )
 from sbi.sbi_types import Array
@@ -144,9 +144,9 @@ class DivergenceOptimizer(ABC):
         self.state_dict = [para.data.clone() for para in self.q.parameters()]
 
         # Init optimizer and scheduler with correct arguments
-        opt_kwargs = filter_kwrags_for_func(optimizer.__init__, kwargs)
+        opt_kwargs = filter_kwargs_for_func(optimizer.__init__, kwargs)
         kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
-        scheduler_kwargs = filter_kwrags_for_func(scheduler.__init__, kwargs)
+        scheduler_kwargs = filter_kwargs_for_func(scheduler.__init__, kwargs)
 
         self._optimizer = optimizer(self.q.parameters(), **opt_kwargs)
         self._scheduler = scheduler(self._optimizer, **scheduler_kwargs)
@@ -371,9 +371,9 @@ class DivergenceOptimizer(ABC):
             sched_type = type(self._scheduler)
 
         kwargs["lr"] = self.learning_rate
-        opt_kwargs = filter_kwrags_for_func(opt_type.__init__, kwargs)
+        opt_kwargs = filter_kwargs_for_func(opt_type.__init__, kwargs)
         kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
-        scheduler_kwargs = filter_kwrags_for_func(sched_type.__init__, kwargs)
+        scheduler_kwargs = filter_kwargs_for_func(sched_type.__init__, kwargs)
 
         self._optimizer = opt_type(self.q.parameters(), **opt_kwargs)
         self._scheduler = sched_type(self._optimizer, **scheduler_kwargs)
@@ -464,17 +464,19 @@ class ElboOptimizer(DivergenceOptimizer):
         if num_samples is None:
             num_samples = self.n_particles
 
-        # Use sample_and_log_prob if available, otherwise use rsample + log_prob
-        if hasattr(self.q, "sample_and_log_prob"):
-            samples, log_q = self.q.sample_and_log_prob(torch.Size((num_samples,)))
-        else:
-            # Fallback for external distributions without sample_and_log_prob
-            samples = self.q.rsample(torch.Size((num_samples,)))
-            log_q = self.q.log_prob(samples)
-
         if self.stick_the_landing:
+            # STL replaces log_q, so only need samples (not log_q from q).
+            if hasattr(self.q, "sample_and_log_prob"):
+                samples, _ = self.q.sample_and_log_prob(torch.Size((num_samples,)))
+            else:
+                samples = self.q.rsample(torch.Size((num_samples,)))
             self.update_surrogate_q()
             log_q = self._surrogate_q.log_prob(samples)
+        elif hasattr(self.q, "sample_and_log_prob"):
+            samples, log_q = self.q.sample_and_log_prob(torch.Size((num_samples,)))
+        else:
+            samples = self.q.rsample(torch.Size((num_samples,)))
+            log_q = self.q.log_prob(samples)
 
         self.potential_fn.x_o = x_o
         log_potential = self.potential_fn(samples)

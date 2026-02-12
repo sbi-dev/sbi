@@ -211,10 +211,7 @@ class VIPosterior(NeuralPosterior):
         )
 
     def to(self, device: Union[str, torch.device]) -> "VIPosterior":
-        """
-        Move potential_fn, _prior and x_o to device, and change the device attribute.
-
-        Reinstantiates the posterior and re sets the default x.
+        """Move all components to the given device.
 
         Args:
             device: The device to move the posterior to.
@@ -222,23 +219,34 @@ class VIPosterior(NeuralPosterior):
         Returns:
             self for method chaining.
         """
-        self.device = device
-        self.potential_fn.to(device)  # type: ignore
-        self._prior.to(device)  # type: ignore
-        if self._x is not None:
-            x_o = self._x.to(device)
-        self.theta_transform = mcmc_transform(self._prior, device=device)
-        super().__init__(
-            self.potential_fn, self.theta_transform, device, x_shape=self.x_shape
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if self._x is not None:
-            self.set_default_x(x_o)
+        self._device = device
 
+        # Move potential (which moves prior, x_o, and estimator).
+        self.potential_fn.to(device)  # type: ignore
+        self._prior = move_distribution_to_device(self._prior, device)
+
+        # Rebuild link_transform on new device (same logic as __init__).
         if self.theta_transform is None:
             self.link_transform = mcmc_transform(self._prior, device=device).inv
         else:
             self.link_transform = self.theta_transform.inv
+
+        # Move cached tensors.
+        if self._x is not None:
+            self._x = self._x.to(device)
+        if self._map is not None:
+            self._map = self._map.to(device)
+        if self._trained_on is not None:
+            self._trained_on = self._trained_on.to(device)
+
+        # Move variational distributions.
+        if hasattr(self, "_q") and hasattr(self._q, "to"):
+            self._q.to(device)
+        # Update link_transform reference on q if it caches one.
+        if hasattr(self, "_q") and hasattr(self._q, "_link_transform"):
+            self._q._link_transform = self.link_transform
+        if self._amortized_q is not None:
+            self._amortized_q.to(device)
 
         return self
 
@@ -506,12 +514,14 @@ class VIPosterior(NeuralPosterior):
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
             self._zuko_flow_type = getattr(q, "_zuko_flow_type", None)
             self.vi_method = q.vi_method  # type: ignore
-            self._device = q._device
             self._prior = q._prior
             self._x = q._x
             self._q_arg = q._q_arg
             make_object_deepcopy_compatible(q.q)
             q = deepcopy(q.q)
+            # Move copied q to self's device (source may be on a different device).
+            if hasattr(q, "to"):
+                q.to(self._device)
         # Validate the variational distribution
         if isinstance(q, _flow_types):
             pass  # These are validated during construction
@@ -1082,12 +1092,7 @@ class VIPosterior(NeuralPosterior):
         theta_train, x_train = theta[train_indices], x[train_indices]
         x_val = x[val_indices]  # Only x needed for validation (θ sampled from q)
 
-        if validation_batch_size < x_val.shape[0]:
-            val_batch_indices = torch.randperm(x_val.shape[0], device=self._device)[
-                :validation_batch_size
-            ]
-        else:
-            val_batch_indices = None
+        use_val_subset = validation_batch_size < x_val.shape[0]
 
         # Build or rebuild the conditional flow (z-score on training data only)
         if self._amortized_q is None or retrain_from_scratch:
@@ -1146,10 +1151,13 @@ class VIPosterior(NeuralPosterior):
             # Compute validation loss
             self._amortized_q.eval()
             with torch.no_grad():
-                if val_batch_indices is None:
-                    x_val_batch = x_val
+                if use_val_subset:
+                    val_idx = torch.randperm(x_val.shape[0], device=self._device)[
+                        :validation_batch_size
+                    ]
+                    x_val_batch = x_val[val_idx]
                 else:
-                    x_val_batch = x_val[val_batch_indices]
+                    x_val_batch = x_val
                 val_loss = self._compute_amortized_elbo_loss(
                     x_val_batch, validation_n_particles
                 ).item()
@@ -1214,8 +1222,8 @@ class VIPosterior(NeuralPosterior):
         theta_dim = theta_samples.shape[-1]
         theta_flat = theta_samples.reshape(n_particles * batch_size, theta_dim)
 
-        # Repeat x to match: (batch_size, x_dim) -> (n_particles * batch_size, x_dim)
-        # Each x[j] is repeated n_particles times to pair with theta[:, j, :]
+        # Tile x to match: (batch_size, x_dim) -> (n_particles * batch_size, x_dim)
+        # Each block of batch_size rows corresponds to one particle.
         x_expanded = x_batch.repeat(n_particles, 1)
 
         # Set x_o for batched evaluation (x_is_iid=False: each θ paired with its x)
