@@ -728,16 +728,11 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
     estimator = inference.append_simulations(
         torch.randn((100, 3)), torch.randn((100, 2))
     ).train(max_num_epochs=1)
-    if sampling_method == "rejection":
-        posterior = inference.build_posterior(
-            density_estimator=estimator,
-            prior=prior,
-            sample_with=sampling_method,
-        )
-    else:
-        posterior = inference.build_posterior(
-            density_estimator=estimator, prior=prior, sample_with=sampling_method
-        )
+    posterior = inference.build_posterior(
+        density_estimator=estimator,
+        prior=prior,
+        sample_with=sampling_method,
+    )
     posterior.set_default_x(x_o)
     posterior.to(device)
 
@@ -753,9 +748,9 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
         f"log_prob was not correctly moved to {device}."
     )
 
-    for trasnf in posterior.theta_transform._inv.base_transform.parts:
+    for transform in posterior.theta_transform._inv.base_transform.parts:
         assert (
-            str(trasnf(torch.tensor([0.0], device=device)).device).strip(":0")
+            str(transform(torch.tensor([0.0], device=device)).device).strip(":0")
             == device.split(":")[0]
         ), "Prior transform is on the correct device."
 

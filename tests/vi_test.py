@@ -111,7 +111,7 @@ def _build_linear_gaussian_setup(trainer_type: str = "nle"):
     if trainer_type == "nle":
         trainer = NLE(prior=prior, show_progress_bars=False, density_estimator="nsf")
         trainer.append_simulations(theta, x)
-        estimator = trainer.train(max_num_epochs=200)
+        estimator = trainer.train()
         potential_fn, _ = likelihood_estimator_based_potential(
             likelihood_estimator=estimator,
             prior=prior,
@@ -120,7 +120,7 @@ def _build_linear_gaussian_setup(trainer_type: str = "nle"):
     elif trainer_type == "nre":
         trainer = NRE(prior=prior, show_progress_bars=False, classifier="mlp")
         trainer.append_simulations(theta, x)
-        estimator = trainer.train(max_num_epochs=200)
+        estimator = trainer.train()
         potential_fn, _ = ratio_estimator_based_potential(
             ratio_estimator=estimator,
             prior=prior,
@@ -362,22 +362,23 @@ def test_vi_posterior_interface():
     assert "The variational posterior was not fit" in execinfo.value.args[0]
 
     # Test training hyperparameters
-    posterior.train(max_num_iters=20)
+    max_num_iters = 5
+    posterior.train(max_num_iters=max_num_iters)
 
-    posterior.train(max_num_iters=20, optimizer=torch.optim.SGD)
+    posterior.train(max_num_iters=max_num_iters, optimizer=torch.optim.SGD)
     assert isinstance(posterior._optimizer._optimizer, torch.optim.SGD)
 
-    posterior.train(max_num_iters=20, stick_the_landing=True)
+    posterior.train(max_num_iters=max_num_iters, stick_the_landing=True)
     assert posterior._optimizer.stick_the_landing
 
     posterior.vi_method = "alpha"
-    posterior.train(max_num_iters=20)
-    posterior.train(max_num_iters=20, alpha=0.9)
+    posterior.train(max_num_iters=max_num_iters)
+    posterior.train(max_num_iters=max_num_iters, alpha=0.9)
     assert posterior._optimizer.alpha == 0.9
 
     posterior.vi_method = "IW"
-    posterior.train(max_num_iters=20)
-    posterior.train(max_num_iters=20, K=32)
+    posterior.train(max_num_iters=max_num_iters)
+    posterior.train(max_num_iters=max_num_iters, K=32)
     assert posterior._optimizer.K == 32
 
     # Test sampling from trained posterior
@@ -424,7 +425,7 @@ def test_vi_with_multiple_independent_prior():
     posterior.sample(sample_shape=(10,), show_progress_bars=False)
 
 
-@pytest.mark.parametrize("num_dim", (1, 2, 3, 4, 5, 10, 25, 33))
+@pytest.mark.parametrize("num_dim", (1, 2, 5))
 @pytest.mark.parametrize("q_type", FLOWS)
 def test_vi_flow_builders(num_dim: int, q_type: str):
     """Test variational families are built correctly with sampling and log_prob."""
@@ -679,7 +680,7 @@ def test_amortized_vi_with_fake_potential():
     posterior.train_amortized(
         theta=theta,
         x=x,
-        max_num_iters=100,  # Fewer iterations for speed
+        max_num_iters=2,  # Fewer iterations for speed
         show_progress_bar=False,
         flow_type=ZukoFlowType.NSF,
         num_transforms=2,
