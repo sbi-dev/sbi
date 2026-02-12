@@ -19,10 +19,11 @@ from sbi.sbi_types import Tracker
 
 
 class NPSE(VectorFieldTrainer):
-    r"""Neural Posterior Score Estimation (NPSE) as in Geffner et al. and Sharrock et al.
+    r"""Neural Posterior Score Estimation (NPSE).
 
-    NPSE estimates the score (gradient of the log density) $\nabla_\theta \log p(\theta|x)$
-    using denoising score matching. Sampling is performed via SDE-based diffusion.
+    NPSE estimates the score (gradient of log density)
+    $\nabla_\theta \log p(\theta|x)$ using denoising score matching.
+    Sampling is performed via SDE-based diffusion.
 
     Note: NPSE does not support multi-round inference with flexible proposals yet.
 

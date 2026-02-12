@@ -32,7 +32,7 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 
 
 class NPE_A(PosteriorEstimatorTrainer):
-    r"""Neural Posterior Estimation algorithm (NPE-A) as in Papamakarios et al. (2016) [1].
+    r"""Neural Posterior Estimation (NPE-A) by Papamakarios et al. (2016) [1].
 
     NPE-A trains a neural network to directly estimate the posterior $p(\theta|x)$.
     It uses a Mixture of Gaussians and applies a post-hoc correction to account
