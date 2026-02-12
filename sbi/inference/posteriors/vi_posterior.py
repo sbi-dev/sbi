@@ -34,7 +34,6 @@ from sbi.samplers.vi.vi_utils import (
     adapt_variational_distribution,
     check_variational_distribution,
     make_object_deepcopy_compatible,
-    move_all_tensor_to_device,
 )
 from sbi.sbi_types import (
     Shape,
@@ -44,6 +43,7 @@ from sbi.sbi_types import (
 )
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 # Supported Zuko flow types for VI (lowercase names)
 _ZUKO_FLOW_TYPES = {"maf", "nsf", "naf", "unaf", "nice", "sospf"}
@@ -154,7 +154,7 @@ class VIPosterior(NeuralPosterior):
         self.theta_transform = theta_transform
         self.x_shape = x_shape
         self.potential_fn.device = device
-        move_all_tensor_to_device(self.potential_fn, device)
+        self.potential_fn.to(device)
 
         # Get prior and previous builds
         if prior is not None:
@@ -170,7 +170,8 @@ class VIPosterior(NeuralPosterior):
                 "We could not find a suitable prior distribution within `potential_fn` "
                 "or `q` (if a VIPosterior is given). Please explicitly specify a prior."
             )
-        move_all_tensor_to_device(self._prior, device)
+
+        self._prior = move_distribution_to_device(self._prior, device)
         self._optimizer = None
 
         # Mode tracking: None (not trained), "single_x", or "amortized"
@@ -278,12 +279,6 @@ class VIPosterior(NeuralPosterior):
             hidden_features = self._hidden_features
         if z_score_theta is None:
             z_score_theta = self._z_score_theta
-
-        if flow_type in ("gaussian", "gaussian_diag"):
-            raise ValueError(
-                f"Flow type '{flow_type}' uses LearnableGaussian, not Zuko flows. "
-                f"This is handled automatically in set_q()."
-            )
 
         if flow_type not in _ZUKO_FLOW_TYPES:
             raise ValueError(
@@ -517,7 +512,6 @@ class VIPosterior(NeuralPosterior):
             self._q_arg = q._q_arg
             make_object_deepcopy_compatible(q.q)
             q = deepcopy(q.q)
-        move_all_tensor_to_device(q, self._device)
         # Validate the variational distribution
         if isinstance(q, _flow_types):
             pass  # These are validated during construction

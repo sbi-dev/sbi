@@ -563,30 +563,6 @@ def detach_all_non_leaf_tensors(obj: object) -> None:
         _base_recursor(obj, check=check, action=action)
 
 
-def move_all_tensor_to_device(obj, device):
-    def check(o):
-        return isinstance(o, (Tensor, Module))
-
-    def action(o):
-        if isinstance(o, Tensor) and o.requires_grad and o.is_leaf:
-            # Moving leaf tensors inplace is hard. Cant call .to as this would create a
-            # copy and thus results in non-leaf tensors.
-            if str(o.device) != str(device):
-                print(o)
-                raise ValueError(
-                    "Some of your leaf tensors are on the wrong device, we cant move"
-                    "them automatically please initialize them correctly. Move e.g. "
-                    f"{o} from {o.device} to {device}"
-                )
-            else:
-                return o
-        else:
-            return o.to(device)
-
-    with torch.no_grad():
-        _base_recursor(obj, check=check, action=action)
-
-
 def make_object_deepcopy_compatible(obj: object):
     """This function overwrites the `__deepcopy__` attribute. This is required if e.g.
     the object contains non leaf PyTorch tensors.

@@ -8,8 +8,8 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.samplers.vi.vi_utils import move_all_tensor_to_device
 from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class BasePotential(metaclass=ABCMeta):
@@ -93,9 +93,10 @@ class BasePotential(metaclass=ABCMeta):
         Returns:
             Self for method chaining.
         """
+
         self.device = device
-        if self.prior:
-            move_all_tensor_to_device(self.prior, device)
+        if self.prior is not None:
+            self.prior = move_distribution_to_device(self.prior, device)
         if self._x_o is not None:
             self._x_o = self._x_o.to(device)
         return self

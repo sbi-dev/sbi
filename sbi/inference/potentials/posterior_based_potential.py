@@ -87,22 +87,18 @@ class PosteriorBasedPotential(BasePotential):
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move posterior_estimator, prior and x_o to the given device.
-
-        It also set the device attribute to the given device.
+    def to(self, device: Union[str, torch.device]) -> "PosteriorBasedPotential":
+        """Move posterior estimator, prior and x_o to the given device.
 
         Args:
             device: Device to move the posterior_estimator, prior and x_o to.
-        """
 
-        self.device = device
+        Returns:
+            Self for method chaining.
+        """
+        super().to(device)
         self.posterior_estimator.to(device)
-        if self.prior is not None:
-            self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
+        return self
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = False):
         """

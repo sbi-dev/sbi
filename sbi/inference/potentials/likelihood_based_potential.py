@@ -81,20 +81,18 @@ class LikelihoodBasedPotential(BasePotential):
         self.likelihood_estimator = likelihood_estimator
         self.likelihood_estimator.eval()
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move likelihood_estimator, prior and x_o to the given device.
-
-        It also set the device attribute to the given device.
+    def to(self, device: Union[str, torch.device]) -> "LikelihoodBasedPotential":
+        """Move likelihood estimator, prior and x_o to the given device.
 
         Args:
             device: Device to move the likelihood_estimator, prior and x_o to.
+
+        Returns:
+            Self for method chaining.
         """
-        self.device = device
+        super().to(device)
         self.likelihood_estimator.to(device)
-        self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
+        return self
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential $\log(p(x_o|\theta)p(\theta))$.

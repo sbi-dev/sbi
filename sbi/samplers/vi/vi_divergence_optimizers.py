@@ -34,10 +34,10 @@ from sbi.samplers.vi.vi_utils import (
     TransformedZukoFlow,
     filter_kwrags_for_func,
     make_object_deepcopy_compatible,
-    move_all_tensor_to_device,
 )
 from sbi.sbi_types import Array
 from sbi.utils.user_input_checks import check_prior
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 # Type alias for variational distributions (Zuko-based flows and LearnableGaussian)
 VariationalDistribution = Union[
@@ -123,9 +123,15 @@ class DivergenceOptimizer(ABC):
         if prior is not None:
             self.prior.set_default_validate_args(False)  # type: ignore
 
-        # Manage modules - all supported distributions are nn.Module-based
-        self.modules = nn.ModuleList([self.q])
-        self.modules.train()
+        # Manage modules - only add q if it's an nn.Module (not for external dists)
+        from torch.nn import Module as TorchModule
+
+        if isinstance(self.q, TorchModule):
+            self.modules = nn.ModuleList([self.q])
+            self.modules.train()
+        else:
+            # For external distributions (not nn.Module), don't use ModuleList
+            self.modules = None
 
         # Ensure that distribution has parameters and that these are on the right device
         if not hasattr(self.q, "parameters"):
@@ -165,12 +171,12 @@ class DivergenceOptimizer(ABC):
     def to(self, device: str) -> None:
         """This will move all parameters to the correct device, both for likelihood and
         posterior"""
+
         self.device = device
-        # These just ensure that everythink must be on the same device.
-        move_all_tensor_to_device(self.potential_fn, self.device)
-        move_all_tensor_to_device(self.q, self.device)
+        self.potential_fn.to(self.device)
+        self.q.to(self.device)
         if self.prior is not None:
-            move_all_tensor_to_device(self.prior, self.device)
+            self.prior = move_distribution_to_device(self.prior, self.device)
 
     def warm_up(self, num_steps: int, method: str = "prior") -> None:
         """This initializes q to follow the prior. This can increase training stability.
@@ -195,8 +201,14 @@ class DivergenceOptimizer(ABC):
         for _ in range(num_steps):
             self._optimizer.zero_grad()
 
-            # Use sample_and_log_prob for efficient reparameterized sampling
-            samples, logq = self.q.sample_and_log_prob(torch.Size((32,)))
+            # Use sample_and_log_prob if available, otherwise use rsample + log_prob
+            if hasattr(self.q, "sample_and_log_prob"):
+                samples, logq = self.q.sample_and_log_prob(torch.Size((32,)))
+            else:
+                # Fallback for external distributions without sample_and_log_prob
+                samples = self.q.rsample(torch.Size((32,)))
+                logq = self.q.log_prob(samples)
+
             logp = initial_target.log_prob(samples)
             loss = -torch.mean(logp - logq)
 
@@ -452,7 +464,14 @@ class ElboOptimizer(DivergenceOptimizer):
         if num_samples is None:
             num_samples = self.n_particles
 
-        samples, log_q = self.q.sample_and_log_prob(torch.Size((num_samples,)))
+        # Use sample_and_log_prob if available, otherwise use rsample + log_prob
+        if hasattr(self.q, "sample_and_log_prob"):
+            samples, log_q = self.q.sample_and_log_prob(torch.Size((num_samples,)))
+        else:
+            # Fallback for external distributions without sample_and_log_prob
+            samples = self.q.rsample(torch.Size((num_samples,)))
+            log_q = self.q.log_prob(samples)
+
         if self.stick_the_landing:
             self.update_surrogate_q()
             log_q = self._surrogate_q.log_prob(samples)
