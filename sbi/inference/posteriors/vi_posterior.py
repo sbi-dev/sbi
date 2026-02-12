@@ -242,7 +242,7 @@ class VIPosterior(NeuralPosterior):
 
         return self
 
-    def _build_zuko_flow(
+    def _build_unconditional_flow(
         self,
         flow_type: str,
         num_transforms: Optional[int] = None,
@@ -458,10 +458,10 @@ class VIPosterior(NeuralPosterior):
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
                 if q in _ZUKO_FLOW_TYPES:
-                    q_flow = self._build_zuko_flow(q)
+                    q_flow = self._build_unconditional_flow(q)
                     self._zuko_flow_type = q
                     self._q_build_fn = lambda *args, ft=q, **kwargs: (
-                        self._build_zuko_flow(ft)
+                        self._build_unconditional_flow(ft)
                     )
                     q = q_flow
                 elif q in ("gaussian", "gaussian_diag"):
