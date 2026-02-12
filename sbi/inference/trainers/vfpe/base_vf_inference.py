@@ -316,6 +316,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         )
 
         if isinstance(validation_times, int):
+            # Use nugget to offset from boundaries for numerical stability
             validation_times = self._neural_net.solve_schedule(
                 validation_times,
                 t_min=self._neural_net.t_min + validation_times_nugget,

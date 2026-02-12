@@ -69,6 +69,7 @@ def test_c2st_vector_field_on_linearGaussian(
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
+    # VE with uniform schedule needs slightly more simulations for stability
     num_simulations = 2600 if vector_field_type == "ve" else 2500
 
     # likelihood_mean will be likelihood_shift+theta
