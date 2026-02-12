@@ -238,7 +238,7 @@ class MultipleIndependent(Distribution):
 
     def __init__(
         self,
-        dists: Sequence[Distribution],
+        dists: list[Distribution],
         validate_args: Optional[bool] = None,
         arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
         device: Optional[str] = None,

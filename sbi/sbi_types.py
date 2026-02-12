@@ -6,7 +6,7 @@ from typing import Optional, Protocol, Sequence, Tuple, TypeVar, Union
 import numpy as np
 import torch
 from torch import Tensor
-from torch.distributions import Distribution, TransformedDistribution
+from torch.distributions import Distribution
 from torch.distributions.transforms import Transform
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import TypeAlias
@@ -31,7 +31,7 @@ transform_types = Optional[
 TensorBoardSummaryWriter: TypeAlias = SummaryWriter
 TorchDistribution: TypeAlias = Distribution
 TorchTransform: TypeAlias = Transform
-VariationalDistribution: TypeAlias = TransformedDistribution
+VariationalDistribution: TypeAlias = Distribution
 TorchTensor: TypeAlias = Tensor
 
 

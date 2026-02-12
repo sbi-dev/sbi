@@ -314,8 +314,8 @@ def check_parameters_modules_attribute(q: VariationalDistribution) -> None:
             returns an iterable of parameters"""
         )
     else:
-        assert isinstance(q.parameters, Callable), "The parameters must be callable"
-        parameters = q.parameters()
+        assert isinstance(q.parameters, Callable), "The parameters must be callable"  # type: ignore[union-attr]
+        parameters = q.parameters()  # type: ignore[union-attr]
         assert isinstance(parameters, Iterable), (
             "The parameters return value must be iterable"
         )
@@ -334,8 +334,8 @@ def check_parameters_modules_attribute(q: VariationalDistribution) -> None:
             an iterable of parameters."""
         )
     else:
-        assert isinstance(q.modules, Callable), "The parameters must be callable"
-        modules = q.modules()
+        assert isinstance(q.modules, Callable), "The parameters must be callable"  # type: ignore[union-attr]
+        modules = q.modules()  # type: ignore[union-attr]
         assert isinstance(modules, Iterable), (
             "The parameters return value must be iterable"
         )
@@ -414,7 +414,7 @@ def add_parameters_module_attributes(
 
 
 def add_parameter_attributes_to_transformed_distribution(
-    q: VariationalDistribution,
+    q: TransformedDistribution,
 ) -> None:
     """A function that will add `parameters` and `modules` to q automatically, if q is a
     TransformedDistribution.
@@ -428,14 +428,14 @@ def add_parameter_attributes_to_transformed_distribution(
     def parameters():
         """Returns the parameters of the distribution."""
         if hasattr(q.base_dist, "parameters"):
-            yield from q.base_dist.parameters()
+            yield from q.base_dist.parameters()  # type: ignore[attr-defined]
         for t in q.transforms:
             yield from get_parameters(t)
 
     def modules():
         """Returns the modules of the distribution."""
         if hasattr(q.base_dist, "modules"):
-            yield from q.base_dist.modules()
+            yield from q.base_dist.modules()  # type: ignore[attr-defined]
         for t in q.transforms:
             yield from get_modules(t)
 

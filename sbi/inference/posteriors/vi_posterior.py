@@ -241,10 +241,10 @@ class VIPosterior(NeuralPosterior):
 
         # Move variational distributions.
         if hasattr(self, "_q") and hasattr(self._q, "to"):
-            self._q.to(device)
+            self._q.to(device)  # type: ignore[union-attr]
         # Update link_transform reference on q if it caches one.
         if hasattr(self, "_q") and hasattr(self._q, "_link_transform"):
-            self._q._link_transform = self.link_transform
+            self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
 
@@ -521,7 +521,7 @@ class VIPosterior(NeuralPosterior):
             q = deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
             if hasattr(q, "to"):
-                q.to(self._device)
+                q.to(self._device)  # type: ignore[union-attr]
         # Validate the variational distribution
         if isinstance(q, _flow_types):
             pass  # These are validated during construction
