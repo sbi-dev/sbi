@@ -485,6 +485,39 @@ class BaseConditionalVectorFieldEstimator:
         """
         raise NotImplementedError("Diffusion is not implemented for this estimator.")
 
+    # -------------------------- SCHEDULE METHODS --------------------------
+
+    def train_schedule(
+        self,
+        num_samples: int,
+        t_min: Optional[float] = None,
+        t_max: Optional[float] = None,
+    ) -> Tensor:
+        """Sample times used during training."""
+        if t_min is None:
+            t_min = self.t_min
+        if t_max is None:
+            t_max = self.t_max
+
+        return (
+            torch.rand(num_samples, device=self._mean_base.device) * (t_max - t_min)
+            + t_min
+        )
+
+    def solve_schedule(
+        self,
+        num_steps: int,
+        t_min: Optional[float] = None,
+        t_max: Optional[float] = None,
+    ) -> Tensor:
+        """Return a deterministic decreasing time grid in [t_max, t_min]."""
+        if t_min is None:
+            t_min = self.t_min
+        if t_max is None:
+            t_max = self.t_max
+
+        return torch.linspace(t_max, t_min, num_steps, device=self._mean_base.device)
+
 
 class ConditionalVectorFieldEstimator(
     ConditionalEstimator, BaseConditionalVectorFieldEstimator, ABC

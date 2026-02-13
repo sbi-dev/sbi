@@ -130,11 +130,9 @@ def test_c2st_vector_field_on_linearGaussian(
     device = "cpu"
     tol = 0.15
 
-    if vf_estimator == "Simformer" and vector_field_type in {'vp', 'subvp'}:
-        # Default values for slow and GPU tests (VP and sub-VP)
+    if vf_estimator == "Simformer":
         num_simulations = 5000
         max_num_epochs = 500
-        device = "gpu"
 
     device = process_device(device)
     x_o = zeros(1, num_dim, device=device)
