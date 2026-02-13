@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, cast
 
 import numpy as np
 import torch
@@ -12,6 +12,7 @@ from sklearn.model_selection import KFold
 from sklearn.neural_network import MLPClassifier
 from skorch import NeuralNetBinaryClassifier
 from skorch.callbacks import EarlyStopping
+from skorch.dataset import ValidSplit
 from torch import Tensor
 from tqdm import tqdm
 
@@ -204,7 +205,7 @@ class LC2ST:
                         ),
                     )
                 ],
-                "train_split": 0.1,
+                "train_split": ValidSplit(cast(Any, 0.1)),
                 "optimizer__weight_decay": 1e-4,
                 "device": self.device,
                 "verbose": 0,
@@ -779,6 +780,11 @@ def train_lc2st(
 
     # train classifier
     clf_ = clone(clf)
+    base_clf = getattr(clf_, "clf", None)
+    if isinstance(clf_, NeuralNetBinaryClassifier) or isinstance(
+        base_clf, NeuralNetBinaryClassifier
+    ):
+        target = target.astype(np.float32)
     clf_.fit(data, target)  # type: ignore
 
     return clf_
@@ -856,10 +862,14 @@ class EnsembleClassifier(BaseEstimator):
             disable=self.verbosity < 1,
         ):
             clf = clone(self.clf)
-            if clf.random_state is not None:  # type: ignore
-                clf.random_state += n  # type: ignore
+            if hasattr(clf, "random_state"):
+                if clf.random_state is not None:  # type: ignore[attr-defined]
+                    clf.random_state += n  # type: ignore[attr-defined]
+                else:
+                    clf.random_state = n + 1  # type: ignore[attr-defined]
             else:
-                clf.random_state = n + 1  # type: ignore
+                torch.manual_seed(n + 1)
+                np.random.seed(n + 1)
             clf.fit(X, y)  # type: ignore
             self.trained_clfs.append(clf)
 

@@ -20,6 +20,8 @@ from sbi.inference import (
     NRE_B,
     NRE_C,
     DirectPosterior,
+    FlowMatchingSimformer,
+    Simformer,
 )
 from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
@@ -248,7 +250,9 @@ def test_batched_mcmc_sample_log_prob_with_different_x(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("vector_field_method", [NPSE, FMPE])
+@pytest.mark.parametrize(
+    "vector_field_method", [NPSE, FMPE, Simformer, FlowMatchingSimformer]
+)
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
 @pytest.mark.parametrize("sampling_method", ["sde", "ode"])
 @pytest.mark.parametrize(
@@ -270,14 +274,31 @@ def test_batched_score_sample_with_different_x(
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
 
-    inference = vector_field_method(prior=prior)
+    vf_params = {}
+    if vector_field_method in {NPSE, FMPE}:
+        vf_params = {
+            "prior": prior,
+        }
+    elif vector_field_method in {Simformer, FlowMatchingSimformer}:
+        vf_params = {
+            "posterior_latent_idx": [0],
+            "posterior_observed_idx": [1],
+        }
+
+    inference = vector_field_method(**vf_params)
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
-    inference.append_simulations(theta, x).train(max_num_epochs=2)
+    if vector_field_method in {Simformer, FlowMatchingSimformer}:
+        inputs = torch.stack([theta, x], dim=1)
+        inference.append_simulations(inputs)
+    else:
+        inference.append_simulations(theta, x)
+
+    inference.train(max_num_epochs=2)
 
     x_o = ones(num_dim) if x_o_batch_dim == 0 else ones(x_o_batch_dim, num_dim)
 
-    posterior = inference.build_posterior(sample_with=sampling_method)
+    posterior = inference.build_posterior(prior=prior, sample_with=sampling_method)
 
     samples = posterior.sample_batched(
         sample_shape,
@@ -293,9 +314,15 @@ def test_batched_score_sample_with_different_x(
     # test only for 1 sample_shape case to avoid repeating this test.
     if x_o_batch_dim > 1 and sample_shape == (5,):
         assert samples.shape[1] == x_o_batch_dim, "Batch dimension wrong"
-        inference = vector_field_method(prior=prior)
-        _ = inference.append_simulations(theta, x).train()
-        posterior = inference.build_posterior(sample_with=sampling_method)
+        inference = vector_field_method(**vf_params)
+        if vector_field_method in {Simformer, FlowMatchingSimformer}:
+            inputs = torch.stack([theta, x], dim=1)
+            inference.append_simulations(inputs)
+        else:
+            inference.append_simulations(theta, x)
+
+        inference.train()
+        posterior = inference.build_posterior(prior=prior, sample_with=sampling_method)
 
         x_o = torch.stack([0.5 * ones(num_dim), -0.5 * ones(num_dim)], dim=0)
         # test with multiple chains to test whether correct chains are

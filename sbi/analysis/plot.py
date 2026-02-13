@@ -309,16 +309,22 @@ def plt_hist_1d(
 ) -> None:
     """Plot 1D histogram."""
     hist_kwargs = copy.deepcopy(diag_kwargs["mpl_kwargs"])
+    limits_min = float(limits[0].item())
+    limits_max = float(limits[1].item())
     if "bins" not in hist_kwargs or hist_kwargs["bins"] is None:
         if diag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
             binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
-            hist_kwargs["bins"] = np.arange(limits[0], limits[1] + binsize, binsize)
+            hist_kwargs["bins"] = np.arange(limits_min, limits_max + binsize, binsize)
         else:
             # TODO: add more bin heuristics
             pass
     if isinstance(hist_kwargs["bins"], int):
-        hist_kwargs["bins"] = np.linspace(limits[0], limits[1], hist_kwargs["bins"])
+        hist_kwargs["bins"] = np.linspace(
+            limits_min,
+            limits_max,
+            hist_kwargs["bins"],
+        )
     ax.hist(samples, **hist_kwargs)
 
 

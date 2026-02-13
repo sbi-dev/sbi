@@ -354,6 +354,8 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         Returns: Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         return self._neural_net.log_prob(theta, x)
 
     def _expand_mog(self, eps: float = 1e-5):
@@ -367,6 +369,8 @@ class NPE_A(PosteriorEstimatorTrainer):
         Args:
             eps: Standard deviation for the random perturbation.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         assert isinstance(self._neural_net.net._distribution, MultivariateGaussianMDN)
 
         # Increase the number of components

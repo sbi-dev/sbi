@@ -9,6 +9,7 @@ from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
+from sbi.inference.trainers.vfpe.simformer import FlowMatchingSimformer, Simformer
 from sbi.utils.metrics import c2st
 
 from .mini_sbibm import get_task
@@ -29,7 +30,7 @@ VF_ESTIMATORS = ["mlp", "ada_mlp", "transformer"]
 
 # Benchmarking method groups i.e. what to run for different --bm-mode
 METHOD_GROUPS = {
-    "none": [NPE, NRE, NLE, FMPE, NPSE],
+    "none": [NPE, NRE, NLE, FMPE, NPSE, Simformer, FlowMatchingSimformer],
     "npe": [NPE],
     "nle": [NLE],
     "nre": [NRE_A, NRE_B, NRE_C, BNRE],
@@ -39,6 +40,8 @@ METHOD_GROUPS = {
     "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
+    "simformer": [Simformer],
+    "flow-simformer": [FlowMatchingSimformer],
 }
 METHOD_PARAMS = {
     "none": [{}],
@@ -55,6 +58,8 @@ METHOD_PARAMS = {
     "snpe": [{}],
     "snle": [{}],
     "snre": [{}],
+    "simformer": [{}],
+    "flow-simformer": [{}],
 }
 
 
@@ -184,8 +189,23 @@ def train_and_eval_amortized_inference(
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
-    inference = inference_class(prior, **extra_kwargs)
-    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
+    if inference_class in {Simformer, FlowMatchingSimformer}:
+        # Get dimensions of thetas and xs, and set latent and observed idx
+        inference = inference_class(**extra_kwargs)
+        num_theta = thetas.shape[1]
+        num_x = xs.shape[1]
+        inference.set_condition_indexes(
+            new_posterior_latent_idx=torch.arange(0, num_theta),
+            new_posterior_observed_idx=torch.arange(num_theta, num_theta + num_x),
+        )
+        inputs = torch.cat([thetas, xs], dim=1)
+        inference.append_simulations(
+            inputs,
+        )
+    else:
+        inference = inference_class(prior, **extra_kwargs)
+        inference.append_simulations(thetas, xs)
+    inference.train(**TRAIN_KWARGS)
 
     posterior = inference.build_posterior()
 

@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from abc import ABC
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
 from torch import Tensor
@@ -32,7 +31,7 @@ from sbi.utils import check_estimator_arg, x_shape_from_simulation
 from sbi.utils.torchutils import assert_all_finite
 
 
-class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
+class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -333,6 +332,8 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         Returns:
             Negative log prob.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural network has not been initialized yet. ")
         theta = reshape_to_batch_event(
             theta, event_shape=self._neural_net.condition_shape
         )

@@ -188,6 +188,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         self._round = max(self._data_round_index)
 
         if self._round > 0:
+            if self._neural_net is None:
+                raise RuntimeError("Neural net not initialized.")
             # Set the proposal to the last proposal that was passed by the user. For
             # atomic SNPE, it does not matter what the proposal is. For non-atomic
             # SNPE, we only use the latest data that was passed, i.e. the one from the
@@ -222,6 +224,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         3) Compute (Precision * mean) for the prior. This quantity is used at every
             training step if the prior is Gaussian.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
 
         self.z_score_theta = isinstance(
             self._neural_net.net._transform, CompositeTransform
@@ -255,6 +259,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
 
         if self.z_score_theta:
+            if self._neural_net is None:
+                raise RuntimeError("Neural net not initialized.")
             scale = self._neural_net.net._transform._transforms[0]._scale
             shift = self._neural_net.net._transform._transforms[0]._shift
 
@@ -308,6 +314,8 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         Returns: Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
 
         if self.use_non_atomic_loss:
             if not (
@@ -350,6 +358,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns:
             Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         batch_size = theta.shape[0]
 
         num_atoms = int(
@@ -442,6 +452,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns:
             Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
 
         # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
         # and then get the mixture_components (**without** calling log_prob()). Hence,
@@ -620,6 +632,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
+            if self._neural_net is None:
+                raise RuntimeError("Neural net not initialized.")
             theta, _ = self._neural_net.net._transform(theta)
 
         return theta

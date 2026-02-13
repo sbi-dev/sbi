@@ -27,6 +27,7 @@ from sbi.sbi_types import Shape
 from sbi.utils import check_prior
 from sbi.utils.sbiutils import (
     gradient_ascent,
+    handle_invalid_x,
     warn_if_outside_prior_support,
     within_support,
 )
@@ -221,6 +222,17 @@ class VectorFieldPosterior(NeuralPosterior):
 
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
+        _, num_nans, num_infs = handle_invalid_x(x)
+
+        if num_nans + num_infs == 0:
+            ValueError(
+                "Some invalid entries (NaN/Infs) were "
+                "found in x. You probably passed these as the ground observed "
+                "x's `x_obs`. "
+                "Please, remove these values and provide reasonable observed x's "
+                "to avoid the sampling process to run indefinitely."
+            )
+
         is_iid = x.shape[0] > 1
         self.potential_fn.set_x(
             x,
@@ -503,6 +515,17 @@ class VectorFieldPosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
+        _, num_nans, num_infs = handle_invalid_x(x)
+
+        if num_nans + num_infs == 0:
+            ValueError(
+                "Some invalid entries (NaN/Infs) were "
+                "found in x. You probably passed these as the ground observed "
+                "x's `x_obs`. "
+                "Please, remove these values and provide reasonable observed x's "
+                "to avoid the sampling process to run indefinitely."
+            )
+
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()

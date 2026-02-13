@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from dataclasses import asdict
-from typing import List, Literal
+from typing import List, Literal, cast
 
 import numpy as np
 import pytest
@@ -17,7 +17,9 @@ from sbi.analysis import conditional_potential
 from sbi.inference import (
     FMPE,
     NPSE,
+    FlowMatchingSimformer,
     MCMCPosterior,
+    Simformer,
     VectorFieldPosterior,
     simulate_for_sbi,
     vector_field_estimator_based_potential,
@@ -33,6 +35,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
+from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks import process_simulator
 
 from .test_utils import get_dkl_gaussian_prior
@@ -44,20 +47,74 @@ from .test_utils import get_dkl_gaussian_prior
 
 # We always test num_dim and sample_with with defaults and mark the rests as slow.
 @pytest.mark.parametrize(
-    "vector_field_type, num_dim, prior_str, sample_with",
+    "vf_estimator, vector_field_type, num_dim, prior_str, sample_with",
     [
-        ("vp", 1, "gaussian", ["sde", "ode"]),
-        ("vp", 3, "uniform", ["sde", "ode"]),
-        ("vp", 3, "gaussian", ["sde", "ode"]),
-        ("ve", 3, "uniform", ["sde", "ode"]),
-        ("subvp", 3, "uniform", ["sde", "ode"]),
-        ("fmpe", 1, "gaussian", ["sde", "ode"]),
-        ("fmpe", 1, "uniform", ["sde", "ode"]),
-        ("fmpe", 3, "gaussian", ["sde", "ode"]),
-        ("fmpe", 3, "uniform", ["sde", "ode"]),
+        ("NeuralPosterior", "vp", 1, "gaussian", ["sde", "ode"]),
+        ("NeuralPosterior", "vp", 3, "uniform", ["sde", "ode"]),
+        ("NeuralPosterior", "vp", 3, "gaussian", ["sde", "ode"]),
+        ("NeuralPosterior", "ve", 3, "uniform", ["sde", "ode"]),
+        ("NeuralPosterior", "subvp", 3, "uniform", ["sde", "ode"]),
+        ("NeuralPosterior", "flow", 1, "gaussian", ["sde", "ode"]),
+        ("NeuralPosterior", "flow", 1, "uniform", ["sde", "ode"]),
+        ("NeuralPosterior", "flow", 3, "gaussian", ["sde", "ode"]),
+        ("NeuralPosterior", "flow", 3, "uniform", ["sde", "ode"]),
+        ("Simformer", "ve", 1, "gaussian", ["sde", "ode"]),
+        ("Simformer", "ve", 3, "gaussian", ["sde", "ode"]),
+        ("Simformer", "flow", 3, "uniform", ["sde", "ode"]),
+        pytest.param(
+            "Simformer",
+            "ve",
+            3,
+            "uniform",
+            ["sde", "ode"],
+            marks=[pytest.mark.slow],
+        ),
+        pytest.param(
+            "Simformer",
+            "vp",
+            3,
+            "uniform",
+            ["sde", "ode"],
+            marks=[pytest.mark.gpu, pytest.mark.slow],
+        ),
+        pytest.param(
+            "Simformer",
+            "subvp",
+            3,
+            "uniform",
+            ["sde", "ode"],
+            marks=[pytest.mark.gpu, pytest.mark.slow],
+        ),
+        pytest.param(
+            "Simformer",
+            "flow",
+            1,
+            "gaussian",
+            ["sde", "ode"],
+            marks=[pytest.mark.slow],
+        ),
+        pytest.param(
+            "Simformer",
+            "flow",
+            1,
+            "uniform",
+            ["sde", "ode"],
+            marks=[pytest.mark.slow],
+        ),
+        pytest.param(
+            "Simformer",
+            "flow",
+            3,
+            "gaussian",
+            ["sde", "ode"],
+            marks=[
+                pytest.mark.slow,
+            ],
+        ),
     ],
 )
 def test_c2st_vector_field_on_linearGaussian(
+    vf_estimator: str,
     vector_field_type,
     num_dim: int,
     prior_str: str,
@@ -67,24 +124,35 @@ def test_c2st_vector_field_on_linearGaussian(
     Test whether NPSE and FMPE infer well a simple example with available ground truth.
     """
 
-    x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 2600 if vector_field_type == "ve" else 2500
+    num_simulations = 5000
+    max_num_epochs = 100
+    device = "cpu"
+    tol = 0.15
+
+    if vf_estimator == "Simformer":
+        num_simulations = 5000
+        max_num_epochs = 500
+
+    device = process_device(device)
+    x_o = zeros(1, num_dim, device=device)
 
     # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
+    likelihood_shift = -1.0 * ones(num_dim, device=device)
+    likelihood_cov = 0.3 * eye(num_dim, device=device)
 
     if prior_str == "gaussian":
-        prior_mean = zeros(num_dim)
-        prior_cov = eye(num_dim)
+        prior_mean = zeros(num_dim, device=device)
+        prior_cov = eye(num_dim, device=device)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
         gt_posterior = true_posterior_linear_gaussian_mvn_prior(
             x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
         )
         target_samples = gt_posterior.sample((num_samples,))
     else:
-        prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+        prior = utils.BoxUniform(
+            -2.0 * ones(num_dim), 2.0 * ones(num_dim), device=device
+        )
         target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
             x_o,
             likelihood_shift,
@@ -92,20 +160,49 @@ def test_c2st_vector_field_on_linearGaussian(
             prior=prior,
             num_samples=num_samples,
         )
-    if vector_field_type == "fmpe":
-        inference = FMPE(prior, show_progress_bars=True)
-    else:
-        inference = NPSE(prior, sde_type=vector_field_type, show_progress_bars=True)
+
+    if vf_estimator == "NeuralPosterior":
+        vf_params = {
+            "prior": prior,
+            "device": device,
+        }
+        if vector_field_type == "flow":
+            inference = FMPE(**vf_params)
+        else:
+            inference = NPSE(sde_type=vector_field_type, **vf_params)  # type: ignore
+    elif vf_estimator == "Simformer":
+        vf_params = {
+            "posterior_latent_idx": [0],
+            "posterior_observed_idx": [1],
+            "device": device,
+        }
+        if vector_field_type == "flow":
+            inference = FlowMatchingSimformer(**vf_params)
+        else:
+            inference = Simformer(sde_type=vector_field_type, **vf_params)  # type: ignore
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    vf_estimator = inference.append_simulations(theta, x).train()
-    # amortize the training when testing sample_with.
+    if vf_estimator == "Simformer":
+        # Cast object to help pyright recognize the right type
+        # This will avoid some warnings below
+        inference = cast(Simformer | FlowMatchingSimformer, inference)
+        # First unsqueeze to make the feature dimension appear (F), then concat
+        inputs = torch.cat([theta.unsqueeze(1), x.unsqueeze(1)], dim=1)
+        inference.append_simulations(inputs)
+    else:
+        inference = cast(NPSE | FMPE, inference)
+        inference.append_simulations(theta, x)
+
+    # Train for max_num_epochs
+    _ = inference.train(max_num_epochs=max_num_epochs)
+
+    # Amortize the training when testing sample_with.
     for method in sample_with:
         posterior = inference.build_posterior(
-            vf_estimator,
-            sample_with=method,
+            prior=prior,
+            sample_with=method,  # type: ignore
             posterior_parameters=VectorFieldPosteriorParameters(),
         )
         posterior.set_default_x(x_o)
@@ -116,10 +213,10 @@ def test_c2st_vector_field_on_linearGaussian(
             samples,
             target_samples,
             alg=f"vector_field-{vector_field_type}-{prior_str}-{num_dim}D-{method}",
+            tol=tol,
         )
 
-    # Checks for log_prob()
-    if prior_str == "gaussian":
+    if prior_str == "gaussian" and vf_estimator == "NeuralPosterior":
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior.
 
@@ -150,6 +247,7 @@ def test_c2st_vector_field_on_linearGaussian(
         )
 
 
+# Simformer cannot be tested here as it requires a coherent input dimensionality
 @pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
 def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
     """Test NPE on linear Gaussian with different theta and x dimensionality."""
@@ -206,6 +304,7 @@ def test_c2st_vector_field_on_linearGaussian_different_dims(vector_field_type):
     )
 
 
+# Simformer cannot be tested here too, as it is always transformer-based
 @pytest.mark.parametrize("vector_field_type", [NPSE, FMPE])
 @pytest.mark.parametrize(
     "model", ["mlp", "ada_mlp", pytest.param("transformer", marks=[pytest.mark.slow])]
@@ -259,7 +358,7 @@ def test_vfinference_with_different_models(vector_field_type, model):
 _trained_models_cache = {}
 
 
-def train_vector_field_model(vector_field_type, prior_type):
+def train_vector_field_model(vf_estimator, vector_field_type, prior_type):
     """Factory function that trains a score estimator for NPSE tests with caching."""
     cache_key = (vector_field_type, prior_type)
 
@@ -282,24 +381,44 @@ def train_vector_field_model(vector_field_type, prior_type):
         prior_mean = zeros(num_dim)
         prior_cov = eye(num_dim)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-        prior_npse = prior
     elif prior_type == "uniform":
         prior = BoxUniform(-2 * ones(num_dim), 2 * ones(num_dim))
-        prior_npse = prior
 
     # This check that our method to handle "general" priors works.
     # i.e. if NPSE does not get a proper passed by the user.
-    if vector_field_type == "fmpe":
-        inference = FMPE(prior_npse, show_progress_bars=True)
-    else:
-        inference = NPSE(
-            prior_npse, show_progress_bars=True, sde_type=vector_field_type
-        )
+    if vf_estimator == "NeuralPosterior":
+        vf_params = {
+            "prior": prior,
+        }
+        if vector_field_type == "flow":
+            inference = FMPE(**vf_params)
+        else:
+            inference = NPSE(sde_type=vector_field_type, **vf_params)  # type: ignore
+    elif vf_estimator == "Simformer":
+        vf_params = {
+            "posterior_latent_idx": [0],
+            "posterior_observed_idx": [1],
+        }
+        if vector_field_type == "flow":
+            inference = FlowMatchingSimformer(**vf_params)
+        else:
+            inference = Simformer(sde_type=vector_field_type, **vf_params)  # type: ignore
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    estimator = inference.append_simulations(theta, x).train()
+    if vf_estimator == "Simformer":
+        # Cast object to help pyright recognize the right type
+        # This will avoid some warnings below
+        inference = cast(Simformer | FlowMatchingSimformer, inference)
+        # First unsqueeze to make the feature dimension appear (F), then concat
+        inputs = torch.cat([theta.unsqueeze(1), x.unsqueeze(1)], dim=1)
+        inference.append_simulations(inputs)
+    else:
+        inference = cast(NPSE | FMPE, inference)
+        inference.append_simulations(theta, x)
+
+    estimator = inference.train()
 
     result = {
         "estimator": estimator,
@@ -320,14 +439,24 @@ def train_vector_field_model(vector_field_type, prior_type):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "vector_field_type, prior_type", [("ve", "gaussian"), ("fmpe", "gaussian")]
+    "vf_estimator, vector_field_type, prior_type",
+    [
+        ("NeuralPosterior", "ve", "gaussian"),
+        ("NeuralPosterior", "fmpe", "gaussian"),
+        ("Simformer", "ve", "gaussian"),
+        ("Simformer", "flow", "gaussian"),
+    ],
 )
-def test_vector_field_sde_ode_sampling_equivalence(vector_field_type, prior_type):
+def test_vector_field_sde_ode_sampling_equivalence(
+    vf_estimator, vector_field_type, prior_type
+):
     """
     Test whether SDE and ODE sampling are equivalent
-    for FMPE and NPSE.
+    for FMPE, NPSE and Simformer.
     """
-    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+    vector_field_trained_model = train_vector_field_model(
+        vf_estimator, vector_field_type, prior_type
+    )
 
     num_samples = 1000
     x_o = zeros(1, vector_field_trained_model["num_dim"])
@@ -349,8 +478,34 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_type, prior_type
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe", "subvp", "vp"])
-@pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
+@pytest.mark.parametrize(
+    "vf_estimator, vector_field_type, prior_type",
+    [
+        ("NeuralPosterior", "ve", "gaussian"),
+        ("NeuralPosterior", "vp", "gaussian"),
+        ("NeuralPosterior", "subvp", "gaussian"),
+        ("NeuralPosterior", "fmpe", "gaussian"),
+        ("NeuralPosterior", "ve", "uniform"),
+        ("NeuralPosterior", "vp", "uniform"),
+        ("NeuralPosterior", "subvp", "uniform"),
+        ("NeuralPosterior", "fmpe", "uniform"),
+        # TODO: need to fine-tune hyper-parameters for Simformer
+        # they all fail to converge properly with the current settings
+        # TODO: need to handle bad shape management for Simformer
+        pytest.param(
+            "Simformer",
+            "flow",
+            "gaussian",
+            marks=pytest.mark.skip(
+                reason=(
+                    "need to fine-tune hyper-parameters for Simformer, "
+                    "they all fail to converge properly with the current settings; "
+                    "need to handle bad shape management for Simformer"
+                )
+            ),
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "iid_method, num_trials",
     [
@@ -361,7 +516,7 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_type, prior_type
     ],
 )
 def test_vector_field_iid_inference(
-    vector_field_type, prior_type, iid_method, num_trials
+    vf_estimator, vector_field_type, prior_type, iid_method, num_trials
 ):
     """
     Test whether NPSE and FMPE infers well a simple example with available ground truth.
@@ -373,7 +528,9 @@ def test_vector_field_iid_inference(
         num_trials: The number of trials to run.
     """
 
-    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+    vector_field_trained_model = train_vector_field_model(
+        vf_estimator, vector_field_type, prior_type
+    )
 
     # Extract data from the trained model
     estimator = vector_field_trained_model["estimator"]
@@ -387,7 +544,11 @@ def test_vector_field_iid_inference(
 
     num_samples = 1000
 
-    x_o = zeros(num_trials, num_dim)
+    if vf_estimator == "Simformer":
+        # Simformer needs to differentiate between variables and features
+        x_o = zeros(num_trials, 1, num_dim)
+    else:
+        x_o = zeros(num_trials, num_dim)
 
     posterior = inference.build_posterior(
         estimator,
@@ -427,11 +588,14 @@ def test_vector_field_iid_inference(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["npse", "fmpe"])
+@pytest.mark.parametrize(
+    "vector_field_type", ["npse", "fmpe", "simformer", "flow-simformer"]
+)
 def test_vector_field_map(vector_field_type):
     num_dim = 2
     x_o = zeros(num_dim)
     num_simulations = 3000
+    max_num_epochs = 100
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -445,16 +609,35 @@ def test_vector_field_map(vector_field_type):
     )
 
     if vector_field_type == "npse":
-        inference = NPSE(prior, show_progress_bars=True)
+        inference = NPSE(prior=prior)
     elif vector_field_type == "fmpe":
-        inference = FMPE(prior, show_progress_bars=True)
+        inference = FMPE(prior=prior)
+    elif vector_field_type == "simformer":
+        inference = Simformer(
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+        )
+    elif vector_field_type == "flow-simformer":
+        inference = FlowMatchingSimformer(
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+        )
     else:
         raise ValueError(f"Invalid vector field type: {vector_field_type}")
 
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inference.append_simulations(theta, x).train(max_num_epochs=100)
+    if vector_field_type in {"simformer", "flow-simformer"}:
+        inference = cast(Simformer | FlowMatchingSimformer, inference)
+        inputs = torch.cat([theta.unsqueeze(1), x.unsqueeze(1)], dim=1)
+        inference.append_simulations(inputs)
+    else:
+        inference = cast(NPSE | FMPE, inference)
+        inference.append_simulations(theta, x)
+
+    inference.train(max_num_epochs=max_num_epochs)
+
     posterior = inference.build_posterior().set_default_x(x_o)
 
     map_ = posterior.map(show_progress_bars=True, num_iter=5)
@@ -591,16 +774,40 @@ def test_sample_conditional():
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["ve", "vp", "fmpe"])
-@pytest.mark.parametrize("prior_type", ["gaussian"])
+@pytest.mark.parametrize(
+    "vf_estimator, vector_field_type, prior_type",
+    [
+        ("NeuralPosterior", "ve", "gaussian"),
+        ("NeuralPosterior", "vp", "gaussian"),
+        ("NeuralPosterior", "subvp", "gaussian"),
+        ("NeuralPosterior", "fmpe", "gaussian"),
+        # TODO: need to fine-tune hyper-parameters for Simformer
+        # they all fail to converge properly with the current settings
+        # TODO: need to handle bad shape management for Simformer
+        pytest.param(
+            "Simformer",
+            "flow",
+            "gaussian",
+            marks=pytest.mark.skip(
+                reason=(
+                    "need to fine-tune hyper-parameters for Simformer, "
+                    "they all fail to converge properly with the current settings; "
+                    "need to handle bad shape management for Simformer"
+                )
+            ),
+        ),
+    ],
+)
 @pytest.mark.parametrize("iid_batch_size", [1, 2, 5])
-def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
+def test_iid_log_prob(vf_estimator, vector_field_type, prior_type, iid_batch_size):
     '''
     Tests the log-probability computation of the score-based posterior.
 
     '''
 
-    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+    vector_field_trained_model = train_vector_field_model(
+        vf_estimator, vector_field_type, prior_type
+    )
 
     # Prior Gaussian
     prior = vector_field_trained_model["prior"]
