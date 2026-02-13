@@ -366,6 +366,8 @@ class BaseConditionalVectorFieldEstimator:
     _mean_base: Tensor
     _std_base: Tensor
     _embedding_net: nn.Module
+    t_min: float
+    t_max: float
 
     # When implementing custom estimators,
     # the following properties should be set:
