@@ -27,7 +27,7 @@ from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import BoxUniform
 
 # Constant for numerical stability in matrix operations.
-_CORRECTION_EPSILON: float = 1e-4
+_CORRECTION_EPSILON: float = 1e-6
 
 
 class NPE_A(PosteriorEstimatorTrainer):

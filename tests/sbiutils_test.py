@@ -570,9 +570,7 @@ class TestWarnIfInvalidForZscoring:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             warn_if_invalid_for_zscoring(x, outlier_iqr_factor=50.0)
-            outlier_warnings = [
-                wi for wi in w if "extreme outliers" in str(wi.message)
-            ]
+            outlier_warnings = [wi for wi in w if "extreme outliers" in str(wi.message)]
             assert len(outlier_warnings) == 0
 
         # Should warn with low factor
@@ -587,3 +585,24 @@ class TestWarnIfInvalidForZscoring:
 
         with pytest.warns(UserWarning, match=r"\[1, 3\]"):
             warn_if_invalid_for_zscoring(x)
+
+    def test_higher_dimensional_tensor(self):
+        """Test that >2D tensors are handled correctly (flattened)."""
+        # 3D tensor: (batch, height, width) - e.g., 1D images
+        x_3d = torch.randn(100, 4, 4)  # 100 samples, 4x4 features
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            warn_if_invalid_for_zscoring(x_3d)
+            assert len(w) == 0, f"Unexpected warning: {w[0].message if w else ''}"
+
+        # 3D tensor with constant feature
+        x_3d_const = torch.randn(100, 4, 4)
+        x_3d_const[:, 0, 0] = 5.0  # Make one feature constant
+        with pytest.warns(UserWarning, match="constant values"):
+            warn_if_invalid_for_zscoring(x_3d_const)
+
+        # 3D tensor with outlier
+        x_3d_outlier = torch.randn(100, 4, 4)
+        x_3d_outlier[0, 2, 3] = 10000.0  # Extreme outlier at position [2,3]
+        with pytest.warns(UserWarning, match="extreme outliers"):
+            warn_if_invalid_for_zscoring(x_3d_outlier)

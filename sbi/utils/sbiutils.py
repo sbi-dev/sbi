@@ -52,7 +52,8 @@ def warn_if_invalid_for_zscoring(
     This is robust because IQR is not affected by the outliers themselves.
 
     Args:
-        x: Data tensor of shape (num_samples, num_features).
+        x: Data tensor of shape (num_samples, *features). For >2D tensors, features
+            are flattened for checking.
         outlier_iqr_factor: Factor for IQR-based outlier detection. Values beyond
             Q1 - factor*IQR or Q3 + factor*IQR are considered extreme outliers.
             Default 10.0 (very conservative; standard is 1.5-3.0).
@@ -64,6 +65,10 @@ def warn_if_invalid_for_zscoring(
         >>> x_outlier[0, 0] = 1000.0  # Add extreme outlier
         >>> warn_if_invalid_for_zscoring(x_outlier)  # Warns about dimension 0
     """
+    # Flatten to 2D (N, D) for tensors with >2 dimensions (e.g., images)
+    if x.ndim > 2:
+        x = x.flatten(start_dim=1)
+
     # Handle edge case of single sample
     if x.shape[0] <= 1:
         warnings.warn(
@@ -81,15 +86,17 @@ def warn_if_invalid_for_zscoring(
     if len(constant_dims) > 0:
         warnings.warn(
             f"Data has constant values in dimension(s) {constant_dims.tolist()}. "
-            "Z-scoring these dimensions would result in NaN. Consider setting "
-            "`z_score_x='none'` or removing constant features from your data.",
+            "These dimensions carry no information and will be mapped to zero after "
+            "z-scoring. Consider removing constant features from your data.",
             UserWarning,
             stacklevel=2,
         )
         return  # Skip outlier check if there are constant features
 
     # Check for extreme outliers using IQR-based detection (robust to outliers)
-    q1, q3 = torch.quantile(x, torch.tensor([0.25, 0.75]), dim=0)
+    q1, q3 = torch.quantile(
+        x, torch.tensor([0.25, 0.75], device=x.device, dtype=x.dtype), dim=0
+    )
     iqr = q3 - q1
 
     # For dimensions with zero IQR (e.g., discrete data), skip outlier check
@@ -100,15 +107,10 @@ def warn_if_invalid_for_zscoring(
     lower_bound = q1 - outlier_iqr_factor * iqr
     upper_bound = q3 + outlier_iqr_factor * iqr
 
-    # Check each dimension for outliers
-    outlier_dims = []
-    for dim in range(x.shape[1]):
-        if valid_iqr[dim]:
-            has_outliers = torch.any(
-                (x[:, dim] < lower_bound[dim]) | (x[:, dim] > upper_bound[dim])
-            )
-            if has_outliers:
-                outlier_dims.append(dim)
+    # Vectorized outlier detection across all dimensions
+    is_outlier = (x < lower_bound) | (x > upper_bound)  # (N, D)
+    has_outlier_per_dim = is_outlier.any(dim=0)  # (D,)
+    outlier_dims = torch.where(has_outlier_per_dim & valid_iqr)[0].tolist()
 
     if outlier_dims:
         warnings.warn(
