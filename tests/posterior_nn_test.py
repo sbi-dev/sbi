@@ -80,7 +80,7 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     _ = posterior.log_prob(samples)
 
 
-@pytest.mark.parametrize("snplre_method", [NPE_A, NPE_C, NLE_A, NRE_A, NRE_B, NRE_C])
+@pytest.mark.parametrize("snplre_method", [NPE_C, NLE_A, NRE_A, NRE_B, NRE_C])
 def test_importance_posterior_sample_log_prob(snplre_method: type):
     num_dim = 2
     num_simulations = 1000

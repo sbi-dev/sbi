@@ -358,24 +358,43 @@ class NPE_A(PosteriorEstimatorTrainer):
 
     def build_posterior(
         self,
-        density_estimator: Optional[torch.nn.Module] = None,
+        density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
+        sample_with: Literal["direct"] = "direct",
         **kwargs,
-    ) -> "NPE_A_Posterior":
+    ) -> NPE_A_Posterior:
         r"""Build posterior from the neural density estimator.
 
-        Returns an NPE_A_Posterior that applies the SNPE-A correction formula
-        when sampling or evaluating log probabilities.
+        Returns an NPE_A_Posterior that applies the SNPE-A correction formula:
+            p(θ|x) ∝ q(θ|x) × prior(θ) / proposal(θ)
+
+        Note:
+            NPE_A only supports `sample_with="direct"`. The corrected posterior is a
+            Mixture of Gaussians (MoG) which can be sampled directly and efficiently.
+            MCMC, VI, rejection, and importance sampling methods do not provide
+            benefits over direct MoG sampling and are therefore not supported.
 
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
+            sample_with: Must be "direct". Other sampling methods are not supported.
             **kwargs: Additional arguments passed to NPE_A_Posterior.
 
         Returns:
-            NPE_A_Posterior with `.sample()` and `.log_prob()` methods.
+            NPE_A_Posterior with the SNPE-A correction applied.
+
+        Raises:
+            ValueError: If sample_with is not "direct".
         """
+        if sample_with != "direct":
+            raise ValueError(
+                f"NPE_A only supports sample_with='direct', got '{sample_with}'. "
+                "The corrected posterior is a Mixture of Gaussians which can be "
+                "sampled directly and efficiently. MCMC, VI, rejection, and "
+                "importance sampling do not provide benefits over direct MoG sampling."
+            )
+
         if prior is None:
             assert self._prior is not None, (
                 "You did not pass a prior. You have to pass the prior either at "
@@ -384,10 +403,10 @@ class NPE_A(PosteriorEstimatorTrainer):
             )
             prior = self._prior
 
+        # Resolve and validate density estimator
         if density_estimator is None:
             density_estimator = deepcopy(self._neural_net)
 
-        # Validate density estimator type
         if not isinstance(density_estimator, MixtureDensityEstimator):
             raise TypeError(
                 "NPE_A requires MixtureDensityEstimator, "
@@ -395,16 +414,14 @@ class NPE_A(PosteriorEstimatorTrainer):
                 "Use density_estimator='mdn_snpe_a' when initializing NPE_A."
             )
 
-        # Determine proposal and whether correction is needed
+        # Compute correction parameters
         proposal = self._proposal_roundwise[-1]
         is_first_round = proposal is self._prior or proposal is None
 
         if is_first_round:
-            # First round: no correction needed
             proposal_mog = None
             prior_mog = None
         else:
-            # Multi-round: extract proposal MoG and compute prior MoG
             proposal_mog = self._get_proposal_mog(proposal)
             prior_mog = self._compute_z_scored_prior_mog(density_estimator)
 
