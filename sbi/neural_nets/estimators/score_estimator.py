@@ -131,8 +131,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         t_tensor = torch.as_tensor([t_max], device=self.mean_0.device)
         mean_t = self.approx_marginal_mean(t_tensor)
         std_t = self.approx_marginal_std(t_tensor)
-        mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
-        std_t = torch.broadcast_to(std_t, (1, *input_shape))
+        # `broadcast_to` returns a view with shared storage. Clone so these buffers are
+        # writable (e.g. when restoring checkpoints via `load_state_dict`).
+        mean_t = torch.broadcast_to(mean_t, (1, *input_shape)).clone()
+        std_t = torch.broadcast_to(std_t, (1, *input_shape)).clone()
 
         # Update the base distribution parameters
         self._mean_base = mean_t
@@ -619,8 +621,10 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         t_tensor = torch.as_tensor([t_max], device=self.mean_0.device)
         mean_t = self.approx_marginal_mean(t_tensor)
         std_t = self.approx_marginal_std(t_tensor)
-        mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
-        std_t = torch.broadcast_to(std_t, (1, *input_shape))
+        # `broadcast_to` returns a view with shared storage. Clone so these buffers are
+        # writable (e.g. when restoring checkpoints via `load_state_dict`).
+        mean_t = torch.broadcast_to(mean_t, (1, *input_shape)).clone()
+        std_t = torch.broadcast_to(std_t, (1, *input_shape)).clone()
 
         # Update the base distribution parameters
         self._mean_base = mean_t
