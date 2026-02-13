@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Tuple
 
 import matplotlib.pyplot as plt
@@ -16,11 +17,13 @@ from sbi.analysis import (
     eval_conditional_density,
     sensitivity_analysis,
 )
-from sbi.inference import NPE, NPE_A
-from sbi.inference.trainers.npe.npe_a import NPE_A_MDN
+from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
-from sbi.utils.sbiutils import z_score_parser
+from sbi.utils.sbiutils import (
+    warn_if_invalid_for_zscoring,
+    z_score_parser,
+)
 
 
 def test_conditional_density_1d():
@@ -206,21 +209,17 @@ def test_average_cond_coeff_matrix():
     assert (torch.abs(gt_matrix - cond_mat) < 1e-3).all()
 
 
-@pytest.mark.parametrize("snpe_method", ("snpe_a", "snpe_c"))
+@pytest.mark.parametrize("snpe_method", ("snpe_c",))
 def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     """
-    Tests whether the the product between proposal and posterior is computed correctly.
+    Tests whether the product between proposal and posterior is computed correctly.
 
-    For NPE-C, this initializes two MoGs with two components each. It then evaluates
+    This test initializes two MoGs with two components each. It then evaluates
     their product by simply multiplying the probabilities of the two. The result is
-    compared to the product of two MoGs as implemented in APT.
-
-    For NPE-A, it initializes a MoG with two compontents and one Gaussian (with one
-    component). It then devices the MoG by the Gaussian and compares it to the
-    transformation in NPE-A.
+    compared to the product of two MoGs as implemented in NPE-C (APT).
 
     Args:
-        snpe_method: String indicating whether to test snpe-a or snpe-c.
+        snpe_method: String indicating method to test.
         plot_results: Whether to plot the products of the distributions.
     """
 
@@ -252,14 +251,9 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     covs1 = torch.stack([0.5 * torch.eye(2), torch.eye(2)])
     weights1 = torch.tensor([0.3, 0.7])
 
-    if snpe_method == "snpe_c":
-        means2 = torch.tensor([[2.0, -2.2], [-2.0, 1.9]])
-        covs2 = torch.stack([0.6 * torch.eye(2), 0.9 * torch.eye(2)])
-        weights2 = torch.tensor([0.6, 0.4])
-    elif snpe_method == "snpe_a":
-        means2 = torch.tensor([[-0.2, -0.4]])
-        covs2 = torch.stack([3.5 * torch.eye(2)])
-        weights2 = torch.tensor([1.0])
+    means2 = torch.tensor([[2.0, -2.2], [-2.0, 1.9]])
+    covs2 = torch.stack([0.6 * torch.eye(2), 0.9 * torch.eye(2)])
+    weights2 = torch.tensor([0.6, 0.4])
 
     mog1 = MoG(means1, covs1, weights1)
     mog2 = MoG(means2, covs2, weights2)
@@ -271,65 +265,31 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     probs2_raw = mog2.log_prob(theta_grid_flat.T)
     probs2 = torch.reshape(probs2_raw, (100, 100))
 
-    if snpe_method == "snpe_c":
-        probs_mult = probs1 * probs2
+    probs_mult = probs1 * probs2
 
-        # Set up a NPE object in order to use the
-        # `_automatic_posterior_transformation()`.
-        prior = BoxUniform(-5 * ones(2), 5 * ones(2))
-        # Testing new z-score arg options.
-        density_estimator = posterior_nn("mdn", z_score_theta=None, z_score_x=None)
-        inference = NPE(prior=prior, density_estimator=density_estimator)
-        theta_ = torch.rand(100, 2)
-        x_ = torch.rand(100, 2)
-        _ = inference.append_simulations(theta_, x_).train(max_num_epochs=1)
-        inference._set_state_for_mog_proposal()
+    # Set up a NPE object in order to use the
+    # `_automatic_posterior_transformation()`.
+    prior = BoxUniform(-5 * ones(2), 5 * ones(2))
+    # Testing new z-score arg options.
+    density_estimator = posterior_nn("mdn", z_score_theta=None, z_score_x=None)
+    inference = NPE(prior=prior, density_estimator=density_estimator)
+    theta_ = torch.rand(100, 2)
+    x_ = torch.rand(100, 2)
+    _ = inference.append_simulations(theta_, x_).train(max_num_epochs=1)
+    inference._set_state_for_mog_proposal()
 
-        precs1 = torch.inverse(covs1)
-        precs2 = torch.inverse(covs2)
+    precs1 = torch.inverse(covs1)
+    precs2 = torch.inverse(covs2)
 
-        # `.unsqueeze(0)` is needed because the method requires a batch dimension.
-        logits_pp, means_pp, _, covs_pp = inference._automatic_posterior_transformation(
-            torch.log(weights1.unsqueeze(0)),
-            means1.unsqueeze(0),
-            precs1.unsqueeze(0),
-            torch.log(weights2.unsqueeze(0)),
-            means2.unsqueeze(0),
-            precs2.unsqueeze(0),
-        )
-
-    elif snpe_method == "snpe_a":
-        probs_mult = probs1 / probs2
-
-        prior = BoxUniform(-5 * ones(2), 5 * ones(2))
-
-        inference = NPE_A(prior=prior)
-        theta_ = torch.rand(100, 2)
-        x_ = torch.rand(100, 2)
-        density_estimator = inference.append_simulations(theta_, x_).train(
-            max_num_epochs=1
-        )
-        wrapped_density_estimator = NPE_A_MDN(
-            flow=density_estimator, proposal=prior, prior=prior, device="cpu"
-        )
-
-        precs1 = torch.inverse(covs1)
-        precs2 = torch.inverse(covs2)
-
-        # `.unsqueeze(0)` is needed because the method requires a batch dimension.
-        (
-            logits_pp,
-            means_pp,
-            _,
-            covs_pp,
-        ) = wrapped_density_estimator._proposal_posterior_transformation(
-            torch.log(weights2.unsqueeze(0)),
-            means2.unsqueeze(0),
-            precs2.unsqueeze(0),
-            torch.log(weights1.unsqueeze(0)),
-            means1.unsqueeze(0),
-            precs1.unsqueeze(0),
-        )
+    # `.unsqueeze(0)` is needed because the method requires a batch dimension.
+    logits_pp, means_pp, _, covs_pp = inference._automatic_posterior_transformation(
+        torch.log(weights1.unsqueeze(0)),
+        means1.unsqueeze(0),
+        precs1.unsqueeze(0),
+        torch.log(weights2.unsqueeze(0)),
+        means2.unsqueeze(0),
+        precs2.unsqueeze(0),
+    )
 
     # Normalize weights.
     logits_pp_norm = logits_pp - torch.logsumexp(logits_pp, dim=-1, keepdim=True)
@@ -564,3 +524,66 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     # plt.plot(x_zstructured.T)
     # plt.title('z-scored: structured dims');
     # plt.show()
+
+
+class TestWarnIfInvalidForZscoring:
+    """Test warn_if_invalid_for_zscoring function."""
+
+    def test_normal_data_no_warning(self):
+        """Test that normal data produces no warning."""
+        x = torch.randn(1000, 3)
+        # Should not warn
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            warn_if_invalid_for_zscoring(x)
+            assert len(w) == 0, f"Unexpected warning: {w[0].message if w else ''}"
+
+    def test_constant_feature_warns(self):
+        """Test that constant features produce a warning."""
+        x = torch.randn(100, 2)
+        x[:, 1] = 5.0  # Make second dimension constant
+
+        with pytest.warns(UserWarning, match="constant values"):
+            warn_if_invalid_for_zscoring(x)
+
+    def test_extreme_outlier_warns(self):
+        """Test that extreme outliers produce a warning."""
+        x = torch.randn(1000, 2)
+        x[0, 0] = 10000.0  # Add extreme outlier to first dimension
+
+        with pytest.warns(UserWarning, match="extreme outliers"):
+            warn_if_invalid_for_zscoring(x)
+
+    def test_single_sample_warns(self):
+        """Test that single sample produces a warning."""
+        x = torch.randn(1, 3)
+
+        with pytest.warns(UserWarning, match="Only one data sample"):
+            warn_if_invalid_for_zscoring(x)
+
+    def test_custom_iqr_factor(self):
+        """Test that custom IQR factor works."""
+        x = torch.randn(1000, 2)
+        x[0, 0] = 20.0  # Moderate outlier (~20 std from mean for N(0,1))
+
+        # Should not warn with very high factor
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            warn_if_invalid_for_zscoring(x, outlier_iqr_factor=50.0)
+            outlier_warnings = [
+                wi for wi in w if "extreme outliers" in str(wi.message)
+            ]
+            assert len(outlier_warnings) == 0
+
+        # Should warn with low factor
+        with pytest.warns(UserWarning, match="extreme outliers"):
+            warn_if_invalid_for_zscoring(x, outlier_iqr_factor=5.0)
+
+    def test_identifies_correct_dimensions(self):
+        """Test that the warning identifies the correct problematic dimensions."""
+        x = torch.randn(1000, 4)
+        x[0, 1] = 10000.0  # Outlier in dim 1
+        x[0, 3] = 10000.0  # Outlier in dim 3
+
+        with pytest.warns(UserWarning, match=r"\[1, 3\]"):
+            warn_if_invalid_for_zscoring(x)

@@ -65,7 +65,7 @@ from sbi.utils import (
     mask_sims_from_prior,
     nle_nre_apt_msg_on_invalid_x,
     validate_theta_and_x,
-    warn_if_zscoring_changes_data,
+    warn_if_invalid_for_zscoring,
 )
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
@@ -293,7 +293,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         theta = theta[is_valid_x]
 
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
+        warn_if_invalid_for_zscoring(x)
         nle_nre_apt_msg_on_invalid_x(
             num_nans, num_infs, exclude_invalid_x, algorithm or type(self).__name__
         )

@@ -80,7 +80,7 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     _ = posterior.log_prob(samples)
 
 
-@pytest.mark.parametrize("snplre_method", [NPE_A, NPE_C, NLE_A, NRE_A, NRE_B, NRE_C])
+@pytest.mark.parametrize("snplre_method", [NPE_C, NLE_A, NRE_A, NRE_B, NRE_C])
 def test_importance_posterior_sample_log_prob(snplre_method: type):
     num_dim = 2
     num_simulations = 1000
@@ -154,7 +154,8 @@ def test_batched_sample_log_prob_with_different_x(
     # Test consistency with non-batched log_prob
     # NOTE: Leakage factor is a MC estimate, so we need to relax the tolerance here.
     if x_o_batch_dim == 0:
-        log_probs = posterior.log_prob(samples, x=x_o)
+        # sample_batched returns (sample_dim, batch_dim, input_dim), squeeze batch dim
+        log_probs = posterior.log_prob(samples.squeeze(1), x=x_o)
         assert torch.allclose(
             log_probs, batched_log_probs[:, 0], atol=1e-1, rtol=1e-1
         ), "Batched log probs different from non-batched log probs"

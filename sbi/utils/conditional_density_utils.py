@@ -4,14 +4,16 @@
 from copy import deepcopy
 from typing import Callable, List, Optional, Tuple, Union
 
+import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
-from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
-from pyknos.nflows.flows import Flow
 from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+)
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
 
@@ -155,18 +157,21 @@ def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
 
 
 def extract_and_transform_mog(
-    net: Flow, context: Optional[Tensor] = None
+    estimator: MixtureDensityEstimator, context: Optional[Tensor] = None
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Extracts the Mixture of Gaussians (MoG) parameters
     from an MDN based DirectPosterior at either the default x or input x.
 
+    If z-scoring was enabled on the estimator, the MoG parameters are
+    transformed back to the original (un-z-scored) parameter space.
+
     Args:
-        posterior: DirectPosterior instance.
+        estimator: MixtureDensityEstimator instance.
         context: Conditioning context for posterior $p(\theta|x)$. If not provided,
             fall back onto `x` passed to `set_default_x()`.
 
     Returns:
-        norm_logits: Normalised log weights of the underyling MoG.
+        norm_logits: Normalised log weights of the underlying MoG.
             (batch_size, n_mixtures)
         means_transformed: Recentred and rescaled means of the underlying MoG
             (batch_size, n_mixtures, n_dims)
@@ -175,22 +180,45 @@ def extract_and_transform_mog(
         sumlogdiag: Sum of the log of the diagonal of the precision factors
             of the new conditional distribution. (batch_size, n_mixtures)
     """
+    if context is None:
+        raise ValueError("context must be provided for extract_and_transform_mog")
 
-    # extract and rescale means, mixture componenets and covariances
-    dist = net._distribution
-    encoded_x = net._embedding_net(context)
+    # Get MoG (raw density estimator output in z-scored space)
+    mog = estimator.get_uncorrected_mog(context)
 
-    logits, means, _, sumlogdiag, precfs = dist.get_mixture_components(encoded_x)
-    norm_logits = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
+    norm_logits = mog.log_weights
+    means = mog.means
+    # precision_factors is guaranteed non-None after MoG.__post_init__
+    precfs = mog.precision_factors
+    assert precfs is not None  # For type checker
 
-    scale = net._transform._transforms[0]._scale
-    shift = net._transform._transforms[0]._shift
+    # Transform means and precision factors to original space if z-scoring is enabled
+    if estimator.has_input_transform:
+        # The z-score transform is: z = (theta - shift) / scale
+        # To transform means: theta = z * scale + shift
+        shift = estimator._transform_shift
+        scale = estimator._transform_scale
 
-    means_transformed = (means - shift) / scale
+        # Transform means: mu_theta = mu_z * scale + shift
+        means_transformed = means * scale + shift
 
-    A = scale * torch.eye(means_transformed.shape[2])
-    precfs_transformed = A @ precfs
+        # Transform precision factors:
+        # For z = (theta - shift) / scale:
+        #   - Covariance transforms as: Cov_theta = Cov_z * scale^2 (element-wise)
+        #   - Precision transforms as: Prec_theta = Prec_z / scale^2 (element-wise)
+        #   - More precisely: Prec_theta_ij = Prec_z_ij / (scale_i * scale_j)
+        #
+        # For precision factors U (upper triangular) where Prec = U^T @ U:
+        #   - We need: U_theta^T @ U_theta = U_z^T @ U_z / (scale ⊗ scale)
+        #   - This is achieved by: U_theta = U_z @ diag(1/scale)
+        #   - Which is equivalent to: U_theta[:, :, :, j] = U_z[:, :, :, j] / scale[j]
+        #   - Or simply: U_theta = U_z / scale (broadcasting divides columns)
+        precfs_transformed = precfs / scale
+    else:
+        means_transformed = means
+        precfs_transformed = precfs
 
+    # Compute sumlogdiag for the (potentially transformed) precision factors
     sumlogdiag = torch.sum(
         torch.log(torch.diagonal(precfs_transformed, dim1=2, dim2=3)), dim=2
     )
@@ -208,21 +236,17 @@ def condition_mog(
     """Finds the conditional distribution p(X|Y) for a MoG.
 
     Args:
-        prior: Prior Distribution. Used to check if condition within support.
         condition: Parameter set that all dimensions not specified in
             `dims_to_sample` will be fixed to. Should contain dim_theta elements,
             i.e. it could e.g. be a sample from the posterior distribution.
             The entries at all `dims_to_sample` will be ignored.
-        dims_to_sample: Which dimensions to sample from. The dimensions not
-            specified in `dims_to_sample` will be fixed to values given in
+        dims: Which dimensions to sample from. The dimensions not
+            specified in `dims` will be fixed to values given in
             `condition`.
         logits: Log weights of the MoG. (batch_size, n_mixtures)
         means: Means of the MoG. (batch_size, n_mixtures, n_dims)
         precfs: Precision factors of the MoG.
             (batch_size, n_mixtures, n_dims, n_dims)
-
-    Raises:
-        ValueError: The chosen condition is not within the prior support.
 
     Returns:
         logits:  Log weights of the conditioned MoG. (batch_size, n_mixtures)
@@ -235,7 +259,7 @@ def condition_mog(
 
     n_mixtures, n_dims = means.shape[1:]
 
-    mask = torch.zeros(n_dims, dtype=torch.bool)
+    mask = torch.zeros(n_dims, dtype=torch.bool, device=means.device)
     mask[dims] = True
 
     y = condition[:, ~mask]
@@ -254,21 +278,67 @@ def condition_mog(
     precs_xy = precs[:, :, mask]
     precs_xy = precs_xy[:, :, :, ~mask]
 
-    means = mu_x - (
-        torch.inverse(precs_xx) @ precs_xy @ (y - mu_y).view(1, n_mixtures, -1, 1)
-    ).view(1, n_mixtures, -1)
+    # Compute conditional means using solve for numerical stability
+    # cond_means = mu_x - precs_xx^{-1} @ precs_xy @ (y - mu_y)
+    rhs = precs_xy @ (y - mu_y).view(1, n_mixtures, -1, 1)
+    adjustment = torch.linalg.solve(precs_xx, rhs)
+    cond_means = mu_x - adjustment.view(1, n_mixtures, -1)
 
+    # Compute log probability of y under each marginal component
+    # Using the formula for Gaussian log prob
     diags = torch.diagonal(precfs_yy, dim1=2, dim2=3)
     sumlogdiag_yy = torch.sum(torch.log(diags), dim=2)
-    log_prob = mdn.log_prob_mog(y, torch.zeros((1, 1)), mu_y, precs_yy, sumlogdiag_yy)
+    log_prob_y = _log_prob_gaussian_per_component(y, mu_y, precs_yy, sumlogdiag_yy)
 
     # Normalize the mixing coef: p(X|Y) = p(Y,X) / p(Y) using the marginal dist.
-    new_mcs = torch.exp(logits + log_prob)
+    new_mcs = torch.exp(logits + log_prob_y)
     new_mcs = new_mcs / new_mcs.sum()
-    logits = torch.log(new_mcs)
+    cond_logits = torch.log(new_mcs)
 
     sumlogdiag = torch.sum(torch.log(torch.diagonal(precfs_xx, dim1=2, dim2=3)), dim=2)
-    return logits, means, precfs_xx, sumlogdiag
+    return cond_logits, cond_means, precfs_xx, sumlogdiag
+
+
+def _log_prob_gaussian_per_component(
+    inputs: Tensor,
+    means: Tensor,
+    precisions: Tensor,
+    sumlogdiag: Tensor,
+) -> Tensor:
+    """Compute log probability per Gaussian component (without mixture weighting).
+
+    Computes log N(inputs; means_k, Sigma_k) for each component k.
+
+    Args:
+        inputs: (batch_size, dim)
+        means: (batch_size, num_components, dim)
+        precisions: (batch_size, num_components, dim, dim)
+        sumlogdiag: (batch_size, num_components) - sum of log diagonal of prec factors
+
+    Returns:
+        Log probabilities per component (batch_size, num_components)
+    """
+    _, num_components, dim = means.shape
+
+    # inputs: (batch_size, 1, dim)
+    inputs_expanded = inputs.unsqueeze(1)
+
+    # diff: (batch_size, num_components, dim)
+    diff = inputs_expanded - means
+
+    # quadratic form
+    diff_col = diff.unsqueeze(-1)  # (batch_size, num_components, dim, 1)
+    quad = (
+        torch.matmul(torch.matmul(diff_col.transpose(-2, -1), precisions), diff_col)
+        .squeeze(-1)
+        .squeeze(-1)
+    )  # (batch_size, num_components)
+
+    # log probability per component (no mixture weights)
+    log_norm = -0.5 * dim * np.log(2 * np.pi)
+    log_component_probs = log_norm + sumlogdiag - 0.5 * quad
+
+    return log_component_probs  # (batch_size, num_components)
 
 
 class ConditionedPotential(BasePotential):
