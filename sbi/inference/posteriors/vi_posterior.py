@@ -347,7 +347,7 @@ class VIPosterior(NeuralPosterior):
             Samples from posterior.
         """
         x = self._x_else_default_x(x)
-        if self._trained_on is None or (x != self._trained_on).all():
+        if self._trained_on is None or (x != self._trained_on).any():
             raise AttributeError(
                 f"The variational posterior was not fit on the specified `default_x` "
                 f"{x}. Please train using `posterior.train()`."
@@ -386,7 +386,7 @@ class VIPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         x = self._x_else_default_x(x)
-        if self._trained_on is None or (x != self._trained_on).all():
+        if self._trained_on is None or (x != self._trained_on).any():
             raise AttributeError(
                 f"The variational posterior was not fit using observation {x}.\
                      Please train."
