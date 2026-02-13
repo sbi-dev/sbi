@@ -26,8 +26,8 @@ from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import BoxUniform
 
-# Small constant for numerical stability in matrix operations
-_CORRECTION_EPSILON: float = 1e-6
+# Constant for numerical stability in matrix operations.
+_CORRECTION_EPSILON: float = 1e-4
 
 
 class NPE_A(PosteriorEstimatorTrainer):
@@ -199,7 +199,9 @@ class NPE_A(PosteriorEstimatorTrainer):
             self._build_neural_net, num_components=self._num_components
         )
 
-        return super().train(**kwargs)
+        density_estimator = super().train(**kwargs)
+
+        return density_estimator
 
     def _get_proposal_mog(
         self,
@@ -223,7 +225,6 @@ class NPE_A(PosteriorEstimatorTrainer):
             ValueError: If NPE_A_Posterior proposal doesn't have default_x set.
             TypeError: If proposal type is not supported.
         """
-        # Case 1: NPE_A_Posterior - use get_mog_params with default_x
         if isinstance(proposal, NPE_A_Posterior):
             default_x = proposal.default_x
             if default_x is None:
@@ -240,15 +241,15 @@ class NPE_A(PosteriorEstimatorTrainer):
                 )
             return proposal.get_mog_params(default_x)
 
-        # Case 2: MultivariateNormal - convert to single-component MoG
         if isinstance(proposal, MultivariateNormal):
-            mean: Tensor = proposal.mean  # type: ignore[assignment]
-            cov: Tensor = proposal.covariance_matrix  # type: ignore[assignment]
+            mean: Tensor = proposal.mean.to(self._device)  # type: ignore[assignment]
+            cov: Tensor = proposal.covariance_matrix.to(  # type: ignore[assignment]
+                self._device
+            )
             return MoG.from_gaussian(mean.unsqueeze(0), cov.unsqueeze(0))
 
-        # Case 3: MoG - use directly
         if isinstance(proposal, MoG):
-            return proposal
+            return proposal.to(self._device)
 
         # Case 4: Any object with get_mog_params method
         if hasattr(proposal, "get_mog_params"):
@@ -259,7 +260,18 @@ class NPE_A(PosteriorEstimatorTrainer):
                     "Proposal has get_mog_params() but no default_x set. "
                     "Call proposal.set_default_x(x_o) before using as proposal."
                 )
-            return proposal.get_mog_params(default_x)
+            if default_x.shape[0] != 1:
+                raise ValueError(
+                    f"SNPE-A requires default_x batch size of 1, got "
+                    f"{default_x.shape[0]}."
+                )
+            mog = proposal.get_mog_params(default_x)
+            if not isinstance(mog, MoG):
+                raise TypeError(
+                    f"Proposal's get_mog_params() must return MoG, "
+                    f"got {type(mog).__name__}."
+                )
+            return mog.to(self._device)
 
         # Unsupported type
         raise TypeError(
@@ -314,24 +326,6 @@ class NPE_A(PosteriorEstimatorTrainer):
         if density_estimator.has_input_transform:
             shift = density_estimator._transform_shift
             scale = density_estimator._transform_scale
-
-            # Validate z-score parameters
-            if not torch.all(torch.isfinite(shift)):
-                raise ValueError(
-                    "Z-score shift contains non-finite values. "
-                    "Check training data for NaN/Inf values."
-                )
-            if not torch.all(torch.isfinite(scale)):
-                raise ValueError(
-                    "Z-score scale contains non-finite values. "
-                    "Check training data for NaN/Inf values."
-                )
-            if torch.any(scale.abs() < 1e-10):
-                raise ValueError(
-                    "Z-score scale contains near-zero values, which would cause "
-                    "numerical instability. This may indicate constant or "
-                    "near-constant features in the training data."
-                )
 
             # Z-scored mean: (mu - shift) / scale
             z_mean = (prior_mean - shift) / scale

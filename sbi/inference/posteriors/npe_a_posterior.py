@@ -36,6 +36,13 @@ class NPE_A_Posterior(DirectPosterior):
 
     For multi-round inference, the correction is applied analytically since all
     distributions are Mixtures of Gaussians (MoG).
+
+    Note:
+        Z-scored space: When the density estimator uses z-scoring (input
+        normalization), all MoG parameters (means, precisions) are in z-scored
+        coordinates. The prior_mog must also be transformed to z-scored space
+        for the correction to be valid. The NPE_A trainer handles this
+        transformation automatically via ``_compute_z_scored_prior_mog()``.
     """
 
     def __init__(
@@ -118,12 +125,21 @@ class NPE_A_Posterior(DirectPosterior):
 
         Args:
             sample_shape: Shape of samples to draw.
-            **kwargs: Must contain 'condition' key with conditioning observation.
+            **kwargs: Must contain 'condition' key with conditioning observation
+                with batch_size == 1.
 
         Returns:
             Samples from corrected distribution, shape (*sample_shape, batch, dim).
+
+        Raises:
+            ValueError: If condition batch size is not 1.
         """
         condition = kwargs["condition"]
+        if condition.shape[0] != 1:
+            raise ValueError(
+                f"_corrected_sample only supports batch_size=1, "
+                f"got {condition.shape[0]}"
+            )
         corrected_mog = self._get_corrected_mog(condition)
         samples = corrected_mog.sample(sample_shape)
 
@@ -216,7 +232,9 @@ class NPE_A_Posterior(DirectPosterior):
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
-                alternative_method="build_posterior(..., sample_with='mcmc')",
+                alternative_method=(
+                    "using fewer samples or increasing max_sampling_time"
+                ),
                 max_sampling_time=max_sampling_time,
             )[0]
         else:

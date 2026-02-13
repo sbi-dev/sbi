@@ -37,49 +37,89 @@ from torch.optim.adam import Adam
 from sbi.sbi_types import TorchTransform
 
 
-def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
-    """Raise warning if z-scoring would create duplicate data points.
+def warn_if_invalid_for_zscoring(
+    x: Tensor,
+    outlier_iqr_factor: float = 10.0,
+) -> None:
+    """Warn if data has properties that may cause issues during z-scoring.
+
+    This function checks for:
+    1. Constant features (zero standard deviation) which would cause NaN
+    2. Extreme outliers which may cause precision loss during z-scoring
+
+    Extreme outliers are detected using a robust IQR-based method: values more than
+    `outlier_iqr_factor * IQR` away from the quartiles are considered extreme.
+    This is robust because IQR is not affected by the outliers themselves.
 
     Args:
-        x: Simulated data.
-        duplicate_tolerance: Tolerated proportion of duplicates after z-scoring.
+        x: Data tensor of shape (num_samples, num_features).
+        outlier_iqr_factor: Factor for IQR-based outlier detection. Values beyond
+            Q1 - factor*IQR or Q3 + factor*IQR are considered extreme outliers.
+            Default 10.0 (very conservative; standard is 1.5-3.0).
+
+    Example:
+        >>> x_normal = torch.randn(1000, 2)
+        >>> warn_if_invalid_for_zscoring(x_normal)  # No warning
+        >>> x_outlier = torch.randn(1000, 2)
+        >>> x_outlier[0, 0] = 1000.0  # Add extreme outlier
+        >>> warn_if_invalid_for_zscoring(x_outlier)  # Warns about dimension 0
     """
-
-    # Count unique xs.
-    num_unique = torch.unique(x, dim=0).numel()
-
-    # Check we do have different data in the batch
-    if num_unique == 1:
+    # Handle edge case of single sample
+    if x.shape[0] <= 1:
         warnings.warn(
-            "Beware that there is only a single unique element in the simulated data. "
-            "If this is intended, make sure to set `z_score_x='none'` as z-scoring "
-            "would result in NaNs",
+            "Only one data sample provided. Z-scoring requires multiple samples "
+            "to compute meaningful statistics. Consider adding more simulations.",
             UserWarning,
             stacklevel=2,
         )
-
-        # Skip computation.
         return
-    else:
-        # z-score.
-        zx = (x - x.mean(0)) / x.std(0)
 
-        # Count again and warn on too many new duplicates.
-        num_unique_z = torch.unique(zx, dim=0).numel()
+    std = x.std(0)
 
-        if num_unique_z < num_unique * (1 - duplicate_tolerance):
-            warnings.warn(
-                f"Z-scoring these simulation outputs resulted in {num_unique_z} unique "
-                f"datapoints. Before z-scoring, it had been {num_unique}. This can "
-                "occur due to numerical inaccuracies when the data covers a large "
-                "range of values. Consider either setting `z_score_x=False` (but "
-                "beware that this can be problematic for training the NN) or exclude "
-                "outliers from your dataset. Note: if you have already set "
-                "`z_score_x=False`, this warning will still be displayed, but you can"
-                " ignore it.",
-                UserWarning,
-                stacklevel=2,
+    # Check for constant features (zero std)
+    constant_dims = torch.where(std < 1e-14)[0]
+    if len(constant_dims) > 0:
+        warnings.warn(
+            f"Data has constant values in dimension(s) {constant_dims.tolist()}. "
+            "Z-scoring these dimensions would result in NaN. Consider setting "
+            "`z_score_x='none'` or removing constant features from your data.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return  # Skip outlier check if there are constant features
+
+    # Check for extreme outliers using IQR-based detection (robust to outliers)
+    q1, q3 = torch.quantile(x, torch.tensor([0.25, 0.75]), dim=0)
+    iqr = q3 - q1
+
+    # For dimensions with zero IQR (e.g., discrete data), skip outlier check
+    valid_iqr = iqr > 1e-14
+    if not valid_iqr.any():
+        return
+
+    lower_bound = q1 - outlier_iqr_factor * iqr
+    upper_bound = q3 + outlier_iqr_factor * iqr
+
+    # Check each dimension for outliers
+    outlier_dims = []
+    for dim in range(x.shape[1]):
+        if valid_iqr[dim]:
+            has_outliers = torch.any(
+                (x[:, dim] < lower_bound[dim]) | (x[:, dim] > upper_bound[dim])
             )
+            if has_outliers:
+                outlier_dims.append(dim)
+
+    if outlier_dims:
+        warnings.warn(
+            f"Data has extreme outliers in dimension(s) {outlier_dims} "
+            f"(beyond {outlier_iqr_factor}x IQR from quartiles). "
+            "This may cause precision loss during z-scoring, where distinct values "
+            "become indistinguishable. Consider removing outliers from your data "
+            "or setting `z_score_x='none'` (though this may affect training).",
+            UserWarning,
+            stacklevel=2,
+        )
 
 
 def x_shape_from_simulation(batch_x: Tensor) -> torch.Size:

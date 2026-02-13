@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Tuple
 
 import matplotlib.pyplot as plt
@@ -19,7 +20,10 @@ from sbi.analysis import (
 from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
-from sbi.utils.sbiutils import z_score_parser
+from sbi.utils.sbiutils import (
+    warn_if_invalid_for_zscoring,
+    z_score_parser,
+)
 
 
 def test_conditional_density_1d():
@@ -520,3 +524,66 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     # plt.plot(x_zstructured.T)
     # plt.title('z-scored: structured dims');
     # plt.show()
+
+
+class TestWarnIfInvalidForZscoring:
+    """Test warn_if_invalid_for_zscoring function."""
+
+    def test_normal_data_no_warning(self):
+        """Test that normal data produces no warning."""
+        x = torch.randn(1000, 3)
+        # Should not warn
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            warn_if_invalid_for_zscoring(x)
+            assert len(w) == 0, f"Unexpected warning: {w[0].message if w else ''}"
+
+    def test_constant_feature_warns(self):
+        """Test that constant features produce a warning."""
+        x = torch.randn(100, 2)
+        x[:, 1] = 5.0  # Make second dimension constant
+
+        with pytest.warns(UserWarning, match="constant values"):
+            warn_if_invalid_for_zscoring(x)
+
+    def test_extreme_outlier_warns(self):
+        """Test that extreme outliers produce a warning."""
+        x = torch.randn(1000, 2)
+        x[0, 0] = 10000.0  # Add extreme outlier to first dimension
+
+        with pytest.warns(UserWarning, match="extreme outliers"):
+            warn_if_invalid_for_zscoring(x)
+
+    def test_single_sample_warns(self):
+        """Test that single sample produces a warning."""
+        x = torch.randn(1, 3)
+
+        with pytest.warns(UserWarning, match="Only one data sample"):
+            warn_if_invalid_for_zscoring(x)
+
+    def test_custom_iqr_factor(self):
+        """Test that custom IQR factor works."""
+        x = torch.randn(1000, 2)
+        x[0, 0] = 20.0  # Moderate outlier (~20 std from mean for N(0,1))
+
+        # Should not warn with very high factor
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            warn_if_invalid_for_zscoring(x, outlier_iqr_factor=50.0)
+            outlier_warnings = [
+                wi for wi in w if "extreme outliers" in str(wi.message)
+            ]
+            assert len(outlier_warnings) == 0
+
+        # Should warn with low factor
+        with pytest.warns(UserWarning, match="extreme outliers"):
+            warn_if_invalid_for_zscoring(x, outlier_iqr_factor=5.0)
+
+    def test_identifies_correct_dimensions(self):
+        """Test that the warning identifies the correct problematic dimensions."""
+        x = torch.randn(1000, 4)
+        x[0, 1] = 10000.0  # Outlier in dim 1
+        x[0, 3] = 10000.0  # Outlier in dim 3
+
+        with pytest.warns(UserWarning, match=r"\[1, 3\]"):
+            warn_if_invalid_for_zscoring(x)
