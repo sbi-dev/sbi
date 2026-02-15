@@ -677,7 +677,7 @@ def test_fmpe_shifted_data_gaussian_baseline():
     def simulator(theta):
         return theta + 0.5 * torch.randn_like(theta)
 
-    num_sims = 1000
+    num_sims = 2000
     theta = prior.sample((num_sims,))
     x = simulator(theta)
 
@@ -688,7 +688,7 @@ def test_fmpe_shifted_data_gaussian_baseline():
         density_estimator_kwargs={"gaussian_baseline": True},
     )
     est_gauss = inference_gauss.append_simulations(theta, x).train(
-        max_num_epochs=20, training_batch_size=100, learning_rate=5e-4
+        max_num_epochs=30, training_batch_size=100, learning_rate=5e-4
     )
 
     inference_var = FMPE(
@@ -698,7 +698,7 @@ def test_fmpe_shifted_data_gaussian_baseline():
         density_estimator_kwargs={"gaussian_baseline": False},
     )
     est_var = inference_var.append_simulations(theta, x).train(
-        max_num_epochs=20, training_batch_size=100, learning_rate=5e-4
+        max_num_epochs=30, training_batch_size=100, learning_rate=5e-4
     )
     theta_val = prior.sample((100,))
     x_val = simulator(theta_val)
