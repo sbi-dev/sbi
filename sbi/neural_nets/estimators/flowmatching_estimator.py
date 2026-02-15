@@ -148,19 +148,27 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             *self.input_shape,
         )
 
-        mu_t = (1 - t_view) * mean_1_view
-        var_t = ((1 - t_view) * std_1_view) ** 2 + t_view**2 + 1e-5
-        std_t = torch.sqrt(var_t)
-        input_norm = (input - mu_t) / std_t
-
-        v_out = self.net(input_norm, condition_emb, time)
-
         if self.gaussian_baseline:
+            mu_t = (1 - t_view) * mean_1_view
+            var_t = ((1 - t_view) * std_1_view) ** 2 + t_view**2 + 1e-5
+
+            std_t = torch.sqrt(var_t)
+            input_norm = (input - mu_t) / std_t
+
             num = t_view - (1 - t_view) * std_1_view**2
             factor = num / var_t
+
             v_affine = factor * (input - mu_t) - mean_1_view
+            v_out = self.net(input_norm, condition_emb, time)
             v = v_out * std_t + v_affine
         else:
+            mu_t = t_view * mean_1_view
+            var_t = (t_view * std_1_view) ** 2 + (1 - t_view) ** 2 + 1e-5
+
+            std_t = torch.sqrt(var_t)
+            input_norm = (input - mu_t) / std_t
+
+            v_out = self.net(input_norm, condition_emb, time)
             v = v_out * std_t
 
         v = v.reshape(*batch_shape + self.input_shape)
