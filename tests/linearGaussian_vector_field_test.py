@@ -248,6 +248,33 @@ def test_vfinference_with_different_models(vector_field_type, model):
     check_c2st(samples, target_samples, alg=f"fmpe_{model}")
 
 
+@pytest.mark.parametrize("vector_field_type", ["fmpe"])
+def test_fmpe_time_dependent_z_scoring_integration(vector_field_type):
+    num_dim = 2
+    prior = BoxUniform(9.0 * ones(num_dim), 11.0 * ones(num_dim))
+
+    def simulator(theta):
+        return theta + torch.randn_like(theta) * 0.1
+
+    inference = FMPE(prior, z_score_x="independent", show_progress_bars=False)
+    theta = prior.sample((200,))
+    x = simulator(theta)
+    density_estimator = inference.append_simulations(theta, x).train(max_num_epochs=1)
+
+    assert hasattr(density_estimator, "mean_1")
+    assert hasattr(density_estimator, "std_1")
+    assert torch.all(density_estimator.mean_1 > 8.0)
+
+    batch_size = 10
+    t = torch.rand(batch_size)
+    theta_test = torch.randn(batch_size, num_dim)
+    cond_test = zeros(batch_size, num_dim)
+    v_pred = density_estimator.ode_fn(theta_test, cond_test, t)
+
+    assert v_pred.shape == (batch_size, num_dim)
+    assert not torch.isnan(v_pred).any()
+
+
 # ------------------------------------------------------------------------------
 # -------------------------------- SLOW TESTS ----------------------------------
 # ------------------------------------------------------------------------------
@@ -633,4 +660,54 @@ def test_iid_log_prob(vector_field_type, prior_type, iid_batch_size):
     assert diff.mean() < 0.3 * iid_batch_size, (
         f"Probs diff: {diff.mean()} too big "
         f"for number of samples {num_posterior_samples}"
+    )
+
+
+@pytest.mark.slow
+def test_fmpe_shifted_data_gaussian_baseline():
+    """
+    Verifies that Flow Matching with Gaussian Baseline performs
+    better on shifted data compared to variance-only scaling.
+    """
+    num_dim = 1
+    prior_min = 95.0 * ones(num_dim)
+    prior_max = 105.0 * ones(num_dim)
+    prior = BoxUniform(prior_min, prior_max)
+
+    def simulator(theta):
+        return theta + 0.5 * torch.randn_like(theta)
+
+    num_sims = 2000
+    theta = prior.sample((num_sims,))
+    x = simulator(theta)
+
+    inference_gauss = FMPE(
+        prior,
+        z_score_x="independent",
+        show_progress_bars=False,
+        density_estimator_kwargs={"gaussian_baseline": True},
+    )
+    est_gauss = inference_gauss.append_simulations(theta, x).train(
+        max_num_epochs=30, training_batch_size=100, learning_rate=5e-4
+    )
+
+    inference_var = FMPE(
+        prior,
+        z_score_x="independent",
+        show_progress_bars=False,
+        density_estimator_kwargs={"gaussian_baseline": False},
+    )
+    est_var = inference_var.append_simulations(theta, x).train(
+        max_num_epochs=30, training_batch_size=100, learning_rate=5e-4
+    )
+    theta_val = prior.sample((100,))
+    x_val = simulator(theta_val)
+
+    with torch.no_grad():
+        loss_gauss = est_gauss.loss(theta_val, x_val).mean()
+        loss_var = est_var.loss(theta_val, x_val).mean()
+
+    assert loss_gauss < loss_var, (
+        f"Gaussian Baseline ({loss_gauss}) should outperform Variance Only "
+        f"({loss_var}) on shifted data."
     )

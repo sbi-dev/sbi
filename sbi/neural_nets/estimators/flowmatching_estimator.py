@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 import torch.nn as nn
@@ -56,6 +56,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         noise_scale: float = 1e-3,
+        mean_1: Union[Tensor, float] = 0.0,
+        std_1: Union[Tensor, float] = 1.0,
+        gaussian_baseline: bool = True,
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -67,6 +70,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             embedding_net: Embedding network for the condition.
             noise_scale: Scale of the noise added to the vector field
                 (:math:`\sigma_{min}` in [2]_).
+            mean_1: Mean of the data at t=1 (used for z-scoring).
+            std_1: Standard deviation of the data at t=1 (used for z-scoring).
+            gaussian_baseline: Whether to use the Gaussian baseline
+                for the vector field.
             zscore_transform_input: Whether to z-score the input.
                 This is ignored and will be removed.
         """
@@ -87,6 +94,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             embedding_net=embedding_net,
         )
         self.noise_scale = noise_scale
+        self.gaussian_baseline = gaussian_baseline
+
+        mean_1_tensor = torch.as_tensor(mean_1).expand(input_shape)
+        std_1_tensor = torch.as_tensor(std_1).expand(input_shape)
+        self.register_buffer("mean_1", mean_1_tensor)
+        self.register_buffer("std_1", std_1_tensor)
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         """Forward pass of the FlowMatchingEstimator.
@@ -127,8 +140,33 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         )
         time = time.reshape(-1)
 
-        # call the network to get the estimated vector field
-        v = self.net(input, condition_emb, time)
+        t_view = time.view(-1, *([1] * (input.ndim - 1)))
+        mean_1_view = self.mean_1.view(1, *self.input_shape)
+        std_1_view = self.std_1.view(1, *self.input_shape)
+
+        if self.gaussian_baseline:
+            mu_t = (1 - t_view) * mean_1_view
+            var_t = ((1 - t_view) * std_1_view) ** 2 + t_view**2 + 1e-5
+
+            std_t = torch.sqrt(var_t)
+            input_norm = (input - mu_t) / std_t
+
+            num = t_view - (1 - t_view) * std_1_view**2
+            factor = num / var_t
+
+            v_affine = factor * (input - mu_t) - mean_1_view
+            v_out = self.net(input_norm, condition_emb, time)
+            v = v_out * std_t + v_affine
+        else:
+            mu_t = t_view * mean_1_view
+            var_t = (t_view * std_1_view) ** 2 + (1 - t_view) ** 2 + 1e-5
+
+            std_t = torch.sqrt(var_t)
+            input_norm = (input - mu_t) / std_t
+
+            v_out = self.net(input_norm, condition_emb, time)
+            v = v_out * std_t
+
         v = v.reshape(*batch_shape + self.input_shape)
 
         return v
