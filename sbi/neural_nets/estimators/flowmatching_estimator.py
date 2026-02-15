@@ -96,8 +96,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         self.noise_scale = noise_scale
         self.gaussian_baseline = gaussian_baseline
 
-        self.register_buffer("mean_1", torch.as_tensor(mean_1))
-        self.register_buffer("std_1", torch.as_tensor(std_1))
+        mean_1_tensor = torch.as_tensor(mean_1).expand(input_shape)
+        std_1_tensor = torch.as_tensor(std_1).expand(input_shape)
+        self.register_buffer("mean_1", mean_1_tensor)
+        self.register_buffer("std_1", std_1_tensor)
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         """Forward pass of the FlowMatchingEstimator.
@@ -139,14 +141,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         time = time.reshape(-1)
 
         t_view = time.view(-1, *([1] * (input.ndim - 1)))
-        mean_1_view = self.mean_1.view(
-            *([1] * (input.ndim - len(self.input_shape))),
-            *self.input_shape,
-        )
-        std_1_view = self.std_1.view(
-            *([1] * (input.ndim - len(self.input_shape))),
-            *self.input_shape,
-        )
+        mean_1_view = self.mean_1.view(1, *self.input_shape)
+        std_1_view = self.std_1.view(1, *self.input_shape)
 
         if self.gaussian_baseline:
             mu_t = (1 - t_view) * mean_1_view
