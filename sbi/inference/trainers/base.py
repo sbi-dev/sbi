@@ -891,7 +891,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             else:
                 train_losses = self._get_losses(batch=batch, loss_args=loss_args)
             train_loss = torch.mean(train_losses)
-            train_loss_sum += train_losses.sum().item()
+            train_loss_sum += train_loss.item()
 
             train_loss.backward()
             if clip_max_norm is not None:
@@ -902,7 +902,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             self.optimizer.step()
 
         train_loss_average = train_loss_sum / (
-            len(train_loader) * train_loader.batch_size  # type: ignore
+            len(train_loader)  # type: ignore
         )
 
         return train_loss_average
@@ -934,11 +934,11 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                     val_losses = self._get_losses(batch=batch)
                 else:
                     val_losses = self._get_losses(batch=batch, loss_args=loss_args)
-                val_loss_sum += val_losses.sum().item()
+                val_loss_sum += val_losses.mean().item()
 
         # Take mean over all validation samples.
         val_loss = val_loss_sum / (
-            len(val_loader) * val_loader.batch_size  # type: ignore
+            len(val_loader)  # type: ignore
         )
 
         return val_loss
