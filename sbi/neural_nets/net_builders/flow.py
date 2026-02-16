@@ -1272,6 +1272,8 @@ def build_zuko_unconditional_flow(
             *base_transforms,
             standardizing_transform_zuko(batch_x, structured_x),
         )
+    else:
+        transforms = base_transforms
 
     # Combine transforms.
     neural_net = zuko.flows.Flow(transforms, base)

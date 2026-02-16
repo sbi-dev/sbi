@@ -8,7 +8,6 @@ from typing import Callable, Tuple
 import numpy as np
 import pytest
 import torch
-from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import (
     Beta,
@@ -21,6 +20,9 @@ from torch.distributions import (
 
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MultivariateGaussianMDN,
+)
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
@@ -364,25 +366,8 @@ def test_inference_with_user_sbi_problems(
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
     x_o = torch.zeros(x.shape[1])
-    posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=2)
-
-    # Build posterior.
-    if snpe_method == NPE_A:
-        if not isinstance(prior, (MultivariateNormal, BoxUniform, DirectPosterior)):
-            with pytest.raises(AssertionError):
-                # NPE-A does not support priors yet.
-                posterior_estimator = inference.correct_for_proposal()
-                _ = DirectPosterior(
-                    posterior_estimator=posterior_estimator, prior=prior
-                ).set_default_x(x_o)
-        else:
-            _ = DirectPosterior(
-                posterior_estimator=posterior_estimator, prior=prior
-            ).set_default_x(x_o)
-    else:
-        _ = DirectPosterior(
-            posterior_estimator=posterior_estimator, prior=prior
-        ).set_default_x(x_o)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+    inference.build_posterior().set_default_x(x_o)
 
 
 @pytest.mark.parametrize(

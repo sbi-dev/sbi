@@ -48,7 +48,7 @@ from sbi.utils import (
     npe_msg_on_invalid_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
-    warn_if_zscoring_changes_data,
+    warn_if_invalid_for_zscoring,
 )
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
@@ -193,7 +193,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         theta = theta[is_valid_x]
 
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
+        warn_if_invalid_for_zscoring(x)
         if (
             type(self).__name__ == "SNPE_C"
             and current_round > 0

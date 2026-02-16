@@ -31,7 +31,7 @@ from sbi.utils import (
     npe_msg_on_invalid_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
-    warn_if_zscoring_changes_data,
+    warn_if_invalid_for_zscoring,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
@@ -168,7 +168,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         theta = theta[is_valid_x]
 
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
+        warn_if_invalid_for_zscoring(x)
 
         npe_msg_on_invalid_x(
             num_nans,

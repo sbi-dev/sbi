@@ -15,16 +15,234 @@ from typing import (
 )
 
 import torch
-from pyro.distributions.torch_transform import TransformModule
-from torch import Tensor
-from torch.distributions import Distribution, TransformedDistribution
+from torch import Tensor, nn
+from torch.distributions import (
+    Distribution,
+    Independent,
+    MultivariateNormal,
+    Normal,
+    TransformedDistribution,
+)
 from torch.distributions.transforms import ComposeTransform, IndependentTransform
 from torch.nn import Module
 
-from sbi.sbi_types import PyroTransformedDistribution, TorchTransform
+from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
+from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
 
 
-def filter_kwrags_for_func(f: Callable, kwargs: Dict) -> Dict:
+class TransformedZukoFlow(nn.Module):
+    """Wrapper for Zuko flows that applies a link transform to samples.
+
+    This wrapper ensures that:
+    1. Samples from the flow (in unconstrained space) are transformed to constrained
+       space via link_transform
+    2. log_prob accounts for the Jacobian of the transformation
+
+    The underlying Zuko flow operates in unconstrained space, but this wrapper
+    provides an interface where samples and log_probs are in constrained space
+    (matching the prior's support).
+    """
+
+    def __init__(
+        self,
+        flow: ZukoUnconditionalFlow,
+        link_transform: TorchTransform,
+    ):
+        """Initialize the transformed flow wrapper.
+
+        Args:
+            flow: The underlying Zuko unconditional flow (operates in unconstrained
+                space).
+            link_transform: Transform from unconstrained to constrained space.
+                link_transform.forward maps unconstrained -> constrained.
+                link_transform.inv maps constrained -> unconstrained.
+        """
+        super().__init__()
+        self._flow = flow
+        self._link_transform = link_transform
+
+    @property
+    def net(self):
+        """Access the underlying flow's network (for compatibility)."""
+        return self._flow.net
+
+    def parameters(self):
+        """Return the parameters of the underlying flow."""
+        return self._flow.parameters()
+
+    def sample(self, sample_shape: Shape) -> Tensor:
+        """Sample from the flow and transform to constrained space.
+
+        Args:
+            sample_shape: Shape of samples to generate.
+
+        Returns:
+            Samples in constrained space with shape (*sample_shape, event_dim).
+        """
+        # Sample in unconstrained space
+        unconstrained_samples = self._flow.sample(sample_shape)
+        # Transform to constrained space
+        constrained_samples = self._link_transform(unconstrained_samples)
+        assert isinstance(constrained_samples, Tensor)  # Type narrowing for pyright
+        return constrained_samples
+
+    def log_prob(self, theta: Tensor) -> Tensor:
+        """Compute log probability of samples in constrained space.
+
+        Uses change of variables: log p(θ) = log q(z) + log|det(dz/dθ)|
+        where z = link_transform.inv(θ) and q is the flow's distribution.
+
+        Args:
+            theta: Samples in constrained space.
+
+        Returns:
+            Log probabilities with shape (*batch_shape,).
+        """
+        # Transform to unconstrained space
+        z = self._link_transform.inv(theta)
+        assert isinstance(z, Tensor)  # Type narrowing for pyright
+        # Get flow log prob in unconstrained space
+        log_prob_z = self._flow.log_prob(z)
+        # Add Jacobian correction for the inverse transform
+        # log_abs_det_jacobian gives log|det(dz/dθ)|
+        log_det_jacobian = self._link_transform.inv.log_abs_det_jacobian(theta, z)
+        # Some transforms (e.g. identity) return per-dimension Jacobians,
+        # while IndependentTransform returns summed Jacobians. Sum if needed.
+        if log_det_jacobian.dim() > log_prob_z.dim():
+            log_det_jacobian = log_det_jacobian.sum(dim=-1)
+        return log_prob_z + log_det_jacobian
+
+    def sample_and_log_prob(self, sample_shape: Shape) -> tuple[Tensor, Tensor]:
+        """Sample from the flow and compute log probabilities efficiently.
+
+        Args:
+            sample_shape: Shape of samples to generate.
+
+        Returns:
+            Tuple of (samples, log_probs) where samples are in constrained space.
+        """
+        # Sample in unconstrained space and get log prob
+        z, log_prob_z = self._flow.sample_and_log_prob(torch.Size(sample_shape))
+        # Transform to constrained space
+        theta = self._link_transform(z)
+        assert isinstance(theta, Tensor)  # Type narrowing for pyright
+        # Subtract Jacobian for forward transform (we want log p(θ) not log q(z))
+        # log p(θ) = log q(z) - log|det(dθ/dz)| = log q(z) + log|det(dz/dθ)|
+        log_det_jacobian = self._link_transform.log_abs_det_jacobian(z, theta)
+        # Some transforms (e.g. identity) return per-dimension Jacobians,
+        # while IndependentTransform returns summed Jacobians. Sum if needed.
+        if log_det_jacobian.dim() > log_prob_z.dim():
+            log_det_jacobian = log_det_jacobian.sum(dim=-1)
+        log_prob_theta = log_prob_z - log_det_jacobian
+        return theta, log_prob_theta
+
+
+class LearnableGaussian(nn.Module):
+    """Learnable Gaussian distribution for variational inference.
+
+    A simple parametric variational family with learnable mean and covariance.
+    Supports both full covariance (gaussian) and diagonal covariance (gaussian_diag).
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        full_covariance: bool = True,
+        link_transform: Optional[TorchTransform] = None,
+        device: Union[str, torch.device] = "cpu",
+    ):
+        """Initialize the learnable Gaussian.
+
+        Args:
+            dim: Dimensionality of the distribution.
+            full_covariance: If True, use full covariance matrix. If False, use
+                diagonal covariance (faster, fewer parameters).
+            link_transform: Optional transform to apply to samples. Maps from
+                unconstrained to constrained space (matching prior support).
+            device: Device to create parameters on.
+        """
+        super().__init__()
+        self._dim = dim
+        self._full_cov = full_covariance
+        self._link_transform = link_transform
+
+        # Learnable parameters - create on correct device from the start
+        self.loc = nn.Parameter(torch.zeros(dim, device=device))
+        if full_covariance:
+            # Lower triangular matrix for Cholesky parameterization
+            self.scale_tril = nn.Parameter(torch.eye(dim, device=device))
+        else:
+            # Log scale for numerical stability
+            self.log_scale = nn.Parameter(torch.zeros(dim, device=device))
+
+    def _base_dist(self) -> Distribution:
+        """Get the base Gaussian distribution with current parameters."""
+        if self._full_cov:
+            return MultivariateNormal(self.loc, scale_tril=self.scale_tril)
+        return Independent(Normal(self.loc, self.log_scale.exp()), 1)
+
+    def sample(self, sample_shape: Shape) -> Tensor:
+        """Sample from the distribution.
+
+        Args:
+            sample_shape: Shape of samples to generate.
+
+        Returns:
+            Samples with shape (*sample_shape, dim).
+        """
+        # Use sample() not rsample() - this is for inference, not training
+        samples = self._base_dist().sample(sample_shape)
+        if self._link_transform is not None:
+            samples = self._link_transform(samples)
+            assert isinstance(samples, Tensor)  # Type narrowing for pyright
+        return samples
+
+    def log_prob(self, theta: Tensor) -> Tensor:
+        """Compute log probability.
+
+        Args:
+            theta: Points at which to evaluate log probability.
+
+        Returns:
+            Log probabilities with shape (*batch_shape,).
+        """
+        if self._link_transform is not None:
+            # Transform to unconstrained space
+            z = self._link_transform.inv(theta)
+            assert isinstance(z, Tensor)  # Type narrowing for pyright
+            log_prob_z = self._base_dist().log_prob(z)
+            # Add Jacobian correction
+            log_det = self._link_transform.inv.log_abs_det_jacobian(theta, z)
+            if log_det.dim() > log_prob_z.dim():
+                log_det = log_det.sum(dim=-1)
+            return log_prob_z + log_det
+        return self._base_dist().log_prob(theta)
+
+    def sample_and_log_prob(self, sample_shape: Shape) -> tuple[Tensor, Tensor]:
+        """Sample and compute log probability efficiently.
+
+        Args:
+            sample_shape: Shape of samples to generate.
+
+        Returns:
+            Tuple of (samples, log_probs).
+        """
+        dist = self._base_dist()
+        z = dist.rsample(sample_shape)
+        log_prob_z = dist.log_prob(z)
+
+        if self._link_transform is not None:
+            theta = self._link_transform(z)
+            assert isinstance(theta, Tensor)  # Type narrowing for pyright
+            # Adjust log_prob for the transformation
+            log_det = self._link_transform.log_abs_det_jacobian(z, theta)
+            if log_det.dim() > log_prob_z.dim():
+                log_det = log_det.sum(dim=-1)
+            return theta, log_prob_z - log_det
+        return z, log_prob_z
+
+
+def filter_kwargs_for_func(f: Callable, kwargs: Dict) -> Dict:
     """This function will filter a dictionary of possible arguments for arguments the
     function can use.
 
@@ -41,7 +259,7 @@ def filter_kwrags_for_func(f: Callable, kwargs: Dict) -> Dict:
     return new_kwargs
 
 
-def get_parameters(t: Union[TorchTransform, TransformModule]) -> Iterable:
+def get_parameters(t: Union[TorchTransform, Module]) -> Iterable:
     """Recursive helper function which can be used to extract parameters from
     TransformedDistributions.
 
@@ -62,7 +280,7 @@ def get_parameters(t: Union[TorchTransform, TransformModule]) -> Iterable:
         pass
 
 
-def get_modules(t: Union[TorchTransform, TransformModule]) -> Iterable:
+def get_modules(t: Union[TorchTransform, Module]) -> Iterable:
     """Recursive helper function which can be used to extract modules from
     TransformedDistributions.
 
@@ -70,7 +288,7 @@ def get_modules(t: Union[TorchTransform, TransformModule]) -> Iterable:
         t: A TorchTransform object, which is scanned for the "modules" attribute.
 
     Yields:
-        Iterator[Iterable]: Generator of TransformModules
+        Iterator[Iterable]: Generator of Modules
     """
     if isinstance(t, Module):
         yield t
@@ -83,7 +301,7 @@ def get_modules(t: Union[TorchTransform, TransformModule]) -> Iterable:
         pass
 
 
-def check_parameters_modules_attribute(q: PyroTransformedDistribution) -> None:
+def check_parameters_modules_attribute(q: VariationalDistribution) -> None:
     """Checks a parameterized distribution object for valid `parameters` and `modules`.
 
     Args:
@@ -96,8 +314,8 @@ def check_parameters_modules_attribute(q: PyroTransformedDistribution) -> None:
             returns an iterable of parameters"""
         )
     else:
-        assert isinstance(q.parameters, Callable), "The parameters must be callable"
-        parameters = q.parameters()
+        assert isinstance(q.parameters, Callable), "The parameters must be callable"  # type: ignore[union-attr]
+        parameters = q.parameters()  # type: ignore[union-attr]
         assert isinstance(parameters, Iterable), (
             "The parameters return value must be iterable"
         )
@@ -116,8 +334,8 @@ def check_parameters_modules_attribute(q: PyroTransformedDistribution) -> None:
             an iterable of parameters."""
         )
     else:
-        assert isinstance(q.modules, Callable), "The parameters must be callable"
-        modules = q.modules()
+        assert isinstance(q.modules, Callable), "The parameters must be callable"  # type: ignore[union-attr]
+        modules = q.modules()  # type: ignore[union-attr]
         assert isinstance(modules, Iterable), (
             "The parameters return value must be iterable"
         )
@@ -196,7 +414,7 @@ def add_parameters_module_attributes(
 
 
 def add_parameter_attributes_to_transformed_distribution(
-    q: PyroTransformedDistribution,
+    q: TransformedDistribution,
 ) -> None:
     """A function that will add `parameters` and `modules` to q automatically, if q is a
     TransformedDistribution.
@@ -210,14 +428,14 @@ def add_parameter_attributes_to_transformed_distribution(
     def parameters():
         """Returns the parameters of the distribution."""
         if hasattr(q.base_dist, "parameters"):
-            yield from q.base_dist.parameters()
+            yield from q.base_dist.parameters()  # type: ignore[attr-defined]
         for t in q.transforms:
             yield from get_parameters(t)
 
     def modules():
         """Returns the modules of the distribution."""
         if hasattr(q.base_dist, "modules"):
-            yield from q.base_dist.modules()
+            yield from q.base_dist.modules()  # type: ignore[attr-defined]
         for t in q.transforms:
             yield from get_modules(t)
 
@@ -225,7 +443,7 @@ def add_parameter_attributes_to_transformed_distribution(
 
 
 def adapt_variational_distribution(
-    q: PyroTransformedDistribution,
+    q: VariationalDistribution,
     prior: Distribution,
     link_transform: Callable,
     parameters: Optional[Iterable] = None,
@@ -340,30 +558,6 @@ def detach_all_non_leaf_tensors(obj: object) -> None:
 
     def action(o):
         return o.detach()
-
-    with torch.no_grad():
-        _base_recursor(obj, check=check, action=action)
-
-
-def move_all_tensor_to_device(obj, device):
-    def check(o):
-        return isinstance(o, (Tensor, Module))
-
-    def action(o):
-        if isinstance(o, Tensor) and o.requires_grad and o.is_leaf:
-            # Moving leaf tensors inplace is hard. Cant call .to as this would create a
-            # copy and thus results in non-leaf tensors.
-            if str(o.device) != str(device):
-                print(o)
-                raise ValueError(
-                    "Some of your leaf tensors are on the wrong device, we cant move"
-                    "them automatically please initialize them correctly. Move e.g. "
-                    f"{o} from {o.device} to {device}"
-                )
-            else:
-                return o
-        else:
-            return o.to(device)
 
     with torch.no_grad():
         _base_recursor(obj, check=check, action=action)
