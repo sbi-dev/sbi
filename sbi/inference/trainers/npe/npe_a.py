@@ -336,6 +336,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         else:
             z_mean = prior_mean
             z_cov = prior_cov
+            z_cov = torch.as_tensor(z_cov)
 
         # Validate covariance is positive definite
         try:
