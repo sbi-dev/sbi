@@ -30,7 +30,7 @@ VF_ESTIMATORS = ["mlp", "ada_mlp", "transformer"]
 
 # Benchmarking method groups i.e. what to run for different --bm-mode
 METHOD_GROUPS = {
-    "none": [NPE, NRE, NLE, FMPE, NPSE, Simformer, FlowMatchingSimformer],
+    "none": [NPE, NRE, NLE, FMPE, NPSE],
     "npe": [NPE],
     "nle": [NLE],
     "nre": [NRE_A, NRE_B, NRE_C, BNRE],
@@ -58,7 +58,7 @@ METHOD_PARAMS = {
     "snpe": [{}],
     "snle": [{}],
     "snre": [{}],
-    "simformer": [{}],
+    "simformer": [{"sde_type": sde} for sde in ["ve", "vp"]],
     "flow-simformer": [{}],
 }
 
@@ -159,7 +159,7 @@ def eval_c2st(
     """
     x_o = task.get_observation(idx_observation)
     posterior_samples = task.get_reference_posterior_samples(idx_observation)
-    approx_posterior_samples = posterior.sample((num_samples,), x=x_o)
+    approx_posterior_samples = posterior.sample((num_samples,), x=x_o).to("cpu")
     if isinstance(approx_posterior_samples, tuple):
         approx_posterior_samples = approx_posterior_samples[0]
     assert posterior_samples.shape[0] >= num_samples, "Not enough reference samples"
@@ -186,8 +186,9 @@ def train_and_eval_amortized_inference(
     """
     torch.manual_seed(SEED)
     task = get_task(task_name)
-    thetas, xs = task.get_data(benchmark_num_simulations)
-    prior = task.get_prior()
+    device = extra_kwargs.get("device", "cpu")
+    thetas, xs = task.get_data(benchmark_num_simulations, device=device)
+    prior = task.get_prior(device=device)
 
     if inference_class in {Simformer, FlowMatchingSimformer}:
         # Get dimensions of thetas and xs, and set latent and observed idx
@@ -201,10 +202,11 @@ def train_and_eval_amortized_inference(
         inputs = torch.cat([thetas, xs], dim=1)
         inference.append_simulations(
             inputs,
+            data_device=device,
         )
     else:
         inference = inference_class(prior, **extra_kwargs)
-        inference.append_simulations(thetas, xs)
+        inference.append_simulations(thetas, xs, data_device=device)
     inference.train(**TRAIN_KWARGS)
 
     posterior = inference.build_posterior()
@@ -237,15 +239,18 @@ def train_and_eval_sequential_inference(
     torch.manual_seed(SEED)
     task = get_task(task_name)
     num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
-    thetas, xs = task.get_data(num_simulations)
-    prior = task.get_prior()
+    device = extra_kwargs.get("device", "cpu")
+    thetas, xs = task.get_data(num_simulations, device=device)
+    prior = task.get_prior(device=device)
     idx_eval = NUM_EVALUATION_OBS_SEQ
     x_o = task.get_observation(idx_eval)
     simulator = task.get_simulator()
 
     # Round 1
     inference = inference_class(prior, **extra_kwargs)
-    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
+    _ = inference.append_simulations(thetas, xs, data_device=device).train(
+        **TRAIN_KWARGS
+    )
 
     for _ in range(NUM_ROUNDS_SEQUENTIAL - 1):
         proposal = inference.build_posterior().set_default_x(x_o)
@@ -279,6 +284,7 @@ def test_run_benchmark(
     extra_kwargs: dict,
     benchmark_mode: str,
     benchmark_num_simulations: int,
+    benchmark_device,
 ) -> None:
     """
     Benchmark test for amortized and sequential inference methods.
@@ -290,13 +296,22 @@ def test_run_benchmark(
         extra_kwargs: Additional keyword arguments for the method.
         benchmark_mode: The benchmark mode. This is a fixture which based on user
             input, determines which type of methods should be run.
+        benchmark_device: The device to use for training (e.g. 'cpu', 'cuda').
     """
+    device = benchmark_device if benchmark_device else "cpu"
+    torch_device = torch.device(device)
+    torch.manual_seed(SEED)
+
+    # Patch extra_kwargs to include device if supported
+    patched_kwargs = dict(extra_kwargs)
+    patched_kwargs["device"] = torch_device
+
     if benchmark_mode in ["snpe", "snle", "snre"]:
         train_and_eval_sequential_inference(
             inference_class,
             task_name,
             benchmark_num_simulations,
-            extra_kwargs,
+            patched_kwargs,
             results_bag,
         )
     else:
@@ -304,6 +319,6 @@ def test_run_benchmark(
             inference_class,
             task_name,
             benchmark_num_simulations,
-            extra_kwargs,
+            patched_kwargs,
             results_bag,
         )

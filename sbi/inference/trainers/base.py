@@ -1616,7 +1616,7 @@ class MaskedNeuralInference(
         if none is specified by the user. It simply pass
         None as a full-attention masks (equivalent to a
         full ones) in order to save memory. `input` is specified
-        for compatibility altough ignored."""
+        for compatibility although ignored."""
 
         return None
 

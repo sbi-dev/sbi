@@ -818,14 +818,14 @@ class MaskedVectorFieldTrainer(
 
     def train(
         self,
-        training_batch_size: int = 800,
+        training_batch_size: int = 200,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
-        stop_after_epochs: int = 20,
+        stop_after_epochs: int = 40,
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
-        ema_loss_decay: float = 0.1,
+        ema_loss_decay: float = 0.5,
         validation_times: Union[Tensor, int] = 10,
         validation_times_nugget: float = 0.05,
         resume_training: bool = False,

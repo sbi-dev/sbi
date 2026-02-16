@@ -782,6 +782,9 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
         """
         input_shape = input.shape
+        print(input_shape)
+        print(condition_mask.shape)
+        print(edge_mask.shape if edge_mask is not None else None)
         B = input_shape[0]  # Batch size
         T = input_shape[1]  # Variables (nodes)
 
