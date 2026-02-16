@@ -34,14 +34,6 @@ SMC = SMCABC
 _abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 
 
-__all__ = (
-    _npe_family
-    + _nre_family
-    + _nle_family
-    + _abc_family
-    + ["FMPE", "NPSE", "Simformer", "FlowMatchingSimformer"]
-)
-
 from sbi.inference.posteriors import (
     DirectPosterior,
     EnsemblePosterior,
@@ -60,14 +52,29 @@ from sbi.inference.potentials import (
 )
 from sbi.utils.simulation_utils import simulate_for_sbi
 
-__all__ = [
-    "FlowMatchingSimformer",
-    "FMPE",
-    "MarginalTrainer",
-    "NLE",
-    "NPE",
-    "NPSE",
-    "NRE",
-    "Simformer",
-    "simulate_for_sbi",
-]
+__all__ = (
+    _npe_family
+    + _nre_family
+    + _nle_family
+    + _abc_family
+    + [
+        "FMPE",
+        "MarginalTrainer",
+        "NPSE",
+        "Simformer",
+        "FlowMatchingSimformer",
+        "DirectPosterior",
+        "EnsemblePosterior",
+        "ImportanceSamplingPosterior",
+        "MCMCPosterior",
+        "RejectionPosterior",
+        "VIPosterior",
+        "VectorFieldPosterior",
+        "simulate_for_sbi",
+        "likelihood_estimator_based_potential",
+        "mixed_likelihood_estimator_based_potential",
+        "posterior_estimator_based_potential",
+        "ratio_estimator_based_potential",
+        "vector_field_estimator_based_potential",
+    ]
+)
