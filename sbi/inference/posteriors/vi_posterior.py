@@ -46,11 +46,11 @@ from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 # Supported Zuko flow types for VI (lowercase names)
-_ZUKO_FLOW_TYPES = {"maf", "nsf", "naf", "unaf", "nice", "sospf"}
+_ZUKO_FLOW_TYPES = {"maf", "nsf", "naf", "unaf", "nice", "sospf", "gf"}
 
 # Type for supported variational family strings
 VariationalFamily = Literal[
-    "maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"
+    "maf", "nsf", "naf", "unaf", "nice", "sospf", "gf", "gaussian", "gaussian_diag"
 ]
 
 # Type for the q parameter in VIPosterior
@@ -109,7 +109,9 @@ class VIPosterior(NeuralPosterior):
                 `VIPosterior` object. This specifies a parametric class of distribution
                 over which the best possible posterior approximation is searched. For
                 string input, we support normalizing flows [maf, nsf, naf, unaf, nice,
-                sospf] via Zuko, and Gaussian families [gaussian, gaussian_diag].
+                sospf, gf] via Zuko, and Gaussian families [gaussian, gaussian_diag].
+                Note: For 1D problems, prefer "gf" (mixture of Gaussians) or "gaussian"
+                as autoregressive flows may be unstable.
                 You can also specify your own variational family by passing a
                 `torch.distributions.Distribution`. Additionally, we allow a `Callable`
                 with signature `(event_shape: torch.Size, link_transform:
@@ -266,7 +268,7 @@ class VIPosterior(NeuralPosterior):
 
         Args:
             flow_type: Type of flow, one of ["maf", "nsf", "naf", "unaf", "nice",
-                "sospf"]. For "gaussian" or "gaussian_diag", use LearnableGaussian.
+                "sospf", "gf"]. For "gaussian"/"gaussian_diag", use LearnableGaussian.
             num_transforms: Number of flow transforms. If None, uses instance default.
             hidden_features: Number of hidden features per layer. If None, uses
                 instance default.
@@ -300,12 +302,12 @@ class VIPosterior(NeuralPosterior):
         # Get prior dimensionality
         prior_dim = self._prior.event_shape[0] if self._prior.event_shape else 1
 
-        # Warn about 1D limitation
-        if prior_dim == 1:
+        # Warn about 1D limitation for autoregressive flows (GF excluded: uses mixtures)
+        if prior_dim == 1 and flow_type != "gf":
             warnings.warn(
                 f"Using {flow_type.upper()} flow for 1D parameter space. "
-                f"Normalizing flows may be unstable for 1D VI optimization. "
-                f"Consider using q='gaussian' for better results in 1D.",
+                f"Autoregressive normalizing flows may be unstable for 1D VI "
+                f"optimization. Consider using q='gaussian' or q='gf' for 1D.",
                 UserWarning,
                 stacklevel=3,
             )
@@ -434,8 +436,8 @@ class VIPosterior(NeuralPosterior):
                 a `VIPosterior`, then the arguments will be copied from it (relevant
                 for multi-round training).
 
-                Note: For 1D parameter spaces, normalizing flows may be unstable.
-                Consider using `q='gaussian'` for 1D problems.
+                Note: For 1D parameter spaces, autoregressive normalizing flows
+                may be unstable. Consider using `q='gaussian'` or `q='gf'` for 1D.
             parameters: List of parameters associated with the distribution object.
             modules: List of modules associated with the distribution object.
 

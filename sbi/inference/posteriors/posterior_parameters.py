@@ -339,11 +339,13 @@ class VIPosteriorParameters(PosteriorParameters):
 
     Fields:
         q: Variational distribution. Either a string specifying the flow type
-            [maf, nsf, naf, unaf, nice, sospf, gaussian, gaussian_diag], a
+            [maf, nsf, naf, unaf, nice, sospf, gf, gaussian, gaussian_diag], a
             `Distribution`, a `VIPosterior` object, or a `Callable`
             builder function. For amortized VI, only string flow types are
             supported. If q is already a `VIPosterior`, arguments are copied
-            from it (relevant for multi-round training).
+            from it (relevant for multi-round training). Note: For 1D problems,
+            prefer "gf" (mixture of Gaussians) or "gaussian" as autoregressive
+            flows may be unstable.
         vi_method: Variational method for fitting q to the posterior. Options:
             [rKL, fKL, IW, alpha]. Some are "mode seeking" (rKL, alpha > 1) and
             some are "mass covering" (fKL, IW, alpha < 1). Currently only used
@@ -369,7 +371,15 @@ class VIPosteriorParameters(PosteriorParameters):
 
     q: Union[
         Literal[
-            "maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"
+            "maf",
+            "nsf",
+            "naf",
+            "unaf",
+            "nice",
+            "sospf",
+            "gf",
+            "gaussian",
+            "gaussian_diag",
         ],
         Distribution,
         "VIPosterior",
@@ -390,6 +400,7 @@ class VIPosteriorParameters(PosteriorParameters):
             "unaf",
             "nice",
             "sospf",
+            "gf",
             "gaussian",
             "gaussian_diag",
         }
