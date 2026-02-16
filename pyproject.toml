@@ -33,7 +33,8 @@ dependencies = [
     "matplotlib",
     "numpy",
     "pillow",
-    "pyknos>=0.16.0",
+    "nflows>=0.14.0",
+    "pyknos>=0.16.0",  # Still needed for MultivariateGaussianMDN
     "pymc>=5.0.0",
     "pyro-ppl>=1.3.1",
     "scikit-learn",

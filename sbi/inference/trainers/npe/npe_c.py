@@ -4,8 +4,8 @@
 from typing import Callable, Dict, Literal, Optional, Union
 
 import torch
+from nflows.transforms import CompositeTransform
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
-from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor, eye, ones
 from torch.distributions import Distribution, MultivariateNormal, Uniform
 from torch.utils.tensorboard.writer import SummaryWriter

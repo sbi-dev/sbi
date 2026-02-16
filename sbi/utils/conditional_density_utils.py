@@ -6,8 +6,8 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import torch
 import torch.distributions.transforms as torch_tf
+from nflows.flows import Flow
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
-from pyknos.nflows.flows import Flow
 from torch import Tensor
 from torch.distributions import Distribution
 

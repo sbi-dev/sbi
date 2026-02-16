@@ -3,8 +3,8 @@
 
 from typing import Optional
 
+from nflows import flows, transforms
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
 from sbi.neural_nets.estimators import NFlowsFlow

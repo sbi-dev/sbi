@@ -17,8 +17,8 @@ from typing import (
     Union,
 )
 
+import nflows.transforms as nflows_tf
 import numpy as np
-import pyknos.nflows.transforms as nflows_tf
 import torch
 import torch.distributions.transforms as torch_tf
 import zuko
