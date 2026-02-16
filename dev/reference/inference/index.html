@@ -607,17 +607,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sbi.inference.trainers.npe.npe_a.NPE_A.correct_for_proposal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;correct_for_proposal
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#sbi.inference.trainers.npe.npe_a.NPE_A.train" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1144,12 +1133,20 @@
 directly approximate the posterior. Also like all other NPE methods, in the
 first round, this density estimator is trained with a maximum-likelihood loss.</p>
 <p>This class implements NPE-A. NPE-A trains across multiple rounds with a
-maximum-likelihood-loss. This will make training converge to the proposal
+maximum-likelihood loss. This will make training converge to the proposal
 posterior instead of the true posterior. To correct for this, SNPE-A applies a
-post-hoc correction after training. This correction has to be performed
-analytically. Thus, NPE-A is limited to Gaussian distributions for all but the
-last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
+post-hoc correction after training. This correction is performed analytically
+and requires Mixture of Gaussians (MoG) density estimators.</p>
 
+
+<details class="note" open>
+  <summary>Note</summary>
+  <p>In multi-round SNPE-A, the number of MoG components grows multiplicatively
+with each round: if the proposal has L components and the density estimator
+has K components, the corrected posterior has L×K components. For many
+rounds, consider using SNPE-C (APT) instead, which handles multi-round
+inference more efficiently.</p>
+</details>
 
 
 
@@ -1159,7 +1156,8 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 34</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 33</span>
+<span class="normal"> 34</span>
 <span class="normal"> 35</span>
 <span class="normal"> 36</span>
 <span class="normal"> 37</span>
@@ -1512,7 +1510,75 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="normal">384</span>
 <span class="normal">385</span>
 <span class="normal">386</span>
-<span class="normal">387</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].</span>
 
 <span class="sd">    [1] *Fast epsilon-free Inference of Simulation Models with Bayesian</span>
@@ -1524,11 +1590,17 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="sd">    first round, this density estimator is trained with a maximum-likelihood loss.</span>
 
 <span class="sd">    This class implements NPE-A. NPE-A trains across multiple rounds with a</span>
-<span class="sd">    maximum-likelihood-loss. This will make training converge to the proposal</span>
+<span class="sd">    maximum-likelihood loss. This will make training converge to the proposal</span>
 <span class="sd">    posterior instead of the true posterior. To correct for this, SNPE-A applies a</span>
-<span class="sd">    post-hoc correction after training. This correction has to be performed</span>
-<span class="sd">    analytically. Thus, NPE-A is limited to Gaussian distributions for all but the</span>
-<span class="sd">    last round. In the last round, NPE-A can use a Mixture of Gaussians.&quot;&quot;&quot;</span>
+<span class="sd">    post-hoc correction after training. This correction is performed analytically</span>
+<span class="sd">    and requires Mixture of Gaussians (MoG) density estimators.</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        In multi-round SNPE-A, the number of MoG components grows multiplicatively</span>
+<span class="sd">        with each round: if the proposal has L components and the density estimator</span>
+<span class="sd">        has K components, the corrected posterior has L×K components. For many</span>
+<span class="sd">        rounds, consider using SNPE-C (APT) instead, which handles multi-round</span>
+<span class="sd">        inference more efficiently.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1559,15 +1631,11 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="sd">                thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">                density estimator needs to provide the methods `.log_prob` and</span>
 <span class="sd">                `.sample()` and must return a `ConditionalDensityEstimator`.</span>
-<span class="sd">                Note that until the last round only a single (multivariate) Gaussian</span>
-<span class="sd">                component is used for training (seeAlgorithm 1 in [1]). In the last</span>
-<span class="sd">                round, this component is replicated `num_components` times,</span>
-<span class="sd">                its parameters are perturbed with a very small noise, and then the last</span>
-<span class="sd">                training round is done with the expanded Gaussian mixture as estimator</span>
-<span class="sd">                for the proposal posterior.</span>
-<span class="sd">            num_components: Number of components of the mixture of Gaussians in the</span>
-<span class="sd">                last round. This overrides the `num_components` value passed to</span>
-<span class="sd">                `posterior_nn()`.</span>
+<span class="sd">            num_components: Number of components of the mixture of Gaussians.</span>
+<span class="sd">                Note: In multi-round SNPE-A, the number of components grows</span>
+<span class="sd">                multiplicatively with each round due to the analytical correction</span>
+<span class="sd">                (L components in proposal × K components in density = L*K posterior</span>
+<span class="sd">                components).</span>
 <span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -1585,9 +1653,7 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
                 <span class="s2">&quot;callable or the string &#39;mdn_snpe_a&#39;!&quot;</span>
             <span class="p">)</span>
 
-        <span class="c1"># `num_components` will be used to replicate the Gaussian in the last round.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span> <span class="o">=</span> <span class="n">num_components</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_ran_final_round</span> <span class="o">=</span> <span class="kc">False</span>
 
         <span class="c1"># WARNING: sneaky trick ahead. We proxy the parent&#39;s `train` here,</span>
         <span class="c1"># requiring the signature to have `num_components`, save it for use below, and</span>
@@ -1601,7 +1667,6 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">final_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
         <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
         <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
@@ -1613,7 +1678,6 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
         <span class="n">retrain_from_scratch</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">show_train_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">component_perturbation</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-3</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConditionalDensityEstimator</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return density estimator that approximates the proposal posterior.</span>
 
@@ -1625,9 +1689,6 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="sd">        which leads the algorithm to converge to the proposal posterior.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            final_round: Whether we are in the last round of training or not. For all</span>
-<span class="sd">                but the last round, Algorithm 1 from [1] is executed. In last the</span>
-<span class="sd">                round, Algorithm 2 from [1] is executed once.</span>
 <span class="sd">            training_batch_size: Training batch size.</span>
 <span class="sd">            learning_rate: Learning rate for Adam optimizer.</span>
 <span class="sd">            validation_fraction: The fraction of data to use for validation.</span>
@@ -1651,10 +1712,6 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="sd">                loss and leakage after the training.</span>
 <span class="sd">            dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
 <span class="sd">                and validation dataloaders (like, e.g., a collate_fn)</span>
-<span class="sd">            component_perturbation: The standard deviation applied to all weights and</span>
-<span class="sd">                biases when, in the last round, the Mixture of Gaussians is build from</span>
-<span class="sd">                a single Gaussian. This value can be problem-specific and also depends</span>
-<span class="sd">                on the number of mixture components.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Density estimator that approximates the distribution $p(\theta|x)$.</span>
@@ -1670,8 +1727,6 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
             <span class="n">entries</span><span class="o">=</span><span class="p">(</span>
                 <span class="s2">&quot;self&quot;</span><span class="p">,</span>
                 <span class="s2">&quot;__class__&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;final_round&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;component_perturbation&quot;</span><span class="p">,</span>
             <span class="p">),</span>
         <span class="p">)</span>
 
@@ -1687,132 +1742,242 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_round</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_round_index</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">final_round</span><span class="p">:</span>
-            <span class="c1"># If there is (will be) only one round, train with Algorithm 2 from [1].</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_round</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span><span class="p">,</span> <span class="n">num_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span>
-                <span class="p">)</span>
-            <span class="c1"># Run Algorithm 2 from [1].</span>
-            <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ran_final_round</span><span class="p">:</span>
-                <span class="c1"># Now switch to the specified number of components. This method will</span>
-                <span class="c1"># only be used if `retrain_from_scratch=True`. Otherwise,</span>
-                <span class="c1"># the MDN will be built from replicating the single-component net for</span>
-                <span class="c1"># `num_component` times (via `_expand_mog()`).</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span><span class="p">,</span> <span class="n">num_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span>
-                <span class="p">)</span>
+        <span class="c1"># Always use the specified number of components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span><span class="p">,</span> <span class="n">num_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span>
+        <span class="p">)</span>
 
-                <span class="c1"># Extend the MDN to the originally desired number of components.</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_expand_mog</span><span class="p">(</span><span class="n">eps</span><span class="o">=</span><span class="n">component_perturbation</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                    <span class="s2">&quot;You have already run SNPE-A with `final_round=True`. Running it&quot;</span>
-                    <span class="s2">&quot;again with this setting will not allow computing the posthoc&quot;</span>
-                    <span class="s2">&quot;correction applied in SNPE-A. Thus, you will get an error when &quot;</span>
-                    <span class="s2">&quot;calling `.build_posterior()` after training.&quot;</span><span class="p">,</span>
-                    <span class="ne">UserWarning</span><span class="p">,</span>
-                    <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-                <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Run Algorithm 1 from [1].</span>
-            <span class="c1"># Wrap the function that builds the MDN such that we can make</span>
-            <span class="c1"># sure that there is only one component when running.</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span><span class="p">,</span> <span class="n">num_components</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">density_estimator</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">final_round</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_ran_final_round</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">density_estimator</span>
 
-        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">correct_for_proposal</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_proposal_mog</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NPE_A_MDN&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build mixture of Gaussians that approximates the posterior.</span>
+        <span class="n">proposal</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="s2">&quot;NPE_A_Posterior&quot;</span><span class="p">,</span> <span class="n">MultivariateNormal</span><span class="p">,</span> <span class="n">MoG</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MoG</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract MoG parameters from a proposal distribution.</span>
 
-<span class="sd">        Returns a `NPE_A_MDN` object, which applies the posthoc-correction required in</span>
-<span class="sd">        SNPE-A.</span>
+<span class="sd">        Supports multiple proposal types:</span>
+<span class="sd">        - NPE_A_Posterior: extracts corrected MoG via get_mog_params()</span>
+<span class="sd">        - MultivariateNormal: converts to single-component MoG</span>
+<span class="sd">        - MoG: uses directly</span>
+<span class="sd">        - Any object with get_mog_params(x) method</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            density_estimator: The density estimator that the posterior is based on.</span>
-<span class="sd">                If `None`, use the latest neural density estimator that was trained.</span>
+<span class="sd">            proposal: The proposal distribution from the previous round.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.</span>
+<span class="sd">            MoG parameters from the proposal.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If NPE_A_Posterior proposal doesn&#39;t have default_x set.</span>
+<span class="sd">            TypeError: If proposal type is not supported.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">density_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span>
-            <span class="c1"># If internal net is used device is defined.</span>
-            <span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Otherwise, infer it from the device of the net parameters.</span>
-            <span class="n">device</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="n">NPE_A_Posterior</span><span class="p">):</span>
+            <span class="n">default_x</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">default_x</span>
+            <span class="k">if</span> <span class="n">default_x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Proposal posterior must have a default_x set for SNPE-A &quot;</span>
+                    <span class="s2">&quot;correction. Call posterior.set_default_x(x_o) before using &quot;</span>
+                    <span class="s2">&quot;as proposal.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="n">default_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;SNPE-A requires default_x batch size of 1, got &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">default_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">. SNPE-A only supports single &quot;</span>
+                    <span class="s2">&quot;observations for correction.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">proposal</span><span class="o">.</span><span class="n">get_mog_params</span><span class="p">(</span><span class="n">default_x</span><span class="p">)</span>
 
-        <span class="c1"># Set proposal of the density estimator.</span>
-        <span class="c1"># This also evokes the z-scoring correction if necessary.</span>
-        <span class="k">if</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span>
-            <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span>
-        <span class="p">):</span>
-            <span class="n">proposal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-                <span class="n">proposal</span><span class="p">,</span> <span class="p">(</span><span class="n">MultivariateNormal</span><span class="p">,</span> <span class="n">BoxUniform</span><span class="p">)</span>
-            <span class="p">),</span> <span class="s2">&quot;&quot;&quot;Prior must be `torch.distributions.MultivariateNormal` or `sbi.utils.</span>
-<span class="s2">                BoxUniform`&quot;&quot;&quot;</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">DirectPosterior</span>
-            <span class="p">),</span> <span class="s2">&quot;&quot;&quot;The proposal you passed to `append_simulations` is neither the prior</span>
-<span class="s2">                nor a `DirectPosterior`. SNPE-A currently only supports these scenarios.</span>
-<span class="s2">                &quot;&quot;&quot;</span>
-            <span class="n">proposal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="n">MultivariateNormal</span><span class="p">):</span>
+            <span class="n">mean</span><span class="p">:</span> <span class="n">Tensor</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">mean</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>  <span class="c1"># type: ignore[assignment]</span>
+            <span class="n">cov</span><span class="p">:</span> <span class="n">Tensor</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">covariance_matrix</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>  <span class="c1"># type: ignore[assignment]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">MoG</span><span class="o">.</span><span class="n">from_gaussian</span><span class="p">(</span><span class="n">mean</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">cov</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
 
-        <span class="c1"># Create the NPE_A_MDN</span>
-        <span class="n">wrapped_density_estimator</span> <span class="o">=</span> <span class="n">NPE_A_MDN</span><span class="p">(</span>
-            <span class="n">flow</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
-            <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">,</span>
-            <span class="n">prior</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span>
-            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="n">MoG</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">proposal</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+
+        <span class="c1"># Case 4: Any object with get_mog_params method</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="s2">&quot;get_mog_params&quot;</span><span class="p">):</span>
+            <span class="c1"># Try to get default_x if available</span>
+            <span class="n">default_x</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="s2">&quot;default_x&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">default_x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Proposal has get_mog_params() but no default_x set. &quot;</span>
+                    <span class="s2">&quot;Call proposal.set_default_x(x_o) before using as proposal.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="n">default_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;SNPE-A requires default_x batch size of 1, got &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">default_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+            <span class="n">mog</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">get_mog_params</span><span class="p">(</span><span class="n">default_x</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mog</span><span class="p">,</span> <span class="n">MoG</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Proposal&#39;s get_mog_params() must return MoG, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">mog</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">mog</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+
+        <span class="c1"># Unsupported type</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;For multi-round SNPE-A, proposal must be one of: NPE_A_Posterior, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;MultivariateNormal, MoG, or an object with get_mog_params() method. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. For custom proposals, construct &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;NPE_A_Posterior directly with your proposal_mog parameter.&quot;</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="n">wrapped_density_estimator</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_z_scored_prior_mog</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">density_estimator</span><span class="p">:</span> <span class="n">MixtureDensityEstimator</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">MoG</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the prior as a MoG in z-scored space (if applicable).</span>
+
+<span class="sd">        For SNPE-A correction, the prior needs to be in the same coordinate system</span>
+<span class="sd">        as the density estimator&#39;s output. When z-scoring is applied to inputs,</span>
+<span class="sd">        the density estimator outputs MoG parameters in z-scored space, so the</span>
+<span class="sd">        prior must also be transformed to z-scored space.</span>
+
+<span class="sd">        For uniform priors (BoxUniform), returns None since uniform priors have</span>
+<span class="sd">        zero precision (infinite covariance) and are handled specially in the</span>
+<span class="sd">        correction formula.</span>
+
+<span class="sd">        Mathematical background:</span>
+<span class="sd">            For z-score transform: z = (theta - shift) / scale</span>
+<span class="sd">            If theta ~ N(mu, Sigma), then:</span>
+<span class="sd">            z ~ N((mu - shift) / scale, Sigma / (scale ⊗ scale))</span>
+<span class="sd">            where (scale ⊗ scale)_ij = scale_i * scale_j</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            density_estimator: The MixtureDensityEstimator (to get z-score parameters).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            MoG representation of the z-scored prior for Gaussian priors,</span>
+<span class="sd">            or None for uniform priors.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Uniform priors have zero precision, return None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span> <span class="n">BoxUniform</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span> <span class="n">MultivariateNormal</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Prior must be MultivariateNormal or BoxUniform, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Get prior parameters</span>
+        <span class="n">prior_mean</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">mean</span>
+        <span class="n">prior_cov</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">covariance_matrix</span>
+
+        <span class="c1"># Apply z-score transform if enabled</span>
+        <span class="k">if</span> <span class="n">density_estimator</span><span class="o">.</span><span class="n">has_input_transform</span><span class="p">:</span>
+            <span class="n">shift</span> <span class="o">=</span> <span class="n">density_estimator</span><span class="o">.</span><span class="n">_transform_shift</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">density_estimator</span><span class="o">.</span><span class="n">_transform_scale</span>
+
+            <span class="c1"># Z-scored mean: (mu - shift) / scale</span>
+            <span class="n">z_mean</span> <span class="o">=</span> <span class="p">(</span><span class="n">prior_mean</span> <span class="o">-</span> <span class="n">shift</span><span class="p">)</span> <span class="o">/</span> <span class="n">scale</span>
+
+            <span class="c1"># Z-scored covariance: Sigma_z[i,j] = Sigma[i,j] / (scale_i * scale_j)</span>
+            <span class="n">scale_outer</span> <span class="o">=</span> <span class="n">scale</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">scale</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">z_cov</span> <span class="o">=</span> <span class="n">prior_cov</span> <span class="o">/</span> <span class="n">scale_outer</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">z_mean</span> <span class="o">=</span> <span class="n">prior_mean</span>
+            <span class="n">z_cov</span> <span class="o">=</span> <span class="n">prior_cov</span>
+
+        <span class="c1"># Validate covariance is positive definite</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">z_cov</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">RuntimeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Z-scored prior covariance is not positive definite. &quot;</span>
+                <span class="s2">&quot;This may indicate numerical issues with the z-score transform. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Original error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+
+        <span class="c1"># Convert to MoG</span>
+        <span class="k">return</span> <span class="n">MoG</span><span class="o">.</span><span class="n">from_gaussian</span><span class="p">(</span><span class="n">z_mean</span><span class="p">,</span> <span class="n">z_cov</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;direct&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;direct&quot;</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;DirectPosterior&quot;</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NPE_A_Posterior</span><span class="p">:</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the neural density estimator.</span>
 
-<span class="sd">        This method first corrects the estimated density with `correct_for_proposal`</span>
-<span class="sd">        and then returns a `DirectPosterior`.</span>
+<span class="sd">        Returns an NPE_A_Posterior that applies the SNPE-A correction formula:</span>
+<span class="sd">            p(θ|x) ∝ q(θ|x) × prior(θ) / proposal(θ)</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            NPE_A only supports `sample_with=&quot;direct&quot;`. The corrected posterior is a</span>
+<span class="sd">            Mixture of Gaussians (MoG) which can be sampled directly and efficiently.</span>
+<span class="sd">            MCMC, VI, rejection, and importance sampling methods do not provide</span>
+<span class="sd">            benefits over direct MoG sampling and are therefore not supported.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            density_estimator: The density estimator that the posterior is based on.</span>
 <span class="sd">                If `None`, use the latest neural density estimator that was trained.</span>
 <span class="sd">            prior: Prior distribution.</span>
+<span class="sd">            sample_with: Must be &quot;direct&quot;. Other sampling methods are not supported.</span>
+<span class="sd">            **kwargs: Additional arguments passed to NPE_A_Posterior.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.</span>
+<span class="sd">            NPE_A_Posterior with the SNPE-A correction applied.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If sample_with is not &quot;direct&quot;.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">sample_with</span> <span class="o">!=</span> <span class="s2">&quot;direct&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;NPE_A only supports sample_with=&#39;direct&#39;, got &#39;</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">&#39;. &quot;</span>
+                <span class="s2">&quot;The corrected posterior is a Mixture of Gaussians which can be &quot;</span>
+                <span class="s2">&quot;sampled directly and efficiently. MCMC, VI, rejection, and &quot;</span>
+                <span class="s2">&quot;importance sampling do not provide benefits over direct MoG sampling.&quot;</span>
+            <span class="p">)</span>
+
         <span class="k">if</span> <span class="n">prior</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-            <span class="p">),</span> <span class="s2">&quot;&quot;&quot;You did not pass a prior. You have to pass the prior either at</span>
-<span class="s2">                initialization `inference = SNPE_A(prior)` or to `.build_posterior</span>
-<span class="s2">                (prior=prior)`.&quot;&quot;&quot;</span>
+            <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
+                <span class="s2">&quot;You did not pass a prior. You have to pass the prior either at &quot;</span>
+                <span class="s2">&quot;initialization `inference = NPE_A(prior)` or to &quot;</span>
+                <span class="s2">&quot;`.build_posterior(prior=prior)`.&quot;</span>
+            <span class="p">)</span>
             <span class="n">prior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span>
 
-        <span class="n">wrapped_density_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">correct_for_proposal</span><span class="p">(</span>
-            <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span>
-            <span class="n">density_estimator</span><span class="o">=</span><span class="n">wrapped_density_estimator</span><span class="p">,</span>
+        <span class="c1"># Resolve and validate density estimator</span>
+        <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="s2">&quot;NPE_A requires MixtureDensityEstimator, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="s2">&quot;Use density_estimator=&#39;mdn_snpe_a&#39; when initializing NPE_A.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Compute correction parameters</span>
+        <span class="n">proposal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">is_first_round</span> <span class="o">=</span> <span class="n">proposal</span> <span class="ow">is</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="ow">or</span> <span class="n">proposal</span> <span class="ow">is</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">is_first_round</span><span class="p">:</span>
+            <span class="n">proposal_mog</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">prior_mog</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">proposal_mog</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_proposal_mog</span><span class="p">(</span><span class="n">proposal</span><span class="p">)</span>
+            <span class="n">prior_mog</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_z_scored_prior_mog</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
+
+        <span class="c1"># Build the posterior</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">NPE_A_Posterior</span><span class="p">(</span>
+            <span class="n">posterior_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
             <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
+            <span class="n">proposal_mog</span><span class="o">=</span><span class="n">proposal_mog</span><span class="p">,</span>
+            <span class="n">prior_mog</span><span class="o">=</span><span class="n">prior_mog</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span>  <span class="c1"># type: ignore</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_log_prob_proposal_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1836,36 +2001,6 @@ last round. In the last round, NPE-A can use a Mixture of Gaussians.</p>
 <span class="sd">        Returns: Log-probability of the proposal posterior.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_expand_mog</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Replicate a singe Gaussian trained with Algorithm 1 before continuing</span>
-<span class="sd">        with Algorithm 2. The weights and biases of the associated MDN layers</span>
-<span class="sd">        are repeated `num_components` times, slightly perturbed to break the</span>
-<span class="sd">        symmetry such that the gradients in the subsequent training are not</span>
-<span class="sd">        all identical.</span>
-
-<span class="sd">        Args:</span>
-<span class="sd">            eps: Standard deviation for the random perturbation.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span><span class="p">,</span> <span class="n">MultivariateGaussianMDN</span><span class="p">)</span>
-
-        <span class="c1"># Increase the number of components</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span><span class="o">.</span><span class="n">_num_components</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span>
-
-        <span class="c1"># Expand the 1-dim Gaussian.</span>
-        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
-            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
-                <span class="n">key</span> <span class="ow">in</span> <span class="n">name</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;logits&quot;</span><span class="p">,</span> <span class="s2">&quot;means&quot;</span><span class="p">,</span> <span class="s2">&quot;unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;upper&quot;</span><span class="p">]</span>
-            <span class="p">):</span>
-                <span class="k">if</span> <span class="s2">&quot;bias&quot;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
-                    <span class="n">param</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">param</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span><span class="p">)</span>
-                    <span class="n">param</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">param</span><span class="o">.</span><span class="n">data</span><span class="p">)</span> <span class="o">*</span> <span class="n">eps</span><span class="p">)</span>
-                    <span class="n">param</span><span class="o">.</span><span class="n">grad</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># let autograd construct a new gradient</span>
-                <span class="k">elif</span> <span class="s2">&quot;weight&quot;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
-                    <span class="n">param</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">param</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-                    <span class="n">param</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">param</span><span class="o">.</span><span class="n">data</span><span class="p">)</span> <span class="o">*</span> <span class="n">eps</span><span class="p">)</span>
-                    <span class="n">param</span><span class="o">.</span><span class="n">grad</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># let autograd construct a new gradient</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -1942,13 +2077,7 @@ that builds a custom neural network, which adheres to
 will be called with the first batch of simulations (theta, x), which can
 thus be used for shape inference and potentially for z-scoring. The
 density estimator needs to provide the methods <code>.log_prob</code> and
-<code>.sample()</code> and must return a <code>ConditionalDensityEstimator</code>.
-Note that until the last round only a single (multivariate) Gaussian
-component is used for training (seeAlgorithm 1 in [1]). In the last
-round, this component is replicated <code>num_components</code> times,
-its parameters are perturbed with a very small noise, and then the last
-training round is done with the expanded Gaussian mixture as estimator
-for the proposal posterior.</p>
+<code>.sample()</code> and must return a <code>ConditionalDensityEstimator</code>.</p>
               </div>
             </td>
             <td>
@@ -1964,9 +2093,11 @@ for the proposal posterior.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Number of components of the mixture of Gaussians in the
-last round. This overrides the <code>num_components</code> value passed to
-<code>posterior_nn()</code>.</p>
+                <p>Number of components of the mixture of Gaussians.
+Note: In multi-round SNPE-A, the number of components grows
+multiplicatively with each round due to the analytical correction
+(L components in proposal × K components in density = L*K posterior
+components).</p>
               </div>
             </td>
             <td>
@@ -2062,12 +2193,7 @@ TensorBoard tracker is used with a default log directory.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 52</span>
-<span class="normal"> 53</span>
-<span class="normal"> 54</span>
-<span class="normal"> 55</span>
-<span class="normal"> 56</span>
-<span class="normal"> 57</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 57</span>
 <span class="normal"> 58</span>
 <span class="normal"> 59</span>
 <span class="normal"> 60</span>
@@ -2128,8 +2254,7 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="normal">115</span>
 <span class="normal">116</span>
 <span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">118</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -2158,15 +2283,11 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="sd">            thus be used for shape inference and potentially for z-scoring. The</span>
 <span class="sd">            density estimator needs to provide the methods `.log_prob` and</span>
 <span class="sd">            `.sample()` and must return a `ConditionalDensityEstimator`.</span>
-<span class="sd">            Note that until the last round only a single (multivariate) Gaussian</span>
-<span class="sd">            component is used for training (seeAlgorithm 1 in [1]). In the last</span>
-<span class="sd">            round, this component is replicated `num_components` times,</span>
-<span class="sd">            its parameters are perturbed with a very small noise, and then the last</span>
-<span class="sd">            training round is done with the expanded Gaussian mixture as estimator</span>
-<span class="sd">            for the proposal posterior.</span>
-<span class="sd">        num_components: Number of components of the mixture of Gaussians in the</span>
-<span class="sd">            last round. This overrides the `num_components` value passed to</span>
-<span class="sd">            `posterior_nn()`.</span>
+<span class="sd">        num_components: Number of components of the mixture of Gaussians.</span>
+<span class="sd">            Note: In multi-round SNPE-A, the number of components grows</span>
+<span class="sd">            multiplicatively with each round due to the analytical correction</span>
+<span class="sd">            (L components in proposal × K components in density = L*K posterior</span>
+<span class="sd">            components).</span>
 <span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -2184,9 +2305,7 @@ TensorBoard tracker is used with a default log directory.</p>
             <span class="s2">&quot;callable or the string &#39;mdn_snpe_a&#39;!&quot;</span>
         <span class="p">)</span>
 
-    <span class="c1"># `num_components` will be used to replicate the Gaussian in the last round.</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span> <span class="o">=</span> <span class="n">num_components</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_ran_final_round</span> <span class="o">=</span> <span class="kc">False</span>
 
     <span class="c1"># WARNING: sneaky trick ahead. We proxy the parent&#39;s `train` here,</span>
     <span class="c1"># requiring the signature to have `num_components`, save it for use below, and</span>
@@ -2207,7 +2326,7 @@ TensorBoard tracker is used with a default log directory.</p>
 
 
 <h3 id="sbi.inference.trainers.npe.npe_a.NPE_A.build_posterior" class="doc doc-heading">
-            <code class=" language-python"><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;direct&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.trainers.npe.npe_a.NPE_A.build_posterior" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -2215,9 +2334,20 @@ TensorBoard tracker is used with a default log directory.</p>
     <div class="doc doc-contents ">
 
         <p>Build posterior from the neural density estimator.</p>
-<p>This method first corrects the estimated density with <code>correct_for_proposal</code>
-and then returns a <code>DirectPosterior</code>.</p>
 
+
+<details class="returns-an-npe_a_posterior-that-applies-the-snpe-a-correction-formula" open>
+  <summary>Returns an NPE_A_Posterior that applies the SNPE-A correction formula</summary>
+  <p>p(θ|x) ∝ q(θ|x) × prior(θ) / proposal(θ)</p>
+</details>
+
+<details class="note" open>
+  <summary>Note</summary>
+  <p>NPE_A only supports <code>sample_with="direct"</code>. The corrected posterior is a
+Mixture of Gaussians (MoG) which can be sampled directly and efficiently.
+MCMC, VI, rejection, and importance sampling methods do not provide
+benefits over direct MoG sampling and are therefore not supported.</p>
+</details>
 
 <p><span class="doc-section-title">Parameters:</span></p>
     <table>
@@ -2235,7 +2365,7 @@ and then returns a <code>DirectPosterior</code>.</p>
                 <code>density_estimator</code>
             </td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="torch.nn.Module">Module</span>]</code>
+                  <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" title="ConditionalDensityEstimator (sbi.neural_nets.estimators.base.ConditionalDensityEstimator)" href="../models/#sbi.neural_nets.estimators.ConditionalDensityEstimator">ConditionalDensityEstimator</a>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2263,6 +2393,37 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>sample_with</code>
+            </td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;direct&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Must be &ldquo;direct&rdquo;. Other sampling methods are not supported.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;direct&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional arguments passed to NPE_A_Posterior.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -2278,11 +2439,34 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="DirectPosterior (sbi.inference.posteriors.direct_posterior.DirectPosterior)" href="../posteriors/#sbi.inference.posteriors.direct_posterior.DirectPosterior">DirectPosterior</a></code>
+                  <code><span title="sbi.inference.posteriors.npe_a_posterior.NPE_A_Posterior">NPE_A_Posterior</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Posterior <span class="arithmatex">\(p(\theta|x)\)</span>  with <code>.sample()</code> and <code>.log_prob()</code> methods.</p>
+                <p>NPE_A_Posterior with the SNPE-A correction applied.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If sample_with is not &ldquo;direct&rdquo;.</p>
               </div>
             </td>
           </tr>
@@ -2292,257 +2476,165 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
-<span class="normal">302</span>
-<span class="normal">303</span>
-<span class="normal">304</span>
-<span class="normal">305</span>
-<span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
-<span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span>
-<span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">sample_with</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;direct&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;direct&quot;</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;DirectPosterior&quot;</span><span class="p">:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NPE_A_Posterior</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the neural density estimator.</span>
 
-<span class="sd">    This method first corrects the estimated density with `correct_for_proposal`</span>
-<span class="sd">    and then returns a `DirectPosterior`.</span>
+<span class="sd">    Returns an NPE_A_Posterior that applies the SNPE-A correction formula:</span>
+<span class="sd">        p(θ|x) ∝ q(θ|x) × prior(θ) / proposal(θ)</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        NPE_A only supports `sample_with=&quot;direct&quot;`. The corrected posterior is a</span>
+<span class="sd">        Mixture of Gaussians (MoG) which can be sampled directly and efficiently.</span>
+<span class="sd">        MCMC, VI, rejection, and importance sampling methods do not provide</span>
+<span class="sd">        benefits over direct MoG sampling and are therefore not supported.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        density_estimator: The density estimator that the posterior is based on.</span>
 <span class="sd">            If `None`, use the latest neural density estimator that was trained.</span>
 <span class="sd">        prior: Prior distribution.</span>
+<span class="sd">        sample_with: Must be &quot;direct&quot;. Other sampling methods are not supported.</span>
+<span class="sd">        **kwargs: Additional arguments passed to NPE_A_Posterior.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.</span>
+<span class="sd">        NPE_A_Posterior with the SNPE-A correction applied.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If sample_with is not &quot;direct&quot;.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">sample_with</span> <span class="o">!=</span> <span class="s2">&quot;direct&quot;</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;NPE_A only supports sample_with=&#39;direct&#39;, got &#39;</span><span class="si">{</span><span class="n">sample_with</span><span class="si">}</span><span class="s2">&#39;. &quot;</span>
+            <span class="s2">&quot;The corrected posterior is a Mixture of Gaussians which can be &quot;</span>
+            <span class="s2">&quot;sampled directly and efficiently. MCMC, VI, rejection, and &quot;</span>
+            <span class="s2">&quot;importance sampling do not provide benefits over direct MoG sampling.&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="n">prior</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="p">),</span> <span class="s2">&quot;&quot;&quot;You did not pass a prior. You have to pass the prior either at</span>
-<span class="s2">            initialization `inference = SNPE_A(prior)` or to `.build_posterior</span>
-<span class="s2">            (prior=prior)`.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
+            <span class="s2">&quot;You did not pass a prior. You have to pass the prior either at &quot;</span>
+            <span class="s2">&quot;initialization `inference = NPE_A(prior)` or to &quot;</span>
+            <span class="s2">&quot;`.build_posterior(prior=prior)`.&quot;</span>
+        <span class="p">)</span>
         <span class="n">prior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span>
 
-    <span class="n">wrapped_density_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">correct_for_proposal</span><span class="p">(</span>
-        <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span>
-    <span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span>
-        <span class="n">density_estimator</span><span class="o">=</span><span class="n">wrapped_density_estimator</span><span class="p">,</span>
+    <span class="c1"># Resolve and validate density estimator</span>
+    <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;NPE_A requires MixtureDensityEstimator, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="s2">&quot;Use density_estimator=&#39;mdn_snpe_a&#39; when initializing NPE_A.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Compute correction parameters</span>
+    <span class="n">proposal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">is_first_round</span> <span class="o">=</span> <span class="n">proposal</span> <span class="ow">is</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="ow">or</span> <span class="n">proposal</span> <span class="ow">is</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="n">is_first_round</span><span class="p">:</span>
+        <span class="n">proposal_mog</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">prior_mog</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">proposal_mog</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_proposal_mog</span><span class="p">(</span><span class="n">proposal</span><span class="p">)</span>
+        <span class="n">prior_mog</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_z_scored_prior_mog</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
+
+    <span class="c1"># Build the posterior</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">NPE_A_Posterior</span><span class="p">(</span>
+        <span class="n">posterior_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
+        <span class="n">proposal_mog</span><span class="o">=</span><span class="n">proposal_mog</span><span class="p">,</span>
+        <span class="n">prior_mog</span><span class="o">=</span><span class="n">prior_mog</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span>  <span class="c1"># type: ignore</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
 
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="sbi.inference.trainers.npe.npe_a.NPE_A.correct_for_proposal" class="doc doc-heading">
-            <code class=" language-python"><span class="n">correct_for_proposal</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
-
-<a href="#sbi.inference.trainers.npe.npe_a.NPE_A.correct_for_proposal" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Build mixture of Gaussians that approximates the posterior.</p>
-<p>Returns a <code>NPE_A_MDN</code> object, which applies the posthoc-correction required in
-SNPE-A.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>density_estimator</code>
-            </td>
-            <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="torch.nn.Module">Module</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The density estimator that the posterior is based on.
-If <code>None</code>, use the latest neural density estimator that was trained.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="sbi.inference.trainers.npe.npe_a.NPE_A_MDN">NPE_A_MDN</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Posterior <span class="arithmatex">\(p(\theta|x)\)</span>  with <code>.sample()</code> and <code>.log_prob()</code> methods.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
-<span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span>
-<span class="normal">278</span>
-<span class="normal">279</span>
-<span class="normal">280</span>
-<span class="normal">281</span>
-<span class="normal">282</span>
-<span class="normal">283</span>
-<span class="normal">284</span>
-<span class="normal">285</span>
-<span class="normal">286</span>
-<span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">correct_for_proposal</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;NPE_A_MDN&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build mixture of Gaussians that approximates the posterior.</span>
-
-<span class="sd">    Returns a `NPE_A_MDN` object, which applies the posthoc-correction required in</span>
-<span class="sd">    SNPE-A.</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        density_estimator: The density estimator that the posterior is based on.</span>
-<span class="sd">            If `None`, use the latest neural density estimator that was trained.</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">density_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span>
-        <span class="c1"># If internal net is used device is defined.</span>
-        <span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="c1"># Otherwise, infer it from the device of the net parameters.</span>
-        <span class="n">device</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-
-    <span class="c1"># Set proposal of the density estimator.</span>
-    <span class="c1"># This also evokes the z-scoring correction if necessary.</span>
-    <span class="k">if</span> <span class="p">(</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span>
-        <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span>
-    <span class="p">):</span>
-        <span class="n">proposal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="n">proposal</span><span class="p">,</span> <span class="p">(</span><span class="n">MultivariateNormal</span><span class="p">,</span> <span class="n">BoxUniform</span><span class="p">)</span>
-        <span class="p">),</span> <span class="s2">&quot;&quot;&quot;Prior must be `torch.distributions.MultivariateNormal` or `sbi.utils.</span>
-<span class="s2">            BoxUniform`&quot;&quot;&quot;</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">DirectPosterior</span>
-        <span class="p">),</span> <span class="s2">&quot;&quot;&quot;The proposal you passed to `append_simulations` is neither the prior</span>
-<span class="s2">            nor a `DirectPosterior`. SNPE-A currently only supports these scenarios.</span>
-<span class="s2">            &quot;&quot;&quot;</span>
-        <span class="n">proposal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-
-    <span class="c1"># Create the NPE_A_MDN</span>
-    <span class="n">wrapped_density_estimator</span> <span class="o">=</span> <span class="n">NPE_A_MDN</span><span class="p">(</span>
-        <span class="n">flow</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
-        <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">,</span>
-        <span class="n">prior</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span>
-        <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="k">return</span> <span class="n">wrapped_density_estimator</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -2553,7 +2645,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 
 
 <h3 id="sbi.inference.trainers.npe.npe_a.NPE_A.train" class="doc doc-heading">
-            <code class=" language-python"><span class="n">train</span><span class="p">(</span><span class="n">final_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">component_perturbation</span><span class="o">=</span><span class="mf">0.005</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.trainers.npe.npe_a.NPE_A.train" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -2579,24 +2671,6 @@ which leads the algorithm to converge to the proposal posterior.</p>
         </tr>
       </thead>
       <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>final_round</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether we are in the last round of training or not. For all
-but the last round, Algorithm 1 from [1] is executed. In last the
-round, Algorithm 2 from [1] is executed once.</p>
-              </div>
-            </td>
-            <td>
-                  <code>False</code>
-            </td>
-          </tr>
           <tr class="doc-section-item">
             <td>
                 <code>training_batch_size</code>
@@ -2785,25 +2859,6 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
                   <code>None</code>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>component_perturbation</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The standard deviation applied to all weights and
-biases when, in the last round, the Mixture of Gaussians is build from
-a single Gaussian. This value can be problem-specific and also depends
-on the number of mixture components.</p>
-              </div>
-            </td>
-            <td>
-                  <code>0.005</code>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -2833,7 +2888,8 @@ on the number of mixture components.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">121</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">120</span>
+<span class="normal">121</span>
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span>
@@ -2916,50 +2972,8 @@ on the number of mixture components.</p>
 <span class="normal">201</span>
 <span class="normal">202</span>
 <span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span>
-<span class="normal">218</span>
-<span class="normal">219</span>
-<span class="normal">220</span>
-<span class="normal">221</span>
-<span class="normal">222</span>
-<span class="normal">223</span>
-<span class="normal">224</span>
-<span class="normal">225</span>
-<span class="normal">226</span>
-<span class="normal">227</span>
-<span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">204</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">final_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
     <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
@@ -2971,7 +2985,6 @@ on the number of mixture components.</p>
     <span class="n">retrain_from_scratch</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">show_train_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">component_perturbation</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-3</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConditionalDensityEstimator</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return density estimator that approximates the proposal posterior.</span>
 
@@ -2983,9 +2996,6 @@ on the number of mixture components.</p>
 <span class="sd">    which leads the algorithm to converge to the proposal posterior.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        final_round: Whether we are in the last round of training or not. For all</span>
-<span class="sd">            but the last round, Algorithm 1 from [1] is executed. In last the</span>
-<span class="sd">            round, Algorithm 2 from [1] is executed once.</span>
 <span class="sd">        training_batch_size: Training batch size.</span>
 <span class="sd">        learning_rate: Learning rate for Adam optimizer.</span>
 <span class="sd">        validation_fraction: The fraction of data to use for validation.</span>
@@ -3009,10 +3019,6 @@ on the number of mixture components.</p>
 <span class="sd">            loss and leakage after the training.</span>
 <span class="sd">        dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
 <span class="sd">            and validation dataloaders (like, e.g., a collate_fn)</span>
-<span class="sd">        component_perturbation: The standard deviation applied to all weights and</span>
-<span class="sd">            biases when, in the last round, the Mixture of Gaussians is build from</span>
-<span class="sd">            a single Gaussian. This value can be problem-specific and also depends</span>
-<span class="sd">            on the number of mixture components.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Density estimator that approximates the distribution $p(\theta|x)$.</span>
@@ -3028,8 +3034,6 @@ on the number of mixture components.</p>
         <span class="n">entries</span><span class="o">=</span><span class="p">(</span>
             <span class="s2">&quot;self&quot;</span><span class="p">,</span>
             <span class="s2">&quot;__class__&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;final_round&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;component_perturbation&quot;</span><span class="p">,</span>
         <span class="p">),</span>
     <span class="p">)</span>
 
@@ -3045,43 +3049,14 @@ on the number of mixture components.</p>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">_round</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_round_index</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">final_round</span><span class="p">:</span>
-        <span class="c1"># If there is (will be) only one round, train with Algorithm 2 from [1].</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_round</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span><span class="p">,</span> <span class="n">num_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span>
-            <span class="p">)</span>
-        <span class="c1"># Run Algorithm 2 from [1].</span>
-        <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ran_final_round</span><span class="p">:</span>
-            <span class="c1"># Now switch to the specified number of components. This method will</span>
-            <span class="c1"># only be used if `retrain_from_scratch=True`. Otherwise,</span>
-            <span class="c1"># the MDN will be built from replicating the single-component net for</span>
-            <span class="c1"># `num_component` times (via `_expand_mog()`).</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span><span class="p">,</span> <span class="n">num_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span>
-            <span class="p">)</span>
+    <span class="c1"># Always use the specified number of components</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span><span class="p">,</span> <span class="n">num_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_num_components</span>
+    <span class="p">)</span>
 
-            <span class="c1"># Extend the MDN to the originally desired number of components.</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_expand_mog</span><span class="p">(</span><span class="n">eps</span><span class="o">=</span><span class="n">component_perturbation</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                <span class="s2">&quot;You have already run SNPE-A with `final_round=True`. Running it&quot;</span>
-                <span class="s2">&quot;again with this setting will not allow computing the posthoc&quot;</span>
-                <span class="s2">&quot;correction applied in SNPE-A. Thus, you will get an error when &quot;</span>
-                <span class="s2">&quot;calling `.build_posterior()` after training.&quot;</span><span class="p">,</span>
-                <span class="ne">UserWarning</span><span class="p">,</span>
-                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-            <span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="c1"># Run Algorithm 1 from [1].</span>
-        <span class="c1"># Wrap the function that builds the MDN such that we can make</span>
-        <span class="c1"># sure that there is only one component when running.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span><span class="p">,</span> <span class="n">num_components</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">density_estimator</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">final_round</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_ran_final_round</span> <span class="o">=</span> <span class="kc">True</span>
-
-    <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">density_estimator</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3694,8 +3669,7 @@ the atomic loss.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 38</span>
-<span class="normal"> 39</span>
+                <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 39</span>
 <span class="normal"> 40</span>
 <span class="normal"> 41</span>
 <span class="normal"> 42</span>
@@ -4349,7 +4323,15 @@ the atomic loss.</p>
 <span class="normal">690</span>
 <span class="normal">691</span>
 <span class="normal">692</span>
-<span class="normal">693</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">693</span>
+<span class="normal">694</span>
+<span class="normal">695</span>
+<span class="normal">696</span>
+<span class="normal">697</span>
+<span class="normal">698</span>
+<span class="normal">699</span>
+<span class="normal">700</span>
+<span class="normal">701</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]</span>
 
 <span class="sd">    [1] *Automatic Posterior Transformation for Likelihood-free Inference*,</span>
@@ -4509,8 +4491,8 @@ the atomic loss.</p>
             <span class="n">proposal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">use_non_atomic_loss</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="n">DirectPosterior</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span><span class="p">,</span> <span class="n">mdn</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span><span class="p">,</span> <span class="n">mdn</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">)</span>
                 <span class="ow">and</span> <span class="n">check_dist_class</span><span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span> <span class="n">class_to_check</span><span class="o">=</span><span class="p">(</span><span class="n">Uniform</span><span class="p">,</span> <span class="n">MultivariateNormal</span><span class="p">)</span>
                 <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
@@ -4529,17 +4511,16 @@ the atomic loss.</p>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Set state variables that are used at each training step of non-atomic SNPE-C.</span>
 
 <span class="sd">        Three things are computed:</span>
-<span class="sd">        1) Check if z-scoring was requested. To do so, we check if the `_transform`</span>
-<span class="sd">            argument of the net had been a `CompositeTransform`. See pyknos mdn.py.</span>
+<span class="sd">        1) Check if z-scoring was requested. We check if the MixtureDensityEstimator</span>
+<span class="sd">            has an input transform enabled via the has_input_transform property.</span>
 <span class="sd">        2) Define a (potentially standardized) prior. It&#39;s standardized if z-scoring</span>
 <span class="sd">            had been requested.</span>
 <span class="sd">        3) Compute (Precision * mean) for the prior. This quantity is used at every</span>
 <span class="sd">            training step if the prior is Gaussian.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">z_score_theta</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_transform</span><span class="p">,</span> <span class="n">CompositeTransform</span>
-        <span class="p">)</span>
+        <span class="c1"># Check if z-scoring is enabled on the MixtureDensityEstimator</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">z_score_theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">has_input_transform</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_maybe_z_scored_prior</span><span class="p">()</span>
 
@@ -4569,16 +4550,17 @@ the atomic loss.</p>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_score_theta</span><span class="p">:</span>
-            <span class="n">scale</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_transform</span><span class="o">.</span><span class="n">_transforms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">_scale</span>
-            <span class="n">shift</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_transform</span><span class="o">.</span><span class="n">_transforms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">_shift</span>
+            <span class="c1"># Get z-score parameters from the MixtureDensityEstimator</span>
+            <span class="c1"># The transform is: z = (theta - shift) / scale</span>
+            <span class="c1"># where shift = mean (estimated from samples) and scale = std (estimated)</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">)</span>
+            <span class="n">shift</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">_transform_shift</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">_transform_scale</span>
 
-            <span class="c1"># Following the definintion of the linear transform in</span>
-            <span class="c1"># `standardizing_transform` in `sbiutils.py`:</span>
-            <span class="c1"># shift=-mean / std</span>
-            <span class="c1"># scale=1 / std</span>
-            <span class="c1"># Solving these equations for mean and std:</span>
-            <span class="n">estim_prior_std</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">scale</span>
-            <span class="n">estim_prior_mean</span> <span class="o">=</span> <span class="o">-</span><span class="n">shift</span> <span class="o">*</span> <span class="n">estim_prior_std</span>
+            <span class="c1"># The MixtureDensityEstimator uses: z = (theta - shift) / scale</span>
+            <span class="c1"># where shift = mean and scale = std (estimated from training data)</span>
+            <span class="n">estim_prior_mean</span> <span class="o">=</span> <span class="n">shift</span>
+            <span class="n">estim_prior_std</span> <span class="o">=</span> <span class="n">scale</span>
 
             <span class="c1"># Compute the discrepancy of the true prior mean and std and the mean and</span>
             <span class="c1"># std that was empirically estimated from samples.</span>
@@ -4624,12 +4606,10 @@ the atomic loss.</p>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_non_atomic_loss</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
-                <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="p">,</span> <span class="s2">&quot;_distribution&quot;</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span><span class="p">,</span> <span class="n">mdn</span><span class="p">)</span>
-            <span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;The density estimator must be a MDNtext for non-atomic loss.&quot;</span>
+                    <span class="s2">&quot;The density estimator must be a MixtureDensityEstimator &quot;</span>
+                    <span class="s2">&quot;for non-atomic loss.&quot;</span>
                 <span class="p">)</span>
 
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log_prob_proposal_posterior_mog</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">proposal</span><span class="p">)</span>
@@ -4756,24 +4736,22 @@ the atomic loss.</p>
 <span class="sd">        Returns:</span>
 <span class="sd">            Log-probability of the proposal posterior.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Get the proposal MoG at the default_x</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">proposal</span><span class="o">.</span><span class="n">default_x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Proposal must have default_x set&quot;</span>
+        <span class="n">mog_p</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">get_uncorrected_mog</span><span class="p">(</span><span class="n">proposal</span><span class="o">.</span><span class="n">default_x</span><span class="p">)</span>
+        <span class="n">norm_logits_p</span> <span class="o">=</span> <span class="n">mog_p</span><span class="o">.</span><span class="n">log_weights</span>  <span class="c1"># Already normalized</span>
+        <span class="n">m_p</span> <span class="o">=</span> <span class="n">mog_p</span><span class="o">.</span><span class="n">means</span>
+        <span class="n">prec_p</span> <span class="o">=</span> <span class="n">mog_p</span><span class="o">.</span><span class="n">precisions</span>
 
-        <span class="c1"># Evaluate the proposal. MDNs do not have functionality to run the embedding_net</span>
-        <span class="c1"># and then get the mixture_components (**without** calling log_prob()). Hence,</span>
-        <span class="c1"># we call them separately here.</span>
-        <span class="n">encoded_x</span> <span class="o">=</span> <span class="n">proposal</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_embedding_net</span><span class="p">(</span><span class="n">proposal</span><span class="o">.</span><span class="n">default_x</span><span class="p">)</span>
-        <span class="n">dist</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">proposal</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span>
-        <span class="p">)</span>  <span class="c1"># defined to avoid ugly black formatting.</span>
-        <span class="n">logits_p</span><span class="p">,</span> <span class="n">m_p</span><span class="p">,</span> <span class="n">prec_p</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_mixture_components</span><span class="p">(</span><span class="n">encoded_x</span><span class="p">)</span>
-        <span class="n">norm_logits_p</span> <span class="o">=</span> <span class="n">logits_p</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">logsumexp</span><span class="p">(</span><span class="n">logits_p</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdim</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># Get the density estimator MoG at the training data x</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">)</span>
+        <span class="n">mog_d</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">get_uncorrected_mog</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">norm_logits_d</span> <span class="o">=</span> <span class="n">mog_d</span><span class="o">.</span><span class="n">log_weights</span>  <span class="c1"># Already normalized</span>
+        <span class="n">m_d</span> <span class="o">=</span> <span class="n">mog_d</span><span class="o">.</span><span class="n">means</span>
+        <span class="n">prec_d</span> <span class="o">=</span> <span class="n">mog_d</span><span class="o">.</span><span class="n">precisions</span>
 
-        <span class="c1"># Evaluate the density estimator.</span>
-        <span class="n">encoded_x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_embedding_net</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-        <span class="n">dist</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span>  <span class="c1"># defined to avoid black formatting.</span>
-        <span class="n">logits_d</span><span class="p">,</span> <span class="n">m_d</span><span class="p">,</span> <span class="n">prec_d</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_mixture_components</span><span class="p">(</span><span class="n">encoded_x</span><span class="p">)</span>
-        <span class="n">norm_logits_d</span> <span class="o">=</span> <span class="n">logits_d</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">logsumexp</span><span class="p">(</span><span class="n">logits_d</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdim</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-
-        <span class="c1"># z-score theta if it z-scoring had been requested.</span>
+        <span class="c1"># z-score theta if z-scoring was requested.</span>
         <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_maybe_z_score_theta</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 
         <span class="c1"># Compute the MoG parameters of the proposal posterior.</span>
@@ -4786,8 +4764,18 @@ the atomic loss.</p>
             <span class="n">norm_logits_p</span><span class="p">,</span> <span class="n">m_p</span><span class="p">,</span> <span class="n">prec_p</span><span class="p">,</span> <span class="n">norm_logits_d</span><span class="p">,</span> <span class="n">m_d</span><span class="p">,</span> <span class="n">prec_d</span>
         <span class="p">)</span>
 
+        <span class="c1"># Create MoG for proposal posterior and compute log_prob</span>
+        <span class="c1"># We need precision_factors for MoG, compute via Cholesky</span>
+        <span class="n">precf_pp</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">prec_pp</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">mog_pp</span> <span class="o">=</span> <span class="n">MoG</span><span class="p">(</span>
+            <span class="n">logits</span><span class="o">=</span><span class="n">logits_pp</span><span class="p">,</span>
+            <span class="n">means</span><span class="o">=</span><span class="n">m_pp</span><span class="p">,</span>
+            <span class="n">precisions</span><span class="o">=</span><span class="n">prec_pp</span><span class="p">,</span>
+            <span class="n">precision_factors</span><span class="o">=</span><span class="n">precf_pp</span><span class="p">,</span>
+        <span class="p">)</span>
+
         <span class="c1"># Compute the log_prob of theta under the product.</span>
-        <span class="n">log_prob_proposal_posterior</span> <span class="o">=</span> <span class="n">mog_log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">logits_pp</span><span class="p">,</span> <span class="n">m_pp</span><span class="p">,</span> <span class="n">prec_pp</span><span class="p">)</span>
+        <span class="n">log_prob_proposal_posterior</span> <span class="o">=</span> <span class="n">mog_pp</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
         <span class="n">assert_all_finite</span><span class="p">(</span>
             <span class="n">log_prob_proposal_posterior</span><span class="p">,</span>
 <span class="w">            </span><span class="sd">&quot;&quot;&quot;the evaluation of the MoG proposal posterior. This is likely due to a</span>
@@ -4934,7 +4922,8 @@ the atomic loss.</p>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return potentially standardized theta if z-scoring was requested.&quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_score_theta</span><span class="p">:</span>
-            <span class="n">theta</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_transform</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">)</span>
+            <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">_transform_input</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">theta</span>
 
@@ -5175,8 +5164,7 @@ TensorBoard tracker is used with a default log directory.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 73</span>
-<span class="normal"> 74</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 74</span>
 <span class="normal"> 75</span>
 <span class="normal"> 76</span>
 <span class="normal"> 77</span>
@@ -5212,7 +5200,8 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="normal">107</span>
 <span class="normal">108</span>
 <span class="normal">109</span>
-<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">110</span>
+<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -5569,8 +5558,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">112</span>
-<span class="normal">113</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
 <span class="normal">114</span>
 <span class="normal">115</span>
 <span class="normal">116</span>
@@ -5669,7 +5657,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">209</span>
 <span class="normal">210</span>
 <span class="normal">211</span>
-<span class="normal">212</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">212</span>
+<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -5755,8 +5744,8 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
         <span class="n">proposal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_roundwise</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">use_non_atomic_loss</span> <span class="o">=</span> <span class="p">(</span>
             <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="p">,</span> <span class="n">DirectPosterior</span><span class="p">)</span>
-            <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span><span class="p">,</span> <span class="n">mdn</span><span class="p">)</span>
-            <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span><span class="p">,</span> <span class="n">mdn</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="p">,</span> <span class="n">MixtureDensityEstimator</span><span class="p">)</span>
             <span class="ow">and</span> <span class="n">check_dist_class</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span> <span class="n">class_to_check</span><span class="o">=</span><span class="p">(</span><span class="n">Uniform</span><span class="p">,</span> <span class="n">MultivariateNormal</span><span class="p">)</span>
             <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
