@@ -170,7 +170,7 @@ def infer(
     return posterior
 
 
-def check_if_proposal_has_default_x(proposal: Any):
+def check_if_proposal_has_default_x(proposal: Union[NeuralPosterior, Distribution]) -> None:
     """Check for validity of the provided proposal distribution.
 
     If the proposal is a `NeuralPosterior`, we check if the default_x is set and
@@ -1283,7 +1283,7 @@ class NeuralInference(
         theta = theta[is_valid_x]
 
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
+        warn_if_invalid_for_zscoring(x)
         nle_nre_apt_msg_on_invalid_x(
             num_nans, num_infs, exclude_invalid_x, algorithm or type(self).__name__
         )

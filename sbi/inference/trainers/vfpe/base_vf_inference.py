@@ -784,7 +784,7 @@ class MaskedVectorFieldTrainer(
         )
 
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(inputs)
+        warn_if_invalid_for_zscoring(inputs)
 
         # Warn the user if invalid inputs are found
         simformer_msg_on_invalid_x(
@@ -818,7 +818,7 @@ class MaskedVectorFieldTrainer(
 
     def train(
         self,
-        training_batch_size: int = 200,
+        training_batch_size: int = 800,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
@@ -1130,6 +1130,7 @@ class MaskedVectorFieldTrainer(
         cls_name = self.__class__.__name__
         if self._round == 0 or force_first_round_loss:
             # First round loss.
+            del prior_masks, proposal  # Not used
             if self._neural_net is None:
                 raise AttributeError("Initialize self._neural_net.")
             loss = self._neural_net.loss(
