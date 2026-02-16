@@ -7,8 +7,8 @@ This module provides:
 - MultivariateGaussianMDN: Neural network that outputs MoG parameters
 - MixtureDensityEstimator: ConditionalDensityEstimator wrapper for sbi integration
 
-The MDN implementation is adapted from pyknos (https://github.com/sbi-dev/pyknos),
-original implementation by Conor M. Durkan et al., licensed under Apache 2.0.
+The MDN implementation is based on Bishop's "Mixture Density Networks" (1994),
+with code originally developed by Conor M. Durkan et al.
 Based on: C. M. Bishop, "Mixture Density Networks", NCRG Report (1994)
 """
 

@@ -1042,7 +1042,7 @@ def mog_log_prob(
     the batch. This is because these values were computed from a batch of $x$ (and the
     $x$ in the batch are not the same).
 
-    This code is similar to the code of mdn.py in pyknos, but it does not use
+    This code is similar to the MDN implementation in sbi, but it does not use
     log(det(Cov)) = -2*sum(log(diag(L))), L being Cholesky of Precision. Instead, it
     just computes log(det(Cov)). Also, it uses the above-defined helper
     `_batched_vmv()`.
