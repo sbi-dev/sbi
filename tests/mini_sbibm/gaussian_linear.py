@@ -131,8 +131,6 @@ class GaussianLinear(Task):
 
         def sim(theta):
             theta = theta.to(device) if device is not None else theta
-            return diagonal_linear_gaussian(
-                theta, std=self.simulator_scale
-            )
+            return diagonal_linear_gaussian(theta, std=self.simulator_scale)
 
         return sim

@@ -170,7 +170,9 @@ def infer(
     return posterior
 
 
-def check_if_proposal_has_default_x(proposal: Union[NeuralPosterior, Distribution]) -> None:
+def check_if_proposal_has_default_x(
+    proposal: Union[NeuralPosterior, Distribution],
+) -> None:
     """Check for validity of the provided proposal distribution.
 
     If the proposal is a `NeuralPosterior`, we check if the default_x is set and
