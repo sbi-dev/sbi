@@ -40,7 +40,7 @@ dependencies = [
     "scipy",
     "skorch",
     "tensorboard",
-    "torch>=1.13.0, <2.6.0",
+    "torch>=1.13.0",
     "tqdm",
     "zuko>=1.2.0",
 ]
