@@ -99,8 +99,8 @@ class NFlowsFlow(ConditionalDensityEstimator):
             and condition.shape[0] == input_sample_dim
             and condition.shape[1] == input_batch_dim
         ):
-            input = input.reshape(-1, input.shape[-1])
-            condition = condition.reshape(-1, condition.shape[-1])
+            input = input.reshape(input_sample_dim * input_batch_dim, -1)
+            condition = condition.reshape(input_sample_dim * input_batch_dim, -1)
             log_probs = self.net.log_prob(input, context=condition)
         else:
             condition_batch_dim = condition.shape[0]
