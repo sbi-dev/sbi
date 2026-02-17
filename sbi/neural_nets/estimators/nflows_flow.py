@@ -74,14 +74,16 @@ class NFlowsFlow(ConditionalDensityEstimator):
         noise = noise.reshape(batch_shape)
         return noise
 
-    def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
+    def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
         i.e. batched conditions.
 
         Args:
             input: Inputs to evaluate the log probability on. Of shape
                 `(sample_dim, batch_dim, *event_shape)`.
-            condition: Conditions of shape `(batch_dim, *event_shape)`.
+            condition: Conditions of shape `(batch_dim, *event_shape)` or
+                 `(sample_dim, batch_dim, *event_shape)`.
+            **kwargs: Additional arguments.
 
         Raises:
             AssertionError: If `input_batch_dim != condition_batch_dim`.
@@ -91,22 +93,33 @@ class NFlowsFlow(ConditionalDensityEstimator):
         """
         input_sample_dim = input.shape[0]
         input_batch_dim = input.shape[1]
-        condition_batch_dim = condition.shape[0]
-        condition_event_dims = len(condition.shape[1:])
 
-        assert condition_batch_dim == input_batch_dim, (
-            f"Batch shape of condition {condition_batch_dim} and input "
-            f"{input_batch_dim} do not match."
-        )
+        if (
+            condition.ndim == input.ndim
+            and condition.shape[0] == input_sample_dim
+            and condition.shape[1] == input_batch_dim
+        ):
+            input = input.reshape(-1, input.shape[-1])
+            condition = condition.reshape(-1, condition.shape[-1])
+            log_probs = self.net.log_prob(input, context=condition)
+        else:
+            condition_batch_dim = condition.shape[0]
+            condition_event_dims = len(condition.shape[1:])
 
-        # Nflows needs to have a single batch dimension for condition and input.
-        input = input.reshape((input_batch_dim * input_sample_dim, -1))
+            assert condition_batch_dim == input_batch_dim, (
+                f"Batch shape of condition {condition_batch_dim} and input "
+                f"{input_batch_dim} do not match."
+            )
 
-        # Repeat the condition to match `input_batch_dim * input_sample_dim`.
-        ones_for_event_dims = (1,) * condition_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
-        condition = condition.repeat(input_sample_dim, *ones_for_event_dims)
+            # Nflows needs to have a single batch dimension for condition and input.
+            input = input.reshape((input_batch_dim * input_sample_dim, -1))
 
-        log_probs = self.net.log_prob(input, context=condition)
+            # Repeat the condition to match `input_batch_dim * input_sample_dim`.
+            # Tuple of 1s, e.g. (1, 1, 1)
+            ones_for_event_dims = (1,) * condition_event_dims
+            condition = condition.repeat(input_sample_dim, *ones_for_event_dims)
+
+            log_probs = self.net.log_prob(input, context=condition)
         return log_probs.reshape((input_sample_dim, input_batch_dim))
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
