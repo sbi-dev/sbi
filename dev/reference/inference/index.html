@@ -1146,7 +1146,34 @@ with each round: if the proposal has L components and the density estimator
 has K components, the corrected posterior has L×K components. For many
 rounds, consider using SNPE-C (APT) instead, which handles multi-round
 inference more efficiently.</p>
-</details>
+</details>        <h4 id="sbi.inference.trainers.npe.npe_a.NPE_A--example">Example:<a class="headerlink" href="#sbi.inference.trainers.npe.npe_a.NPE_A--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import NPE_A
+from sbi.utils import BoxUniform
+
+# 1. Setup simulator, prior, and observation
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+x_o = torch.randn(1, 3)  # Observed data
+
+def simulator(theta):
+    return theta + torch.randn_like(theta) * 0.1
+
+# 2. Multi-round inference
+inference = NPE_A(prior=prior, num_components=5)
+proposal = prior
+
+for round_idx in range(5):
+    theta = proposal.sample((100,))
+    x = simulator(theta)
+    density_estimator = inference.append_simulations(theta, x).train()
+    posterior = inference.build_posterior(density_estimator)
+    proposal = posterior.set_default_x(x_o)
+
+# 3. Sample from final posterior
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
+
 
 
 
@@ -1578,7 +1605,38 @@ inference more efficiently.</p>
 <span class="normal">452</span>
 <span class="normal">453</span>
 <span class="normal">454</span>
-<span class="normal">455</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_A</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm as in Papamakarios et al. (2016) [1].</span>
 
 <span class="sd">    [1] *Fast epsilon-free Inference of Simulation Models with Bayesian</span>
@@ -1600,7 +1658,38 @@ inference more efficiently.</p>
 <span class="sd">        with each round: if the proposal has L components and the density estimator</span>
 <span class="sd">        has K components, the corrected posterior has L×K components. For many</span>
 <span class="sd">        rounds, consider using SNPE-C (APT) instead, which handles multi-round</span>
-<span class="sd">        inference more efficiently.&quot;&quot;&quot;</span>
+<span class="sd">        inference more efficiently.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import NPE_A</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
+
+<span class="sd">        # 1. Setup simulator, prior, and observation</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        x_o = torch.randn(1, 3)  # Observed data</span>
+
+<span class="sd">        def simulator(theta):</span>
+<span class="sd">            return theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Multi-round inference</span>
+<span class="sd">        inference = NPE_A(prior=prior, num_components=5)</span>
+<span class="sd">        proposal = prior</span>
+
+<span class="sd">        for round_idx in range(5):</span>
+<span class="sd">            theta = proposal.sample((100,))</span>
+<span class="sd">            x = simulator(theta)</span>
+<span class="sd">            density_estimator = inference.append_simulations(theta, x).train()</span>
+<span class="sd">            posterior = inference.build_posterior(density_estimator)</span>
+<span class="sd">            proposal = posterior.set_default_x(x_o)</span>
+
+<span class="sd">        # 3. Sample from final posterior</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -2193,38 +2282,7 @@ TensorBoard tracker is used with a default log directory.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
-<span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 88</span>
 <span class="normal"> 89</span>
 <span class="normal"> 90</span>
 <span class="normal"> 91</span>
@@ -2254,7 +2312,38 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="normal">115</span>
 <span class="normal">116</span>
 <span class="normal">117</span>
-<span class="normal">118</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -2476,38 +2565,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
-<span class="normal">354</span>
-<span class="normal">355</span>
-<span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
-<span class="normal">361</span>
-<span class="normal">362</span>
-<span class="normal">363</span>
-<span class="normal">364</span>
-<span class="normal">365</span>
-<span class="normal">366</span>
-<span class="normal">367</span>
-<span class="normal">368</span>
-<span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
-<span class="normal">381</span>
-<span class="normal">382</span>
-<span class="normal">383</span>
-<span class="normal">384</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">384</span>
 <span class="normal">385</span>
 <span class="normal">386</span>
 <span class="normal">387</span>
@@ -2555,7 +2613,38 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
 <span class="normal">429</span>
 <span class="normal">430</span>
 <span class="normal">431</span>
-<span class="normal">432</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalDensityEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2888,38 +2977,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">151</span>
 <span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
@@ -2972,7 +3030,38 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">201</span>
 <span class="normal">202</span>
 <span class="normal">203</span>
-<span class="normal">204</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -3089,15 +3178,43 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
         <p>Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].</p>
+<p>NPE-B (also known as SNPE-B) trains a neural network to directly approximate
+the posterior <span class="arithmatex">\(p(\theta|x)\)</span> using an importance-weighted loss. Unlike NPE-A,
+this importance weighting ensures convergence to the true posterior in multi-round
+inference, and it is not limited to Gaussian proposals. NPE-B can use flexible
+density estimators like normalizing flows.</p>
+<p>For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
+plain NLL loss.</p>
 <p>[1] <em>Flexible statistical inference for mechanistic models of neural
-    dynamics</em>, Lueckmann, Gonçalves et al., NeurIPS 2017. <a href="https://arxiv.org/abs/171">https://arxiv.org/abs/171</a></p>
-<p>Like all NPE methods, this method trains a deep neural density estimator to
-directly approximate the posterior. Also like all other NPE methods, in the
-first round, this density estimator is trained with a maximum-likelihood loss.</p>
-<p>This class implements NPE-B. NPE-B trains across multiple rounds with a
-an importance-weighted log-loss. Unlike NPE-A the loss will make training
-directly converge to the true posterior.
-Thus, SNPE-B is not limited to Gaussian proposal.</p>
+    dynamics</em>, Lueckmann, Gonçalves et al., NeurIPS 2017.
+    <a href="https://arxiv.org/abs/1711.01861">https://arxiv.org/abs/1711.01861</a></p>
+<h4 id="sbi.inference.trainers.npe.npe_b.NPE_B--example">Example:<a class="headerlink" href="#sbi.inference.trainers.npe.npe_b.NPE_B--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import NPE_B
+from sbi.utils import BoxUniform
+
+# 1. Setup simulator, prior, and observation
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+x_o = torch.randn(1, 3)  # Observed data
+
+def simulator(theta):
+    return theta + torch.randn_like(theta) * 0.1
+
+# 2. Multi-round inference
+inference = NPE_B(prior=prior)
+proposal = prior
+
+for round_idx in range(5):
+    theta = proposal.sample((100,))
+    x = simulator(theta)
+    density_estimator = inference.append_simulations(theta, x).train()
+    posterior = inference.build_posterior(density_estimator)
+    proposal = posterior.set_default_x(x_o)
+
+# 3. Sample from final posterior
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
 
 
 
@@ -3231,20 +3348,82 @@ Thus, SNPE-B is not limited to Gaussian proposal.</p>
 <span class="normal">144</span>
 <span class="normal">145</span>
 <span class="normal">146</span>
-<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_B</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_B</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].</span>
 
+<span class="sd">    NPE-B (also known as SNPE-B) trains a neural network to directly approximate</span>
+<span class="sd">    the posterior $p(\theta|x)$ using an importance-weighted loss. Unlike NPE-A,</span>
+<span class="sd">    this importance weighting ensures convergence to the true posterior in multi-round</span>
+<span class="sd">    inference, and it is not limited to Gaussian proposals. NPE-B can use flexible</span>
+<span class="sd">    density estimators like normalizing flows.</span>
+
+<span class="sd">    For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use</span>
+<span class="sd">    plain NLL loss.</span>
+
 <span class="sd">    [1] *Flexible statistical inference for mechanistic models of neural</span>
-<span class="sd">        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/171</span>
+<span class="sd">        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017.</span>
+<span class="sd">        https://arxiv.org/abs/1711.01861</span>
 
-<span class="sd">    Like all NPE methods, this method trains a deep neural density estimator to</span>
-<span class="sd">    directly approximate the posterior. Also like all other NPE methods, in the</span>
-<span class="sd">    first round, this density estimator is trained with a maximum-likelihood loss.</span>
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
 
-<span class="sd">    This class implements NPE-B. NPE-B trains across multiple rounds with a</span>
-<span class="sd">    an importance-weighted log-loss. Unlike NPE-A the loss will make training</span>
-<span class="sd">    directly converge to the true posterior.</span>
-<span class="sd">    Thus, SNPE-B is not limited to Gaussian proposal.</span>
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import NPE_B</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
+
+<span class="sd">        # 1. Setup simulator, prior, and observation</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        x_o = torch.randn(1, 3)  # Observed data</span>
+
+<span class="sd">        def simulator(theta):</span>
+<span class="sd">            return theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Multi-round inference</span>
+<span class="sd">        inference = NPE_B(prior=prior)</span>
+<span class="sd">        proposal = prior</span>
+
+<span class="sd">        for round_idx in range(5):</span>
+<span class="sd">            theta = proposal.sample((100,))</span>
+<span class="sd">            x = simulator(theta)</span>
+<span class="sd">            density_estimator = inference.append_simulations(theta, x).train()</span>
+<span class="sd">            posterior = inference.build_posterior(density_estimator)</span>
+<span class="sd">            proposal = posterior.set_default_x(x_o)</span>
+
+<span class="sd">        # 3. Sample from final posterior</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -3525,44 +3704,44 @@ TensorBoard tracker is used with a default log directory.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -3631,34 +3810,46 @@ TensorBoard tracker is used with a default log directory.</p>
 
 
 
-        <p>Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]</p>
+        <p>Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019) [1].</p>
+<p>NPE-C (also known as APT - Automatic Posterior Transformation, aka SNPE-C) trains
+a neural network over multiple rounds to directly approximate the posterior for a
+specific observation x_o. In the first round, NPE-C is equivalent to other NPE
+methods and is fully amortized (direct inference for any new observation). After
+the first round, NPE-C automatically selects between two loss variants depending
+on the chosen density estimator: the non-atomic loss (for Mixture of Gaussians)
+which is stable and avoids leakage, or the atomic loss (for flows) which is more
+flexible but may suffer from leakage issues.</p>
+<p>For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
+plain NLL loss.</p>
 <p>[1] <em>Automatic Posterior Transformation for Likelihood-free Inference</em>,
     Greenberg et al., ICML 2019, <a href="https://arxiv.org/abs/1905.07488">https://arxiv.org/abs/1905.07488</a>.</p>
-<p>Like all NPE methods, this method trains a deep neural density estimator to
-directly approximate the posterior. Also like all other NPE methods, in the
-first round, this density estimator is trained with a maximum-likelihood loss.</p>
-<p>For the sequential mode in which the density estimator is trained across rounds,
-this class implements two loss variants of NPE-C: the non-atomic and the atomic
-version. The atomic loss of NPE-C can be used for any density estimator,
-i.e. also for normalizing flows. However, it suffers from leakage issues. On
-the other hand, the non-atomic loss can only be used only if the proposal
-distribution is a mixture of Gaussians, the density estimator is a mixture of
-Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from
-leakage issues. At the beginning of each round, we print whether the non-atomic
-or the atomic version is used.</p>
-<p>In this codebase, we will automatically switch to the non-atomic loss if the
-following criteria are fulfilled:</p>
-<ul>
-<li>proposal is a <code>DirectPosterior</code> with density_estimator <code>mdn</code>, as built with
-  <code>sbi.neural_nets.posterior_nn()</code>.</li>
-<li>the density estimator is a <code>mdn</code>, as built with
-  <code>sbi.neural_nets.posterior_nn()</code>.</li>
-<li><code>isinstance(prior, MultivariateNormal)</code> (from <code>torch.distributions</code>) or
-  <code>isinstance(prior, sbi.utils.BoxUniform)</code></li>
-</ul>
-<p>Note that custom implementations of any of these densities (or estimators) will
-not trigger the non-atomic loss, and the algorithm will fall back onto using
-the atomic loss.</p>
+<h4 id="sbi.inference.trainers.npe.npe_c.NPE_C--example">Example:<a class="headerlink" href="#sbi.inference.trainers.npe.npe_c.NPE_C--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import NPE_C
+from sbi.utils import BoxUniform
+
+# 1. Setup simulator, prior, and observation
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+x_o = torch.randn(1, 3)  # Observed data
+
+def simulator(theta):
+    return theta + torch.randn_like(theta) * 0.1
+
+# 2. Multi-round inference
+inference = NPE_C(prior=prior)
+proposal = prior
+
+for round_idx in range(5):
+    theta = proposal.sample((100,))
+    x = simulator(theta)
+    density_estimator = inference.append_simulations(theta, x).train()
+    posterior = inference.build_posterior(density_estimator)
+    proposal = posterior.set_default_x(x_o)
+
+# 3. Sample from final posterior
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
 
 
 
@@ -4331,39 +4522,67 @@ the atomic loss.</p>
 <span class="normal">698</span>
 <span class="normal">699</span>
 <span class="normal">700</span>
-<span class="normal">701</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]</span>
+<span class="normal">701</span>
+<span class="normal">702</span>
+<span class="normal">703</span>
+<span class="normal">704</span>
+<span class="normal">705</span>
+<span class="normal">706</span>
+<span class="normal">707</span>
+<span class="normal">708</span>
+<span class="normal">709</span>
+<span class="normal">710</span>
+<span class="normal">711</span>
+<span class="normal">712</span>
+<span class="normal">713</span>
+<span class="normal">714</span>
+<span class="normal">715</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPE_C</span><span class="p">(</span><span class="n">PosteriorEstimatorTrainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019) [1].</span>
+
+<span class="sd">    NPE-C (also known as APT - Automatic Posterior Transformation, aka SNPE-C) trains</span>
+<span class="sd">    a neural network over multiple rounds to directly approximate the posterior for a</span>
+<span class="sd">    specific observation x_o. In the first round, NPE-C is equivalent to other NPE</span>
+<span class="sd">    methods and is fully amortized (direct inference for any new observation). After</span>
+<span class="sd">    the first round, NPE-C automatically selects between two loss variants depending</span>
+<span class="sd">    on the chosen density estimator: the non-atomic loss (for Mixture of Gaussians)</span>
+<span class="sd">    which is stable and avoids leakage, or the atomic loss (for flows) which is more</span>
+<span class="sd">    flexible but may suffer from leakage issues.</span>
+
+<span class="sd">    For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use</span>
+<span class="sd">    plain NLL loss.</span>
 
 <span class="sd">    [1] *Automatic Posterior Transformation for Likelihood-free Inference*,</span>
 <span class="sd">        Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.</span>
 
-<span class="sd">    Like all NPE methods, this method trains a deep neural density estimator to</span>
-<span class="sd">    directly approximate the posterior. Also like all other NPE methods, in the</span>
-<span class="sd">    first round, this density estimator is trained with a maximum-likelihood loss.</span>
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
 
-<span class="sd">    For the sequential mode in which the density estimator is trained across rounds,</span>
-<span class="sd">    this class implements two loss variants of NPE-C: the non-atomic and the atomic</span>
-<span class="sd">    version. The atomic loss of NPE-C can be used for any density estimator,</span>
-<span class="sd">    i.e. also for normalizing flows. However, it suffers from leakage issues. On</span>
-<span class="sd">    the other hand, the non-atomic loss can only be used only if the proposal</span>
-<span class="sd">    distribution is a mixture of Gaussians, the density estimator is a mixture of</span>
-<span class="sd">    Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from</span>
-<span class="sd">    leakage issues. At the beginning of each round, we print whether the non-atomic</span>
-<span class="sd">    or the atomic version is used.</span>
+<span class="sd">    ::</span>
 
-<span class="sd">    In this codebase, we will automatically switch to the non-atomic loss if the</span>
-<span class="sd">    following criteria are fulfilled:</span>
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import NPE_C</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
 
-<span class="sd">    - proposal is a `DirectPosterior` with density_estimator `mdn`, as built with</span>
-<span class="sd">      `sbi.neural_nets.posterior_nn()`.</span>
-<span class="sd">    - the density estimator is a `mdn`, as built with</span>
-<span class="sd">      `sbi.neural_nets.posterior_nn()`.</span>
-<span class="sd">    - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or</span>
-<span class="sd">      ``isinstance(prior, sbi.utils.BoxUniform)``</span>
+<span class="sd">        # 1. Setup simulator, prior, and observation</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        x_o = torch.randn(1, 3)  # Observed data</span>
 
-<span class="sd">    Note that custom implementations of any of these densities (or estimators) will</span>
-<span class="sd">    not trigger the non-atomic loss, and the algorithm will fall back onto using</span>
-<span class="sd">    the atomic loss.</span>
+<span class="sd">        def simulator(theta):</span>
+<span class="sd">            return theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Multi-round inference</span>
+<span class="sd">        inference = NPE_C(prior=prior)</span>
+<span class="sd">        proposal = prior</span>
+
+<span class="sd">        for round_idx in range(5):</span>
+<span class="sd">            theta = proposal.sample((100,))</span>
+<span class="sd">            x = simulator(theta)</span>
+<span class="sd">            density_estimator = inference.append_simulations(theta, x).train()</span>
+<span class="sd">            posterior = inference.build_posterior(density_estimator)</span>
+<span class="sd">            proposal = posterior.set_default_x(x_o)</span>
+
+<span class="sd">        # 3. Sample from final posterior</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -5164,21 +5383,7 @@ TensorBoard tracker is used with a default log directory.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 88</span>
 <span class="normal"> 89</span>
 <span class="normal"> 90</span>
 <span class="normal"> 91</span>
@@ -5201,7 +5406,21 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
-<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -5558,21 +5777,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/npe/npe_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
@@ -5658,7 +5863,21 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
-<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -5790,7 +6009,40 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 
-        <p>Flow Matching Posterior Estimation (FMPE).</p>
+        <p>Flow Matching Posterior Estimation (FMPE) [1].</p>
+<p>FMPE trains a continuous normalizing flow (CNF) to transform samples from the
+prior distribution to the posterior distribution using flow matching. Instead of
+maximum likelihood, it trains a vector field to match the marginal vector field
+of a conditional flow that interpolates between the prior and posterior. The
+neural network architecture for the vector field is not constrained like for
+flows and can be any expressive network. Sampling is performed by solving an ODE,
+which can be slower than flow-based NPE, but log_prob evaluation can also be slower.</p>
+<p>NOTE: FMPE does not support multi-round inference with flexible proposals yet.
+You can try multi-round with truncated proposals, but this is not tested.</p>
+<p>[1] Flow Matching for Generative Modeling, Lipman et al., ICLR 2023,
+    <a href="https://arxiv.org/abs/2210.02747">https://arxiv.org/abs/2210.02747</a></p>
+<h4 id="sbi.inference.trainers.vfpe.fmpe.FMPE--example">Example:<a class="headerlink" href="#sbi.inference.trainers.vfpe.fmpe.FMPE--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import FMPE
+from sbi.utils import BoxUniform
+
+# 1. Setup prior and simulate data
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+theta = prior.sample((100,))
+x = theta + torch.randn_like(theta) * 0.1
+
+# 2. Train flow matching estimator
+inference = FMPE(prior=prior)
+flow_estimator = inference.append_simulations(theta, x).train()
+
+# 3. Build posterior (uses ODE solver for sampling)
+posterior = inference.build_posterior(flow_estimator)
+
+# 4. Sample from posterior
+x_o = torch.randn(1, 3)
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
 
 
 
@@ -5914,8 +6166,88 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">135</span>
 <span class="normal">136</span>
 <span class="normal">137</span>
-<span class="normal">138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flow Matching Posterior Estimation (FMPE).&quot;&quot;&quot;</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FMPE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Flow Matching Posterior Estimation (FMPE) [1].</span>
+
+<span class="sd">    FMPE trains a continuous normalizing flow (CNF) to transform samples from the</span>
+<span class="sd">    prior distribution to the posterior distribution using flow matching. Instead of</span>
+<span class="sd">    maximum likelihood, it trains a vector field to match the marginal vector field</span>
+<span class="sd">    of a conditional flow that interpolates between the prior and posterior. The</span>
+<span class="sd">    neural network architecture for the vector field is not constrained like for</span>
+<span class="sd">    flows and can be any expressive network. Sampling is performed by solving an ODE,</span>
+<span class="sd">    which can be slower than flow-based NPE, but log_prob evaluation can also be slower.</span>
+
+<span class="sd">    NOTE: FMPE does not support multi-round inference with flexible proposals yet.</span>
+<span class="sd">    You can try multi-round with truncated proposals, but this is not tested.</span>
+
+<span class="sd">    [1] Flow Matching for Generative Modeling, Lipman et al., ICLR 2023,</span>
+<span class="sd">        https://arxiv.org/abs/2210.02747</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import FMPE</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
+
+<span class="sd">        # 1. Setup prior and simulate data</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        theta = prior.sample((100,))</span>
+<span class="sd">        x = theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Train flow matching estimator</span>
+<span class="sd">        inference = FMPE(prior=prior)</span>
+<span class="sd">        flow_estimator = inference.append_simulations(theta, x).train()</span>
+
+<span class="sd">        # 3. Build posterior (uses ODE solver for sampling)</span>
+<span class="sd">        posterior = inference.build_posterior(flow_estimator)</span>
+
+<span class="sd">        # 4. Sample from posterior</span>
+<span class="sd">        x_o = torch.randn(1, 3)</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6226,64 +6558,64 @@ TensorBoard tracker is used with a default log directory.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -6496,51 +6828,51 @@ VectorFieldPosterior.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
-<span class="normal">131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6616,13 +6948,40 @@ VectorFieldPosterior.</p>
 
 
 
-        <p>Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</p>
-<p>Instead of performing conditonal <em>density</em> estimation, NPSE methods perform
-conditional <em>score</em> estimation i.e. they estimate the gradient of the log
-density using denoising score matching loss.</p>
+        <p>Neural Posterior Score Estimation (NPSE) [1, 2].</p>
+<p>NPSE trains a neural network to estimate the score function (gradient of the log
+posterior) <span class="arithmatex">\(\nabla_\theta \log p(\theta|x)\)</span> using denoising score matching. NPSE
+learns the score of a diffusion process that transforms the prior into the
+posterior. The neural network can be any expressive architecture. Sampling is
+performed using SDE solvers (e.g., Langevin dynamics) or ODE solvers, which can
+be slower than flow-based NPE, but expressiveness can be higher.</p>
 <p>NOTE: NPSE does not support multi-round inference with flexible proposals yet.
-You can try to run multi-round with truncated proposals, but note that this is
-not tested yet.</p>
+You can try multi-round with truncated proposals, but this is not tested.</p>
+<p>[1] Score modeling for simulation-based inference, Geffner et al., ICML 2023.
+[2] Sequential neural score estimation: Likelihood-free inference with conditional
+    score based diffusion models, Sharrock et al., ICML 2024.</p>
+<h4 id="sbi.inference.trainers.vfpe.npse.NPSE--example">Example:<a class="headerlink" href="#sbi.inference.trainers.vfpe.npse.NPSE--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import NPSE
+from sbi.utils import BoxUniform
+
+# 1. Setup prior and simulate data
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+theta = prior.sample((100,))
+x = theta + torch.randn_like(theta) * 0.1
+
+# 2. Train score estimator
+inference = NPSE(prior=prior, sde_type=&quot;ve&quot;)
+score_estimator = inference.append_simulations(theta, x).train()
+
+# 3. Build posterior (uses SDE solver by default)
+posterior = inference.build_posterior(score_estimator)
+
+# 4. Sample from posterior using Langevin dynamics
+x_o = torch.randn(1, 3)
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
 
 
 
@@ -6767,16 +7126,80 @@ not tested yet.</p>
 <span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
-<span class="normal">155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Posterior Score Estimation as in Geffner et al. and Sharrock et al.</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Score Estimation (NPSE) [1, 2].</span>
 
-<span class="sd">    Instead of performing conditonal *density* estimation, NPSE methods perform</span>
-<span class="sd">    conditional *score* estimation i.e. they estimate the gradient of the log</span>
-<span class="sd">    density using denoising score matching loss.</span>
+<span class="sd">    NPSE trains a neural network to estimate the score function (gradient of the log</span>
+<span class="sd">    posterior) $\nabla_\theta \log p(\theta|x)$ using denoising score matching. NPSE</span>
+<span class="sd">    learns the score of a diffusion process that transforms the prior into the</span>
+<span class="sd">    posterior. The neural network can be any expressive architecture. Sampling is</span>
+<span class="sd">    performed using SDE solvers (e.g., Langevin dynamics) or ODE solvers, which can</span>
+<span class="sd">    be slower than flow-based NPE, but expressiveness can be higher.</span>
 
 <span class="sd">    NOTE: NPSE does not support multi-round inference with flexible proposals yet.</span>
-<span class="sd">    You can try to run multi-round with truncated proposals, but note that this is</span>
-<span class="sd">    not tested yet.&quot;&quot;&quot;</span>
+<span class="sd">    You can try multi-round with truncated proposals, but this is not tested.</span>
+
+<span class="sd">    [1] Score modeling for simulation-based inference, Geffner et al., ICML 2023.</span>
+<span class="sd">    [2] Sequential neural score estimation: Likelihood-free inference with conditional</span>
+<span class="sd">        score based diffusion models, Sharrock et al., ICML 2024.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import NPSE</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
+
+<span class="sd">        # 1. Setup prior and simulate data</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        theta = prior.sample((100,))</span>
+<span class="sd">        x = theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Train score estimator</span>
+<span class="sd">        inference = NPSE(prior=prior, sde_type=&quot;ve&quot;)</span>
+<span class="sd">        score_estimator = inference.append_simulations(theta, x).train()</span>
+
+<span class="sd">        # 3. Build posterior (uses SDE solver by default)</span>
+<span class="sd">        posterior = inference.build_posterior(score_estimator)</span>
+
+<span class="sd">        # 4. Sample from posterior using Langevin dynamics</span>
+<span class="sd">        x_o = torch.randn(1, 3)</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -7128,39 +7551,7 @@ TensorBoard tracker is used with a default log directory.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 32</span>
-<span class="normal"> 33</span>
-<span class="normal"> 34</span>
-<span class="normal"> 35</span>
-<span class="normal"> 36</span>
-<span class="normal"> 37</span>
-<span class="normal"> 38</span>
-<span class="normal"> 39</span>
-<span class="normal"> 40</span>
-<span class="normal"> 41</span>
-<span class="normal"> 42</span>
-<span class="normal"> 43</span>
-<span class="normal"> 44</span>
-<span class="normal"> 45</span>
-<span class="normal"> 46</span>
-<span class="normal"> 47</span>
-<span class="normal"> 48</span>
-<span class="normal"> 49</span>
-<span class="normal"> 50</span>
-<span class="normal"> 51</span>
-<span class="normal"> 52</span>
-<span class="normal"> 53</span>
-<span class="normal"> 54</span>
-<span class="normal"> 55</span>
-<span class="normal"> 56</span>
-<span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
-<span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 64</span>
 <span class="normal"> 65</span>
 <span class="normal"> 66</span>
 <span class="normal"> 67</span>
@@ -7198,7 +7589,39 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
 <span class="normal">101</span>
-<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -7423,39 +7846,7 @@ VectorFieldPosterior.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">138</span>
 <span class="normal">139</span>
 <span class="normal">140</span>
 <span class="normal">141</span>
@@ -7465,7 +7856,39 @@ VectorFieldPosterior.</p>
 <span class="normal">145</span>
 <span class="normal">146</span>
 <span class="normal">147</span>
-<span class="normal">148</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7540,9 +7963,36 @@ VectorFieldPosterior.</p>
 
 
         <p>Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</p>
+<p>NLE trains a neural network to approximate the likelihood <span class="arithmatex">\(p(x|\theta)\)</span> using a
+conditional density estimator (normalizing flow). Unlike NPE methods, which directly
+estimate the posterior, NLE estimates the likelihood.</p>
+<p>NLE can be run multi-round without need for correction, but requires running
+potentially expensive posterior sampling in each round.</p>
 <p>[1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
     Autoregressive Flows, Papamakarios et al., AISTATS 2019,
     <a href="https://arxiv.org/abs/1805.07226">https://arxiv.org/abs/1805.07226</a></p>
+<h4 id="sbi.inference.trainers.nle.nle_a.NLE_A--example">Example:<a class="headerlink" href="#sbi.inference.trainers.nle.nle_a.NLE_A--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import NLE_A
+from sbi.utils import BoxUniform
+
+# 1. Setup prior and simulate data
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+theta = prior.sample((100,))
+x = theta + torch.randn_like(theta) * 0.1
+
+# 2. Train likelihood estimator
+inference = NLE_A(prior=prior)
+likelihood_estimator = inference.append_simulations(theta, x).train()
+
+# 3. Build posterior (uses MCMC for sampling)
+posterior = inference.build_posterior(likelihood_estimator)
+
+# 4. Sample from posterior
+x_o = torch.randn(1, 3)
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
 
 
 
@@ -7600,12 +8050,76 @@ VectorFieldPosterior.</p>
 <span class="normal">62</span>
 <span class="normal">63</span>
 <span class="normal">64</span>
-<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimatorTrainer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span>
+<span class="normal">97</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NLE_A</span><span class="p">(</span><span class="n">LikelihoodEstimatorTrainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Likelihood Estimation (NLE) as in Papamakarios et al. (2019) [1].</span>
+
+<span class="sd">    NLE trains a neural network to approximate the likelihood $p(x|\theta)$ using a</span>
+<span class="sd">    conditional density estimator (normalizing flow). Unlike NPE methods, which directly</span>
+<span class="sd">    estimate the posterior, NLE estimates the likelihood.</span>
+
+<span class="sd">    NLE can be run multi-round without need for correction, but requires running</span>
+<span class="sd">    potentially expensive posterior sampling in each round.</span>
 
 <span class="sd">    [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with</span>
 <span class="sd">        Autoregressive Flows, Papamakarios et al., AISTATS 2019,</span>
 <span class="sd">        https://arxiv.org/abs/1805.07226</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import NLE_A</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
+
+<span class="sd">        # 1. Setup prior and simulate data</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        theta = prior.sample((100,))</span>
+<span class="sd">        x = theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Train likelihood estimator</span>
+<span class="sd">        inference = NLE_A(prior=prior)</span>
+<span class="sd">        likelihood_estimator = inference.append_simulations(theta, x).train()</span>
+
+<span class="sd">        # 3. Build posterior (uses MCMC for sampling)</span>
+<span class="sd">        posterior = inference.build_posterior(likelihood_estimator)</span>
+
+<span class="sd">        # 4. Sample from posterior</span>
+<span class="sd">        x_o = torch.randn(1, 3)</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -7820,46 +8334,46 @@ sampling.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nle/nle_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">58</span>
 <span class="normal">59</span>
 <span class="normal">60</span>
 <span class="normal">61</span>
 <span class="normal">62</span>
 <span class="normal">63</span>
 <span class="normal">64</span>
-<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span>
+<span class="normal">97</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -7930,9 +8444,38 @@ sampling.</p>
 
 
 
-        <p>AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].</p>
+        <p>Neural Ratio Estimation (NRE-A / AALR) as in Hermans et al. (2020) [1].</p>
+<p>NRE-A trains a neural classifier to estimate the likelihood-to-evidence ratio
+<span class="arithmatex">\(r(\theta, x) = p(x|\theta) / p(x)\)</span> by distinguishing between samples from the
+joint distribution <span class="arithmatex">\(p(\theta, x)\)</span> and samples from the marginals <span class="arithmatex">\(p(\theta)p(x)\)</span>.
+Posterior sampling is then performed via MCMC, rejection sampling, or variational
+inference using the estimated ratio.</p>
+<p>NRE can be run multi-round without need for correction, but requires running
+potentially expensive posterior sampling in each round.</p>
 <p>[1] <em>Likelihood-free MCMC with Amortized Approximate Likelihood Ratios</em>, Hermans
     et al., ICML 2020, <a href="https://arxiv.org/abs/1903.04057">https://arxiv.org/abs/1903.04057</a></p>
+<h4 id="sbi.inference.trainers.nre.nre_a.NRE_A--example">Example:<a class="headerlink" href="#sbi.inference.trainers.nre.nre_a.NRE_A--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import NRE_A
+from sbi.utils import BoxUniform
+
+# 1. Setup prior and simulate data
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+theta = prior.sample((100,))
+x = theta + torch.randn_like(theta) * 0.1
+
+# 2. Train ratio estimator
+inference = NRE_A(prior=prior)
+ratio_estimator = inference.append_simulations(theta, x).train()
+
+# 3. Build posterior (uses MCMC or rejection sampling)
+posterior = inference.build_posterior(ratio_estimator)
+
+# 4. Sample from posterior
+x_o = torch.randn(1, 3)
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
 
 
 
@@ -8070,11 +8613,79 @@ sampling.</p>
 <span class="normal">146</span>
 <span class="normal">147</span>
 <span class="normal">148</span>
-<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_A</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Ratio Estimation (NRE-A / AALR) as in Hermans et al. (2020) [1].</span>
+
+<span class="sd">    NRE-A trains a neural classifier to estimate the likelihood-to-evidence ratio</span>
+<span class="sd">    $r(\theta, x) = p(x|\theta) / p(x)$ by distinguishing between samples from the</span>
+<span class="sd">    joint distribution $p(\theta, x)$ and samples from the marginals $p(\theta)p(x)$.</span>
+<span class="sd">    Posterior sampling is then performed via MCMC, rejection sampling, or variational</span>
+<span class="sd">    inference using the estimated ratio.</span>
+
+<span class="sd">    NRE can be run multi-round without need for correction, but requires running</span>
+<span class="sd">    potentially expensive posterior sampling in each round.</span>
 
 <span class="sd">    [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans</span>
 <span class="sd">        et al., ICML 2020, https://arxiv.org/abs/1903.04057</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import NRE_A</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
+
+<span class="sd">        # 1. Setup prior and simulate data</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        theta = prior.sample((100,))</span>
+<span class="sd">        x = theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Train ratio estimator</span>
+<span class="sd">        inference = NRE_A(prior=prior)</span>
+<span class="sd">        ratio_estimator = inference.append_simulations(theta, x).train()</span>
+
+<span class="sd">        # 3. Build posterior (uses MCMC or rejection sampling)</span>
+<span class="sd">        posterior = inference.build_posterior(ratio_estimator)</span>
+
+<span class="sd">        # 4. Sample from posterior</span>
+<span class="sd">        x_o = torch.randn(1, 3)</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -8369,42 +8980,42 @@ sampling.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span>
+<span class="normal">97</span>
+<span class="normal">98</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -8704,41 +9315,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_a.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
@@ -8761,7 +9338,41 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">120</span>
 <span class="normal">121</span>
 <span class="normal">122</span>
-<span class="normal">123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
@@ -8850,9 +9461,38 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 
-        <p>SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].</p>
+        <p>Neural Ratio Estimation (NRE-B / SRE) as in Durkan et al. (2020) [1].</p>
+<p>NRE-B is an extension of NRE-A that trains a neural classifier using a contrastive
+(1-out-of-K) loss to estimate the likelihood-to-evidence ratio. Instead of binary
+classification, it contrasts one sample from the joint <span class="arithmatex">\(p(\theta, x)\)</span> against <span class="arithmatex">\(K-1\)</span>
+samples from the marginals <span class="arithmatex">\(p(\theta)p(x)\)</span>. This multi-class formulation improves
+training stability compared to NRE-A.</p>
+<p>NRE can be run multi-round without need for correction, but requires running
+potentially expensive posterior sampling in each round.</p>
 <p>[1] <em>On Contrastive Learning for Likelihood-free Inference</em>, Durkan et al.,
     ICML 2020, <a href="https://arxiv.org/pdf/2002.03712">https://arxiv.org/pdf/2002.03712</a></p>
+<h4 id="sbi.inference.trainers.nre.nre_b.NRE_B--example">Example:<a class="headerlink" href="#sbi.inference.trainers.nre.nre_b.NRE_B--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import NRE_B
+from sbi.utils import BoxUniform
+
+# 1. Setup prior and simulate data
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+theta = prior.sample((100,))
+x = theta + torch.randn_like(theta) * 0.1
+
+# 2. Train ratio estimator with contrastive loss
+inference = NRE_B(prior=prior)
+ratio_estimator = inference.append_simulations(theta, x).train(num_atoms=10)
+
+# 3. Build posterior
+posterior = inference.build_posterior(ratio_estimator)
+
+# 4. Sample from posterior
+x_o = torch.randn(1, 3)
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
 
 
 
@@ -8983,11 +9623,79 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">139</span>
 <span class="normal">140</span>
 <span class="normal">141</span>
-<span class="normal">142</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_B</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Ratio Estimation (NRE-B / SRE) as in Durkan et al. (2020) [1].</span>
+
+<span class="sd">    NRE-B is an extension of NRE-A that trains a neural classifier using a contrastive</span>
+<span class="sd">    (1-out-of-K) loss to estimate the likelihood-to-evidence ratio. Instead of binary</span>
+<span class="sd">    classification, it contrasts one sample from the joint $p(\theta, x)$ against $K-1$</span>
+<span class="sd">    samples from the marginals $p(\theta)p(x)$. This multi-class formulation improves</span>
+<span class="sd">    training stability compared to NRE-A.</span>
+
+<span class="sd">    NRE can be run multi-round without need for correction, but requires running</span>
+<span class="sd">    potentially expensive posterior sampling in each round.</span>
 
 <span class="sd">    [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,</span>
 <span class="sd">        ICML 2020, https://arxiv.org/pdf/2002.03712</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import NRE_B</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
+
+<span class="sd">        # 1. Setup prior and simulate data</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        theta = prior.sample((100,))</span>
+<span class="sd">        x = theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Train ratio estimator with contrastive loss</span>
+<span class="sd">        inference = NRE_B(prior=prior)</span>
+<span class="sd">        ratio_estimator = inference.append_simulations(theta, x).train(num_atoms=10)</span>
+
+<span class="sd">        # 3. Build posterior</span>
+<span class="sd">        posterior = inference.build_posterior(ratio_estimator)</span>
+
+<span class="sd">        # 4. Sample from posterior</span>
+<span class="sd">        x_o = torch.randn(1, 3)</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -9275,42 +9983,42 @@ sampling.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span>
+<span class="normal">97</span>
+<span class="normal">98</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -9610,41 +10318,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_b.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
@@ -9659,7 +10333,41 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">112</span>
 <span class="normal">113</span>
 <span class="normal">114</span>
-<span class="normal">115</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
@@ -9740,20 +10448,36 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 
-        <p>NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</p>
-<p>NRE-C:
-(1) Like NRE_B, features a &ldquo;multiclass&rdquo; loss function where several marginally
-drawn parameter-data pairs are contrasted against a jointly drawn pair.</p>
-<p>(2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages
-the approximate ratio :math:<code>p(\theta,x)/p(\theta)p(x)</code>, accessed through
-<code>.potential()</code> within <code>sbi</code>, to be exact at optimum. This addresses the
-issue that NRE_B estimates this ratio only up to an arbitrary function
-(normalizing constant) of the data :math:<code>x</code>.</p>
-<p>Just like for all ratio estimation algorithms, the sequential version of NRE_C
-will be estimated only up to a function (normalizing constant) of the data
-:math:<code>x</code> in rounds after the first.</p>
-<p>[1] <em>Contrastive Neural Ratio Estimation</em>, Benajmin Kurt Miller, et. al.,
+        <p>Neural Ratio Estimation (NRE-C / CNRE) as in Miller et al. (2022) [1].</p>
+<p>NRE-C generalizes NRE-A and NRE-B using a &ldquo;multi-class sigmoid&rdquo; loss that
+ensures the estimated ratio <span class="arithmatex">\(p(\theta,x)/p(\theta)p(x)\)</span> is exact at optimum
+in the first round. This addresses the issue that NRE-B&rsquo;s ratio is only defined
+up to an arbitrary function of <span class="arithmatex">\(x\)</span>. NRE-C provides more accurate ratio estimates
+while maintaining the benefits of contrastive learning.</p>
+<p>[1] <em>Contrastive Neural Ratio Estimation</em>, Benjamin Kurt Miller, et al.,
     NeurIPS 2022, <a href="https://arxiv.org/abs/2210.06170">https://arxiv.org/abs/2210.06170</a></p>
+<h4 id="sbi.inference.trainers.nre.nre_c.NRE_C--example">Example:<a class="headerlink" href="#sbi.inference.trainers.nre.nre_c.NRE_C--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import NRE_C
+from sbi.utils import BoxUniform
+
+# 1. Setup prior and simulate data
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+theta = prior.sample((100,))
+x = theta + torch.randn_like(theta) * 0.1
+
+# 2. Train ratio estimator
+inference = NRE_C(prior=prior)
+ratio_estimator = inference.append_simulations(theta, x).train(num_classes=5)
+
+# 3. Build posterior
+posterior = inference.build_posterior(ratio_estimator)
+
+# 4. Sample from posterior
+x_o = torch.randn(1, 3)
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
 
 
 
@@ -9978,25 +10702,59 @@ will be estimated only up to a function (normalizing constant) of the data
 <span class="normal">233</span>
 <span class="normal">234</span>
 <span class="normal">235</span>
-<span class="normal">236</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NRE_C</span><span class="p">(</span><span class="n">RatioEstimatorTrainer</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Ratio Estimation (NRE-C / CNRE) as in Miller et al. (2022) [1].</span>
 
-<span class="sd">    NRE-C:</span>
-<span class="sd">    (1) Like NRE_B, features a &quot;multiclass&quot; loss function where several marginally</span>
-<span class="sd">    drawn parameter-data pairs are contrasted against a jointly drawn pair.</span>
+<span class="sd">    NRE-C generalizes NRE-A and NRE-B using a &quot;multi-class sigmoid&quot; loss that</span>
+<span class="sd">    ensures the estimated ratio $p(\theta,x)/p(\theta)p(x)$ is exact at optimum</span>
+<span class="sd">    in the first round. This addresses the issue that NRE-B&#39;s ratio is only defined</span>
+<span class="sd">    up to an arbitrary function of $x$. NRE-C provides more accurate ratio estimates</span>
+<span class="sd">    while maintaining the benefits of contrastive learning.</span>
 
-<span class="sd">    (2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages</span>
-<span class="sd">    the approximate ratio :math:`p(\theta,x)/p(\theta)p(x)`, accessed through</span>
-<span class="sd">    `.potential()` within `sbi`, to be exact at optimum. This addresses the</span>
-<span class="sd">    issue that NRE_B estimates this ratio only up to an arbitrary function</span>
-<span class="sd">    (normalizing constant) of the data :math:`x`.</span>
-
-<span class="sd">    Just like for all ratio estimation algorithms, the sequential version of NRE_C</span>
-<span class="sd">    will be estimated only up to a function (normalizing constant) of the data</span>
-<span class="sd">    :math:`x` in rounds after the first.</span>
-
-<span class="sd">    [1] *Contrastive Neural Ratio Estimation*, Benajmin Kurt Miller, et. al.,</span>
+<span class="sd">    [1] *Contrastive Neural Ratio Estimation*, Benjamin Kurt Miller, et al.,</span>
 <span class="sd">        NeurIPS 2022, https://arxiv.org/abs/2210.06170</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import NRE_C</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
+
+<span class="sd">        # 1. Setup prior and simulate data</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        theta = prior.sample((100,))</span>
+<span class="sd">        x = theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Train ratio estimator</span>
+<span class="sd">        inference = NRE_C(prior=prior)</span>
+<span class="sd">        ratio_estimator = inference.append_simulations(theta, x).train(num_classes=5)</span>
+
+<span class="sd">        # 3. Build posterior</span>
+<span class="sd">        posterior = inference.build_posterior(ratio_estimator)</span>
+
+<span class="sd">        # 4. Sample from posterior</span>
+<span class="sd">        x_o = torch.randn(1, 3)</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -10364,24 +11122,7 @@ sampling.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">60</span>
 <span class="normal">61</span>
 <span class="normal">62</span>
 <span class="normal">63</span>
@@ -10399,7 +11140,24 @@ sampling.</p>
 <span class="normal">75</span>
 <span class="normal">76</span>
 <span class="normal">77</span>
-<span class="normal">78</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -10738,24 +11496,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/nre_c.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 97</span>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
@@ -10801,7 +11542,24 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <span class="normal">140</span>
 <span class="normal">141</span>
 <span class="normal">142</span>
-<span class="normal">143</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
     <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
@@ -10896,13 +11654,42 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 
 
 
-        <p>Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].</p>
-<p>BNRE is a variation of NRE aiming to produce more conservative posterior
-approximations.</p>
-<p>[1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G..
-Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
-Estimation.
-NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2208.13624</a></p>
+        <p>Balanced Neural Ratio Estimation (BNRE) as in Delaunoy et al. (2022) [1].</p>
+<p>BNRE is a variation of NRE-A that adds a balancing regularizer to the binary
+cross-entropy loss. This regularizer encourages the classifier to predict equal
+probabilities for joint and marginal samples on average, which can lead to more
+conservative and reliable posterior approximations. BNRE is particularly useful
+when robustness is prioritized over tightness of the posterior.</p>
+<p>NRE can be run multi-round without need for correction, but requires running
+potentially expensive posterior sampling in each round.</p>
+<p>[1] Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
+    Estimation, Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G.,
+    NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2208.13624</a></p>
+<h4 id="sbi.inference.trainers.nre.bnre.BNRE--example">Example:<a class="headerlink" href="#sbi.inference.trainers.nre.bnre.BNRE--example" title="Permanent link">&para;</a></h4>
+<p>::</p>
+<div class="codehilite"><pre><span></span><code>import torch
+from sbi.inference import BNRE
+from sbi.utils import BoxUniform
+
+# 1. Setup prior and simulate data
+prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+theta = prior.sample((100,))
+x = theta + torch.randn_like(theta) * 0.1
+
+# 2. Train balanced ratio estimator
+inference = BNRE(prior=prior)
+# Note: regularization_strength needs to be tuned carefully for your problem
+ratio_estimator = inference.append_simulations(theta, x).train(
+    regularization_strength=100.0
+)
+
+# 3. Build posterior
+posterior = inference.build_posterior(ratio_estimator)
+
+# 4. Sample from posterior
+x_o = torch.randn(1, 3)
+samples = posterior.sample((1000,), x=x_o)
+</code></pre></div>
 
 
 
@@ -11067,16 +11854,82 @@ NeurIPS 2022. <a href="https://arxiv.org/abs/2208.13624">https://arxiv.org/abs/2
 <span class="normal">171</span>
 <span class="normal">172</span>
 <span class="normal">173</span>
-<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BNRE</span><span class="p">(</span><span class="n">NRE_A</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Balanced Neural Ratio Estimation (BNRE) as in Delaunoy et al. (2022) [1].</span>
 
-<span class="sd">    BNRE is a variation of NRE aiming to produce more conservative posterior</span>
-<span class="sd">    approximations.</span>
+<span class="sd">    BNRE is a variation of NRE-A that adds a balancing regularizer to the binary</span>
+<span class="sd">    cross-entropy loss. This regularizer encourages the classifier to predict equal</span>
+<span class="sd">    probabilities for joint and marginal samples on average, which can lead to more</span>
+<span class="sd">    conservative and reliable posterior approximations. BNRE is particularly useful</span>
+<span class="sd">    when robustness is prioritized over tightness of the posterior.</span>
 
-<span class="sd">    [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G..</span>
-<span class="sd">    Towards Reliable Simulation-Based Inference with Balanced Neural Ratio</span>
-<span class="sd">    Estimation.</span>
-<span class="sd">    NeurIPS 2022. https://arxiv.org/abs/2208.13624</span>
+<span class="sd">    NRE can be run multi-round without need for correction, but requires running</span>
+<span class="sd">    potentially expensive posterior sampling in each round.</span>
+
+<span class="sd">    [1] Towards Reliable Simulation-Based Inference with Balanced Neural Ratio</span>
+<span class="sd">        Estimation, Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., &amp; Louppe, G.,</span>
+<span class="sd">        NeurIPS 2022. https://arxiv.org/abs/2208.13624</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    --------</span>
+
+<span class="sd">    ::</span>
+
+<span class="sd">        import torch</span>
+<span class="sd">        from sbi.inference import BNRE</span>
+<span class="sd">        from sbi.utils import BoxUniform</span>
+
+<span class="sd">        # 1. Setup prior and simulate data</span>
+<span class="sd">        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))</span>
+<span class="sd">        theta = prior.sample((100,))</span>
+<span class="sd">        x = theta + torch.randn_like(theta) * 0.1</span>
+
+<span class="sd">        # 2. Train balanced ratio estimator</span>
+<span class="sd">        inference = BNRE(prior=prior)</span>
+<span class="sd">        # Note: regularization_strength needs to be tuned carefully for your problem</span>
+<span class="sd">        ratio_estimator = inference.append_simulations(theta, x).train(</span>
+<span class="sd">            regularization_strength=100.0</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # 3. Build posterior</span>
+<span class="sd">        posterior = inference.build_posterior(ratio_estimator)</span>
+
+<span class="sd">        # 4. Sample from posterior</span>
+<span class="sd">        x_o = torch.randn(1, 3)</span>
+<span class="sd">        samples = posterior.sample((1000,), x=x_o)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -11393,42 +12246,42 @@ sampling.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">RatioEstimator</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot;resnet&quot;</span><span class="p">,</span>
@@ -11518,40 +12371,7 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/nre/bnre.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
 <span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span>
@@ -11575,7 +12395,40 @@ dataloader_kwargs: Additional or updated kwargs to be passed to the training
 <span class="normal">123</span>
 <span class="normal">124</span>
 <span class="normal">125</span>
-<span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">regularization_strength</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">100.0</span><span class="p">,</span>
     <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>
