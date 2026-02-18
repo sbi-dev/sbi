@@ -160,6 +160,8 @@ pythonVersion = "3.10"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
 reportInvalidTypeForm = false
+# We disable the following checks to avoid torch related false positives.
+# This is required since torch > 2.5 due to stricter Module/Tensor type stubs.
 reportArgumentType = false
 reportCallIssue = false
 reportOperatorIssue = false
