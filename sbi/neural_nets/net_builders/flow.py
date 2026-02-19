@@ -1149,7 +1149,7 @@ def build_tabpfn_flow(
     ] = "independent",
     embedding_net: nn.Module = nn.Identity(),
     regressor_init_kwargs: Optional[dict] = None,
-    **kwargs,
+    # **kwargs, TODO
 ) -> TabPFNFlow:
     r"""Build a TabPFN-based conditional density estimator.
 
@@ -1175,10 +1175,8 @@ def build_tabpfn_flow(
     if z_score_x != "none":
         raise ValueError(
             "`build_tabpfn_flow` currently supports only `z_score_x='none'`, "
-            f"got '{z_score_x}'."
+            f"got '{z_score_x}'. TabPFN performs extensive preprocessing internally."
         )
-
-    _ = kwargs
 
     # TODO however, if one uses an embedding net, things are a bit different again.
     # And it maybe makes sense to check wheter one is used.

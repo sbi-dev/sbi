@@ -40,9 +40,6 @@ class TabPFNFlow(ConditionalDensityEstimator):
         self.register_buffer("_context_input", None, persistent=False)
         self.register_buffer("_context_condition", None, persistent=False)
 
-        # TODO do I want to enforce setting the context dataset at initialization? Similar to a trained net being required for sth like Zuko flow?
-        # Answer: No, the builder logic also builds these networks before any training happens, so this makes no sense. Keep as is.
-
     @property
     def embedding_net(self) -> nn.Module:
         r"""Return the embedding network."""
