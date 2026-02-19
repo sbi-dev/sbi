@@ -31,6 +31,7 @@ from sbi.neural_nets.net_builders.flow import (
 from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
+    VectorFieldEstimatorConfig,
     build_flow_matching_estimator,
     build_score_matching_estimator,
 )
@@ -398,10 +399,15 @@ def posterior_score_nn(
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
+        **kwargs: Additional estimator / network arguments.  Valid keys are
+            defined by ``VectorFieldEstimatorConfig``; unknown keys raise
+            ``TypeError``.
 
     Returns:
         Constructor function for NPSE.
     """
+    # Validate extra kwargs against known fields — raises TypeError on typos.
+    VectorFieldEstimatorConfig(**kwargs)
 
     if score_net_type is not None:
         model = score_net_type
@@ -566,10 +572,15 @@ def posterior_flow_nn(
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
+        **kwargs: Additional estimator / network arguments.  Valid keys are
+            defined by ``VectorFieldEstimatorConfig``; unknown keys raise
+            ``TypeError``.
 
     Returns:
         Constructor function for FMPE.
     """
+    # Validate extra kwargs against known fields — raises TypeError on typos.
+    VectorFieldEstimatorConfig(**kwargs)
 
     if z_score_theta is not None:
         raise ValueError(

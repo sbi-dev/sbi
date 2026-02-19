@@ -2,7 +2,8 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from typing import Literal, Optional, Sequence, Union
+from dataclasses import dataclass, fields
+from typing import Any, Literal, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
@@ -23,6 +24,75 @@ from sbi.utils.sbiutils import (
 )
 from sbi.utils.user_input_checks import check_data_device
 from sbi.utils.vector_field_utils import VectorFieldNet
+
+
+@dataclass
+class VectorFieldEstimatorConfig:
+    """Internal configuration that validates keyword arguments for vector field
+    estimator builders.
+
+    This dataclass captures all known keyword arguments accepted by
+    ``posterior_score_nn`` / ``posterior_flow_nn`` and forwarded to the underlying
+    estimator and network constructors.  Constructing an instance from user-supplied
+    ``**kwargs`` ensures that typos and unknown parameters raise ``TypeError``
+    immediately rather than being silently swallowed.
+
+    Defaults are ``None`` so that only explicitly-set fields are forwarded — the
+    actual default values live in the estimator / network constructors.
+    """
+
+    # --- Score estimator: VE schedule params (Karras et al. 2022) ---
+    train_schedule: Optional[Literal["uniform", "lognormal"]] = None
+    solve_schedule: Optional[Literal["uniform", "power_law"]] = None
+    sigma_min: Optional[float] = None
+    sigma_max: Optional[float] = None
+    lognormal_mean: Optional[float] = None
+    lognormal_std: Optional[float] = None
+    power_law_exponent: Optional[float] = None
+
+    # --- Score estimator: VP / SubVP params ---
+    beta_min: Optional[float] = None
+    beta_max: Optional[float] = None
+
+    # --- Network architecture extras (shared) ---
+    activation: Optional[Any] = None
+    sinusoidal_max_freq: Optional[float] = None
+    fourier_scale: Optional[float] = None
+
+    # --- MLP-specific ---
+    layer_norm: Optional[bool] = None
+    skip_connections: Optional[bool] = None
+
+    # --- AdaMLP-specific ---
+    condition_emb_dim: Optional[int] = None
+    num_intermediate_mlp_layers: Optional[int] = None
+    adamlp_ratio: Optional[int] = None
+
+    # --- Transformer-specific ---
+    is_x_emb_seq: Optional[bool] = None
+
+    # --- Params that are explicit in build_vector_field_estimator but may be
+    #     passed through **kwargs at the factory level ---
+    net: Optional[Any] = None
+    z_score_x: Optional[Any] = None
+    z_score_y: Optional[Any] = None
+    hidden_features: Optional[Any] = None
+    num_layers: Optional[int] = None
+    time_embedding_dim: Optional[int] = None
+    num_heads: Optional[int] = None
+    mlp_ratio: Optional[int] = None
+    embedding_net: Optional[Any] = None
+    sde_type: Optional[str] = None
+    estimator_type: Optional[str] = None
+    time_emb_type: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        """Return only explicitly-set (non-``None``) fields as a dict."""
+        return {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if getattr(self, f.name) is not None
+        }
 
 
 # ==================== Building Flow/Score Matching Estimators =========================
@@ -65,15 +135,17 @@ def build_vector_field_estimator(
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
             "transformer_cross_attention" or a custom network following the
             VectorFieldNet protocol.
-        **kwargs: Additional arguments for the network. For score estimators:
-            - VP/SubVP: beta_min, beta_max (control noise schedule strength)
-            - VE: train_schedule, solve_schedule, lognormal_mean, lognormal_std,
-              power_law_exponent (control training and sampling discretization)
+        **kwargs: Additional arguments forwarded to the estimator and network
+            constructors.  Valid keys are defined by
+            ``VectorFieldEstimatorConfig``; unknown keys raise ``TypeError``.
 
     Returns:
         A vector field estimator (either FlowMatchingEstimator or
         ConditionalScoreEstimator).
     """
+    # Validate kwargs against known fields — raises TypeError on typos.
+    VectorFieldEstimatorConfig(**kwargs)
+
     # Check inputs and device
     check_data_device(batch_x, batch_y)
 
