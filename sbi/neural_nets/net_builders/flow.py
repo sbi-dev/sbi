@@ -1190,6 +1190,7 @@ def build_tabpfn_flow(
         embedding_net=embedding_net,
         regressor_init_kwargs=regressor_init_kwargs,
     )
+    flow.set_context(batch_x, batch_y)
 
     return flow
 

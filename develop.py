@@ -3,32 +3,10 @@ import torch
 from torch.distributions import MultivariateNormal, Normal
 
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
-
+from tests.mini_sbibm.two_moons import TwoMoons
+import matplotlib.pyplot as plt
 
 torch.manual_seed(0)
-
-estimator = TabPFNFlow(
-    input_shape=torch.Size([3]),
-    condition_shape=torch.Size([4]),
-)
-
-theta_context = torch.randn(1000, 3)
-x_context = torch.randn(1000, 4)
-
-estimator.set_context(input_context=theta_context, condition_context=x_context)
-
-# %%
-res = estimator.sample((100,), torch.randn(100, 4))
-
-log_prob = estimator.log_prob(torch.randn(20, 5, 3), torch.randn(5, 4))
-
-# %%
-print(res.shape)
-print(log_prob.shape)
-
-
-# %%
-from tests.mini_sbibm.two_moons import TwoMoons
 
 two_moons_task = TwoMoons()
 prior = two_moons_task.get_prior()
@@ -47,6 +25,8 @@ obs3 = two_moons_task.get_observation(3)
 stack_obs = torch.cat([obs1, obs2, obs3], dim=0)
 print(stack_obs.shape)
 
+
+# %%
 two_moons_estimator = TabPFNFlow(
     input_shape=torch.Size([2]),
     condition_shape=torch.Size([2]),
@@ -57,13 +37,9 @@ two_moons_estimator.set_context(theta_samples, sims)
 
 # %%
 samples = two_moons_estimator.sample((1000,), stack_obs)
-
-# %%
 print(samples.shape)
 
 # %%
-import matplotlib.pyplot as plt
-
 plt.scatter(samples[:, 0, 0], samples[:, 0, 1])
 plt.scatter(samples[:, 1, 0], samples[:, 1, 1])
 plt.scatter(samples[:, 2, 0], samples[:, 2, 1])
@@ -101,12 +77,19 @@ for obs_idx, ax in enumerate(axes):
 plt.show()
 
 
-
 # %%
-from sbi.inference import NPE
+from sbi.inference.trainers.npe.npe_pfn import NPE_PFN
 from sbi.neural_nets import posterior_nn
 
 estimator = posterior_nn("tabpfn", z_score_theta="none", z_score_x="none")
 # Given: parameters theta and corresponding simulations x
-inference = NPE(prior=prior, density_estimator=estimator)
+inference = NPE_PFN(prior=prior, density_estimator=estimator)
 inference.append_simulations(theta_samples, sims).train()
+posterior = inference.build_posterior()
+
+# %%
+f_samples = posterior.sample((1000,), x=obs1)
+
+# %%
+plt.scatter(f_samples[:, 0], f_samples[:, 1])
+plt.show()

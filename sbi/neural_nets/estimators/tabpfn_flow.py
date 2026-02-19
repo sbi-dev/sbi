@@ -40,6 +40,8 @@ class TabPFNFlow(ConditionalDensityEstimator):
         self._context_input: Optional[Tensor] = None
         self._context_condition: Optional[Tensor] = None
 
+        self._mock_param = nn.Parameter(torch.zeros(100))
+
         # TODO do I want to enforce setting the context dataset at initialization? Similar to a trained net being required for sth like Zuko flow?
         # Answer: No, the builder logic also builds these networks before any training happens, so this makes no sense. Keep as is.
 
