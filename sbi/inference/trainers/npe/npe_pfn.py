@@ -146,7 +146,11 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         # TODO add tailored check?
         # check_estimator_arg(density_estimator)
         if density_estimator is None:
-            self._build_neural_net = posterior_nn(model="tabpfn")
+            self._build_neural_net = posterior_nn(
+                model="tabpfn",
+                z_score_theta="none",
+                z_score_x="none",
+            )
         else:
             self._build_neural_net = density_estimator
 
