@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -10,26 +10,41 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
 from sbi import utils as utils
-from sbi.inference.posteriors import DirectPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.trainers._contracts import StartIndexContext
-from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
+    MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
+    VIPosteriorParameters,
+)
+from sbi.inference.potentials import posterior_estimator_based_potential
+from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
+from sbi.inference.trainers._contracts import LossArgs, StartIndexContext
+from sbi.inference.trainers.base import NeuralInference
+from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuilder,
 )
-from sbi.sbi_types import Tracker
+from sbi.neural_nets.estimators.shape_handling import (
+    reshape_to_batch_event,
+    reshape_to_sample_batch_event,
+)
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
-    del_entries,
+    check_estimator_arg,
     handle_invalid_x,
     npe_msg_on_invalid_x,
+    test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
 
-class NPE_PFN(PosteriorEstimatorTrainer):
+class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
     r"""Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019) [1].
 
     NPE-C (also known as APT - Automatic Posterior Transformation, aka SNPE-C) trains
@@ -114,8 +129,30 @@ class NPE_PFN(PosteriorEstimatorTrainer):
             show_progress_bars: Whether to show a progressbar during training.
         """
 
-        kwargs = del_entries(locals(), entries=("self", "__class__"))
-        super().__init__(**kwargs)
+        super().__init__(
+            prior=prior,
+            device=device,
+            logging_level=logging_level,
+            summary_writer=summary_writer,
+            tracker=tracker,
+            show_progress_bars=show_progress_bars,
+        )
+
+        # As detailed in the docstring, `density_estimator` is either a string or
+        # a callable. The function creating the neural network is attached to
+        # `_build_neural_net`. It will be called in the first round and receive
+        # thetas and xs as inputs, so that they can be used for shape inference and
+        # potentially for z-scoring.
+
+        # TODO, kinda fucked here, its only one anyway
+        # So rather check if anything is given, if nothing is given get default, otherwise use density estimator
+        check_estimator_arg(density_estimator)
+        if isinstance(density_estimator, str):
+            self._build_neural_net = posterior_nn(model="tabpfn")
+        else:
+            self._build_neural_net = density_estimator
+
+        self._proposal_roundwise = []
 
     def append_simulations(
         self,
@@ -266,7 +303,7 @@ class NPE_PFN(PosteriorEstimatorTrainer):
         )
 
         # TODO mock these for now
-        theta, x, masks = self.get_simulations(0)
+        theta, x, masks = self.get_simulations(start_idx)
         self.train_indices = torch.arange(theta.shape[0])
 
         # TODO this function is a bit questionable in the context of NPE-PFN
@@ -277,34 +314,253 @@ class NPE_PFN(PosteriorEstimatorTrainer):
         # Another alternative would be to just set retrain from scracth to True.
         # Some decisions need to be made here
         self._initialize_neural_network(retrain_from_scratch, start_idx)
-        print("HALLO")
         self._neural_net.set_context(theta, x)
 
         return self._neural_net
 
-    def _log_prob_proposal_posterior(
+    def build_posterior(
         self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: DirectPosterior,
-    ) -> Tensor:
-        """Return the log-probability of the proposal posterior.
+        density_estimator: Optional[ConditionalDensityEstimator] = None,
+        prior: Optional[Distribution] = None,
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct"
+        ] = "direct",
+        mcmc_method: Literal[
+            "slice_np",
+            "slice_np_vectorized",
+            "hmc_pyro",
+            "nuts_pyro",
+            "slice_pymc",
+            "hmc_pymc",
+            "nuts_pymc",
+        ] = "slice_np_vectorized",
+        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
+        direct_sampling_parameters: Optional[Dict[str, Any]] = None,
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        importance_sampling_parameters: Optional[Dict[str, Any]] = None,
+        posterior_parameters: Optional[
+            Union[
+                DirectPosteriorParameters,
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ] = None,
+    ) -> NeuralPosterior:
+        r"""Build posterior from the neural density estimator.
 
-        If the proposal is a MoG, the density estimator is a MoG, and the prior is
-        either Gaussian or uniform, we use non-atomic loss. Else, use atomic loss (which
-        suffers from leakage).
+        For SNPE, the posterior distribution that is returned here implements the
+        following functionality over the raw neural density estimator:
+        - correct the calculation of the log probability such that it compensates for
+            the leakage.
+        - reject samples that lie outside of the prior bounds.
+        - alternatively, if leakage is very high (which can happen for multi-round
+            SNPE), sample from the posterior with MCMC.
 
         Args:
-            theta: Batch of parameters θ.
-            x: Batch of data.
-            masks: Mask that is True for prior samples in the batch in order to train
-                them with prior loss.
-            proposal: Proposal distribution.
+            density_estimator: The density estimator that the posterior is based on.
+                If `None`, use the latest neural density estimator that was trained.
+            prior: Prior distribution.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`direct` | `mcmc` | `rejection` | `vi` | `importance`].
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
+                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
+            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
+                some of the methods admit a `mode seeking` property (e.g. rKL) whereas
+                some admit a `mass covering` one (e.g fKL).
+            direct_sampling_parameters: Additional kwargs passed to `DirectPosterior`.
+            mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
+            vi_parameters: Additional kwargs passed to `VIPosterior`.
+            rejection_sampling_parameters: Additional kwargs passed to
+                `RejectionPosterior`.
+            importance_sampling_parameters: Additional kwargs passed to
+                `ImportanceSamplingPosterior`.
+            posterior_parameters: Configuration passed to the init method for the
+                posterior. Must be one of the following
+                - `VIPosteriorParameters`
+                - `ImportanceSamplingPosteriorParameters`
+                - `MCMCPosteriorParameters`
+                - `DirectPosteriorParameters`
+                - `RejectionPosteriorParameters`
 
-        Returns: Log-probability of the proposal posterior.
+        Returns:
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
+            (the returned log-probability is unnormalized).
         """
 
-        # TODO is required by PosteriorEstimatorTrainer
+        self._check_prior_for_rejection_sampling(
+            prior, sample_with, posterior_parameters
+        )
 
-        raise NotImplementedError
+        return super().build_posterior(
+            density_estimator,
+            prior,
+            sample_with,
+            posterior_parameters,
+            mcmc_method=mcmc_method,
+            vi_method=vi_method,
+            mcmc_parameters=mcmc_parameters,
+            vi_parameters=vi_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
+            importance_sampling_parameters=importance_sampling_parameters,
+            direct_sampling_parameters=direct_sampling_parameters,
+        )
+
+    def _get_start_index(self, context: StartIndexContext) -> int:
+        """
+        Determine the starting index for training based on previous rounds.
+
+        Args:
+            context: StartIndexContext dataclass values used to determine the starting
+                index of the training set.
+        Returns:
+            The method will return 1 to skip samples from round 0; otherwise,
+            it returns 0.
+        """
+
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+
+        if self._round == 0 and self._neural_net is not None:
+            assert context.force_first_round_loss, (
+                # TODO adapt message
+                "You have already trained this neural network. After you had trained "
+                "the network, you again appended simulations with `append_simulations"
+                "(theta, x)`, but you did not provide a proposal. If the new "
+                "simulations are sampled from the prior, you can set "
+                "`.train(..., force_first_round_loss=True`). However, if the new "
+                "simulations were not sampled from the prior, you should pass the "
+                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
+                "your samples are not sampled from the prior and you do not pass a "
+                "proposal and you set `force_first_round_loss=True`, the result of "
+                "NPSE will not be the true posterior. Instead, it will be the proposal "
+                "posterior, which (usually) is more narrow than the true posterior."
+            )
+
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(context.discard_prior_samples and self._round > 0)
+
+        return start_idx
+
+    def _initialize_neural_network(
+        self,
+        retrain_from_scratch: bool,
+        start_idx: int,
+    ) -> None:
+        """
+        Initialize the neural network if it is None or retraining from scratch.
+
+        Args:
+            retrain_from_scratch: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
+            start_idx: The index of the first round to retrieve simulation data from.
+        """
+
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network.
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._neural_net is None or retrain_from_scratch:
+            # Get theta,x to initialize NN
+            theta, x, _ = self.get_simulations(starting_round=start_idx)
+            # Use only training data for building the neural net (z-scoring transforms)
+
+            self._neural_net = self._build_neural_net(
+                theta[self.train_indices].to("cpu"),
+                x[self.train_indices].to("cpu"),
+            )
+
+            theta = reshape_to_sample_batch_event(
+                theta.to("cpu"), self._neural_net.input_shape
+            )
+            x = reshape_to_batch_event(x.to("cpu"), self._neural_net.condition_shape)
+            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
+
+            del theta, x
+
+    def _get_potential_function(
+        self,
+        prior: Distribution,
+        estimator: ConditionalDensityEstimator,
+    ) -> Tuple[PosteriorBasedPotential, TorchTransform]:
+        r"""Gets the potential for posterior-based methods.
+
+        It also returns a transformation that can be used to transform the potential
+        into unconstrained space.
+
+        The potential is the same as the log-probability of the `posterior_estimator`,
+        but it is set to $-\inf$ outside of the prior bounds.
+
+        Args:
+            prior: The prior distribution.
+            estimator: The neural network modelling the posterior.
+
+        Returns:
+            The potential function and a transformation that maps
+            to unconstrained space.
+        """
+
+        potential_fn, theta_transform = posterior_estimator_based_potential(
+            posterior_estimator=estimator,
+            prior=prior,
+            x_o=None,
+        )
+        return potential_fn, theta_transform
+
+    def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        raise NotImplementedError(
+            "NPE-PFN is training-free. Currenlty not implemented. Finetuning not yet supported."
+        )
+
+    def _loss(self, *args, **kwargs) -> Tensor:
+        raise NotImplementedError(
+            "NPE-PFN is training-free. Currenlty not implemented. Finetuning not yet supported."
+        )
+
+    def _check_prior_for_rejection_sampling(
+        self,
+        prior: Optional[Distribution],
+        sample_with: Literal["mcmc", "rejection", "vi", "importance", "direct"],
+        posterior_parameters: Optional[
+            Union[
+                DirectPosteriorParameters,
+                MCMCPosteriorParameters,
+                VIPosteriorParameters,
+                RejectionPosteriorParameters,
+                ImportanceSamplingPosteriorParameters,
+            ]
+        ],
+    ) -> None:
+        """
+        Validates that when using rejection sampling, a prior distribution
+        is explicitly provided.
+
+        Args:
+            prior: Prior distribution.
+            sample_with: The sampling method used. Must be one of
+                "mcmc", "rejection", "vi", "importance", or "direct".
+            posterior_parameters: Configuration for building the posterior.
+        """
+
+        if (
+            sample_with == "rejection"
+            or isinstance(posterior_parameters, RejectionPosteriorParameters)
+        ) and prior is None:
+            raise ValueError(
+                "You indicated sampling via rejection sampling but "
+                "haven't passed a prior. As of sbi v0.23.0, you either have"
+                " to pass a prior to perform rejection sampling using the prior"
+                " as proposal, or to use the posterior as proposal, you have to"
+                " use a DirectPosterior via `sample_with='direct' or"
+                " `posterior_parameters=DirectPosteriorParameters`."
+            )
