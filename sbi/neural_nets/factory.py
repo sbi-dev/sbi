@@ -17,6 +17,7 @@ from sbi.neural_nets.net_builders.flow import (
     build_maf,
     build_maf_rqs,
     build_nsf,
+    build_tabpfn_flow,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -26,7 +27,6 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_nsf,
     build_zuko_sospf,
     build_zuko_unaf,
-    build_tabpfn_flow,
     build_zuko_unconditional_flow,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
@@ -332,9 +332,6 @@ def posterior_nn(
         # batch_theta are the parameters and batch_x the observable variables.
         return model_builders[model](batch_x=batch_theta, batch_y=batch_x, **kwargs)
 
-    # TODO maybe
-    # def build_tabpfn(batch_theta, batch_x):
-
     if model == "mdn_snpe_a":
         if num_components != 10:
             raise ValueError(
@@ -344,7 +341,6 @@ def posterior_nn(
             )
         kwargs.pop("num_components")
 
-    # TODO i guess this would be good do differentiate here
     return build_fn_snpe_a if model == "mdn_snpe_a" else build_fn
 
 

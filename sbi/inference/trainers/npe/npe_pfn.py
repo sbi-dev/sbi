@@ -96,10 +96,9 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[
-            Literal["tabpfn"],
-            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
-        ] = "maf",
+        density_estimator: Optional[
+            ConditionalEstimatorBuilder[ConditionalDensityEstimator]
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -144,10 +143,9 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
 
-        # TODO, kinda fucked here, its only one anyway
-        # So rather check if anything is given, if nothing is given get default, otherwise use density estimator
-        check_estimator_arg(density_estimator)
-        if isinstance(density_estimator, str):
+        # TODO add tailored check?
+        # check_estimator_arg(density_estimator)
+        if density_estimator is None:
             self._build_neural_net = posterior_nn(model="tabpfn")
         else:
             self._build_neural_net = density_estimator
