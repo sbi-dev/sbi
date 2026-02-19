@@ -1146,10 +1146,10 @@ def build_tabpfn_flow(
     ] = "none",
     z_score_y: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    ] = "none",
     embedding_net: nn.Module = nn.Identity(),
     regressor_init_kwargs: Optional[dict] = None,
-    # **kwargs, TODO
+    **kwargs,
 ) -> TabPFNFlow:
     r"""Build a TabPFN-based conditional density estimator.
 
@@ -1161,6 +1161,7 @@ def build_tabpfn_flow(
         batch_y: Batch of ys, used to infer condition shape and set context conditions.
         z_score_x: Included for API consistency. Must be `none`.
         z_score_y: Whether to z-score ys before passing them to `embedding_net`.
+            If `embedding_net` is `nn.Identity`, this must be `none`.
         embedding_net: Optional embedding network for y.
         regressor_init_kwargs: Keyword arguments passed to `TabPFNRegressor`.
         **kwargs: Additional keyword arguments passed by higher-level builders and
@@ -1178,9 +1179,12 @@ def build_tabpfn_flow(
             f"got '{z_score_x}'. TabPFN performs extensive preprocessing internally."
         )
 
-    # TODO however, if one uses an embedding net, things are a bit different again.
-    # And it maybe makes sense to check wheter one is used.
-    # If one is used, the preprocessing on the SBI side, if not, then on TabPFN side.
+    if isinstance(embedding_net, nn.Identity) and z_score_y != "none":
+        raise ValueError(
+            "`build_tabpfn_flow` requires `z_score_y='none'` when "
+            "`embedding_net` is `nn.Identity`."
+        )
+
     embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
     flow = TabPFNFlow(
         input_shape=batch_x[0].shape,
