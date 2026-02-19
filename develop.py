@@ -99,3 +99,14 @@ for obs_idx, ax in enumerate(axes):
     fig.colorbar(image, ax=ax)
 
 plt.show()
+
+
+
+# %%
+from sbi.inference import NPE
+from sbi.neural_nets import posterior_nn
+
+estimator = posterior_nn("tabpfn", z_score_theta="none", z_score_x="none")
+# Given: parameters theta and corresponding simulations x
+inference = NPE(prior=prior, density_estimator=estimator)
+inference.append_simulations(theta_samples, sims).train()

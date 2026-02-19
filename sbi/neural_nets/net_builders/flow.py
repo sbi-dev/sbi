@@ -17,6 +17,7 @@ from torch.distributions import Distribution
 from zuko.lazy import Flow, LazyDistribution
 
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow, ZukoUnconditionalFlow
+from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
     biject_transform_zuko,
@@ -1132,6 +1133,62 @@ def build_zuko_flow(
         embedding_net,
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
+    )
+
+    return flow
+
+
+def build_tabpfn_flow(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ] = "none",
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ] = "independent",
+    embedding_net: nn.Module = nn.Identity(),
+    regressor_init_kwargs: Optional[dict] = None,
+    **kwargs,
+) -> TabPFNFlow:
+    r"""Build a TabPFN-based conditional density estimator.
+
+    This builder initializes a `TabPFNFlow` and sets its context dataset directly from
+    `batch_x` and `batch_y`.
+
+    Args:
+        batch_x: Batch of xs, used to infer input shape and set context inputs.
+        batch_y: Batch of ys, used to infer condition shape and set context conditions.
+        z_score_x: Included for API consistency. Must be `none`.
+        z_score_y: Whether to z-score ys before passing them to `embedding_net`.
+        embedding_net: Optional embedding network for y.
+        regressor_init_kwargs: Keyword arguments passed to `TabPFNRegressor`.
+        **kwargs: Additional keyword arguments passed by higher-level builders and
+            ignored for TabPFN.
+
+    Returns:
+        Initialized `TabPFNFlow` with context set.
+    """
+    check_data_device(batch_x, batch_y)
+
+    # TODO this kinda makes sense for now, as a lot is handled by TABPFN anyway, so a good default the outer api is nothing in the case of NPE-PFN
+    if z_score_x != "none":
+        raise ValueError(
+            "`build_tabpfn_flow` currently supports only `z_score_x='none'`, "
+            f"got '{z_score_x}'."
+        )
+
+    _ = kwargs
+
+    # TODO however, if one uses an embedding net, things are a bit different again.
+    # And it maybe makes sense to check wheter one is used.
+    # If one is used, the preprocessing on the SBI side, if not, then on TabPFN side.
+    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    flow = TabPFNFlow(
+        input_shape=batch_x[0].shape,
+        condition_shape=batch_y[0].shape,
+        embedding_net=embedding_net,
+        regressor_init_kwargs=regressor_init_kwargs,
     )
 
     return flow

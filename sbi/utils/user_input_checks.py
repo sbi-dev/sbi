@@ -798,12 +798,12 @@ def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:
-            message = f"""Debug hint: The simulated data x has {ndims - 1} dimensions.
+            hint = f"""Debug hint: The simulated data x has {ndims - 1} dimensions.
             With default settings, sbi cannot deal with multidimensional simulations.
             Make sure to use an embedding net that reduces the dimensionality, e.g., a
             CNN in case of images, or change the simulator to return one-dimensional x.
             """
         else:
-            message = ""
+            hint = "Error while testing posterior net with x/theta shapes."
 
-        raise RuntimeError(message) from rte
+        raise RuntimeError(f"{hint}\nOriginal error: {rte}") from rte

@@ -89,7 +89,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         self,
         prior: Optional[Distribution] = None,
         density_estimator: Union[
-            Literal["nsf", "maf", "mdn", "made"],
+            Literal["nsf", "maf", "mdn", "made", "tabpfn"],
             ConditionalEstimatorBuilder[ConditionalDensityEstimator],
         ] = "maf",
         device: str = "cpu",
