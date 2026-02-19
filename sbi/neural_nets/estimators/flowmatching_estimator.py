@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -58,7 +58,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         noise_scale: float = 1e-3,
         mean_1: Union[Tensor, float] = 0.0,
         std_1: Union[Tensor, float] = 1.0,
-        gaussian_baseline: bool = True,
+        gaussian_baseline: bool = False,
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -70,12 +70,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             embedding_net: Embedding network for the condition.
             noise_scale: Scale of the noise added to the vector field
                 (:math:`\sigma_{min}` in [2]_).
-            mean_1: Mean of the data at t=1 (used for z-scoring).
-            std_1: Standard deviation of the data at t=1 (used for z-scoring).
-            gaussian_baseline: Whether to use the Gaussian baseline
-                for the vector field.
-            zscore_transform_input: Whether to z-score the input.
-                This is ignored and will be removed.
+            mean_1: Mean of the data distribution (used for time-dependent z-scoring).
+            std_1: Std of the data distribution (used for time-dependent z-scoring).
+            gaussian_baseline: If True, use Gaussian baseline which adds
+                an analytical velocity component assuming Gaussian data. The network
+                then learns only the residual. This can improve performance, especially
+                for unimodal data.
         """
 
         if "num_freqs" in kwargs:
@@ -96,13 +96,88 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         self.noise_scale = noise_scale
         self.gaussian_baseline = gaussian_baseline
 
-        mean_1_tensor = torch.as_tensor(mean_1).expand(input_shape)
-        std_1_tensor = torch.as_tensor(std_1).expand(input_shape)
+        # Register z-scoring parameters as buffers
+        mean_1_tensor = torch.as_tensor(mean_1).expand(input_shape).clone()
+        std_1_tensor = torch.as_tensor(std_1).expand(input_shape).clone()
         self.register_buffer("mean_1", mean_1_tensor)
         self.register_buffer("std_1", std_1_tensor)
 
+    def _get_time_dependent_stats(self, time: Tensor) -> Tuple[Tensor, Tensor]:
+        """Compute time-dependent mean and std for z-scoring.
+
+        Uses z-scoring convention that preserves time-dependent information in the
+        normalized inputs:
+            μ_z(t) = t * mean_data
+            σ_z(t) = sqrt(t² * std_data² + (1-t)²)
+
+        Note: This is different from the true marginal statistics of the
+        interpolation θ_t = (1-t) * θ_data + t * θ_noise, which are:
+            E[θ_t] = (1-t) * mean_data
+            Var[θ_t] = (1-t)² * std_data² + t²
+
+        The convention is used because subtracting the true mean at each time step
+        removes useful time-dependent information from the input.
+
+        Args:
+            time: Time tensor of shape (batch,)
+
+        Returns:
+            mu_t: Time-dependent mean for z-scoring, shape (batch, *input_shape)
+            std_t: Time-dependent std for z-scoring, shape (batch, *input_shape)
+        """
+        t = time.view(-1, *([1] * len(self.input_shape)))
+        mean = self.mean_1.view(1, *self.input_shape)
+        std = self.std_1.view(1, *self.input_shape)
+
+        # PR convention: preserves time-dependent signal in normalized input
+        mu_t = t * mean
+        var_t = (t * std) ** 2 + (1 - t) ** 2 + 1e-6
+        std_t = torch.sqrt(var_t)
+
+        return mu_t, std_t
+
+    def _get_gaussian_baseline_velocity(self, input: Tensor, time: Tensor) -> Tensor:
+        """Compute the analytical marginal velocity assuming Gaussian data.
+
+        For the interpolation θ_t = (1-t)*θ_data + t*θ_noise where
+        θ_data ~ N(mean, std²) and θ_noise ~ N(0,1), the marginal velocity is:
+
+            v(x, t) = E[θ_noise - θ_data | θ_t = x]
+                    = factor * (x - μ_true) - mean
+
+        where:
+            μ_true = (1-t) * mean           (true marginal mean)
+            var_true = (1-t)² * std² + t²   (true marginal variance)
+            factor = (t - (1-t) * std²) / var_true
+
+        This is derived using Bayes' rule for jointly Gaussian variables.
+
+        Args:
+            input: Current position θ_t, shape (batch, *input_shape)
+            time: Time tensor of shape (batch,)
+
+        Returns:
+            v_affine: Analytical Gaussian velocity, shape (batch, *input_shape)
+        """
+        t = time.view(-1, *([1] * len(self.input_shape)))
+        one_minus_t = 1 - t
+        mean = self.mean_1.view(1, *self.input_shape)
+        std = self.std_1.view(1, *self.input_shape)
+
+        # True marginal statistics (not z-scoring stats!)
+        mu_true = one_minus_t * mean
+        var_true = (one_minus_t * std) ** 2 + t**2 + 1e-6
+
+        # Analytical velocity: v = factor * (x - μ_true) - mean
+        factor = (t - one_minus_t * std**2) / var_true
+        v_affine = factor * (input - mu_true) - mean
+
+        return v_affine
+
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         """Forward pass of the FlowMatchingEstimator.
+
+        Returns velocity in ORIGINAL SPACE for ODE integration.
 
         Args:
             input: Inputs to evaluate the vector field on of shape
@@ -113,7 +188,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
                 `(batch_dim_time, *event_shape_time)`.
 
         Returns:
-            The estimated vector field.
+            The estimated vector field in original space.
         """
         # Continue with standard processing (broadcast shapes etc.)
         batch_shape_input = input.shape[: -len(self.input_shape)]
@@ -140,31 +215,19 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         )
         time = time.reshape(-1)
 
-        t_view = time.view(-1, *([1] * (input.ndim - 1)))
-        mean_1_view = self.mean_1.view(1, *self.input_shape)
-        std_1_view = self.std_1.view(1, *self.input_shape)
+        # Time-dependent z-scoring
+        mu_t, std_t = self._get_time_dependent_stats(time)
+        input_norm = (input - mu_t) / std_t
+
+        # Network forward pass (outputs in normalized space)
+        v_out = self.net(input_norm, condition_emb, time)
 
         if self.gaussian_baseline:
-            mu_t = (1 - t_view) * mean_1_view
-            var_t = ((1 - t_view) * std_1_view) ** 2 + t_view**2 + 1e-5
-
-            std_t = torch.sqrt(var_t)
-            input_norm = (input - mu_t) / std_t
-
-            num = t_view - (1 - t_view) * std_1_view**2
-            factor = num / var_t
-
-            v_affine = factor * (input - mu_t) - mean_1_view
-            v_out = self.net(input_norm, condition_emb, time)
-            v = v_out * std_t + v_affine
+            # Analytical Gaussian velocity + un-normalized network residual
+            v_affine = self._get_gaussian_baseline_velocity(input, time)
+            v = v_affine + v_out * std_t
         else:
-            mu_t = t_view * mean_1_view
-            var_t = (t_view * std_1_view) ** 2 + (1 - t_view) ** 2 + 1e-5
-
-            std_t = torch.sqrt(var_t)
-            input_norm = (input - mu_t) / std_t
-
-            v_out = self.net(input_norm, condition_emb, time)
+            # Un-normalize network output to original space
             v = v_out * std_t
 
         v = v.reshape(*batch_shape + self.input_shape)
@@ -176,6 +239,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     ) -> Tensor:
         r"""Return the loss for training the density estimator.
 
+        Computes loss in NORMALIZED SPACE for stable training with uniform
+        gradient magnitudes across all time steps.
+
         More precisely, we compute the conditional flow matching loss with naive optimal
         trajectories as described in the original paper [1]_:
 
@@ -184,52 +250,60 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             \theta_t = t \cdot \theta_1 + (1 - t) \cdot \theta_0,
             \left[ \| v(\theta_t, t; x_o = x_o) - (\theta_1 - \theta_0) \|^2 \right]
 
-        where :math:`v(\theta_t, t; x_o)` is the vector field estimated by the neural
-        network (see Equation 1 in [1]_ with added conditioning on :math:`x_o`. The
-        notation is changed to match the standard SBI notation: :math:`\theta_0 = x_0`
-        and :math:`\theta_1 = x_1`).
-
-        The loss is computed as the mean squared error between the vector field:
-
-        .. math::
-            L(\theta_0, \theta_1, t, x_o) = \| v(\theta_t, t; x_o) -
-            (\theta_1 - \theta_0) \|^2
-
-            where
-
-            .. math::
-                \theta_1 \sim p_{base}
-                \theta_t = t \cdot \theta_1 + (1 - t) \cdot \theta_0
-
-            Additionally, the small noise :math:`\sigma_{min}` is added to the
-            vector field as per [2]_ to address numerical issues at small times.
-
         Args:
-            theta: Parameters (:math:`\theta_0`).
-            x: Observed data (:math:`x_o`).
+            input: Parameters (:math:`\theta_0`).
+            condition: Observed data (:math:`x_o`).
             times: Time steps to compute the loss at.
                 Optional, will sample from [0, 1] if not provided.
 
         Returns:
             Loss value.
         """
-        # randomly sample the time steps to compare the vector field at
-        # different time steps
+        # Randomly sample time steps
         if times is None:
             times = torch.rand(input.shape[:-1], device=input.device, dtype=input.dtype)
         times_ = times[..., None]
 
-        # sample from probability path at time t
+        # Sample from probability path at time t
+        # θ_t = (1-t) * θ_data + t * θ_noise, where θ_noise ~ N(0,1)
         theta_1 = torch.randn_like(input)
         theta_t = (1 - times_) * input + (times_ + self.noise_scale) * theta_1
 
-        # compute vector field at the sampled time steps
+        # Target vector field in original space
         vector_field = theta_1 - input
 
-        # compute the mean squared error between the vector fields
-        return torch.mean(
-            (self.forward(theta_t, condition, times) - vector_field) ** 2, dim=-1
-        )
+        # Embed condition
+        condition_emb = self._embedding_net(condition)
+
+        # Compute time-dependent z-scoring stats
+        times_flat = times.reshape(-1)
+        mu_t, std_t = self._get_time_dependent_stats(times_flat)
+
+        # Reshape for broadcasting
+        theta_t_flat = theta_t.reshape(-1, *self.input_shape)
+        condition_emb_flat = condition_emb.reshape(-1, condition_emb.shape[-1])
+        vector_field_flat = vector_field.reshape(-1, *self.input_shape)
+
+        # Normalize input for network
+        theta_t_norm = (theta_t_flat - mu_t) / std_t
+
+        # Network predicts in normalized space
+        v_out = self.net(theta_t_norm, condition_emb_flat, times_flat)
+
+        if self.gaussian_baseline:
+            # Compute analytical baseline in original space
+            v_affine = self._get_gaussian_baseline_velocity(theta_t_flat, times_flat)
+            # Normalize the residual target
+            residual_target = (vector_field_flat - v_affine) / std_t
+            # Loss in normalized space
+            loss = torch.mean((v_out - residual_target) ** 2, dim=-1)
+        else:
+            # Normalize the full velocity target
+            target_norm = vector_field_flat / std_t
+            # Loss in normalized space
+            loss = torch.mean((v_out - target_norm) ** 2, dim=-1)
+
+        return loss.reshape(input.shape[:-1])
 
     def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
         r"""
