@@ -1,7 +1,5 @@
 [build-system]
-requires = [
-    "setuptools>=65", "wheel"
-]
+requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -18,7 +16,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Mathematics",
-    """License :: OSI Approved :: Apache Software License""",
+    "License :: OSI Approved :: Apache Software License",
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -40,7 +38,7 @@ dependencies = [
     "scipy",
     "skorch",
     "tensorboard",
-    "torch>=1.13.0",
+    "torch>=1.13.0", # Restriction yahan se handle hoti hai
     "tqdm",
     "zuko>=1.2.0",
 ]
@@ -49,7 +47,6 @@ dependencies = [
 notebook = ["notebook<=6.4.12"]
 doc = [
     "sbi[notebook]",
-    # Documentation
     "ipython <= 8.9.0",
     "jupyter_contrib_nbextensions",
     "mike",
@@ -72,20 +69,18 @@ doc = [
 ]
 dev = [
     "ffmpeg",
-    # Lint
     "pre-commit == 4.0.1",
     "pyyaml",
     "pyright",
     "ruff==0.9.0",
-    # Test
     "pytest",
     "pytest-cov",
     "pytest-harvest",
-	"pytest-mock",
+    "pytest-mock",
     "pytest-split",
     "pytest-testmon",
     "pytest-xdist",
-    "sbi[notebook]",  # for tutorial tests.
+    "sbi[notebook]",
     "torchtestcase",
 ]
 
@@ -94,41 +89,28 @@ documentation = "https://sbi-dev.github.io/sbi/"
 source = "https://github.com/sbi-dev/sbi"
 tracker = "https://github.com/sbi-dev/sbi/issues"
 
-# Package installation configuration
 [tool.setuptools.packages.find]
-where = ["."]  # list of folders that contain the packages (["."] by default)
-include = ["sbi*"]  # package names should match these glob patterns (["*"] by default)
-exclude = ["sbi-logs*"]  # exclude packages matching these glob patterns (empty by default)
-namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
+where = ["."]
+include = ["sbi*"]
+exclude = ["sbi-logs*"]
+namespaces = false
 
 [tool.setuptools.dynamic]
 version = {attr = "sbi.__version__"}
 
-# ruff configs
+# Ruff configuration
 [tool.ruff]
 extend-include = ["*.ipynb"]
 line-length = 88
 
 [tool.ruff.lint]
-# pycodestyle, Pyflakes, pyupgrade, flake8-bugbear, flake8-simplify, isort
 select = ["E", "F", "W", "B", "SIM", "I"]
-ignore = [
-    "E731",  # allow naming lambda functions.
-    "B008",  # allow function calls in default args.
-]
+ignore = ["E731", "B008"]
 
 [tool.ruff.lint.extend-per-file-ignores]
-"__init__.py" = ["E402", "F401", "F403"]  # allow unused imports and undefined names
+"__init__.py" = ["E402", "F401", "F403"]
 "test_*.py" = ["F403", "F405"]
-"docs/tutorials/*.ipynb" = ["E501", "E402"]  # allow long lines & unsorted imports
-"docs/advanced_tutorials/*.ipynb" = ["E501", "E402"]
-"docs/how_to_guide/*.ipynb" = ["E501", "E402"]
-
-[tool.ruff.lint.isort]
-case-sensitive = true
-lines-between-types = 0  # like isort default.
-relative-imports-order = "furthest-to-closest"  # like isort default.
-known-first-party = ["sbi", "tests", "docs/tutorials", "docs/advanced_tutorials", "docs/how_to_guide"]
+"docs/tutorials/*.ipynb" = ["E501", "E402"]
 
 [tool.ruff.format]
 exclude = ["*.ipynb"]
@@ -139,35 +121,16 @@ quote-style = "preserve"
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra -q"
-filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore::PendingDeprecationWarning"
-]
 testpaths = ["tests"]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')",
-    "mcmc: marks tests that require MCMC sampling (deselect with '-m \"not mcmc\"')",
-    "benchmark: marks test that are soley for benchmarking purposes"
-]
 xfail_strict = true
 
-# Pyright configuration
+# Pyright configuration (FIXED VERSION)
 [tool.pyright]
 include = ["sbi"]
-exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "mkdocs", "tests"]
+exclude = ["**/__pycache__", ".git", "docs", "tests"]
 pythonVersion = "3.10"
-reportUnsupportedDunderAll = false
-reportGeneralTypeIssues = false
-reportInvalidTypeForm = false
-# We disable the following checks to avoid torch related false positives.
-# This is required since torch > 2.5 due to stricter Module/Tensor type stubs.
-reportArgumentType = false
-reportCallIssue = false
-reportOperatorIssue = false
-reportAttributeAccessIssue = false
-reportOptionalOperand = false
-reportIndexIssue = false
-reportReturnType = false
-reportPrivateImportUsage = false
 typeCheckingMode = "basic"
+# Manuel's Fix: Faltu ki restrictions hata di gayi hain
+# taake Pyright asli bugs ko pakad sake.
+reportPrivateImportUsage = false
+reportGeneralTypeIssues = false
