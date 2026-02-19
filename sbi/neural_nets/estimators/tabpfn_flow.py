@@ -37,10 +37,8 @@ class TabPFNFlow(ConditionalDensityEstimator):
         self._model = TabPFNRegressor(**self._regressor_init_kwargs)
 
         self._input_numel = int(torch.Size(input_shape).numel())
-        self._context_input: Optional[Tensor] = None
-        self._context_condition: Optional[Tensor] = None
-
-        self._mock_param = nn.Parameter(torch.zeros(100))
+        self.register_buffer("_context_input", None, persistent=False)
+        self.register_buffer("_context_condition", None, persistent=False)
 
         # TODO do I want to enforce setting the context dataset at initialization? Similar to a trained net being required for sth like Zuko flow?
         # Answer: No, the builder logic also builds these networks before any training happens, so this makes no sense. Keep as is.
@@ -73,15 +71,14 @@ class TabPFNFlow(ConditionalDensityEstimator):
                 f"got {input_context.shape[0]} and {condition_context.shape[0]}."
             )
 
-        embedded_condition = self._embedding_net(condition_context)
+        with torch.no_grad():
+            embedded_condition = self._embedding_net(condition_context)
 
-        # TODO a bit wierd here, especially the detach
-        self._context_input = (
-            input_context.reshape(input_context.shape[0], -1).detach().cpu()
-        )
-        self._context_condition = (
-            embedded_condition.reshape(embedded_condition.shape[0], -1).detach().cpu()
-        )
+        # TODO does it make sense to enforce cpu here?
+        self._context_input = input_context.reshape(input_context.shape[0], -1).cpu()
+        self._context_condition = embedded_condition.reshape(
+            embedded_condition.shape[0], -1
+        ).cpu()
         return self
 
     def _require_context(self) -> Tuple[Tensor, Tensor]:
@@ -95,8 +92,9 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
     def _prepare_condition(self, condition: Tensor) -> Tensor:
         self._check_condition_shape(condition)
-        embedded = self._embedding_net(condition)
-        return embedded.reshape(embedded.shape[0], -1).detach().cpu()
+        with torch.no_grad():
+            embedded = self._embedding_net(condition)
+        return embedded.reshape(embedded.shape[0], -1).cpu()
 
     def _autoregressive_log_prob(
         self, input_flat: Tensor, condition_flat: Tensor, eps: float = 1e-15
@@ -119,6 +117,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
             bar_dist = pred_dist["criterion"]
             dim_log_prob = -bar_dist(
+                # move pred_dist["logits"] for sanity, but shoule be same device
                 pred_dist["logits"].to(bar_dist.borders.device),
                 test_joint[:, target_idx].to(bar_dist.borders.device),
             )
@@ -200,10 +199,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
                 f"({input_batch_dim}) do not match."
             )
 
-        # TODO look at these questionable detach calls.
-        input_flat = (
-            input.reshape(input_sample_dim * input_batch_dim, -1).detach().cpu()
-        )
+        input_flat = input.reshape(input_sample_dim * input_batch_dim, -1)
         repeated_condition = condition_flat.repeat(input_sample_dim, 1)
 
         log_probs_flat = self._autoregressive_log_prob(
@@ -244,11 +240,12 @@ class TabPFNFlow(ConditionalDensityEstimator):
         self, sample_shape: torch.Size, condition: Tensor, eps: float = 1e-15, **kwargs
     ) -> Tuple[Tensor, Tensor]:
 
-        raise NotImplementedError  # TODO will somehow reuse the internal sample function
+        # TODO will somehow reuse the internal sample function
+        raise NotImplementedError
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        r"""Return loss for training.
+        r"""Return loss for training."""
 
-        This is intentionally left unimplemented for now.
-        """
-        raise NotImplementedError("TabPFNFlow.loss is not implemented yet.")
+        raise NotImplementedError(
+            "Loss for potential finetuning is not implemented yet."
+        )

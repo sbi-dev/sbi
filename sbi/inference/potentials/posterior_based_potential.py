@@ -20,7 +20,7 @@ from sbi.utils.sbiutils import (
     mcmc_transform,
     within_support,
 )
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, infer_module_device
 
 
 def posterior_estimator_based_potential(
@@ -49,7 +49,7 @@ def posterior_estimator_based_potential(
         to unconstrained space.
     """
 
-    device = str(next(posterior_estimator.parameters()).device)
+    device = infer_module_device(posterior_estimator, fallback="cpu")
 
     potential_fn = PosteriorBasedPotential(
         posterior_estimator, prior, x_o, device=device
@@ -142,11 +142,11 @@ class PosteriorBasedPotential(BasePotential):
             theta_batch_size = theta.shape[0]
             x_batch_size = x.shape[0]
 
-            assert theta_batch_size == x_batch_size or x_batch_size == 1, (
-                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
+            assert (
+                theta_batch_size == x_batch_size or x_batch_size == 1
+            ), f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
                 When performing batched sampling for multiple `x`, the batch size of\
                 `theta` must match the batch size of `x`."
-            )
 
             if x_batch_size == 1:
                 # If a single `x` is passed (i.e. batchsize==1), we squeeze

@@ -4,6 +4,7 @@
 """Various PyTorch utility functions."""
 
 import os
+import warnings
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -102,6 +103,21 @@ def check_if_prior_on_device(
             "prior = torch.distributions.Normal"
             "(torch.zeros(2, device='cuda'), scale=1.0)`."
         )
+
+
+def infer_module_device(module: torch.nn.Module, fallback: str) -> str:
+    try:
+        return str(next(module.parameters()).device)
+    except StopIteration:
+        try:
+            return str(next(module.buffers()).device)
+        except StopIteration:
+            warnings.warn(
+                f"{type(module).__name__} has no parameters/buffers; "
+                f"falling back to device='{fallback}'.",
+                stacklevel=2,
+            )
+            return fallback
 
 
 def tile(x, n):
@@ -330,9 +346,9 @@ class BoxUniform(Independent):
         """
 
         # Type checks.
-        assert isinstance(low, Tensor) and isinstance(high, Tensor), (
-            f"low and high must be tensors but are {type(low)} and {type(high)}."
-        )
+        assert isinstance(low, Tensor) and isinstance(
+            high, Tensor
+        ), f"low and high must be tensors but are {type(low)} and {type(high)}."
         if not low.device == high.device:
             raise RuntimeError(
                 "Expected all tensors to be on the same device, but found at least"
@@ -494,6 +510,6 @@ def assert_not_nan_or_plus_inf(quantity: Tensor, description: str = "tensor") ->
     """Raise if tensor quantity contains any NaN or +Inf element."""
 
     msg = f"NaN/ +Inf present in {description}."
-    assert not (torch.isposinf(quantity).any()) and not (torch.isnan(quantity).any()), (
-        msg
-    )
+    assert not (torch.isposinf(quantity).any()) and not (
+        torch.isnan(quantity).any()
+    ), msg
