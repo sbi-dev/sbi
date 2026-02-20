@@ -1146,9 +1146,10 @@ def build_tabpfn_flow(
     ] = "none",
     z_score_y: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "none",
+    ] = "independent",
     embedding_net: nn.Module = nn.Identity(),
     regressor_init_kwargs: Optional[dict] = None,
+    # TODO add max context size
     **kwargs,
 ) -> TabPFNFlow:
     r"""Build a TabPFN-based conditional density estimator.
@@ -1170,7 +1171,6 @@ def build_tabpfn_flow(
     Returns:
         Initialized `TabPFNFlow` with context set.
     """
-    check_data_device(batch_x, batch_y)
 
     # TODO this kinda makes sense for now, as a lot is handled by TABPFN anyway, so a good default the outer api is nothing in the case of NPE-PFN
     if z_score_x != "none":
@@ -1179,20 +1179,16 @@ def build_tabpfn_flow(
             f"got '{z_score_x}'. TabPFN performs extensive preprocessing internally."
         )
 
-    if isinstance(embedding_net, nn.Identity) and z_score_y != "none":
-        raise ValueError(
-            "`build_tabpfn_flow` requires `z_score_y='none'` when "
-            "`embedding_net` is `nn.Identity`."
-        )
-
     embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
     flow = TabPFNFlow(
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
         embedding_net=embedding_net,
         regressor_init_kwargs=regressor_init_kwargs,
+        # TODO add max context size here, enforce error if larger gets passed
     )
-    flow.set_context(batch_x, batch_y)
+    # TODO set context with suppress warning.
+    flow.set_context(batch_x, batch_y)  # take the first max context size here
 
     return flow
 

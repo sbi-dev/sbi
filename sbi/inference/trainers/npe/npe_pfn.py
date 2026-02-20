@@ -246,78 +246,10 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
 
         return self
 
-    def train(
-        self,
-        retrain_from_scratch: bool = False,
-        discard_prior_samples: bool = False,
-        force_first_round_loss: bool = False,
-    ) -> ConditionalDensityEstimator:
-        r"""Return density estimator that approximates the distribution $p(\theta|x)$.
+    def train(self) -> None:
+        r"""NPE_PFN is training free!"""
+        pass
 
-        Args:
-            num_atoms: Number of atoms to use for classification.
-            training_batch_size: Training batch size.
-            learning_rate: Learning rate for Adam optimizer.
-            validation_fraction: The fraction of data to use for validation.
-            stop_after_epochs: The number of epochs to wait for improvement on the
-                validation set before terminating training.
-            max_num_epochs: Maximum number of epochs to run. If reached, we stop
-                training even when the validation loss is still decreasing. Otherwise,
-                we train until validation loss increases (see also
-                ``stop_after_epochs``).
-            clip_max_norm: Value at which to clip the total gradient norm in order to
-                prevent exploding gradients. Use None for no clipping.
-            calibration_kernel: A function to calibrate the loss with respect to the
-                simulations ``x``. See Lueckmann, Gonçalves et al., NeurIPS 2017.
-            resume_training: Can be used in case training time is limited, e.g. on a
-                cluster. If ``True``, the split between train and validation set, the
-                optimizer, the number of epochs, and the best validation log-prob will
-                be restored from the last time ``.train()`` was called.
-            force_first_round_loss: If ``True``, train with maximum likelihood,
-                i.e., potentially ignoring the correction for using a proposal
-                distribution different from the prior.
-            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-                from the prior. Training may be sped up by ignoring such less targeted
-                samples.
-            use_combined_loss: Whether to train the neural net also on prior samples
-                using maximum likelihood in addition to training it on all samples using
-                atomic loss. The extra MLE loss helps prevent density leaking with
-                bounded priors.
-            retrain_from_scratch: Whether to retrain the conditional density
-                estimator for the posterior from scratch each round.
-            show_train_summary: Whether to print the number of epochs and validation
-                loss and leakage after the training.
-            dataloader_kwargs: Additional or updated kwargs to be passed to the training
-                and validation dataloaders (like, e.g., a collate_fn)
-
-        Returns:
-            Density estimator that approximates the distribution $p(\theta|x)$.
-        """
-
-        start_idx = self._get_start_index(
-            context=StartIndexContext(
-                discard_prior_samples=discard_prior_samples,
-                force_first_round_loss=force_first_round_loss,
-            )
-        )
-
-        # TODO mock these for now
-        theta, x, masks = self.get_simulations(start_idx)
-        self.train_indices = torch.arange(theta.shape[0])
-
-        # TODO this function is a bit questionable in the context of NPE-PFN
-        # The tabpfn builder now already adds the batch used to infer dimensionality to get a working estimator.
-        # In initizlize_neural_network, actually all train indices are used, so its the whole dataset.
-        # This will however be called only if not yet initizliaed or if retrain from sratch.
-        # So its important so set context here (and also more intuitive)
-        # Another alternative would be to just set retrain from scracth to True.
-        # Some decisions need to be made here
-        self._initialize_neural_network(retrain_from_scratch, start_idx)
-        self._neural_net.set_context(theta, x)
-
-        return self._neural_net
-
-    # TODO how silently should one fail here if incongruent stuff is passed
     def build_posterior(
         self,
         density_estimator: Optional[ConditionalDensityEstimator] = None,
@@ -337,6 +269,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 ImportanceSamplingPosteriorParameters,
             ]
         ] = None,
+        discard_prior_samples=False,
     ) -> NeuralPosterior:
         r"""Build posterior from the neural density estimator.
 
@@ -396,9 +329,17 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 "before calling building the NPE_PFN posterior."
             )
 
+        start_idx = self._get_start_index(
+            context=StartIndexContext(
+                discard_prior_samples=discard_prior_samples,
+            )
+        )
+
+        self._initialize_neural_network(start_idx)
+
         if sample_with == "filtered_direct":
             full_context_input, full_context_condition, _ = self.get_simulations(
-                starting_round=0
+                starting_round=start_idx
             )
 
             prior = self._resolve_prior(prior)
@@ -427,12 +368,6 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 **asdict(resolved_params),
             )
             return self._posterior
-
-        if filtered_direct_sampling_parameters is not None:
-            raise ValueError(
-                "`filtered_direct_sampling_parameters` can only be used with "
-                "sample_with='filtered_direct'."
-            )
 
         self._check_prior_for_rejection_sampling(
             prior, sample_with, posterior_parameters
@@ -486,40 +421,25 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
 
     def _initialize_neural_network(
         self,
-        retrain_from_scratch: bool,
         start_idx: int,
     ) -> None:
         """
-        Initialize the neural network if it is None or retraining from scratch.
+        Initialize the neural network.
 
         Args:
-            retrain_from_scratch: Whether to retrain the conditional density
-                estimator for the posterior from scratch each round.
             start_idx: The index of the first round to retrieve simulation data from.
         """
 
-        # First round or if retraining from scratch:
-        # Call the `self._build_neural_net` with the rounds' thetas and xs as
-        # arguments, which will build the neural network.
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch:
-            # Get theta,x to initialize NN
-            theta, x, _ = self.get_simulations(starting_round=start_idx)
-            # Use only training data for building the neural net (z-scoring transforms)
+        theta, x, _ = self.get_simulations(starting_round=start_idx)
+        x = x.to("cpu")
+        theta = theta.to("cpu")
+        self._neural_net = self._build_neural_net(theta, x)
 
-            self._neural_net = self._build_neural_net(
-                theta[self.train_indices].to("cpu"),
-                x[self.train_indices].to("cpu"),
-            )
+        theta = reshape_to_sample_batch_event(theta, self._neural_net.input_shape)
+        x = reshape_to_batch_event(x, self._neural_net.condition_shape)
+        test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
 
-            theta = reshape_to_sample_batch_event(
-                theta.to("cpu"), self._neural_net.input_shape
-            )
-            x = reshape_to_batch_event(x.to("cpu"), self._neural_net.condition_shape)
-            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
-
-            del theta, x
+        del theta, x
 
     def _get_potential_function(
         self,

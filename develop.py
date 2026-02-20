@@ -87,7 +87,7 @@ inference = NPE_PFN(prior=prior, density_estimator=estimator)
 inference.append_simulations(theta_samples, sims).train()
 posterior = inference.build_posterior(
     # sample_with="direct",
-    filtered_direct_sampling_parameters={"filter_size": 100}
+    filtered_direct_sampling_parameters={"filter_size": 1000}
     # direct_sampling_parameters={"max_sampling_batch_size": 1000},
 )
 
