@@ -27,13 +27,10 @@ class FilteredDirectPosterior(DirectPosterior):
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
         enable_transform: bool = True,
-        context_nn_k: int = 2048,
-        context_nn_enabled: bool = True,
+        filter_size: int = 2048,
     ):
-        if context_nn_k <= 0:
-            raise ValueError(
-                f"context_nn_k must be greater than 0, got {context_nn_k}."
-            )
+        if filter_size <= 0:
+            raise ValueError(f"context_nn_k must be greater than 0, got {filter_size}.")
 
         super().__init__(
             posterior_estimator=posterior_estimator,
@@ -44,12 +41,9 @@ class FilteredDirectPosterior(DirectPosterior):
             enable_transform=enable_transform,
         )
 
-        self.context_nn_k = int(context_nn_k)
-        self.context_nn_enabled = bool(context_nn_enabled)
-        self._full_context_input, self._full_context_condition = (
-            full_context_input,
-            full_context_condition,
-        )
+        self.filter_size = int(filter_size)
+        self._full_context_input = full_context_input
+        self._full_context_condition = full_context_condition
 
     def _set_context_for_x_o(self, x_o: Tensor) -> None:
 
@@ -57,7 +51,7 @@ class FilteredDirectPosterior(DirectPosterior):
 
         condition_embedded = self.posterior_estimator.embed_x_o(x_o)
         num_context = self._full_context_condition.shape[0]
-        k = min(self.context_nn_k, num_context)
+        k = min(self.filter_size, num_context)
 
         if k >= num_context:
             self.posterior_estimator.set_context(

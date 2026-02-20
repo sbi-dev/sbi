@@ -12,7 +12,7 @@ two_moons_task = TwoMoons()
 prior = two_moons_task.get_prior()
 simulator = two_moons_task.get_simulator()
 
-theta_samples = prior.sample((10000,))
+theta_samples = prior.sample((1000,))
 sims = simulator(theta_samples)
 
 print(theta_samples.shape)
@@ -86,7 +86,9 @@ estimator = posterior_nn("tabpfn", z_score_theta="none", z_score_x="none")
 inference = NPE_PFN(prior=prior, density_estimator=estimator)
 inference.append_simulations(theta_samples, sims).train()
 posterior = inference.build_posterior(
-    filtered_direct_sampling_parameters={"context_nn_k": 10000}
+    # sample_with="direct",
+    filtered_direct_sampling_parameters={"filter_size": 100}
+    # direct_sampling_parameters={"max_sampling_batch_size": 1000},
 )
 
 # %%

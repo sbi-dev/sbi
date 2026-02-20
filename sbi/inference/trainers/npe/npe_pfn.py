@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from copy import deepcopy
+from dataclasses import asdict
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
@@ -12,13 +14,12 @@ from typing_extensions import Self
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
-    ImportanceSamplingPosteriorParameters,
-    MCMCPosteriorParameters,
     FilteredDirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
     RejectionPosteriorParameters,
-    VIPosteriorParameters,
 )
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
@@ -33,6 +34,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
+from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_estimator_arg,
@@ -292,12 +294,6 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
-        if len(self._data_round_index) == 0:
-            raise RuntimeError(
-                "No simulations found. You must call .append_simulations() "
-                "before calling .train()."
-            )
-
         start_idx = self._get_start_index(
             context=StartIndexContext(
                 discard_prior_samples=discard_prior_samples,
@@ -321,38 +317,24 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
 
         return self._neural_net
 
-    # TODO can we even support all posteriors here?
+    # TODO how silently should one fail here if incongruent stuff is passed
     def build_posterior(
         self,
         density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "filtered_direct"
+            "rejection", "importance", "direct", "filtered_direct"
         ] = "filtered_direct",
-        mcmc_method: Literal[
-            "slice_np",
-            "slice_np_vectorized",
-            "hmc_pyro",
-            "nuts_pyro",
-            "slice_pymc",
-            "hmc_pymc",
-            "nuts_pymc",
-        ] = "slice_np_vectorized",
-        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
-        vi_parameters: Optional[Dict[str, Any]] = None,
         filtered_direct_sampling_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
         posterior_parameters: Optional[
             Union[
                 DirectPosteriorParameters,
-                MCMCPosteriorParameters,
-                VIPosteriorParameters,
+                FilteredDirectPosteriorParameters,
                 RejectionPosteriorParameters,
                 ImportanceSamplingPosteriorParameters,
-                FilteredDirectPosteriorParameters,
             ]
         ] = None,
     ) -> NeuralPosterior:
@@ -385,9 +367,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 some admit a `mass covering` one (e.g fKL).
             direct_sampling_parameters: Additional kwargs passed to `DirectPosterior`.
             filtered_direct_sampling_parameters: Additional kwargs passed to
-                `FilteredDirectPosterior`. If `posterior_parameters` is not
-                provided and `sample_with='filtered_direct'`, context tensors are
-                derived from stored simulations and combined with these overrides.
+                `FilteredDirectPosterior`. Context tensors are derived from stored
+                simulations and combined with these overrides.
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
@@ -401,64 +382,57 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 - `MCMCPosteriorParameters`
                 - `DirectPosteriorParameters`
                 - `RejectionPosteriorParameters`
-                - `FilteredDirectPosteriorParameters`
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
 
+        # TODO add much more logic here, such that train is basically without function
+
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling building the NPE_PFN posterior."
+            )
+
         if sample_with == "filtered_direct":
-            if (
-                posterior_parameters is not None
-                and filtered_direct_sampling_parameters is not None
-            ):
-                raise ValueError(
-                    "Cannot pass both `posterior_parameters` and "
-                    "`filtered_direct_sampling_parameters` for "
-                    "sample_with='filtered_direct'."
-                )
+            full_context_input, full_context_condition, _ = self.get_simulations(
+                starting_round=0
+            )
 
-            if posterior_parameters is not None and not isinstance(
-                posterior_parameters, FilteredDirectPosteriorParameters
-            ):
+            prior = self._resolve_prior(prior)
+            estimator, device = self._resolve_estimator(density_estimator)
+            estimator = deepcopy(estimator)
+
+            resolved_params = self._resolve_posterior_parameters(
+                sample_with,
+                posterior_parameters,
+                filtered_direct_sampling_parameters=filtered_direct_sampling_parameters,
+            )
+
+            # TODO do we need this?
+            if not isinstance(estimator, TabPFNFlow):
                 raise TypeError(
-                    "For sample_with='filtered_direct', posterior_parameters must be "
-                    "an instance of FilteredDirectPosteriorParameters."
+                    f"Expected estimator to be TabPFNFlow for 'filtered_direct', got "
+                    f"{type(estimator).__name__}."
                 )
 
-            if posterior_parameters is None:
-                if len(self._data_round_index) == 0:
-                    raise RuntimeError(
-                        "No simulations found. You must call "
-                        ".append_simulations() before calling "
-                        ".build_posterior(sample_with='filtered_direct')."
-                    )
+            self._posterior = FilteredDirectPosterior(
+                posterior_estimator=estimator,
+                prior=prior,
+                full_context_input=full_context_input,
+                full_context_condition=full_context_condition,
+                device=device,
+                **asdict(resolved_params),
+            )
+            return self._posterior
 
-                full_context_input, full_context_condition, _ = self.get_simulations(
-                    starting_round=0
-                )
-
-                if full_context_input.shape[0] == 0:
-                    raise RuntimeError(
-                        "No valid simulations available to build "
-                        "`FilteredDirectPosteriorParameters` context."
-                    )
-
-                default_filtered_direct_params = {
-                    "full_context_input": full_context_input,
-                    "full_context_condition": full_context_condition,
-                    "max_sampling_batch_size": 10_000,
-                    "enable_transform": True,
-                    "context_nn_k": min(2048, int(full_context_input.shape[0])),
-                    "context_nn_enabled": True,
-                }
-                overrides = filtered_direct_sampling_parameters or {}
-                posterior_parameters = FilteredDirectPosteriorParameters(
-                    **dict(default_filtered_direct_params, **overrides)
-                )
-                # Avoid old/new style parameter conflict in base validation.
-                filtered_direct_sampling_parameters = None
+        if filtered_direct_sampling_parameters is not None:
+            raise ValueError(
+                "`filtered_direct_sampling_parameters` can only be used with "
+                "sample_with='filtered_direct'."
+            )
 
         self._check_prior_for_rejection_sampling(
             prior, sample_with, posterior_parameters
@@ -469,14 +443,9 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             prior,
             sample_with,
             posterior_parameters,
-            mcmc_method=mcmc_method,
-            vi_method=vi_method,
-            mcmc_parameters=mcmc_parameters,
-            vi_parameters=vi_parameters,
-            filtered_direct_sampling_parameters=filtered_direct_sampling_parameters,
+            direct_sampling_parameters=direct_sampling_parameters,
             rejection_sampling_parameters=rejection_sampling_parameters,
             importance_sampling_parameters=importance_sampling_parameters,
-            direct_sampling_parameters=direct_sampling_parameters,
         )
 
     def _get_start_index(self, context: StartIndexContext) -> int:
@@ -591,6 +560,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             "NPE-PFN is training-free. Currenlty not implemented. Finetuning not yet supported."
         )
 
+    # TODO where to place this? this could be a general helper?
     def _check_prior_for_rejection_sampling(
         self,
         prior: Optional[Distribution],
@@ -605,11 +575,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         posterior_parameters: Optional[
             Union[
                 DirectPosteriorParameters,
-                MCMCPosteriorParameters,
-                VIPosteriorParameters,
                 RejectionPosteriorParameters,
                 ImportanceSamplingPosteriorParameters,
-                FilteredDirectPosteriorParameters,
             ]
         ],
     ) -> None:
