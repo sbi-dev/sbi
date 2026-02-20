@@ -204,7 +204,6 @@ class LC2ST:
                         ),
                     )
                 ],
-                "train_split": 0.1,
                 "optimizer__weight_decay": 1e-4,
                 "device": self.device,
                 "verbose": 0,
@@ -771,10 +770,10 @@ def train_lc2st(
 
     # prepare data
     data = np.concatenate((joint_p, joint_q))
-    # labels
+    # labels (float32 for compatibility with BCEWithLogitsLoss in skorch)
     target = np.concatenate((
-        np.zeros((joint_p.shape[0],), dtype=np.int64),
-        np.ones((joint_q.shape[0],), dtype=np.int64),
+        np.zeros((joint_p.shape[0],), dtype=np.float32),
+        np.ones((joint_q.shape[0],), dtype=np.float32),
     ))
 
     # train classifier
@@ -856,10 +855,11 @@ class EnsembleClassifier(BaseEstimator):
             disable=self.verbosity < 1,
         ):
             clf = clone(self.clf)
-            if clf.random_state is not None:  # type: ignore
-                clf.random_state += n  # type: ignore
-            else:
-                clf.random_state = n + 1  # type: ignore
+            if hasattr(clf, 'random_state'):
+                if clf.random_state is not None:
+                    clf.random_state += n
+                else:
+                    clf.random_state = n + 1
             clf.fit(X, y)  # type: ignore
             self.trained_clfs.append(clf)
 

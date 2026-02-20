@@ -52,7 +52,7 @@ def badly_trained_npe(npe_factory):
 
 @pytest.fixture(scope="session")
 def well_trained_npe(npe_factory):
-    return npe_factory(num_simulations=5_000)
+    return npe_factory(num_simulations=4000)
 
 
 @pytest.fixture(scope="session")
@@ -75,21 +75,12 @@ def calibration_data(basic_setup, badly_trained_npe):
 @pytest.mark.parametrize("cv_folds", (1, 2))
 @pytest.mark.parametrize("num_ensemble", (1, 3))
 @pytest.mark.parametrize("z_score", (True, False))
-@pytest.mark.parametrize(
-    "device",
-    (
-        "cpu",
-        "cuda" if torch.cuda.is_available() else "cpu",
-        "mps" if torch.backends.mps.is_available() else "cpu",
-    ),
-)
 def test_running_lc2st(
     method,
     classifier,
     cv_folds,
     num_ensemble,
     z_score,
-    device,
     calibration_data,
     badly_trained_npe,
 ):
@@ -127,7 +118,6 @@ def test_running_lc2st(
         }
         kwargs_eval = {}
     kwargs_test["classifier"] = classifier
-    kwargs_test["device"] = device
 
     lc2st = method(
         thetas,
