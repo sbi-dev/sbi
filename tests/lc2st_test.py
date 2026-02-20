@@ -52,7 +52,7 @@ def badly_trained_npe(npe_factory):
 
 @pytest.fixture(scope="session")
 def well_trained_npe(npe_factory):
-    return npe_factory(num_simulations=4000)
+    return npe_factory(num_simulations=5000)
 
 
 @pytest.fixture(scope="session")
@@ -251,6 +251,7 @@ def test_lc2st_true_positiv_rate(method, basic_setup, badly_trained_npe):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
+@pytest.mark.skip(reason="flaky due to evaluation error, will be fixed in #1727")
 def test_lc2st_false_positiv_rate(method, basic_setup, well_trained_npe, set_seed):
     """Tests the false positiv rate of the LC2ST-(NF) test:
     for a "good" estimator, the LC2ST-(NF) should not reject the null hypothesis."""

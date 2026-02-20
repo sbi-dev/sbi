@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import math
-import sys
 
 import pytest
 import torch
@@ -619,10 +618,8 @@ def test_lru_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
-                or sys.version_info >= (3, 13),
-                reason="PyTorch's associative_scan only exists for torch >= 2.5 \
-                    and Python < 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
@@ -681,10 +678,8 @@ def test_lru_block_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
-                or sys.version_info >= (3, 13),
-                reason="PyTorch's associative_scan only exists for torch >= 2.5 \
-                    and Python < 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
@@ -807,10 +802,8 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
 
 
 @pytest.mark.xfail(
-    condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
-    or sys.version_info >= (3, 13),
-    reason="PyTorch's associative_scan only exists for torch >= 2.5 \
-        and Python < 3.13",
+    condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+    reason="PyTorch's associative_scan only exists for torch >= 2.5",
     strict=True,
 )
 @pytest.mark.filterwarnings("ignore:Torchinductor")
