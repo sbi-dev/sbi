@@ -810,7 +810,7 @@ def eval_lc2st(
     # probability of being in P (class 0)
     proba = clf.predict_proba(joint_p)[:, 0]  # type: ignore
     # mean squared error between proba and dirac at 0.5
-    score = float(((proba - [0.5] * len(proba)) ** 2).mean())
+    score = float(np.mean((proba - 0.5) ** 2))
 
     if return_proba:
         return proba, score
@@ -864,5 +864,5 @@ class EnsembleClassifier(BaseEstimator):
             self.trained_clfs.append(clf)
 
     def predict_proba(self, X):
-        probas = [clf.predict_proba(X) for clf in self.trained_clfs]
+        probas = np.array([clf.predict_proba(X) for clf in self.trained_clfs])
         return np.mean(probas, axis=0)
