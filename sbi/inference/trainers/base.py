@@ -43,6 +43,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
     PosteriorParameters,
     RejectionPosteriorParameters,
+    TabPFNDirectPosteriorParameters,
     VIPosteriorParameters,
     VectorFieldPosteriorParameters,
 )
@@ -476,7 +477,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         estimator: Optional[ConditionalEstimator],
         prior: Optional[Distribution],
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "direct_tabpfn",
         ],
         posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
@@ -500,6 +508,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 - "direct"
                 - "sde"
                 - "ode"
+                - "direct_tabpfn"
             posterior_parameters: Configuration passed to the init method for the
                 posterior. Must be of type PosteriorParameters.
             **kwargs: Additional method-specific parameters.
@@ -573,9 +582,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         """
 
         if estimator is None:
-            assert self._neural_net is not None, (
-                "Provide an estimator or initialize self._neural_net."
-            )
+            assert (
+                self._neural_net is not None
+            ), "Provide an estimator or initialize self._neural_net."
             estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
@@ -593,7 +602,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     def _resolve_posterior_parameters(
         self,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "direct_tabpfn",
         ],
         posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
@@ -640,7 +656,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     def _build_posterior_parameters(
         self,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "direct_tabpfn",
         ],
         **kwargs,
     ) -> PosteriorParameters:
@@ -664,6 +687,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             posterior_parameters = MCMCPosteriorParameters(
                 method=kwargs.get("mcmc_method", "slice_np_vectorized"), **params
             )
+        elif sample_with == "direct_tabpfn":
+            params = kwargs.get("direct_tabpfn_sampling_parameters", {}) or {}
+            posterior_parameters = TabPFNDirectPosteriorParameters(**params)
         elif sample_with in ("ode", "sde"):
             params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
             posterior_parameters = VectorFieldPosteriorParameters(**params)
@@ -701,6 +727,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         deprecated_params = {
             "direct_sampling_parameters",
+            "direct_tabpfn_sampling_parameters",
             "mcmc_parameters",
             "vectorfield_sampling_parameters",
             "rejection_sampling_parameters",
@@ -850,7 +877,31 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             NeuralPosterior object.
         """
 
-        if isinstance(posterior_parameters, DirectPosteriorParameters):
+        # TODO looks weird
+        if isinstance(posterior_parameters, TabPFNDirectPosteriorParameters):
+            from sbi.inference.posteriors.tabpfn_direct_posterior import (
+                TabPFNDirectPosterior,
+            )
+            from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
+
+            if not isinstance(estimator, TabPFNFlow):
+                raise TypeError(
+                    f"Expected estimator to be TabPFNFlow for 'direct_tabpfn', got "
+                    f"{type(estimator).__name__}."
+                )
+
+            tabpfn_parameters = {
+                name: getattr(posterior_parameters, name)
+                for name in posterior_parameters.__dataclass_fields__
+            }
+
+            posterior = TabPFNDirectPosterior(
+                posterior_estimator=estimator,
+                prior=prior,
+                device=device,
+                **tabpfn_parameters,
+            )
+        elif isinstance(posterior_parameters, DirectPosteriorParameters):
             posterior_estimator = estimator
             if not isinstance(posterior_estimator, ConditionalDensityEstimator):
                 raise TypeError(

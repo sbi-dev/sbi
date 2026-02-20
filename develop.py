@@ -85,7 +85,9 @@ estimator = posterior_nn("tabpfn", z_score_theta="none", z_score_x="none")
 # Given: parameters theta and corresponding simulations x
 inference = NPE_PFN(prior=prior, density_estimator=estimator)
 inference.append_simulations(theta_samples, sims).train()
-posterior = inference.build_posterior()
+posterior = inference.build_posterior(
+    direct_tabpfn_sampling_parameters={"context_nn_k": 10}
+)
 
 # %%
 f_samples = posterior.sample((1000,), x=obs1)
@@ -93,3 +95,6 @@ f_samples = posterior.sample((1000,), x=obs1)
 # %%
 plt.scatter(f_samples[:, 0], f_samples[:, 1])
 plt.show()
+
+# %%
+print(posterior)

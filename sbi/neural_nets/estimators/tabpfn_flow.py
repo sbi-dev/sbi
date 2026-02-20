@@ -62,20 +62,14 @@ class TabPFNFlow(ConditionalDensityEstimator):
             condition_context, event_shape=self.condition_shape
         )
 
-        if input_context.shape[0] != condition_context.shape[0]:
-            raise ValueError(
-                "Context input and condition must have the same batch dimension, but "
-                f"got {input_context.shape[0]} and {condition_context.shape[0]}."
-            )
+        embedded_condition = self._embed_condition(condition_context)
 
-        with torch.no_grad():
-            embedded_condition = self._embedding_net(condition_context)
-
-        # TODO does it make sense to enforce cpu here?
-        self._context_input = input_context.reshape(input_context.shape[0], -1).cpu()
-        self._context_condition = embedded_condition.reshape(
-            embedded_condition.shape[0], -1
-        ).cpu()
+        self.set_context_flat(
+            input_context_flat=input_context.reshape(input_context.shape[0], -1).cpu(),
+            condition_context_flat=embedded_condition.reshape(
+                embedded_condition.shape[0], -1
+            ).cpu(),
+        )
         return self
 
     def _require_context(self) -> Tuple[Tensor, Tensor]:
@@ -87,11 +81,52 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
         return self._context_input, self._context_condition
 
-    def _prepare_condition(self, condition: Tensor) -> Tensor:
+    def _embed_condition(self, condition: Tensor) -> Tensor:
         self._check_condition_shape(condition)
         with torch.no_grad():
             embedded = self._embedding_net(condition)
         return embedded.reshape(embedded.shape[0], -1).cpu()
+
+    def embed_x_o(self, condition: Tensor) -> Tensor:
+        r"""Public wrapper for preparing embedded, flattened conditions."""
+        return self._embed_condition(condition)
+
+    # TODO double check if all of these make sense
+    def set_context_flat(
+        self,
+        input_context_flat: Tensor,
+        condition_context_flat: Tensor,
+    ) -> "TabPFNFlow":
+        r"""Set flattened context directly.
+
+        Args:
+            input_context_flat: Tensor of shape `(context_batch, input_numel)`.
+            condition_context_flat: Tensor of shape `(context_batch, condition_embed_numel)`.
+        """
+
+        # TODO double check these conditions.
+        if input_context_flat.ndim != 2 or condition_context_flat.ndim != 2:
+            raise ValueError(
+                "Expected 2D flattened context tensors for input and condition, but got "
+                f"shapes {tuple(input_context_flat.shape)} and "
+                f"{tuple(condition_context_flat.shape)}."
+            )
+
+        if input_context_flat.shape[0] != condition_context_flat.shape[0]:
+            raise ValueError(
+                "Context input and condition must have the same batch dimension, but "
+                f"got {input_context_flat.shape[0]} and {condition_context_flat.shape[0]}."
+            )
+
+        if input_context_flat.shape[1] != self._input_numel:
+            raise ValueError(
+                f"Expected flattened input context with second dimension {self._input_numel}, "
+                f"but got {input_context_flat.shape[1]}."
+            )
+
+        self._context_input = input_context_flat.to("cpu")
+        self._context_condition = condition_context_flat.to("cpu")
+        return self
 
     def _autoregressive_log_prob(
         self, input_flat: Tensor, condition_flat: Tensor, eps: float = 1e-15
@@ -184,7 +219,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         """
 
         self._check_input_shape(input)
-        condition_flat = self._prepare_condition(condition)
+        condition_flat = self._embed_condition(condition)
 
         input_sample_dim = input.shape[0]
         input_batch_dim = input.shape[1]
@@ -220,7 +255,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         """
         sample_shape = torch.Size(sample_shape)
         num_samples = sample_shape.numel()
-        condition_flat = self._prepare_condition(condition)
+        condition_flat = self._embed_condition(condition)
         batch_dim = condition.shape[0]
 
         repeated_condition = condition_flat.repeat(num_samples, 1)

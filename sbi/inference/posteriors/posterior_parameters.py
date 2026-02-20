@@ -15,6 +15,7 @@ from typing import (
     get_origin,
 )
 
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.vi_posterior import VIPosterior
@@ -129,6 +130,53 @@ class DirectPosteriorParameters(PosteriorParameters):
 
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
+
+
+# TODO rename
+@dataclass(frozen=True)
+class TabPFNDirectPosteriorParameters(PosteriorParameters):
+    """Parameters for initializing TabPFNDirectPosterior.
+
+    Fields:
+        full_context_input: Full context input tensor used by TabPFN posterior.
+        full_context_condition: Full context condition tensor used by TabPFN
+            posterior.
+        max_sampling_batch_size: Batchsize of samples being drawn from
+            the proposal at every iteration.
+        enable_transform: Whether to transform parameters to unconstrained space
+            during MAP optimization. When False, an identity transform will be
+            returned for `theta_transform`.
+        context_nn_k: Number of nearest neighbors selected from full context.
+        context_nn_enabled: Whether nearest-neighbor context selection is enabled.
+    """
+
+    full_context_input: Tensor
+    full_context_condition: Tensor
+    max_sampling_batch_size: int = 10_000
+    enable_transform: bool = True
+    context_nn_k: int = 2048
+    context_nn_enabled: bool = True  # TODO this should not be an option
+
+    def validate(self):
+        """Validate TabPFNDirectPosteriorParameters fields."""
+
+        if not is_positive_int(self.max_sampling_batch_size):
+            raise ValueError("max_sampling_batch_size must be greater than 0.")
+        if not is_positive_int(self.context_nn_k):
+            raise ValueError("context_nn_k must be greater than 0.")
+        if not isinstance(self.full_context_input, Tensor):
+            raise TypeError("full_context_input must be a torch.Tensor.")
+        if not isinstance(self.full_context_condition, Tensor):
+            raise TypeError("full_context_condition must be a torch.Tensor.")
+        if self.full_context_input.shape[0] <= 0:
+            raise ValueError("full_context_input must contain at least one row.")
+        if self.full_context_condition.shape[0] <= 0:
+            raise ValueError("full_context_condition must contain at least one row.")
+        if self.full_context_input.shape[0] != self.full_context_condition.shape[0]:
+            raise ValueError(
+                "full_context_input and full_context_condition must have matching "
+                "first dimension."
+            )
 
 
 @dataclass(frozen=True)

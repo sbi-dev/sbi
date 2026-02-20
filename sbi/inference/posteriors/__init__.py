@@ -11,10 +11,12 @@ from sbi.inference.posteriors.posterior_parameters import (
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
-    VIPosteriorParameters,
+    TabPFNDirectPosteriorParameters,
     VectorFieldPosteriorParameters,
+    VIPosteriorParameters,
 )
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
+from sbi.inference.posteriors.tabpfn_direct_posterior import TabPFNDirectPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 
@@ -31,6 +33,8 @@ __all__ = [
     "ImportanceSamplingPosteriorParameters",
     "MCMCPosteriorParameters",
     "RejectionPosteriorParameters",
+    "TabPFNDirectPosteriorParameters",
     "VectorFieldPosteriorParameters",
     "VIPosteriorParameters",
+    "TabPFNDirectPosterior",  # TODO rename here again, dont forget
 ]
