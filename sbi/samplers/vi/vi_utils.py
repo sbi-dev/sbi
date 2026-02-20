@@ -523,6 +523,10 @@ def _base_recursor(
                 obj[k] = action(o)
             else:
                 _base_recursor(o, parent=obj, key=k, check=check, action=action)
+    elif isinstance(obj, type):
+        # Skip class/type objects to avoid modifying immutable C extension types
+        # (e.g. torch.LongTensor) which fail on Python 3.13+.
+        return
     elif hasattr(obj, "__dict__"):
         for k, o in obj.__dict__.items():
             if check(o):
