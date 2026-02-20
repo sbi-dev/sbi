@@ -336,6 +336,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         )
 
         self._initialize_neural_network(start_idx)
+        # TODO use this to return simulations, this saves the call later on. Based on them
+        # one can raise a warning for the other estimators.
 
         if sample_with == "filtered_direct":
             full_context_input, full_context_condition, _ = self.get_simulations(
