@@ -60,7 +60,7 @@ jobs:
       run: uv run pytest -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml --junitxml=junit.xml -o junit_family=legacy --splitting-algorithm least_duration --splits ${{ matrix.split_size }} --group ${{ matrix.group_number }} tests/
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         env_vars: OS,PYTHON
         file: ./coverage.xml
@@ -70,6 +70,7 @@ jobs:
 
     - name: Upload test results to Codecov
       if: ${{ !cancelled() }}
-      uses: codecov/test-results-action@v1
+      uses: codecov/codecov-action@v5
       with:
+        report_type: test_results
         token: ${{ secrets.CODECOV_TOKEN }}
