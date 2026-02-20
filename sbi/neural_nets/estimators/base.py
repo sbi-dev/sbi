@@ -481,7 +481,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
 
     def solve_schedule(
         self,
-        steps: int,
+        num_steps: int,
         t_min: Optional[float] = None,
         t_max: Optional[float] = None,
     ) -> Tensor:
@@ -490,7 +490,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         Returns a uniform time stepping between t_max and t_min by default.
 
         Args:
-            steps: Number of discretization steps.
+            num_steps: Number of discretization steps.
             t_min: Minimum time value. Defaults to self.t_min.
             t_max: Maximum time value. Defaults to self.t_max.
 
@@ -499,7 +499,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         """
         t_min = self.t_min if t_min is None else t_min
         t_max = self.t_max if t_max is None else t_max
-        return torch.linspace(t_max, t_min, steps, device=self._mean_base.device)
+        return torch.linspace(t_max, t_min, num_steps, device=self._mean_base.device)
 
 
 class UnconditionalEstimator(nn.Module, ABC):
