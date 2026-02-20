@@ -132,10 +132,9 @@ class DirectPosteriorParameters(PosteriorParameters):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
 
 
-# TODO rename
 @dataclass(frozen=True)
-class TabPFNDirectPosteriorParameters(PosteriorParameters):
-    """Parameters for initializing TabPFNDirectPosterior.
+class FilteredDirectPosteriorParameters(PosteriorParameters):
+    """Parameters for initializing FilteredDirectPosterior.
 
     Fields:
         full_context_input: Full context input tensor used by TabPFN posterior.
@@ -158,7 +157,7 @@ class TabPFNDirectPosteriorParameters(PosteriorParameters):
     context_nn_enabled: bool = True  # TODO this should not be an option
 
     def validate(self):
-        """Validate TabPFNDirectPosteriorParameters fields."""
+        """Validate FilteredDirectPosteriorParameters fields."""
 
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")

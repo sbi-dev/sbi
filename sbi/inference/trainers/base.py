@@ -35,15 +35,18 @@ from typing_extensions import Self
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.filtered_direct_posterior import (
+    FilteredDirectPosterior,
+)
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+    FilteredDirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     PosteriorParameters,
     RejectionPosteriorParameters,
-    TabPFNDirectPosteriorParameters,
     VIPosteriorParameters,
     VectorFieldPosteriorParameters,
 )
@@ -58,6 +61,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalEstimatorType,
     ConditionalVectorFieldEstimator,
 )
+from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_prior,
@@ -484,7 +488,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             "direct",
             "sde",
             "ode",
-            "direct_tabpfn",
+            "filtered_direct",
         ],
         posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
@@ -508,7 +512,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 - "direct"
                 - "sde"
                 - "ode"
-                - "direct_tabpfn"
+                - "filtered_direct"
             posterior_parameters: Configuration passed to the init method for the
                 posterior. Must be of type PosteriorParameters.
             **kwargs: Additional method-specific parameters.
@@ -609,7 +613,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             "direct",
             "sde",
             "ode",
-            "direct_tabpfn",
+            "filtered_direct",
         ],
         posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
@@ -663,7 +667,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             "direct",
             "sde",
             "ode",
-            "direct_tabpfn",
+            "filtered_direct",
         ],
         **kwargs,
     ) -> PosteriorParameters:
@@ -687,9 +691,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             posterior_parameters = MCMCPosteriorParameters(
                 method=kwargs.get("mcmc_method", "slice_np_vectorized"), **params
             )
-        elif sample_with == "direct_tabpfn":
-            params = kwargs.get("direct_tabpfn_sampling_parameters", {}) or {}
-            posterior_parameters = TabPFNDirectPosteriorParameters(**params)
+        elif sample_with == "filtered_direct":
+            params = kwargs.get("filtered_direct_sampling_parameters", {}) or {}
+            posterior_parameters = FilteredDirectPosteriorParameters(**params)
         elif sample_with in ("ode", "sde"):
             params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
             posterior_parameters = VectorFieldPosteriorParameters(**params)
@@ -727,7 +731,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         deprecated_params = {
             "direct_sampling_parameters",
-            "direct_tabpfn_sampling_parameters",
+            "filtered_direct_sampling_parameters",
             "mcmc_parameters",
             "vectorfield_sampling_parameters",
             "rejection_sampling_parameters",
@@ -844,7 +848,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         estimator: ConditionalEstimator,
         prior: Distribution,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "filtered_direct",
         ],
         device: Union[str, torch.device],
         posterior_parameters: PosteriorParameters,
@@ -878,30 +889,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         """
 
         # TODO looks weird
-        if isinstance(posterior_parameters, TabPFNDirectPosteriorParameters):
-            from sbi.inference.posteriors.tabpfn_direct_posterior import (
-                TabPFNDirectPosterior,
-            )
-            from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
-
-            if not isinstance(estimator, TabPFNFlow):
-                raise TypeError(
-                    f"Expected estimator to be TabPFNFlow for 'direct_tabpfn', got "
-                    f"{type(estimator).__name__}."
-                )
-
-            tabpfn_parameters = {
-                name: getattr(posterior_parameters, name)
-                for name in posterior_parameters.__dataclass_fields__
-            }
-
-            posterior = TabPFNDirectPosterior(
-                posterior_estimator=estimator,
-                prior=prior,
-                device=device,
-                **tabpfn_parameters,
-            )
-        elif isinstance(posterior_parameters, DirectPosteriorParameters):
+        if isinstance(posterior_parameters, DirectPosteriorParameters):
             posterior_estimator = estimator
             if not isinstance(posterior_estimator, ConditionalDensityEstimator):
                 raise TypeError(
@@ -914,6 +902,26 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 prior=prior,
                 device=device,
                 **asdict(posterior_parameters),
+            )
+        elif isinstance(posterior_parameters, FilteredDirectPosteriorParameters):
+            if not isinstance(estimator, TabPFNFlow):
+                raise TypeError(
+                    f"Expected estimator to be TabPFNFlow for 'filtered_direct', got "
+                    f"{type(estimator).__name__}."
+                )
+
+            # TODO this is done, because large tensors in this dataset. I dont like it to much
+            # Maybe its worth not holding them in the parameters at all
+            tabpfn_parameters = {
+                name: getattr(posterior_parameters, name)
+                for name in posterior_parameters.__dataclass_fields__
+            }
+
+            posterior = FilteredDirectPosterior(
+                posterior_estimator=estimator,
+                prior=prior,
+                device=device,
+                **tabpfn_parameters,
             )
         elif isinstance(posterior_parameters, VectorFieldPosteriorParameters):
             vector_field_estimator = estimator

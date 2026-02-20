@@ -9,7 +9,7 @@ from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.sbi_types import Shape
 
 
-class TabPFNDirectPosterior(DirectPosterior):
+class FilteredDirectPosterior(DirectPosterior):
     r"""Direct posterior with context kNN selection for TabPFN estimators.
 
     For every queried condition `x`, this posterior selects nearest-neighbor context

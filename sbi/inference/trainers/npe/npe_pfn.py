@@ -16,8 +16,8 @@ from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
+    FilteredDirectPosteriorParameters,
     RejectionPosteriorParameters,
-    TabPFNDirectPosteriorParameters,
     VIPosteriorParameters,
 )
 from sbi.inference.potentials import posterior_estimator_based_potential
@@ -327,8 +327,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         density_estimator: Optional[ConditionalDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "direct_tabpfn"
-        ] = "direct_tabpfn",
+            "mcmc", "rejection", "vi", "importance", "direct", "filtered_direct"
+        ] = "filtered_direct",
         mcmc_method: Literal[
             "slice_np",
             "slice_np_vectorized",
@@ -342,7 +342,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
-        direct_tabpfn_sampling_parameters: Optional[Dict[str, Any]] = None,
+        filtered_direct_sampling_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         importance_sampling_parameters: Optional[Dict[str, Any]] = None,
         posterior_parameters: Optional[
@@ -352,7 +352,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 VIPosteriorParameters,
                 RejectionPosteriorParameters,
                 ImportanceSamplingPosteriorParameters,
-                TabPFNDirectPosteriorParameters,
+                FilteredDirectPosteriorParameters,
             ]
         ] = None,
     ) -> NeuralPosterior:
@@ -371,7 +371,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
-                [`direct` | `direct_tabpfn` | `mcmc` | `rejection` | `vi` | `importance`].
+                [`direct` | `filtered_direct` | `mcmc` | `rejection` | `vi` | `importance`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`,
                 `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
                 `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
@@ -384,9 +384,9 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 some of the methods admit a `mode seeking` property (e.g. rKL) whereas
                 some admit a `mass covering` one (e.g fKL).
             direct_sampling_parameters: Additional kwargs passed to `DirectPosterior`.
-            direct_tabpfn_sampling_parameters: Additional kwargs passed to
-                `TabPFNDirectPosterior`. If `posterior_parameters` is not
-                provided and `sample_with='direct_tabpfn'`, context tensors are
+            filtered_direct_sampling_parameters: Additional kwargs passed to
+                `FilteredDirectPosterior`. If `posterior_parameters` is not
+                provided and `sample_with='filtered_direct'`, context tensors are
                 derived from stored simulations and combined with these overrides.
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
             vi_parameters: Additional kwargs passed to `VIPosterior`.
@@ -401,30 +401,30 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 - `MCMCPosteriorParameters`
                 - `DirectPosteriorParameters`
                 - `RejectionPosteriorParameters`
-                - `TabPFNDirectPosteriorParameters`
+                - `FilteredDirectPosteriorParameters`
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
 
-        if sample_with == "direct_tabpfn":
+        if sample_with == "filtered_direct":
             if (
                 posterior_parameters is not None
-                and direct_tabpfn_sampling_parameters is not None
+                and filtered_direct_sampling_parameters is not None
             ):
                 raise ValueError(
                     "Cannot pass both `posterior_parameters` and "
-                    "`direct_tabpfn_sampling_parameters` for "
-                    "sample_with='direct_tabpfn'."
+                    "`filtered_direct_sampling_parameters` for "
+                    "sample_with='filtered_direct'."
                 )
 
             if posterior_parameters is not None and not isinstance(
-                posterior_parameters, TabPFNDirectPosteriorParameters
+                posterior_parameters, FilteredDirectPosteriorParameters
             ):
                 raise TypeError(
-                    "For sample_with='direct_tabpfn', posterior_parameters must be "
-                    "an instance of TabPFNDirectPosteriorParameters."
+                    "For sample_with='filtered_direct', posterior_parameters must be "
+                    "an instance of FilteredDirectPosteriorParameters."
                 )
 
             if posterior_parameters is None:
@@ -432,7 +432,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                     raise RuntimeError(
                         "No simulations found. You must call "
                         ".append_simulations() before calling "
-                        ".build_posterior(sample_with='direct_tabpfn')."
+                        ".build_posterior(sample_with='filtered_direct')."
                     )
 
                 full_context_input, full_context_condition, _ = self.get_simulations(
@@ -442,10 +442,10 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 if full_context_input.shape[0] == 0:
                     raise RuntimeError(
                         "No valid simulations available to build "
-                        "`TabPFNDirectPosteriorParameters` context."
+                        "`FilteredDirectPosteriorParameters` context."
                     )
 
-                default_tabpfn_params = {
+                default_filtered_direct_params = {
                     "full_context_input": full_context_input,
                     "full_context_condition": full_context_condition,
                     "max_sampling_batch_size": 10_000,
@@ -453,12 +453,12 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                     "context_nn_k": min(2048, int(full_context_input.shape[0])),
                     "context_nn_enabled": True,
                 }
-                overrides = direct_tabpfn_sampling_parameters or {}
-                posterior_parameters = TabPFNDirectPosteriorParameters(
-                    **dict(default_tabpfn_params, **overrides)
+                overrides = filtered_direct_sampling_parameters or {}
+                posterior_parameters = FilteredDirectPosteriorParameters(
+                    **dict(default_filtered_direct_params, **overrides)
                 )
                 # Avoid old/new style parameter conflict in base validation.
-                direct_tabpfn_sampling_parameters = None
+                filtered_direct_sampling_parameters = None
 
         self._check_prior_for_rejection_sampling(
             prior, sample_with, posterior_parameters
@@ -473,7 +473,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             vi_method=vi_method,
             mcmc_parameters=mcmc_parameters,
             vi_parameters=vi_parameters,
-            direct_tabpfn_sampling_parameters=direct_tabpfn_sampling_parameters,
+            filtered_direct_sampling_parameters=filtered_direct_sampling_parameters,
             rejection_sampling_parameters=rejection_sampling_parameters,
             importance_sampling_parameters=importance_sampling_parameters,
             direct_sampling_parameters=direct_sampling_parameters,
@@ -600,7 +600,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             "vi",
             "importance",
             "direct",
-            "direct_tabpfn",
+            "filtered_direct",
         ],
         posterior_parameters: Optional[
             Union[
@@ -609,7 +609,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 VIPosteriorParameters,
                 RejectionPosteriorParameters,
                 ImportanceSamplingPosteriorParameters,
-                TabPFNDirectPosteriorParameters,
+                FilteredDirectPosteriorParameters,
             ]
         ],
     ) -> None:
@@ -621,7 +621,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             prior: Prior distribution.
             sample_with: The sampling method used. Must be one of
                 "mcmc", "rejection", "vi", "importance", "direct", or
-                "direct_tabpfn".
+                "filtered_direct".
             posterior_parameters: Configuration for building the posterior.
         """
 
