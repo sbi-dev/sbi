@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from typing import Any, Literal, Optional, Sequence, Union
 
 import torch
@@ -41,7 +41,7 @@ class VectorFieldEstimatorConfig:
     actual default values live in the estimator / network constructors.
     """
 
-    # --- Score estimator: VE schedule params (Karras et al. 2022) ---
+    # Score estimator: VE schedule params (Karras et al. 2022)
     train_schedule: Optional[Literal["uniform", "lognormal"]] = None
     solve_schedule: Optional[Literal["uniform", "power_law"]] = None
     sigma_min: Optional[float] = None
@@ -50,29 +50,29 @@ class VectorFieldEstimatorConfig:
     lognormal_std: Optional[float] = None
     power_law_exponent: Optional[float] = None
 
-    # --- Score estimator: VP / SubVP params ---
+    # Score estimator: VP / SubVP params
     beta_min: Optional[float] = None
     beta_max: Optional[float] = None
 
-    # --- Network architecture extras (shared) ---
+    # Network architecture extras (shared)
     activation: Optional[Any] = None
     sinusoidal_max_freq: Optional[float] = None
     fourier_scale: Optional[float] = None
 
-    # --- MLP-specific ---
+    # MLP-specific
     layer_norm: Optional[bool] = None
     skip_connections: Optional[bool] = None
 
-    # --- AdaMLP-specific ---
+    # AdaMLP-specific
     condition_emb_dim: Optional[int] = None
     num_intermediate_mlp_layers: Optional[int] = None
     adamlp_ratio: Optional[int] = None
 
-    # --- Transformer-specific ---
+    # Transformer-specific
     is_x_emb_seq: Optional[bool] = None
 
-    # --- Params that are explicit in build_vector_field_estimator but may be
-    #     passed through **kwargs at the factory level ---
+    # Params that are explicit in build_vector_field_estimator but may be
+    # passed through **kwargs at the factory level
     net: Optional[Any] = None
     z_score_x: Optional[Any] = None
     z_score_y: Optional[Any] = None
@@ -85,14 +85,6 @@ class VectorFieldEstimatorConfig:
     sde_type: Optional[str] = None
     estimator_type: Optional[str] = None
     time_emb_type: Optional[str] = None
-
-    def to_dict(self) -> dict:
-        """Return only explicitly-set (non-``None``) fields as a dict."""
-        return {
-            f.name: getattr(self, f.name)
-            for f in fields(self)
-            if getattr(self, f.name) is not None
-        }
 
 
 # ==================== Building Flow/Score Matching Estimators =========================

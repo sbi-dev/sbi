@@ -1056,10 +1056,6 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         else:  # power_law
             # Power-law sigma schedule (Karras et al. 2022, Eq. 5):
             # σ_i = (σ_max^(1/ρ) + i/(N-1) * (σ_min^(1/ρ) - σ_max^(1/ρ)))^ρ
-            #
-            # We compute the schedule in unit [0, 1] space and rescale to
-            # [t_min, t_max] so that caller-supplied bounds are respected
-            # and the grid stays monotonically decreasing.
             rho = self.power_law_exponent
             rho_inv = 1.0 / rho
 
@@ -1077,7 +1073,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             unit = torch.log(sigmas / self.sigma_min) / log_ratio  # in [0, 1]
             times = unit * (t_max - t_min) + t_min
 
-            # Pin exact boundary values (float32 rescaling may drift slightly).
+            # Pin exact boundary values.
             times[0] = t_max
             if num_steps > 1:
                 times[-1] = t_min
