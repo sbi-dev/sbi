@@ -14072,8 +14072,8 @@ the ODE to compute the log-probability.</p>
 <span class="sd">            corrector: The corrector for the diffusion-based sampler. Either of</span>
 <span class="sd">                [None].</span>
 <span class="sd">            steps: Number of steps to take for the Euler-Maruyama method.</span>
-<span class="sd">            ts: Time points at which to evaluate the diffusion process. If None, call</span>
-<span class="sd">                the solve schedule specific to the score estimator.</span>
+<span class="sd">            ts: Time points at which to evaluate the diffusion process. If None,</span>
+<span class="sd">                uses the solve_schedule() specific to the estimator.</span>
 <span class="sd">            max_sampling_batch_size: Maximum batch size for sampling.</span>
 <span class="sd">            sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to</span>
 <span class="sd">                `.sample()`.</span>
