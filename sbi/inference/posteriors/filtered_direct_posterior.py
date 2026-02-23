@@ -36,6 +36,21 @@ class FilteredDirectPosterior(DirectPosterior):
         filter_type: FilterType = "knn",
         filter_size: int = 2048,
     ):
+        r"""Initialize a direct posterior with observation-dependent context filtering.
+
+        Args:
+            estimator: TabPFN-based posterior estimator used for evaluation.
+            prior: Prior distribution over parameters.
+            full_context_input: Full set of context inputs (typically `theta`).
+            full_context_condition: Full set of context conditions (typically `x`).
+            max_sampling_batch_size: Maximum number of samples drawn per internal batch.
+            device: Device on which posterior computations are performed.
+            x_shape: Optional event shape for observations.
+            enable_transform: Whether to use unconstrained-space transforms for MAP.
+            filter_type: Context filtering strategy. Either `"knn"`, `"first"`,
+                or a callable returning selected indices.
+            filter_size: Maximum number of context points retained per observation.
+        """
         if filter_size < 1:
             raise ValueError(f"filter_size must be greater than 0, got {filter_size}.")
 
@@ -71,6 +86,7 @@ class FilteredDirectPosterior(DirectPosterior):
         return unique_indices
 
     def _select_context_indices(self, condition_embedded: Tensor) -> Tensor:
+        """Select context indices according to the configured filtering strategy."""
         num_context = self._full_context_condition.shape[0]
         k = min(self.filter_size, num_context)
 
@@ -98,6 +114,7 @@ class FilteredDirectPosterior(DirectPosterior):
         return self._validate_filter_indices(indices, num_context)
 
     def _set_context_for_x_o(self, x_o: Tensor) -> None:
+        """Filter and set estimator context for a single queried observation."""
         condition_embedded = self.posterior_estimator.embed_x_o(x_o)
         unique_indices = self._select_context_indices(condition_embedded)
 
@@ -116,6 +133,20 @@ class FilteredDirectPosterior(DirectPosterior):
         max_sampling_time: Optional[float] = None,
         return_partial_on_timeout: bool = False,
     ) -> Tensor:
+        r"""Sample from the posterior after setting context for the queried `x`.
+
+        Args:
+            sample_shape: Shape of the returned sample batch.
+            x: Observation to condition on. Uses the default observation if `None`.
+            max_sampling_batch_size: Maximum internal sampling batch size.
+            show_progress_bars: Whether to display progress bars.
+            reject_outside_prior: Whether to reject samples outside prior support.
+            max_sampling_time: Optional timeout in seconds.
+            return_partial_on_timeout: Whether to return collected samples on timeout.
+
+        Returns:
+            Samples from the filtered direct posterior.
+        """
         x_for_context = self._x_else_default_x(x)
         self._set_context_for_x_o(x_for_context)
         return super().sample(
@@ -138,6 +169,7 @@ class FilteredDirectPosterior(DirectPosterior):
         max_sampling_time: Optional[float] = None,
         return_partial_on_timeout: bool = False,
     ) -> Tensor:
+        """Batched sampling is not supported for observation-dependent filtering."""
         raise NotImplementedError(
             "Filtering makes the context observation dependent. Batched inference requires"
             " sharing context, which is currently not supported."
@@ -151,6 +183,18 @@ class FilteredDirectPosterior(DirectPosterior):
         track_gradients: bool = False,
         leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
+        r"""Evaluate posterior log-probability after setting context for `x`.
+
+        Args:
+            theta: Parameters at which to evaluate log-probability.
+            x: Observation to condition on. Uses the default observation if `None`.
+            norm_posterior: Whether to include leakage correction normalization.
+            track_gradients: Whether to evaluate with gradient tracking.
+            leakage_correction_params: Optional parameters for leakage correction.
+
+        Returns:
+            Posterior log-probabilities for ``theta`` conditioned on ``x``.
+        """
         x_for_context = self._x_else_default_x(x)
         self._set_context_for_x_o(x_for_context)
         return super().log_prob(
@@ -169,6 +213,7 @@ class FilteredDirectPosterior(DirectPosterior):
         track_gradients: bool = False,
         leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
+        """Batched log-probability is unsupported with per-observation filtering."""
         raise NotImplementedError(
             "Filtering makes the context observation dependent. Batched inference requires"
             " sharing context, which is currently not supported."
@@ -186,6 +231,7 @@ class FilteredDirectPosterior(DirectPosterior):
         show_progress_bars=False,
         force_update=False,
     ):
+        """MAP is not supported because gradient-based optimization is unavailable."""
         raise NotImplementedError(
             "Computing the MAP requires gradients, which are currently not supported "
             "for NPE-PFN."
@@ -197,10 +243,12 @@ def _knn_filter_indices(
     full_context_condition: Tensor,
     filter_size: int,
 ) -> Tensor:
+    """Return flattened k-nearest-neighbor context indices."""
     distances = torch.cdist(condition_embedded, full_context_condition, p=2)
     nn_indices = torch.topk(distances, k=filter_size, largest=False, dim=1).indices
     return nn_indices.reshape(-1)
 
 
 def _first_filter_indices(filter_size: int, device: torch.device) -> Tensor:
+    """Return indices of the first `filter_size` context entries."""
     return torch.arange(filter_size, device=device)

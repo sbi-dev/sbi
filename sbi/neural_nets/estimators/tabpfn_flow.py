@@ -25,6 +25,17 @@ class TabPFNFlow(ConditionalDensityEstimator):
         regressor_init_kwargs: Optional[Mapping] = None,
         max_context_size: int = 10_000,
     ) -> None:
+        r"""Initialize a TabPFN-based conditional density estimator.
+
+        Args:
+            input_shape: Event shape of the modeled input variable.
+            condition_shape: Event shape of the conditioning variable.
+            embedding_net: Optional embedding module applied to conditions before
+                TabPFN regression. Defaults to identity.
+            regressor_init_kwargs: Optional keyword arguments forwarded to
+                `TabPFNRegressor`.
+            max_context_size: Maximum number of context pairs that can be stored.
+        """
         super().__init__(
             net=nn.Identity(),
             input_shape=input_shape,
@@ -75,6 +86,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         return self
 
     def _require_context(self) -> Tuple[Tensor, Tensor]:
+        """Return stored context tensors or raise if no context is available."""
         if self._context_input is None or self._context_condition is None:
             raise RuntimeError(
                 "No context is set. Call `set_context(input_context, condition_context)` "
@@ -84,6 +96,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         return self._context_input, self._context_condition
 
     def _embed_condition(self, condition: Tensor) -> Tensor:
+        """Validate, embed, flatten, and move conditions to CPU."""
         self._check_condition_shape(condition)
         with torch.no_grad():
             embedded = self._embedding_net(condition)
@@ -137,6 +150,17 @@ class TabPFNFlow(ConditionalDensityEstimator):
     def _autoregressive_log_prob(
         self, input_flat: Tensor, condition_flat: Tensor, eps: float = 1e-15
     ) -> Tensor:
+        r"""Evaluate autoregressive log probability for flattened inputs.
+
+        Args:
+            input_flat: Flattened input tensor of shape `(batch, input_numel)`.
+            condition_flat: Flattened embedded conditions of shape
+                `(batch, condition_embed_numel)`.
+            eps: Small positive value used to replace `-inf` log-probabilities.
+
+        Returns:
+            Log probabilities of shape `(batch,)`.
+        """
         context_input, context_condition = self._require_context()
         joint_data = torch.cat([context_condition, context_input], dim=1)
 
@@ -172,6 +196,19 @@ class TabPFNFlow(ConditionalDensityEstimator):
     def _autoregressive_sample(
         self, condition_flat: Tensor, with_log_prob: bool = False, eps: float = 1e-15
     ) -> tuple[Tensor, Optional[Tensor]]:
+        r"""Draw autoregressive samples for flattened embedded conditions.
+
+        Args:
+            condition_flat: Flattened embedded conditions of shape
+                `(batch, condition_embed_numel)`.
+            with_log_prob: Whether to accumulate and return sample log-probabilities.
+            eps: Small positive value used to replace `-inf` log-probabilities.
+
+        Returns:
+            A tuple `(samples_flat, log_probs)` where `samples_flat` has shape
+            `(batch, input_numel)` and `log_probs` is `None` unless
+            `with_log_prob=True`.
+        """
         context_input, context_condition = self._require_context()
         joint_data = torch.cat([context_condition, context_input], dim=1)
 
@@ -276,6 +313,19 @@ class TabPFNFlow(ConditionalDensityEstimator):
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, eps: float = 1e-15, **kwargs
     ) -> Tuple[Tensor, Tensor]:
+        r"""Return samples and corresponding log probabilities.
+
+        Args:
+            sample_shape: Shape of the samples to return.
+            condition: Conditions of shape `(batch_dim, *condition_shape)`.
+            eps: Small positive value used to replace `-inf` log-probabilities.
+            **kwargs: Unused; accepted for API compatibility.
+
+        Returns:
+            A tuple `(samples, log_probs)` with shapes
+            `(*sample_shape, batch_dim, *input_shape)` and
+            `(*sample_shape, batch_dim)`.
+        """
         sample_shape = torch.Size(sample_shape)
         num_samples = sample_shape.numel()
         condition_flat = self._embed_condition(condition)

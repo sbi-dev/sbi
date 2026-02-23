@@ -95,14 +95,6 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             show_progress_bars=show_progress_bars,
         )
 
-        # As detailed in the docstring, `density_estimator` is either a string or
-        # a callable. The function creating the neural network is attached to
-        # `_build_neural_net`. It will be called in the first round and receive
-        # thetas and xs as inputs, so that they can be used for shape inference and
-        # potentially for z-scoring.
-
-        # TODO add tailored check?
-        # check_estimator_arg(density_estimator)
         if density_estimator is None:
             self._build_neural_net = posterior_nn(
                 model="tabpfn",
@@ -376,16 +368,19 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         return potential_fn, theta_transform
 
     def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
+        """Not implemented because NPE-PFN does not optimize a training loss."""
         raise NotImplementedError(
             "NPE-PFN is training-free. Fine-tuning is currently not implemented."
         )
 
     def _loss(self, *args, **kwargs) -> Tensor:
+        """Not implemented because NPE-PFN does not perform gradient training."""
         raise NotImplementedError(
             "NPE-PFN is training-free. Fine-tuning is currently not implemented."
         )
 
     def _initialize_neural_network(self, retrain_from_scratch, start_idx):
+        """Not implemented because the estimator is rebuilt from context data."""
         raise NotImplementedError(
             "NPE-PFN is based on in-context learning. The underlying density estimator will "
             "automatically reflect updates to the training dataset after rebuilding the posterior."
