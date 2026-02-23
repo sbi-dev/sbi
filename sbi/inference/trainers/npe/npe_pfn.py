@@ -6,7 +6,6 @@ from dataclasses import asdict
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 from warnings import warn
 
-import torch
 from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -31,17 +30,11 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuilder,
 )
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_batch_event,
-    reshape_to_sample_batch_event,
-)
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
-    check_estimator_arg,
     handle_invalid_x,
     npe_msg_on_invalid_x,
-    test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
@@ -304,7 +297,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         if full_data_size > estimator.max_context_size:
             warn(
                 "Number of simulations exceeds context capacity. "
-                f"Using only the first {estimator.max_context_size} of {full_data_size} "
+                f"Using only the first {estimator.max_context_size} "
+                f"of {full_data_size} "
                 "simulations.",
                 stacklevel=2,
             )
@@ -382,6 +376,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
     def _initialize_neural_network(self, retrain_from_scratch, start_idx):
         """Not implemented because the estimator is rebuilt from context data."""
         raise NotImplementedError(
-            "NPE-PFN is based on in-context learning. The underlying density estimator will "
-            "automatically reflect updates to the training dataset after rebuilding the posterior."
+            "NPE-PFN is based on in-context learning. "
+            "The underlying density estimator will automatically "
+            "reflect updates to the training dataset "
+            "after rebuilding the posterior."
         )

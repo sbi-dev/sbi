@@ -15,7 +15,6 @@ from typing import (
     get_origin,
 )
 
-from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.vi_posterior import VIPosterior

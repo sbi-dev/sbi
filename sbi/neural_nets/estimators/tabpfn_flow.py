@@ -89,7 +89,8 @@ class TabPFNFlow(ConditionalDensityEstimator):
         """Return stored context tensors or raise if no context is available."""
         if self._context_input is None or self._context_condition is None:
             raise RuntimeError(
-                "No context is set. Call `set_context(input_context, condition_context)` "
+                "No context is set. "
+                "Call `set_context(input_context, condition_context)` "
                 "before calling `sample` or `log_prob`."
             )
 
@@ -115,18 +116,21 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
         Args:
             input_context_flat: Tensor of shape `(context_batch, input_numel)`.
-            condition_context_flat: Tensor of shape `(context_batch, condition_embed_numel)`.
+            condition_context_flat: Tensor of shape
+                `(context_batch, condition_embed_numel)`.
         """
 
         if input_context_flat.shape[0] > self.max_context_size:
             raise ValueError(
                 "Context batch size exceeds the configured maximum in `set_context`: "
-                f"got {input_context_flat.shape[0]}, maximum is {self.max_context_size}."
+                f"got {input_context_flat.shape[0]}, maximum is "
+                f"{self.max_context_size}."
             )
 
         if input_context_flat.ndim != 2 or condition_context_flat.ndim != 2:
             raise ValueError(
-                "Expected 2D flattened context tensors for input and condition, but got "
+                "Expected 2D flattened context tensors for input and condition, "
+                "but got "
                 f"shapes {tuple(input_context_flat.shape)} and "
                 f"{tuple(condition_context_flat.shape)}."
             )
@@ -134,12 +138,14 @@ class TabPFNFlow(ConditionalDensityEstimator):
         if input_context_flat.shape[0] != condition_context_flat.shape[0]:
             raise ValueError(
                 "Context input and condition must have the same batch dimension, but "
-                f"got {input_context_flat.shape[0]} and {condition_context_flat.shape[0]}."
+                f"got {input_context_flat.shape[0]} and "
+                f"{condition_context_flat.shape[0]}."
             )
 
         if input_context_flat.shape[1] != self._input_numel:
             raise ValueError(
-                f"Expected flattened input context with second dimension {self._input_numel}, "
+                "Expected flattened input context with second dimension "
+                f"{self._input_numel}, "
                 f"but got {input_context_flat.shape[1]}."
             )
 

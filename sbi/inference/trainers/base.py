@@ -39,13 +39,13 @@ from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPost
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+    FilteredDirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     PosteriorParameters,
     RejectionPosteriorParameters,
     VIPosteriorParameters,
     VectorFieldPosteriorParameters,
-    FilteredDirectPosteriorParameters,
 )
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
@@ -72,8 +72,8 @@ from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
 from sbi.utils.torchutils import (
     check_if_prior_on_device,
-    process_device,
     infer_module_device,
+    process_device,
 )
 from sbi.utils.tracking import TensorBoardTracker
 from sbi.utils.user_input_checks import (
@@ -584,9 +584,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         """
 
         if estimator is None:
-            assert (
-                self._neural_net is not None
-            ), "Provide an estimator or initialize self._neural_net."
+            assert self._neural_net is not None, (
+                "Provide an estimator or initialize self._neural_net."
+            )
             estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device

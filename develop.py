@@ -1,10 +1,11 @@
 # %%
+import matplotlib.pyplot as plt
 import torch
-from torch.distributions import MultivariateNormal, Normal
 
+from sbi.inference.trainers.npe.npe_pfn import NPE_PFN
+from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from tests.mini_sbibm.two_moons import TwoMoons
-import matplotlib.pyplot as plt
 
 torch.manual_seed(0)
 
@@ -76,10 +77,6 @@ for obs_idx, ax in enumerate(axes):
 
 plt.show()
 
-
-# %%
-from sbi.inference.trainers.npe.npe_pfn import NPE_PFN
-from sbi.neural_nets import posterior_nn
 
 estimator = posterior_nn("tabpfn", z_score_theta="none", z_score_x="none")
 # Given: parameters theta and corresponding simulations x

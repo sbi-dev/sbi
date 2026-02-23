@@ -346,9 +346,9 @@ class BoxUniform(Independent):
         """
 
         # Type checks.
-        assert isinstance(low, Tensor) and isinstance(
-            high, Tensor
-        ), f"low and high must be tensors but are {type(low)} and {type(high)}."
+        assert isinstance(low, Tensor) and isinstance(high, Tensor), (
+            f"low and high must be tensors but are {type(low)} and {type(high)}."
+        )
         if not low.device == high.device:
             raise RuntimeError(
                 "Expected all tensors to be on the same device, but found at least"
@@ -510,6 +510,6 @@ def assert_not_nan_or_plus_inf(quantity: Tensor, description: str = "tensor") ->
     """Raise if tensor quantity contains any NaN or +Inf element."""
 
     msg = f"NaN/ +Inf present in {description}."
-    assert not (torch.isposinf(quantity).any()) and not (
-        torch.isnan(quantity).any()
-    ), msg
+    assert not (torch.isposinf(quantity).any()) and not (torch.isnan(quantity).any()), (
+        msg
+    )
