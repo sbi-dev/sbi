@@ -865,13 +865,17 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             t_max=t_max,
         )
 
-        # Warn once at construction if lognormal params cause excessive clamping.
-        # Computed analytically via the normal CDF (no sampling needed).
-        if train_schedule == "lognormal":
-            log_sigma_min = math.log(sigma_min)
-            log_sigma_max = math.log(sigma_max)
-            z_lo = (log_sigma_min - lognormal_mean) / lognormal_std
-            z_hi = (log_sigma_max - lognormal_mean) / lognormal_std
+        self._warn_on_inappropriate_config()
+
+    def _warn_on_inappropriate_config(self) -> None:
+        """Warn at construction time if config parameters cause known issues."""
+        if self._train_schedule_type == "lognormal":
+            # Analytically compute the fraction of lognormal samples that will
+            # be clamped to [sigma_min, sigma_max] via the normal CDF.
+            log_sigma_min = math.log(self.sigma_min)
+            log_sigma_max = math.log(self.sigma_max)
+            z_lo = (log_sigma_min - self.lognormal_mean) / self.lognormal_std
+            z_hi = (log_sigma_max - self.lognormal_mean) / self.lognormal_std
             frac_inside = 0.5 * (
                 math.erf(z_hi / math.sqrt(2)) - math.erf(z_lo / math.sqrt(2))
             )
@@ -879,11 +883,11 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             if frac_clamped > 0.05:
                 warnings.warn(
                     f"Lognormal schedule: ~{100 * frac_clamped:.1f}% of samples "
-                    f"will be clamped to [{sigma_min}, {sigma_max}]. "
-                    f"Consider adjusting lognormal_mean={lognormal_mean} or "
-                    f"lognormal_std={lognormal_std}.",
+                    f"will be clamped to [{self.sigma_min}, {self.sigma_max}]. "
+                    f"Consider adjusting lognormal_mean={self.lognormal_mean} or "
+                    f"lognormal_std={self.lognormal_std}.",
                     UserWarning,
-                    stacklevel=2,
+                    stacklevel=3,
                 )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:

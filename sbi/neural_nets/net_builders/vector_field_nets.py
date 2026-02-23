@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Literal, Optional, Sequence, Union
 
 import torch
@@ -27,32 +27,12 @@ from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 @dataclass
-class VectorFieldEstimatorConfig:
-    """Internal configuration that validates keyword arguments for vector field
-    estimator builders.
-
-    This dataclass captures all known keyword arguments accepted by
-    ``posterior_score_nn`` / ``posterior_flow_nn`` and forwarded to the underlying
-    estimator and network constructors.  Constructing an instance from user-supplied
-    ``**kwargs`` ensures that typos and unknown parameters raise ``TypeError``
-    immediately rather than being silently swallowed.
+class _VectorFieldBaseConfig:
+    """Shared configuration fields for all vector field estimator builders.
 
     Defaults are ``None`` so that only explicitly-set fields are forwarded — the
     actual default values live in the estimator / network constructors.
     """
-
-    # Score estimator: VE schedule params (Karras et al. 2022)
-    train_schedule: Optional[Literal["uniform", "lognormal"]] = None
-    solve_schedule: Optional[Literal["uniform", "power_law"]] = None
-    sigma_min: Optional[float] = None
-    sigma_max: Optional[float] = None
-    lognormal_mean: Optional[float] = None
-    lognormal_std: Optional[float] = None
-    power_law_exponent: Optional[float] = None
-
-    # Score estimator: VP / SubVP params
-    beta_min: Optional[float] = None
-    beta_max: Optional[float] = None
 
     # Network architecture extras (shared)
     activation: Optional[Any] = None
@@ -82,9 +62,51 @@ class VectorFieldEstimatorConfig:
     num_heads: Optional[int] = None
     mlp_ratio: Optional[int] = None
     embedding_net: Optional[Any] = None
+    time_emb_type: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        """Return only explicitly-set (non-``None``) fields as a dict."""
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+@dataclass
+class ScoreEstimatorConfig(_VectorFieldBaseConfig):
+    """Configuration for score-matching estimator builders (NPSE).
+
+    Extends the base config with SDE-specific parameters for VE, VP, and SubVP
+    noise schedules.  Constructing an instance from user-supplied ``**kwargs``
+    ensures that typos and unknown parameters raise ``TypeError`` immediately.
+    """
+
+    # VE schedule params (Karras et al. 2022)
+    train_schedule: Optional[Literal["uniform", "lognormal"]] = None
+    solve_schedule: Optional[Literal["uniform", "power_law"]] = None
+    sigma_min: Optional[float] = None
+    sigma_max: Optional[float] = None
+    lognormal_mean: Optional[float] = None
+    lognormal_std: Optional[float] = None
+    power_law_exponent: Optional[float] = None
+
+    # VP / SubVP params
+    beta_min: Optional[float] = None
+    beta_max: Optional[float] = None
+
+    # SDE type (forwarded through **kwargs at the factory level)
     sde_type: Optional[str] = None
     estimator_type: Optional[str] = None
-    time_emb_type: Optional[str] = None
+
+
+@dataclass
+class FlowEstimatorConfig(_VectorFieldBaseConfig):
+    """Configuration for flow-matching estimator builders (FMPE).
+
+    Currently identical to the base config.  Constructing an instance from
+    user-supplied ``**kwargs`` ensures that typos and unknown parameters raise
+    ``TypeError`` immediately — and that score-only parameters (e.g.
+    ``sigma_min``, ``beta_min``) are rejected early.
+    """
+
+    estimator_type: Optional[str] = None
 
 
 # ==================== Building Flow/Score Matching Estimators =========================
@@ -128,16 +150,14 @@ def build_vector_field_estimator(
             "transformer_cross_attention" or a custom network following the
             VectorFieldNet protocol.
         **kwargs: Additional arguments forwarded to the estimator and network
-            constructors.  Valid keys are defined by
-            ``VectorFieldEstimatorConfig``; unknown keys raise ``TypeError``.
+            constructors.  Valid keys are defined by ``ScoreEstimatorConfig``
+            and ``FlowEstimatorConfig``; validation happens in the upstream
+            factory functions (``posterior_score_nn`` / ``posterior_flow_nn``).
 
     Returns:
         A vector field estimator (either FlowMatchingEstimator or
         ConditionalScoreEstimator).
     """
-    # Validate kwargs against known fields — raises TypeError on typos.
-    VectorFieldEstimatorConfig(**kwargs)
-
     # Check inputs and device
     check_data_device(batch_x, batch_y)
 

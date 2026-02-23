@@ -30,7 +30,8 @@ from sbi.neural_nets.net_builders.flow import (
 from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
-    VectorFieldEstimatorConfig,
+    FlowEstimatorConfig,
+    ScoreEstimatorConfig,
     build_flow_matching_estimator,
     build_score_matching_estimator,
 )
@@ -393,49 +394,34 @@ def posterior_score_nn(
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
         **kwargs: Additional estimator / network arguments.  Valid keys are
-            defined by ``VectorFieldEstimatorConfig``; unknown keys raise
+            defined by ``ScoreEstimatorConfig``; unknown keys raise
             ``TypeError``.
 
     Returns:
         Constructor function for NPSE.
     """
-    # Validate extra kwargs against known fields — raises TypeError on typos.
-    VectorFieldEstimatorConfig(**kwargs)
-
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "z_score_y",
-                "hidden_features",
-                "num_layers",
-                "embedding_net",
-                "time_embedding_dim",
-                "time_emb_type",
-                "net",
-            ),
-            (
-                z_score_x,
-                z_score_theta,
-                hidden_features,
-                num_layers,
-                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-                t_embedding_dim,
-                time_emb_type,
-                model,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    # Map user-facing parameter names to internal names.
+    mapped = dict(
+        z_score_x=z_score_x,
+        z_score_y=z_score_theta,
+        hidden_features=hidden_features,
+        num_layers=num_layers,
+        embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
+        time_embedding_dim=t_embedding_dim,
+        time_emb_type=time_emb_type,
+        net=model,
     )
 
+    # Validate against known fields — raises TypeError on typos or
+    config = ScoreEstimatorConfig(**mapped, **kwargs)
+    builder_kwargs = config.to_dict()
+
     def build_fn(batch_theta, batch_x):
-        # Build the score matching estimator
         return build_score_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
             sde_type=sde_type,
-            **kwargs,
+            **builder_kwargs,
         )
 
     return build_fn
@@ -481,15 +467,12 @@ def posterior_flow_nn(
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
         **kwargs: Additional estimator / network arguments.  Valid keys are
-            defined by ``VectorFieldEstimatorConfig``; unknown keys raise
+            defined by ``FlowEstimatorConfig``; unknown keys raise
             ``TypeError``.
 
     Returns:
         Constructor function for FMPE.
     """
-    # Validate extra kwargs against known fields — raises TypeError on typos.
-    VectorFieldEstimatorConfig(**kwargs)
-
     if z_score_theta is not None:
         raise ValueError(
             "z_score_theta is not supported for FMPE. For simulator "
@@ -497,39 +480,27 @@ def posterior_flow_nn(
             "z-scoring the inputs manually beforehand."
         )
 
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "z_score_y",
-                "embedding_net",
-                "hidden_features",
-                "time_embedding_dim",
-                "time_emb_type",
-                "net",
-                "num_layers",
-            ),
-            (
-                z_score_x,
-                z_score_theta,
-                embedding_net,
-                hidden_features,
-                t_embedding_dim,
-                time_emb_type,
-                model,
-                num_layers,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    # Map user-facing parameter names to internal names.
+    mapped = dict(
+        z_score_x=z_score_x,
+        z_score_y=z_score_theta,
+        hidden_features=hidden_features,
+        num_layers=num_layers,
+        embedding_net=embedding_net,
+        time_embedding_dim=t_embedding_dim,
+        time_emb_type=time_emb_type,
+        net=model,
     )
 
+    # Validate against known fields — raises TypeError on typos or
+    config = FlowEstimatorConfig(**mapped, **kwargs)
+    builder_kwargs = config.to_dict()
+
     def build_fn(batch_theta, batch_x):
-        # Build the flow matching estimator
         return build_flow_matching_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
-            **kwargs,
+            **builder_kwargs,
         )
 
     return build_fn

@@ -237,7 +237,7 @@ def test_vfinference_with_different_models(vector_field_type, model):
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    estimator_build_fun = posterior_flow_nn(net=model)
+    estimator_build_fun = posterior_flow_nn(model=model)
 
     inference = vector_field_type(prior, vf_estimator=estimator_build_fun)
 
