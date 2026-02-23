@@ -9,7 +9,6 @@ from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.sbi_types import Shape
 
-
 FilterMode = Literal["knn", "first"]
 FilterFn = Callable[[Tensor, Tensor, Tensor, int], Tensor]
 FilterType = Union[FilterMode, FilterFn]
@@ -51,8 +50,8 @@ class FilteredDirectPosterior(DirectPosterior):
                 or a callable returning selected indices.
             filter_size: Maximum number of context points retained per observation.
         """
-        if filter_size < 1:
-            raise ValueError(f"filter_size must be greater than 0, got {filter_size}.")
+        if filter_size <= 1:
+            raise ValueError(f"filter_size must be greater than 1, got {filter_size}.")
 
         super().__init__(
             posterior_estimator=estimator,
@@ -171,8 +170,9 @@ class FilteredDirectPosterior(DirectPosterior):
     ) -> Tensor:
         """Batched sampling is not supported for observation-dependent filtering."""
         raise NotImplementedError(
-            "Filtering makes the context observation dependent. Batched inference requires"
-            " sharing context, which is currently not supported."
+            "Filtering makes the context observation dependent. "
+            "Batched inference requires sharing context, "
+            "which is currently not supported."
         )
 
     def log_prob(
@@ -215,8 +215,9 @@ class FilteredDirectPosterior(DirectPosterior):
     ) -> Tensor:
         """Batched log-probability is unsupported with per-observation filtering."""
         raise NotImplementedError(
-            "Filtering makes the context observation dependent. Batched inference requires"
-            " sharing context, which is currently not supported."
+            "Filtering makes the context observation dependent. "
+            "Batched inference requires sharing context, "
+            "which is currently not supported."
         )
 
     def map(
