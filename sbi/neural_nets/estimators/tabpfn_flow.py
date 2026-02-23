@@ -176,7 +176,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         joint_data = torch.cat([context_condition, context_input], dim=1)
 
         dim_condition = context_condition.shape[1]
-        features = condition_flat
+        autoregressive_inputs = condition_flat
         log_prob = torch.zeros(condition_flat.shape[0]) if with_log_prob else None
 
         for dim_idx in range(self._input_numel):
@@ -185,7 +185,9 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
             self._model.fit(joint_data[:, :features_end], joint_data[:, target_idx])
             pred_dist = self._model.predict(
-                features[:, :features_end], output_type="full", quantiles=[]
+                autoregressive_inputs[:, :features_end],
+                output_type="full",
+                quantiles=[],
             )
 
             sampled_dim = pred_dist["criterion"].sample(pred_dist["logits"])
@@ -205,12 +207,11 @@ class TabPFNFlow(ConditionalDensityEstimator):
                 )
                 log_prob += dim_log_prob
 
-            # TODO no handling of cuda stuff like we did before. Not sure if necessary still as TabPFN package is a lot more mature now.
+            autoregressive_inputs = torch.cat(
+                [autoregressive_inputs, sampled_dim[:, None]], dim=1
+            )
 
-            # TODO questionable name
-            features = torch.cat([features, sampled_dim[:, None]], dim=1)
-
-        return features[:, dim_condition:], log_prob
+        return autoregressive_inputs[:, dim_condition:], log_prob
 
     def log_prob(self, input: Tensor, condition: Tensor, eps: float = 1e-15) -> Tensor:
         r"""Return log probabilities of input given condition.
@@ -275,9 +276,25 @@ class TabPFNFlow(ConditionalDensityEstimator):
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, eps: float = 1e-15, **kwargs
     ) -> Tuple[Tensor, Tensor]:
+        sample_shape = torch.Size(sample_shape)
+        num_samples = sample_shape.numel()
+        condition_flat = self._embed_condition(condition)
+        batch_dim = condition.shape[0]
 
-        # TODO will somehow reuse the internal sample function
-        raise NotImplementedError
+        repeated_condition = condition_flat.repeat(num_samples, 1)
+
+        samples_flat, log_probs_flat = self._autoregressive_sample(
+            repeated_condition, with_log_prob=True, eps=eps
+        )
+        if log_probs_flat is None:
+            raise RuntimeError("Expected log probabilities when with_log_prob=True.")
+
+        samples = samples_flat.reshape((*sample_shape, batch_dim, *self.input_shape))
+        log_probs = log_probs_flat.reshape((*sample_shape, batch_dim))
+
+        return samples.to(device=condition.device), log_probs.to(
+            device=condition.device
+        )
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return loss for training."""
