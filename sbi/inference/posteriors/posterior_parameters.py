@@ -143,11 +143,13 @@ class FilteredDirectPosteriorParameters(PosteriorParameters):
         enable_transform: Whether to transform parameters to unconstrained space
             during MAP optimization. When False, an identity transform will be
             returned for `theta_transform`.
+            # TODO update docstring
     """
 
     max_sampling_batch_size: int = 10_000
     enable_transform: bool = True
     filter_size: int = 2048
+    filter_type: Union[Literal["knn", "first"], Callable] = "knn"
 
     def validate(self):
         """Validate DirectPosteriorParameters fields."""
@@ -155,8 +157,14 @@ class FilteredDirectPosteriorParameters(PosteriorParameters):
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
 
-        if not is_positive_int(self.filter_size - 1):
-            raise ValueError("filter_size must be greater than 1.")
+        if not is_positive_int(self.filter_size):
+            raise ValueError("filter_size must be greater than 0.")
+
+        if not (
+            (isinstance(self.filter_type, str) and self.filter_type in {"knn", "first"})
+            or callable(self.filter_type)
+        ):
+            raise ValueError("filtering must be one of ['knn', 'first'] or a callable.")
 
 
 @dataclass(frozen=True)

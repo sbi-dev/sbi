@@ -302,7 +302,9 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             direct_sampling_parameters: Additional kwargs passed to `DirectPosterior`.
             filtered_direct_sampling_parameters: Additional kwargs passed to
                 `FilteredDirectPosterior`. Context tensors are derived from stored
-                simulations and combined with these overrides.
+                simulations and combined with these overrides. Supported keys include
+                `filter_size` and `filtering` (`'knn'`, `'first'`, or a callable
+                returning indices).
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
