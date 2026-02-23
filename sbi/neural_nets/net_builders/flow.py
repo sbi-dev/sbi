@@ -1175,7 +1175,8 @@ def build_tabpfn_flow(
         Initialized `TabPFNFlow` with context set.
     """
 
-    # TODO this kinda makes sense for now, as a lot is handled by TABPFN anyway, so a good default the outer api is nothing in the case of NPE-PFN
+    # TODO This is a sensible default for now because TabPFN handles substantial
+    # preprocessing internally, so the outer API defaults to no x z-scoring for NPE-PFN.
     if z_score_x != "none":
         raise ValueError(
             "`build_tabpfn_flow` currently supports only `z_score_x='none'`, "

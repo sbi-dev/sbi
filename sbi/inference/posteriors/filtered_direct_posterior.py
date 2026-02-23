@@ -54,6 +54,7 @@ class FilteredDirectPosterior(DirectPosterior):
         self._full_context_condition = full_context_condition
 
     def _validate_filter_indices(self, indices: Tensor, num_context: int) -> Tensor:
+        """Validate and normalize context indices returned by a filter."""
 
         if indices.numel() < 2:
             raise ValueError("Filtering function must return at least two indices.")
@@ -138,8 +139,8 @@ class FilteredDirectPosterior(DirectPosterior):
         return_partial_on_timeout: bool = False,
     ) -> Tensor:
         raise NotImplementedError(
-            "Filtering makes the context data dependent. Batched inference requires"
-            "sharing context, which is currenlty not supported."
+            "Filtering makes the context observation dependent. Batched inference requires"
+            " sharing context, which is currently not supported."
         )
 
     def log_prob(
@@ -169,8 +170,8 @@ class FilteredDirectPosterior(DirectPosterior):
         leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
         raise NotImplementedError(
-            "Filtering makes the context data dependent. Batched inference requires"
-            "sharing context, which is currenlty not supported."
+            "Filtering makes the context observation dependent. Batched inference requires"
+            " sharing context, which is currently not supported."
         )
 
     def map(
@@ -186,7 +187,8 @@ class FilteredDirectPosterior(DirectPosterior):
         force_update=False,
     ):
         raise NotImplementedError(
-            "Computing the map requires gradients, which are currently not support for NPE-PFN."
+            "Computing the MAP requires gradients, which are currently not supported "
+            "for NPE-PFN."
         )
 
 

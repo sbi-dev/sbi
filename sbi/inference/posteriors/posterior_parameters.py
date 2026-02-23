@@ -134,16 +134,17 @@ class DirectPosteriorParameters(PosteriorParameters):
 
 @dataclass(frozen=True)
 class FilteredDirectPosteriorParameters(PosteriorParameters):
-    """
-    Parameters for initializing DirectPosterior.
+    """Parameters for initializing `FilteredDirectPosterior`.
 
     Fields:
-        max_sampling_batch_size: Batchsize of samples being drawn from
+        max_sampling_batch_size: Batchsize of samples drawn from
             the proposal at every iteration.
         enable_transform: Whether to transform parameters to unconstrained space
             during MAP optimization. When False, an identity transform will be
             returned for `theta_transform`.
-            # TODO update docstring
+        filter_size: Number of context simulations retained after filtering.
+        filter_type: Filtering strategy. Either `"knn"`, `"first"`, or a
+            callable returning context indices.
     """
 
     max_sampling_batch_size: int = 10_000
@@ -152,7 +153,7 @@ class FilteredDirectPosteriorParameters(PosteriorParameters):
     filter_type: Union[Literal["knn", "first"], Callable] = "knn"
 
     def validate(self):
-        """Validate DirectPosteriorParameters fields."""
+        """Validate `FilteredDirectPosteriorParameters` fields."""
 
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
@@ -164,7 +165,9 @@ class FilteredDirectPosteriorParameters(PosteriorParameters):
             (isinstance(self.filter_type, str) and self.filter_type in {"knn", "first"})
             or callable(self.filter_type)
         ):
-            raise ValueError("filtering must be one of ['knn', 'first'] or a callable.")
+            raise ValueError(
+                "filter_type must be one of ['knn', 'first'] or a callable."
+            )
 
 
 @dataclass(frozen=True)

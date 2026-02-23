@@ -49,79 +49,33 @@ from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
 
 class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
-    r"""Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019) [1].
+    r"""Neural Posterior Estimation with TabPFN (NPE-PFN).
 
-    NPE-C (also known as APT - Automatic Posterior Transformation, aka SNPE-C) trains
-    a neural network over multiple rounds to directly approximate the posterior for a
-    specific observation x_o. In the first round, NPE-C is equivalent to other NPE
-    methods and is fully amortized (direct inference for any new observation). After
-    the first round, NPE-C automatically selects between two loss variants depending
-    on the chosen density estimator: the non-atomic loss (for Mixture of Gaussians)
-    which is stable and avoids leakage, or the atomic loss (for flows) which is more
-    flexible but may suffer from leakage issues.
+    NPE-PFN is a training-free NPE variant based on in-context learning with
+    `TabPFNFlow`. Simulations are stored as context pairs `(theta, x)` and the
+    posterior is built directly from this context without gradient-based training.
 
-    For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
-    plain NLL loss.
-
-    [1] *Automatic Posterior Transformation for Likelihood-free Inference*,
-        Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
-
-    Example:
-    --------
-
-    ::
-
-        import torch
-        from sbi.inference import NPE_C
-        from sbi.utils import BoxUniform
-
-        # 1. Setup simulator, prior, and observation
-        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
-        x_o = torch.randn(1, 3)  # Observed data
-
-        def simulator(theta):
-            return theta + torch.randn_like(theta) * 0.1
-
-        # 2. Multi-round inference
-        inference = NPE_C(prior=prior)
-        proposal = prior
-
-        for round_idx in range(5):
-            theta = proposal.sample((100,))
-            x = simulator(theta)
-            density_estimator = inference.append_simulations(theta, x).train()
-            posterior = inference.build_posterior(density_estimator)
-            proposal = posterior.set_default_x(x_o)
-
-        # 3. Sample from final posterior
-        samples = posterior.sample((1000,), x=x_o)
+    The current implementation supports single-round inference only.
     """
 
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Optional[
-            ConditionalEstimatorBuilder[ConditionalDensityEstimator]
-        ] = None,
+        density_estimator: Optional[ConditionalEstimatorBuilder[TabPFNFlow]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Initialize NPE-C.
+        r"""Initialize NPE-PFN.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them.
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type (one of nsf, maf, mdn, made). Alternatively, a function
-                that builds a custom neural network, which adheres to
-                `ConditionalEstimatorBuilder` protocol can be provided. The function
-                will be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. The
-                density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
+            density_estimator: Optional custom builder for the density estimator.
+                When `None`, a `TabPFNFlow` estimator is constructed via `posterior_nn`.
+                Otherwise, a function that builds such a estimator needs to be provided.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -168,7 +122,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
     ) -> Self:
-        r"""Store parameters and simulation outputs to use them for later training.
+        r"""Store parameters and simulation outputs for posterior construction.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
 
@@ -194,7 +148,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 much VRAM can set to 'cpu' to store data on system memory instead.
 
         Returns:
-            VectorFieldTrainer object (returned so that this function is chainable).
+            `self` (returned so that this function is chainable).
         """
         inference_name = self.__class__.__name__
         assert proposal is None, (
@@ -248,7 +202,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         return self
 
     def train(self) -> None:
-        r"""NPE_PFN is training free!"""
+        r"""NPE-PFN is training-free and therefore has no training step."""
         pass
 
     def build_posterior(
@@ -272,51 +226,33 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         ] = None,
         discard_prior_samples=False,
     ) -> NeuralPosterior:
-        r"""Build posterior from the neural density estimator.
+        r"""Build a posterior from a `TabPFNFlow` estimator.
 
-        For SNPE, the posterior distribution that is returned here implements the
-        following functionality over the raw neural density estimator:
-        - correct the calculation of the log probability such that it compensates for
-            the leakage.
-        - reject samples that lie outside of the prior bounds.
-        - alternatively, if leakage is very high (which can happen for multi-round
-            SNPE), sample from the posterior with MCMC.
+        For `sample_with="filtered_direct"`, the returned posterior dynamically
+        filters the context for each queried observation before evaluating
+        probabilities or drawing samples.
 
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
-            sample_with: Method to use for sampling from the posterior. Must be one of
-                [`direct` | `filtered_direct` | `mcmc` | `rejection` | `vi` | `importance`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
-                `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
-                `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
-                numpy implementation of slice sampling. `slice_np_vectorized` is
-                identical to `slice_np`, but if `num_chains>1`, the chains are
-                vectorized for `slice_np_vectorized` whereas they are run sequentially
-                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
-                likewise the samplers ending on `_pymc` are using PyMC.
-            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
-                some of the methods admit a `mode seeking` property (e.g. rKL) whereas
-                some admit a `mass covering` one (e.g fKL).
+            sample_with: Method used for posterior sampling. One of
+                [`direct`, `filtered_direct`, `rejection`, `importance`].
             direct_sampling_parameters: Additional kwargs passed to `DirectPosterior`.
             filtered_direct_sampling_parameters: Additional kwargs passed to
                 `FilteredDirectPosterior`. Context tensors are derived from stored
                 simulations and combined with these overrides. Supported keys include
-                `filter_size` and `filtering` (`'knn'`, `'first'`, or a callable
+                `filter_size` and `filter_type` (`'knn'`, `'first'`, or a callable
                 returning indices).
-            mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
-            vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
             importance_sampling_parameters: Additional kwargs passed to
                 `ImportanceSamplingPosterior`.
             posterior_parameters: Configuration passed to the init method for the
                 posterior. Must be one of the following
-                - `VIPosteriorParameters`
                 - `ImportanceSamplingPosteriorParameters`
-                - `MCMCPosteriorParameters`
                 - `DirectPosteriorParameters`
+                - `FilteredDirectPosteriorParameters`
                 - `RejectionPosteriorParameters`
 
         Returns:
@@ -327,7 +263,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         if len(self._data_round_index) == 0:
             raise RuntimeError(
                 "No simulations found. You must call .append_simulations() "
-                "before calling building the NPE_PFN posterior."
+                "before building the NPE_PFN posterior."
             )
 
         start_idx = self._get_start_index(
@@ -373,8 +309,6 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             )
             return self._posterior
 
-        print(full_data_size)
-        print(estimator.max_context_size)
         if full_data_size > estimator.max_context_size:
             warn(
                 "Number of simulations exceeds context capacity. "
@@ -395,14 +329,13 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
 
     def _get_start_index(self, context: StartIndexContext) -> int:
         """
-        Determine the starting index for training based on previous rounds.
+        Determine the starting index for stored simulation rounds.
 
         Args:
-            context: StartIndexContext dataclass values used to determine the starting
-                index of the training set.
+            context: `StartIndexContext` values used to determine the starting
+                index in the stored simulation data.
         Returns:
-            The method will return 1 to skip samples from round 0; otherwise,
-            it returns 0.
+            `1` to skip round-0 samples, otherwise `0`.
         """
 
         # Load data from most recent round.
@@ -444,12 +377,12 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
 
     def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         raise NotImplementedError(
-            "NPE-PFN is training-free. Currenlty not implemented. Finetuning not yet supported."
+            "NPE-PFN is training-free. Fine-tuning is currently not implemented."
         )
 
     def _loss(self, *args, **kwargs) -> Tensor:
         raise NotImplementedError(
-            "NPE-PFN is training-free. Currenlty not implemented. Finetuning not yet supported."
+            "NPE-PFN is training-free. Fine-tuning is currently not implemented."
         )
 
     def _initialize_neural_network(self, retrain_from_scratch, start_idx):

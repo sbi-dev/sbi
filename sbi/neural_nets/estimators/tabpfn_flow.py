@@ -93,7 +93,6 @@ class TabPFNFlow(ConditionalDensityEstimator):
         r"""Public wrapper for preparing embedded, flattened conditions."""
         return self._embed_condition(condition)
 
-    # TODO double check if all of these make sense
     def set_context_flat(
         self,
         input_context_flat: Tensor,
@@ -156,7 +155,6 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
             bar_dist = pred_dist["criterion"]
             dim_log_prob = -bar_dist(
-                # move pred_dist["logits"] for sanity, but shoule be same device
                 pred_dist["logits"].to(bar_dist.borders.device),
                 test_joint[:, target_idx].to(bar_dist.borders.device),
             )
@@ -271,7 +269,6 @@ class TabPFNFlow(ConditionalDensityEstimator):
             repeated_condition, with_log_prob=False, eps=eps
         )
 
-        # samples_flat = samples_flat.reshape(num_samples, batch_dim, -1)
         samples = samples_flat.reshape((*sample_shape, batch_dim, *self.input_shape))
         return samples.to(device=condition.device)
 
@@ -286,5 +283,5 @@ class TabPFNFlow(ConditionalDensityEstimator):
         r"""Return loss for training."""
 
         raise NotImplementedError(
-            "Loss for potential finetuning is not implemented yet."
+            "Loss for potential fine-tuning is not implemented yet."
         )
