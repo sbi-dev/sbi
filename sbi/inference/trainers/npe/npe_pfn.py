@@ -4,6 +4,7 @@
 from copy import deepcopy
 from dataclasses import asdict
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
+from warnings import warn
 
 import torch
 from torch import Tensor, ones
@@ -252,10 +253,10 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
 
     def build_posterior(
         self,
-        density_estimator: Optional[ConditionalDensityEstimator] = None,
+        density_estimator: Optional[TabPFNFlow] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal[
-            "rejection", "importance", "direct", "filtered_direct"
+            "direct", "filtered_direct", "rejection", "importance"
         ] = "filtered_direct",
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
         filtered_direct_sampling_parameters: Optional[Dict[str, Any]] = None,
@@ -321,8 +322,6 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             (the returned log-probability is unnormalized).
         """
 
-        # TODO add much more logic here, such that train is basically without function
-
         if len(self._data_round_index) == 0:
             raise RuntimeError(
                 "No simulations found. You must call .append_simulations() "
@@ -335,9 +334,18 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             )
         )
 
-        self._initialize_neural_network(start_idx)
-        # TODO use this to return simulations, this saves the call later on. Based on them
-        # one can raise a warning for the other estimators.
+        full_theta, full_x, _ = self.get_simulations(starting_round=start_idx)
+        full_data_size = full_theta.shape[0]
+        if density_estimator is None:
+            self._neural_net = self._build_neural_net(
+                full_theta.to("cpu"), full_x.to("cpu")
+            )
+
+        estimator, device = self._resolve_estimator(density_estimator)
+        if not isinstance(estimator, TabPFNFlow):
+            raise TypeError(
+                f"Expected estimator to be TabPFNFlow, got {type(estimator).__name__}."
+            )
 
         if sample_with == "filtered_direct":
             full_context_input, full_context_condition, _ = self.get_simulations(
@@ -345,7 +353,6 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             )
 
             prior = self._resolve_prior(prior)
-            estimator, device = self._resolve_estimator(density_estimator)
             estimator = deepcopy(estimator)
 
             resolved_params = self._resolve_posterior_parameters(
@@ -354,15 +361,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 filtered_direct_sampling_parameters=filtered_direct_sampling_parameters,
             )
 
-            # TODO do we need this?
-            if not isinstance(estimator, TabPFNFlow):
-                raise TypeError(
-                    f"Expected estimator to be TabPFNFlow for 'filtered_direct', got "
-                    f"{type(estimator).__name__}."
-                )
-
             self._posterior = FilteredDirectPosterior(
-                posterior_estimator=estimator,
+                estimator=estimator,
                 prior=prior,
                 full_context_input=full_context_input,
                 full_context_condition=full_context_condition,
@@ -371,12 +371,18 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             )
             return self._posterior
 
-        self._check_prior_for_rejection_sampling(
-            prior, sample_with, posterior_parameters
-        )
+        print(full_data_size)
+        print(estimator.max_context_size)
+        if full_data_size > estimator.max_context_size:
+            warn(
+                "Number of simulations exceeds context capacity. "
+                f"Using only the first {estimator.max_context_size} of {full_data_size} "
+                "simulations.",
+                stacklevel=2,
+            )
 
         return super().build_posterior(
-            density_estimator,
+            estimator,
             prior,
             sample_with,
             posterior_parameters,
@@ -400,48 +406,10 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         # Load data from most recent round.
         self._round = max(self._data_round_index)
 
-        if self._round == 0 and self._neural_net is not None:
-            assert context.force_first_round_loss, (
-                # TODO adapt message
-                "You have already trained this neural network. After you had trained "
-                "the network, you again appended simulations with `append_simulations"
-                "(theta, x)`, but you did not provide a proposal. If the new "
-                "simulations are sampled from the prior, you can set "
-                "`.train(..., force_first_round_loss=True`). However, if the new "
-                "simulations were not sampled from the prior, you should pass the "
-                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
-                "your samples are not sampled from the prior and you do not pass a "
-                "proposal and you set `force_first_round_loss=True`, the result of "
-                "NPSE will not be the true posterior. Instead, it will be the proposal "
-                "posterior, which (usually) is more narrow than the true posterior."
-            )
-
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(context.discard_prior_samples and self._round > 0)
 
         return start_idx
-
-    def _initialize_neural_network(
-        self,
-        start_idx: int,
-    ) -> None:
-        """
-        Initialize the neural network.
-
-        Args:
-            start_idx: The index of the first round to retrieve simulation data from.
-        """
-
-        theta, x, _ = self.get_simulations(starting_round=start_idx)
-        x = x.to("cpu")
-        theta = theta.to("cpu")
-        self._neural_net = self._build_neural_net(theta, x)
-
-        theta = reshape_to_sample_batch_event(theta, self._neural_net.input_shape)
-        x = reshape_to_batch_event(x, self._neural_net.condition_shape)
-        test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
-
-        del theta, x
 
     def _get_potential_function(
         self,
@@ -482,47 +450,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             "NPE-PFN is training-free. Currenlty not implemented. Finetuning not yet supported."
         )
 
-    # TODO where to place this? this could be a general helper?
-    def _check_prior_for_rejection_sampling(
-        self,
-        prior: Optional[Distribution],
-        sample_with: Literal[
-            "mcmc",
-            "rejection",
-            "vi",
-            "importance",
-            "direct",
-            "filtered_direct",
-        ],
-        posterior_parameters: Optional[
-            Union[
-                DirectPosteriorParameters,
-                RejectionPosteriorParameters,
-                ImportanceSamplingPosteriorParameters,
-            ]
-        ],
-    ) -> None:
-        """
-        Validates that when using rejection sampling, a prior distribution
-        is explicitly provided.
-
-        Args:
-            prior: Prior distribution.
-            sample_with: The sampling method used. Must be one of
-                "mcmc", "rejection", "vi", "importance", "direct", or
-                "filtered_direct".
-            posterior_parameters: Configuration for building the posterior.
-        """
-
-        if (
-            sample_with == "rejection"
-            or isinstance(posterior_parameters, RejectionPosteriorParameters)
-        ) and prior is None:
-            raise ValueError(
-                "You indicated sampling via rejection sampling but "
-                "haven't passed a prior. As of sbi v0.23.0, you either have"
-                " to pass a prior to perform rejection sampling using the prior"
-                " as proposal, or to use the posterior as proposal, you have to"
-                " use a DirectPosterior via `sample_with='direct' or"
-                " `posterior_parameters=DirectPosteriorParameters`."
-            )
+    def _initialize_neural_network(self, retrain_from_scratch, start_idx):
+        raise NotImplementedError(
+            "NPE-PFN is based on in-context learning. The underlying density estimator will "
+            "automatically reflect updates to the training dataset after rebuilding the posterior."
+        )

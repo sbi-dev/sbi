@@ -23,6 +23,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         regressor_init_kwargs: Optional[Mapping] = None,
+        max_context_size: int = 10_000,
     ) -> None:
         super().__init__(
             net=nn.Identity(),
@@ -36,6 +37,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         self._regressor_init_kwargs = dict(regressor_init_kwargs or {})
         self._model = TabPFNRegressor(**self._regressor_init_kwargs)
 
+        self.max_context_size = int(max_context_size)
         self._input_numel = int(torch.Size(input_shape).numel())
         self.register_buffer("_context_input", None, persistent=False)
         self.register_buffer("_context_condition", None, persistent=False)
@@ -104,7 +106,12 @@ class TabPFNFlow(ConditionalDensityEstimator):
             condition_context_flat: Tensor of shape `(context_batch, condition_embed_numel)`.
         """
 
-        # TODO double check these conditions.
+        if input_context_flat.shape[0] > self.max_context_size:
+            raise ValueError(
+                "Context batch size exceeds the configured maximum in `set_context`: "
+                f"got {input_context_flat.shape[0]}, maximum is {self.max_context_size}."
+            )
+
         if input_context_flat.ndim != 2 or condition_context_flat.ndim != 2:
             raise ValueError(
                 "Expected 2D flattened context tensors for input and condition, but got "

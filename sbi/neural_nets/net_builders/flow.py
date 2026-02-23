@@ -1149,7 +1149,7 @@ def build_tabpfn_flow(
     ] = "independent",
     embedding_net: nn.Module = nn.Identity(),
     regressor_init_kwargs: Optional[dict] = None,
-    # TODO add max context size
+    max_context_size: int = 10_000,
     **kwargs,
 ) -> TabPFNFlow:
     r"""Build a TabPFN-based conditional density estimator.
@@ -1165,6 +1165,9 @@ def build_tabpfn_flow(
             If `embedding_net` is `nn.Identity`, this must be `none`.
         embedding_net: Optional embedding network for y.
         regressor_init_kwargs: Keyword arguments passed to `TabPFNRegressor`.
+        max_context_size: Maximum number of context samples stored in the estimator.
+            If `batch_x`/`batch_y` are larger, only the first `max_context_size`
+            samples are used.
         **kwargs: Additional keyword arguments passed by higher-level builders and
             ignored for TabPFN.
 
@@ -1185,10 +1188,13 @@ def build_tabpfn_flow(
         condition_shape=batch_y[0].shape,
         embedding_net=embedding_net,
         regressor_init_kwargs=regressor_init_kwargs,
-        # TODO add max context size here, enforce error if larger gets passed
+        max_context_size=max_context_size,
     )
-    # TODO set context with suppress warning.
-    flow.set_context(batch_x, batch_y)  # take the first max context size here
+
+    batch_x = batch_x[:max_context_size]
+    batch_y = batch_y[:max_context_size]
+
+    flow.set_context(batch_x, batch_y)
 
     return flow
 

@@ -70,7 +70,11 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
-from sbi.utils.torchutils import check_if_prior_on_device, process_device
+from sbi.utils.torchutils import (
+    check_if_prior_on_device,
+    process_device,
+    infer_module_device,
+)
 from sbi.utils.tracking import TensorBoardTracker
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
@@ -593,7 +597,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                     f" got {type(estimator).__name__}",
                 )
             # Otherwise, infer it from the device of the net parameters.
-            device = str(next(estimator.parameters()).device)
+            device = infer_module_device(estimator, "cpu")
 
         return estimator, device
 

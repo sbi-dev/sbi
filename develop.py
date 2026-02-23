@@ -12,7 +12,7 @@ two_moons_task = TwoMoons()
 prior = two_moons_task.get_prior()
 simulator = two_moons_task.get_simulator()
 
-theta_samples = prior.sample((1000,))
+theta_samples = prior.sample((48000,))
 sims = simulator(theta_samples)
 
 print(theta_samples.shape)
@@ -84,11 +84,11 @@ from sbi.neural_nets import posterior_nn
 estimator = posterior_nn("tabpfn", z_score_theta="none", z_score_x="none")
 # Given: parameters theta and corresponding simulations x
 inference = NPE_PFN(prior=prior, density_estimator=estimator)
-inference.append_simulations(theta_samples, sims).train()
+inference.append_simulations(theta_samples, sims)
 posterior = inference.build_posterior(
-    # sample_with="direct",
-    filtered_direct_sampling_parameters={"filter_size": 1000}
-    # direct_sampling_parameters={"max_sampling_batch_size": 1000},
+    sample_with="direct",
+    # filtered_direct_sampling_parameters={"filter_size": 1000}
+    direct_sampling_parameters={"max_sampling_batch_size": 1000},
 )
 
 # %%

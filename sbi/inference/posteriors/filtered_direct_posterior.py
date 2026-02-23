@@ -19,7 +19,7 @@ class FilteredDirectPosterior(DirectPosterior):
 
     def __init__(
         self,
-        posterior_estimator: TabPFNFlow,
+        estimator: TabPFNFlow,
         prior: Distribution,
         full_context_input: Tensor,
         full_context_condition: Tensor,
@@ -33,7 +33,7 @@ class FilteredDirectPosterior(DirectPosterior):
             raise ValueError(f"context_nn_k must be greater than 0, got {filter_size}.")
 
         super().__init__(
-            posterior_estimator=posterior_estimator,
+            posterior_estimator=estimator,
             prior=prior,
             max_sampling_batch_size=max_sampling_batch_size,
             device=device,
