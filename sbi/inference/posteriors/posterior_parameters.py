@@ -157,8 +157,8 @@ class FilteredDirectPosteriorParameters(PosteriorParameters):
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
 
-        if not is_positive_int(self.filter_size):
-            raise ValueError("filter_size must be greater than 0.")
+        if not is_positive_int(self.filter_size - 1):
+            raise ValueError("filter_size must be greater than 1.")
 
         if not (
             (isinstance(self.filter_type, str) and self.filter_type in {"knn", "first"})
