@@ -1,3 +1,4 @@
+import logging
 from typing import Mapping, Optional, Tuple
 
 import torch
@@ -7,6 +8,9 @@ from torch import Tensor, nn
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 from sbi.sbi_types import Shape
+
+_HAS_LOGGED_TABPFN_LICENSE: bool = False
+logger = logging.getLogger(__name__)
 
 
 class TabPFNFlow(ConditionalDensityEstimator):
@@ -23,7 +27,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         regressor_init_kwargs: Optional[Mapping] = None,
-        max_context_size: int = 10_000,
+        max_context_size: int = 50_000,
     ) -> None:
         r"""Initialize a TabPFN-based conditional density estimator.
 
@@ -47,6 +51,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         )
         self._regressor_init_kwargs = dict(regressor_init_kwargs or {})
         self._model = TabPFNRegressor(**self._regressor_init_kwargs)
+        self._log_license()
 
         self.max_context_size = int(max_context_size)
         self._input_numel = int(torch.Size(input_shape).numel())
@@ -358,3 +363,14 @@ class TabPFNFlow(ConditionalDensityEstimator):
         raise NotImplementedError(
             "Loss for potential fine-tuning is not implemented yet."
         )
+
+    def _log_license(self) -> None:
+        global _HAS_LOGGED_TABPFN_LICENSE
+        if not _HAS_LOGGED_TABPFN_LICENSE:
+            logger.warning(
+                "TabPFN-2.5 is a NONCOMMERCIAL model. "
+                "Usage of this artifact (including through the sbi package) "
+                "is not permitted for commercial tasks unless granted "
+                "explicit permission by the model authors (PriorLabs)."
+            )  # Aligning with TabPFNv25 license
+            _HAS_LOGGED_TABPFN_LICENSE = True
