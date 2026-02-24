@@ -17,7 +17,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
     
     
       
@@ -595,10 +595,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sbi.neural_nets.factory.flowmatching_nn" class="md-nav__link">
+  <a href="#sbi.neural_nets.factory.posterior_score_nn" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;flowmatching_nn
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;posterior_score_nn
       
     </span>
   </a>
@@ -606,10 +606,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sbi.neural_nets.factory.posterior_score_nn" class="md-nav__link">
+  <a href="#sbi.neural_nets.factory.posterior_flow_nn" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;posterior_score_nn
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;posterior_flow_nn
       
     </span>
   </a>
@@ -913,8 +913,7 @@ Ignored if density estimator is not an mdn.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">237</span>
-<span class="normal">238</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">238</span>
 <span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
@@ -1018,7 +1017,8 @@ Ignored if density estimator is not an mdn.</p>
 <span class="normal">339</span>
 <span class="normal">340</span>
 <span class="normal">341</span>
-<span class="normal">342</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">posterior_nn</span><span class="p">(</span>
+<span class="normal">342</span>
+<span class="normal">343</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">posterior_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;independent&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">,</span> <span class="s2">&quot;transform_to_unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
@@ -1319,8 +1319,7 @@ Ignored if density estimator is not an mdn.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">158</span>
-<span class="normal">159</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">159</span>
 <span class="normal">160</span>
 <span class="normal">161</span>
 <span class="normal">162</span>
@@ -1395,7 +1394,8 @@ Ignored if density estimator is not an mdn.</p>
 <span class="normal">231</span>
 <span class="normal">232</span>
 <span class="normal">233</span>
-<span class="normal">234</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">likelihood_nn</span><span class="p">(</span>
+<span class="normal">234</span>
+<span class="normal">235</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">likelihood_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;independent&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">,</span> <span class="s2">&quot;transform_to_unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
@@ -1634,8 +1634,7 @@ simulation outputs.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 79</span>
-<span class="normal"> 80</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 80</span>
 <span class="normal"> 81</span>
 <span class="normal"> 82</span>
 <span class="normal"> 83</span>
@@ -1710,7 +1709,8 @@ simulation outputs.</p>
 <span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
-<span class="normal">155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classifier_nn</span><span class="p">(</span>
+<span class="normal">155</span>
+<span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">classifier_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;independent&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">,</span> <span class="s2">&quot;transform_to_unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
@@ -1796,346 +1796,8 @@ simulation outputs.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="sbi.neural_nets.factory.flowmatching_nn" class="doc doc-heading">
-            <code class=" language-python"><span class="n">flowmatching_nn</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">z_score_theta</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">num_layers</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">num_blocks</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">num_frequencies</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
-
-<a href="#sbi.neural_nets.factory.flowmatching_nn" class="headerlink" title="Permanent link">&para;</a></h2>
-
-
-    <div class="doc doc-contents first">
-
-        <p>Returns a function that builds a neural net that can act as
-a vector field estimator for Flow Matching. This function will usually
-be used for Flow Matching. The returned function is to be passed to the</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>model</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>the type of regression network to learn the vector field. One of [&lsquo;mlp&rsquo;,
-&lsquo;resnet&rsquo;].</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>z_score_theta</code>
-            </td>
-            <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Literal">Literal</span>[&#39;independent&#39;, &#39;structured&#39;, &#39;transform_to_unconstrained&#39;, &#39;none&#39;]]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to z-score parameters <span class="arithmatex">\(\theta\)</span> before passing them into
-the network, can take one of the following:
-- <code>none</code>, or None: do not z-score.
-- <code>independent</code>: z-score each dimension independently.
-- <code>structured</code>: treat dimensions as related, therefore compute mean and std
-over the entire batch, instead of per-dimension. Should be used when each
-sample is, for example, a time series or an image.</p>
-              </div>
-            </td>
-            <td>
-                  <code>&#39;independent&#39;</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>z_score_x</code>
-            </td>
-            <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Literal">Literal</span>[&#39;independent&#39;, &#39;structured&#39;, &#39;transform_to_unconstrained&#39;, &#39;none&#39;]]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to z-score simulation outputs <span class="arithmatex">\(x\)</span> before passing them into
-the network, same options as z_score_theta.</p>
-              </div>
-            </td>
-            <td>
-                  <code>&#39;independent&#39;</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>hidden_features</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Number of hidden features.</p>
-              </div>
-            </td>
-            <td>
-                  <code>64</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>num_layers</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Number of transforms when a flow is used. Only relevant if
-density estimator is a normalizing flow (i.e. currently either a <code>maf</code> or a
-<code>nsf</code>). Ignored if density estimator is a <code>mdn</code> or <code>made</code>.</p>
-              </div>
-            </td>
-            <td>
-                  <code>5</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>num_blocks</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Number of blocks if a ResNet is used.</p>
-              </div>
-            </td>
-            <td>
-                  <code>5</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>num_frequencies</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Number of frequencies for the time embedding.</p>
-              </div>
-            </td>
-            <td>
-                  <code>3</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>embedding_net</code>
-            </td>
-            <td>
-                  <code><span title="torch.nn.Module">Module</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Optional embedding network for the condition.</p>
-              </div>
-            </td>
-            <td>
-                  <code><span title="torch.nn.Identity">Identity</span>()</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>kwargs</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>additional custom arguments passed to downstream build functions.</p>
-              </div>
-            </td>
-            <td>
-                  <code>{}</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">455</span>
-<span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span>
-<span class="normal">459</span>
-<span class="normal">460</span>
-<span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
-<span class="normal">464</span>
-<span class="normal">465</span>
-<span class="normal">466</span>
-<span class="normal">467</span>
-<span class="normal">468</span>
-<span class="normal">469</span>
-<span class="normal">470</span>
-<span class="normal">471</span>
-<span class="normal">472</span>
-<span class="normal">473</span>
-<span class="normal">474</span>
-<span class="normal">475</span>
-<span class="normal">476</span>
-<span class="normal">477</span>
-<span class="normal">478</span>
-<span class="normal">479</span>
-<span class="normal">480</span>
-<span class="normal">481</span>
-<span class="normal">482</span>
-<span class="normal">483</span>
-<span class="normal">484</span>
-<span class="normal">485</span>
-<span class="normal">486</span>
-<span class="normal">487</span>
-<span class="normal">488</span>
-<span class="normal">489</span>
-<span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span>
-<span class="normal">497</span>
-<span class="normal">498</span>
-<span class="normal">499</span>
-<span class="normal">500</span>
-<span class="normal">501</span>
-<span class="normal">502</span>
-<span class="normal">503</span>
-<span class="normal">504</span>
-<span class="normal">505</span>
-<span class="normal">506</span>
-<span class="normal">507</span>
-<span class="normal">508</span>
-<span class="normal">509</span>
-<span class="normal">510</span>
-<span class="normal">511</span>
-<span class="normal">512</span>
-<span class="normal">513</span>
-<span class="normal">514</span>
-<span class="normal">515</span>
-<span class="normal">516</span>
-<span class="normal">517</span>
-<span class="normal">518</span>
-<span class="normal">519</span>
-<span class="normal">520</span>
-<span class="normal">521</span>
-<span class="normal">522</span>
-<span class="normal">523</span>
-<span class="normal">524</span>
-<span class="normal">525</span>
-<span class="normal">526</span>
-<span class="normal">527</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">flowmatching_nn</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;independent&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">,</span> <span class="s2">&quot;transform_to_unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
-    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
-    <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
-        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;independent&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">,</span> <span class="s2">&quot;transform_to_unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
-    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
-    <span class="n">hidden_features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">64</span><span class="p">,</span>
-    <span class="n">num_layers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
-    <span class="n">num_blocks</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
-    <span class="n">num_frequencies</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
-    <span class="n">embedding_net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns a function that builds a neural net that can act as</span>
-<span class="sd">    a vector field estimator for Flow Matching. This function will usually</span>
-<span class="sd">    be used for Flow Matching. The returned function is to be passed to the</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        model: the type of regression network to learn the vector field. One of [&#39;mlp&#39;,</span>
-<span class="sd">            &#39;resnet&#39;].</span>
-<span class="sd">        z_score_theta: Whether to z-score parameters $\theta$ before passing them into</span>
-<span class="sd">            the network, can take one of the following:</span>
-<span class="sd">            - `none`, or None: do not z-score.</span>
-<span class="sd">            - `independent`: z-score each dimension independently.</span>
-<span class="sd">            - `structured`: treat dimensions as related, therefore compute mean and std</span>
-<span class="sd">            over the entire batch, instead of per-dimension. Should be used when each</span>
-<span class="sd">            sample is, for example, a time series or an image.</span>
-<span class="sd">        z_score_x: Whether to z-score simulation outputs $x$ before passing them into</span>
-<span class="sd">            the network, same options as z_score_theta.</span>
-<span class="sd">        hidden_features: Number of hidden features.</span>
-<span class="sd">        num_layers: Number of transforms when a flow is used. Only relevant if</span>
-<span class="sd">            density estimator is a normalizing flow (i.e. currently either a `maf` or a</span>
-<span class="sd">            `nsf`). Ignored if density estimator is a `mdn` or `made`.</span>
-<span class="sd">        num_blocks: Number of blocks if a ResNet is used.</span>
-<span class="sd">        num_frequencies: Number of frequencies for the time embedding.</span>
-<span class="sd">        embedding_net: Optional embedding network for the condition.</span>
-<span class="sd">        kwargs: additional custom arguments passed to downstream build functions.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># NOTE: I keep this function because it was used in the documentation notebook</span>
-    <span class="c1"># examples.</span>
-    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-        <span class="s2">&quot;flowmatching_nn is deprecated and will be removed in a future release. &quot;</span>
-        <span class="s2">&quot;Please use posterior_flow_nn or the new vector field estimator builders &quot;</span>
-        <span class="s2">&quot;instead.&quot;</span><span class="p">,</span>
-        <span class="ne">FutureWarning</span><span class="p">,</span>
-        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="n">implemented_models</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;resnet&quot;</span><span class="p">]</span>
-
-    <span class="k">if</span> <span class="n">model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">implemented_models</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Model </span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2"> in not implemented for FMPE&quot;</span><span class="p">)</span>
-
-    <span class="n">model_str</span> <span class="o">=</span> <span class="n">model</span> <span class="o">+</span> <span class="s2">&quot;_flowmatcher&quot;</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">model_builders</span><span class="p">[</span><span class="n">model_str</span><span class="p">](</span>
-            <span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span>
-            <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span>
-            <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_theta</span><span class="p">,</span>
-            <span class="n">z_score_y</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
-            <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-            <span class="n">num_layers</span><span class="o">=</span><span class="n">num_layers</span><span class="p">,</span>
-            <span class="n">num_blocks</span><span class="o">=</span><span class="n">num_blocks</span><span class="p">,</span>
-            <span class="n">num_freqs</span><span class="o">=</span><span class="n">num_frequencies</span><span class="p">,</span>
-            <span class="n">embedding_net</span><span class="o">=</span><span class="n">check_net_device</span><span class="p">(</span>
-                <span class="n">embedding_net</span><span class="p">,</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="n">embedding_net_warn_msg</span>
-            <span class="p">),</span>
-            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-        <span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">build_fn</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h2 id="sbi.neural_nets.factory.posterior_score_nn" class="doc doc-heading">
-            <code class=" language-python"><span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s1">&#39;ve&#39;</span><span class="p">,</span> <span class="n">z_score_theta</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">num_layers</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">time_emb_type</span><span class="o">=</span><span class="s1">&#39;sinusoidal&#39;</span><span class="p">,</span> <span class="n">t_embedding_dim</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">score_net_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s1">&#39;ve&#39;</span><span class="p">,</span> <span class="n">z_score_theta</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">num_layers</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">time_emb_type</span><span class="o">=</span><span class="s1">&#39;sinusoidal&#39;</span><span class="p">,</span> <span class="n">t_embedding_dim</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 <a href="#sbi.neural_nets.factory.posterior_score_nn" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -2304,6 +1966,24 @@ nn.Identity().</p>
                   <code>32</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional estimator / network arguments.  Valid keys are
+defined by <code>ScoreEstimatorConfig</code>; unknown keys raise
+<code>TypeError</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -2333,8 +2013,7 @@ nn.Identity().</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">345</span>
-<span class="normal">346</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">346</span>
 <span class="normal">347</span>
 <span class="normal">348</span>
 <span class="normal">349</span>
@@ -2415,31 +2094,7 @@ nn.Identity().</p>
 <span class="normal">424</span>
 <span class="normal">425</span>
 <span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
-<span class="normal">429</span>
-<span class="normal">430</span>
-<span class="normal">431</span>
-<span class="normal">432</span>
-<span class="normal">433</span>
-<span class="normal">434</span>
-<span class="normal">435</span>
-<span class="normal">436</span>
-<span class="normal">437</span>
-<span class="normal">438</span>
-<span class="normal">439</span>
-<span class="normal">440</span>
-<span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">posterior_score_nn</span><span class="p">(</span>
+<span class="normal">427</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">posterior_score_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
         <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
         <span class="n">VectorFieldNet</span><span class="p">,</span>
@@ -2456,12 +2111,6 @@ nn.Identity().</p>
     <span class="n">embedding_net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
     <span class="n">time_emb_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;sinusoidal&quot;</span><span class="p">,</span> <span class="s2">&quot;fourier&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;sinusoidal&quot;</span><span class="p">,</span>
     <span class="n">t_embedding_dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
-    <span class="n">score_net_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
-        <span class="n">Union</span><span class="p">[</span>
-            <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
-            <span class="n">VectorFieldNet</span><span class="p">,</span>
-        <span class="p">]</span>
-    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Build util function that builds a ScoreEstimator object for score-based</span>
@@ -2495,54 +2144,404 @@ nn.Identity().</p>
 <span class="sd">            nn.Identity().</span>
 <span class="sd">        time_emb_type: Type of time embedding. Defaults to &#39;sinusoidal&#39;.</span>
 <span class="sd">        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.</span>
+<span class="sd">        **kwargs: Additional estimator / network arguments.  Valid keys are</span>
+<span class="sd">            defined by ``ScoreEstimatorConfig``; unknown keys raise</span>
+<span class="sd">            ``TypeError``.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Constructor function for NPSE.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="k">if</span> <span class="n">score_net_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="n">score_net_type</span>
-        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-            <span class="s2">&quot;score_net_type is deprecated and will be removed in a future release. &quot;</span>
-            <span class="s2">&quot;Please use model instead.&quot;</span><span class="p">,</span>
-            <span class="ne">DeprecationWarning</span><span class="p">,</span>
-            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-        <span class="p">)</span>
-
-    <span class="n">kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
-        <span class="nb">zip</span><span class="p">(</span>
-            <span class="p">(</span>
-                <span class="s2">&quot;z_score_x&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;z_score_y&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;hidden_features&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;num_layers&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;embedding_net&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;time_embedding_dim&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;time_emb_type&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;net&quot;</span><span class="p">,</span>
-            <span class="p">),</span>
-            <span class="p">(</span>
-                <span class="n">z_score_x</span><span class="p">,</span>
-                <span class="n">z_score_theta</span><span class="p">,</span>
-                <span class="n">hidden_features</span><span class="p">,</span>
-                <span class="n">num_layers</span><span class="p">,</span>
-                <span class="n">check_net_device</span><span class="p">(</span><span class="n">embedding_net</span><span class="p">,</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="n">embedding_net_warn_msg</span><span class="p">),</span>
-                <span class="n">t_embedding_dim</span><span class="p">,</span>
-                <span class="n">time_emb_type</span><span class="p">,</span>
-                <span class="n">model</span><span class="p">,</span>
-            <span class="p">),</span>
-            <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="p">),</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="c1"># Map user-facing parameter names to internal names.</span>
+    <span class="n">mapped</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
+        <span class="n">z_score_y</span><span class="o">=</span><span class="n">z_score_theta</span><span class="p">,</span>
+        <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
+        <span class="n">num_layers</span><span class="o">=</span><span class="n">num_layers</span><span class="p">,</span>
+        <span class="n">embedding_net</span><span class="o">=</span><span class="n">check_net_device</span><span class="p">(</span><span class="n">embedding_net</span><span class="p">,</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="n">embedding_net_warn_msg</span><span class="p">),</span>
+        <span class="n">time_embedding_dim</span><span class="o">=</span><span class="n">t_embedding_dim</span><span class="p">,</span>
+        <span class="n">time_emb_type</span><span class="o">=</span><span class="n">time_emb_type</span><span class="p">,</span>
+        <span class="n">net</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
     <span class="p">)</span>
 
+    <span class="c1"># Validate against known fields — raises TypeError on typos or</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">ScoreEstimatorConfig</span><span class="p">(</span><span class="o">**</span><span class="n">mapped</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">builder_kwargs</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
-        <span class="c1"># Build the score matching estimator</span>
         <span class="k">return</span> <span class="n">build_score_matching_estimator</span><span class="p">(</span>
             <span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span>
             <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span>
             <span class="n">sde_type</span><span class="o">=</span><span class="n">sde_type</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">builder_kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">build_fn</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="sbi.neural_nets.factory.posterior_flow_nn" class="doc doc-heading">
+            <code class=" language-python"><span class="n">posterior_flow_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">z_score_theta</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">num_layers</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">time_emb_type</span><span class="o">=</span><span class="s1">&#39;sinusoidal&#39;</span><span class="p">,</span> <span class="n">t_embedding_dim</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+<a href="#sbi.neural_nets.factory.posterior_flow_nn" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Build util function that builds a FlowMatchingEstimator object for flow-based
+posteriors.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>model</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="typing.Literal">Literal</span>[&#39;mlp&#39;, &#39;ada_mlp&#39;, &#39;transformer&#39;, &#39;transformer_cross_attn&#39;], <span title="sbi.utils.vector_field_utils.VectorFieldNet">VectorFieldNet</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Type of regression network. One of:
+- &lsquo;mlp&rsquo;: Fully connected feed-forward network.
+- &lsquo;ada_mlp&rsquo;: Fully connected feed-forward with adaptive
+    layer normalization for conditioning.
+- &lsquo;transformer&rsquo;: Transformer network.
+- &lsquo;transformer_cross_attention&rsquo;: Transformer with cross-attention.
+-  nn.Module: Custom network
+Defaults to &lsquo;mlp&rsquo;.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;mlp&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>z_score_theta</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Literal">Literal</span>[&#39;independent&#39;, &#39;structured&#39;, &#39;transform_to_unconstrained&#39;, &#39;none&#39;]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>This is not supported for FMPE and will raise an error.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>z_score_x</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Literal">Literal</span>[&#39;independent&#39;, &#39;structured&#39;, &#39;transform_to_unconstrained&#39;, &#39;none&#39;]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to z-score xs passing into the network, same options as
+z_score_theta.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;independent&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hidden_features</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of hidden units per layer. Defaults to 50.</p>
+              </div>
+            </td>
+            <td>
+                  <code>100</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>num_layers</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of hidden layers. Defaults to 5.</p>
+              </div>
+            </td>
+            <td>
+                  <code>5</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>embedding_net</code>
+            </td>
+            <td>
+                  <code><span title="torch.nn.Module">Module</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Embedding network for x (conditioning variable). Defaults to
+nn.Identity().</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="torch.nn.Identity">Identity</span>()</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>time_emb_type</code>
+            </td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;sinusoidal&#39;, &#39;fourier&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Type of time embedding. Defaults to &lsquo;sinusoidal&rsquo;.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;sinusoidal&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t_embedding_dim</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Embedding dimension of diffusion time. Defaults to 32.</p>
+              </div>
+            </td>
+            <td>
+                  <code>32</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional estimator / network arguments.  Valid keys are
+defined by <code>FlowEstimatorConfig</code>; unknown keys raise
+<code>TypeError</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Callable">Callable</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Constructor function for FMPE.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>sbi/neural_nets/factory.py</code></summary>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">posterior_flow_nn</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
+        <span class="n">VectorFieldNet</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
+    <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;independent&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">,</span> <span class="s2">&quot;transform_to_unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;independent&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">,</span> <span class="s2">&quot;transform_to_unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
+    <span class="n">hidden_features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+    <span class="n">num_layers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="n">embedding_net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
+    <span class="n">time_emb_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;sinusoidal&quot;</span><span class="p">,</span> <span class="s2">&quot;fourier&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;sinusoidal&quot;</span><span class="p">,</span>
+    <span class="n">t_embedding_dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build util function that builds a FlowMatchingEstimator object for flow-based</span>
+<span class="sd">    posteriors.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        model: Type of regression network. One of:</span>
+<span class="sd">            - &#39;mlp&#39;: Fully connected feed-forward network.</span>
+<span class="sd">            - &#39;ada_mlp&#39;: Fully connected feed-forward with adaptive</span>
+<span class="sd">                layer normalization for conditioning.</span>
+<span class="sd">            - &#39;transformer&#39;: Transformer network.</span>
+<span class="sd">            - &#39;transformer_cross_attention&#39;: Transformer with cross-attention.</span>
+<span class="sd">            -  nn.Module: Custom network</span>
+<span class="sd">            Defaults to &#39;mlp&#39;.</span>
+<span class="sd">        z_score_theta: This is not supported for FMPE and will raise an error.</span>
+<span class="sd">        z_score_x: Whether to z-score xs passing into the network, same options as</span>
+<span class="sd">            z_score_theta.</span>
+<span class="sd">        hidden_features: Number of hidden units per layer. Defaults to 50.</span>
+<span class="sd">        num_layers: Number of hidden layers. Defaults to 5.</span>
+<span class="sd">        embedding_net: Embedding network for x (conditioning variable). Defaults to</span>
+<span class="sd">            nn.Identity().</span>
+<span class="sd">        time_emb_type: Type of time embedding. Defaults to &#39;sinusoidal&#39;.</span>
+<span class="sd">        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.</span>
+<span class="sd">        **kwargs: Additional estimator / network arguments.  Valid keys are</span>
+<span class="sd">            defined by ``FlowEstimatorConfig``; unknown keys raise</span>
+<span class="sd">            ``TypeError``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Constructor function for FMPE.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">z_score_theta</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;z_score_theta is not supported for FMPE. For simulator &quot;</span>
+            <span class="s2">&quot;parameters with highly different scales, we recommend &quot;</span>
+            <span class="s2">&quot;z-scoring the inputs manually beforehand.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Map user-facing parameter names to internal names.</span>
+    <span class="n">mapped</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
+        <span class="n">z_score_y</span><span class="o">=</span><span class="n">z_score_theta</span><span class="p">,</span>
+        <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
+        <span class="n">num_layers</span><span class="o">=</span><span class="n">num_layers</span><span class="p">,</span>
+        <span class="n">embedding_net</span><span class="o">=</span><span class="n">embedding_net</span><span class="p">,</span>
+        <span class="n">time_embedding_dim</span><span class="o">=</span><span class="n">t_embedding_dim</span><span class="p">,</span>
+        <span class="n">time_emb_type</span><span class="o">=</span><span class="n">time_emb_type</span><span class="p">,</span>
+        <span class="n">net</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Validate against known fields — raises TypeError on typos or</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">FlowEstimatorConfig</span><span class="p">(</span><span class="o">**</span><span class="n">mapped</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">builder_kwargs</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">build_flow_matching_estimator</span><span class="p">(</span>
+            <span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span>
+            <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">builder_kwargs</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">build_fn</span>

@@ -17,7 +17,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
     
     
       
@@ -6264,7 +6264,6 @@ samples = posterior.sample((1000,), x=x_o)
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">tracker</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tracker</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialization method for the FMPE class.</span>
 
@@ -6275,8 +6274,9 @@ samples = posterior.sample((1000,), x=x_o)
 <span class="sd">                &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
 <span class="sd">                the `ConditionalEstimatorBuilder` protocol with `__call__` that receives</span>
 <span class="sd">                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
-<span class="sd">            density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a</span>
-<span class="sd">                warning is raised and the `vf_estimator=&quot;mlp&quot;` default is used.</span>
+<span class="sd">                To configure estimator-level options, use `posterior_flow_nn` to</span>
+<span class="sd">                build a custom callable and pass it here.</span>
+<span class="sd">            density_estimator: Deprecated. Use `vf_estimator` instead.</span>
 <span class="sd">            device: Device to use for training.</span>
 <span class="sd">            logging_level: Logging level.</span>
 <span class="sd">            summary_writer: Deprecated alias for the TensorBoard summary writer.</span>
@@ -6284,8 +6284,6 @@ samples = posterior.sample((1000,), x=x_o)
 <span class="sd">            tracker: Tracking adapter used to log training metrics. If None, a</span>
 <span class="sd">                TensorBoard tracker is used with a default log directory.</span>
 <span class="sd">            show_progress_bars: Whether to show progress bars.</span>
-<span class="sd">            **kwargs: Additional keyword arguments passed to the default builder if</span>
-<span class="sd">                `density_estimator` is a string.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -6305,8 +6303,11 @@ samples = posterior.sample((1000,), x=x_o)
             <span class="n">tracker</span><span class="o">=</span><span class="n">tracker</span><span class="p">,</span>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
             <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
+
+        <span class="c1"># When vf_estimator is a string, build the default neural net.</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vf_estimator</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_default_nn_fn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6357,9 +6358,8 @@ samples = posterior.sample((1000,), x=x_o)
     <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="n">posterior_flow_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">posterior_flow_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6380,7 +6380,7 @@ samples = posterior.sample((1000,), x=x_o)
 
 
 <h3 id="sbi.inference.trainers.vfpe.fmpe.FMPE.__init__" class="doc doc-heading">
-            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tracker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tracker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.trainers.vfpe.fmpe.FMPE.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -6430,7 +6430,9 @@ samples = posterior.sample((1000,), x=x_o)
 vector field estimator. Can be a string (e.g. &lsquo;mlp&rsquo;, &lsquo;ada_mlp&rsquo;,
 &lsquo;transformer&rsquo; or &lsquo;transformer_cross_attn&rsquo;) or a callable that implements
 the <code>ConditionalEstimatorBuilder</code> protocol with <code>__call__</code> that receives
-<code>theta</code> and <code>x</code> and returns a <code>ConditionalVectorFieldEstimator</code>.</p>
+<code>theta</code> and <code>x</code> and returns a <code>ConditionalVectorFieldEstimator</code>.
+To configure estimator-level options, use <code>posterior_flow_nn</code> to
+build a custom callable and pass it here.</p>
               </div>
             </td>
             <td>
@@ -6446,8 +6448,7 @@ the <code>ConditionalEstimatorBuilder</code> protocol with <code>__call__</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Deprecated. Use <code>vf_estimator</code> instead. When passed, a
-warning is raised and the <code>vf_estimator="mlp"</code> default is used.</p>
+                <p>Deprecated. Use <code>vf_estimator</code> instead.</p>
               </div>
             </td>
             <td>
@@ -6536,22 +6537,6 @@ TensorBoard tracker is used with a default log directory.</p>
                   <code>True</code>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>**kwargs</code>
-            </td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Additional keyword arguments passed to the default builder if
-<code>density_estimator</code> is a string.</p>
-              </div>
-            </td>
-            <td>
-                  <code>{}</code>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -6615,7 +6600,8 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span>
-<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">125</span>
+<span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -6630,7 +6616,6 @@ TensorBoard tracker is used with a default log directory.</p>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">tracker</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tracker</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Initialization method for the FMPE class.</span>
 
@@ -6641,8 +6626,9 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="sd">            &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
 <span class="sd">            the `ConditionalEstimatorBuilder` protocol with `__call__` that receives</span>
 <span class="sd">            `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
-<span class="sd">        density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a</span>
-<span class="sd">            warning is raised and the `vf_estimator=&quot;mlp&quot;` default is used.</span>
+<span class="sd">            To configure estimator-level options, use `posterior_flow_nn` to</span>
+<span class="sd">            build a custom callable and pass it here.</span>
+<span class="sd">        density_estimator: Deprecated. Use `vf_estimator` instead.</span>
 <span class="sd">        device: Device to use for training.</span>
 <span class="sd">        logging_level: Logging level.</span>
 <span class="sd">        summary_writer: Deprecated alias for the TensorBoard summary writer.</span>
@@ -6650,8 +6636,6 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="sd">        tracker: Tracking adapter used to log training metrics. If None, a</span>
 <span class="sd">            TensorBoard tracker is used with a default log directory.</span>
 <span class="sd">        show_progress_bars: Whether to show progress bars.</span>
-<span class="sd">        **kwargs: Additional keyword arguments passed to the default builder if</span>
-<span class="sd">            `density_estimator` is a string.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -6671,8 +6655,11 @@ TensorBoard tracker is used with a default log directory.</p>
         <span class="n">tracker</span><span class="o">=</span><span class="n">tracker</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
         <span class="n">vector_field_estimator_builder</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
+
+    <span class="c1"># When vf_estimator is a string, build the default neural net.</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vf_estimator</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_default_nn_fn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6828,8 +6815,7 @@ VectorFieldPosterior.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/fmpe.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
-<span class="normal">128</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
@@ -6872,7 +6858,8 @@ VectorFieldPosterior.</p>
 <span class="normal">168</span>
 <span class="normal">169</span>
 <span class="normal">170</span>
-<span class="normal">171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">171</span>
+<span class="normal">172</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7158,7 +7145,23 @@ samples = posterior.sample((1000,), x=x_o)
 <span class="normal">184</span>
 <span class="normal">185</span>
 <span class="normal">186</span>
-<span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NPSE</span><span class="p">(</span><span class="n">VectorFieldTrainer</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Neural Posterior Score Estimation (NPSE) [1, 2].</span>
 
 <span class="sd">    NPSE trains a neural network to estimate the score function (gradient of the log</span>
@@ -7214,13 +7217,15 @@ samples = posterior.sample((1000,), x=x_o)
                 <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">],</span>
             <span class="p">]</span>
         <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+            <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sde_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;vp&quot;</span><span class="p">,</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span> <span class="s2">&quot;subvp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">tracker</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tracker</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize Neural Posterior Score Estimation.</span>
 
@@ -7232,9 +7237,13 @@ samples = posterior.sample((1000,), x=x_o)
 <span class="sd">                &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
 <span class="sd">                the `ConditionalEstimatorBuilder` protocol with `__call__` that receives</span>
 <span class="sd">                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
-<span class="sd">            score_estimator: Deprecated, use `vf_estimator` instead. When passed,</span>
-<span class="sd">                a warning is raised and the new `vf_estimator` default is used.</span>
+<span class="sd">                To configure estimator-level options (e.g. noise schedules for VE),</span>
+<span class="sd">                use `posterior_score_nn` to build a custom callable and pass it here.</span>
+<span class="sd">            score_estimator: Deprecated, use `vf_estimator` instead.</span>
+<span class="sd">            density_estimator: Deprecated, use `vf_estimator` instead.</span>
 <span class="sd">            sde_type: Type of SDE to use. Must be one of [&#39;vp&#39;, &#39;ve&#39;, &#39;subvp&#39;].</span>
+<span class="sd">                Only used when `vf_estimator` is a string (i.e. when using the</span>
+<span class="sd">                default builder). Ignored when a custom callable is passed.</span>
 <span class="sd">            device: Device to run the training on.</span>
 <span class="sd">            logging_level: Logging level for the training. Can be an integer or a</span>
 <span class="sd">                string.</span>
@@ -7243,8 +7252,6 @@ samples = posterior.sample((1000,), x=x_o)
 <span class="sd">            tracker: Tracking adapter used to log training metrics. If None, a</span>
 <span class="sd">                TensorBoard tracker is used with a default log directory.</span>
 <span class="sd">            show_progress_bars: Whether to show progress bars during training.</span>
-<span class="sd">            kwargs: Additional keyword arguments passed to the default builder if</span>
-<span class="sd">                `score_estimator` is a string.</span>
 
 <span class="sd">        References:</span>
 <span class="sd">            - Geffner, Tomas, George Papamakarios, and Andriy Mnih. &quot;Score modeling for</span>
@@ -7253,13 +7260,22 @@ samples = posterior.sample((1000,), x=x_o)
 <span class="sd">                free inference with conditional score based diffusion models.&quot; ICML 2024</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">score_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">score_estimator</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
                 <span class="s2">&quot;`score_estimator` is deprecated and will be removed in a future &quot;</span>
-                <span class="s2">&quot;release .Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;release. Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
                 <span class="ne">FutureWarning</span><span class="p">,</span>
                 <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
             <span class="p">)</span>
+            <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">score_estimator</span>
+
+        <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;`density_estimator` is deprecated and will be removed in a future &quot;</span>
+                <span class="s2">&quot;release. Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
+                <span class="ne">FutureWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">density_estimator</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
             <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
@@ -7269,11 +7285,14 @@ samples = posterior.sample((1000,), x=x_o)
             <span class="n">summary_writer</span><span class="o">=</span><span class="n">summary_writer</span><span class="p">,</span>
             <span class="n">tracker</span><span class="o">=</span><span class="n">tracker</span><span class="p">,</span>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
-            <span class="n">sde_type</span><span class="o">=</span><span class="n">sde_type</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="c1"># score_estimator name is kept since it is public API, but it is</span>
-        <span class="c1"># actually misleading since it is a builder for an estimator.</span>
+
+        <span class="c1"># When vf_estimator is a string, build the default neural net using</span>
+        <span class="c1"># the NPSE-specific builder which requires sde_type.</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vf_estimator</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_default_nn_fn</span><span class="p">(</span>
+                <span class="n">model</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="n">sde_type</span>
+            <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -7322,9 +7341,9 @@ samples = posterior.sample((1000,), x=x_o)
     <span class="k">def</span><span class="w"> </span><span class="nf">_build_default_nn_fn</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">model</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;ada_mlp&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer&quot;</span><span class="p">,</span> <span class="s2">&quot;transformer_cross_attn&quot;</span><span class="p">],</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="n">sde_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;vp&quot;</span><span class="p">,</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span> <span class="s2">&quot;subvp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">posterior_score_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="n">sde_type</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -7345,7 +7364,7 @@ samples = posterior.sample((1000,), x=x_o)
 
 
 <h3 id="sbi.inference.trainers.vfpe.npse.NPSE.__init__" class="doc doc-heading">
-            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">score_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s1">&#39;ve&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tracker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vf_estimator</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">score_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="s1">&#39;ve&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tracker</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.trainers.vfpe.npse.NPSE.__init__" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -7396,7 +7415,9 @@ vector field estimator aiming to estimate the marginal scores of the
 target diffusion process. Can be a string (e.g. &lsquo;mlp&rsquo;, &lsquo;ada_mlp&rsquo;,
 &lsquo;transformer&rsquo; or &lsquo;transformer_cross_attn&rsquo;) or a callable that implements
 the <code>ConditionalEstimatorBuilder</code> protocol with <code>__call__</code> that receives
-<code>theta</code> and <code>x</code> and returns a <code>ConditionalVectorFieldEstimator</code>.</p>
+<code>theta</code> and <code>x</code> and returns a <code>ConditionalVectorFieldEstimator</code>.
+To configure estimator-level options (e.g. noise schedules for VE),
+use <code>posterior_score_nn</code> to build a custom callable and pass it here.</p>
               </div>
             </td>
             <td>
@@ -7412,8 +7433,23 @@ the <code>ConditionalEstimatorBuilder</code> protocol with <code>__call__</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Deprecated, use <code>vf_estimator</code> instead. When passed,
-a warning is raised and the new <code>vf_estimator</code> default is used.</p>
+                <p>Deprecated, use <code>vf_estimator</code> instead.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>density_estimator</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="sbi.neural_nets.estimators.base.ConditionalEstimatorBuilder">ConditionalEstimatorBuilder</span>[<span title="sbi.neural_nets.estimators.ConditionalVectorFieldEstimator">ConditionalVectorFieldEstimator</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Deprecated, use <code>vf_estimator</code> instead.</p>
               </div>
             </td>
             <td>
@@ -7429,7 +7465,9 @@ a warning is raised and the new <code>vf_estimator</code> default is used.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Type of SDE to use. Must be one of [&lsquo;vp&rsquo;, &lsquo;ve&rsquo;, &lsquo;subvp&rsquo;].</p>
+                <p>Type of SDE to use. Must be one of [&lsquo;vp&rsquo;, &lsquo;ve&rsquo;, &lsquo;subvp&rsquo;].
+Only used when <code>vf_estimator</code> is a string (i.e. when using the
+default builder). Ignored when a custom callable is passed.</p>
               </div>
             </td>
             <td>
@@ -7519,22 +7557,6 @@ TensorBoard tracker is used with a default log directory.</p>
                   <code>True</code>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>kwargs</code>
-            </td>
-            <td>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Additional keyword arguments passed to the default builder if
-<code>score_estimator</code> is a string.</p>
-              </div>
-            </td>
-            <td>
-                  <code>{}</code>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -7621,7 +7643,25 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">vf_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
@@ -7634,13 +7674,15 @@ TensorBoard tracker is used with a default log directory.</p>
             <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">],</span>
         <span class="p">]</span>
     <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">ConditionalEstimatorBuilder</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">sde_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;vp&quot;</span><span class="p">,</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span> <span class="s2">&quot;subvp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ve&quot;</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">tracker</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tracker</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize Neural Posterior Score Estimation.</span>
 
@@ -7652,9 +7694,13 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="sd">            &#39;transformer&#39; or &#39;transformer_cross_attn&#39;) or a callable that implements</span>
 <span class="sd">            the `ConditionalEstimatorBuilder` protocol with `__call__` that receives</span>
 <span class="sd">            `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.</span>
-<span class="sd">        score_estimator: Deprecated, use `vf_estimator` instead. When passed,</span>
-<span class="sd">            a warning is raised and the new `vf_estimator` default is used.</span>
+<span class="sd">            To configure estimator-level options (e.g. noise schedules for VE),</span>
+<span class="sd">            use `posterior_score_nn` to build a custom callable and pass it here.</span>
+<span class="sd">        score_estimator: Deprecated, use `vf_estimator` instead.</span>
+<span class="sd">        density_estimator: Deprecated, use `vf_estimator` instead.</span>
 <span class="sd">        sde_type: Type of SDE to use. Must be one of [&#39;vp&#39;, &#39;ve&#39;, &#39;subvp&#39;].</span>
+<span class="sd">            Only used when `vf_estimator` is a string (i.e. when using the</span>
+<span class="sd">            default builder). Ignored when a custom callable is passed.</span>
 <span class="sd">        device: Device to run the training on.</span>
 <span class="sd">        logging_level: Logging level for the training. Can be an integer or a</span>
 <span class="sd">            string.</span>
@@ -7663,8 +7709,6 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="sd">        tracker: Tracking adapter used to log training metrics. If None, a</span>
 <span class="sd">            TensorBoard tracker is used with a default log directory.</span>
 <span class="sd">        show_progress_bars: Whether to show progress bars during training.</span>
-<span class="sd">        kwargs: Additional keyword arguments passed to the default builder if</span>
-<span class="sd">            `score_estimator` is a string.</span>
 
 <span class="sd">    References:</span>
 <span class="sd">        - Geffner, Tomas, George Papamakarios, and Andriy Mnih. &quot;Score modeling for</span>
@@ -7673,13 +7717,22 @@ TensorBoard tracker is used with a default log directory.</p>
 <span class="sd">            free inference with conditional score based diffusion models.&quot; ICML 2024</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">score_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">score_estimator</span>
         <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
             <span class="s2">&quot;`score_estimator` is deprecated and will be removed in a future &quot;</span>
-            <span class="s2">&quot;release .Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;release. Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
             <span class="ne">FutureWarning</span><span class="p">,</span>
             <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
         <span class="p">)</span>
+        <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">score_estimator</span>
+
+    <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;`density_estimator` is deprecated and will be removed in a future &quot;</span>
+            <span class="s2">&quot;release. Use `vf_estimator` instead.&quot;</span><span class="p">,</span>
+            <span class="ne">FutureWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">vf_estimator</span> <span class="o">=</span> <span class="n">density_estimator</span>
 
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
@@ -7689,9 +7742,14 @@ TensorBoard tracker is used with a default log directory.</p>
         <span class="n">summary_writer</span><span class="o">=</span><span class="n">summary_writer</span><span class="p">,</span>
         <span class="n">tracker</span><span class="o">=</span><span class="n">tracker</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
-        <span class="n">sde_type</span><span class="o">=</span><span class="n">sde_type</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">)</span>
+
+    <span class="c1"># When vf_estimator is a string, build the default neural net using</span>
+    <span class="c1"># the NPSE-specific builder which requires sde_type.</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vf_estimator</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_build_neural_net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_default_nn_fn</span><span class="p">(</span>
+            <span class="n">model</span><span class="o">=</span><span class="n">vf_estimator</span><span class="p">,</span> <span class="n">sde_type</span><span class="o">=</span><span class="n">sde_type</span>
+        <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -7846,23 +7904,7 @@ VectorFieldPosterior.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/trainers/vfpe/npse.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
 <span class="normal">157</span>
@@ -7888,7 +7930,23 @@ VectorFieldPosterior.</p>
 <span class="normal">177</span>
 <span class="normal">178</span>
 <span class="normal">179</span>
-<span class="normal">180</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_posterior</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">vector_field_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ConditionalVectorFieldEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
