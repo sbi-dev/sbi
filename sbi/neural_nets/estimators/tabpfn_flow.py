@@ -108,7 +108,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
             embedded = self._embedding_net(condition)
         return embedded.reshape(embedded.shape[0], -1).cpu()
 
-    def embed_x_o(self, condition: Tensor) -> Tensor:
+    def embed(self, condition: Tensor) -> Tensor:
         r"""Public wrapper for preparing embedded, flattened conditions."""
         return self._embed_condition(condition)
 

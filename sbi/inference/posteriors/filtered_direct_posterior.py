@@ -66,6 +66,7 @@ class FilteredDirectPosterior(DirectPosterior):
         self.filtering = filter_type
         self._full_context_input = full_context_input
         self._full_context_condition = full_context_condition
+        self._full_context_condition_embedded = estimator.embed(full_context_condition)
 
     def _validate_filter_indices(self, indices: Tensor, num_context: int) -> Tensor:
         """Validate and normalize context indices returned by a filter."""
@@ -86,7 +87,7 @@ class FilteredDirectPosterior(DirectPosterior):
 
     def _select_context_indices(self, condition_embedded: Tensor) -> Tensor:
         """Select context indices according to the configured filtering strategy."""
-        num_context = self._full_context_condition.shape[0]
+        num_context = self._full_context_condition_embedded.shape[0]
         k = min(self.filter_size, num_context)
 
         if k >= num_context:
@@ -95,7 +96,7 @@ class FilteredDirectPosterior(DirectPosterior):
         if isinstance(self.filtering, str):
             if self.filtering == "knn":
                 indices = _knn_filter_indices(
-                    condition_embedded, self._full_context_condition, k
+                    condition_embedded, self._full_context_condition_embedded, k
                 )
             elif self.filtering == "first":
                 indices = _first_filter_indices(k, self._full_context_input.device)
@@ -107,14 +108,14 @@ class FilteredDirectPosterior(DirectPosterior):
         indices = self.filtering(
             condition_embedded,
             self._full_context_input,
-            self._full_context_condition,
+            self._full_context_condition_embedded,
             k,
         )
         return self._validate_filter_indices(indices, num_context)
 
     def _set_context_for_x_o(self, x_o: Tensor) -> None:
         """Filter and set estimator context for a single queried observation."""
-        condition_embedded = self.posterior_estimator.embed_x_o(x_o)
+        condition_embedded = self.posterior_estimator.embed(x_o)
         unique_indices = self._select_context_indices(condition_embedded)
 
         self.posterior_estimator.set_context(
