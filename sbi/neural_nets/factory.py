@@ -370,7 +370,7 @@ def posterior_score_nn(
             - 'vp': Variance preserving.
             - 'subvp': Sub-variance preserving.
             - 've': Variance exploding.
-            Defaults to 'vp'.
+            Defaults to 've'.
         model: Type of regression network. One of:
             - 'mlp': Fully connected feed-forward network.
             - 'ada_mlp': Fully connected feed-forward with adaptive
@@ -388,7 +388,7 @@ def posterior_score_nn(
             sample is, for example, a time series or an image.
         z_score_x: Whether to z-score xs passing into the network, same options as
             z_score_theta.
-        hidden_features: Number of hidden units per layer. Defaults to 50.
+        hidden_features: Number of hidden units per layer. Defaults to 100.
         embedding_net: Embedding network for x (conditioning variable). Defaults to
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
@@ -412,7 +412,8 @@ def posterior_score_nn(
         net=model,
     )
 
-    # Validate against known fields — raises TypeError on typos or
+    # Validate against known fields — raises TypeError on typos
+    # or if kwargs duplicate an explicit parameter.
     config = ScoreEstimatorConfig(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 
@@ -460,7 +461,7 @@ def posterior_flow_nn(
         z_score_theta: This is not supported for FMPE and will raise an error.
         z_score_x: Whether to z-score xs passing into the network, same options as
             z_score_theta.
-        hidden_features: Number of hidden units per layer. Defaults to 50.
+        hidden_features: Number of hidden units per layer. Defaults to 100.
         num_layers: Number of hidden layers. Defaults to 5.
         embedding_net: Embedding network for x (conditioning variable). Defaults to
             nn.Identity().
@@ -492,7 +493,8 @@ def posterior_flow_nn(
         net=model,
     )
 
-    # Validate against known fields — raises TypeError on typos or
+    # Validate against known fields — raises TypeError on typos
+    # or if kwargs duplicate an explicit parameter.
     config = FlowEstimatorConfig(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 

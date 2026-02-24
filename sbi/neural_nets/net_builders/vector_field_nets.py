@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, fields
 from typing import Any, Literal, Optional, Sequence, Union
 
 import torch
@@ -65,8 +65,17 @@ class _VectorFieldBaseConfig:
     time_emb_type: Optional[str] = None
 
     def to_dict(self) -> dict:
-        """Return only explicitly-set (non-``None``) fields as a dict."""
-        return {k: v for k, v in asdict(self).items() if v is not None}
+        """Return only explicitly-set (non-``None``) fields as a dict.
+
+        Uses shallow field access (not ``dataclasses.asdict``) to avoid
+        deep-copying ``nn.Module`` objects stored in fields like
+        ``embedding_net`` or ``net``.
+        """
+        return {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if getattr(self, f.name) is not None
+        }
 
 
 @dataclass
@@ -91,9 +100,6 @@ class ScoreEstimatorConfig(_VectorFieldBaseConfig):
     beta_min: Optional[float] = None
     beta_max: Optional[float] = None
 
-    # SDE type (forwarded through **kwargs at the factory level)
-    sde_type: Optional[str] = None
-    estimator_type: Optional[str] = None
 
 
 @dataclass
@@ -106,7 +112,6 @@ class FlowEstimatorConfig(_VectorFieldBaseConfig):
     ``sigma_min``, ``beta_min``) are rejected early.
     """
 
-    estimator_type: Optional[str] = None
 
 
 # ==================== Building Flow/Score Matching Estimators =========================
