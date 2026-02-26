@@ -96,8 +96,7 @@ def _fit_gmm_ratio_impl(
     max_log_ratio: float = 50.0,
     device: Union[str, torch.device] = "cpu",
 ) -> Tuple[Tensor, Tensor, Tensor]:
-    """Implementation for fitting a generalized GMM to the prior ratio
-    q(theta) / p(theta)."""
+    """Fit a generalized GMM to the prior ratio q(theta) / p(theta)."""
     num_components = int(num_components)
     device = torch.device(device)
     if hasattr(train_prior, "to"):

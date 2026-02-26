@@ -18,7 +18,7 @@ from sbi.samplers.score import Diffuser
 from sbi.utils import BoxUniform, MultipleIndependent
 
 
-def build_some_priors(num_dim: int):
+def build_random_priors(num_dim: int):
     # Diag normal prior
     prior1 = Independent(Normal(torch.zeros(num_dim), torch.ones(num_dim)), 1)
     # Uniform prior
@@ -36,8 +36,7 @@ def build_some_priors(num_dim: int):
             Normal(torch.zeros(1), torch.ones(1)) for _ in range(num_dim)
         ])
 
-    # Bug in Independent introduced????
-    priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]  # Something broke
+    priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]
 
     return priors
 
@@ -66,7 +65,7 @@ def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
     std0 = torch.ones(num_dim)
     score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
 
-    priors = build_some_priors(num_dim)
+    priors = build_random_priors(num_dim)
     x_o_iid = torch.ones((5, 1))
     score_fn.set_x(x_o_iid, x_is_iid=True, iid_method=iid_method)
     inputs = torch.ones((1, 1, num_dim))
@@ -121,7 +120,7 @@ def test_score_fn_guidance_general(sde_type, guidance_method, num_dim):
     inputs = torch.ones((1, 1, num_dim))
     time = torch.ones(1)
 
-    priors = build_some_priors(num_dim)
+    priors = build_random_priors(num_dim)
     for prior in priors:
         score_fn.prior = prior
         output = score_fn.gradient(inputs, time=time)
@@ -161,7 +160,7 @@ def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_metho
     inputs = torch.ones((1, 1, num_dim))
     time = torch.ones(1)
 
-    for prior in build_some_priors(num_dim):
+    for prior in build_random_priors(num_dim):
         score_fn.prior = prior
         output = score_fn.gradient(inputs, time=time)
         assert output.shape == (1, 1, num_dim), (

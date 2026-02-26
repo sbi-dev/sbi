@@ -588,6 +588,9 @@ class PriorGuide(ScoreAdaptation):
         mu0 = (input_ + std**2 * score) / m
 
         # Prior adjustment
+        # NOTE: For now this assumes that sigma0_t2 is at most a vector
+        # representing a diagonal matrix. This has to be adapted if
+        # _sigma0_t2 is changed.
         sigma0_t2 = self._sigma0_t2(std)
         sigma0_t2 = sigma0_t2.reshape(-1)
         if sigma0_t2.numel() == 1:
