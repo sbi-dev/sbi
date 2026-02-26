@@ -132,6 +132,44 @@ def test_score_fn_guidance_general(sde_type, guidance_method, num_dim):
     assert torch.isfinite(output).all(), "Output contains non-finite values"
 
 
+@pytest.mark.parametrize("sde_type", ["vp", "ve"])
+@pytest.mark.parametrize("iid_method", ["fnpe", "gauss"])
+@pytest.mark.parametrize(
+    "guidance_method",
+    [
+        ("affine_classifier_free", {"likelihood_scale": 0.7}),
+        ("interval", {"lower_bound": 0.0, "upper_bound": 1.0}),
+    ],
+)
+def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_method):
+    """Test that guidance can be combined with IID score accumulation."""
+    num_dim = 2
+    mean0 = torch.zeros(num_dim)
+    std0 = torch.ones(num_dim)
+    score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
+
+    x_o_iid = torch.ones((5, 1))
+    guidance_name, guidance_params = guidance_method
+    score_fn.set_x(
+        x_o_iid,
+        x_is_iid=True,
+        iid_method=iid_method,
+        guidance_method=guidance_name,
+        guidance_params=guidance_params,
+    )
+
+    inputs = torch.ones((1, 1, num_dim))
+    time = torch.ones(1)
+
+    for prior in build_some_priors(num_dim):
+        score_fn.prior = prior
+        output = score_fn.gradient(inputs, time=time)
+        assert output.shape == (1, 1, num_dim), (
+            f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
+        )
+        assert torch.isfinite(output).all(), "Output contains non-finite values"
+
+
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("predictor", ("euler_maruyama",))
 @pytest.mark.parametrize("corrector", (None, "gibbs", "langevin"))

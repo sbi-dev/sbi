@@ -221,6 +221,7 @@ class VectorFieldBasedPotential(BasePotential):
 
         if time is None:
             time = torch.tensor([self.vector_field_estimator.t_min])
+        assert time is not None
 
         if self._x_o is None:
             raise ValueError(
@@ -229,14 +230,14 @@ class VectorFieldBasedPotential(BasePotential):
             )
 
         if self.guidance_method is not None:
-            score_wrapper, cfg = get_guidance_method(self.guidance_method)
-            cfg_params = cfg(**(self.guidance_params or {}))
+            score_wrapper, config_cls = get_guidance_method(self.guidance_method)
+            config_params = config_cls(**(self.guidance_params or {}))
             # Note to make this cross compatible with IID we need make this
             # wrapper more like a proper estimator.
             vf_estimator = score_wrapper(
                 self.vector_field_estimator,
                 self.prior,
-                cfg=cfg_params,
+                config=config_params,
                 device=device,
             )
         else:

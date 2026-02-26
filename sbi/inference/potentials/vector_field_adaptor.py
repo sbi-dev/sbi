@@ -24,7 +24,7 @@ from sbi.utils.vector_field_utils import (
 )
 
 IID_METHODS: dict[str, Type["IIDScoreFunction"]] = {}
-GUIDANCE_METHODS: dict[str, tuple[Type["ScoreAdaptation"], Optional[Type]]] = {}
+GUIDANCE_METHODS: dict[str, tuple[Callable[..., "ScoreAdaptation"], Type[object]]] = {}
 
 ScoreAdaptationT = TypeVar("ScoreAdaptationT", bound="ScoreAdaptation")
 IIDScoreFunctionT = TypeVar("IIDScoreFunctionT", bound="IIDScoreFunction")
@@ -49,7 +49,7 @@ def get_iid_method(name: str) -> Type["IIDScoreFunction"]:
 
 def get_guidance_method(
     name: str,
-) -> tuple[Type["ScoreAdaptation"], Optional[Type]]:
+) -> tuple[Callable[..., "ScoreAdaptation"], Type[object]]:
     r"""
     Retrieves the guidance method by name.
 
@@ -65,7 +65,7 @@ def get_guidance_method(
 
 
 def register_guidance_method(
-    name: str, default_config: Optional[Type] = None
+    name: str, default_config: Type[object]
 ) -> Callable[[Type[ScoreAdaptationT]], Type[ScoreAdaptationT]]:
     r"""
     Registers a guidance method and its default configuration.
@@ -137,6 +137,32 @@ class ScoreAdaptation(ABC):
         self, input: Tensor, condition: Tensor, t: Optional[Tensor] = None
     ) -> Tensor:
         return self.__call__(input, condition, t)
+
+    @property
+    def SCORE_DEFINED(self) -> bool:
+        return self.vf_estimator.SCORE_DEFINED
+
+    @property
+    def MARGINALS_DEFINED(self) -> bool:
+        return self.vf_estimator.MARGINALS_DEFINED
+
+    def to(self, device: Union[str, torch.device]) -> "ScoreAdaptation":
+        self.device = device
+        self.vf_estimator.to(device)
+        if self.prior is not None and hasattr(self.prior, "to"):
+            self.prior.to(device)  # type: ignore
+        return self
+
+    def eval(self) -> "ScoreAdaptation":
+        self.vf_estimator.eval()
+        return self
+
+    def train(self, mode: bool = True) -> "ScoreAdaptation":
+        self.vf_estimator.train(mode)
+        return self
+
+    def __getattr__(self, name: str):
+        return getattr(self.vf_estimator, name)
 
 
 @dataclass
@@ -619,7 +645,7 @@ class IIDScoreFunction(ABC):
 
     def __init__(
         self,
-        vector_field_estimator: ConditionalVectorFieldEstimator,
+        vector_field_estimator: Union[ConditionalVectorFieldEstimator, ScoreAdaptation],
         prior: Distribution,  # type: ignore
         device: Union[str, torch.device] = "cpu",
     ) -> None:
@@ -719,7 +745,7 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
 
     def __init__(
         self,
-        vector_field_estimator: ConditionalVectorFieldEstimator,
+        vector_field_estimator: Union[ConditionalVectorFieldEstimator, ScoreAdaptation],
         prior: Distribution,
         device: Union[str, torch.device] = "cpu",
         prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
@@ -801,7 +827,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
 
     def __init__(
         self,
-        vector_field_estimator: ConditionalVectorFieldEstimator,
+        vector_field_estimator: Union[ConditionalVectorFieldEstimator, ScoreAdaptation],
         prior: Distribution,
         ensure_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
@@ -1025,7 +1051,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 
     def __init__(
         self,
-        vector_field_estimator: ConditionalVectorFieldEstimator,
+        vector_field_estimator: Union[ConditionalVectorFieldEstimator, ScoreAdaptation],
         prior: Distribution,
         posterior_precision: Optional[Tensor] = None,
         scale_from_prior_precision: float = 2.0,
@@ -1123,7 +1149,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 
     def __init__(
         self,
-        vector_field_estimator: ConditionalVectorFieldEstimator,
+        vector_field_estimator: Union[ConditionalVectorFieldEstimator, ScoreAdaptation],
         prior: Distribution,
         enable_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
