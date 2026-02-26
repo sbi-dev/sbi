@@ -63,7 +63,7 @@ class GaussianLinear(Task):
         posterior = true_posterior_linear_gaussian_mvn_prior(
             x_o,
             torch.zeros(self.dim),
-            self.simulator_scale**2 * torch.eye(self.dim),
+            self.simulator_scale * torch.eye(self.dim),
             torch.zeros(self.dim),
             torch.eye(self.dim),
         )
