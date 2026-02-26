@@ -27,7 +27,8 @@ class GaussianLinear(Task):
         """
         Initializes the GaussianLinear task.
         """
-        self.simulator_scale = 0.1
+        self.prior_scale = 0.1**0.5
+        self.simulator_scale = 0.1**0.5
         self.dim = 10
         super().__init__("gaussian_linear")
 
@@ -65,7 +66,7 @@ class GaussianLinear(Task):
             torch.zeros(self.dim),
             self.simulator_scale**2 * torch.eye(self.dim),
             torch.zeros(self.dim),
-            torch.eye(self.dim),
+            self.prior_scale**2 * torch.eye(self.dim),
         )
 
         return posterior.sample((10_000,))
@@ -104,7 +105,10 @@ class GaussianLinear(Task):
         Returns:
             Distribution: The prior distribution.
         """
-        return MultivariateNormal(torch.zeros(self.dim), torch.eye(self.dim))
+        return MultivariateNormal(
+            torch.zeros(self.dim),
+            self.prior_scale**2 * torch.eye(self.dim),
+        )
 
     def get_simulator(self) -> Callable:
         """
