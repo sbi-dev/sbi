@@ -200,11 +200,11 @@ class VectorFieldPosterior(NeuralPosterior):
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
             guidance_method: Method to guide the diffusion process. If None, no guidance
-                is used. currently we support `affine_classifier_free`, which allows to
+                is used. Currently we support `affine_classifier_free`, which allows to
                 scale and shift the "likelihood" or "prior" score contribution. This can
-                be used to perform "super" conditioning i.e. shring the variance of the
+                be used to perform "super" conditioning i.e. shrink the variance of the
                 likelihood. `Universal` can be used to guide the diffusion process with
-                a general guidance function. `Interval` is an isntance of that where
+                a general guidance function. `Interval` is an instance of that where
                 the guidance function constraints the diffusion process to a given
                 interval.
             guidance_params: Additional parameters passed to the guidance method. See

@@ -23,8 +23,8 @@ from sbi.utils.vector_field_utils import (
     solve_diag_or_dense,
 )
 
-IID_METHODS = {}
-GUIDANCE_METHODS = {}
+IID_METHODS: dict[str, Type["IIDScoreFunction"]] = {}
+GUIDANCE_METHODS: dict[str, tuple[Type["ScoreAdaptation"], Optional[Type]]] = {}
 
 
 def get_iid_method(name: str) -> Type["IIDScoreFunction"]:
@@ -44,7 +44,9 @@ def get_iid_method(name: str) -> Type["IIDScoreFunction"]:
     return IID_METHODS[name]
 
 
-def get_guidance_method(name: str) -> Type["ScoreAdaptation"]:
+def get_guidance_method(
+    name: str,
+) -> tuple[Type["ScoreAdaptation"], Optional[Type]]:
     r"""
     Retrieves the guidance method by name.
 
@@ -52,33 +54,37 @@ def get_guidance_method(name: str) -> Type["ScoreAdaptation"]:
         name: The name of the guidance method.
 
     Returns:
-        The guidance method class and its default configuration.
+        A tuple of the guidance method class and its default configuration class.
     """
     if name not in GUIDANCE_METHODS:
         raise NotImplementedError(f"Method {name} for guidance not implemented.")
     return GUIDANCE_METHODS[name]
 
 
-def register_guidance_method(name: str, default_cfg: Optional[Type] = None) -> Callable:
+def register_guidance_method(
+    name: str, default_config: Optional[Type] = None
+) -> Callable[[Type["ScoreAdaptation"]], Type["ScoreAdaptation"]]:
     r"""
     Registers a guidance method and its default configuration.
 
     Args:
         name: The name of the guidance method.
-        default_cfg: The default configuration class for the guidance method.
+        default_config: The default configuration class for the guidance method.
 
     Returns:
         A decorator function to register the guidance method class.
     """
 
     def decorator(cls: Type["ScoreAdaptation"]) -> Type["ScoreAdaptation"]:
-        GUIDANCE_METHODS[name] = (cls, default_cfg)
+        GUIDANCE_METHODS[name] = (cls, default_config)
         return cls
 
     return decorator
 
 
-def register_iid_method(name: str) -> Callable:
+def register_iid_method(
+    name: str,
+) -> Callable[[Type["IIDScoreFunction"]], Type["IIDScoreFunction"]]:
     r"""
     Registers an IID method.
 
@@ -101,8 +107,8 @@ class ScoreAdaptation(ABC):
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
-        device: str = "cpu",
-    ):
+        device: Union[str, torch.device] = "cpu",
+    ) -> None:
         """This class manages manipulating the score estimator to impose additional
         constraints on the posterior via guidance.
 
@@ -116,30 +122,34 @@ class ScoreAdaptation(ABC):
         self.device = device
 
     @abstractmethod
-    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
+    def __call__(
+        self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None
+    ) -> Tensor:
         pass
 
-    def score(self, input: Tensor, condition: Tensor, t: Optional[Tensor] = None):
+    def score(
+        self, input: Tensor, condition: Tensor, t: Optional[Tensor] = None
+    ) -> Tensor:
         return self.__call__(input, condition, t)
 
 
 @dataclass
-class AffineClassifierFreeGuidanceCfg:
+class AffineClassifierFreeGuidanceConfig:
     prior_scale: Union[float, Tensor] = 1.0
     prior_shift: Union[float, Tensor] = 0.0
     likelihood_scale: Union[float, Tensor] = 1.0
     likelihood_shift: Union[float, Tensor] = 0.0
 
 
-@register_guidance_method("affine_classifier_free", AffineClassifierFreeGuidanceCfg)
+@register_guidance_method("affine_classifier_free", AffineClassifierFreeGuidanceConfig)
 class AffineClassifierFreeGuidance(ScoreAdaptation):
     def __init__(
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
-        cfg: AffineClassifierFreeGuidanceCfg,
-        device: str = "cpu",
-    ):
+        config: AffineClassifierFreeGuidanceConfig,
+        device: Union[str, torch.device] = "cpu",
+    ) -> None:
         """This class manages manipulating the score estimator to temper or shift the
         prior and likelihood.
 
@@ -150,7 +160,7 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         Args:
             score_estimator: The score estimator.
             prior: The prior distribution.
-            cfg: Configuration for the affine classifier-free guidance. This includes
+            config: Configuration for the affine classifier-free guidance. This includes
                 the scale and shift applied to the prior and likelihood contributions.
             device: The device on which to evaluate the potential.
 
@@ -163,24 +173,26 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         if prior is None:
             raise ValueError(
                 "Prior is required for classifier-free guidance, please"
-                " provide as least an improper empirical prior."
+                " provide at least an improper empirical prior."
             )
 
-        self.prior_scale = torch.tensor(cfg.prior_scale, device=device)
-        self.prior_shift = torch.tensor(cfg.prior_shift, device=device)
-        self.likelihood_scale = torch.tensor(cfg.likelihood_scale, device=device)
-        self.likelihood_shift = torch.tensor(cfg.likelihood_shift, device=device)
+        self.prior_scale = torch.tensor(config.prior_scale, device=device)
+        self.prior_shift = torch.tensor(config.prior_shift, device=device)
+        self.likelihood_scale = torch.tensor(config.likelihood_scale, device=device)
+        self.likelihood_shift = torch.tensor(config.likelihood_shift, device=device)
         super().__init__(vf_estimator, prior, device)
 
-    def marginal_prior_score(self, theta: Tensor, time: Tensor):
-        """Computes the marginal prior score analyticaly (or approximatly)"""
+    def marginal_prior_score(self, theta: Tensor, time: Tensor) -> Tensor:
+        """Computes the marginal prior score analytically (or approximately)."""
         m = self.vf_estimator.mean_t_fn(time)
         std = self.vf_estimator.std_fn(time)
         marginal_prior = marginalize(self.prior, m, std)  # type: ignore
         marginal_prior_score = compute_score(marginal_prior, theta)
         return marginal_prior_score
 
-    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
+    def __call__(
+        self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None
+    ) -> Tensor:
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
 
@@ -194,29 +206,29 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
 
 
 @dataclass
-class UniversalGuidanceCfg:
+class UniversalGuidanceConfig:
     guidance_fn: Callable[[Tensor, Tensor, Tensor, Tensor], Tensor]
     guidance_fn_score: Optional[Callable[[Tensor, Tensor, Tensor, Tensor], Tensor]] = (
         None
     )
 
 
-@register_guidance_method("universal", UniversalGuidanceCfg)
+@register_guidance_method("universal", UniversalGuidanceConfig)
 class UniversalGuidance(ScoreAdaptation):
     def __init__(
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
-        cfg: UniversalGuidanceCfg,
-        device: str = "cpu",
-    ):
+        config: UniversalGuidanceConfig,
+        device: Union[str, torch.device] = "cpu",
+    ) -> None:
         """This class manages manipulating the score estimator using a custom guidance
         function.
 
         Args:
             score_estimator: The score estimator.
             prior: The prior distribution.
-            cfg: Configuration for the universal guidance.
+            config: Configuration for the universal guidance.
             device: The device on which to evaluate the potential.
 
 
@@ -224,15 +236,15 @@ class UniversalGuidance(ScoreAdaptation):
         References:
         - [1] Universal Guidance for Diffusion Models (2022)
         """
-        self.guidance_fn = cfg.guidance_fn
+        self.guidance_fn = config.guidance_fn
 
-        if cfg.guidance_fn_score is None:
+        if config.guidance_fn_score is None:
 
             def guidance_fn_score(input, condition, m, std):
                 with torch.enable_grad():
                     input = input.detach().clone().requires_grad_(True)
                     score = torch.autograd.grad(
-                        cfg.guidance_fn(input, condition, m, std).sum(),
+                        config.guidance_fn(input, condition, m, std).sum(),
                         input,
                         create_graph=True,
                     )[0]
@@ -240,11 +252,13 @@ class UniversalGuidance(ScoreAdaptation):
 
             self.guidance_fn_score = guidance_fn_score
         else:
-            self.guidance_fn_score = cfg.guidance_fn_score
+            self.guidance_fn_score = config.guidance_fn_score
 
         super().__init__(vf_estimator, prior, device)
 
-    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
+    def __call__(
+        self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None
+    ) -> Tensor:
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
         score = self.vf_estimator(input, condition, time)
@@ -259,28 +273,28 @@ class UniversalGuidance(ScoreAdaptation):
 
 
 @dataclass
-class IntervalGuidanceCfg:
+class IntervalGuidanceConfig:
     lower_bound: Optional[Union[float, Tensor]]
     upper_bound: Optional[Union[float, Tensor]]
     mask: Optional[Tensor] = None
     scale_factor: float = 0.5
 
 
-@register_guidance_method("interval", IntervalGuidanceCfg)
+@register_guidance_method("interval", IntervalGuidanceConfig)
 class IntervalGuidance(UniversalGuidance):
     def __init__(
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
-        cfg: IntervalGuidanceCfg,
-        device: str = "cpu",
-    ):
+        config: IntervalGuidanceConfig,
+        device: Union[str, torch.device] = "cpu",
+    ) -> None:
         """Implements interval guidance to constrain parameters within bounds.
 
         Args:
             score_estimator: The score estimator.
             prior: The prior distribution.
-            cfg: Configuration specifying the interval bounds.
+            config: Configuration specifying the interval bounds.
             device: The device on which to evaluate the potential.
 
         References:
@@ -288,40 +302,40 @@ class IntervalGuidance(UniversalGuidance):
         """
 
         def interval_fn(input, condition, m, std):
-            if cfg.lower_bound is None and cfg.upper_bound is None:
+            if config.lower_bound is None and config.upper_bound is None:
                 raise ValueError(
                     "At least one of lower_bound or upper_bound is required. Otherwise"
                     " the guidance function has no effect."
                 )
 
-            scale = cfg.scale_factor / (m**2 * std**2)
+            scale = config.scale_factor / (m**2 * std**2)
             upper_bound = (
-                F.logsigmoid(-scale * (input - cfg.upper_bound))
-                if cfg.upper_bound is not None
+                F.logsigmoid(-scale * (input - config.upper_bound))
+                if config.upper_bound is not None
                 else torch.zeros_like(input)
             )
             lower_bound = (
-                F.logsigmoid(scale * (input - cfg.lower_bound))
-                if cfg.lower_bound is not None
+                F.logsigmoid(scale * (input - config.lower_bound))
+                if config.lower_bound is not None
                 else torch.zeros_like(input)
             )
             out = upper_bound + lower_bound
-            if cfg.mask is not None:
-                if cfg.mask.shape != out.shape:
-                    cfg.mask = cfg.mask.unsqueeze(0).expand_as(out)
-                out = torch.where(cfg.mask, out, torch.zeros_like(out))
+            if config.mask is not None:
+                if config.mask.shape != out.shape:
+                    config.mask = config.mask.unsqueeze(0).expand_as(out)
+                out = torch.where(config.mask, out, torch.zeros_like(out))
             return out
 
         super().__init__(
             vf_estimator,
             prior,
-            UniversalGuidanceCfg(guidance_fn=interval_fn),
+            UniversalGuidanceConfig(guidance_fn=interval_fn),
             device=device,
         )
 
 
 @dataclass
-class PriorGuideCfg:
+class PriorGuideConfig:
     train_prior: Distribution
     test_prior: Distribution
     K: int = 5
@@ -333,15 +347,15 @@ class PriorGuideCfg:
     max_log_ratio: float = 50.0
 
 
-@register_guidance_method("prior_guide", PriorGuideCfg)
+@register_guidance_method("prior_guide", PriorGuideConfig)
 class PriorGuide(ScoreAdaptation):
     def __init__(
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
-        cfg: PriorGuideCfg,
-        device: str = "cpu",
-    ):
+        config: PriorGuideConfig,
+        device: Union[str, torch.device] = "cpu",
+    ) -> None:
         """Prior guidance via a GMM approximation of the prior ratio and
         leveraging the backward kernel of the diffusion process to
         accurately compute the marginal adjusted posterior score [1].
@@ -349,7 +363,7 @@ class PriorGuide(ScoreAdaptation):
         Args:
             vf_estimator: The score estimator.
             prior: The training prior distribution.
-            cfg: PriorGuide configuration, including train/test priors and K.
+            config: PriorGuide configuration, including train/test priors and K.
             device: The device on which to evaluate the potential.
 
         References:
@@ -363,17 +377,17 @@ class PriorGuide(ScoreAdaptation):
             raise ValueError(
                 "Marginals are not defined for this vector field estimator."
             )
-        self.cfg = cfg
+        self.config = config
         self.weights, self.means, self.cov = fit_gmm_ratio(
-            cfg.train_prior,
-            cfg.test_prior,
-            int(cfg.K),
-            num_steps=cfg.num_steps,
-            batch_size=cfg.batch_size,
-            lr=cfg.lr,
-            covariance_type=cfg.covariance_type,
-            min_cov=cfg.min_cov,
-            max_log_ratio=cfg.max_log_ratio,
+            config.train_prior,
+            config.test_prior,
+            int(config.K),
+            num_steps=config.num_steps,
+            batch_size=config.batch_size,
+            lr=config.lr,
+            covariance_type=config.covariance_type,
+            min_cov=config.min_cov,
+            max_log_ratio=config.max_log_ratio,
             device=device,
         )
         super().__init__(vf_estimator, prior, device)
@@ -383,10 +397,12 @@ class PriorGuide(ScoreAdaptation):
         # NOTE: This can be improved similar to the AutoGauss or
         # JAC methods for IIDScoreFunctions i.e. this assumes
         # identity covariance but one can also use an estimator
-        # of the posterior covaraince.
+        # of the posterior covariance.
         return std**2 / (1.0 + std**2)
 
-    def __call__(self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None):
+    def __call__(
+        self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None
+    ) -> Tensor:
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
 
@@ -402,7 +418,7 @@ class PriorGuide(ScoreAdaptation):
         sigma0_t2 = sigma0_t2.reshape(-1)
         if sigma0_t2.numel() == 1:
             sigma0_t2 = sigma0_t2.expand(mu0.shape[-1])
-        if self.cfg.covariance_type == "diag":
+        if self.config.covariance_type == "diag":
             cov_e = self.cov + sigma0_t2
             diff = mu0[..., None, :] - self.means
             log_det = torch.log(cov_e).sum(-1)
@@ -426,7 +442,7 @@ class PriorGuide(ScoreAdaptation):
         w_tilde = numerator / denom
 
         diff = self.means - mu0[..., None, :]
-        if self.cfg.covariance_type == "diag":
+        if self.config.covariance_type == "diag":
             v_i = diff / cov_e
         else:
             # Solve per-component for full covariance; support shared or
@@ -448,14 +464,14 @@ class IIDScoreFunction(ABC):
         device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
-        This is a abstract base class wrapper for score estimators.
+        This is an abstract base class wrapper for score estimators.
 
         Subclasses are used to implement different methods for factorized distributions.
         For example, in the IID setting the posterior for N observations can be
         represented as a product of N "local" posteriors, divided by N-1 prior terms.
         This allows to efficiently extend "single" observation score estimators to a
-        sequence of IID observtions. Unfortunatly, this is not as simple as just summing
-        the scores minus the prior score, as in diffusion models the we also need to
+        sequence of IID observations. Unfortunately, this is not as simple as just summing
+        the scores minus the prior score, as in diffusion models we also need to
         represent the "marginal" posterior scores at time $t$. Even if the true
         posterior factorizes, the marginal true posterior at time $t>0$ does not and
         this requires some adjustments.
@@ -537,7 +553,7 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
         prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
     ) -> None:
         r"""
-        The FactorizedNPEScoreFunction implments the
+        The FactorizedNPEScoreFunction implements the
         "Factorized Neural Posterior Estimation" method for score-based models [1].
 
         This method does not apply the necessary corrections for the score function, but
@@ -546,7 +562,7 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
         $t > 0$.
         For a moderate number of factors, this hence does require post-hoc adjustment
         through e.g. predictor-corrector samplers to ensure stable convergence to the
-        correct terminal distiribution at $t=0$.
+        correct terminal distribution at $t=0$.
 
         Literature:
         - [1] Compositional Score Modeling for Simulation-Based Inference
@@ -621,7 +637,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
     ) -> None:
         r"""Base class for Gauss-corrected score function as proposed in [1].
 
-        Specificially a simple analytic correction for the marginal scores is derived
+        Specifically a simple analytic correction for the marginal scores is derived
         using Gaussian assumptions. This is a simple and efficient method to correct
         the score function for the marginal posterior, which was also shown to scale
         well to large sequence settings [1,2].
@@ -634,7 +650,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         Within this library we have an extensive set of tools to obtain analytic (or
         good approximations) for the most common prior distributions. The marginal
         posterior precision can be treated as a "hyperparameter" different estimation
-        methods are available, which will be subclased from this class.
+        methods are available, which will be subclassed from this class.
 
         Literature:
         - [1] Diffusion posterior sampling for simulation-based inference in tall data
@@ -709,7 +725,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         Returns:
             Marginal prior score.
         """
-        # NOTE: This is for the uniform distribution and distirbutions that do not
+        # NOTE: This is for the uniform distribution and distributions that do not
         # implement a log_prob.
         try:
             with torch.enable_grad():
@@ -756,7 +772,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
             except Exception as e:
                 msg = """This iid_method tries to denoise the prior distribution
                 analytically. For custom prior distributions (i.e. which do not
-                implemented the variance/covariance_matrix method) but inherit from
+                implement the variance/covariance_matrix method) but inherit from
                 standard prior distributions i.e. Normal or Uniform, this might lead to
                 errors. If you encounter this error, please raise an issue on the sbi
                 repository.
@@ -932,7 +948,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         device: Union[str, torch.device] = "cpu",
     ) -> None:
         r"""
-        This method extends the by estimating the posterior precision using
+        This method extends the base class by estimating the posterior precision using
         approximate posterior samples obtained from a diffusion model (using the
         vector_field_estimator) [1]. This method has a slight initialization overhead,
         but generally provides more accurate results than simple heuristics.
@@ -1003,7 +1019,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         Returns:
             Estimated posterior precision.
         """
-        # NOTE: This assumes that the objects dont change between calls to cache
+        # NOTE: This assumes that the objects don't change between calls to cache
         # the results efficiently.
 
         # NOTE: To avoid circular imports :(
@@ -1075,7 +1091,7 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         """
         d = inputs.shape[-1]
         with torch.enable_grad():
-            # NOTE: torch.func can be realtively unstable...
+            # NOTE: torch.func can be relatively unstable...
             jac_fn = torch.func.jacrev(  # type: ignore
                 lambda x: self.vector_field_estimator.score(x, conditions, time)
             )
@@ -1094,8 +1110,8 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         return denoising_posterior_precision
 
 
-def compute_score(p: Distribution, inputs: Tensor):
-    # NOTE The try except is for unifrom priors which do not have a grad, and
+def compute_score(p: Distribution, inputs: Tensor) -> Tensor:
+    # NOTE The try except is for uniform priors which do not have a grad, and
     # implementations that do not implement the log_prob method.
     try:
         with torch.enable_grad():
