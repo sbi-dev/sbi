@@ -103,17 +103,20 @@ def register_iid_method(
 
 
 class ScoreAdaptation(ABC):
+    """Abstract base class for manipulating score estimators to impose additional
+    constraints on the posterior via guidance.
+    """
+
     def __init__(
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],
         device: Union[str, torch.device] = "cpu",
     ) -> None:
-        """This class manages manipulating the score estimator to impose additional
-        constraints on the posterior via guidance.
+        """Initializes the score adaptation with an estimator, prior, and device.
 
         Args:
-            score_estimator: The score estimator.
+            vf_estimator: The vector field estimator.
             prior: The prior distribution.
             device: The device on which to evaluate the potential.
         """
@@ -143,6 +146,34 @@ class AffineClassifierFreeGuidanceConfig:
 
 @register_guidance_method("affine_classifier_free", AffineClassifierFreeGuidanceConfig)
 class AffineClassifierFreeGuidance(ScoreAdaptation):
+    r"""Classifier-free guidance via affine transformation of prior and likelihood
+    scores.
+
+    Decomposes the posterior score into a prior and likelihood component, then applies
+    independent scale and shift to each. This allows tempering the posterior, e.g.,
+    sharpening or flattening it.
+
+    Example:
+    --------
+
+    ::
+
+        from sbi.inference.potentials.vector_field_adaptor import (
+            AffineClassifierFreeGuidance,
+            AffineClassifierFreeGuidanceConfig,
+        )
+
+        config = AffineClassifierFreeGuidanceConfig(likelihood_scale=2.0)
+        guidance = AffineClassifierFreeGuidance(
+            vf_estimator, prior, config, device="cpu"
+        )
+        adjusted_score = guidance(input, condition, time)
+
+    References:
+    - [1] Classifier-Free Diffusion Guidance (2022)
+    - [2] All-in-one simulation-based inference (2024)
+    """
+
     def __init__(
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
@@ -150,24 +181,13 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         config: AffineClassifierFreeGuidanceConfig,
         device: Union[str, torch.device] = "cpu",
     ) -> None:
-        """This class manages manipulating the score estimator to temper or shift the
-        prior and likelihood.
-
-        This is usually known as classifier-free guidance. And works by decomposing the
-        posterior score into a prior and likelihood component. These can then be scaled
-        and shifted to impose change the posterior to p
+        """Initializes affine classifier-free guidance.
 
         Args:
-            score_estimator: The score estimator.
-            prior: The prior distribution.
-            config: Configuration for the affine classifier-free guidance. This includes
-                the scale and shift applied to the prior and likelihood contributions.
+            vf_estimator: The vector field estimator.
+            prior: The prior distribution (required).
+            config: Scale and shift parameters for the prior and likelihood.
             device: The device on which to evaluate the potential.
-
-        References:
-        - [1] Classifier-Free Diffusion Guidance (2022)
-        - [2] All-in-one simulation-based inference (2024)
-
         """
 
         if prior is None:
@@ -215,6 +235,33 @@ class UniversalGuidanceConfig:
 
 @register_guidance_method("universal", UniversalGuidanceConfig)
 class UniversalGuidance(ScoreAdaptation):
+    r"""Score guidance using a user-supplied differentiable guidance function.
+
+    Adds a guidance term to the score by applying Tweedie's formula to denoise the
+    input and then computing the gradient of a custom guidance function. If no
+    analytic gradient is provided, it is obtained via ``torch.autograd``.
+
+    Example:
+    --------
+
+    ::
+
+        from sbi.inference.potentials.vector_field_adaptor import (
+            UniversalGuidance,
+            UniversalGuidanceConfig,
+        )
+
+        def my_guidance(input, condition, m, std):
+            return -((input - condition) ** 2).sum(-1, keepdim=True)
+
+        config = UniversalGuidanceConfig(guidance_fn=my_guidance)
+        guidance = UniversalGuidance(vf_estimator, prior, config)
+        adjusted_score = guidance(input, condition, time)
+
+    References:
+    - [1] Universal Guidance for Diffusion Models (2022)
+    """
+
     def __init__(
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
@@ -222,19 +269,13 @@ class UniversalGuidance(ScoreAdaptation):
         config: UniversalGuidanceConfig,
         device: Union[str, torch.device] = "cpu",
     ) -> None:
-        """This class manages manipulating the score estimator using a custom guidance
-        function.
+        """Initializes universal guidance with a custom guidance function.
 
         Args:
-            score_estimator: The score estimator.
+            vf_estimator: The vector field estimator.
             prior: The prior distribution.
-            config: Configuration for the universal guidance.
+            config: Configuration containing the guidance function.
             device: The device on which to evaluate the potential.
-
-
-
-        References:
-        - [1] Universal Guidance for Diffusion Models (2022)
         """
         self.guidance_fn = config.guidance_fn
 
@@ -282,6 +323,30 @@ class IntervalGuidanceConfig:
 
 @register_guidance_method("interval", IntervalGuidanceConfig)
 class IntervalGuidance(UniversalGuidance):
+    r"""Guidance that constrains parameters to lie within specified bounds.
+
+    Uses soft log-sigmoid penalties to steer samples toward an interval
+    ``[lower_bound, upper_bound]``. Built on top of
+    :class:`UniversalGuidance`.
+
+    Example:
+    --------
+
+    ::
+
+        from sbi.inference.potentials.vector_field_adaptor import (
+            IntervalGuidance,
+            IntervalGuidanceConfig,
+        )
+
+        config = IntervalGuidanceConfig(lower_bound=0.0, upper_bound=1.0)
+        guidance = IntervalGuidance(vf_estimator, prior, config)
+        adjusted_score = guidance(input, condition, time)
+
+    References:
+    - [1] All-in-one simulation-based inference (2024)
+    """
+
     def __init__(
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
@@ -289,16 +354,13 @@ class IntervalGuidance(UniversalGuidance):
         config: IntervalGuidanceConfig,
         device: Union[str, torch.device] = "cpu",
     ) -> None:
-        """Implements interval guidance to constrain parameters within bounds.
+        """Initializes interval guidance with bound constraints.
 
         Args:
-            score_estimator: The score estimator.
+            vf_estimator: The vector field estimator.
             prior: The prior distribution.
             config: Configuration specifying the interval bounds.
             device: The device on which to evaluate the potential.
-
-        References:
-        - [2] All-in-one simulation-based inference (2024)
         """
 
         def interval_fn(input, condition, m, std):
@@ -349,6 +411,30 @@ class PriorGuideConfig:
 
 @register_guidance_method("prior_guide", PriorGuideConfig)
 class PriorGuide(ScoreAdaptation):
+    r"""Prior guidance via a GMM approximation of the prior ratio.
+
+    Fits a Gaussian mixture model to the ratio between a training prior and a
+    test prior, then leverages the backward kernel of the diffusion process to
+    accurately compute the marginal adjusted posterior score.
+
+    Example:
+    --------
+
+    ::
+
+        from sbi.inference.potentials.vector_field_adaptor import (
+            PriorGuide,
+            PriorGuideConfig,
+        )
+
+        config = PriorGuideConfig(train_prior=train_prior, test_prior=test_prior, K=5)
+        guidance = PriorGuide(vf_estimator, train_prior, config)
+        adjusted_score = guidance(input, condition, time)
+
+    References:
+    - [1] "Prior Guidance for Diffusion Models" (arXiv:2510.13763)
+    """
+
     def __init__(
         self,
         vf_estimator: ConditionalVectorFieldEstimator,
@@ -356,18 +442,13 @@ class PriorGuide(ScoreAdaptation):
         config: PriorGuideConfig,
         device: Union[str, torch.device] = "cpu",
     ) -> None:
-        """Prior guidance via a GMM approximation of the prior ratio and
-        leveraging the backward kernel of the diffusion process to
-        accurately compute the marginal adjusted posterior score [1].
+        """Initializes prior guidance and fits the GMM ratio approximation.
 
         Args:
-            vf_estimator: The score estimator.
-            prior: The training prior distribution.
+            vf_estimator: The vector field estimator.
+            prior: The training prior distribution (required).
             config: PriorGuide configuration, including train/test priors and K.
             device: The device on which to evaluate the potential.
-
-        References:
-        - [1] "Prior Guidance for Diffusion Models" (arXiv:2510.13763)
         """
         if prior is None:
             raise ValueError(
@@ -457,24 +538,21 @@ class PriorGuide(ScoreAdaptation):
 
 
 class IIDScoreFunction(ABC):
+    r"""Abstract base class for IID score accumulation methods.
+
+    In the IID setting the posterior for N observations can be represented as a
+    product of N "local" posteriors, divided by N-1 prior terms. Subclasses
+    implement different strategies for computing the marginal posterior score at
+    time :math:`t`, which does not factorize even when the true posterior does.
+    """
+
     def __init__(
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Distribution,  # type: ignore
         device: Union[str, torch.device] = "cpu",
     ) -> None:
-        r"""
-        This is an abstract base class wrapper for score estimators.
-
-        Subclasses are used to implement different methods for factorized distributions.
-        For example, in the IID setting the posterior for N observations can be
-        represented as a product of N "local" posteriors, divided by N-1 prior terms.
-        This allows to efficiently extend "single" observation score estimators to a
-        sequence of IID observations. Unfortunately, this is not as simple as just summing
-        the scores minus the prior score, as in diffusion models we also need to
-        represent the "marginal" posterior scores at time $t$. Even if the true
-        posterior factorizes, the marginal true posterior at time $t>0$ does not and
-        this requires some adjustments.
+        """Initializes the IID score function with validation checks.
 
         Args:
             vector_field_estimator: The neural network modeling the score.
@@ -545,6 +623,29 @@ class IIDScoreFunction(ABC):
 
 @register_iid_method("fnpe")
 class FactorizedNPEScoreFunction(IIDScoreFunction):
+    r"""Factorized Neural Posterior Estimation for score-based models.
+
+    Accumulates per-observation scores with a weighted prior subtraction. Does not
+    apply corrections for the marginal score at :math:`t > 0`, so post-hoc adjustment
+    (e.g., predictor-corrector samplers) may be needed for many observations.
+
+    Example:
+    --------
+
+    ::
+
+        from sbi.inference.potentials.vector_field_adaptor import (
+            FactorizedNPEScoreFunction,
+        )
+
+        iid_score = FactorizedNPEScoreFunction(vf_estimator, prior)
+        score = iid_score(inputs, conditions, time)  # inputs: [b, iid, d]
+
+    References:
+    - [1] Compositional Score Modeling for Simulation-Based Inference
+        (https://arxiv.org/abs/2209.14249)
+    """
+
     def __init__(
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
@@ -552,21 +653,7 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
         device: Union[str, torch.device] = "cpu",
         prior_score_weight: Optional[Callable[[Tensor], Tensor]] = None,
     ) -> None:
-        r"""
-        The FactorizedNPEScoreFunction implements the
-        "Factorized Neural Posterior Estimation" method for score-based models [1].
-
-        This method does not apply the necessary corrections for the score function, but
-        instead uses a simple weighting of the prior score. This is generally applicable
-        and simple but does in general not return the correct marginal score for any
-        $t > 0$.
-        For a moderate number of factors, this hence does require post-hoc adjustment
-        through e.g. predictor-corrector samplers to ensure stable convergence to the
-        correct terminal distribution at $t=0$.
-
-        Literature:
-        - [1] Compositional Score Modeling for Simulation-Based Inference
-            (https://arxiv.org/abs/2209.14249)
+        """Initializes factorized NPE score accumulation.
 
         Args:
             vector_field_estimator: The neural network modeling the score.
@@ -627,6 +714,20 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
 
 
 class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
+    r"""Base class for Gauss-corrected IID score accumulation.
+
+    Derives an analytic correction for the marginal scores under Gaussian
+    assumptions. Subclasses provide different strategies for estimating the
+    posterior precision (see :class:`GaussCorrectedScoreFn`,
+    :class:`AutoGaussCorrectedScoreFn`, :class:`JacCorrectedScoreFn`).
+
+    References:
+    - [1] Diffusion posterior sampling for simulation-based inference in tall data
+        settings (https://arxiv.org/abs/2404.07593)
+    - [2] Compositional simulation-based inference for time series
+        (https://arxiv.org/abs/2411.02728)
+    """
+
     def __init__(
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
@@ -635,28 +736,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         lam_psd_nugget: float = 0.01,
         device: Union[str, torch.device] = "cpu",
     ) -> None:
-        r"""Base class for Gauss-corrected score function as proposed in [1].
-
-        Specifically a simple analytic correction for the marginal scores is derived
-        using Gaussian assumptions. This is a simple and efficient method to correct
-        the score function for the marginal posterior, which was also shown to scale
-        well to large sequence settings [1,2].
-
-        A limitation of the method is that it requires following inputs:
-        - The marginal prior distribution (which might be non-trivial to compute)
-        - The marginal posterior precision (which is generally not available, and needs
-            to be estimated).
-
-        Within this library we have an extensive set of tools to obtain analytic (or
-        good approximations) for the most common prior distributions. The marginal
-        posterior precision can be treated as a "hyperparameter" different estimation
-        methods are available, which will be subclassed from this class.
-
-        Literature:
-        - [1] Diffusion posterior sampling for simulation-based inference in tall data
-            settings (https://arxiv.org/abs/2404.07593)
-        - [2] Compositional simulation-based inference for time series
-            (https://arxiv.org/abs/2411.02728)
+        """Initializes Gauss-corrected score accumulation.
 
         Args:
             vector_field_estimator: The neural network modelling the score.
@@ -853,6 +933,25 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
 
 @register_iid_method("gauss")
 class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
+    r"""Gauss-corrected IID scores with a heuristic posterior precision estimate.
+
+    Estimates the posterior precision by scaling the prior precision by a fixed
+    factor, assuming that the data is informative enough for the posterior to be
+    narrower than the prior.
+
+    Example:
+    --------
+
+    ::
+
+        from sbi.inference.potentials.vector_field_adaptor import (
+            GaussCorrectedScoreFn,
+        )
+
+        iid_score = GaussCorrectedScoreFn(vf_estimator, prior)
+        score = iid_score(inputs, conditions, time)  # inputs: [b, iid, d]
+    """
+
     def __init__(
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
@@ -863,18 +962,14 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         lam_psd_nugget: float = 0.01,
         device: Union[str, torch.device] = "cpu",
     ) -> None:
-        r"""
-        This extends the BaseGaussCorrectedScoreFunction to provide a simple method to
-        heuristically estimate the posterior precision. Assuming that data is
-        informative enough, the posterior precision should be higher than the prior
-        precision. This method simply scales the prior precision by a factor.
+        """Initializes Gauss-corrected scores with a heuristic precision estimate.
 
         Args:
             vector_field_estimator: The neural network modeling the score.
             prior: The prior distribution.
             posterior_precision: Optional preset posterior precision.
-            scale_from_prior_precision: If not provided it simply increases the prior
-                precision by this factor.
+            scale_from_prior_precision: Factor to scale the prior precision by when
+                ``posterior_precision`` is not provided.
             enable_lam_psd: Whether to ensure the precision matrix is positive definite.
             lam_psd_nugget: The nugget value to ensure positive definiteness.
             device: The device on which to evaluate the potential. Defaults to "cpu".
@@ -936,6 +1031,25 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 
 @register_iid_method("auto_gauss")
 class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
+    r"""Gauss-corrected IID scores with automatic posterior precision estimation.
+
+    Estimates the posterior precision by drawing approximate samples from each
+    per-observation posterior using the vector field estimator. Has a slight
+    initialization overhead but is generally more accurate than a fixed heuristic.
+
+    Example:
+    --------
+
+    ::
+
+        from sbi.inference.potentials.vector_field_adaptor import (
+            AutoGaussCorrectedScoreFn,
+        )
+
+        iid_score = AutoGaussCorrectedScoreFn(vf_estimator, prior)
+        score = iid_score(inputs, conditions, time)  # inputs: [b, iid, d]
+    """
+
     def __init__(
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
@@ -947,11 +1061,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         precision_initial_sampler_steps: int = 100,
         device: Union[str, torch.device] = "cpu",
     ) -> None:
-        r"""
-        This method extends the base class by estimating the posterior precision using
-        approximate posterior samples obtained from a diffusion model (using the
-        vector_field_estimator) [1]. This method has a slight initialization overhead,
-        but generally provides more accurate results than simple heuristics.
+        """Initializes Gauss-corrected scores with automatic precision estimation.
 
         Args:
             vector_field_estimator: The neural network modeling the score.
