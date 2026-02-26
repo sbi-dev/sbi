@@ -5,7 +5,7 @@ import functools
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Optional, Type, Union
+from typing import Callable, Optional, Type, TypeVar, Union
 
 import torch
 import torch.nn.functional as F
@@ -25,6 +25,9 @@ from sbi.utils.vector_field_utils import (
 
 IID_METHODS: dict[str, Type["IIDScoreFunction"]] = {}
 GUIDANCE_METHODS: dict[str, tuple[Type["ScoreAdaptation"], Optional[Type]]] = {}
+
+ScoreAdaptationT = TypeVar("ScoreAdaptationT", bound="ScoreAdaptation")
+IIDScoreFunctionT = TypeVar("IIDScoreFunctionT", bound="IIDScoreFunction")
 
 
 def get_iid_method(name: str) -> Type["IIDScoreFunction"]:
@@ -63,7 +66,7 @@ def get_guidance_method(
 
 def register_guidance_method(
     name: str, default_config: Optional[Type] = None
-) -> Callable[[Type["ScoreAdaptation"]], Type["ScoreAdaptation"]]:
+) -> Callable[[Type[ScoreAdaptationT]], Type[ScoreAdaptationT]]:
     r"""
     Registers a guidance method and its default configuration.
 
@@ -75,7 +78,7 @@ def register_guidance_method(
         A decorator function to register the guidance method class.
     """
 
-    def decorator(cls: Type["ScoreAdaptation"]) -> Type["ScoreAdaptation"]:
+    def decorator(cls: Type[ScoreAdaptationT]) -> Type[ScoreAdaptationT]:
         GUIDANCE_METHODS[name] = (cls, default_config)
         return cls
 
@@ -84,7 +87,7 @@ def register_guidance_method(
 
 def register_iid_method(
     name: str,
-) -> Callable[[Type["IIDScoreFunction"]], Type["IIDScoreFunction"]]:
+) -> Callable[[Type[IIDScoreFunctionT]], Type[IIDScoreFunctionT]]:
     r"""
     Registers an IID method.
 
@@ -95,7 +98,7 @@ def register_iid_method(
         A decorator function to register the IID method class.
     """
 
-    def decorator(cls: Type["IIDScoreFunction"]) -> Type["IIDScoreFunction"]:
+    def decorator(cls: Type[IIDScoreFunctionT]) -> Type[IIDScoreFunctionT]:
         IID_METHODS[name] = cls
         return cls
 
@@ -138,6 +141,15 @@ class ScoreAdaptation(ABC):
 
 @dataclass
 class AffineClassifierFreeGuidanceConfig:
+    """Configuration for :class:`AffineClassifierFreeGuidance`.
+
+    Attributes:
+        prior_scale: Multiplicative factor applied to the prior score.
+        prior_shift: Additive shift applied to the prior score.
+        likelihood_scale: Multiplicative factor applied to the likelihood score.
+        likelihood_shift: Additive shift applied to the likelihood score.
+    """
+
     prior_scale: Union[float, Tensor] = 1.0
     prior_shift: Union[float, Tensor] = 0.0
     likelihood_scale: Union[float, Tensor] = 1.0
@@ -227,6 +239,13 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
 
 @dataclass
 class UniversalGuidanceConfig:
+    """Configuration for :class:`UniversalGuidance`.
+
+    Attributes:
+        guidance_fn: Differentiable scalar guidance function.
+        guidance_fn_score: Optional analytic score of ``guidance_fn``.
+    """
+
     guidance_fn: Callable[[Tensor, Tensor, Tensor, Tensor], Tensor]
     guidance_fn_score: Optional[Callable[[Tensor, Tensor, Tensor, Tensor], Tensor]] = (
         None
@@ -281,7 +300,9 @@ class UniversalGuidance(ScoreAdaptation):
 
         if config.guidance_fn_score is None:
 
-            def guidance_fn_score(input, condition, m, std):
+            def guidance_fn_score(
+                input: Tensor, condition: Tensor, m: Tensor, std: Tensor
+            ) -> Tensor:
                 with torch.enable_grad():
                     input = input.detach().clone().requires_grad_(True)
                     score = torch.autograd.grad(
@@ -315,10 +336,32 @@ class UniversalGuidance(ScoreAdaptation):
 
 @dataclass
 class IntervalGuidanceConfig:
+    """Configuration for :class:`IntervalGuidance`.
+
+    Attributes:
+        lower_bound: Optional lower bound for parameters.
+        upper_bound: Optional upper bound for parameters.
+        mask: Optional boolean mask selecting constrained dimensions.
+        scale_factor: Soft-constraint strength.
+    """
+
     lower_bound: Optional[Union[float, Tensor]]
     upper_bound: Optional[Union[float, Tensor]]
     mask: Optional[Tensor] = None
     scale_factor: float = 0.5
+
+    def __post_init__(self) -> None:
+        if self.lower_bound is None and self.upper_bound is None:
+            raise ValueError("At least one of lower_bound or upper_bound is required.")
+        if (
+            self.lower_bound is not None
+            and self.upper_bound is not None
+            and self.lower_bound >= self.upper_bound
+        ):
+            raise ValueError(
+                f"lower_bound ({self.lower_bound}) must be less than "
+                f"upper_bound ({self.upper_bound})."
+            )
 
 
 @register_guidance_method("interval", IntervalGuidanceConfig)
@@ -363,14 +406,11 @@ class IntervalGuidance(UniversalGuidance):
             device: The device on which to evaluate the potential.
         """
 
-        def interval_fn(input, condition, m, std):
-            if config.lower_bound is None and config.upper_bound is None:
-                raise ValueError(
-                    "At least one of lower_bound or upper_bound is required. Otherwise"
-                    " the guidance function has no effect."
-                )
-
-            scale = config.scale_factor / (m**2 * std**2)
+        def interval_fn(
+            input: Tensor, condition: Tensor, m: Tensor, std: Tensor
+        ) -> Tensor:
+            del condition
+            scale = config.scale_factor / (m**2 * std**2 + 1e-6)
             upper_bound = (
                 F.logsigmoid(-scale * (input - config.upper_bound))
                 if config.upper_bound is not None
@@ -398,6 +438,21 @@ class IntervalGuidance(UniversalGuidance):
 
 @dataclass
 class PriorGuideConfig:
+    """Configuration for :class:`PriorGuide`.
+
+    Attributes:
+        train_prior: Prior used during training.
+        test_prior: Prior used at inference time.
+        K: Number of GMM components.
+        num_steps: Optimization steps for ratio fitting.
+        batch_size: Batch size for ratio fitting.
+        lr: Learning rate for ratio fitting.
+        covariance_type: Covariance parameterization (``"diag"`` or ``"full"``).
+        min_cov: Minimum covariance value used during fitting.
+        max_log_ratio: Maximum log-ratio clipping value.
+        nugget: Numerical safety term for matrix and division stabilization.
+    """
+
     train_prior: Distribution
     test_prior: Distribution
     K: int = 5
@@ -407,6 +462,18 @@ class PriorGuideConfig:
     covariance_type: str = "diag"
     min_cov: float = 1e-4
     max_log_ratio: float = 50.0
+    nugget: float = 1e-6
+
+    def __post_init__(self) -> None:
+        if self.K < 1:
+            raise ValueError(f"K must be at least 1, got {self.K}.")
+        if self.covariance_type not in ("diag", "full"):
+            raise ValueError(
+                f"covariance_type must be 'diag' or 'full', "
+                f"got '{self.covariance_type}'."
+            )
+        if self.nugget < 0:
+            raise ValueError(f"nugget must be non-negative, got {self.nugget}.")
 
 
 @register_guidance_method("prior_guide", PriorGuideConfig)
@@ -499,15 +566,19 @@ class PriorGuide(ScoreAdaptation):
         sigma0_t2 = sigma0_t2.reshape(-1)
         if sigma0_t2.numel() == 1:
             sigma0_t2 = sigma0_t2.expand(mu0.shape[-1])
+        nugget = self.config.nugget
         if self.config.covariance_type == "diag":
-            cov_e = self.cov + sigma0_t2
+            cov_e = self.cov + sigma0_t2 + nugget
             diff = mu0[..., None, :] - self.means
             log_det = torch.log(cov_e).sum(-1)
             quad = (diff**2 / cov_e).sum(-1)
             d = diff.shape[-1]
             log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
         else:
-            cov_e = self.cov + torch.diag_embed(sigma0_t2)
+            nugget_eye = nugget * torch.eye(
+                sigma0_t2.shape[-1], device=sigma0_t2.device
+            )
+            cov_e = self.cov + torch.diag_embed(sigma0_t2) + nugget_eye
             diff = mu0[..., None, :] - self.means
             chol = torch.linalg.cholesky(cov_e)
             diff_col = diff[..., None]
@@ -519,7 +590,7 @@ class PriorGuide(ScoreAdaptation):
 
         numerator = self.weights[None, :] * torch.exp(log_comp)
         denom = numerator.sum(dim=1, keepdim=True)
-        denom = torch.where(denom.abs() < 1e-12, torch.full_like(denom, 1e-12), denom)
+        denom = torch.clamp(denom, min=nugget)
         w_tilde = numerator / denom
 
         diff = self.means - mu0[..., None, :]
@@ -532,7 +603,7 @@ class PriorGuide(ScoreAdaptation):
 
         v = torch.sum(w_tilde[..., None] * v_i, dim=-2)
         mu0_adjusted = mu0 + std**2 * v
-        score_adjusted = (mu0_adjusted * m - input_) / (std**2)
+        score_adjusted = (mu0_adjusted * m - input_) / (std**2 + nugget)
 
         return score_adjusted
 
@@ -666,7 +737,7 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
         if prior_score_weight is None:
             t_max = vector_field_estimator.t_max
 
-            def prior_score_weight_fn(t):
+            def prior_score_weight_fn(t: Tensor) -> Tensor:
                 return (t_max - t) / t_max
 
         self.prior_score_weight_fn = prior_score_weight_fn
@@ -982,7 +1053,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             posterior_precision = self.estimate_prior_precision(
                 prior, scale_from_prior_precision
             )
-
+        assert posterior_precision is not None
         self.posterior_precision = posterior_precision
 
     def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
@@ -1221,8 +1292,18 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 
 
 def compute_score(p: Distribution, inputs: Tensor) -> Tensor:
-    # NOTE The try except is for uniform priors which do not have a grad, and
-    # implementations that do not implement the log_prob method.
+    """Computes the score (gradient of log-probability) of a distribution.
+
+    Falls back to zero if the distribution does not support ``log_prob`` or
+    autodiff (e.g., uniform priors).
+
+    Args:
+        p: The distribution to compute the score for.
+        inputs: The points at which to evaluate the score.
+
+    Returns:
+        The score tensor, same shape as ``inputs``.
+    """
     try:
         with torch.enable_grad():
             inputs = inputs.detach().clone().requires_grad_(True)
