@@ -50,6 +50,7 @@ Training
 - :doc:`how_to_guide/07_save_and_load`
 - :doc:`how_to_guide/07_resume_training`
 - :doc:`how_to_guide/21_hyperparameter_tuning`
+- :doc:`how_to_guide/22_experiment_tracking`
 
 
 Sampling
