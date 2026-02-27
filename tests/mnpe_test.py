@@ -154,7 +154,10 @@ def test_batched_sampling(num_simulations: int = 100):
 @pytest.mark.parametrize("embedding_net", (torch.nn.Identity(), FCEmbedding(1, 1)))
 @pytest.mark.parametrize("dropout_probability", (0.0, 0.5))
 def test_mnpe_api(
-    flow_model: str, z_score_x: str, embedding_net: nn.Module, dropout_probability: float,
+    flow_model: str,
+    z_score_x: str,
+    embedding_net: nn.Module,
+    dropout_probability: float,
 ):
     """Test MNPE API."""
 

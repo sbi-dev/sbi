@@ -124,8 +124,9 @@ def _build_mixed_density_estimator(
         log_transform_x: whether to apply a log-transform to x to move it to unbounded
             space, e.g., in case x consists of reaction time data (bounded by
             zero).
-        kwargs: additional keyword arguments passed to the flow model and the categorical
-            net. Supports dropout_probability for regularization (default 0.0).
+        kwargs: additional keyword arguments passed to the flow model and the
+            categorical net. Supports dropout_probability for regularization
+            (default 0.0).
 
     Returns:
         MixedDensityEstimator: nn.Module for performing MNLE or MNPE.
