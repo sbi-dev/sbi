@@ -16,6 +16,7 @@ from sbi.neural_nets.net_builders.flow import (
     build_maf,
     build_maf_rqs,
     build_nsf,
+    build_tabpfn_flow,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -55,6 +56,7 @@ model_builders = {
     "zuko_unaf": build_zuko_unaf,
     "zuko_gf": build_zuko_gf,
     "zuko_bpf": build_zuko_bpf,
+    "tabpfn": build_tabpfn_flow,
 }
 
 

@@ -20,7 +20,7 @@ from sbi.utils.sbiutils import (
     mcmc_transform,
     within_support,
 )
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, infer_module_device
 
 
 def posterior_estimator_based_potential(
@@ -49,7 +49,7 @@ def posterior_estimator_based_potential(
         to unconstrained space.
     """
 
-    device = str(next(posterior_estimator.parameters()).device)
+    device = infer_module_device(posterior_estimator, fallback="cpu")
 
     potential_fn = PosteriorBasedPotential(
         posterior_estimator, prior, x_o, device=device
