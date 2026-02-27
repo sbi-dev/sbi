@@ -124,7 +124,8 @@ def _build_mixed_density_estimator(
         log_transform_x: whether to apply a log-transform to x to move it to unbounded
             space, e.g., in case x consists of reaction time data (bounded by
             zero).
-        kwargs: additional keyword arguments passed to the flow model.
+        kwargs: additional keyword arguments passed to the flow model and the
+            categorical net. 
 
     Returns:
         MixedDensityEstimator: nn.Module for performing MNLE or MNPE.
@@ -168,6 +169,7 @@ def _build_mixed_density_estimator(
         num_layers=hidden_layers,
         embedding_net=embedding_net,
         num_categories_per_variable=num_categories_per_variable,
+        dropout_probability=kwargs.get("dropout_probability", 0.0),
     )
 
     if combined_embedding_net is None:
@@ -179,6 +181,11 @@ def _build_mixed_density_estimator(
             nn.Linear(hidden_features, hidden_features),
             nn.ReLU(),
         )
+
+    # zuko-based flow models do not support dropout_probability; remove it from kwargs
+    # so it is only applied to the categorical net.
+    if flow_model.startswith("zuko"):
+        kwargs.pop("dropout_probability", None)
 
     # Set up a flow for modelling the continuous data, conditioned on the discrete data.
     continuous_net = model_builders[flow_model](
