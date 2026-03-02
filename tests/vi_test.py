@@ -95,7 +95,7 @@ def _build_linear_gaussian_setup(trainer_type: str = "nle"):
     torch.manual_seed(42)
 
     num_dim = 2
-    num_simulations = 6000
+    num_simulations = 7000
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.25 * eye(num_dim)

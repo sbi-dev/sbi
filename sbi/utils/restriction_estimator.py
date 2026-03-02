@@ -7,7 +7,7 @@ from typing import Any, Callable, Literal, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
-from pyknos.nflows.nn import nets
+from nflows.nn import nets
 from torch import Tensor, nn, relu
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_

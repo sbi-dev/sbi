@@ -6,10 +6,10 @@ from typing import List, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 import zuko
-from pyknos.nflows import distributions as distributions_
-from pyknos.nflows import flows, transforms
-from pyknos.nflows.nn import nets
-from pyknos.nflows.transforms.splines import (
+from nflows import distributions as distributions_
+from nflows import flows, transforms
+from nflows.nn import nets
+from nflows.transforms.splines import (
     rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8

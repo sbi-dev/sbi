@@ -16,7 +16,7 @@ from torch.distributions import (
     constraints,
 )
 
-from sbi.utils.torchutils import process_device
+from sbi.utils.torchutils import move_all_tensor_to_device, process_device
 
 
 def get_distribution_parameters(
@@ -61,8 +61,12 @@ def move_distribution_to_device(
         dist.to(device)  # type: ignore
         return dist
     else:
-        params = get_distribution_parameters(dist, device)
-        return type(dist)(**params)
+        try:
+            params = get_distribution_parameters(dist, device)
+            return type(dist)(**params)
+        except Exception:
+            move_all_tensor_to_device(dist, device)
+            return dist
 
 
 class CustomPriorWrapper(Distribution):

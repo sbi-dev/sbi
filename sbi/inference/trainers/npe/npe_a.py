@@ -52,7 +52,38 @@ class NPE_A(PosteriorEstimatorTrainer):
         with each round: if the proposal has L components and the density estimator
         has K components, the corrected posterior has L×K components. For many
         rounds, consider using SNPE-C (APT) instead, which handles multi-round
-        inference more efficiently."""
+        inference more efficiently.
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import NPE_A
+        from sbi.utils import BoxUniform
+
+        # 1. Setup simulator, prior, and observation
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        x_o = torch.randn(1, 3)  # Observed data
+
+        def simulator(theta):
+            return theta + torch.randn_like(theta) * 0.1
+
+        # 2. Multi-round inference
+        inference = NPE_A(prior=prior, num_components=5)
+        proposal = prior
+
+        for round_idx in range(5):
+            theta = proposal.sample((100,))
+            x = simulator(theta)
+            density_estimator = inference.append_simulations(theta, x).train()
+            posterior = inference.build_posterior(density_estimator)
+            proposal = posterior.set_default_x(x_o)
+
+        # 3. Sample from final posterior
+        samples = posterior.sample((1000,), x=x_o)
+    """
 
     def __init__(
         self,

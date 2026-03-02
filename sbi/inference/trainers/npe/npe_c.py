@@ -37,38 +37,52 @@ from sbi.utils.torchutils import BoxUniform, assert_all_finite
 
 
 class NPE_C(PosteriorEstimatorTrainer):
-    """Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]
+    r"""Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019) [1].
+
+    NPE-C (also known as APT - Automatic Posterior Transformation, aka SNPE-C) trains
+    a neural network over multiple rounds to directly approximate the posterior for a
+    specific observation x_o. In the first round, NPE-C is equivalent to other NPE
+    methods and is fully amortized (direct inference for any new observation). After
+    the first round, NPE-C automatically selects between two loss variants depending
+    on the chosen density estimator: the non-atomic loss (for Mixture of Gaussians)
+    which is stable and avoids leakage, or the atomic loss (for flows) which is more
+    flexible but may suffer from leakage issues.
+
+    For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
+    plain NLL loss.
 
     [1] *Automatic Posterior Transformation for Likelihood-free Inference*,
         Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
-    Like all NPE methods, this method trains a deep neural density estimator to
-    directly approximate the posterior. Also like all other NPE methods, in the
-    first round, this density estimator is trained with a maximum-likelihood loss.
+    Example:
+    --------
 
-    For the sequential mode in which the density estimator is trained across rounds,
-    this class implements two loss variants of NPE-C: the non-atomic and the atomic
-    version. The atomic loss of NPE-C can be used for any density estimator,
-    i.e. also for normalizing flows. However, it suffers from leakage issues. On
-    the other hand, the non-atomic loss can only be used only if the proposal
-    distribution is a mixture of Gaussians, the density estimator is a mixture of
-    Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from
-    leakage issues. At the beginning of each round, we print whether the non-atomic
-    or the atomic version is used.
+    ::
 
-    In this codebase, we will automatically switch to the non-atomic loss if the
-    following criteria are fulfilled:
+        import torch
+        from sbi.inference import NPE_C
+        from sbi.utils import BoxUniform
 
-    - proposal is a `DirectPosterior` with density_estimator `mdn`, as built with
-      `sbi.neural_nets.posterior_nn()`.
-    - the density estimator is a `mdn`, as built with
-      `sbi.neural_nets.posterior_nn()`.
-    - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or
-      ``isinstance(prior, sbi.utils.BoxUniform)``
+        # 1. Setup simulator, prior, and observation
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        x_o = torch.randn(1, 3)  # Observed data
 
-    Note that custom implementations of any of these densities (or estimators) will
-    not trigger the non-atomic loss, and the algorithm will fall back onto using
-    the atomic loss.
+        def simulator(theta):
+            return theta + torch.randn_like(theta) * 0.1
+
+        # 2. Multi-round inference
+        inference = NPE_C(prior=prior)
+        proposal = prior
+
+        for round_idx in range(5):
+            theta = proposal.sample((100,))
+            x = simulator(theta)
+            density_estimator = inference.append_simulations(theta, x).train()
+            posterior = inference.build_posterior(density_estimator)
+            proposal = posterior.set_default_x(x_o)
+
+        # 3. Sample from final posterior
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(

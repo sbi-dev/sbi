@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pyknos.nflows.nn import nets
+from nflows.nn import nets
 from torch import Tensor, nn, relu
 
 from sbi.neural_nets.ratio_estimators import RatioEstimator

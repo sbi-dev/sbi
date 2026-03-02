@@ -17,8 +17,8 @@ from typing import (
     Union,
 )
 
+import nflows.transforms as nflows_tf
 import numpy as np
-import pyknos.nflows.transforms as nflows_tf
 import torch
 import torch.distributions.transforms as torch_tf
 import zuko
@@ -1132,7 +1132,7 @@ def mog_log_prob(
     the batch. This is because these values were computed from a batch of $x$ (and the
     $x$ in the batch are not the same).
 
-    This code is similar to the code of mdn.py in pyknos, but it does not use
+    This code is similar to the MDN implementation in sbi, but it does not use
     log(det(Cov)) = -2*sum(log(diag(L))), L being Cholesky of Precision. Instead, it
     just computes log(det(Cov)). Also, it uses the above-defined helper
     `_batched_vmv()`.

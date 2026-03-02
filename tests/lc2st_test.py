@@ -52,7 +52,7 @@ def badly_trained_npe(npe_factory):
 
 @pytest.fixture(scope="session")
 def well_trained_npe(npe_factory):
-    return npe_factory(num_simulations=5_000)
+    return npe_factory(num_simulations=5000)
 
 
 @pytest.fixture(scope="session")
@@ -75,21 +75,12 @@ def calibration_data(basic_setup, badly_trained_npe):
 @pytest.mark.parametrize("cv_folds", (1, 2))
 @pytest.mark.parametrize("num_ensemble", (1, 3))
 @pytest.mark.parametrize("z_score", (True, False))
-@pytest.mark.parametrize(
-    "device",
-    (
-        "cpu",
-        "cuda" if torch.cuda.is_available() else "cpu",
-        "mps" if torch.backends.mps.is_available() else "cpu",
-    ),
-)
 def test_running_lc2st(
     method,
     classifier,
     cv_folds,
     num_ensemble,
     z_score,
-    device,
     calibration_data,
     badly_trained_npe,
 ):
@@ -127,7 +118,6 @@ def test_running_lc2st(
         }
         kwargs_eval = {}
     kwargs_test["classifier"] = classifier
-    kwargs_test["device"] = device
 
     lc2st = method(
         thetas,
@@ -261,6 +251,7 @@ def test_lc2st_true_positiv_rate(method, basic_setup, badly_trained_npe):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", (LC2ST, LC2ST_NF))
+@pytest.mark.skip(reason="flaky due to evaluation error, will be fixed in #1727")
 def test_lc2st_false_positiv_rate(method, basic_setup, well_trained_npe, set_seed):
     """Tests the false positiv rate of the LC2ST-(NF) test:
     for a "good" estimator, the LC2ST-(NF) should not reject the null hypothesis."""

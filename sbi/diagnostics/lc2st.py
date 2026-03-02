@@ -205,7 +205,10 @@ class LC2ST:
                         ),
                     )
                 ],
+<<<<<<< HEAD
                 "train_split": ValidSplit(cast(Any, 0.1)),
+=======
+>>>>>>> origin/main
                 "optimizer__weight_decay": 1e-4,
                 "device": self.device,
                 "verbose": 0,
@@ -772,10 +775,10 @@ def train_lc2st(
 
     # prepare data
     data = np.concatenate((joint_p, joint_q))
-    # labels
+    # labels (float32 for compatibility with BCEWithLogitsLoss in skorch)
     target = np.concatenate((
-        np.zeros((joint_p.shape[0],), dtype=np.int64),
-        np.ones((joint_q.shape[0],), dtype=np.int64),
+        np.zeros((joint_p.shape[0],), dtype=np.float32),
+        np.ones((joint_q.shape[0],), dtype=np.float32),
     ))
 
     # train classifier
@@ -862,6 +865,7 @@ class EnsembleClassifier(BaseEstimator):
             disable=self.verbosity < 1,
         ):
             clf = clone(self.clf)
+<<<<<<< HEAD
             if hasattr(clf, "random_state"):
                 if clf.random_state is not None:  # type: ignore[attr-defined]
                     clf.random_state += n  # type: ignore[attr-defined]
@@ -870,6 +874,13 @@ class EnsembleClassifier(BaseEstimator):
             else:
                 torch.manual_seed(n + 1)
                 np.random.seed(n + 1)
+=======
+            if hasattr(clf, 'random_state'):
+                if clf.random_state is not None:
+                    clf.random_state += n
+                else:
+                    clf.random_state = n + 1
+>>>>>>> origin/main
             clf.fit(X, y)  # type: ignore
             self.trained_clfs.append(clf)
 
