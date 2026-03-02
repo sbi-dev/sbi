@@ -126,40 +126,73 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
 
         Args:
             input: Inputs to evaluate the log probability on. Of shape
+                `(sample_dim, batch_dim, *event_shape)` or
+                `(batch_dim, *event_shape)`.
+            condition: Conditions of shape `(batch_dim, *event_shape)` or
                 `(sample_dim, batch_dim, *event_shape)`.
-            condition: Conditions of shape `(batch_dim, *event_shape)`.
 
         Raises:
             NotImplementedError: If `input` has a sample shape > 1. The reason
                 is that in MLE, discrete and continuous data are combined into one
                 condition, creating a mismatch if sample shapes are present because
                 the condition cannot have a sample shape.
-            AssertionError: If `input_batch_dim != condition_batch_dim`.
 
         Returns:
             Sample-wise log probabilities, shape `(input_sample_dim, input_batch_dim)`.
         """
 
+        input_event_dims = len(self.input_shape)
+        condition_event_dims = len(self.condition_shape)
+
+        # Allow input without explicit sample_dim.
+        has_sample_dim = input.dim() > input_event_dims + 1
+        if not has_sample_dim:
+            input = input.unsqueeze(0)
+
         assert input.dim() > 2, (
             "Input must be of shape (sample_dim, batch_dim, *event_shape)."
         )
         input_sample_dim, input_batch_dim = input.shape[:2]
-        condition_batch_dim = condition.shape[0]
-        combined_batch_size = input_sample_dim * input_batch_dim
 
-        assert condition_batch_dim == input_batch_dim, (
-            f"Batch shape of condition {condition_batch_dim} and input "
-            f"{input_batch_dim} do not match."
-        )
+        # Allow condition with or without sample_dim.
+        condition_has_sample_dim = condition.dim() > condition_event_dims + 1
+        if condition_has_sample_dim:
+            condition_batch_dim = condition.shape[1]
+        else:
+            condition_batch_dim = condition.shape[0]
+
+        # Broadcast batch dimensions.
+        batch_dim = torch.broadcast_shapes((input_batch_dim,), (condition_batch_dim,))[
+            0
+        ]
+        input = input.expand(input_sample_dim, batch_dim, *self.input_shape)
+        combined_batch_size = input_sample_dim * batch_dim
+
+        if condition_has_sample_dim:
+            condition = condition.expand(
+                input_sample_dim, batch_dim, *self.condition_shape
+            )
+            # Flatten sample_dim into batch for downstream use.
+            condition_flat = condition.reshape(
+                combined_batch_size, *self.condition_shape
+            )
+        else:
+            condition = condition.expand(batch_dim, *self.condition_shape)
+            condition_flat = condition
 
         num_discrete_variables = self.discrete_net.net.num_variables
         cont_input, disc_input = _separate_input(input, num_discrete_variables)
         # Embed continuous condition
-        embedded_condition = self.condition_embedding(condition)
-        # expand and repeat to match batch of inputs.
-        embedded_condition = embedded_condition.unsqueeze(0).repeat(
-            input_sample_dim, 1, 1
-        )
+        embedded_condition = self.condition_embedding(condition_flat)
+        if not condition_has_sample_dim:
+            # expand and repeat to match batch of inputs.
+            embedded_condition = embedded_condition.unsqueeze(0).repeat(
+                input_sample_dim, 1, 1
+            )
+        else:
+            embedded_condition = embedded_condition.reshape(
+                input_sample_dim, batch_dim, -1
+            )
         combined_condition = torch.cat((disc_input, embedded_condition), dim=-1)
         # reshape to match requirement that condition has no sample dim.
         combined_condition = combined_condition.reshape(combined_batch_size, -1)
@@ -189,7 +222,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         if self.log_transform_input:
             log_probs_combined -= torch.log(cont_input).sum(-1)
 
-        return log_probs_combined.reshape((input_sample_dim, input_batch_dim))
+        return log_probs_combined.reshape((input_sample_dim, batch_dim))
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return the loss for training the density estimator.
