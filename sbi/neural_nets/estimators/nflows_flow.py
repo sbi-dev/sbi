@@ -74,7 +74,7 @@ class NFlowsFlow(ConditionalDensityEstimator):
         noise = noise.reshape(batch_shape)
         return noise
 
-    def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+    def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
         i.e. batched conditions.
 
@@ -84,7 +84,6 @@ class NFlowsFlow(ConditionalDensityEstimator):
                 `(batch_dim, *event_shape)`.
             condition: Conditions of shape `(batch_dim, *event_shape)` or
                 `(sample_dim, batch_dim, *event_shape)`.
-            **kwargs: Additional arguments.
 
         Returns:
             Sample-wise log probabilities, shape `(sample_dim, batch_dim)`.
