@@ -21,7 +21,6 @@ in the ``sbi`` toolbox (e.g., how to choose the inference method?).
    how_to_guide/sampling
    how_to_guide/diagnostics
    how_to_guide/visualization
-   how_to_guide/posterior_parameters
 
 
 Prior and simulator
@@ -61,6 +60,7 @@ Sampling
 - :doc:`how_to_guide/11_iid_sampling_with_nle_or_nre`
 - :doc:`how_to_guide/12_mcmc_diagnostics_with_arviz`
 - :doc:`how_to_guide/23_using_pyro_with_sbi`
+- :doc:`how_to_guide/19_posterior_parameters`
 
 
 Diagnostics
@@ -78,9 +78,3 @@ Visualization
 -------------
 
 - :doc:`how_to_guide/05_conditional_distributions`
-
-
-Posterior Parameters
---------------------
-
-- :doc:`how_to_guide/19_posterior_parameters`

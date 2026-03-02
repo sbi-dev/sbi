@@ -12,3 +12,4 @@ Sampling
    11_iid_sampling_with_nle_or_nre.ipynb
    12_mcmc_diagnostics_with_arviz.ipynb
    23_using_pyro_with_sbi.ipynb
+   19_posterior_parameters.ipynb

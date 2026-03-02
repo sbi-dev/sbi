@@ -16,7 +16,7 @@ API reference
    api_reference/posteriors
    api_reference/posterior_parameters
    api_reference/diagnostics
-   api_reference/visualization
+   api_reference/analysis
    api_reference/other_utilities
 
 
@@ -83,6 +83,7 @@ Training
    sbi.inference.BNRE
    sbi.inference.MCABC
    sbi.inference.SMCABC
+   sbi.inference.MarginalTrainer
 
 
 Potentials
@@ -134,21 +135,16 @@ Diagnostics
 
    sbi.diagnostics.run_sbc
    sbi.diagnostics.check_sbc
-   sbi.analysis.sbc_rank_plot
    sbi.diagnostics.run_tarp
    sbi.diagnostics.check_tarp
-   sbi.analysis.plot_tarp
    sbi.diagnostics.LC2ST
-   sbi.analysis.pp_plot_lc2st
    sbi.diagnostics.get_nltp
-   sbi.analysis.pp_plot
-   sbi.inference.MarginalTrainer
    sbi.diagnostics.calc_misspecification_logprob
    sbi.diagnostics.calc_misspecification_mmd
 
 
-Visualization
--------------
+Analysis
+--------
 
 .. autosummary::
    :nosignatures:
@@ -156,10 +152,17 @@ Visualization
    sbi.analysis.pairplot
    sbi.analysis.marginal_plot
    sbi.analysis.conditional_pairplot
+   sbi.analysis.sbc_rank_plot
+   sbi.analysis.plot_tarp
+   sbi.analysis.pp_plot_lc2st
+   sbi.analysis.pp_plot
+   sbi.analysis.conditional_corrcoeff
+   sbi.analysis.conditional_potential
+   sbi.analysis.ActiveSubspace
 
 
-Other utilities
----------------
+Utilities
+---------
 
 .. autosummary::
    :nosignatures:
@@ -167,6 +170,3 @@ Other utilities
    sbi.utils.get_density_thresholder
    sbi.utils.transformed_potential
    sbi.utils.mcmc_transform
-   sbi.analysis.conditional_corrcoeff
-   sbi.analysis.conditional_potential
-   sbi.analysis.ActiveSubspace

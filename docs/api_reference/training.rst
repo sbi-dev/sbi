@@ -20,3 +20,4 @@ Training
    sbi.inference.BNRE
    sbi.inference.MCABC
    sbi.inference.SMCABC
+   sbi.inference.MarginalTrainer
