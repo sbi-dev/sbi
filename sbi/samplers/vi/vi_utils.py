@@ -5,12 +5,8 @@ from copy import deepcopy
 from typing import (
     Callable,
     Dict,
-    Generator,
     Iterable,
-    List,
     Optional,
-    OrderedDict,
-    Tuple,
     Union,
 )
 
@@ -28,6 +24,7 @@ from torch.nn import Module
 
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
+from sbi.utils.torchutils import _base_recursor
 
 
 class TransformedZukoFlow(nn.Module):
@@ -492,59 +489,6 @@ def adapt_variational_distribution(
         add_parameters_module_attributes(q, parameters_fn, modules_fn)
 
     return q
-
-
-def _base_recursor(
-    obj: object,
-    parent: Optional[object] = None,
-    key: Optional[str] = None,
-    check: Callable[..., bool] = lambda obj: False,
-    action: Callable[..., object] = lambda obj: obj,
-):
-    """This functions is a recursive function that traverses classes i.e. Distributions
-    and checks any encountered object according to `check`. If a check evaluates to
-    True, then an action is applied as specified in `action`. We use it e.g. to
-    move tensors to a given device.
-
-    Args:
-        obj: An object which serves as root of the traversal.
-        parent: The previously traversed object.
-        key: The name of the previously traversed object
-        check: A function that inputs a object which is currently investigates and
-            outputs a boolean. If the check evalues to True, then `action` is applied.
-        action: A function that specifies an operation on an object and return an
-            modified version.
-    """
-    if isinstance(obj, Module) and check(obj):
-        action(obj)
-    elif isinstance(obj, (Dict, OrderedDict)):
-        for k, o in obj.items():
-            if check(o):
-                obj[k] = action(o)
-            else:
-                _base_recursor(o, parent=obj, key=k, check=check, action=action)
-    elif isinstance(obj, type):
-        # Skip class/type objects to avoid modifying immutable C extension types
-        # (e.g. torch.LongTensor) which fail on Python 3.13+.
-        return
-    elif hasattr(obj, "__dict__"):
-        for k, o in obj.__dict__.items():
-            if check(o):
-                setattr(obj, k, action(o))
-            else:
-                _base_recursor(o, parent=obj, key=k, check=check, action=action)
-    elif isinstance(obj, (List, Tuple, Generator)):
-        new_obj = []
-        for o in obj:
-            if check(o):
-                new_obj.append(action(o))
-            else:
-                _base_recursor(o, check=check, action=action)
-                new_obj.append(o)
-        if parent is not None and key is not None:
-            setattr(parent, key, type(obj)(new_obj))  # type: ignore
-    else:
-        return
 
 
 def detach_all_non_leaf_tensors(obj: object) -> None:
