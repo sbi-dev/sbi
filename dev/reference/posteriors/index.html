@@ -13791,7 +13791,22 @@ the ODE to compute the log-probability.</p>
 <span class="normal">670</span>
 <span class="normal">671</span>
 <span class="normal">672</span>
-<span class="normal">673</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VectorFieldPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">673</span>
+<span class="normal">674</span>
+<span class="normal">675</span>
+<span class="normal">676</span>
+<span class="normal">677</span>
+<span class="normal">678</span>
+<span class="normal">679</span>
+<span class="normal">680</span>
+<span class="normal">681</span>
+<span class="normal">682</span>
+<span class="normal">683</span>
+<span class="normal">684</span>
+<span class="normal">685</span>
+<span class="normal">686</span>
+<span class="normal">687</span>
+<span class="normal">688</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VectorFieldPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior based on flow- or score-matching estimators.</span>
 
 <span class="sd">    This posterior samples from the vector field model - typically a score-based or a</span>
@@ -13917,6 +13932,8 @@ the ODE to compute the log-probability.</p>
             <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;fnpe&quot;</span><span class="p">,</span> <span class="s2">&quot;gauss&quot;</span><span class="p">,</span> <span class="s2">&quot;auto_gauss&quot;</span><span class="p">,</span> <span class="s2">&quot;jac_gauss&quot;</span><span class="p">]</span>
         <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">iid_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">guidance_method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">guidance_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
         <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -13955,6 +13972,17 @@ the ODE to compute the log-probability.</p>
 <span class="sd">                SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.</span>
 <span class="sd">            iid_params: Additional parameters passed to the iid method. See the specific</span>
 <span class="sd">                `IIDScoreFunction` child class for details.</span>
+<span class="sd">            guidance_method: Method to guide the diffusion process. If None, no guidance</span>
+<span class="sd">                is used. Currently we support `affine_classifier_free`, which allows to</span>
+<span class="sd">                scale and shift the &quot;likelihood&quot; or &quot;prior&quot; score contribution. This can</span>
+<span class="sd">                be used to perform &quot;super&quot; conditioning i.e. shrink the variance of the</span>
+<span class="sd">                likelihood. `Universal` can be used to guide the diffusion process with</span>
+<span class="sd">                a general guidance function. `Interval` is an instance of that where</span>
+<span class="sd">                the guidance function constraints the diffusion process to a given</span>
+<span class="sd">                interval.</span>
+<span class="sd">            guidance_params: Additional parameters passed to the guidance method. See</span>
+<span class="sd">                the specific `ScoreAdaptation` child class for details, specifically</span>
+<span class="sd">                `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.</span>
 <span class="sd">            max_sampling_batch_size: Maximum batch size for sampling.</span>
 <span class="sd">            sample_with: Sampling method to use - &#39;ode&#39; or &#39;sde&#39;. Note that in order to</span>
 <span class="sd">                use the &#39;sde&#39; sampling method, the vector field estimator must support</span>
@@ -13985,6 +14013,8 @@ the ODE to compute the log-probability.</p>
             <span class="n">x_is_iid</span><span class="o">=</span><span class="n">is_iid</span><span class="p">,</span>
             <span class="n">iid_method</span><span class="o">=</span><span class="n">iid_method</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">iid_method</span><span class="p">,</span>
             <span class="n">iid_params</span><span class="o">=</span><span class="n">iid_params</span><span class="p">,</span>
+            <span class="n">guidance_method</span><span class="o">=</span><span class="n">guidance_method</span><span class="p">,</span>
+            <span class="n">guidance_params</span><span class="o">=</span><span class="n">guidance_params</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
@@ -14842,22 +14872,7 @@ consumption.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">419</span>
-<span class="normal">420</span>
-<span class="normal">421</span>
-<span class="normal">422</span>
-<span class="normal">423</span>
-<span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
-<span class="normal">429</span>
-<span class="normal">430</span>
-<span class="normal">431</span>
-<span class="normal">432</span>
-<span class="normal">433</span>
-<span class="normal">434</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">434</span>
 <span class="normal">435</span>
 <span class="normal">436</span>
 <span class="normal">437</span>
@@ -14874,7 +14889,22 @@ consumption.</p>
 <span class="normal">448</span>
 <span class="normal">449</span>
 <span class="normal">450</span>
-<span class="normal">451</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -15133,22 +15163,7 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">582</span>
-<span class="normal">583</span>
-<span class="normal">584</span>
-<span class="normal">585</span>
-<span class="normal">586</span>
-<span class="normal">587</span>
-<span class="normal">588</span>
-<span class="normal">589</span>
-<span class="normal">590</span>
-<span class="normal">591</span>
-<span class="normal">592</span>
-<span class="normal">593</span>
-<span class="normal">594</span>
-<span class="normal">595</span>
-<span class="normal">596</span>
-<span class="normal">597</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">597</span>
 <span class="normal">598</span>
 <span class="normal">599</span>
 <span class="normal">600</span>
@@ -15224,7 +15239,22 @@ have a cached value.</p>
 <span class="normal">670</span>
 <span class="normal">671</span>
 <span class="normal">672</span>
-<span class="normal">673</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">673</span>
+<span class="normal">674</span>
+<span class="normal">675</span>
+<span class="normal">676</span>
+<span class="normal">677</span>
+<span class="normal">678</span>
+<span class="normal">679</span>
+<span class="normal">680</span>
+<span class="normal">681</span>
+<span class="normal">682</span>
+<span class="normal">683</span>
+<span class="normal">684</span>
+<span class="normal">685</span>
+<span class="normal">686</span>
+<span class="normal">687</span>
+<span class="normal">688</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
@@ -15326,7 +15356,7 @@ have a cached value.</p>
 
 
 <h3 id="sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior.sample" class="doc doc-heading">
-            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s1">&#39;euler_maruyama&#39;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">corrector_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">steps</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">ts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">iid_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">iid_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor</span><span class="o">=</span><span class="s1">&#39;euler_maruyama&#39;</span><span class="p">,</span> <span class="n">corrector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">predictor_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">corrector_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">steps</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">ts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">iid_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">iid_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">guidance_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">guidance_params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_sampling_batch_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">reject_outside_prior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_sampling_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_partial_on_timeout</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
 <a href="#sbi.inference.posteriors.vector_field_posterior.VectorFieldPosterior.sample" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -15504,6 +15534,47 @@ SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.</p>
               <div class="doc-md-description">
                 <p>Additional parameters passed to the iid method. See the specific
 <code>IIDScoreFunction</code> child class for details.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>guidance_method</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Method to guide the diffusion process. If None, no guidance
+is used. Currently we support <code>affine_classifier_free</code>, which allows to
+scale and shift the &ldquo;likelihood&rdquo; or &ldquo;prior&rdquo; score contribution. This can
+be used to perform &ldquo;super&rdquo; conditioning i.e. shrink the variance of the
+likelihood. <code>Universal</code> can be used to guide the diffusion process with
+a general guidance function. <code>Interval</code> is an instance of that where
+the guidance function constraints the diffusion process to a given
+interval.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>guidance_params</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Dict">Dict</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Additional parameters passed to the guidance method. See
+the specific <code>ScoreAdaptation</code> child class for details, specifically
+<code>AffineClassifierFreeCfg</code>, <code>UniversalCfg</code>, and <code>IntervalCfg</code>.</p>
               </div>
             </td>
             <td>
@@ -15762,7 +15833,22 @@ A warning will be issued. Only applies when <code>reject_outside_prior=True</cod
 <span class="normal">284</span>
 <span class="normal">285</span>
 <span class="normal">286</span>
-<span class="normal">287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -15776,6 +15862,8 @@ A warning will be issued. Only applies when <code>reject_outside_prior=True</cod
         <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;fnpe&quot;</span><span class="p">,</span> <span class="s2">&quot;gauss&quot;</span><span class="p">,</span> <span class="s2">&quot;auto_gauss&quot;</span><span class="p">,</span> <span class="s2">&quot;jac_gauss&quot;</span><span class="p">]</span>
     <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">iid_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">guidance_method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">guidance_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">max_sampling_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span>
     <span class="n">sample_with</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -15814,6 +15902,17 @@ A warning will be issued. Only applies when <code>reject_outside_prior=True</cod
 <span class="sd">            SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.</span>
 <span class="sd">        iid_params: Additional parameters passed to the iid method. See the specific</span>
 <span class="sd">            `IIDScoreFunction` child class for details.</span>
+<span class="sd">        guidance_method: Method to guide the diffusion process. If None, no guidance</span>
+<span class="sd">            is used. Currently we support `affine_classifier_free`, which allows to</span>
+<span class="sd">            scale and shift the &quot;likelihood&quot; or &quot;prior&quot; score contribution. This can</span>
+<span class="sd">            be used to perform &quot;super&quot; conditioning i.e. shrink the variance of the</span>
+<span class="sd">            likelihood. `Universal` can be used to guide the diffusion process with</span>
+<span class="sd">            a general guidance function. `Interval` is an instance of that where</span>
+<span class="sd">            the guidance function constraints the diffusion process to a given</span>
+<span class="sd">            interval.</span>
+<span class="sd">        guidance_params: Additional parameters passed to the guidance method. See</span>
+<span class="sd">            the specific `ScoreAdaptation` child class for details, specifically</span>
+<span class="sd">            `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.</span>
 <span class="sd">        max_sampling_batch_size: Maximum batch size for sampling.</span>
 <span class="sd">        sample_with: Sampling method to use - &#39;ode&#39; or &#39;sde&#39;. Note that in order to</span>
 <span class="sd">            use the &#39;sde&#39; sampling method, the vector field estimator must support</span>
@@ -15844,6 +15943,8 @@ A warning will be issued. Only applies when <code>reject_outside_prior=True</cod
         <span class="n">x_is_iid</span><span class="o">=</span><span class="n">is_iid</span><span class="p">,</span>
         <span class="n">iid_method</span><span class="o">=</span><span class="n">iid_method</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_fn</span><span class="o">.</span><span class="n">iid_method</span><span class="p">,</span>
         <span class="n">iid_params</span><span class="o">=</span><span class="n">iid_params</span><span class="p">,</span>
+        <span class="n">guidance_method</span><span class="o">=</span><span class="n">guidance_method</span><span class="p">,</span>
+        <span class="n">guidance_params</span><span class="o">=</span><span class="n">guidance_params</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
@@ -16185,22 +16286,7 @@ A warning will be issued. Only applies when <code>reject_outside_prior=True</cod
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span>
-<span class="normal">459</span>
-<span class="normal">460</span>
-<span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
-<span class="normal">464</span>
-<span class="normal">465</span>
-<span class="normal">466</span>
-<span class="normal">467</span>
-<span class="normal">468</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">468</span>
 <span class="normal">469</span>
 <span class="normal">470</span>
 <span class="normal">471</span>
@@ -16312,7 +16398,22 @@ A warning will be issued. Only applies when <code>reject_outside_prior=True</cod
 <span class="normal">577</span>
 <span class="normal">578</span>
 <span class="normal">579</span>
-<span class="normal">580</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -16535,22 +16636,7 @@ depend on the used ODE backend.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/vector_field_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">391</span>
-<span class="normal">392</span>
-<span class="normal">393</span>
-<span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
-<span class="normal">397</span>
-<span class="normal">398</span>
-<span class="normal">399</span>
-<span class="normal">400</span>
-<span class="normal">401</span>
-<span class="normal">402</span>
-<span class="normal">403</span>
-<span class="normal">404</span>
-<span class="normal">405</span>
-<span class="normal">406</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">406</span>
 <span class="normal">407</span>
 <span class="normal">408</span>
 <span class="normal">409</span>
@@ -16561,7 +16647,22 @@ depend on the used ODE backend.</p>
 <span class="normal">414</span>
 <span class="normal">415</span>
 <span class="normal">416</span>
-<span class="normal">417</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_via_ode</span><span class="p">(</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">sample_via_ode</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
