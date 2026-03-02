@@ -17,7 +17,7 @@ API reference
    api_reference/posterior_parameters
    api_reference/diagnostics
    api_reference/analysis
-   api_reference/other_utilities
+   api_reference/utilities
 
 
 Prior and simulator
