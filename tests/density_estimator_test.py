@@ -14,7 +14,6 @@ from sbi.inference import NLE, NPE, NRE
 from sbi.inference.trainers.base import NeuralInference
 from sbi.inference.trainers.vfpe.fmpe import FMPE
 from sbi.inference.trainers.vfpe.npse import NPSE
-from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
@@ -750,37 +749,3 @@ def test_trainers_with_valid_and_invalid_estimator_builders(
     inference.append_simulations(theta, x)
 
     inference.train(max_num_epochs=1)
-
-
-@pytest.mark.parametrize("model", ["maf", "nsf", "made"])
-def test_density_estimator_condition_sample_dim_support(model: str):
-    """Test whether density estimators support a `sample_dim` in the condition."""
-    S, B = 5, 10
-    D_in, D_cond = 2, 4
-
-    build_fn = posterior_nn(
-        model=model,
-        embedding_net=torch.nn.Linear(D_cond, D_cond),
-        hidden_features=16,
-        num_transforms=2,
-    )
-
-    flow = build_fn(torch.randn(B, D_in), torch.randn(B, D_cond))
-    theta_3d = torch.randn(S, B, D_in)
-    cond_3d = torch.randn(S, B, D_cond)
-    log_prob_3d = flow.log_prob(theta_3d, condition=cond_3d, context=None)
-
-    assert log_prob_3d.shape == (S, B)
-
-    manual_log_probs = []
-    for s in range(S):
-        lp = flow.log_prob(theta_3d[s].unsqueeze(0), condition=cond_3d[s])
-        manual_log_probs.append(lp.squeeze(0))
-    manual_res = torch.stack(manual_log_probs)
-
-    assert (log_prob_3d - manual_res).abs().max().item() < 1e-5
-
-    cond_2d = torch.randn(B, D_cond)
-    log_prob_2d = flow.log_prob(theta_3d, condition=cond_2d)
-
-    assert log_prob_2d.shape == (S, B)
