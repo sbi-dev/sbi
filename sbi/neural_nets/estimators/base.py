@@ -184,15 +184,15 @@ class ConditionalDensityEstimator(ConditionalEstimator):
 
         Args:
             input: Inputs to evaluate the log probability on of shape
-                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+                    `(sample_dim, batch_dim, *event_shape_input)` or
+                    `(batch_dim, *event_shape_input)`.
             condition: Conditions of shape
-                `(batch_dim_condition, *event_shape_condition)`.
-
-        Raises:
-            RuntimeError: If batch_dim_input and batch_dim_condition do not match.
+                `(batch_dim, *event_shape_condition)` or
+                `(sample_dim, batch_dim, *event_shape_condition)`.
 
         Returns:
-            Sample-wise log probabilities.
+            Sample-wise log probabilities, shape `(sample_dim, batch_dim)`.
+            Batch dimensions of input and condition are broadcast.
         """
 
         pass
