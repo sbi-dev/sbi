@@ -117,7 +117,7 @@ class GaussianLinear(Task):
             if device is not None
             else torch.eye(self.dim)
         )
-        return MultivariateNormal(mean, self.prior_var*cov)
+        return MultivariateNormal(mean, self.prior_var * cov)
 
     def get_simulator(self, device=None) -> Callable:
         """
@@ -132,6 +132,6 @@ class GaussianLinear(Task):
 
         def sim(theta):
             theta = theta.to(device) if device is not None else theta
-            return diagonal_linear_gaussian(theta, std=self.simulator_var ** 0.5)
+            return diagonal_linear_gaussian(theta, std=self.simulator_var**0.5)
 
         return sim

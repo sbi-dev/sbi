@@ -205,10 +205,7 @@ class LC2ST:
                         ),
                     )
                 ],
-<<<<<<< HEAD
                 "train_split": ValidSplit(cast(Any, 0.1)),
-=======
->>>>>>> origin/main
                 "optimizer__weight_decay": 1e-4,
                 "device": self.device,
                 "verbose": 0,
@@ -865,7 +862,6 @@ class EnsembleClassifier(BaseEstimator):
             disable=self.verbosity < 1,
         ):
             clf = clone(self.clf)
-<<<<<<< HEAD
             if hasattr(clf, "random_state"):
                 if clf.random_state is not None:  # type: ignore[attr-defined]
                     clf.random_state += n  # type: ignore[attr-defined]
@@ -874,13 +870,6 @@ class EnsembleClassifier(BaseEstimator):
             else:
                 torch.manual_seed(n + 1)
                 np.random.seed(n + 1)
-=======
-            if hasattr(clf, 'random_state'):
-                if clf.random_state is not None:
-                    clf.random_state += n
-                else:
-                    clf.random_state = n + 1
->>>>>>> origin/main
             clf.fit(X, y)  # type: ignore
             self.trained_clfs.append(clf)
 

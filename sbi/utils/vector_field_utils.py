@@ -77,6 +77,7 @@ class MaskedVectorFieldNet(nn.Module, ABC):
         """
         pass
 
+
 def _diag_gaussian_log_prob(x: Tensor, mean: Tensor, var: Tensor) -> Tensor:
     """Log-probability of a diagonal Gaussian evaluated at x."""
     diff = x[:, None, :] - mean[None, :, :]
