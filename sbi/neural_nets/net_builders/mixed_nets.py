@@ -125,7 +125,7 @@ def _build_mixed_density_estimator(
             space, e.g., in case x consists of reaction time data (bounded by
             zero).
         kwargs: additional keyword arguments passed to the flow model and the
-            categorical net. 
+            categorical net.
 
     Returns:
         MixedDensityEstimator: nn.Module for performing MNLE or MNPE.
