@@ -35,12 +35,10 @@ def set_default_tensor_type():
 
 # Pytest hook to skip GPU tests if no devices are available.
 def pytest_collection_modifyitems(config, items):
-    """Skip GPU tests if no devices are available."""
-    gpu_device_available = (
-        torch.cuda.is_available() or torch.backends.mps.is_available()
-    )
+    """Skip GPU tests if no CUDA devices are available."""
+    gpu_device_available = torch.cuda.is_available()
     if not gpu_device_available:
-        skip_gpu = pytest.mark.skip(reason="No devices available")
+        skip_gpu = pytest.mark.skip(reason="No CUDA device available")
 
         for item in items:
             if "gpu" in item.keywords:

@@ -16,7 +16,7 @@ from torch.distributions import (
     constraints,
 )
 
-from sbi.utils.torchutils import process_device
+from sbi.utils.torchutils import move_all_tensor_to_device, process_device
 
 
 def get_distribution_parameters(
@@ -37,6 +37,36 @@ def get_distribution_parameters(
     elif isinstance(dist, (Binomial, Bernoulli, Categorical, Multinomial)):
         params["logits"] = None
     return params
+
+
+def move_distribution_to_device(
+    dist: Distribution, device: Union[str, torch.device]
+) -> Distribution:
+    """Move a distribution to the specified device.
+
+    If the distribution has a `.to()` method (e.g. sbi prior wrappers like
+    ``PytorchReturnTypeWrapper`` or ``BoxUniform``), it is called directly.
+    Otherwise, the distribution is reconstructed on the target device by
+    extracting its parameters via ``get_distribution_parameters()``.
+
+    Args:
+        dist: The distribution to move.
+        device: The target device.
+
+    Returns:
+        The distribution on the target device. If `.to()` was used, this is the
+        same object; otherwise it is a newly constructed instance.
+    """
+    if hasattr(dist, "to"):
+        dist.to(device)  # type: ignore
+        return dist
+    else:
+        try:
+            params = get_distribution_parameters(dist, device)
+            return type(dist)(**params)
+        except Exception:
+            move_all_tensor_to_device(dist, device)
+            return dist
 
 
 class CustomPriorWrapper(Distribution):
@@ -203,8 +233,7 @@ class PytorchReturnTypeWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
-        params = get_distribution_parameters(self.prior, device)
-        self.prior = type(self.prior)(**params)
+        self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
 
@@ -213,7 +242,7 @@ class MultipleIndependent(Distribution):
 
     def __init__(
         self,
-        dists: Sequence[Distribution],
+        dists: list[Distribution],
         validate_args: Optional[bool] = None,
         arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
         device: Optional[str] = None,
@@ -402,12 +431,7 @@ class MultipleIndependent(Distribution):
             device: device to move the distribution to.
         """
         for i in range(len(self.dists)):
-            # ignoring because it is related to torch and not sbi
-            if hasattr(self.dists[i], "to"):
-                self.dists[i].to(device)  # type: ignore
-            else:
-                params = get_distribution_parameters(self.dists[i], device)
-                self.dists[i] = type(self.dists[i])(**params)  # type: ignore
+            self.dists[i] = move_distribution_to_device(self.dists[i], device)
         self.device = device
 
 
@@ -519,8 +543,7 @@ class OneDimPriorWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
-        params = get_distribution_parameters(self.prior, device)
-        self.prior = type(self.prior)(**params)
+        self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
     def sample(self, *args, **kwargs) -> Tensor:

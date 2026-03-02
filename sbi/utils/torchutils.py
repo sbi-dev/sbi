@@ -4,12 +4,23 @@
 """Various PyTorch utility functions."""
 
 import os
-from typing import Any, Optional, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    OrderedDict,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import torch
 from torch import Tensor, float32
 from torch.distributions import Independent, Uniform
+from torch.nn import Module
 
 from sbi.sbi_types import Array, OneOrMore
 from sbi.utils.typechecks import is_nonnegative_int, is_positive_int
@@ -497,3 +508,93 @@ def assert_not_nan_or_plus_inf(quantity: Tensor, description: str = "tensor") ->
     assert not (torch.isposinf(quantity).any()) and not (torch.isnan(quantity).any()), (
         msg
     )
+
+
+def _base_recursor(
+    obj: object,
+    parent: Optional[object] = None,
+    key: Optional[str] = None,
+    check: Callable[..., bool] = lambda obj: False,
+    action: Callable[..., object] = lambda obj: obj,
+):
+    """Recursive function that traverses objects (e.g. Distributions) and applies
+    an action to any encountered object that passes the check.
+
+    Used e.g. to move all tensors within a distribution to a given device.
+
+    Args:
+        obj: An object which serves as root of the traversal.
+        parent: The previously traversed object.
+        key: The name of the previously traversed object.
+        check: A function that inputs an object and outputs a boolean.
+            If the check evaluates to True, then ``action`` is applied.
+        action: A function that specifies an operation on an object and returns
+            a modified version.
+    """
+    if isinstance(obj, Module) and check(obj):
+        action(obj)
+    elif isinstance(obj, (Dict, OrderedDict)):
+        for k, o in obj.items():
+            if check(o):
+                obj[k] = action(o)
+            else:
+                _base_recursor(o, parent=obj, key=k, check=check, action=action)
+    elif isinstance(obj, type):
+        # Skip class/type objects to avoid modifying immutable C extension types
+        # (e.g. torch.LongTensor) which fail on Python 3.13+.
+        return
+    elif hasattr(obj, "__dict__"):
+        for k, o in obj.__dict__.items():
+            if check(o):
+                setattr(obj, k, action(o))
+            else:
+                _base_recursor(o, parent=obj, key=k, check=check, action=action)
+    elif isinstance(obj, (List, Tuple, Generator)):
+        new_obj = []
+        for o in obj:
+            if check(o):
+                new_obj.append(action(o))
+            else:
+                _base_recursor(o, check=check, action=action)
+                new_obj.append(o)
+        if parent is not None and key is not None:
+            setattr(parent, key, type(obj)(new_obj))  # type: ignore
+    else:
+        return
+
+
+def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> None:
+    """Recursively move all tensors and modules within an object to a device.
+
+    Traverses the object's attributes, dictionaries, lists, and tuples,
+    moving any encountered ``Tensor`` or ``Module`` to the specified device.
+
+    Note:
+        Leaf tensors with ``requires_grad=True`` cannot be moved in-place.
+        A ``ValueError`` is raised if such a tensor is on the wrong device.
+
+    Args:
+        obj: The root object to traverse.
+        device: The target device.
+    """
+
+    def check(o: object) -> bool:
+        return isinstance(o, (Tensor, Module))
+
+    def action(o: object) -> object:
+        if isinstance(o, Tensor) and o.requires_grad and o.is_leaf:
+            # Moving leaf tensors inplace is hard. Cant call .to as this would create a
+            # copy and thus results in non-leaf tensors.
+            if str(o.device) != str(device):
+                raise ValueError(
+                    f"Cannot move leaf tensor with requires_grad=True from "
+                    f"{o.device} to {device}. Please initialize it on the "
+                    f"correct device."
+                )
+            else:
+                return o
+        else:
+            return o.to(device)  # type: ignore
+
+    with torch.no_grad():
+        _base_recursor(obj, check=check, action=action)

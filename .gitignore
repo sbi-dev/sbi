@@ -102,3 +102,7 @@ target/
 # uv
 uv.lock
 .python-version
+
+# tools cache
+.serena/
+.claude/

@@ -31,7 +31,7 @@ from sbi.utils import (
     npe_msg_on_invalid_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
-    warn_if_zscoring_changes_data,
+    warn_if_invalid_for_zscoring,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 from sbi.utils.torchutils import assert_all_finite
@@ -50,7 +50,6 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         summary_writer: Optional[SummaryWriter] = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
-        **kwargs,
     ):
         """Base class for vector field inference methods. It is used
         both for NPSE and FMPE.
@@ -72,8 +71,6 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
-            kwargs: Additional keyword arguments passed to the default builder if
-                `vector_field_estimator_builder` is a string.
         """
 
         super().__init__(
@@ -85,17 +82,17 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             show_progress_bars=show_progress_bars,
         )
 
-        # As detailed in the docstring, `vector_field_estimator` is either a string or
-        # a callable. The function creating the neural network is attached to
+        # The `vector_field_estimator_builder` is either a string or a callable.
+        # The function creating the neural network is attached to
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
+        #
+        # When it's a callable, we use it directly. When it's a string, subclasses
+        # are responsible for calling `_build_default_nn_fn` with the appropriate
+        # subclass-specific arguments (e.g. sde_type for NPSE).
         check_estimator_arg(vector_field_estimator_builder)
-        if isinstance(vector_field_estimator_builder, str):
-            self._build_neural_net = self._build_default_nn_fn(
-                model=vector_field_estimator_builder, **kwargs
-            )
-        else:
+        if not isinstance(vector_field_estimator_builder, str):
             self._build_neural_net = vector_field_estimator_builder
 
         self._proposal_roundwise = []
@@ -104,7 +101,6 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
     def _build_default_nn_fn(
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-        **kwargs,
     ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]: ...
 
     def append_simulations(
@@ -168,7 +164,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         theta = theta[is_valid_x]
 
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
+        warn_if_invalid_for_zscoring(x)
 
         npe_msg_on_invalid_x(
             num_nans,
@@ -316,6 +312,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         )
 
         if isinstance(validation_times, int):
+            # Use nugget to offset from boundaries for numerical stability
             validation_times = self._neural_net.solve_schedule(
                 validation_times,
                 t_min=self._neural_net.t_min + validation_times_nugget,

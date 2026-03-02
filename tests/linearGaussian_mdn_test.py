@@ -80,8 +80,8 @@ def test_mdn_with_1D_uniform_prior():
     """
     Note, we have this test because for 1D uniform priors, mdn log prob evaluation
     results in batch_size x batch_size return. This is probably because Uniform does
-    not allow for event dimension > 1 and somewhere in pyknos it is used as if this was
-    possible.
+    not allow for event dimension > 1 and somewhere in the MDN code it is used as if
+    this was possible.
     Casting to BoxUniform solves it.
     """
     num_dim = 1

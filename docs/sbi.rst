@@ -27,8 +27,8 @@ Neural nets
    sbi.neural_nets.posterior_nn
    sbi.neural_nets.likelihood_nn
    sbi.neural_nets.classifier_nn
-   sbi.neural_nets.flowmatching_nn
    sbi.neural_nets.posterior_score_nn
+   sbi.neural_nets.posterior_flow_nn
    sbi.neural_nets.marginal_nn
 
 

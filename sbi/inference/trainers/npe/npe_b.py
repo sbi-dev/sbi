@@ -24,17 +24,48 @@ from sbi.utils.sbiutils import del_entries
 class NPE_B(PosteriorEstimatorTrainer):
     r"""Neural Posterior Estimation algorithm (NPE-B) as in Lueckmann et al. (2017) [1].
 
+    NPE-B (also known as SNPE-B) trains a neural network to directly approximate
+    the posterior $p(\theta|x)$ using an importance-weighted loss. Unlike NPE-A,
+    this importance weighting ensures convergence to the true posterior in multi-round
+    inference, and it is not limited to Gaussian proposals. NPE-B can use flexible
+    density estimators like normalizing flows.
+
+    For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
+    plain NLL loss.
+
     [1] *Flexible statistical inference for mechanistic models of neural
-        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017. https://arxiv.org/abs/171
+        dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017.
+        https://arxiv.org/abs/1711.01861
 
-    Like all NPE methods, this method trains a deep neural density estimator to
-    directly approximate the posterior. Also like all other NPE methods, in the
-    first round, this density estimator is trained with a maximum-likelihood loss.
+    Example:
+    --------
 
-    This class implements NPE-B. NPE-B trains across multiple rounds with a
-    an importance-weighted log-loss. Unlike NPE-A the loss will make training
-    directly converge to the true posterior.
-    Thus, SNPE-B is not limited to Gaussian proposal.
+    ::
+
+        import torch
+        from sbi.inference import NPE_B
+        from sbi.utils import BoxUniform
+
+        # 1. Setup simulator, prior, and observation
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        x_o = torch.randn(1, 3)  # Observed data
+
+        def simulator(theta):
+            return theta + torch.randn_like(theta) * 0.1
+
+        # 2. Multi-round inference
+        inference = NPE_B(prior=prior)
+        proposal = prior
+
+        for round_idx in range(5):
+            theta = proposal.sample((100,))
+            x = simulator(theta)
+            density_estimator = inference.append_simulations(theta, x).train()
+            posterior = inference.build_posterior(density_estimator)
+            proposal = posterior.set_default_x(x_o)
+
+        # 3. Sample from final posterior
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(
