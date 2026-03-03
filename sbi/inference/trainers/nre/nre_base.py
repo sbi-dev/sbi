@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import asdict, replace
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
@@ -41,7 +41,7 @@ from sbi.utils import (
 from sbi.utils.torchutils import repeat_rows
 
 
-class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
+class RatioEstimatorTrainer(NeuralInference[RatioEstimator]):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -377,6 +377,8 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
         The logits are obtained from atomic sets of (theta,x) pairs.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural network has not been initialized yet. ")
         batch_size = theta.shape[0]
         repeated_x = repeat_rows(x, num_atoms)
 

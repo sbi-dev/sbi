@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import asdict
 from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
 
@@ -57,7 +57,7 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import assert_all_finite
 
 
-class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
+class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -542,6 +542,8 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 i.e., potentially ignoring the correction for using a proposal
                 distribution different from the prior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural network has not been initialized yet. ")
         if self._round == 0 or force_first_round_loss:
             theta = reshape_to_batch_event(
                 theta, event_shape=self._neural_net.input_shape

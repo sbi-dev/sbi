@@ -719,6 +719,37 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     )
 
 
+def _validate_tensor_properties_and_device(
+    tensor: Any,
+    name: str,
+    data_device: str,
+    training_device: str,
+    expected_dtype: Union[torch.dtype, Tuple[torch.dtype, ...]],
+) -> Tensor:
+    """Helper to validate a single tensor's type and dtype,
+    and move it to the data_device."""
+    assert isinstance(tensor, Tensor), f"{name} must be a `torch.Tensor`."
+
+    if isinstance(expected_dtype, tuple):
+        assert tensor.dtype in expected_dtype, (
+            f"Type of {name} must be one of {expected_dtype}, but got {tensor.dtype}."
+        )
+    else:
+        assert tensor.dtype == expected_dtype, (
+            f"Type of {name} must be {expected_dtype}, but got {tensor.dtype}."
+        )
+
+    if str(tensor.device) != str(data_device):
+        warnings.warn(
+            f"{name} has device '{tensor.device}'. "
+            f"Moving {name} to the data_device '{data_device}'. "
+            f"Training will proceed on device '{training_device}'.",
+            stacklevel=3,
+        )
+        tensor = tensor.to(data_device)
+    return tensor
+
+
 def validate_theta_and_x(
     theta: Any, x: Any, data_device: str = "cpu", training_device: str = "cpu"
 ) -> Tuple[Tensor, Tensor]:
@@ -744,38 +775,61 @@ def validate_theta_and_x(
         data_device: Device where data is stored.
         training_device: Training device for net.
     """
-    assert isinstance(theta, Tensor), "Parameters theta must be a `torch.Tensor`."
-    assert isinstance(x, Tensor), "Simulator output must be a `torch.Tensor`."
+    theta = _validate_tensor_properties_and_device(
+        theta, "theta", data_device, training_device, torch.float32
+    )
+    x = _validate_tensor_properties_and_device(
+        x, "x", data_device, training_device, torch.float32
+    )
 
     assert theta.shape[0] == x.shape[0], (
         f"Number of parameter sets (={theta.shape[0]} must match the number of "
         f"simulation outputs (={x.shape[0]})"
     )
 
-    # I did not fuse these asserts with the `isinstance(x, Tensor)` asserts in order
-    # to give more explicit errors.
-    assert theta.dtype == float32, "Type of parameters must be float32."
-    assert x.dtype == float32, "Type of simulator outputs must be float32."
-
-    if str(x.device) != str(data_device):
-        warnings.warn(
-            f"Data x has device '{x.device}'. "
-            f"Moving x to the data_device '{data_device}'. "
-            f"Training will proceed on device '{training_device}'.",
-            stacklevel=2,
-        )
-        x = x.to(data_device)
-
-    if str(theta.device) != str(data_device):
-        warnings.warn(
-            f"Parameters theta has device '{theta.device}'. "
-            f"Moving theta to the data_device '{data_device}'. "
-            f"Training will proceed on device '{training_device}'.",
-            stacklevel=2,
-        )
-        theta = theta.to(data_device)
-
     return theta, x
+
+
+def validate_inputs(
+    inputs: Any,
+    data_device: str = "cpu",
+    training_device: str = "cpu",
+) -> Tensor:
+    r"""
+    Checks if the passed inputs, condition_masks, and edge_masks are valid.
+
+    Specifically, we check:
+    1) If they are (torch) tensors.
+    2) If they all have the same batch size.
+    3) If their dtypes are appropriate (float32 for inputs, bool/int for masks).
+
+    Additionally, we move all data to the specified `data_device`. This is where the
+    data is stored and can be separate from `training_device`, where the
+    computations for training are performed.
+
+    Raises:
+        AssertionError: If any input is not a torch.Tensor,
+        if they do not yield the same batch size, or if their dtypes are incorrect.
+
+    Args:
+        inputs: Full graph inputs, containing both latent parameters and observed data.
+            Expected shape: `(batch_size, num_nodes, num_node_features)`.
+        condition_masks: A mask indicating which nodes are latent or observed.
+            Expected shape: `(batch_size, num_nodes)`.
+        edge_masks: A mask defining dependencies between nodes (adjacency matrix).
+            Expected shape: `(batch_size, num_nodes, num_nodes)`.
+        data_device: Device where data is stored.
+        training_device: Training device for neural network computations.
+
+    Returns:
+        Validated inputs, condition_masks, and edge_masks on the `data_device`.
+    """
+    # Validate and move each tensor individually
+    inputs = _validate_tensor_properties_and_device(
+        inputs, "inputs", data_device, training_device, torch.float32
+    )
+
+    return inputs
 
 
 def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:

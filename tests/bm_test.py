@@ -9,6 +9,7 @@ from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
+from sbi.inference.trainers.vfpe.simformer import FlowMatchingSimformer, Simformer
 from sbi.utils.metrics import c2st
 
 from .mini_sbibm import get_task
@@ -39,6 +40,8 @@ METHOD_GROUPS = {
     "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
+    "simformer": [Simformer],
+    "flow-simformer": [FlowMatchingSimformer],
 }
 METHOD_PARAMS = {
     "none": [{}],
@@ -55,6 +58,8 @@ METHOD_PARAMS = {
     "snpe": [{}],
     "snle": [{}],
     "snre": [{}],
+    "simformer": [{"sde_type": sde} for sde in ["ve", "vp"]],
+    "flow-simformer": [{}],
 }
 
 
@@ -154,7 +159,7 @@ def eval_c2st(
     """
     x_o = task.get_observation(idx_observation)
     posterior_samples = task.get_reference_posterior_samples(idx_observation)
-    approx_posterior_samples = posterior.sample((num_samples,), x=x_o)
+    approx_posterior_samples = posterior.sample((num_samples,), x=x_o).to("cpu")
     if isinstance(approx_posterior_samples, tuple):
         approx_posterior_samples = approx_posterior_samples[0]
     assert posterior_samples.shape[0] >= num_samples, "Not enough reference samples"
@@ -181,11 +186,28 @@ def train_and_eval_amortized_inference(
     """
     torch.manual_seed(SEED)
     task = get_task(task_name)
-    thetas, xs = task.get_data(benchmark_num_simulations)
-    prior = task.get_prior()
+    device = extra_kwargs.get("device", "cpu")
+    thetas, xs = task.get_data(benchmark_num_simulations, device=device)
+    prior = task.get_prior(device=device)
 
-    inference = inference_class(prior, **extra_kwargs)
-    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
+    if inference_class in {Simformer, FlowMatchingSimformer}:
+        # Get dimensions of thetas and xs, and set latent and observed idx
+        inference = inference_class(**extra_kwargs)
+        num_theta = thetas.shape[1]
+        num_x = xs.shape[1]
+        inference.set_condition_indexes(
+            new_posterior_latent_idx=torch.arange(0, num_theta),
+            new_posterior_observed_idx=torch.arange(num_theta, num_theta + num_x),
+        )
+        inputs = torch.cat([thetas, xs], dim=1)
+        inference.append_simulations(
+            inputs,
+            data_device=device,
+        )
+    else:
+        inference = inference_class(prior, **extra_kwargs)
+        inference.append_simulations(thetas, xs, data_device=device)
+    inference.train(**TRAIN_KWARGS)
 
     posterior = inference.build_posterior()
 
@@ -217,15 +239,18 @@ def train_and_eval_sequential_inference(
     torch.manual_seed(SEED)
     task = get_task(task_name)
     num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
-    thetas, xs = task.get_data(num_simulations)
-    prior = task.get_prior()
+    device = extra_kwargs.get("device", "cpu")
+    thetas, xs = task.get_data(num_simulations, device=device)
+    prior = task.get_prior(device=device)
     idx_eval = NUM_EVALUATION_OBS_SEQ
     x_o = task.get_observation(idx_eval)
     simulator = task.get_simulator()
 
     # Round 1
     inference = inference_class(prior, **extra_kwargs)
-    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
+    _ = inference.append_simulations(thetas, xs, data_device=device).train(
+        **TRAIN_KWARGS
+    )
 
     for _ in range(NUM_ROUNDS_SEQUENTIAL - 1):
         proposal = inference.build_posterior().set_default_x(x_o)
@@ -259,6 +284,7 @@ def test_run_benchmark(
     extra_kwargs: dict,
     benchmark_mode: str,
     benchmark_num_simulations: int,
+    benchmark_device,
 ) -> None:
     """
     Benchmark test for amortized and sequential inference methods.
@@ -270,13 +296,22 @@ def test_run_benchmark(
         extra_kwargs: Additional keyword arguments for the method.
         benchmark_mode: The benchmark mode. This is a fixture which based on user
             input, determines which type of methods should be run.
+        benchmark_device: The device to use for training (e.g. 'cpu', 'cuda').
     """
+    device = benchmark_device if benchmark_device else "cpu"
+    torch_device = torch.device(device)
+    torch.manual_seed(SEED)
+
+    # Patch extra_kwargs to include device if supported
+    patched_kwargs = dict(extra_kwargs)
+    patched_kwargs["device"] = torch_device
+
     if benchmark_mode in ["snpe", "snle", "snre"]:
         train_and_eval_sequential_inference(
             inference_class,
             task_name,
             benchmark_num_simulations,
-            extra_kwargs,
+            patched_kwargs,
             results_bag,
         )
     else:
@@ -284,6 +319,6 @@ def test_run_benchmark(
             inference_class,
             task_name,
             benchmark_num_simulations,
-            extra_kwargs,
+            patched_kwargs,
             results_bag,
         )

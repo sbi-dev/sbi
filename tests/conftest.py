@@ -74,7 +74,6 @@ def pytest_addoption(parser):
         default=None,
         help="Run mini-benchmark tests with specified mode",
     )
-
     parser.addoption(
         "--bm-num-simulations",
         action="store",
@@ -82,11 +81,17 @@ def pytest_addoption(parser):
         type=int,
         help="Run mini-benchmark tests with specified number of simulations",
     )
+    parser.addoption(
+        "--bm-device",
+        action="store",
+        default=None,
+        help="Run mini-benchmark tests on specified device (e.g. cpu, cuda)",
+    )
 
 
 @pytest.fixture
 def benchmark_mode(request):
-    """Fixture to access the --bm value in test files."""
+    """Fixture to access the --bm-mode value in test files."""
     return request.config.getoption("--bm-mode")
 
 
@@ -94,6 +99,12 @@ def benchmark_mode(request):
 def benchmark_num_simulations(request):
     """Fixture to access the --bm-num-simulations value in test files."""
     return int(request.config.getoption("--bm-num-simulations"))
+
+
+@pytest.fixture
+def benchmark_device(request):
+    """Fixture to access the --bm-device value in test files."""
+    return request.config.getoption("--bm-device")
 
 
 @pytest.fixture(scope="session", autouse=True)

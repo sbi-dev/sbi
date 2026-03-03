@@ -367,6 +367,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         else:
             z_mean = prior_mean
             z_cov = prior_cov
+            z_cov = torch.as_tensor(z_cov)
 
         # Validate covariance is positive definite
         try:
@@ -483,6 +484,8 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         Returns: Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         return self._neural_net.log_prob(theta, x)
 
 

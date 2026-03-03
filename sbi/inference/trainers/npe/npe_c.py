@@ -203,6 +203,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         self._round = max(self._data_round_index)
 
         if self._round > 0:
+            if self._neural_net is None:
+                raise RuntimeError("Neural net not initialized.")
             # Set the proposal to the last proposal that was passed by the user. For
             # atomic SNPE, it does not matter what the proposal is. For non-atomic
             # SNPE, we only use the latest data that was passed, i.e. the one from the
@@ -237,6 +239,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         3) Compute (Precision * mean) for the prior. This quantity is used at every
             training step if the prior is Gaussian.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         # Check if z-scoring is enabled on the MixtureDensityEstimator
         assert isinstance(self._neural_net, MixtureDensityEstimator)
         self.z_score_theta = self._neural_net.has_input_transform
@@ -269,6 +273,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
 
         if self.z_score_theta:
+            if self._neural_net is None:
+                raise RuntimeError("Neural net not initialized.")
             # Get z-score parameters from the MixtureDensityEstimator
             # The transform is: z = (theta - shift) / scale
             # where shift = mean (estimated from samples) and scale = std (estimated)
@@ -323,6 +329,8 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         Returns: Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
 
         if self.use_non_atomic_loss:
             if not isinstance(self._neural_net, MixtureDensityEstimator):
@@ -363,6 +371,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns:
             Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         batch_size = theta.shape[0]
 
         num_atoms = int(
@@ -455,6 +465,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns:
             Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         # Get the proposal MoG at the default_x
         assert isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
         assert proposal.default_x is not None, "Proposal must have default_x set"
@@ -641,6 +653,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
+            if self._neural_net is None:
+                raise RuntimeError("Neural net not initialized.")
             assert isinstance(self._neural_net, MixtureDensityEstimator)
             theta = self._neural_net._transform_input(theta)
 

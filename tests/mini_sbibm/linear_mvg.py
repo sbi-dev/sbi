@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 # NOTE: This is inspired by the sbibm-package <https://github.com/sbi-benchmark/sbibm>
 
-from functools import partial
 from typing import Callable
 
 import torch
@@ -97,24 +96,39 @@ class LinearMVG2d(Task):
         x_o = self.get_simulator()(theta_o[None, :])[0]
         return x_o
 
-    def get_prior(self) -> Distribution:
+    def get_prior(self, device=None) -> Distribution:
         """
         Returns the prior distribution over parameters.
+
+        Args:
+            device (str or torch.device, optional): The device to initialize tensors on.
 
         Returns:
             Distribution: The prior distribution.
         """
-        return MultivariateNormal(torch.zeros(2), torch.eye(2))
+        mean = torch.zeros(2, device=device) if device is not None else torch.zeros(2)
+        cov = torch.eye(2, device=device) if device is not None else torch.eye(2)
+        return MultivariateNormal(mean, cov)
 
-    def get_simulator(self) -> Callable:
+    def get_simulator(self, device=None) -> Callable:
         """
         Returns the simulator function.
+
+        Args:
+            device (str or torch.device, optional): The device to initialize tensors on.
 
         Returns:
             Callable: The simulator function.
         """
-        return partial(
-            linear_gaussian,
-            likelihood_shift=self.likelihood_shift,
-            likelihood_cov=self.likelihood_cov,
-        )
+
+        def sim(theta):
+            theta = theta.to(device) if device is not None else theta
+            likelihood_shift = self.likelihood_shift.to(theta.device)
+            likelihood_cov = self.likelihood_cov.to(theta.device)
+            return linear_gaussian(
+                theta,
+                likelihood_shift=likelihood_shift,
+                likelihood_cov=likelihood_cov,
+            )
+
+        return sim
