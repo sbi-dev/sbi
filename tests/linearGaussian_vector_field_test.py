@@ -809,3 +809,94 @@ def test_npse_affine_classifier_free(vector_field_type, prior_type, guidance_par
             tol=0.1,
             alg=f"npse-gaussian-{num_dim}-affine_classifier_free",
         )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "z_score_theta, gaussian_baseline",
+    [
+        pytest.param(None, False, marks=pytest.mark.xfail(reason="No z-scoring fails")),
+        pytest.param("independent", False, id="zscore"),
+        pytest.param("independent", True, id="zscore_baseline"),
+    ],
+)
+def test_fmpe_shifted_data_c2st(z_score_theta, gaussian_baseline):
+    """C2ST test for FMPE on shifted data (theta ~ U(95, 105), mean ~100)."""
+    from sbi.utils.metrics import c2st
+
+    torch.manual_seed(42)
+    num_dim = 2
+    prior = BoxUniform(95.0 * ones(num_dim), 105.0 * ones(num_dim))
+
+    theta_train = prior.sample((1000,))
+    x_train = theta_train + 0.5 * torch.randn_like(theta_train)
+    x_o = torch.tensor([[100.0, 100.0]])
+
+    torch.manual_seed(123)
+    reference_samples = x_o + 0.5 * torch.randn(1000, 2)
+
+    torch.manual_seed(42)
+    inference = FMPE(
+        prior,
+        z_score_theta=z_score_theta,
+        gaussian_baseline=gaussian_baseline,
+        show_progress_bars=False,
+    )
+    inference.append_simulations(theta_train, x_train)
+    inference.train(max_num_epochs=300, show_train_summary=False)
+    samples = inference.build_posterior().sample(
+        (1000,), x=x_o, show_progress_bars=False, reject_outside_prior=False
+    )
+
+    c2st_value = float(c2st(reference_samples, samples))
+    assert c2st_value < 0.55, f"C2ST={c2st_value:.3f} should be < 0.55"
+
+
+@pytest.mark.slow
+def test_fmpe_untrained_gaussian_baseline_samples_prior():
+    """
+    Test that an untrained network with gaussian_baseline=True samples from
+    the data distribution (not N(0,1)).
+    """
+    from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
+
+    torch.manual_seed(42)
+
+    num_dim = 2
+    prior_mean = torch.tensor([100.0, 100.0])
+    prior_std = torch.tensor([5.0, 5.0])
+    prior = BoxUniform(prior_mean - 2 * prior_std, prior_mean + 2 * prior_std)
+
+    # Generate data to compute statistics
+    theta_train = prior.sample((500,))
+    theta_mean = theta_train.mean(dim=0)
+    theta_std = theta_train.std(dim=0)
+
+    # Network that outputs zeros (simulating untrained network)
+    class ZeroNet(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, input, condition, time):
+            return torch.zeros_like(input) * self.dummy
+
+    estimator = FlowMatchingEstimator(
+        net=ZeroNet(),
+        input_shape=torch.Size([num_dim]),
+        condition_shape=torch.Size([num_dim]),
+        mean_1=theta_mean,
+        std_1=theta_std,
+        gaussian_baseline=True,
+    )
+
+    posterior = VectorFieldPosterior(prior=prior, vector_field_estimator=estimator)
+    posterior.set_default_x(torch.tensor([[100.0, 100.0]]))
+
+    samples = posterior.sample((1000,), show_progress_bars=False)
+    sample_mean = samples.mean(dim=0)
+
+    # Samples should be near data mean (~100), not near 0
+    assert torch.all(sample_mean > 80) and torch.all(sample_mean < 120), (
+        f"Untrained gaussian_baseline should sample near data mean ~100, got {sample_mean}"
+    )

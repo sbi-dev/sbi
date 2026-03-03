@@ -127,7 +127,8 @@ def build_vector_field_estimator(
         Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         VectorFieldNet,
     ] = "mlp",
-    gaussian_baseline: bool = False,
+    gaussian_baseline: Union[bool, Literal["velocity", "position", "position_raw"]] = False,
+    z_score_method: Literal["true_marginal", "initial_pr_formula"] = "true_marginal",
     **kwargs,
 ) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
     """Builds a vector field estimator (flow matching or score matching) with the given
@@ -150,9 +151,16 @@ def build_vector_field_estimator(
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
             "transformer_cross_attention" or a custom network following the
             VectorFieldNet protocol.
-        gaussian_baseline: If True, use analytical Gaussian baseline velocity
-            derived from Bayes' rule. The network then only learns the residual.
-            Only used when estimator_type="flow". Defaults to False.
+        gaussian_baseline: Controls the Gaussian baseline velocity method.
+            - False: No baseline (network learns full velocity)
+            - True or "velocity": Use correct velocity formula derived from Bayes' rule
+            - "position": Use position-based formula (for comparison, NOT recommended)
+            - "position_raw": Same without velocity normalization
+            Only used when estimator_type="flow".
+        z_score_method: Method for time-dependent input z-scoring.
+            - "true_marginal": Use true marginal statistics (recommended)
+            - "initial_pr_formula": Use initial PR formula (for comparison, NOT recommended)
+            Only used when estimator_type="flow".
         **kwargs: Additional arguments forwarded to the estimator and network
             constructors.  Valid keys are defined by ``ScoreEstimatorConfig``
             and ``FlowEstimatorConfig``; validation happens in the upstream
@@ -243,6 +251,7 @@ def build_vector_field_estimator(
             mean_1=mean_0,  # Data statistics for time-dependent z-scoring
             std_1=std_0,
             gaussian_baseline=gaussian_baseline,
+            z_score_method=z_score_method,
         )
     elif estimator_type == "score":
         # Choose the appropriate score estimator based on SDE type
