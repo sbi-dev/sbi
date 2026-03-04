@@ -8,11 +8,11 @@ Diagnostics
    :toctree: _autosummary
    :nosignatures:
 
-   sbi.diagnostics.run_sbc
-   sbi.diagnostics.check_sbc
-   sbi.diagnostics.run_tarp
-   sbi.diagnostics.check_tarp
-   sbi.diagnostics.LC2ST
-   sbi.diagnostics.get_nltp
    sbi.diagnostics.calc_misspecification_logprob
    sbi.diagnostics.calc_misspecification_mmd
+   sbi.diagnostics.check_sbc
+   sbi.diagnostics.check_tarp
+   sbi.diagnostics.get_nltp
+   sbi.diagnostics.LC2ST
+   sbi.diagnostics.run_sbc
+   sbi.diagnostics.run_tarp

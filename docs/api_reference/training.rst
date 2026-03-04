@@ -8,16 +8,18 @@ Training
    :toctree: _autosummary
    :nosignatures:
 
-   sbi.inference.NPE_C
-   sbi.inference.NPE_A
-   sbi.inference.MNPE
+   sbi.inference.BNRE
    sbi.inference.FMPE
-   sbi.inference.NPSE
+   sbi.inference.MarginalTrainer
+   sbi.inference.MCABC
+   sbi.inference.MNLE
+   sbi.inference.MNPE
    sbi.inference.NLE_A
+   sbi.inference.NPE_A
+   sbi.inference.NPE_B
+   sbi.inference.NPE_C
+   sbi.inference.NPSE
    sbi.inference.NRE_A
    sbi.inference.NRE_B
    sbi.inference.NRE_C
-   sbi.inference.BNRE
-   sbi.inference.MCABC
    sbi.inference.SMCABC
-   sbi.inference.MarginalTrainer

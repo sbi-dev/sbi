@@ -9,5 +9,5 @@ Utilities
    :nosignatures:
 
    sbi.utils.get_density_thresholder
-   sbi.utils.transformed_potential
    sbi.utils.mcmc_transform
+   sbi.utils.transformed_potential

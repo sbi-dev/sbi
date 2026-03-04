@@ -9,9 +9,9 @@ Posteriors
    :nosignatures:
 
    sbi.inference.DirectPosterior
+   sbi.inference.EnsemblePosterior
    sbi.inference.ImportanceSamplingPosterior
    sbi.inference.MCMCPosterior
    sbi.inference.RejectionPosterior
    sbi.inference.VectorFieldPosterior
    sbi.inference.VIPosterior
-   sbi.inference.EnsemblePosterior

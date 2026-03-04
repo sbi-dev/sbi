@@ -8,10 +8,10 @@ Prior and simulator
    :toctree: _autosummary
    :nosignatures:
 
-   sbi.utils.process_prior
-   sbi.utils.process_simulator
    sbi.utils.BoxUniform
    sbi.utils.MultipleIndependent
+   sbi.utils.process_prior
+   sbi.utils.process_simulator
    sbi.utils.RestrictedPrior
    sbi.utils.RestrictionEstimator
    sbi.inference.simulate_for_sbi

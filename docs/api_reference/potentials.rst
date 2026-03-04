@@ -8,7 +8,8 @@ Potentials
    :toctree: _autosummary
    :nosignatures:
 
-   sbi.inference.posterior_estimator_based_potential
    sbi.inference.likelihood_estimator_based_potential
+   sbi.inference.mixed_likelihood_estimator_based_potential
+   sbi.inference.posterior_estimator_based_potential
    sbi.inference.ratio_estimator_based_potential
    sbi.inference.vector_field_estimator_based_potential
