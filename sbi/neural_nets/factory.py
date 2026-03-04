@@ -443,10 +443,7 @@ def posterior_flow_nn(
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
-    gaussian_baseline: Union[
-        bool, Literal["velocity", "position", "position_raw"]
-    ] = False,
-    z_score_method: Literal["true_marginal", "initial_pr_formula"] = "true_marginal",
+    gaussian_baseline: bool = False,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a FlowMatchingEstimator object for flow-based
@@ -475,8 +472,6 @@ def posterior_flow_nn(
         gaussian_baseline: If True, use analytical Gaussian baseline velocity
             derived from Bayes' rule. The network then only learns the residual.
             Defaults to False.
-        z_score_method: Method for time-dependent input z-scoring.
-            Defaults to "true_marginal".
         **kwargs: Additional estimator / network arguments.  Valid keys are
             defined by ``FlowEstimatorConfig``; unknown keys raise
             ``TypeError``.
@@ -495,7 +490,6 @@ def posterior_flow_nn(
         time_emb_type=time_emb_type,
         net=model,
         gaussian_baseline=gaussian_baseline,
-        z_score_method=z_score_method,
     )
 
     # Validate against known fields — raises TypeError on typos or
