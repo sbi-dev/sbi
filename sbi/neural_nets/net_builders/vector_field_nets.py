@@ -107,6 +107,7 @@ class FlowEstimatorConfig(_VectorFieldBaseConfig):
     """
 
     estimator_type: Optional[str] = None
+    gaussian_baseline: Optional[bool] = None
 
 
 # ==================== Building Flow/Score Matching Estimators =========================
