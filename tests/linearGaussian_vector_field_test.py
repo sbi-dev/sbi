@@ -257,7 +257,13 @@ def test_fmpe_time_dependent_z_scoring_integration(vector_field_type):
     def simulator(theta):
         return theta + torch.randn_like(theta) * 0.1
 
-    inference = FMPE(prior, z_score_x="independent", show_progress_bars=False)
+    inference = FMPE(
+        prior,
+        vf_estimator=posterior_flow_nn(
+            z_score_theta="independent", z_score_x="independent"
+        ),
+        show_progress_bars=False,
+    )
     theta = prior.sample((200,))
     x = simulator(theta)
     density_estimator = inference.append_simulations(theta, x).train(max_num_epochs=1)
@@ -836,10 +842,13 @@ def test_fmpe_shifted_data_c2st(z_score_theta, gaussian_baseline):
     reference_samples = x_o + 0.5 * torch.randn(1000, 2)
 
     torch.manual_seed(42)
-    inference = FMPE(
-        prior,
+    vf_estimator = posterior_flow_nn(
         z_score_theta=z_score_theta,
         gaussian_baseline=gaussian_baseline,
+    )
+    inference = FMPE(
+        prior,
+        vf_estimator=vf_estimator,
         show_progress_bars=False,
     )
     inference.append_simulations(theta_train, x_train)
@@ -898,5 +907,5 @@ def test_fmpe_untrained_gaussian_baseline_samples_prior():
 
     # Samples should be near data mean (~100), not near 0
     assert torch.all(sample_mean > 80) and torch.all(sample_mean < 120), (
-        f"Untrained gaussian_baseline should sample near data mean ~100, got {sample_mean}"
+        f"Untrained gaussian_baseline must sample near mean ~100, got {sample_mean}"
     )

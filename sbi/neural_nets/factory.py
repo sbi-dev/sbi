@@ -481,8 +481,8 @@ def posterior_flow_nn(
     """
     # Map user-facing parameter names to internal names.
     mapped = dict(
-        z_score_x=z_score_x,
-        z_score_y=z_score_theta,
+        z_score_x=z_score_theta,
+        z_score_y=z_score_x,
         hidden_features=hidden_features,
         num_layers=num_layers,
         embedding_net=embedding_net,
