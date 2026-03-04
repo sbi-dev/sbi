@@ -107,6 +107,7 @@ class FlowEstimatorConfig(_VectorFieldBaseConfig):
     """
 
     estimator_type: Optional[str] = None
+    gaussian_baseline: Optional[bool] = None
 
 
 # ==================== Building Flow/Score Matching Estimators =========================
@@ -127,6 +128,7 @@ def build_vector_field_estimator(
         Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         VectorFieldNet,
     ] = "mlp",
+    gaussian_baseline: bool = False,
     **kwargs,
 ) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
     """Builds a vector field estimator (flow matching or score matching) with the given
@@ -149,6 +151,9 @@ def build_vector_field_estimator(
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
             "transformer_cross_attention" or a custom network following the
             VectorFieldNet protocol.
+        gaussian_baseline: If True, use analytical Gaussian baseline velocity
+            derived from Bayes' rule. The network then only learns the residual.
+            Only used when estimator_type="flow". Defaults to False.
         **kwargs: Additional arguments forwarded to the estimator and network
             constructors.  Valid keys are defined by ``ScoreEstimatorConfig``
             and ``FlowEstimatorConfig``; validation happens in the upstream
@@ -236,6 +241,9 @@ def build_vector_field_estimator(
             input_shape=batch_x[0].shape,
             condition_shape=batch_y[0].shape,
             embedding_net=embedding_net_y,
+            mean_1=mean_0,  # Data statistics for time-dependent z-scoring
+            std_1=std_0,
+            gaussian_baseline=gaussian_baseline,
         )
     elif estimator_type == "score":
         # Choose the appropriate score estimator based on SDE type
