@@ -121,7 +121,8 @@ def classifier_nn(
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
         **kwargs: Additional classifier arguments.  Valid keys are defined by
-            ``ClassifierConfig``; unknown keys raise ``TypeError``.
+            ``ClassifierConfig``; unknown keys trigger a warning and are forwarded to
+            the builder.
     """
 
     # Map user-facing parameter names to internal names.
@@ -137,9 +138,9 @@ def classifier_nn(
         ),
     )
 
-    # Validate against known fields — raises TypeError on typos
-    # or if kwargs duplicate an explicit parameter.
-    config = ClassifierConfig(**mapped, **kwargs)
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # # while still forwarding them to the underlying builder.
+    config = ClassifierConfig.from_kwargs(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
@@ -204,7 +205,8 @@ def likelihood_nn(
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
         **kwargs: Additional estimator arguments.  Valid keys are defined by
-            ``ConditionalFlowConfig``; unknown keys raise ``TypeError``.
+            ``ConditionalFlowConfig``; unknown keys trigger a warning
+            and are forwarded to the builder.
     """
 
     # Map user-facing parameter names to internal names.
@@ -218,9 +220,9 @@ def likelihood_nn(
         num_components=num_components,
     )
 
-    # Validate against known fields — raises TypeError on typos
-    # or if kwargs duplicate an explicit parameter.
-    config = ConditionalFlowConfig(**mapped, **kwargs)
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = ConditionalFlowConfig.from_kwargs(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
@@ -279,7 +281,8 @@ def posterior_nn(
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
         **kwargs: Additional estimator arguments.  Valid keys are defined by
-            ``ConditionalFlowConfig``; unknown keys raise ``TypeError``.
+            ``ConditionalFlowConfig``; unknown keys trigger a warning
+            and are forwarded to the builder.
     """
 
     # Map user-facing parameter names to internal names.
@@ -293,9 +296,9 @@ def posterior_nn(
         num_components=num_components,
     )
 
-    # Validate against known fields — raises TypeError on typos
-    # or if kwargs duplicate an explicit parameter.
-    config = ConditionalFlowConfig(**mapped, **kwargs)
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = ConditionalFlowConfig.from_kwargs(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 
     def build_fn_snpe_a(batch_theta, batch_x, num_components):
@@ -405,9 +408,9 @@ def posterior_score_nn(
         net=model,
     )
 
-    # Validate against known fields — raises TypeError on typos
-    # or if kwargs duplicate an explicit parameter.
-    config = ScoreEstimatorConfig(**mapped, **kwargs)
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = ScoreEstimatorConfig.from_kwargs(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
@@ -486,9 +489,9 @@ def posterior_flow_nn(
         net=model,
     )
 
-    # Validate against known fields — raises TypeError on typos
-    # or if kwargs duplicate an explicit parameter.
-    config = FlowEstimatorConfig(**mapped, **kwargs)
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = FlowEstimatorConfig.from_kwargs(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
@@ -524,7 +527,8 @@ def marginal_nn(
         num_bins: Number of bins used for the splines in `nsf`.
         num_components: Number of mixture components for a mixture of Gaussians.
         **kwargs: Additional estimator arguments.  Valid keys are defined by
-            ``MarginalFlowConfig``; unknown keys raise ``TypeError``.
+            ``MarginalFlowConfig``; unknown keys trigger a warning and are forwarded to
+            the builder.
     """
 
     # Map user-facing parameter names to internal names (no renaming needed here).
@@ -536,9 +540,9 @@ def marginal_nn(
         num_components=num_components,
     )
 
-    # Validate against known fields — raises TypeError on typos
-    # or if kwargs duplicate an explicit parameter.
-    config = MarginalFlowConfig(**mapped, **kwargs)
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = MarginalFlowConfig.from_kwargs(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_x: Tensor) -> Any:

@@ -3,8 +3,9 @@
 
 """Tests for config-based kwarg validation in factory functions.
 
-The primary contract: unknown / misspelled kwargs raise ``TypeError`` immediately
-instead of being silently swallowed by downstream builder functions.
+The primary contract: unknown / misspelled kwargs emit a warning (so typos are
+surfaced) but are still forwarded to the downstream builder, allowing
+library-specific parameters (e.g. Zuko flow kwargs) to pass through.
 """
 
 import pytest
@@ -30,6 +31,16 @@ def test_config_to_dict_filters_none():
     assert "z_score_x" not in d
 
 
+def test_config_from_kwargs_extra():
+    """from_kwargs() stores unknown keys in extra_kwargs and merges in to_dict()."""
+    with pytest.warns(UserWarning, match="Unknown kwargs"):
+        cfg = ConditionalFlowConfig.from_kwargs(
+            hidden_features=64, some_zuko_param=True
+        )
+    d = cfg.to_dict()
+    assert d == {"hidden_features": 64, "some_zuko_param": True}
+
+
 @pytest.mark.parametrize(
     "factory_fn, factory_args, bad_kwarg",
     [
@@ -42,8 +53,8 @@ def test_config_to_dict_filters_none():
         (posterior_flow_nn, (), {"sigma_min": 0.01}),  # score-only param
     ],
 )
-def test_factory_rejects_unknown_kwargs(factory_fn, factory_args, bad_kwarg):
-    with pytest.raises(TypeError, match="unexpected keyword argument"):
+def test_factory_warns_on_unknown_kwargs(factory_fn, factory_args, bad_kwarg):
+    with pytest.warns(UserWarning, match="Unknown kwargs"):
         factory_fn(*factory_args, **bad_kwarg)
 
 
