@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict
 from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
 
-import torch
 import torch.nn as nn
 from torch import Tensor, ones
 from torch.distributions import Distribution

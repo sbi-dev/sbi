@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, Dict, Literal, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Union, cast
 
 import torch
 from torch import Tensor
@@ -132,13 +132,11 @@ class NPE_A(PosteriorEstimatorTrainer):
         """
 
         # Catch invalid inputs.
-        if not (
-            (density_estimator == "mdn_snpe_a")
-            or callable(density_estimator)
-        ):
+        if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
             raise TypeError(
                 "The `density_estimator` passed to SNPE_A needs to be a "
-                "callable, an instantiated ConditionalEstimator, or the string 'mdn_snpe_a'!"
+                "callable, an instantiated ConditionalEstimator, or the "
+                "string 'mdn_snpe_a'!"
             )
 
         self._num_components = num_components
@@ -435,7 +433,9 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         # Resolve and validate density estimator
         if density_estimator is None:
-            density_estimator = deepcopy(self._neural_net)
+            density_estimator = cast(
+                ConditionalDensityEstimator, deepcopy(self._neural_net)
+            )
 
         if not isinstance(density_estimator, MixtureDensityEstimator):
             raise TypeError(

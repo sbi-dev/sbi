@@ -9,7 +9,6 @@ from typing import Any, Callable, Optional, Tuple, Union
 from warnings import warn
 
 import torch
-import torch.nn as nn
 from torch import Tensor
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.optim.adam import Adam

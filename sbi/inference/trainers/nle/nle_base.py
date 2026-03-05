@@ -5,7 +5,6 @@ import warnings
 from abc import ABC
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
-import torch
 import torch.nn as nn
 from torch import Tensor
 from torch.distributions import Distribution
