@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Protocol, Union
+from typing import Any, Optional, Protocol, Union
 
 import torch
 from torch import Tensor
@@ -40,7 +40,29 @@ class BasePotential(metaclass=ABCMeta):
         self, theta: Tensor, time: Optional[Tensor] = None, track_gradients: bool = True
     ) -> Tensor:
         raise NotImplementedError
+    
+    def init(self, **kwargs: Any) -> "BasePotential":
+        """One-time setup before sampling begins.
 
+        Subclasses that need expensive preprocessing (hyperparameter search,
+        covariance estimation, GMM fitting, etc.) override this method to do
+        that work here instead of lazily on the first ``__call__``.
+
+        The default is a no-op so all existing potentials remain valid without
+        any changes.
+
+        Returns ``self`` so calls can be chained::
+
+            potential.init(x_obs=x).gradient(theta, t)
+
+        Args:
+            **kwargs: Subclass-specific keyword arguments (e.g. ``x_obs``).
+
+        Returns:
+            ``self`` for method chaining.
+        """
+        return self
+    
     @property
     def x_is_iid(self) -> bool:
         """If x has batch dimension greater than 1, whether to intepret the batch as iid
