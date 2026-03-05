@@ -64,8 +64,10 @@ def _build_mixed_density_estimator(
     num_transforms: int = 2,
     num_components: int = 5,
     num_bins: int = 5,
-    hidden_features: int = 50,
-    hidden_layers: int = 2,
+    hidden_features_continuous: int = 50,
+    hidden_features_discrete: int = 50,
+    hidden_layers_continuous: int = 2,
+    hidden_layers_discrete: int = 2,
     tail_bound: float = 10.0,
     log_transform_x: bool = False,
     **kwargs,
@@ -118,8 +120,10 @@ def _build_mixed_density_estimator(
         num_transforms: number of transforms in the flow model.
         num_components: number of components in the mixture model.
         num_bins: bins per spline for NSF.
-        hidden_features: number of hidden features used in both nets.
-        hidden_layers: number of hidden layers in the categorical net.
+        hidden_features_continuous: number of hidden features used in the continuous net.
+        hidden_features_discrete: number of hidden features used in the categorical net.
+        hidden_layers_continuous: number of hidden layers in the continuous net.
+        hidden_layers_discrete: number of hidden layers in the categorical net.
         tail_bound: spline tail bound for NSF.
         log_transform_x: whether to apply a log-transform to x to move it to unbounded
             space, e.g., in case x consists of reaction time data (bounded by
@@ -165,8 +169,8 @@ def _build_mixed_density_estimator(
         batch_y,
         z_score_x="none",  # discrete data should not be z-scored
         z_score_y="none",  # y-embedding net already z-scores
-        num_hidden=hidden_features,
-        num_layers=hidden_layers,
+        num_hidden=hidden_features_discrete,
+        num_layers=hidden_layers_discrete,
         embedding_net=embedding_net,
         num_categories_per_variable=num_categories_per_variable,
         dropout_probability=kwargs.get("dropout_probability", 0.0),
@@ -176,9 +180,9 @@ def _build_mixed_density_estimator(
         # set up linear embedding net for combining discrete and continuous
         # data.
         combined_embedding_net = nn.Sequential(
-            nn.Linear(combined_condition.shape[-1], hidden_features),
+            nn.Linear(combined_condition.shape[-1], hidden_features_continuous),
             nn.ReLU(),
-            nn.Linear(hidden_features, hidden_features),
+            nn.Linear(hidden_features_continuous, hidden_features_continuous),
             nn.ReLU(),
         )
 
@@ -204,7 +208,8 @@ def _build_mixed_density_estimator(
         num_transforms=num_transforms,
         num_components=num_components,
         tail_bound=tail_bound,
-        hidden_features=hidden_features,
+        hidden_features=hidden_features_continuous,
+        hidden_layers=hidden_layers_continuous,
         **kwargs,
     )
 
