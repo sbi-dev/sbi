@@ -16,6 +16,7 @@ from sbi.inference.trainers.npe.npe_base import (
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
+    ConditionalEstimator,
     ConditionalEstimatorBuilder,
 )
 from sbi.neural_nets.estimators.mixture_density_estimator import (
@@ -91,6 +92,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         density_estimator: Union[
             Literal["mdn_snpe_a"],
             ConditionalEstimatorBuilder[ConditionalDensityEstimator],
+            ConditionalEstimator,
         ] = "mdn_snpe_a",
         num_components: int = 10,
         device: str = "cpu",
@@ -130,10 +132,13 @@ class NPE_A(PosteriorEstimatorTrainer):
         """
 
         # Catch invalid inputs.
-        if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
+        if not (
+            (density_estimator == "mdn_snpe_a")
+            or callable(density_estimator)
+        ):
             raise TypeError(
                 "The `density_estimator` passed to SNPE_A needs to be a "
-                "callable or the string 'mdn_snpe_a'!"
+                "callable, an instantiated ConditionalEstimator, or the string 'mdn_snpe_a'!"
             )
 
         self._num_components = num_components

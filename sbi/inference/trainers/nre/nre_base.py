@@ -7,6 +7,7 @@ from dataclasses import asdict, replace
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
+import torch.nn as nn
 from torch import Tensor, eye, ones
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -31,7 +32,9 @@ from sbi.inference.trainers.base import (
     NeuralInference,
 )
 from sbi.neural_nets import classifier_nn
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import (
+    ConditionalEstimatorBuilder,
+)
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -98,6 +101,9 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         check_estimator_arg(classifier)
         if isinstance(classifier, str):
             self._build_neural_net = classifier_nn(model=classifier)
+        elif isinstance(classifier, nn.Module):
+            self._neural_net = classifier
+            self._build_neural_net = lambda theta, x: classifier
         else:
             self._build_neural_net = classifier
 

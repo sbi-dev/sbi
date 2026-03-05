@@ -44,6 +44,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         vector_field_estimator_builder: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
             ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
+            ConditionalVectorFieldEstimator,
         ] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -93,7 +94,11 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         # subclass-specific arguments (e.g. sde_type for NPSE).
         check_estimator_arg(vector_field_estimator_builder)
         if not isinstance(vector_field_estimator_builder, str):
-            self._build_neural_net = vector_field_estimator_builder
+            if isinstance(vector_field_estimator_builder, torch.nn.Module):
+                self._neural_net = vector_field_estimator_builder
+                self._build_neural_net = lambda theta, x: vector_field_estimator_builder
+            else:
+                self._build_neural_net = vector_field_estimator_builder
 
         self._proposal_roundwise = []
 
