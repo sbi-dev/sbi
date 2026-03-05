@@ -67,7 +67,7 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
-from sbi.utils.sbiutils import get_simulations_since_round
+from sbi.utils.sbiutils import ImproperEmpirical, get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
 from sbi.utils.torchutils import check_if_prior_on_device, process_device
 from sbi.utils.tracking import TensorBoardTracker
@@ -542,7 +542,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         """
 
         if prior is None:
-            if self._prior is None:
+            if self._prior is None or isinstance(self._prior, ImproperEmpirical):
                 cls_name = self.__class__.__name__
                 raise ValueError(
                     f"""You did not pass a prior. You have to pass the prior either at
