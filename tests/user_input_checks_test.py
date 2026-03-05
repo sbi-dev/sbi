@@ -611,3 +611,16 @@ def test_proposal_sharing_weights_with_trainer_raises():
 
     with pytest.raises(ValueError, match="same object"):
         inference.append_simulations(theta, x, proposal=unsafe_proposal)
+import pytest
+from sbi.utils.user_input_checks import check_prior
+
+
+def test_check_prior_invalid_type():
+    """
+    Ensure that check_prior raises a TypeError
+    when given an invalid prior type.
+    """
+    invalid_prior = 123  # clearly not a valid prior object
+
+    with pytest.raises((TypeError, AssertionError, ValueError)):
+        check_prior(invalid_prior)
