@@ -661,7 +661,7 @@ def test_prior_guide(vector_field_type, prior_type, covariance_type, K):
     posterior.set_default_x(x_o)
 
     test_prior_mean = zeros(num_dim) + 0.1
-    test_prior_cov = eye(num_dim) * 0.5  # In train priors
+    test_prior_cov = eye(num_dim) * 0.4  # In train priors
     test_prior = MultivariateNormal(
         loc=test_prior_mean, covariance_matrix=test_prior_cov
     )
