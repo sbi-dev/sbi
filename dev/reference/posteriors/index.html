@@ -1850,7 +1850,10 @@ trained network to deal with these cases.</p>
 <span class="normal">577</span>
 <span class="normal">578</span>
 <span class="normal">579</span>
-<span class="normal">580</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DirectPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DirectPosterior</span><span class="p">(</span><span class="n">NeuralPosterior</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Posterior based on neural networks that directly estimate the posterior (NPE).</span>
 
 <span class="sd">    NPE trains a neural network to directly approximate the posterior distribution.</span>
@@ -2245,8 +2248,11 @@ trained network to deal with these cases.</p>
 
         <span class="n">theta</span> <span class="o">=</span> <span class="n">ensure_theta_batched</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
         <span class="n">event_shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">input_shape</span>
+        <span class="c1"># If theta has 1 leading dim (batch, event), treat it as batch (matching x).</span>
+        <span class="c1"># overwise, the leading is sample.</span>
+        <span class="n">num_leading</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">event_shape</span><span class="p">)</span>
         <span class="n">theta_density_estimator</span> <span class="o">=</span> <span class="n">reshape_to_sample_batch_event</span><span class="p">(</span>
-            <span class="n">theta</span><span class="p">,</span> <span class="n">event_shape</span><span class="p">,</span> <span class="n">leading_is_sample</span><span class="o">=</span><span class="kc">True</span>
+            <span class="n">theta</span><span class="p">,</span> <span class="n">event_shape</span><span class="p">,</span> <span class="n">leading_is_sample</span><span class="o">=</span><span class="p">(</span><span class="n">num_leading</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span>
         <span class="p">)</span>
         <span class="n">x_density_estimator</span> <span class="o">=</span> <span class="n">reshape_to_batch_event</span><span class="p">(</span>
             <span class="n">x</span><span class="p">,</span> <span class="n">event_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">condition_shape</span>
@@ -2765,10 +2771,7 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span>
-<span class="normal">459</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">459</span>
 <span class="normal">460</span>
 <span class="normal">461</span>
 <span class="normal">462</span>
@@ -2822,7 +2825,10 @@ re-evaluate only whenever a new <code>x</code> is passed.</p>
 <span class="normal">510</span>
 <span class="normal">511</span>
 <span class="normal">512</span>
-<span class="normal">513</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">leakage_correction</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -3408,7 +3414,10 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 <span class="normal">451</span>
 <span class="normal">452</span>
 <span class="normal">453</span>
-<span class="normal">454</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob_batched</span><span class="p">(</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_prob_batched</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
@@ -3449,8 +3458,11 @@ These parameters only have an effect if <code>norm_posterior=True</code>.</p>
 
     <span class="n">theta</span> <span class="o">=</span> <span class="n">ensure_theta_batched</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
     <span class="n">event_shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">input_shape</span>
+    <span class="c1"># If theta has 1 leading dim (batch, event), treat it as batch (matching x).</span>
+    <span class="c1"># overwise, the leading is sample.</span>
+    <span class="n">num_leading</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">event_shape</span><span class="p">)</span>
     <span class="n">theta_density_estimator</span> <span class="o">=</span> <span class="n">reshape_to_sample_batch_event</span><span class="p">(</span>
-        <span class="n">theta</span><span class="p">,</span> <span class="n">event_shape</span><span class="p">,</span> <span class="n">leading_is_sample</span><span class="o">=</span><span class="kc">True</span>
+        <span class="n">theta</span><span class="p">,</span> <span class="n">event_shape</span><span class="p">,</span> <span class="n">leading_is_sample</span><span class="o">=</span><span class="p">(</span><span class="n">num_leading</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span>
     <span class="p">)</span>
     <span class="n">x_density_estimator</span> <span class="o">=</span> <span class="n">reshape_to_batch_event</span><span class="p">(</span>
         <span class="n">x</span><span class="p">,</span> <span class="n">event_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">posterior_estimator</span><span class="o">.</span><span class="n">condition_shape</span>
@@ -3724,10 +3736,7 @@ have a cached value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>sbi/inference/posteriors/direct_posterior.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">515</span>
-<span class="normal">516</span>
-<span class="normal">517</span>
-<span class="normal">518</span>
+              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">518</span>
 <span class="normal">519</span>
 <span class="normal">520</span>
 <span class="normal">521</span>
@@ -3789,7 +3798,10 @@ have a cached value.</p>
 <span class="normal">577</span>
 <span class="normal">578</span>
 <span class="normal">579</span>
-<span class="normal">580</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_iter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_000</span><span class="p">,</span>
