@@ -1449,7 +1449,178 @@ def _arrange_grid(
 
     return fig, axes  # pyright: ignore[reportReturnType]
 
+import numpy as np
+import matplotlib.pyplot as plt
+from typing import Optional, Literal
+from scipy import stats
 
+
+# ============================================================================
+# Helper Function 1: Improved Binning
+# ============================================================================
+
+def _calculate_optimal_bins(
+    num_sbc_runs: int,
+    method: Literal["fd", "sturges", "scott", "sqrt"] = "fd"
+) -> int:
+    """
+    Calculate optimal number of bins for SBC rank histograms.
+    
+    This function implements various binning heuristics adapted for uniform
+    distributions, which is what we expect from well-calibrated SBC ranks.
+    
+    Args:
+        num_sbc_runs: Number of SBC simulation runs.
+        method: Binning method to use:
+            - 'fd': Freedman-Diaconis rule (recommended for SBC)
+                    Returns approximately n^(1/3) bins
+            - 'sturges': Sturges' formula, ceil(log2(n)) + 1
+            - 'scott': Scott's rule (similar to FD for uniform data)
+            - 'sqrt': Square root choice, ceil(sqrt(n))
+    
+    Returns:
+        Optimal number of bins (minimum of 10).
+        
+    Examples:
+        >>> _calculate_optimal_bins(100, method='fd')
+        10
+        >>> _calculate_optimal_bins(1000, method='fd')
+        10
+        >>> _calculate_optimal_bins(500, method='sturges')
+        10
+    
+    References:
+        Freedman, D. and Diaconis, P. (1981). On the histogram as a density
+        estimator: L2 theory. Probability Theory and Related Fields, 57(4).
+    """
+    n = num_sbc_runs
+    
+    if method == "fd":
+        # Freedman-Diaconis: bin_width = 2 * IQR * n^(-1/3)
+        # For uniform distribution on [0, L], IQR ≈ L/2
+        # This gives: num_bins ≈ L / (2 * (L/2) * n^(-1/3)) = n^(1/3)
+        return max(int(np.ceil(n ** (1/3))), 10)
+    
+    elif method == "sturges":
+        # Sturges: k = ceil(log2(n)) + 1
+        return max(int(np.ceil(np.log2(n))) + 1, 10)
+    
+    elif method == "scott":
+        # Scott's rule adapted for uniform distribution
+        # Similar to FD but uses std instead of IQR
+        return max(int(np.ceil(n ** (1/3))), 10)
+    
+    elif method == "sqrt":
+        # Square root rule: k = ceil(sqrt(n))
+        return max(int(np.ceil(np.sqrt(n))), 10)
+    
+    else:
+        raise ValueError(
+            f"Unknown binning method: {method}. "
+            f"Choose from 'fd', 'sturges', 'scott', or 'sqrt'."
+        )
+
+
+# ============================================================================
+# Helper Function 2: ECDF Difference Plot
+# ============================================================================
+
+def _plot_ranks_as_ecdf_diff(
+    ranks: np.ndarray,
+    num_posterior_samples: int,
+    label: Optional[str] = None,
+    color: Optional[str] = None,
+    alpha: float = 0.8,
+    show_uniform_region: bool = True,
+    uniform_region_alpha: float = 0.3,
+    confidence_level: float = 0.99,
+) -> None:
+    """
+    Plot ECDF difference from uniform expectation with ellipse confidence band.
+    
+    This visualization shows the deviation of the empirical CDF from the uniform
+    CDF expected under perfect calibration. The "ellipse" confidence band accounts
+    for the fact that deviations are naturally larger near p=0.5 than near the edges.
+    
+    This plot is often more sensitive to calibration issues than histograms because:
+    1. It uses the full resolution of the data (no binning artifacts)
+    2. Deviations accumulate, making patterns more visible
+    3. The confidence band has the correct shape for uniform data
+    
+    Args:
+        ranks: SBC ranks array of shape (num_sbc_runs,) for a single parameter.
+        num_posterior_samples: Number of posterior samples used for ranking.
+        label: Label for the line in the legend.
+        color: Line color (uses matplotlib default if None).
+        alpha: Line transparency (0 to 1).
+        show_uniform_region: Whether to show the confidence band.
+        uniform_region_alpha: Transparency of the confidence band.
+        confidence_level: Confidence level for the band (default 0.99).
+    
+    Notes:
+        The confidence band is derived from the variance of the ECDF under the
+        null hypothesis of uniformity: Var(F_n(p)) = p(1-p)/n, which gives the
+        characteristic "ellipse" shape that is widest at p=0.5.
+    
+    References:
+        Talts, S., Betancourt, M., Simpson, D., Vehtari, A., & Gelman, A. (2018).
+        Validating Bayesian inference algorithms with simulation-based calibration.
+        arXiv preprint arXiv:1804.06788.
+    """
+    n = len(ranks)
+    
+    # 1. Normalize ranks to [0, 1] and sort
+    y_observed = np.sort(ranks) / num_posterior_samples
+    
+    # 2. Theoretical uniform quantiles (where points should be)
+    x_theoretical = np.linspace(0, 1, n)
+    
+    # 3. Calculate deviation from uniform
+    diff = y_observed - x_theoretical
+    
+    # 4. Plot the deviation line
+    plt.plot(
+        x_theoretical, 
+        diff, 
+        label=label, 
+        color=color, 
+        alpha=alpha, 
+        linewidth=1.5
+    )
+    
+    # Add zero reference line
+    plt.axhline(0, color='black', linestyle='--', alpha=0.3, linewidth=1)
+    
+    # 5. Add ellipse-shaped confidence band
+    if show_uniform_region:
+        # High-resolution x-axis for smooth band
+        p = np.linspace(0, 1, 1000)
+        
+        # Standard deviation of ECDF: sqrt(p(1-p)/n)
+        std_dev = np.sqrt(p * (1 - p) / n)
+        
+        # Z-score for the specified confidence level
+        alpha_val = (1 - confidence_level) / 2
+        z_score = stats.norm.ppf(1 - alpha_val)
+        
+        # Upper and lower bounds
+        upper = z_score * std_dev
+        lower = -z_score * std_dev
+        
+        plt.fill_between(
+            p, lower, upper,
+            color='gray',
+            alpha=uniform_region_alpha,
+            label=f'{int(confidence_level * 100)}% CI',
+            zorder=0  # Draw behind the line
+        )
+    
+    # Set labels and limits
+    plt.xlabel("Rank (normalized)")
+    plt.ylabel("ECDF - Uniform")
+    plt.xlim(0, 1)
+    plt.ylim(-0.5, 0.5)
+    
 def sbc_rank_plot(
     ranks: Union[Tensor, np.ndarray, List[Tensor], List[np.ndarray]],
     num_posterior_samples: int,
@@ -1564,7 +1735,7 @@ def _sbc_rank_plot(
         if isinstance(rank, Tensor):
             ranks_list[idx]: np.ndarray = rank.numpy()  # type: ignore
 
-    plot_types = ["hist", "cdf"]
+    plot_types = ["hist", "cdf", "ecdf_diff"]
     assert plot_type in plot_types, (
         "plot type {plot_type} not implemented, use one in {plot_types}."
     )
@@ -1593,8 +1764,7 @@ def _sbc_rank_plot(
     if ranks_labels is None:
         ranks_labels = [f"rank set {i + 1}" for i in range(num_ranks)]
     if num_bins is None:
-        # Recommendation from Talts et al.
-        num_bins = num_sbc_runs // 20
+        num_bins = _calculate_optimal_bins(num_sbc_runs, method='fd')
     assert isinstance(num_bins, int)
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
@@ -1653,12 +1823,16 @@ def _sbc_rank_plot(
                         alpha=line_alpha,
                         xlim_offset_factor=xlim_offset_factor,
                     )
-                    # Plot expected uniform band.
-                    _plot_hist_region_expected_under_uniformity(
-                        num_sbc_runs,
-                        num_bins,
+                elif plot_type == "ecdf_diff":
+                    _plot_ranks_as_ecdf_diff(
+                        np.asarray(ranki[:, jj]),
                         num_posterior_samples,
-                        alpha=uniform_region_alpha,
+                        label=ranks_labels[ii],
+                        color=f"C{ii}" if colors is None else colors[ii],
+                        alpha=line_alpha,
+                        show_uniform_region=show_uniform_region,
+                        uniform_region_alpha=uniform_region_alpha,
+                        confidence_level=0.99,
                     )
                     # show legend only in first subplot.
                     if jj == 0 and ranks_labels[ii] is not None:
@@ -1669,10 +1843,10 @@ def _sbc_rank_plot(
                         f"plot_type {plot_type} not defined, use one in {plot_types}"
                     )
                 # Remove empty subplots.
-        col_idx += 1
-        while num_rows > 1 and col_idx < num_cols:
-            ax[row_idx, col_idx].axis("off")
-            col_idx += 1
+                col_idx += 1
+                while num_rows > 1 and col_idx < num_cols:
+                    ax[row_idx, col_idx].axis("off")
+                    col_idx += 1
 
     # When there is only one set of ranks show all params in a single subplot.
     else:
