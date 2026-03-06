@@ -5,6 +5,7 @@ import warnings
 from abc import ABC
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
+import torch.nn as nn
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -82,6 +83,9 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         check_estimator_arg(density_estimator)
         if isinstance(density_estimator, str):
             self._build_neural_net = likelihood_nn(model=density_estimator)
+        elif isinstance(density_estimator, nn.Module):
+            self._neural_net = density_estimator
+            self._build_neural_net = lambda theta, x: density_estimator
         else:
             self._build_neural_net = density_estimator
 

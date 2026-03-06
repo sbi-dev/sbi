@@ -26,7 +26,9 @@ from sbi.utils import check_estimator_arg, get_log_root
 from sbi.utils.torchutils import assert_all_finite, process_device
 from sbi.utils.tracking import TensorBoardTracker
 
-DensityEstimatorType = Union[ZukoFlowType, str, Callable[[Tensor], Any]]
+DensityEstimatorType = Union[
+    ZukoFlowType, str, Callable[[Tensor], Any], UnconditionalDensityEstimator
+]
 
 
 class MarginalTrainer:
@@ -126,10 +128,14 @@ class MarginalTrainer:
         elif callable(density_estimator):
             check_estimator_arg(density_estimator)
             self._build_neural_net = density_estimator
+        elif isinstance(density_estimator, torch.nn.Module):
+            check_estimator_arg(density_estimator)
+            self._neural_net = density_estimator
+            self._build_neural_net = lambda x: density_estimator
         else:
             raise ValueError(
-                "density_estimator must be either a DensityEstimator, str, or a "
-                "Callable[[Tensor], Any]."
+                "density_estimator must be either a DensityEstimator, str, a "
+                "Callable[[Tensor], Any], or an UnconditionalDensityEstimator."
             )
 
     def get_dataloaders(

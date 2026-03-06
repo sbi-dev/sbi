@@ -709,13 +709,11 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
         num_samples={num_prior_samples}."""
 
 
-def check_estimator_arg(estimator: Union[str, Callable]) -> None:
+def check_estimator_arg(estimator: Union[str, Callable, nn.Module]) -> None:
     """Check (density or ratio) estimator argument passed by the user."""
-    assert isinstance(estimator, str) or (
-        isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
-    ), (
-        "The passed density estimator / classifier must be a string or a function "
-        f"returning a nn.Module, but is {type(estimator)}"
+    assert isinstance(estimator, (str, Callable)), (
+        "The passed density estimator / classifier must be a string, a function "
+        f"returning a nn.Module, or an instantiated nn.Module, but is {type(estimator)}"
     )
 
 
