@@ -130,7 +130,9 @@ class ConditionalFlowConfig(_EstimatorConfigBase):
     log_transform_x: Optional[bool] = None
     num_categories_per_variable: Optional[Any] = None
     combined_embedding_net: Optional[Any] = None
-    hidden_layers: Optional[int] = None
+    discrete_hidden_features: Optional[int] = None
+    discrete_hidden_layers: Optional[int] = None
+    continuous_hidden_features: Optional[int] = None
 
     # --- Base distribution ---
     dtype: Optional[Any] = None
