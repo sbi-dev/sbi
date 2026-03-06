@@ -1,5 +1,70 @@
 # Changelog
 
+## v0.26.0
+
+### ✨ Highlights
+
+#### 🧠 Neural Network Architectures
+
+* **Add 1D time-series support and automatic input projection to TransformerEmbedding** by @satwiksps in https://github.com/sbi-dev/sbi/pull/1703
+
+#### 🔧 Code Quality & Refactoring
+
+* **Refactor and modularize inference training method** by @abelaba in https://github.com/sbi-dev/sbi/pull/1651
+* **Refactor Plotting functions** by @abelaba in https://github.com/sbi-dev/sbi/pull/1631
+* **Training dataclasses** by @abelaba in https://github.com/sbi-dev/sbi/pull/1668
+
+### ⭐ New Features
+
+* Add max_sampling_time support to rejection samplers by @satwiksps in https://github.com/sbi-dev/sbi/pull/1705
+
+### 🐛 Bug Fixes
+
+* fix: disable transform, add warning for empirical prior by @janfb in https://github.com/sbi-dev/sbi/pull/1669
+* MNPE fix for categorical variables by @dgedon in https://github.com/sbi-dev/sbi/pull/1671
+* Fix: Make NPSE picklable by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1679
+* Fix for z-scoring in vectorfield nets by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1681
+* fix: autoregressive sampling bug in categorical MADE by @janfb in https://github.com/sbi-dev/sbi/pull/1684
+* Remove gate_activation to allow pickling by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1694
+* assert finite x_o by @gmoss13 in https://github.com/sbi-dev/sbi/pull/1701
+* fix: ImproperEmpirical is inefficient by @gmoss13 in https://github.com/sbi-dev/sbi/pull/1700
+* Fix device mismatch in NPSE marginal mean/std computation by @satwiksps in https://github.com/sbi-dev/sbi/pull/1707
+* Fix misleading assertion message in NPE train by @satwiksps in https://github.com/sbi-dev/sbi/pull/1706
+* fix: pin PyMC version below 5.20.1 to avoid TypeError (closes #1397) by @Dev-Sudarshan in https://github.com/sbi-dev/sbi/pull/1697
+
+### 🛠️ Maintenance & Improvements
+
+#### 📖 Documentation & Website
+
+* Add how-to guide for embedding time-series by @satwiksps in https://github.com/sbi-dev/sbi/pull/1695
+* Improve docs of MNPE and EnsemblePosterior by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1677
+* Add SNPE-B to implemented methods by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1691
+* Fixups for the API of implemented methods by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1692
+* Fixups by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1693
+* Update Potentially Misleading Error Message in simulate_for_sbi by @vagechirkov in https://github.com/sbi-dev/sbi/pull/1689
+* Update README with tutorial paper reference by @jahma in https://github.com/sbi-dev/sbi/pull/1712
+
+#### 🧪 Testing & CI/CD
+
+* Refactor z-scoring tests to fix shapes and enable MNLE support by @satwiksps in https://github.com/sbi-dev/sbi/pull/1711
+
+#### 🏗️ Infrastructure & Dependencies
+
+* fix release workflow, add sign workflow by @janfb in https://github.com/sbi-dev/sbi/pull/1663
+* Fix release workflow by @janfb in https://github.com/sbi-dev/sbi/pull/1664
+* An Enhancement Proposal Workflow by @janfb in https://github.com/sbi-dev/sbi/pull/1674
+* build: Move notebook dependency to 'notebook' extra by @matthewfeickert in https://github.com/sbi-dev/sbi/pull/1714
+* fix: add dependencies for tutorial tests; fix pymc errors by @janfb in https://github.com/sbi-dev/sbi/pull/1716
+
+### 🎉 New Contributors
+
+* @vagechirkov made their first contribution in https://github.com/sbi-dev/sbi/pull/1689
+* @satwiksps made their first contribution in https://github.com/sbi-dev/sbi/pull/1695
+* @jahma made their first contribution in https://github.com/sbi-dev/sbi/pull/1712
+* @Dev-Sudarshan made their first contribution in https://github.com/sbi-dev/sbi/pull/1697
+
+**Full Changelog**: https://github.com/sbi-dev/sbi/compare/v0.25.0...v0.26.0
+
 ## v0.25.0
 
 ### ✨ Highlights
