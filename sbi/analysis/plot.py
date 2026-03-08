@@ -49,7 +49,7 @@ from sbi.utils.plotting_helpers import (
 
 UpperLiteral = Literal["hist", "scatter", "contour", "kde"]
 LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
-DiagLiteral = Literal["hist", "scatter", "kde"]
+DiagLiteral = Literal["hist", "scatter", "kde", "bar"]
 K = TypeVar("K")
 KwargsType = Union[List[Optional[Union[Dict, K]]], Dict, K, None]
 
@@ -173,6 +173,7 @@ def pairplot(
     fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
+    discrete_indices: Optional[List[int]] = None,
     **kwargs: Optional[Any],
 ) -> Tuple[FigureBase, Axes]:
     """
@@ -194,14 +195,14 @@ def pairplot(
             None}.
         lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
             None}.
-        diag: Plotting style for diagonal, {hist, scatter, kde}.
+        diag: Plotting style for diagonal, {hist, scatter, kde, bar}.
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
         offdiag: deprecated, use upper instead.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
-            `ScatterDiagOptions`.
+            see the source code in `KdeDiagOptions`, `HistDiagOptions`,
+            `ScatterDiagOptions` or `BarDiagOptions`.
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
             see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
             `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
@@ -212,6 +213,11 @@ def pairplot(
             see the source code in `FigOptions`
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
+        discrete_indices: List of dimension indices that contain discrete values.
+            When provided, discrete dimensions automatically use bar charts on the
+            diagonal (instead of kde/hist) and scatter with jitter on the
+            off-diagonal (instead of kde/contour). This prevents crashes from
+            KDE on integer-valued data.
         **kwargs: Additional arguments to adjust the plot (deprecated).
 
     Returns: figure and axis of posterior distribution plot
@@ -297,6 +303,7 @@ def pairplot(
         fig,
         axes,
         fig_kwargs_filled,
+        discrete_indices=discrete_indices,
     )
 
 
@@ -344,6 +351,20 @@ def plt_scatter_1d(
     """Plot vertical lines for each sample. Note: limits are not used."""
     for single_sample in samples:
         ax.axvline(single_sample, **diag_kwargs["mpl_kwargs"])
+
+
+def plt_bar_1d(
+    ax: Axes,
+    samples: np.ndarray,
+    limits: torch.Tensor,
+    diag_kwargs: Dict,
+) -> None:
+    """Bar chart for discrete-valued dimension."""
+    values, counts = np.unique(samples, return_counts=True)
+    freqs = counts / counts.sum()
+    bar_kwargs = copy.deepcopy(diag_kwargs["mpl_kwargs"])
+    width = diag_kwargs.get("width", 0.8)
+    ax.bar(values, freqs, width=width, **bar_kwargs)
 
 
 def plt_hist_2d(
@@ -539,6 +560,8 @@ def get_diag_funcs(
             diag_funcs.append(plt_kde_1d)
         elif diag == "scatter":
             diag_funcs.append(plt_scatter_1d)
+        elif diag == "bar":
+            diag_funcs.append(plt_bar_1d)
         else:
             diag_funcs.append(None)
 
@@ -1203,6 +1226,38 @@ def conditional_pairplot(
     )
 
 
+_OFFDIAG_NEEDS_DISCRETE_FALLBACK = {plt_kde_2d, plt_contour_2d, plt_hist_2d}
+
+
+def _discrete_offdiag_override(
+    func: Optional[Callable],
+    kwargs: Optional[Dict],
+    samples_a: np.ndarray,
+    samples_b: np.ndarray,
+    a_discrete: bool,
+    b_discrete: bool,
+    sample_ind: int,
+) -> Tuple[Optional[Callable], Optional[Dict], np.ndarray, np.ndarray]:
+    """Override off-diagonal function and add jitter for discrete dimensions.
+
+    When either dimension is discrete, KDE/contour/hist2d would fail or be
+    misleading. This falls back to scatter and adds jitter to discrete axes.
+    """
+    if func in _OFFDIAG_NEEDS_DISCRETE_FALLBACK:
+        func = plt_scatter_2d
+        kwargs = get_default_offdiag_kwargs("scatter", sample_ind)
+
+    # Add jitter to discrete dimension(s) for scatter-like plots.
+    # Seed varies by sample_ind so different sample sets get distinct jitter.
+    rng = np.random.default_rng(sample_ind)
+    if a_discrete:
+        samples_a = samples_a + rng.uniform(-0.3, 0.3, size=len(samples_a))
+    if b_discrete:
+        samples_b = samples_b + rng.uniform(-0.3, 0.3, size=len(samples_b))
+
+    return func, kwargs, samples_a, samples_b
+
+
 def _arrange_grid(
     diag_funcs: List[Optional[Callable]],
     upper_funcs: List[Optional[Callable]],
@@ -1222,6 +1277,7 @@ def _arrange_grid(
     fig: Optional[FigureBase],
     axes: Optional[Axes],
     fig_kwargs: FigOptions,
+    discrete_indices: Optional[List[int]] = None,
 ) -> Tuple[FigureBase, Axes]:
     """
     Arranges the plots for any function that plots parameters either in a row of 1D
@@ -1258,6 +1314,7 @@ def _arrange_grid(
         Axes: matplotlib axes
     """
     dim = samples[0].shape[1]
+    discrete_set = set(discrete_indices) if discrete_indices is not None else set()
     # Prepare points
     if points is None:
         points = []
@@ -1355,9 +1412,14 @@ def _arrange_grid(
                 else:
                     for sample_ind, sample in enumerate(samples):
                         diag_f = diag_funcs[sample_ind]
-                        if callable(diag_f):  # is callable:
+                        diag_kw = diag_kwargs[sample_ind]
+                        # Override for discrete dimensions
+                        if row in discrete_set and diag_f is not plt_bar_1d:
+                            diag_f = plt_bar_1d
+                            diag_kw = get_default_diag_kwargs("bar", sample_ind)
+                        if callable(diag_f):
                             diag_f(
-                                ax, sample[:, row], limits[row], diag_kwargs[sample_ind]
+                                ax, sample[:, row], limits[row], diag_kw
                             )
 
                 if len(points) > 0:
@@ -1380,16 +1442,33 @@ def _arrange_grid(
                 if excl_upper:
                     ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
+                    col_discrete = col in discrete_set
+                    row_discrete = row in discrete_set
                     for sample_ind, sample in enumerate(samples):
                         upper_f = upper_funcs[sample_ind]
+                        upper_kw = upper_kwargs[sample_ind]
+                        samples_col = sample[:, col]
+                        samples_row = sample[:, row]
+                        if col_discrete or row_discrete:
+                            upper_f, upper_kw, samples_col, samples_row = (
+                                _discrete_offdiag_override(
+                                    upper_f,
+                                    upper_kw,
+                                    samples_col,
+                                    samples_row,
+                                    col_discrete,
+                                    row_discrete,
+                                    sample_ind,
+                                )
+                            )
                         if callable(upper_f):
                             upper_f(
                                 ax,
-                                sample[:, col],
-                                sample[:, row],
+                                samples_col,
+                                samples_row,
                                 limits[col],
                                 limits[row],
-                                upper_kwargs[sample_ind],
+                                upper_kw,
                             )
                     if len(points) > 0:
                         for n, v in enumerate(points):
@@ -1404,16 +1483,33 @@ def _arrange_grid(
                 if excl_lower:
                     ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
+                    row_discrete = row in discrete_set
+                    col_discrete = col in discrete_set
                     for sample_ind, sample in enumerate(samples):
                         lower_f = lower_funcs[sample_ind]
+                        lower_kw = lower_kwargs[sample_ind]
+                        samples_row_l = sample[:, row]
+                        samples_col_l = sample[:, col]
+                        if row_discrete or col_discrete:
+                            lower_f, lower_kw, samples_row_l, samples_col_l = (
+                                _discrete_offdiag_override(
+                                    lower_f,
+                                    lower_kw,
+                                    samples_row_l,
+                                    samples_col_l,
+                                    row_discrete,
+                                    col_discrete,
+                                    sample_ind,
+                                )
+                            )
                         if callable(lower_f):
                             lower_f(
                                 ax,
-                                sample[:, row],
-                                sample[:, col],
+                                samples_row_l,
+                                samples_col_l,
                                 limits[row],
                                 limits[col],
-                                lower_kwargs[sample_ind],
+                                lower_kw,
                             )
                     if len(points) > 0:
                         for n, v in enumerate(points):
