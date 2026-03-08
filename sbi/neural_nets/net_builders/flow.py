@@ -138,7 +138,9 @@ def build_maf(
         embedding_net: Optional embedding network for y.
         num_blocks: number of blocks used for residual net for context embedding.
         dropout_probability: dropout probability for regularization in residual net.
-        use_batch_norm: whether to use batch norm in residual net.
+        use_batch_norm: whether to use batch norm in residual net. Defaults to False.
+            It is recommended to keep this False: BatchNorm normalises across the
+            batch and violates the iid assumption used in SBI objective functions.
         kwargs: Additional arguments that are passed by the build function but are not
             relevant for maf and are therefore ignored.
 
@@ -241,7 +243,9 @@ def build_maf_rqs(
         tail_bound: RQS transformation is applied on domain [-B, B],
             `tail_bound` is equal to B.
         dropout_probability: dropout probability for regularization in residual net.
-        use_batch_norm: whether to use batch norm in residual net.
+        use_batch_norm: whether to use batch norm in residual net. Defaults to False.
+            It is recommended to keep this False: BatchNorm normalises across the
+            batch and violates the iid assumption used in SBI objective functions.
         min_bin_width: Minimum bin width.
         min_bin_height: Minimum bin height.
         min_derivative: Minimum derivative at knot values of bins.
@@ -345,7 +349,9 @@ def build_nsf(
             for one-dimensional x.
         num_blocks: number of blocks used for residual net for context embedding.
         dropout_probability: dropout probability for regularization in residual net.
-        use_batch_norm: whether to use batch norm in residual net.
+        use_batch_norm: whether to use batch norm in residual net. Defaults to False.
+            It is recommended to keep this False: BatchNorm normalises across the
+            batch and violates the iid assumption used in SBI objective functions.
         kwargs: Additional arguments that are passed by the build function but are not
             relevant for maf and are therefore ignored.
 
