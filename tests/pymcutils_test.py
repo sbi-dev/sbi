@@ -394,6 +394,175 @@ def test_hierarchical_pymc_c2st(hierarchical_nle_setup):
     )
 
 
+def test_3level_hierarchical_smoke(hierarchical_nle_setup):
+    """Smoke test: 3-level hierarchy instantiates and runs without error.
+
+    Model structure (3-level):
+    - mu_g ~ N(0, 1)           # group-level means
+    - theta[g, s] ~ N(mu_g, 1)  # subject-level parameters
+    - x[g, s, t] ~ NLE(theta[g, s])  # observations via neural likelihood
+    """
+    num_groups = 2
+    num_subjects = 3
+    num_trials = 4
+    likelihood_nn = hierarchical_nle_setup["likelihood_nn"]
+    sigma_x = hierarchical_nle_setup["sigma_x"]
+
+    # Generate observed data: shape (G, S, T, *event)
+    np.random.seed(123)
+    true_mu_g = np.array([0.3, -0.3])
+    true_theta = np.zeros((num_groups, num_subjects))
+    for g in range(num_groups):
+        true_theta[g, :] = true_mu_g[g] + 0.5 * np.random.randn(num_subjects)
+
+    # x[g, s, t] ~ N(theta[g, s], sigma_x^2), with 1D event
+    x_o = np.zeros((num_groups, num_subjects, num_trials, 1))
+    for g in range(num_groups):
+        for s in range(num_subjects):
+            x_o[g, s, :, 0] = (
+                true_theta[g, s] + sigma_x * np.random.randn(num_trials)
+            )
+
+    with pm.Model():
+        mu_g = pm.Normal("mu_g", mu=0, sigma=1, shape=num_groups)
+        theta = pm.Normal(
+            "theta",
+            mu=mu_g[:, None, None],
+            sigma=1,
+            shape=(num_groups, num_subjects, 1),
+        )
+        neural_likelihood_to_pymc(
+            likelihood_nn=likelihood_nn,
+            theta=theta,
+            observed=x_o,
+            name="x",
+            num_trials=num_trials,
+            num_subjects=num_subjects,
+            num_groups=num_groups,
+        )
+
+        trace = pm.sample(
+            draws=10,
+            tune=20,
+            step=pm.Slice(),
+            chains=1,
+            cores=1,
+            progressbar=False,
+            return_inferencedata=True,
+        )
+
+    # Basic shape checks
+    assert trace.posterior["mu_g"].shape == (1, 10, num_groups)
+    assert trace.posterior["theta"].shape == (1, 10, num_groups, num_subjects, 1)
+
+
+@pytest.mark.slow
+def test_3level_hierarchical_c2st(hierarchical_nle_setup):
+    """Test 3-level hierarchical model accuracy via c2st against true likelihood.
+
+    Model structure:
+    - mu_g ~ N(0, 1)              # group-level means
+    - tau ~ InvGamma(2, 1)        # shared variance
+    - theta[g, s] ~ N(mu_g, sqrt(tau))  # subject-level parameters
+    - x[g, s, t] ~ N(theta[g, s], sigma_x)  # observations
+    """
+    num_groups = 2
+    num_subjects = 3
+    num_trials = 5
+    likelihood_nn = hierarchical_nle_setup["likelihood_nn"]
+    sigma_x = hierarchical_nle_setup["sigma_x"]
+
+    # Generate observed data
+    np.random.seed(42)
+    true_mu_g = np.array([0.5, -0.5])
+    true_tau = 0.3
+    true_theta = np.zeros((num_groups, num_subjects))
+    for g in range(num_groups):
+        true_theta[g, :] = (
+            true_mu_g[g] + np.sqrt(true_tau) * np.random.randn(num_subjects)
+        )
+
+    # x[g, s, t] ~ N(theta[g, s], sigma_x^2)
+    x_o_flat = np.zeros((num_groups, num_subjects, num_trials))
+    for g in range(num_groups):
+        for s in range(num_subjects):
+            x_o_flat[g, s, :] = (
+                true_theta[g, s] + sigma_x * np.random.randn(num_trials)
+            )
+
+    draws = 1000
+    tune = 500
+    chains = 2
+
+    # --- True Gaussian likelihood ---
+    # x_o for pm.Normal: need shape that broadcasts with theta shape (G, S)
+    # pm.Normal("x", mu=theta, ..., observed=x_o) where theta is (G, S)
+    # observed needs shape (T, G, S) so each trial broadcasts against theta
+    x_o_for_true = x_o_flat.transpose(2, 0, 1)  # (T, G, S)
+
+    with pm.Model():
+        mu_g = pm.Normal("mu_g", mu=0, sigma=1, shape=num_groups)
+        tau = pm.InverseGamma("tau", alpha=2, beta=1)
+        theta = pm.Normal(
+            "theta",
+            mu=mu_g[:, None],
+            sigma=pm.math.sqrt(tau),
+            shape=(num_groups, num_subjects),
+        )
+        pm.Normal("x", mu=theta, sigma=sigma_x, observed=x_o_for_true)
+
+        trace_true = pm.sample(
+            draws=draws,
+            tune=tune,
+            chains=chains,
+            cores=1,
+            progressbar=True,
+            return_inferencedata=True,
+        )
+
+    # --- NLE bridge ---
+    # observed for bridge: shape (G, S, T, *event) = (G, S, T, 1)
+    x_o_with_event = x_o_flat[..., np.newaxis]  # (G, S, T, 1)
+
+    with pm.Model():
+        mu_g = pm.Normal("mu_g", mu=0, sigma=1, shape=num_groups)
+        tau = pm.InverseGamma("tau", alpha=2, beta=1)
+        theta = pm.Normal(
+            "theta",
+            mu=mu_g[:, None, None],
+            sigma=pm.math.sqrt(tau),
+            shape=(num_groups, num_subjects, 1),
+        )
+        neural_likelihood_to_pymc(
+            likelihood_nn=likelihood_nn,
+            theta=theta,
+            observed=x_o_with_event,
+            name="x",
+            num_trials=num_trials,
+            num_subjects=num_subjects,
+            num_groups=num_groups,
+        )
+
+        trace_nle = pm.sample(
+            draws=draws,
+            tune=tune,
+            chains=chains,
+            cores=1,
+            progressbar=True,
+            return_inferencedata=True,
+        )
+
+    true_samples = flatten_pymc_samples(trace_true, ["mu_g", "tau", "theta"])
+    nle_samples = flatten_pymc_samples(trace_nle, ["mu_g", "tau", "theta"])
+
+    check_c2st(
+        true_samples,
+        nle_samples,
+        alg="3level-hierarchical-pymc-nle-vs-true",
+        tol=0.1,
+    )
+
+
 def test_dims_keyword_support(linear_gaussian_setup, get_trained_nle):
     """Test that dims keyword is properly forwarded to PyMC CustomDist."""
     likelihood_nn = get_trained_nle._neural_net

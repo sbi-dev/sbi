@@ -13,8 +13,8 @@ Notes
     We convert between them at the boundaries.
 - **Memory considerations**: The Op stores references to the neural network and
     observation data. For large models or datasets, this may impact memory usage.
-- **Op equality**: Ops are considered equal if they reference the same estimator
-    and have identical observations (compared via SHA-256 hash digest).
+- **Op equality**: Ops are considered equal if they have identical observation
+    shapes and content (compared via SHA-256 hash digest).
 """
 
 import hashlib
@@ -106,7 +106,7 @@ class NeuralLikelihoodOp(Op):
     # We define outputs explicitly in make_node and only use default_output here.
     default_output: int = 0  # Return only log-likelihood by default when called
 
-    __props__ = ("estimator_id", "observation_shape", "observation_digest")
+    __props__ = ("observation_shape", "observation_digest")
 
     def __init__(
         self,
@@ -120,7 +120,6 @@ class NeuralLikelihoodOp(Op):
             observation: Observed data x_o to condition on, shape (n_obs, *event_shape)
         """
         self.estimator = estimator
-        self.estimator_id = id(estimator)  # For props/equality
 
         # Infer device & dtype from estimator parameters
         self._torch_device, self._torch_dtype = _get_estimator_device_dtype(estimator)
@@ -174,6 +173,8 @@ class NeuralLikelihoodOp(Op):
             inputs: List containing [theta_array]
             output_storage: List of arrays to store outputs [log_prob, gradients]
         """
+        self.estimator.eval()
+
         theta_np = inputs[0]
         original_ndim = int(np.ndim(theta_np))
 
@@ -230,8 +231,8 @@ class NeuralLikelihoodOp(Op):
         # Reshape gradient to match original theta shape
         # grad_np is currently (1, D), need to match original_shape
         if original_ndim == 0:
-            # Scalar: (1, 1) -> ()
-            grad_np = grad_np.squeeze()
+            # Scalar: (1, 1) -> () — use reshape for explicit 0-d output
+            grad_np = grad_np.reshape(())
         elif original_ndim == 1:
             # Vector param: (1, D) -> (D,)
             grad_np = grad_np.squeeze(0)
@@ -267,24 +268,30 @@ class NeuralLikelihoodOp(Op):
 class HierarchicalNeuralLikelihoodOp(Op):
     """PyTensor Op for hierarchical models with subject/trial structure.
 
-    This Op handles the case where we have S subjects, each with T trials.
-    The NLE is trained on single-subject data, and at inference time we
-    broadcast each subject's parameters across their trials.
+    This Op handles models with S subjects each having T trials (2-level),
+    or G groups each with S subjects and T trials (3-level). The NLE is
+    trained on single-subject data, and at inference time we broadcast each
+    subject's parameters across their trials.
 
-    Shape conventions:
+    Shape conventions (2-level, num_groups=None):
     - theta: (S, D) where S = num_subjects, D = parameter event dimension
-    - observations: stored as (T*S, *obs_event) after flattening
-    - Output: scalar log-likelihood summed over all subjects and trials
+    - observations: input as (T, S, *obs_event), stored as (S*T, *obs_event)
+
+    Shape conventions (3-level, num_groups > 0):
+    - theta: (G, S, D) where G = num_groups
+    - observations: input as (G, S, T, *obs_event), stored as (G*S*T, *obs_event)
+
+    Output: scalar log-likelihood summed over all subjects and trials.
     """
 
     default_output: int = 0
 
     __props__ = (
-        "estimator_id",
         "observation_shape",
         "observation_digest",
         "num_trials",
         "num_subjects",
+        "num_groups",
     )
 
     def __init__(
@@ -293,19 +300,22 @@ class HierarchicalNeuralLikelihoodOp(Op):
         observation: np.ndarray,
         num_trials: int,
         num_subjects: int,
+        num_groups: int | None = None,
     ):
         """Initialize the hierarchical neural likelihood op.
 
         Args:
             estimator: Trained ConditionalDensityEstimator from NLE
-            observation: Observed data with shape (num_trials, num_subjects, *event)
+            observation: Observed data. 2-level: shape (T, S, *event).
+                3-level: shape (G, S, T, *event).
             num_trials: Number of trials per subject
-            num_subjects: Number of subjects
+            num_subjects: Number of subjects (per group in 3-level)
+            num_groups: Number of groups for 3-level hierarchy (None for 2-level)
         """
         self.estimator = estimator
-        self.estimator_id = id(estimator)
         self.num_trials = num_trials
         self.num_subjects = num_subjects
+        self.num_groups = num_groups
 
         # Infer device & dtype from estimator parameters
         self._torch_device, self._torch_dtype = _get_estimator_device_dtype(estimator)
@@ -314,22 +324,44 @@ class HierarchicalNeuralLikelihoodOp(Op):
         obs_np = np.asarray(observation)
         self.observation_shape = tuple(obs_np.shape)
 
-        if obs_np.shape[0] != num_trials or obs_np.shape[1] != num_subjects:
-            raise ValueError(
-                f"Observation shape {obs_np.shape} doesn't match "
-                f"num_trials={num_trials}, num_subjects={num_subjects}. "
-                f"Expected shape (num_trials, num_subjects, *event_shape)."
-            )
+        if num_groups is not None:
+            # 3-level: obs shape (G, S, T, *E) — hierarchy from coarsest to finest
+            if obs_np.ndim < 3:
+                raise ValueError(
+                    f"3-level hierarchy requires observed with at least 3 dimensions "
+                    f"(num_groups, num_subjects, num_trials, ...), "
+                    f"got shape {obs_np.shape}"
+                )
+            if (
+                obs_np.shape[0] != num_groups
+                or obs_np.shape[1] != num_subjects
+                or obs_np.shape[2] != num_trials
+            ):
+                raise ValueError(
+                    f"Observation shape {obs_np.shape} doesn't match "
+                    f"num_groups={num_groups}, num_subjects={num_subjects}, "
+                    f"num_trials={num_trials}. Expected shape "
+                    f"(num_groups, num_subjects, num_trials, *event_shape)."
+                )
+
+            # Flatten: (G, S, T, *E) -> (G*S*T, *E) — already in correct order
+            event_shape = obs_np.shape[3:]
+            obs_flat = obs_np.reshape(-1, *event_shape)  # (G*S*T, *E)
+        else:
+            # 2-level: obs shape (T, S, *E)
+            if obs_np.shape[0] != num_trials or obs_np.shape[1] != num_subjects:
+                raise ValueError(
+                    f"Observation shape {obs_np.shape} doesn't match "
+                    f"num_trials={num_trials}, num_subjects={num_subjects}. "
+                    f"Expected shape (num_trials, num_subjects, *event_shape)."
+                )
+
+            # Flatten: (T, S, *E) -> (S, T, *E) -> (S*T, *E)
+            obs_flat = obs_np.transpose(1, 0, *range(2, obs_np.ndim))  # (S, T, *E)
+            obs_flat = obs_flat.reshape(-1, *obs_np.shape[2:])  # (S*T, *E)
 
         self.observation_digest = _compute_observation_digest(obs_np)
 
-        # Flatten observations: (T, S, *E) -> (S*T, *E) in subject-major order
-        # After transpose: (S, T, *E) - all trials for each subject are consecutive
-        # This matches the repeat_interleave on theta which creates (S*T, D) by
-        # repeating each subject's params T times: [θ0, θ0, ..., θ1, θ1, ...]
-        obs_flat = obs_np.transpose(1, 0, *range(2, obs_np.ndim))  # (S, T, *E)
-        obs_flat = obs_flat.reshape(-1, *obs_np.shape[2:])  # (S*T, *E)
-        # Use device parameter directly to avoid unnecessary copy
         self.observation = torch.as_tensor(
             obs_flat, dtype=self._torch_dtype, device=self._torch_device
         )
@@ -356,69 +388,99 @@ class HierarchicalNeuralLikelihoodOp(Op):
     ) -> None:
         """Compute the hierarchical log-likelihood and gradients.
 
-        The computation:
-        1. Broadcast theta: (S, D) -> (S*T, D) by repeating each subject T times
-        2. Evaluate log p(x | theta) for all S*T pairs
-        3. Sum to get total log-likelihood
+        2-level: theta (S, D) -> repeat_interleave(T) -> (S*T, D)
+        3-level: theta (G, S, D) -> reshape (G*S, D)
+            -> repeat_interleave(T) -> (G*S*T, D)
         """
+        self.estimator.eval()
+
         theta_np = inputs[0]
         original_shape = theta_np.shape
 
-        # Normalize theta shape: PyMC may add leading dimensions
-        # Expected: (S, D) but may receive (1, S, D) where S=num_subjects, D=event_dim
-        if theta_np.ndim == 3 and theta_np.shape[0] == 1:
-            # Squeeze out the leading sample dimension
-            theta_np = theta_np.squeeze(0)
-        elif theta_np.ndim != 2:
-            raise ValueError(
-                f"HierarchicalNeuralLikelihoodOp expects theta with shape "
-                f"(num_subjects={self.num_subjects}, event_dim), but received "
-                f"shape {original_shape} with {theta_np.ndim} dimensions. "
-                f"For hierarchical models, theta should be a 2D array where each "
-                f"row represents one subject's parameters. Check your PyMC prior:\n"
-                f"  theta = pm.Normal('theta', ..., "
-                f"shape=({self.num_subjects}, event_dim))"
+        if self.num_groups is not None:
+            # 3-level: expected (G, S, D), may receive (1, G, S, D) from PyMC
+            if theta_np.ndim == 4 and theta_np.shape[0] == 1:
+                theta_np = theta_np.squeeze(0)
+            if theta_np.ndim != 3:
+                raise ValueError(
+                    f"3-level HierarchicalNeuralLikelihoodOp expects theta with shape "
+                    f"(num_groups={self.num_groups}, num_subjects={self.num_subjects}, "
+                    f"event_dim), but received shape {original_shape}. "
+                    f"Check your PyMC prior:\n"
+                    f"  theta = pm.Normal('theta', ..., "
+                    f"shape=({self.num_groups}, {self.num_subjects}, event_dim))"
+                )
+
+            if theta_np.shape[0] != self.num_groups:
+                raise ValueError(
+                    f"theta has {theta_np.shape[0]} groups but Op expects "
+                    f"{self.num_groups} groups."
+                )
+            if theta_np.shape[1] != self.num_subjects:
+                raise ValueError(
+                    f"theta has {theta_np.shape[1]} subjects but Op expects "
+                    f"{self.num_subjects} subjects."
+                )
+
+            # Convert to torch with gradient tracking
+            theta_torch = torch.as_tensor(
+                theta_np, dtype=self._torch_dtype, device=self._torch_device
             )
+            theta_torch.requires_grad_(True)
 
-        if theta_np.shape[0] != self.num_subjects:
-            raise ValueError(
-                f"theta has {theta_np.shape[0]} subjects but Op expects "
-                f"{self.num_subjects} subjects. Check that your PyMC prior shape "
-                f"matches num_subjects:\n"
-                f"  theta = pm.Normal('theta', ..., "
-                f"shape=({self.num_subjects}, event_dim))"
+            # Flatten: (G, S, D) -> (G*S, D) -> repeat_interleave(T) -> (G*S*T, D)
+            theta_flat = theta_torch.reshape(-1, theta_torch.shape[-1])  # (G*S, D)
+            theta_expanded = theta_flat.repeat_interleave(self.num_trials, dim=0)
+        else:
+            # 2-level: expected (S, D), may receive (1, S, D) from PyMC
+            if theta_np.ndim == 3 and theta_np.shape[0] == 1:
+                theta_np = theta_np.squeeze(0)
+            if theta_np.ndim != 2:
+                raise ValueError(
+                    f"HierarchicalNeuralLikelihoodOp expects theta with shape "
+                    f"(num_subjects={self.num_subjects}, event_dim), but received "
+                    f"shape {original_shape} with {theta_np.ndim} dimensions. "
+                    f"Check your PyMC prior:\n"
+                    f"  theta = pm.Normal('theta', ..., "
+                    f"shape=({self.num_subjects}, event_dim))"
+                )
+
+            if theta_np.shape[0] != self.num_subjects:
+                raise ValueError(
+                    f"theta has {theta_np.shape[0]} subjects but Op expects "
+                    f"{self.num_subjects} subjects."
+                )
+
+            # Convert to torch with gradient tracking
+            theta_torch = torch.as_tensor(
+                theta_np, dtype=self._torch_dtype, device=self._torch_device
             )
+            theta_torch.requires_grad_(True)
 
-        # Convert to torch with gradient tracking
-        theta_torch = torch.as_tensor(
-            theta_np, dtype=self._torch_dtype, device=self._torch_device
-        )
-        theta_torch.requires_grad_(True)
+            # Broadcast: (S, D) -> (S*T, D)
+            theta_expanded = theta_torch.repeat_interleave(self.num_trials, dim=0)
 
-        # Broadcast theta: (S, D) -> (S*T, D)
-        # Each subject's parameters repeated T times to match flattened obs
-        theta_expanded = theta_torch.repeat_interleave(self.num_trials, dim=0)
-
-        # Observations are already flattened: (S*T, *E)
-        # Add sample_dim=1 for estimator: (1, S*T, *E)
+        # Observations already flattened in __init__: (S*T, *E) or (G*S*T, *E)
+        # Add sample_dim=1 for estimator
         obs_for_est = self.observation.unsqueeze(0)
 
         with torch.set_grad_enabled(True):
-            # Vectorized forward pass
             log_probs = self.estimator.log_prob(
-                input=obs_for_est,  # (1, S*T, *E)
-                condition=theta_expanded,  # (S*T, D)
-            )  # Returns: (1, S*T)
-
-            # Sum all log probs to get total likelihood
+                input=obs_for_est,
+                condition=theta_expanded,
+            )
             total_logp = log_probs.sum()
 
         # Compute gradients w.r.t. theta (before expansion)
         grad_np = _compute_gradients(total_logp, theta_torch)
 
         # Restore original shape if we squeezed a leading dimension
-        if len(original_shape) == 3 and original_shape[0] == 1:
-            grad_np = grad_np[np.newaxis, ...]
+        if self.num_groups is not None:
+            if len(original_shape) == 4 and original_shape[0] == 1:
+                grad_np = grad_np[np.newaxis, ...]
+        else:
+            if len(original_shape) == 3 and original_shape[0] == 1:
+                grad_np = grad_np[np.newaxis, ...]
 
         _store_outputs(output_storage, total_logp, grad_np, inputs[0].dtype)
 
@@ -435,6 +497,7 @@ def _validate_inputs(
     observed: np.ndarray,
     num_trials: int | None,
     num_subjects: int | None,
+    num_groups: int | None = None,
 ) -> np.ndarray:
     """Validate inputs for neural_likelihood_to_pymc.
 
@@ -442,6 +505,7 @@ def _validate_inputs(
         observed: Observed data array
         num_trials: Number of trials (hierarchical mode)
         num_subjects: Number of subjects (hierarchical mode)
+        num_groups: Number of groups (3-level hierarchy)
 
     Returns:
         Validated observed array
@@ -469,26 +533,18 @@ def _validate_inputs(
         raise ValueError(f"num_trials must be positive, got {num_trials}")
     if num_subjects is not None and num_subjects <= 0:
         raise ValueError(f"num_subjects must be positive, got {num_subjects}")
+    if num_groups is not None and num_groups <= 0:
+        raise ValueError(f"num_groups must be positive, got {num_groups}")
 
-    # Early shape validation for hierarchical mode
-    if num_trials is not None and num_subjects is not None:
-        if observed.ndim < 2:
-            raise ValueError(
-                f"Hierarchical mode requires observed with at least 2 dimensions "
-                f"(num_trials, num_subjects, ...), got shape {observed.shape}"
-            )
-        if observed.shape[0] != num_trials:
-            raise ValueError(
-                f"observed.shape[0]={observed.shape[0]} doesn't match "
-                f"num_trials={num_trials}. Expected shape "
-                f"(num_trials={num_trials}, num_subjects={num_subjects}, *event_shape)."
-            )
-        if observed.shape[1] != num_subjects:
-            raise ValueError(
-                f"observed.shape[1]={observed.shape[1]} doesn't match "
-                f"num_subjects={num_subjects}. Expected shape "
-                f"(num_trials={num_trials}, num_subjects={num_subjects}, *event_shape)."
-            )
+    # Validate num_groups requires num_trials and num_subjects
+    if num_groups is not None and (num_trials is None or num_subjects is None):
+        raise ValueError(
+            "num_groups requires both num_trials and num_subjects to be set."
+        )
+
+    # Shape-specific validation is handled by the Op constructors
+    # (NeuralLikelihoodOp / HierarchicalNeuralLikelihoodOp) which know
+    # their own shape conventions.
 
     return observed
 
@@ -501,26 +557,33 @@ def neural_likelihood_to_pymc(
     dims: tuple[str, ...] | None = None,
     num_trials: int | None = None,
     num_subjects: int | None = None,
+    num_groups: int | None = None,
     **kwargs: Any,
 ) -> TensorVariable:
     """Create a PyMC CustomDist from a neural likelihood estimator.
 
     This function wraps a trained NLE network as a PyMC distribution that can
     be used as a likelihood in a PyMC model. The likelihood is conditioned on
-    the observed data and evaluates log p(x|θ).
+    the observed data and evaluates log p(x|theta).
 
-    Supports two modes:
+    Supports three modes:
     1. **Simple mode** (default): For single-subject models with i.i.d. observations
-    2. **Hierarchical mode**: For multi-subject models with trials per subject
+    2. **2-level hierarchical**: For multi-subject models with trials per subject
+    3. **3-level hierarchical**: For grouped multi-subject models
+       (groups > subjects > trials)
 
     Simple mode shape conventions:
     - Single observation: observed has shape (*event_shape,)
     - I.i.d. observations: observed has shape (n_obs, *event_shape)
     - theta: any shape supported by PyMC (scalar, vector, etc.)
 
-    Hierarchical mode shape conventions (when num_trials and num_subjects given):
+    2-level hierarchical (num_trials + num_subjects):
     - observed: shape (num_trials, num_subjects, *event_shape)
-    - theta: shape (num_subjects, event_dim) - one parameter vector per subject
+    - theta: shape (num_subjects, event_dim)
+
+    3-level hierarchical (num_trials + num_subjects + num_groups):
+    - observed: shape (num_groups, num_subjects, num_trials, *event_shape)
+    - theta: shape (num_groups, num_subjects, event_dim)
 
     Args:
         likelihood_nn: Trained ConditionalDensityEstimator from NLE
@@ -532,6 +595,7 @@ def neural_likelihood_to_pymc(
             Despite the name "trials", this refers to independent observations
             (e.g., repeated measurements, time points, or experimental replicates).
         num_subjects: For hierarchical models, number of subjects (or groups/units)
+        num_groups: For 3-level hierarchical models, number of groups
         **kwargs: Additional arguments forwarded to pm.CustomDist
 
     Returns:
@@ -550,28 +614,33 @@ def neural_likelihood_to_pymc(
             )
             trace = pm.sample()
 
-        # Hierarchical mode: multiple subjects with trials
-        # observed shape: (num_trials, num_subjects, *event_shape)
+        # 2-level hierarchical: multiple subjects with trials
         with pm.Model() as model:
-            # Hyperpriors
             mu = pm.Normal("mu", mu=0, sigma=1)
             tau = pm.InverseGamma("tau", alpha=1, beta=1)
-
-            # Subject-level parameters: shape (num_subjects, event_dim)
             theta = pm.Normal("theta", mu=mu, sigma=pm.math.sqrt(tau),
                               shape=(num_subjects, event_dim))
-
-            # Neural likelihood with hierarchical structure
             likelihood = neural_likelihood_to_pymc(
                 likelihood_nn, theta, x_observed, "x",
-                num_trials=num_trials,
-                num_subjects=num_subjects,
+                num_trials=num_trials, num_subjects=num_subjects,
+            )
+            trace = pm.sample()
+
+        # 3-level hierarchical: groups of subjects with trials
+        with pm.Model() as model:
+            mu_group = pm.Normal("mu_group", mu=0, sigma=1, shape=num_groups)
+            theta = pm.Normal("theta", mu=mu_group[:, None, None],
+                              sigma=1, shape=(num_groups, num_subjects, event_dim))
+            likelihood = neural_likelihood_to_pymc(
+                likelihood_nn, theta, x_observed, "x",
+                num_trials=num_trials, num_subjects=num_subjects,
+                num_groups=num_groups,
             )
             trace = pm.sample()
         ```
     """
     # Validate inputs early
-    observed = _validate_inputs(observed, num_trials, num_subjects)
+    observed = _validate_inputs(observed, num_trials, num_subjects, num_groups)
 
     # Validate estimator has parameters (i.e., is trained)
     try:
@@ -586,17 +655,19 @@ def neural_likelihood_to_pymc(
     op: NeuralLikelihoodOp | HierarchicalNeuralLikelihoodOp
 
     if num_trials is not None and num_subjects is not None:
-        # Hierarchical mode
+        # Hierarchical mode (2-level or 3-level)
         op = HierarchicalNeuralLikelihoodOp(
-            likelihood_nn, observed, num_trials, num_subjects
+            likelihood_nn, observed, num_trials, num_subjects,
+            num_groups=num_groups,
         )
-    elif num_trials is None and num_subjects is None:
+    elif num_trials is None and num_subjects is None and num_groups is None:
         # Simple mode
         op = NeuralLikelihoodOp(likelihood_nn, observed)
     else:
         raise ValueError(
-            "Both num_trials and num_subjects must be provided for "
-            "hierarchical mode, or neither for simple mode."
+            "For hierarchical mode, provide both num_trials and num_subjects "
+            "(and optionally num_groups for 3-level). "
+            "For simple mode, provide none of these."
         )
 
     # Cache device/dtype from the Op for use in random() closure
@@ -692,6 +763,20 @@ def neural_likelihood_to_pymc(
         # reshape from (S, *E) to (*size, *E)
         return np.asarray(x_np).reshape(*out_shape, *x_np.shape[1:])
 
+    # For 3-level hierarchy, rearrange observed so PyMC can broadcast.
+    # The Op stores its own flattened copy from the (G, S, T, *E) input.
+    # PyMC needs T in the leading position to broadcast with theta (G, S, D):
+    # (G, S, T, *E) -> (T, G, S, *E)
+    observed_for_pymc = observed
+    if num_groups is not None:
+        observed_for_pymc = np.moveaxis(observed, 2, 0)
+
     return pm.CustomDist(
-        name, theta, logp=logp, random=random, observed=observed, dims=dims, **kwargs
+        name,
+        theta,
+        logp=logp,
+        random=random,
+        observed=observed_for_pymc,
+        dims=dims,
+        **kwargs,
     )
