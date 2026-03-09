@@ -361,3 +361,56 @@ def test_plotting_style_arguments_validation(kwargs):
     _ = pairplot(samples=posterior_samples, **kwargs)
 
     close()
+
+
+# --- Tests for discrete_indices support ---
+
+
+def _make_mixed_samples(n: int = 200, dim: int = 4) -> torch.Tensor:
+    """Helper: first 2 dims continuous, rest discrete."""
+    samples = torch.randn(n, dim)
+    for i in range(2, dim):
+        samples[:, i] = torch.randint(0, 4, (n,)).float()
+    return samples
+
+
+@pytest.mark.parametrize("diag", ("hist", "kde", "scatter", "bar"))
+@pytest.mark.parametrize("upper", ("scatter", "kde", "contour", "hist"))
+def test_pairplot_discrete_indices(diag, upper):
+    """pairplot with discrete_indices should not crash for any diag/upper combo."""
+    samples = _make_mixed_samples()
+    fig, _ = pairplot(samples, discrete_indices=[2, 3], diag=diag, upper=upper)
+    assert isinstance(fig, Figure)
+    close()
+
+
+@pytest.mark.parametrize(
+    "samples_fn, pairplot_kwargs",
+    [
+        pytest.param(
+            lambda: torch.randint(0, 5, (200, 3)).float(),
+            dict(discrete_indices=[0, 1, 2], diag="kde", upper="kde"),
+            id="all_discrete",
+        ),
+        pytest.param(
+            lambda: _make_mixed_samples(n=200, dim=3),
+            dict(discrete_indices=[2], diag="kde", upper="scatter", lower="contour"),
+            id="lower_triangle",
+        ),
+        pytest.param(
+            lambda: [_make_mixed_samples(n=100, dim=3)] * 2,
+            dict(discrete_indices=[2], diag="kde", upper="scatter"),
+            id="multiple_samples",
+        ),
+        pytest.param(
+            lambda: _make_mixed_samples(),
+            dict(discrete_indices=[2, 3], subset=[0, 2], diag="kde", upper="kde"),
+            id="subset",
+        ),
+    ],
+)
+def test_pairplot_discrete_edge_cases(samples_fn, pairplot_kwargs):
+    """Edge cases: all-discrete, lower triangle, multiple samples, subset."""
+    fig, _ = pairplot(samples_fn(), **pairplot_kwargs)
+    assert isinstance(fig, Figure)
+    close()
