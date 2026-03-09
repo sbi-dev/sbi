@@ -1251,8 +1251,9 @@ def _discrete_offdiag_override(
 ) -> Tuple[Optional[Callable], Optional[Dict], np.ndarray, np.ndarray]:
     """Override off-diagonal function and add jitter for discrete dimensions.
 
-    When either dimension is discrete, KDE/contour/hist2d would fail or be
-    misleading. This falls back to scatter and adds jitter to discrete axes.
+    When either dimension is discrete, KDE/contour/hist2d would fail or produce
+    misleading smooth densities. This falls back to scatter and adds small
+    uniform jitter to discrete axes so that overlapping points become visible.
     """
     if func in _OFFDIAG_NEEDS_DISCRETE_FALLBACK:
         func = plt_scatter_2d
@@ -1326,7 +1327,7 @@ def _arrange_grid(
         discrete_indices: Optional list of dimension indices treated as discrete.
             When provided, diagonal plots for these dimensions use bar charts,
             and off-diagonal plots involving these dimensions fall back to
-            jittered scatter.
+            jittered scatter plots.
 
     Returns:
         Fig: matplotlib figure
@@ -1334,6 +1335,7 @@ def _arrange_grid(
     """
     dim = samples[0].shape[1]
     discrete_set = set(discrete_indices) if discrete_indices is not None else set()
+
     # Prepare points
     if points is None:
         points = []
@@ -1432,18 +1434,20 @@ def _arrange_grid(
                     for sample_ind, sample in enumerate(samples):
                         diag_f = diag_funcs[sample_ind]
                         diag_kw = diag_kwargs[sample_ind]
-                        # Override for discrete dimensions
+                        # Override diagonal for discrete dimensions: use bar.
                         if row in discrete_set and diag_f is not plt_bar_1d:
                             diag_f = plt_bar_1d
                             bar_defaults = get_default_diag_kwargs("bar", sample_ind)
-                            # Carry over user color if set, but not
-                            # plot-type-specific keys (e.g. histtype).
                             user_mpl = (diag_kw or {}).get("mpl_kwargs", {})
                             if "color" in user_mpl:
                                 bar_defaults.setdefault("mpl_kwargs", {})["color"] = (
                                     user_mpl["color"]
                                 )
                             diag_kw = bar_defaults
+                        # Reverse: bar on a continuous dimension → fall back to hist.
+                        elif row not in discrete_set and diag_f is plt_bar_1d:
+                            diag_f = plt_hist_1d
+                            diag_kw = get_default_diag_kwargs("hist", sample_ind)
                         if callable(diag_f):
                             diag_f(ax, sample[:, row], limits[row], diag_kw)
 
