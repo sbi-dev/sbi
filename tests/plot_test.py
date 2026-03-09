@@ -380,9 +380,7 @@ def _make_mixed_samples(n: int = 200, dim: int = 4) -> torch.Tensor:
 def test_pairplot_discrete_indices(diag, upper):
     """pairplot with discrete_indices should not crash for any diag/upper combo."""
     samples = _make_mixed_samples()
-    fig, axes = pairplot(
-        samples, discrete_indices=[2, 3], diag=diag, upper=upper
-    )
+    fig, axes = pairplot(samples, discrete_indices=[2, 3], diag=diag, upper=upper)
     assert isinstance(fig, Figure)
     assert isinstance(axes, np.ndarray)
     close()
@@ -399,9 +397,7 @@ def test_pairplot_discrete_bar_explicit():
 def test_pairplot_discrete_all_discrete():
     """All-discrete samples should work with discrete_indices."""
     samples = torch.randint(0, 5, (200, 3)).float()
-    fig, axes = pairplot(
-        samples, discrete_indices=[0, 1, 2], diag="kde", upper="kde"
-    )
+    fig, axes = pairplot(samples, discrete_indices=[0, 1, 2], diag="kde", upper="kde")
     assert isinstance(fig, Figure)
     close()
 
@@ -424,9 +420,7 @@ def test_pairplot_discrete_multiple_sample_sets():
     """discrete_indices should work with multiple sample sets."""
     s1 = _make_mixed_samples(n=100, dim=3)
     s2 = _make_mixed_samples(n=100, dim=3)
-    fig, axes = pairplot(
-        [s1, s2], discrete_indices=[2], diag="kde", upper="scatter"
-    )
+    fig, axes = pairplot([s1, s2], discrete_indices=[2], diag="kde", upper="scatter")
     assert isinstance(fig, Figure)
     close()
 

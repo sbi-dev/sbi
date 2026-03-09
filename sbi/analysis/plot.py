@@ -1308,6 +1308,10 @@ def _arrange_grid(
         axes: matplotlib axes corresponding to fig.
         fig_kwargs: Additional arguments to adjust the overall figure,
             see the source code in `_get_default_fig_kwargs()`
+        discrete_indices: Optional list of dimension indices treated as discrete.
+            When provided, diagonal plots for these dimensions use bar charts,
+            and off-diagonal plots involving these dimensions fall back to
+            jittered scatter.
 
     Returns:
         Fig: matplotlib figure
@@ -1416,11 +1420,10 @@ def _arrange_grid(
                         # Override for discrete dimensions
                         if row in discrete_set and diag_f is not plt_bar_1d:
                             diag_f = plt_bar_1d
-                            diag_kw = get_default_diag_kwargs("bar", sample_ind)
+                            bar_defaults = get_default_diag_kwargs("bar", sample_ind)
+                            diag_kw = update(bar_defaults, diag_kw)
                         if callable(diag_f):
-                            diag_f(
-                                ax, sample[:, row], limits[row], diag_kw
-                            )
+                            diag_f(ax, sample[:, row], limits[row], diag_kw)
 
                 if len(points) > 0:
                     extent = ax.get_ylim()  # pyright: ignore reportOptionalMemberAccess
