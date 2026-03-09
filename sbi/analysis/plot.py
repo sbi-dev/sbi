@@ -1229,6 +1229,17 @@ def conditional_pairplot(
 _OFFDIAG_NEEDS_DISCRETE_FALLBACK = {plt_kde_2d, plt_contour_2d, plt_hist_2d}
 
 
+def _min_spacing(samples: np.ndarray, default: float = 1.0) -> float:
+    """Return the minimum spacing between unique values in *samples*.
+
+    Falls back to *default* when fewer than two unique values exist.
+    """
+    unique = np.unique(samples)
+    if len(unique) < 2:
+        return default
+    return float(np.min(np.diff(unique)))
+
+
 def _discrete_offdiag_override(
     func: Optional[Callable],
     kwargs: Optional[Dict],
@@ -1248,12 +1259,16 @@ def _discrete_offdiag_override(
         kwargs = get_default_offdiag_kwargs("scatter", sample_ind)
 
     # Add jitter to discrete dimension(s) for scatter-like plots.
+    # Jitter magnitude is 15% of the minimum spacing between unique values,
+    # so points spread out but never overlap with neighbours.
     # Seed varies by sample_ind so different sample sets get distinct jitter.
     rng = np.random.default_rng(sample_ind)
     if a_discrete:
-        samples_a = samples_a + rng.uniform(-0.3, 0.3, size=len(samples_a))
+        jitter_a = 0.15 * _min_spacing(samples_a)
+        samples_a = samples_a + rng.uniform(-jitter_a, jitter_a, size=len(samples_a))
     if b_discrete:
-        samples_b = samples_b + rng.uniform(-0.3, 0.3, size=len(samples_b))
+        jitter_b = 0.15 * _min_spacing(samples_b)
+        samples_b = samples_b + rng.uniform(-jitter_b, jitter_b, size=len(samples_b))
 
     return func, kwargs, samples_a, samples_b
 
@@ -1421,7 +1436,14 @@ def _arrange_grid(
                         if row in discrete_set and diag_f is not plt_bar_1d:
                             diag_f = plt_bar_1d
                             bar_defaults = get_default_diag_kwargs("bar", sample_ind)
-                            diag_kw = update(bar_defaults, diag_kw)
+                            # Carry over user color if set, but not
+                            # plot-type-specific keys (e.g. histtype).
+                            user_mpl = (diag_kw or {}).get("mpl_kwargs", {})
+                            if "color" in user_mpl:
+                                bar_defaults.setdefault("mpl_kwargs", {})["color"] = (
+                                    user_mpl["color"]
+                                )
+                            diag_kw = bar_defaults
                         if callable(diag_f):
                             diag_f(ax, sample[:, row], limits[row], diag_kw)
 

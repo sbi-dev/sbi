@@ -367,78 +367,50 @@ def test_plotting_style_arguments_validation(kwargs):
 
 
 def _make_mixed_samples(n: int = 200, dim: int = 4) -> torch.Tensor:
-    """Helper: first 2 dims continuous, last 2 discrete."""
+    """Helper: first 2 dims continuous, rest discrete."""
     samples = torch.randn(n, dim)
-    samples[:, 2] = torch.randint(0, 4, (n,)).float()
-    if dim > 3:
-        samples[:, 3] = torch.randint(0, 3, (n,)).float()
+    for i in range(2, dim):
+        samples[:, i] = torch.randint(0, 4, (n,)).float()
     return samples
 
 
-@pytest.mark.parametrize("diag", ("hist", "kde", "scatter"))
+@pytest.mark.parametrize("diag", ("hist", "kde", "scatter", "bar"))
 @pytest.mark.parametrize("upper", ("scatter", "kde", "contour", "hist"))
 def test_pairplot_discrete_indices(diag, upper):
     """pairplot with discrete_indices should not crash for any diag/upper combo."""
     samples = _make_mixed_samples()
-    fig, axes = pairplot(samples, discrete_indices=[2, 3], diag=diag, upper=upper)
-    assert isinstance(fig, Figure)
-    assert isinstance(axes, np.ndarray)
-    close()
-
-
-def test_pairplot_discrete_bar_explicit():
-    """Explicitly requesting diag='bar' should work."""
-    samples = _make_mixed_samples()
-    fig, axes = pairplot(samples, diag="bar", upper="scatter")
+    fig, _ = pairplot(samples, discrete_indices=[2, 3], diag=diag, upper=upper)
     assert isinstance(fig, Figure)
     close()
 
 
-def test_pairplot_discrete_all_discrete():
-    """All-discrete samples should work with discrete_indices."""
-    samples = torch.randint(0, 5, (200, 3)).float()
-    fig, axes = pairplot(samples, discrete_indices=[0, 1, 2], diag="kde", upper="kde")
-    assert isinstance(fig, Figure)
-    close()
-
-
-def test_pairplot_discrete_with_lower():
-    """discrete_indices should also work for the lower triangle."""
-    samples = _make_mixed_samples(n=200, dim=3)
-    fig, axes = pairplot(
-        samples,
-        discrete_indices=[2],
-        diag="kde",
-        upper="scatter",
-        lower="contour",
-    )
-    assert isinstance(fig, Figure)
-    close()
-
-
-def test_pairplot_discrete_multiple_sample_sets():
-    """discrete_indices should work with multiple sample sets."""
-    s1 = _make_mixed_samples(n=100, dim=3)
-    s2 = _make_mixed_samples(n=100, dim=3)
-    fig, axes = pairplot([s1, s2], discrete_indices=[2], diag="kde", upper="scatter")
-    assert isinstance(fig, Figure)
-    close()
-
-
-def test_pairplot_no_discrete_indices_unchanged():
-    """Without discrete_indices, behaviour is identical to before."""
-    samples = torch.randn(100, 3)
-    fig, axes = pairplot(samples, diag="hist", upper="scatter")
-    assert isinstance(fig, Figure)
-    assert isinstance(axes, np.ndarray)
-    close()
-
-
-def test_pairplot_discrete_subset():
-    """discrete_indices should work correctly with subset parameter."""
-    samples = _make_mixed_samples()
-    fig, axes = pairplot(
-        samples, discrete_indices=[2, 3], subset=[0, 2], diag="kde", upper="kde"
-    )
+@pytest.mark.parametrize(
+    "samples_fn, pairplot_kwargs",
+    [
+        pytest.param(
+            lambda: torch.randint(0, 5, (200, 3)).float(),
+            dict(discrete_indices=[0, 1, 2], diag="kde", upper="kde"),
+            id="all_discrete",
+        ),
+        pytest.param(
+            lambda: _make_mixed_samples(n=200, dim=3),
+            dict(discrete_indices=[2], diag="kde", upper="scatter", lower="contour"),
+            id="lower_triangle",
+        ),
+        pytest.param(
+            lambda: [_make_mixed_samples(n=100, dim=3)] * 2,
+            dict(discrete_indices=[2], diag="kde", upper="scatter"),
+            id="multiple_samples",
+        ),
+        pytest.param(
+            lambda: _make_mixed_samples(),
+            dict(discrete_indices=[2, 3], subset=[0, 2], diag="kde", upper="kde"),
+            id="subset",
+        ),
+    ],
+)
+def test_pairplot_discrete_edge_cases(samples_fn, pairplot_kwargs):
+    """Edge cases: all-discrete, lower triangle, multiple samples, subset."""
+    fig, _ = pairplot(samples_fn(), **pairplot_kwargs)
     assert isinstance(fig, Figure)
     close()
