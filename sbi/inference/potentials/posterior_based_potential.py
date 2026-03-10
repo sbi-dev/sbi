@@ -103,17 +103,8 @@ class PosteriorBasedPotential(BasePotential):
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = False):
         """
         Check the shape of the observed data and, if valid, set it.
-        For posterior-based methods, `x_o` is not allowed to be iid, as we assume that
-        iid `x` is handled by a Permutation Invariant embedding net.
         """
-        if x_is_iid and x_o is not None and x_o.shape[0] > 1:
-            raise NotImplementedError(
-                "For NPE, iid `x` must be handled by a permutation invariant embedding "
-                "net. Therefore, the iid dimension of `x` is added to the event "
-                "dimension of `x`. Please set `x_is_iid=False`."
-            )
-        else:
-            super().set_x(x_o, x_is_iid=False)
+        super().set_x(x_o, x_is_iid=x_is_iid)
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.
@@ -135,37 +126,59 @@ class PosteriorBasedPotential(BasePotential):
         with torch.set_grad_enabled(track_gradients):
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
-            x = reshape_to_batch_event(
-                self.x_o, event_shape=self.posterior_estimator.condition_shape
-            )
             theta = ensure_theta_batched(torch.as_tensor(theta)).to(self.device)
-            theta_batch_size = theta.shape[0]
-            x_batch_size = x.shape[0]
 
-            assert theta_batch_size == x_batch_size or x_batch_size == 1, (
-                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
-                When performing batched sampling for multiple `x`, the batch size of\
-                `theta` must match the batch size of `x`."
-            )
-
-            if x_batch_size == 1:
-                # If a single `x` is passed (i.e. batchsize==1), we squeeze
-                # the batch dimension of the log-prob with `.squeeze(dim=1)`.
-                theta = reshape_to_sample_batch_event(
+            if self.x_is_iid and self.x_o.shape[0] > 1:
+                num_iid = self.x_o.shape[0]
+                theta_sbe = reshape_to_sample_batch_event(
                     theta, event_shape=theta.shape[1:], leading_is_sample=True
                 )
-
-                posterior_log_prob = self.posterior_estimator.log_prob(
-                    theta, condition=x
-                )
-                posterior_log_prob = posterior_log_prob.squeeze(1)
+                iid_log_probs = []
+                for i in range(num_iid):
+                    x_i = reshape_to_batch_event(
+                        self.x_o[i],
+                        event_shape=self.posterior_estimator.condition_shape,
+                    )
+                    lp = self.posterior_estimator.log_prob(
+                        theta_sbe, condition=x_i
+                    ).squeeze(1)
+                    iid_log_probs.append(lp)
+                posterior_log_prob = torch.stack(iid_log_probs, dim=0).sum(dim=0)
+                posterior_log_prob = posterior_log_prob - (
+                    num_iid - 1
+                ) * self.prior.log_prob(theta)
             else:
-                # If multiple `x` are passed, we return the log-probs for each (x,theta)
-                # pair, and do not squeeze the batch dimension.
-                theta = theta.unsqueeze(0)
-                posterior_log_prob = self.posterior_estimator.log_prob(
-                    theta, condition=x
+                x = reshape_to_batch_event(
+                    self.x_o,
+                    event_shape=self.posterior_estimator.condition_shape,
                 )
+                theta_batch_size = theta.shape[0]
+                x_batch_size = x.shape[0]
+
+                assert theta_batch_size == x_batch_size or x_batch_size == 1, (
+                    f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
+                    When performing batched sampling for multiple `x`, the batch size\
+                    of `theta` must match the batch size of `x`."
+                )
+
+                if x_batch_size == 1:
+                    # If a single `x` is passed (i.e. batchsize==1), we squeeze
+                    # the batch dimension of the log-prob with `.squeeze(dim=1)`.
+                    theta = reshape_to_sample_batch_event(
+                        theta, event_shape=theta.shape[1:], leading_is_sample=True
+                    )
+
+                    posterior_log_prob = self.posterior_estimator.log_prob(
+                        theta, condition=x
+                    )
+                    posterior_log_prob = posterior_log_prob.squeeze(1)
+                else:
+                    # If multiple `x` are passed, we return the log-probs for each
+                    # (x,theta) pair, and do not squeeze the batch dimension.
+                    theta = theta.unsqueeze(0)
+                    posterior_log_prob = self.posterior_estimator.log_prob(
+                        theta, condition=x
+                    )
             posterior_log_prob = torch.where(
                 in_prior_support,
                 posterior_log_prob,
