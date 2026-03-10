@@ -25,6 +25,9 @@ from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
 )
+from sbi.inference.potentials.posterior_based_potential import (
+    posterior_estimator_based_potential,
+)
 from sbi.neural_nets import posterior_flow_nn
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.simulators.linear_gaussian import (
@@ -500,3 +503,51 @@ def get_multidim_simulator_embedding(num_dim: int = 5, embedding_dim: int = 10):
     )
 
     return simulator, embedding_net
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("iid_batch_size", [1, 2, 5])
+def test_posterior_based_potential_iid_log_prob(iid_batch_size: int):
+    """Test IID log-prob computation for posterior-based potential."""
+
+    num_dim = 2
+    num_simulations = 3000
+    num_posterior_samples = 500
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+
+    inference = NPE_C(prior=prior, show_progress_bars=False)
+    theta = prior.sample((num_simulations,))
+    x = diagonal_linear_gaussian(theta)
+    posterior_estimator = inference.append_simulations(theta, x).train()
+
+    theta_o = zeros(num_dim)
+    x_o = linear_gaussian(
+        theta_o.repeat(iid_batch_size, 1),
+        likelihood_shift=likelihood_shift,
+        likelihood_cov=likelihood_cov,
+    )
+
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+
+    potential_fn, _ = posterior_estimator_based_potential(
+        posterior_estimator, prior, x_o=None
+    )
+    potential_fn.set_x(x_o, x_is_iid=True)
+
+    posterior_samples = true_posterior.sample((num_posterior_samples,))
+    true_prob = true_posterior.log_prob(posterior_samples)
+    approx_prob = potential_fn(posterior_samples, track_gradients=False)
+
+    assert approx_prob.shape == true_prob.shape
+    diff = torch.abs(true_prob - approx_prob)
+    assert diff.mean() < 0.3 * iid_batch_size, (
+        f"Mean log-prob diff {diff.mean():.4f} too large for "
+        f"iid_batch_size={iid_batch_size}"
+    )
