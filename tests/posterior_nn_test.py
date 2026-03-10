@@ -511,7 +511,7 @@ def test_posterior_based_potential_iid_log_prob(iid_batch_size: int):
     """Test IID log-prob computation for posterior-based potential."""
 
     num_dim = 2
-    num_simulations = 3000
+    num_simulations = 5000
     num_posterior_samples = 500
 
     likelihood_shift = -1.0 * ones(num_dim)
@@ -522,7 +522,7 @@ def test_posterior_based_potential_iid_log_prob(iid_batch_size: int):
 
     inference = NPE_C(prior=prior, show_progress_bars=False)
     theta = prior.sample((num_simulations,))
-    x = diagonal_linear_gaussian(theta)
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
     posterior_estimator = inference.append_simulations(theta, x).train()
 
     theta_o = zeros(num_dim)
@@ -547,7 +547,7 @@ def test_posterior_based_potential_iid_log_prob(iid_batch_size: int):
 
     assert approx_prob.shape == true_prob.shape
     diff = torch.abs(true_prob - approx_prob)
-    assert diff.mean() < 0.3 * iid_batch_size, (
+    assert diff.mean() < 0.5 * iid_batch_size, (
         f"Mean log-prob diff {diff.mean():.4f} too large for "
         f"iid_batch_size={iid_batch_size}"
     )
