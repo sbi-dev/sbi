@@ -165,10 +165,10 @@ class RestrictionEstimator:
     def build_mlp(self, theta) -> nn.Module:
         classifier = nn.Sequential(
             nn.Linear(theta.shape[1], self._hidden_features),
-            nn.BatchNorm1d(self._hidden_features),
+            nn.LayerNorm(self._hidden_features),
             nn.ReLU(),
             nn.Linear(self._hidden_features, self._hidden_features),
-            nn.BatchNorm1d(self._hidden_features),
+            nn.LayerNorm(self._hidden_features),
             nn.ReLU(),
             nn.Linear(self._hidden_features, 2),
         )
