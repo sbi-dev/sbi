@@ -129,6 +129,11 @@ class PosteriorBasedPotential(BasePotential):
             theta = ensure_theta_batched(torch.as_tensor(theta)).to(self.device)
 
             if self.x_is_iid and self.x_o.shape[0] > 1:
+                if self.prior is None:
+                    raise ValueError(
+                        "A proper prior is required for evaluating the "
+                        "posterior potential with iid observations."
+                    )
                 num_iid = self.x_o.shape[0]
                 theta_sbe = reshape_to_sample_batch_event(
                     theta, event_shape=theta.shape[1:], leading_is_sample=True
