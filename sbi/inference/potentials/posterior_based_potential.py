@@ -138,17 +138,15 @@ class PosteriorBasedPotential(BasePotential):
                 theta_sbe = reshape_to_sample_batch_event(
                     theta, event_shape=theta.shape[1:], leading_is_sample=True
                 )
-                iid_log_probs = []
-                for i in range(num_iid):
-                    x_i = reshape_to_batch_event(
-                        self.x_o[i],
-                        event_shape=self.posterior_estimator.condition_shape,
-                    )
-                    lp = self.posterior_estimator.log_prob(
-                        theta_sbe, condition=x_i
-                    ).squeeze(1)
-                    iid_log_probs.append(lp)
-                posterior_log_prob = torch.stack(iid_log_probs, dim=0).sum(dim=0)
+                x_iid = reshape_to_batch_event(
+                    self.x_o,
+                    event_shape=self.posterior_estimator.condition_shape,
+                )
+                theta_expanded = theta_sbe.expand(-1, num_iid, *theta_sbe.shape[2:])
+                iid_log_probs = self.posterior_estimator.log_prob(
+                    theta_expanded, condition=x_iid
+                )
+                posterior_log_prob = iid_log_probs.sum(dim=1)
                 posterior_log_prob = posterior_log_prob - (
                     num_iid - 1
                 ) * self.prior.log_prob(theta)
