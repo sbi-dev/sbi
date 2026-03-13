@@ -551,3 +551,64 @@ def test_posterior_based_potential_iid_log_prob(iid_batch_size: int):
         f"Mean log-prob diff {diff.mean():.4f} too large for "
         f"iid_batch_size={iid_batch_size}"
     )
+
+
+def test_direct_posterior_raises_on_iid_x():
+    """Direct posterior sampling should raise for multi-observation x."""
+    num_dim = 2
+    num_simulations = 500
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    inference = NPE_C(prior=prior, show_progress_bars=False)
+    theta = prior.sample((num_simulations,))
+    x = diagonal_linear_gaussian(theta)
+    inference.append_simulations(theta, x).train(max_num_epochs=3)
+
+    posterior = inference.build_posterior(sample_with="direct")
+
+    x_o_iid = ones(3, num_dim)
+    with pytest.raises(ValueError, match="batchsize == 1"):
+        posterior.sample((10,), x=x_o_iid)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("iid_batch_size", [2, 5])
+def test_posterior_mcmc_iid_sampling(iid_batch_size: int, mcmc_params_fast):
+    """Test that MCMC sampling with IID x produces correct posterior samples."""
+    num_dim = 2
+    num_simulations = 5000
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+
+    inference = NPE_C(prior=prior, show_progress_bars=False)
+    theta = prior.sample((num_simulations,))
+    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    inference.append_simulations(theta, x).train()
+
+    posterior = inference.build_posterior(
+        sample_with="mcmc", posterior_parameters=mcmc_params_fast
+    )
+
+    theta_o = zeros(num_dim)
+    x_o = linear_gaussian(
+        theta_o.repeat(iid_batch_size, 1),
+        likelihood_shift=likelihood_shift,
+        likelihood_cov=likelihood_cov,
+    )
+
+    samples = posterior.sample((500,), x=x_o)
+
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    true_mean = true_posterior.mean
+
+    # Check that the sample mean is close to the true posterior mean.
+    sample_mean = samples.mean(dim=0)
+    assert torch.allclose(sample_mean, true_mean, atol=0.5), (
+        f"MCMC sample mean {sample_mean} too far from true mean {true_mean}"
+    )
