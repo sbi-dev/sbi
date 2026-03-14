@@ -38,6 +38,12 @@ def plot_summary(
     xlabel: str = "epochs_trained",
     ylabel: Optional[List[str]] = None,
     plot_kwargs: Optional[Dict[str, Any]] = None,
+    overlay: bool = False,
+    colors: Optional[List[str]] = None,
+    labels: Optional[List[str]] = None,
+    legend: bool = True,
+    grid: bool = False,
+    title: Optional[Union[str, List[str]]] = None,
 ) -> Tuple[Figure, Axes]:
     """Plots data logged by the TensorBoard tracker of an inference object.
 
@@ -55,6 +61,13 @@ def plot_summary(
         xlabel: x-axis label describing 'steps' attribute of tensorboards ScalarEvent.
         ylabel: list of alternative ylabels for items in tags. Optional.
         plot_kwargs: will be passed to ax.plot.
+        overlay: if True, plots all tags on a single axes intead of separate subplots.
+        colors: list of colors, one per tag. If None, uses matplotlib's default colors.
+        labels: list of legend labels, one per tag. If None, uses tag names.
+        legend: optionally shows a legend when overlay is True or when labels provided
+        grid: whether to show grid lines.
+        title: title for the figure or individual subplots. A string sets the title
+            for all subplots. A list of strings sets titles per subplot.
 
     Returns a tuple of Figure and Axes objects.
     """
@@ -109,25 +122,67 @@ def plot_summary(
 
     plot_options.update(figsize=figsize, fontsize=fontsize)
     if fig is None or axes is None:
+        num_subplots = len(tags)
+        if overlay:
+            num_subplots = 1
         fig, axes = plt.subplots(  # pyright: ignore[reportAssignmentType]
             1,
-            len(tags),
+            num_subplots,
             figsize=plot_options["figsize"],
             **plot_options["subplots"],
         )
     axes = np.atleast_1d(axes)  # type: ignore
+    assert fig is not None and axes is not None
 
+    _labels = labels or tags
     ylabel = ylabel or tags
 
-    for i, ax in enumerate(axes):  # type: ignore
-        ax.plot(
-            scalars[tags[i]]["step"], scalars[tags[i]]["value"], **plot_kwargs or {}
-        )
-
-        ax.set_ylabel(ylabel[i], fontsize=fontsize)
+    if overlay:
+        ax = axes[0]
+        for i, tag in enumerate(tags):
+            color = colors[i] if colors else None
+            ax.plot(
+                scalars[tag]["step"],
+                scalars[tag]["value"],
+                color=color,
+                label=_labels[i],
+                **(plot_kwargs or {}),
+            )
         ax.set_xlabel(xlabel, fontsize=fontsize)
+        # If overlay, we join all y labels
+        ax.set_ylabel(
+            ylabel[0] if len(set(ylabel)) == 1 else " / ".join(ylabel),
+            fontsize=fontsize,
+        )
         ax.xaxis.set_tick_params(labelsize=fontsize)
         ax.yaxis.set_tick_params(labelsize=fontsize)
+        if legend:
+            ax.legend(fontsize=fontsize)
+        if grid:
+            ax.grid(True)
+        if title:
+            t = title if isinstance(title, str) else title[0]
+            ax.set_title(t, fontsize=fontsize)
+    else:
+        for i, ax in enumerate(axes):  # type: ignore
+            color = colors[i] if colors else None
+            ax.plot(
+                scalars[tags[i]]["step"],
+                scalars[tags[i]]["value"],
+                color=color,
+                label=_labels[i],
+                **plot_kwargs or {},
+            )
+
+            ax.set_ylabel(ylabel[i], fontsize=fontsize)
+            ax.set_xlabel(xlabel, fontsize=fontsize)
+            ax.xaxis.set_tick_params(labelsize=fontsize)
+            ax.yaxis.set_tick_params(labelsize=fontsize)
+            if grid:
+                ax.grid(True)
+            if title:
+                t = title if isinstance(title, str) else title[i]
+                ax.set_title(t, fontsize=fontsize)
 
     plt.subplots_adjust(wspace=0.3)
 
