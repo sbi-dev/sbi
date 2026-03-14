@@ -22,13 +22,12 @@ from torch.distributions import MultivariateNormal
 from sbi.inference import NPSE
 from sbi.inference.posteriors.vector_field_posterior import (
     PosteriorBuilder,
-    VectorFieldPosterior,
 )
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
 
-
 # Minimal helpers
+
 
 def _train_small_npse(num_dim: int = 2, num_simulations: int = 500):
     """Train a tiny NPSE model for unit-testing purposes."""
@@ -37,7 +36,11 @@ def _train_small_npse(num_dim: int = 2, num_simulations: int = 500):
     likelihood_cov = 0.5 * torch.eye(num_dim)
 
     theta = prior.sample((num_simulations,))
-    x = theta + likelihood_shift + torch.randn(num_simulations, num_dim) @ likelihood_cov
+    x = (
+        theta
+        + likelihood_shift
+        + torch.randn(num_simulations, num_dim) @ likelihood_cov
+    )
 
     inference = NPSE(prior, show_progress_bars=False)
     inference.append_simulations(theta, x)
@@ -48,6 +51,7 @@ def _train_small_npse(num_dim: int = 2, num_simulations: int = 500):
 
 
 # BasePotential.init() is a no-op
+
 
 class _DummyPotential(BasePotential):
     """Minimal concrete potential for testing the base class default."""
@@ -64,6 +68,7 @@ def test_base_potential_init_is_noop():
 
 
 # with_iid / with_guidance return PosteriorBuilder
+
 
 @pytest.mark.slow
 def test_with_iid_returns_builder():
@@ -84,10 +89,8 @@ def test_with_guidance_returns_builder():
 @pytest.mark.slow
 def test_builder_chaining():
     posterior, _ = _train_small_npse()
-    builder = (
-        posterior
-        .with_iid(method="fnpe")
-        .with_guidance(method="affine_classifier_free", likelihood_scale=1.5)
+    builder = posterior.with_iid(method="fnpe").with_guidance(
+        method="affine_classifier_free", likelihood_scale=1.5
     )
     assert isinstance(builder, PosteriorBuilder)
     assert builder._iid_method == "fnpe"
@@ -96,6 +99,7 @@ def test_builder_chaining():
 
 
 # init() is called exactly once
+
 
 @pytest.mark.slow
 def test_init_called_once_on_repeated_samples():
@@ -122,6 +126,7 @@ def test_init_called_once_on_repeated_samples():
 
 # Builder produces same results as old API (no regression)
 
+
 @pytest.mark.slow
 def test_builder_fnpe_matches_old_api():
     """Builder path and old sample(iid_method=...) path should be equivalent."""
@@ -129,10 +134,8 @@ def test_builder_fnpe_matches_old_api():
     x_obs = zeros(1, 2)
 
     torch.manual_seed(0)
-    samples_builder = (
-        posterior
-        .with_iid(method="fnpe")
-        .sample((50,), x=x_obs, steps=10, show_progress_bars=False)
+    samples_builder = posterior.with_iid(method="fnpe").sample(
+        (50,), x=x_obs, steps=10, show_progress_bars=False
     )
 
     torch.manual_seed(0)
@@ -152,6 +155,7 @@ def test_builder_fnpe_matches_old_api():
 
 
 # init() warms the cache for auto_gauss
+
 
 @pytest.mark.slow
 def test_init_warms_auto_gauss_cache():

@@ -144,7 +144,7 @@ class PosteriorBuilder:
         potential_fn.init()
         self._initialized = True
         return potential_fn
-    
+
     # Public API
     def sample(
         self,
@@ -217,7 +217,6 @@ class PosteriorBuilder:
         return posterior.log_prob(
             theta, x=x_resolved, track_gradients=track_gradients, ode_kwargs=ode_kwargs
         )
-
 
 
 class VectorFieldPosterior(NeuralPosterior):
@@ -295,7 +294,7 @@ class VectorFieldPosterior(NeuralPosterior):
 
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
-        
+
     def with_iid(
         self,
         method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
@@ -328,7 +327,9 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             A :class:`PosteriorBuilder` ready to call ``.sample()`` on.
         """
-        return PosteriorBuilder(self, guidance_method=method, guidance_params=method_kwargs)
+        return PosteriorBuilder(
+            self, guidance_method=method, guidance_params=method_kwargs
+        )
 
     def to(self, device: Union[str, torch.device]) -> None:
         """Move posterior to device.
