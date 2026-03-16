@@ -26,16 +26,18 @@ interface:
    import torch
    from sbi.inference import NPE
 
-   # define shifted Gaussian simulator.
-   def simulator(θ): return θ + torch.randn_like(θ)
+   # Define a simple simulator where observations are generated
+   # by adding Gaussian noise to the parameters
+   def simulator(theta):
+       return theta + torch.randn_like(theta)
    # draw parameters from Gaussian prior.
-   θ = torch.randn(1000, 2)
+   theta = torch.randn(1000, 2)
    # simulate data
-   x = simulator(θ)
+   x = simulator(theta)
 
-   # choose sbi method and train
+   # Initialize the inference method and train the neural density estimator
    inference = NPE()
-   inference.append_simulations(θ, x).train()
+   inference.append_simulations(theta, x).train()
 
    # do inference given observed data
    x_o = torch.ones(2)
@@ -46,7 +48,7 @@ interface:
 Overview
 --------
 
-To get started, install the ``sbi`` package with:
+To get started, install the ``sbi`` package using pip:
 
 .. code-block:: bash
 
@@ -90,9 +92,8 @@ inference provides a general and powerful framework to invert the simulators, i.
 describe the parameters that are consistent both with empirical data and prior
 knowledge.
 
-In the case of simulators, a key quantity required for statistical inference, the
-likelihood of observed data given parameters, :math:`\mathcal{L}(\theta) = p(x_o|\theta)`, is
-typically intractable, rendering conventional statistical approaches inapplicable.
+The key challenge is that the likelihood :math:`p(x_o \mid \theta)` is typically
+intractable for complex simulators.
 
 ``sbi`` implements powerful machine-learning methods that address this problem. Roughly,
 these algorithms can be categorized as:
