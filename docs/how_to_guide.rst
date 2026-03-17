@@ -61,6 +61,7 @@ Sampling
 - :doc:`how_to_guide/12_mcmc_diagnostics_with_arviz`
 - :doc:`how_to_guide/23_using_pyro_with_sbi`
 - :doc:`how_to_guide/19_posterior_parameters`
+- :doc:`how_to_guide/24_variational_inference`
 
 
 Diagnostics
