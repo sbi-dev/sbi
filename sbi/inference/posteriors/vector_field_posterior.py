@@ -159,6 +159,8 @@ class VectorFieldPosterior(NeuralPosterior):
             Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"]
         ] = None,
         iid_params: Optional[Dict] = None,
+        guidance_method: Optional[str] = None,
+        guidance_params: Optional[Dict] = None,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
@@ -197,6 +199,17 @@ class VectorFieldPosterior(NeuralPosterior):
                 SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
+            guidance_method: Method to guide the diffusion process. If None, no guidance
+                is used. Currently we support `affine_classifier_free`, which allows to
+                scale and shift the "likelihood" or "prior" score contribution. This can
+                be used to perform "super" conditioning i.e. shrink the variance of the
+                likelihood. `Universal` can be used to guide the diffusion process with
+                a general guidance function. `Interval` is an instance of that where
+                the guidance function constraints the diffusion process to a given
+                interval.
+            guidance_params: Additional parameters passed to the guidance method. See
+                the specific `ScoreAdaptation` child class for details, specifically
+                `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Sampling method to use - 'ode' or 'sde'. Note that in order to
                 use the 'sde' sampling method, the vector field estimator must support
@@ -227,6 +240,8 @@ class VectorFieldPosterior(NeuralPosterior):
             x_is_iid=is_iid,
             iid_method=iid_method or self.potential_fn.iid_method,
             iid_params=iid_params,
+            guidance_method=guidance_method,
+            guidance_params=guidance_params,
         )
 
         num_samples = torch.Size(sample_shape).numel()
@@ -298,6 +313,7 @@ class VectorFieldPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
         save_intermediate: bool = False,
+        **kwargs,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
@@ -313,8 +329,8 @@ class VectorFieldPosterior(NeuralPosterior):
             corrector: The corrector for the diffusion-based sampler. Either of
                 [None].
             steps: Number of steps to take for the Euler-Maruyama method.
-            ts: Time points at which to evaluate the diffusion process. If None, call
-                the solve schedule specific to the score estimator.
+            ts: Time points at which to evaluate the diffusion process. If None,
+                uses the solve_schedule() specific to the estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.

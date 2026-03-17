@@ -336,7 +336,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
                 moments run into issues (as mean_t=0) effectively makes it pure
                 noise and equations are not well defined anymore. Alternatively
                 we could also adapt the analytical denoising equations in
-                `utils/score_utils.py` to account for this case.
+                `utils/vector_field_utils.py` to account for this case.
 
         Returns:
             Mean function at a given time.

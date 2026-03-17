@@ -2,7 +2,7 @@
 .sbi_env/
 *sbi-logs/
 /docs/site/*
-/docs/reference/_autosummary/*
+/docs/*/_autosummary/*
 
 # Development files and python cache
 /*.pyc
@@ -103,6 +103,6 @@ target/
 uv.lock
 .python-version
 
-# Serena cache
+# tools cache
 .serena/
 .claude/

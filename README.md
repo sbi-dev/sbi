@@ -5,7 +5,7 @@
 [![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
 [![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.07754/status.svg)](https://doi.org/10.21105/joss.07754)
-[![NumFOCUS affiliated](https://camo.githubusercontent.com/a0f197cee66ccd8ed498cf64e9f3f384c78a072fe1e65bada8d3015356ac7599/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f4e756d464f4355532d616666696c696174656425323070726f6a6563742d6f72616e67652e7376673f7374796c653d666c617426636f6c6f72413d45313532334426636f6c6f72423d303037443841)](https://numfocus.org/sponsored-projects/affiliated-projects)
+[![NumFOCUS affiliated](https://img.shields.io/badge/NumFOCUS-affiliated%20project-orange.svg?style=flat&colorA=E1523D&colorB=007D8A)](https://numfocus.org/sponsored-projects/affiliated-projects)
 
 ## `sbi`: Simulation-Based Inference
 

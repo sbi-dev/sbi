@@ -6,6 +6,7 @@ from typing import Dict, Optional, Union
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers._contracts import LossArgsNRE_A
 from sbi.inference.trainers.nre.nre_base import (
@@ -13,16 +14,50 @@ from sbi.inference.trainers.nre.nre_base import (
 )
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_A(RatioEstimatorTrainer):
-    """AALR, here known as Neural Ratio Estimation algorithm (NRE-A) [1].
+    r"""Neural Ratio Estimation (NRE-A / AALR) as in Hermans et al. (2020) [1].
+
+    NRE-A trains a neural classifier to estimate the likelihood-to-evidence ratio
+    $r(\theta, x) = p(x|\theta) / p(x)$ by distinguishing between samples from the
+    joint distribution $p(\theta, x)$ and samples from the marginals $p(\theta)p(x)$.
+    Posterior sampling is then performed via MCMC, rejection sampling, or variational
+    inference using the estimated ratio.
+
+    NRE can be run multi-round without need for correction, but requires running
+    potentially expensive posterior sampling in each round.
 
     [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans
         et al., ICML 2020, https://arxiv.org/abs/1903.04057
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import NRE_A
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train ratio estimator
+        inference = NRE_A(prior=prior)
+        ratio_estimator = inference.append_simulations(theta, x).train()
+
+        # 3. Build posterior (uses MCMC or rejection sampling)
+        posterior = inference.build_posterior(ratio_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.randn(1, 3)
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(
@@ -31,7 +66,8 @@ class NRE_A(RatioEstimatorTrainer):
         classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NRE_A.
@@ -50,8 +86,10 @@ class NRE_A(RatioEstimatorTrainer):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """

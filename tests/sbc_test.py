@@ -160,7 +160,7 @@ def test_consistent_sbc_results(
     simulator = gaussian_setup["simulator"]
 
     # Test parameters
-    num_simulations = 4000
+    num_simulations = 4500
     num_posterior_samples = 1000
     num_sbc_runs = 100
 

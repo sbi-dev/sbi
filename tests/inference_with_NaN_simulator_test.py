@@ -50,15 +50,15 @@ def test_handle_invalid_x(x_shape):
 
 @pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
 def test_z_scoring_warning(snpe_method: type):
-    # Create data with large variance.
+    # Create data with extreme outlier.
     num_dim = 2
     theta = torch.ones(100, num_dim)
     x = torch.rand(100, num_dim)
-    x[:50] += 1e7
+    x[0, 0] = 1e7  # Single extreme outlier
 
-    # Make sure a warning is raised because z-scoring will map these data to duplicate
-    # data points.
-    with pytest.warns(UserWarning, match="Z-scoring these simulation outputs"):
+    # Make sure a warning is raised because of extreme outliers that may cause
+    # precision loss during z-scoring.
+    with pytest.warns(UserWarning, match="extreme outliers"):
         snpe_method(utils.BoxUniform(zeros(num_dim), ones(num_dim))).append_simulations(
             theta, x
         ).train(max_num_epochs=1)

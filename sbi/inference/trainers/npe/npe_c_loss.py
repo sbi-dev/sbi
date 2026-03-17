@@ -2,31 +2,33 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from torch import Tensor, eye, ones
+from torch.distributions import Distribution, MultivariateNormal
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
-from sbi.utils import (
-    batched_mixture_mv,
-    batched_mixture_vmv,
-    clamp_and_warn,
-    repeat_rows,
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
 )
-from sbi.utils.sbiutils import mog_log_prob
-from sbi.utils.torchutils import (
-    assert_all_finite,
+from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
+from sbi.utils.sbiutils import (
+    batched_mixture_mv,
+    batched_mixture_vmv,
+    clamp_and_warn,
+)
+from sbi.utils.torchutils import assert_all_finite, repeat_rows
 
 
 class NPELoss(ABC):
     """Abstract base class for NPE-C loss strategies."""
 
-    def __init__(self, neural_net: ConditionalDensityEstimator):
+    def __init__(self, neural_net: MixtureDensityEstimator):
         self._neural_net = neural_net
 
     @abstractmethod
@@ -57,8 +59,8 @@ class AtomicLoss(NPELoss):
 
     def __init__(
         self,
-        neural_net: ConditionalDensityEstimator,
-        prior: Any,
+        neural_net: MixtureDensityEstimator,
+        prior: Distribution,
         num_atoms: int = 10,
         use_combined_loss: bool = False,
     ):
@@ -75,24 +77,14 @@ class AtomicLoss(NPELoss):
         proposal: Any,
         **kwargs,
     ) -> Tensor:
-        """Return log probability of the proposal posterior for atomic proposals.
-
-        We have two main options when evaluating the proposal posterior.
-            (1) Generate atoms from the proposal prior.
-            (2) Generate atoms from a more targeted distribution, such as the most
-                recent posterior.
-        If we choose the latter, it is likely beneficial not to do this in the first
-        round, since we would be sampling from a randomly-initialized neural density
-        estimator.
-        """
+        """Return log probability of the proposal posterior for atomic proposals."""
         batch_size = theta.shape[0]
 
         num_atoms = int(
             clamp_and_warn("num_atoms", self._num_atoms, min_val=2, max_val=batch_size)
         )
 
-        # Each set of parameter atoms is evaluated using the same x,
-        # so we repeat rows of the data x, e.g. [1, 2] -> [1, 1, 2, 2]
+        # Each set of parameter atoms is evaluated using the same x
         repeated_x = repeat_rows(x, num_atoms)
 
         # To generate the full set of atoms for a given item in the batch,
@@ -104,7 +96,6 @@ class AtomicLoss(NPELoss):
         contrasting_theta = theta[choices]
 
         # We can now create our sets of atoms from the contrasting parameter sets
-        # we have generated.
         atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
             batch_size * num_atoms, -1
         )
@@ -134,13 +125,13 @@ class AtomicLoss(NPELoss):
         )
         assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
-        # XXX This evaluates the posterior on _all_ prior samples
+        # combined loss helps prevent density leaking with bounded priors.
         if self._use_combined_loss:
             theta = reshape_to_sample_batch_event(theta, self._neural_net.input_shape)
             x = reshape_to_batch_event(x, self._neural_net.condition_shape)
             log_prob_posterior_non_atomic = self._neural_net.log_prob(theta, x)
             # squeeze to remove sample dimension, which is always one during the loss
-            # evaluation of `SNPE_C` (because we have one theta vector per x vector).
+            # evaluation of `SNPE_C`.
             log_prob_posterior_non_atomic = log_prob_posterior_non_atomic.squeeze(dim=0)
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (
@@ -155,9 +146,9 @@ class NonAtomicGaussianLoss(NPELoss):
 
     def __init__(
         self,
-        neural_net: ConditionalDensityEstimator,
-        maybe_z_scored_prior: Any,
-        prec_m_prod_prior: Tensor = None,
+        neural_net: MixtureDensityEstimator,
+        maybe_z_scored_prior: Distribution,
+        prec_m_prod_prior: Optional[Tensor] = None,
         z_score_theta: bool = False,
     ):
         super().__init__(neural_net)
@@ -173,29 +164,24 @@ class NonAtomicGaussianLoss(NPELoss):
         proposal: DirectPosterior,
         **kwargs,
     ) -> Tensor:
-        """Return log-probability of the proposal posterior for MoG proposal.
+        """Return log-probability of the proposal posterior for MoG proposal."""
+        # Get the proposal MoG at the default_x
+        assert isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
+        assert proposal.default_x is not None, "Proposal must have default_x set"
+        mog_p = proposal.posterior_estimator.get_uncorrected_mog(proposal.default_x)
+        norm_logits_p = mog_p.log_weights  # Already normalized
+        m_p = mog_p.means
+        prec_p = mog_p.precisions
 
-        For MoG proposals and MoG density estimators, this can be done in closed form
-        and does not require atomic loss (i.e. there will be no leakage issues).
-        """
-        # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
-        # and then get the mixture_components (**without** calling log_prob()). Hence,
-        # we call them separately here.
-        encoded_x = proposal.posterior_estimator.net._embedding_net(proposal.default_x)
-        dist = (
-            proposal.posterior_estimator.net._distribution
-        )  # defined to avoid ugly black formatting.
-        logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)
-        norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
-
-        # Evaluate the density estimator.
-        encoded_x = self._neural_net.net._embedding_net(x)
-        dist = self._neural_net.net._distribution  # defined to avoid black formatting.
-        logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
-        norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
+        # Get the density estimator MoG at the training data x
+        mog_d = self._neural_net.get_uncorrected_mog(x)
+        norm_logits_d = mog_d.log_weights  # Already normalized
+        m_d = mog_d.means
+        prec_d = mog_d.precisions
 
         # z-score theta if it z-scoring had been requested.
-        theta = self._maybe_z_score_theta(theta)
+        if self.z_score_theta:
+            theta = self._neural_net._transform_input(theta)
 
         # Compute the MoG parameters of the proposal posterior.
         (
@@ -207,22 +193,24 @@ class NonAtomicGaussianLoss(NPELoss):
             norm_logits_p, m_p, prec_p, norm_logits_d, m_d, prec_d
         )
 
+        # Create MoG for proposal posterior and compute log_prob
+        # We need precision_factors for MoG, compute via Cholesky
+        precf_pp = torch.linalg.cholesky(prec_pp, upper=True)
+        mog_pp = MoG(
+            logits=logits_pp,
+            means=m_pp,
+            precisions=prec_pp,
+            precision_factors=precf_pp,
+        )
+
         # Compute the log_prob of theta under the product.
-        log_prob_proposal_posterior = mog_log_prob(theta, logits_pp, m_pp, prec_pp)
+        log_prob_proposal_posterior = mog_pp.log_prob(theta)
         assert_all_finite(
             log_prob_proposal_posterior,
-            """the evaluation of the MoG proposal posterior. This is likely due to a
-            numerical instability in the training procedure. Please create an issue on
-            Github.""",
+            "evaluation of the MoG proposal posterior",
         )
 
         return log_prob_proposal_posterior
-
-    def _maybe_z_score_theta(self, theta: Tensor) -> Tensor:
-        """Return potentially standardized theta if z-scoring was requested."""
-        if self.z_score_theta:
-            theta, _ = self._neural_net.net._transform(theta)
-        return theta
 
     def _automatic_posterior_transformation(
         self,
@@ -234,7 +222,6 @@ class NonAtomicGaussianLoss(NPELoss):
         precisions_d: Tensor,
     ):
         """Returns the MoG parameters of the proposal posterior."""
-
         precisions_pp, covariances_pp = self._precisions_proposal_posterior(
             precisions_p, precisions_d
         )
@@ -268,11 +255,7 @@ class NonAtomicGaussianLoss(NPELoss):
         precisions_d_rep = precisions_d.repeat(1, num_comps_p, 1, 1)
 
         precisions_pp = precisions_p_rep + precisions_d_rep
-        # Note: self._maybe_z_scored_prior is an instance attribute in the main class
-        # logic, but here we pass it in __init__.
-        # We need to check if it's MultivariateNormal for the subtraction.
-        # This was handled in the main class by logic.
-        if hasattr(self._maybe_z_scored_prior, "precision_matrix"):
+        if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
             precisions_pp -= self._maybe_z_scored_prior.precision_matrix
 
         covariances_pp = torch.inverse(precisions_pp)
@@ -347,7 +330,6 @@ class NonAtomicGaussianLoss(NPELoss):
         )
 
         # Compute for proposal, density estimator, and proposal posterior:
-        # mu_i.T * P_i * mu_i
         exponent_p = batched_mixture_vmv(precisions_p, means_p)
         exponent_d = batched_mixture_vmv(precisions_d, means_d)
         exponent_pp = batched_mixture_vmv(precisions_pp, means_pp)

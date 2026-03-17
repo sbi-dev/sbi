@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Callable, Optional
 
-from pyknos.nflows.nn import nets
+from nflows.nn import nets
 from torch import Tensor, nn, relu
 
 from sbi.neural_nets.ratio_estimators import RatioEstimator
@@ -102,6 +102,7 @@ def build_mlp_classifier(
     hidden_features: int = 50,
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
+    norm_layer: Callable[[int], nn.Module] = nn.LayerNorm,
 ) -> RatioEstimator:
     """Builds MLP classifier.
 
@@ -118,6 +119,9 @@ def build_mlp_classifier(
             z_score_x.
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.
+        norm_layer: Normalization layer class to apply after each hidden layer.
+            Defaults to `nn.LayerNorm`. Pass `nn.BatchNorm1d` to use batch norm,
+            or `nn.Identity` to skip normalization entirely.
 
     Returns:
         Neural network.
@@ -129,10 +133,10 @@ def build_mlp_classifier(
 
     neural_net = nn.Sequential(
         nn.Linear(x_numel + y_numel, hidden_features),
-        nn.BatchNorm1d(hidden_features),
+        norm_layer(hidden_features),
         nn.ReLU(),
         nn.Linear(hidden_features, hidden_features),
-        nn.BatchNorm1d(hidden_features),
+        norm_layer(hidden_features),
         nn.ReLU(),
         nn.Linear(hidden_features, 1),
     )

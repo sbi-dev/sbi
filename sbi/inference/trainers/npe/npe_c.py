@@ -4,10 +4,9 @@
 from typing import Callable, Dict, Literal, Optional, Union
 
 import torch
-from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
-from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal, Uniform
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.trainers.npe.npe_base import (
@@ -17,7 +16,10 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuilder,
 )
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+)
+from sbi.sbi_types import Tracker
 from sbi.utils import (
     check_dist_class,
     del_entries,
@@ -26,38 +28,52 @@ from sbi.utils.torchutils import BoxUniform
 
 
 class NPE_C(PosteriorEstimatorTrainer):
-    """Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019). [1]
+    r"""Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019) [1].
+
+    NPE-C (also known as APT - Automatic Posterior Transformation, aka SNPE-C) trains
+    a neural network over multiple rounds to directly approximate the posterior for a
+    specific observation x_o. In the first round, NPE-C is equivalent to other NPE
+    methods and is fully amortized (direct inference for any new observation). After
+    the first round, NPE-C automatically selects between two loss variants depending
+    on the chosen density estimator: the non-atomic loss (for Mixture of Gaussians)
+    which is stable and avoids leakage, or the atomic loss (for flows) which is more
+    flexible but may suffer from leakage issues.
+
+    For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
+    plain NLL loss.
 
     [1] *Automatic Posterior Transformation for Likelihood-free Inference*,
         Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
-    Like all NPE methods, this method trains a deep neural density estimator to
-    directly approximate the posterior. Also like all other NPE methods, in the
-    first round, this density estimator is trained with a maximum-likelihood loss.
+    Example:
+    --------
 
-    For the sequential mode in which the density estimator is trained across rounds,
-    this class implements two loss variants of NPE-C: the non-atomic and the atomic
-    version. The atomic loss of NPE-C can be used for any density estimator,
-    i.e. also for normalizing flows. However, it suffers from leakage issues. On
-    the other hand, the non-atomic loss can only be used only if the proposal
-    distribution is a mixture of Gaussians, the density estimator is a mixture of
-    Gaussians, and the prior is either Gaussian or Uniform. It does not suffer from
-    leakage issues. At the beginning of each round, we print whether the non-atomic
-    or the atomic version is used.
+    ::
 
-    In this codebase, we will automatically switch to the non-atomic loss if the
-    following criteria are fulfilled:
+        import torch
+        from sbi.inference import NPE_C
+        from sbi.utils import BoxUniform
 
-    - proposal is a `DirectPosterior` with density_estimator `mdn`, as built with
-      `sbi.neural_nets.posterior_nn()`.
-    - the density estimator is a `mdn`, as built with
-      `sbi.neural_nets.posterior_nn()`.
-    - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or
-      ``isinstance(prior, sbi.utils.BoxUniform)``
+        # 1. Setup simulator, prior, and observation
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        x_o = torch.randn(1, 3)  # Observed data
 
-    Note that custom implementations of any of these densities (or estimators) will
-    not trigger the non-atomic loss, and the algorithm will fall back onto using
-    the atomic loss.
+        def simulator(theta):
+            return theta + torch.randn_like(theta) * 0.1
+
+        # 2. Multi-round inference
+        inference = NPE_C(prior=prior)
+        proposal = prior
+
+        for round_idx in range(5):
+            theta = proposal.sample((100,))
+            x = simulator(theta)
+            density_estimator = inference.append_simulations(theta, x).train()
+            posterior = inference.build_posterior(density_estimator)
+            proposal = posterior.set_default_x(x_o)
+
+        # 3. Sample from final posterior
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(
@@ -69,7 +85,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         ] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NPE-C.
@@ -88,8 +105,10 @@ class NPE_C(PosteriorEstimatorTrainer):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard ``SummaryWriter`` to control, among others,
-                log file location (default is ``<current working directory>/logs``.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during training.
         """
 
@@ -166,10 +185,7 @@ class NPE_C(PosteriorEstimatorTrainer):
                 "No simulations found. You must call .append_simulations() "
                 "before calling .train()."
             )
-        # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
-        # requiring the signature to have `num_atoms`, save it for use below, and
-        # continue. It's sneaky because we are using the object (self) as a namespace
-        # to pass arguments between functions, and that's implicit state management.
+
         self._num_atoms = num_atoms
         self._use_combined_loss = use_combined_loss
         kwargs = del_entries(
@@ -180,15 +196,12 @@ class NPE_C(PosteriorEstimatorTrainer):
         self._round = max(self._data_round_index)
 
         if self._round > 0:
-            # Set the proposal to the last proposal that was passed by the user. For
-            # atomic SNPE, it does not matter what the proposal is. For non-atomic
-            # SNPE, we only use the latest data that was passed, i.e. the one from the
-            # last proposal.
+            # Set the proposal to the last proposal that was passed by the user.
             proposal = self._proposal_roundwise[-1]
             self.use_non_atomic_loss = (
                 isinstance(proposal, DirectPosterior)
-                and isinstance(proposal.posterior_estimator.net._distribution, mdn)
-                and isinstance(self._neural_net.net._distribution, mdn)
+                and isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
+                and isinstance(self._neural_net, MixtureDensityEstimator)
                 and check_dist_class(
                     self._prior, class_to_check=(Uniform, MultivariateNormal)
                 )[0]
@@ -214,7 +227,7 @@ class NPE_C(PosteriorEstimatorTrainer):
                     neural_net=self._neural_net,
                     maybe_z_scored_prior=self._maybe_z_scored_prior,
                     prec_m_prod_prior=prec_m_prod_prior,
-                    z_score_theta=self.z_score_theta
+                    z_score_theta=self.z_score_theta,
                 )
             else:
                 # Instantiate Atomic Strategy
@@ -225,9 +238,7 @@ class NPE_C(PosteriorEstimatorTrainer):
                     use_combined_loss=self._use_combined_loss,
                 )
         else:
-            # Default to Atomic for first round or if not specified
-            # Actually, in the first round (round 0), we don't have a proposal
-            # posterior loss usually, but if we forced it, we'd default to atomic.
+            # Default to Atomic for first round (equivalent to MLE)
             self._loss_strategy = AtomicLoss(
                 neural_net=self._neural_net,
                 prior=self._prior,
@@ -241,58 +252,29 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Set state variables that are used at each training step of non-atomic SNPE-C.
 
         Three things are computed:
-        1) Check if z-scoring was requested. To do so, we check if the `_transform`
-            argument of the net had been a `CompositeTransform`. See pyknos mdn.py.
-        2) Define a (potentially standardized) prior. It's standardized if z-scoring
-            had been requested.
-        3) Compute (Precision * mean) for the prior. This quantity is used at every
-            training step if the prior is Gaussian.
+        1) Check if z-scoring was requested.
+        2) Define a (potentially standardized) prior.
+        3) Compute (Precision * mean) for the prior.
         """
-
-        self.z_score_theta = isinstance(
-            self._neural_net.net._transform, CompositeTransform
-        )
+        assert isinstance(self._neural_net, MixtureDensityEstimator)
+        self.z_score_theta = self._neural_net.has_input_transform
 
         self._set_maybe_z_scored_prior()
 
-        # NOTE: self.prec_m_prod_prior calculation moved to strategy instantiation
-
     def _set_maybe_z_scored_prior(self) -> None:
-        r"""Compute and store potentially standardized prior (if z-scoring was done).
-
-        The proposal posterior is:
-        $pp(\theta|x) = 1/Z * q(\theta|x) * prop(\theta) / p(\theta)$
-
-        Let's denote z-scored theta by `a`: a = (theta - mean) / std
-        Then pp'(a|x) = 1/Z_2 * q'(a|x) * prop'(a) / p'(a)$
-
-        The ' indicates that the evaluation occurs in standardized space. The constant
-        scaling factor has been absorbed into Z_2.
-        From the above equation, we see that we need to evaluate the prior **in
-        standardized space**. We build the standardized prior in this function.
-
-        The standardize transform that is applied to the samples theta does not use
-        the exact prior mean and std (due to implementation issues). Hence, the z-scored
-        prior will not be exactly have mean=0 and std=1.
-        """
+        r"""Compute and store potentially standardized prior (if z-scoring was done)."""
 
         if self.z_score_theta:
-            scale = self._neural_net.net._transform._transforms[0]._scale
-            shift = self._neural_net.net._transform._transforms[0]._shift
+            # Get z-score parameters from the MixtureDensityEstimator
+            assert isinstance(self._neural_net, MixtureDensityEstimator)
+            shift = self._neural_net._transform_shift
+            scale = self._neural_net._transform_scale
 
-            # Following the definintion of the linear transform in
-            # `standardizing_transform` in `sbiutils.py`:
-            # shift=-mean / std
-            # scale=1 / std
-            # Solving these equations for mean and std:
-            estim_prior_std = 1 / scale
-            estim_prior_mean = -shift * estim_prior_std
+            estim_prior_mean = shift
+            estim_prior_std = scale
 
             # Compute the discrepancy of the true prior mean and std and the mean and
             # std that was empirically estimated from samples.
-            # N(theta|m,s) = N((theta-m_e)/s_e|(m-m_e)/s_e, s/s_e)
-            # Above: m,s are true prior mean and std. m_e,s_e are estimated prior mean
-            # and std (estimated from samples and used to build standardize transform).
             almost_zero_mean = (self._prior.mean - estim_prior_mean) / estim_prior_std
             almost_one_std = torch.sqrt(self._prior.variance) / estim_prior_std
 
@@ -318,10 +300,9 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return the log-probability of the proposal posterior.
         Delegates to the configured loss strategy.
         """
-        # Ensure strategy is initialized (it handles checks internally if needed)
+        # Ensure strategy is initialized
         if hasattr(self, "_loss_strategy"):
-             return self._loss_strategy(theta, x, masks, proposal)
+            return self._loss_strategy(theta, x, masks, proposal)
 
         # Fallback if somehow called without train setup (unlikely)
         raise RuntimeError("Loss strategy not initialized. Call train() first.")
-

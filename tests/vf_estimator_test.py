@@ -248,3 +248,68 @@ def test_train_schedule(estimator_type, sde_type):
     assert torch.allclose(solve_schedule[-1], t_min)
     assert solve_schedule_default.shape == torch.Size((300,))
     assert torch.all(solve_schedule[:-1] - solve_schedule[1:] >= 0)
+
+
+@pytest.mark.parametrize(
+    "train_schedule,solve_schedule",
+    [
+        ("uniform", "uniform"),
+        ("lognormal", "uniform"),
+        ("uniform", "power_law"),
+        ("lognormal", "power_law"),
+    ],
+)
+def test_ve_edm_schedules(train_schedule, solve_schedule):
+    """Test EDM-style schedules for VE estimator (Karras et al. 2022)."""
+    estimator = build_score_matching_estimator(
+        torch.randn(100, 1),
+        torch.randn(100, 1),
+        sde_type="ve",
+        train_schedule=train_schedule,
+        solve_schedule=solve_schedule,
+    )
+
+    # Test train schedule returns valid times without NaN.
+    times_train = estimator.train_schedule(500)
+    assert times_train.shape == (500,)
+    assert torch.all(times_train >= estimator.t_min), "Train times below t_min"
+    assert torch.all(times_train <= estimator.t_max), "Train times above t_max"
+    assert not torch.any(torch.isnan(times_train)), "NaN in train schedule"
+
+    # Test solve schedule returns monotonically decreasing times without NaN.
+    times_solve = estimator.solve_schedule(100)
+    assert times_solve.shape == (100,)
+    assert torch.allclose(times_solve[0], torch.tensor(estimator.t_max)), (
+        "First solve time != t_max"
+    )
+    assert torch.allclose(times_solve[-1], torch.tensor(estimator.t_min)), (
+        "Last solve time != t_min"
+    )
+    assert torch.all(times_solve[:-1] >= times_solve[1:]), (
+        "Solve schedule not monotonically decreasing"
+    )
+    assert not torch.any(torch.isnan(times_solve)), "NaN in solve schedule"
+
+
+def test_ve_lognormal_no_nan_with_extreme_params():
+    """Test that lognormal schedule doesn't produce NaN even with extreme params."""
+    # Use parameters that could cause extreme sigma values.
+    estimator = build_score_matching_estimator(
+        torch.randn(100, 1),
+        torch.randn(100, 1),
+        sde_type="ve",
+        train_schedule="lognormal",
+        lognormal_mean=-3.0,  # Very low mean -> small sigmas
+        lognormal_std=2.0,  # High variance -> some extreme samples
+    )
+
+    # Generate many samples to test edge cases.
+    times = estimator.train_schedule(10000)
+    assert not torch.any(torch.isnan(times)), (
+        "NaN produced with extreme lognormal params"
+    )
+    assert not torch.any(torch.isinf(times)), (
+        "Inf produced with extreme lognormal params"
+    )
+    assert torch.all(times >= estimator.t_min), "Times below t_min"
+    assert torch.all(times <= estimator.t_max), "Times above t_max"

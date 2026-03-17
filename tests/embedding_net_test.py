@@ -4,11 +4,10 @@
 from __future__ import annotations
 
 import math
-import sys
 
 import pytest
 import torch
-from torch import Tensor, eye, ones, zeros
+from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils
@@ -173,6 +172,44 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
         x = x.unsqueeze(1).repeat(
             1, num_channels, *[1 for _ in range(len(input_shape))]
         )
+
+    trainer = NPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior().set_default_x(xo)
+
+    s = posterior.sample((10,))
+    posterior.potential(s)
+
+
+@pytest.mark.parametrize("input_shape", [(2,), (128,)])
+@pytest.mark.parametrize("num_layers", [2, 4])
+@pytest.mark.parametrize("num_hiddens", [32, 64])
+@pytest.mark.parametrize("layer_norm", [True, False])
+@pytest.mark.parametrize("activation", [nn.ReLU, nn.GELU])
+def test_1d_fc_embedding_net(
+    input_shape, num_layers, num_hiddens, layer_norm, activation
+):
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=FCEmbedding(
+            input_shape[0], 20, num_layers, num_hiddens, layer_norm, activation
+        ),
+    )
+
+    num_dim = input_shape[0]
+
+    def simulator1d(theta):
+        return torch.rand_like(theta) + theta
+
+    if len(input_shape) == 1:
+        simulator = simulator1d
+        xo = torch.ones(1, *input_shape)
+
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+
+    num_simulations = 1000
+    theta = prior.sample(torch.Size((num_simulations,)))
+    x = simulator(theta)
 
     trainer = NPE(prior=prior, density_estimator=estimator_provider)
     trainer.append_simulations(theta, x).train(max_num_epochs=2)
@@ -573,23 +610,7 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
     posterior.potential(s)
 
 
-@pytest.mark.parametrize(
-    "mode",
-    [
-        "loop",
-        pytest.param(
-            "scan",
-            marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
-                or sys.version_info >= (3, 13),
-                reason="PyTorch's associative_scan only exists for torch >= 2.5 \
-                    and Python < 3.13",
-                strict=True,
-            ),
-        ),
-    ],
-    ids=["loop", "scan"],
-)
+@pytest.mark.parametrize("mode", ["loop", pytest.param("scan")], ids=["loop", "scan"])
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
@@ -635,10 +656,8 @@ def test_lru_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
-                or sys.version_info >= (3, 13),
-                reason="PyTorch's associative_scan only exists for torch >= 2.5 \
-                    and Python < 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
@@ -697,10 +716,8 @@ def test_lru_block_isolated(
         pytest.param(
             "scan",
             marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
-                or sys.version_info >= (3, 13),
-                reason="PyTorch's associative_scan only exists for torch >= 2.5 \
-                    and Python < 3.13",
+                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+                reason="PyTorch's associative_scan only exists for torch >= 2.5",
                 strict=True,
             ),
         ),
@@ -823,10 +840,8 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
 
 
 @pytest.mark.xfail(
-    condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5)
-    or sys.version_info >= (3, 13),
-    reason="PyTorch's associative_scan only exists for torch >= 2.5 \
-        and Python < 3.13",
+    condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
+    reason="PyTorch's associative_scan only exists for torch >= 2.5",
     strict=True,
 )
 @pytest.mark.filterwarnings("ignore:Torchinductor")

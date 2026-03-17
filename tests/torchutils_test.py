@@ -93,8 +93,13 @@ class TorchUtilsTest(torchtestcase.TorchTestCase):
         right_boundaries = bin_locations[:-1] + 0.1
         mid_points = bin_locations[:-1] + 0.05
 
-        for inputs in [left_boundaries, right_boundaries, mid_points]:
-            with self.subTest(inputs=inputs):
+        test_cases = [
+            ("left_boundaries", left_boundaries),
+            ("right_boundaries", right_boundaries),
+            ("mid_points", mid_points),
+        ]
+        for name, inputs in test_cases:
+            with self.subTest(name=name):
                 idx = torchutils.searchsorted(bin_locations[None, :], inputs)
                 self.assertEqual(idx, torch.arange(0, 9))
 

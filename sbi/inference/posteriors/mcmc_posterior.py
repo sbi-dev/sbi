@@ -140,6 +140,7 @@ class MCMCPosterior(NeuralPosterior):
         self.num_workers = num_workers
         self.mp_context = mp_context
         self._posterior_sampler = None
+
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
         self.x_shape = x_shape
@@ -238,7 +239,8 @@ class MCMCPosterior(NeuralPosterior):
         )
         warn("The log-probability is unnormalized!", stacklevel=2)
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        x = self._x_else_default_x(x)
+        self.potential_fn.set_x(x, x_is_iid=True)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -291,7 +293,8 @@ class MCMCPosterior(NeuralPosterior):
             Samples from posterior.
         """
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        x = self._x_else_default_x(x)
+        self.potential_fn.set_x(x, x_is_iid=True)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method

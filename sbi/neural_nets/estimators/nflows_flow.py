@@ -4,7 +4,7 @@
 from typing import Tuple
 
 import torch
-from pyknos.nflows.flows import Flow
+from nflows.flows import Flow
 from torch import Tensor, nn
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator

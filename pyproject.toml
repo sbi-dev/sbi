@@ -33,16 +33,16 @@ dependencies = [
     "matplotlib",
     "numpy",
     "pillow",
-    "pyknos>=0.16.0",
+    "nflows>=0.14.0",
+    "pymc>=5.0.0",
     "pyro-ppl>=1.3.1",
     "scikit-learn",
     "scipy",
+    "skorch",
     "tensorboard",
-    "torch>=1.13.0, <2.6.0",
+    "torch>=1.13.0",
     "tqdm",
-    "pymc>=5.0.0",
     "zuko>=1.2.0",
-    "ipywidgets>=8.1.7",
 ]
 
 [project.optional-dependencies]
@@ -160,4 +160,14 @@ pythonVersion = "3.10"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
 reportInvalidTypeForm = false
+# We disable the following checks to avoid torch related false positives.
+# This is required since torch > 2.5 due to stricter Module/Tensor type stubs.
+reportArgumentType = false
+reportCallIssue = false
+reportOperatorIssue = false
+reportAttributeAccessIssue = false
+reportOptionalOperand = false
+reportIndexIssue = false
+reportReturnType = false
+reportPrivateImportUsage = false
 typeCheckingMode = "basic"

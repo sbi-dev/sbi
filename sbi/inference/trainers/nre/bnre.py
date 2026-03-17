@@ -6,26 +6,60 @@ from typing import Dict, Optional, Sequence, Union
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers._contracts import LossArgs, LossArgsBNRE
 from sbi.inference.trainers.nre.nre_a import NRE_A
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
 class BNRE(NRE_A):
-    r"""Balanced neural ratio estimation (BNRE) as in Delaunoy et al. (2022) [1].
+    r"""Balanced Neural Ratio Estimation (BNRE) as in Delaunoy et al. (2022) [1].
 
-    BNRE is a variation of NRE aiming to produce more conservative posterior
-    approximations.
+    BNRE is a variation of NRE-A that adds a balancing regularizer to the binary
+    cross-entropy loss. This regularizer encourages the classifier to predict equal
+    probabilities for joint and marginal samples on average, which can lead to more
+    conservative and reliable posterior approximations. BNRE is particularly useful
+    when robustness is prioritized over tightness of the posterior.
 
-    [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
-    Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
-    Estimation.
-    NeurIPS 2022. https://arxiv.org/abs/2208.13624
+    NRE can be run multi-round without need for correction, but requires running
+    potentially expensive posterior sampling in each round.
+
+    [1] Towards Reliable Simulation-Based Inference with Balanced Neural Ratio
+        Estimation, Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G.,
+        NeurIPS 2022. https://arxiv.org/abs/2208.13624
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import BNRE
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train balanced ratio estimator
+        inference = BNRE(prior=prior)
+        # Note: regularization_strength needs to be tuned carefully for your problem
+        ratio_estimator = inference.append_simulations(theta, x).train(
+            regularization_strength=100.0
+        )
+
+        # 3. Build posterior
+        posterior = inference.build_posterior(ratio_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.randn(1, 3)
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(
@@ -34,7 +68,8 @@ class BNRE(NRE_A):
         classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Balanced neural ratio estimation (BNRE).
@@ -53,8 +88,10 @@ class BNRE(NRE_A):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """

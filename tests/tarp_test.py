@@ -13,6 +13,7 @@ from sbi.inference import NPE
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import l1, l2
+from sbi.utils.torchutils import process_device
 
 
 def generate_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
@@ -154,7 +155,7 @@ def test_run_tarp_correct(distance, z_score_theta, accurate_samples):
 def test_run_tarp_correct_on_cuda_device(accurate_samples):
     z_score_theta = True
     distance = l2
-    dev = device("cuda")
+    dev = device(process_device("gpu"))
     theta, samples = accurate_samples
     theta, samples = theta.to(dev), samples.to(dev)
 
@@ -165,7 +166,7 @@ def test_run_tarp_correct_on_cuda_device(accurate_samples):
         # then we can fix the tarp code
         from torch import histogram
 
-        histogram(zeros((3,)).cuda(), bins=4)
+        histogram(zeros((3,)).to(dev), bins=4)
 
     references = get_tarp_references(theta).to(dev)
 

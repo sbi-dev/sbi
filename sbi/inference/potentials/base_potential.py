@@ -9,6 +9,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class BasePotential(metaclass=ABCMeta):
@@ -81,6 +82,25 @@ class BasePotential(metaclass=ABCMeta):
         """
         return self._x_o
 
+    def to(self, device: Union[str, torch.device]) -> "BasePotential":
+        """Move prior and x_o to the given device.
+
+        It also sets the device attribute to the given device.
+
+        Args:
+            device: Device to move the prior and x_o to.
+
+        Returns:
+            Self for method chaining.
+        """
+
+        self.device = device
+        if self.prior is not None:
+            self.prior = move_distribution_to_device(self.prior, device)
+        if self._x_o is not None:
+            self._x_o = self._x_o.to(device)
+        return self
+
 
 class CustomPotential(Protocol):
     """Protocol for custom potential functions."""
@@ -115,21 +135,17 @@ class CustomPotentialWrapper(BasePotential):
 
         self.potential_fn = potential_fn
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move prior and x_o to the given device.
-
-        It also set the device attribute to the given device.
+    def to(self, device: Union[str, torch.device]) -> "CustomPotentialWrapper":
+        """Move prior and x_o to the given device.
 
         Args:
             device: Device to move the prior and x_o to.
+
+        Returns:
+            Self for method chaining.
         """
-        self.device = device
-        if self.prior:
-            self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
-        super().__init__(self.prior, self._x_o, device)
+        super().to(device)
+        return self
 
     def __call__(self, theta, track_gradients: bool = True):
         """Calls the custom potential function on given theta.
