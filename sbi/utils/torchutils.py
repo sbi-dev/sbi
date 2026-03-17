@@ -365,10 +365,10 @@ def get_temperature(max_value: float, bound: float = 1 - 1e-3) -> Tensor:
     Returns:
         Scalar tensor containing the temperature value, capped at 1.
     """
-    max_value = torch.Tensor([max_value])
-    bound = torch.Tensor([bound])
+    max_value_t = torch.Tensor([max_value])
+    bound_t = torch.Tensor([bound])
     temperature = torch.min(
-        -(1 / max_value) * (torch.log1p(-bound) - torch.log(bound)),
+        -(1 / max_value_t) * (torch.log1p(-bound_t) - torch.log(bound_t)),
         torch.ones(1),
     )
     return temperature
