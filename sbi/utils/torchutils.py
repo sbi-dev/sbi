@@ -16,7 +16,6 @@ from typing import (
     Union,
 )
 
-from typing import List
 import numpy as np
 import torch
 from torch import Tensor, float32
@@ -289,11 +288,14 @@ def create_alternating_binary_mask(features: int, even: bool = True) -> Tensor:
 
 
 def create_mid_split_binary_mask(features: int) -> Tensor:
-    """
-    Creates a binary mask of a given dimension which splits its masking at the midpoint.
+    """Creates a binary mask of a given dimension which splits its masking
+    at the midpoint
 
-    :param features: Dimension of mask.
-    :return: Binary mask split at midpoint of type torch.Tensor
+    Args:
+        features: Dimension of mask.
+
+    Returns:
+        Binary mask split at midpoint of type torch.Tensor.
     """
     mask = torch.zeros(features).byte()
     midpoint = features // 2 if features % 2 == 0 else features // 2 + 1
@@ -302,15 +304,14 @@ def create_mid_split_binary_mask(features: int) -> Tensor:
 
 
 def create_random_binary_mask(features: int) -> Tensor:
-    """Creates a binary mask of a given dimension which splits at the midpoint.
-
-    The first half of the mask is set to 1s and the second half to 0s.
+    """Creates a random binary mask of a given dimension with half of its entries
+    randomly set to 1s.
 
     Args:
         features: Dimension of mask.
 
     Returns:
-        Binary mask split at midpoint of type torch.Tensor.
+        Binary mask with half of its entries set to 1s, of type torch.Tensor.
     """
     mask = torch.zeros(features).byte()
     weights = torch.ones(features).float()
