@@ -156,7 +156,10 @@ class NPE_C(PosteriorEstimatorTrainer):
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
         # Load the strategy classes locally to avoid circular imports if any
-        from sbi.inference.trainers.npe.npe_c_loss import AtomicLoss, NonAtomicGaussianLoss
+        from sbi.inference.trainers.npe.npe_c_loss import (
+            AtomicLoss,
+            NonAtomicGaussianLoss,
+        )
 
         if len(self._data_round_index) == 0:
             raise RuntimeError(
@@ -197,7 +200,7 @@ class NPE_C(PosteriorEstimatorTrainer):
             if self.use_non_atomic_loss:
                 # Take care of z-scoring, pre-compute and store prior terms.
                 self._set_state_for_mog_proposal()
-                
+
                 # Instantiate Non-Atomic Strategy
                 if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
                     prec_m_prod_prior = torch.mv(
@@ -219,17 +222,17 @@ class NPE_C(PosteriorEstimatorTrainer):
                     neural_net=self._neural_net,
                     prior=self._prior,
                     num_atoms=self._num_atoms,
-                    use_combined_loss=self._use_combined_loss
+                    use_combined_loss=self._use_combined_loss,
                 )
         else:
-             # Default to Atomic for first round or if not specified (though round > 0 check handles this)
-             # Actually, in the first round (round 0), we don't have a proposal posterior loss usually, 
-             # but if we forced it, we'd default to atomic.
-             self._loss_strategy = AtomicLoss(
+            # Default to Atomic for first round or if not specified
+            # Actually, in the first round (round 0), we don't have a proposal
+            # posterior loss usually, but if we forced it, we'd default to atomic.
+            self._loss_strategy = AtomicLoss(
                 neural_net=self._neural_net,
                 prior=self._prior,
                 num_atoms=self._num_atoms,
-                use_combined_loss=self._use_combined_loss
+                use_combined_loss=self._use_combined_loss,
             )
 
         return super().train(**kwargs)
@@ -318,7 +321,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         # Ensure strategy is initialized (it handles checks internally if needed)
         if hasattr(self, "_loss_strategy"):
              return self._loss_strategy(theta, x, masks, proposal)
-        
+
         # Fallback if somehow called without train setup (unlikely)
         raise RuntimeError("Loss strategy not initialized. Call train() first.")
 

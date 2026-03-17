@@ -2,10 +2,9 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import ABC, abstractmethod
-from typing import Any, Tuple
+from typing import Any
 
 import torch
-from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from torch import Tensor, eye, ones
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -17,7 +16,11 @@ from sbi.utils import (
     repeat_rows,
 )
 from sbi.utils.sbiutils import mog_log_prob
-from sbi.utils.torchutils import assert_all_finite, reshape_to_batch_event, reshape_to_sample_batch_event
+from sbi.utils.torchutils import (
+    assert_all_finite,
+    reshape_to_batch_event,
+    reshape_to_sample_batch_event,
+)
 
 
 class NPELoss(ABC):
@@ -265,12 +268,12 @@ class NonAtomicGaussianLoss(NPELoss):
         precisions_d_rep = precisions_d.repeat(1, num_comps_p, 1, 1)
 
         precisions_pp = precisions_p_rep + precisions_d_rep
-        # Note: self._maybe_z_scored_prior is an instance attribute in the main class logic,
-        # but here we pass it in __init__.
+        # Note: self._maybe_z_scored_prior is an instance attribute in the main class
+        # logic, but here we pass it in __init__.
         # We need to check if it's MultivariateNormal for the subtraction.
         # This was handled in the main class by logic.
         if hasattr(self._maybe_z_scored_prior, "precision_matrix"):
-             precisions_pp -= self._maybe_z_scored_prior.precision_matrix
+            precisions_pp -= self._maybe_z_scored_prior.precision_matrix
 
         covariances_pp = torch.inverse(precisions_pp)
 
@@ -298,9 +301,9 @@ class NonAtomicGaussianLoss(NPELoss):
 
         # Means = C_ij * (P_i * m_i + P_x * m_x - P_o * m_o).
         summed_cov_m_prod_rep = prec_m_prod_p_rep + prec_m_prod_d_rep
-        
+
         if self.prec_m_prod_prior is not None:
-             summed_cov_m_prod_rep -= self.prec_m_prod_prior
+            summed_cov_m_prod_rep -= self.prec_m_prod_prior
 
         means_pp = batched_mixture_mv(covariances_pp, summed_cov_m_prod_rep)
 
