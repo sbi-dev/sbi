@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+from typing import Callable
 
 import pytest
 import torch
@@ -38,8 +39,14 @@ from sbi.utils.user_input_checks import (
 )
 
 
-@pytest.mark.mcmc
-@pytest.mark.parametrize("method", ["NPE", "NLE", "NRE"])
+@pytest.mark.parametrize(
+    "method",
+    [
+        pytest.param("NPE"),
+        pytest.param("NLE", marks=pytest.mark.mcmc),
+        pytest.param("NRE", marks=pytest.mark.mcmc),
+    ],
+)
 @pytest.mark.parametrize("num_dim", [1, 2])
 @pytest.mark.parametrize("embedding_net", ["mlp"])
 def test_embedding_net_api(
@@ -67,7 +74,7 @@ def test_embedding_net_api(
     _test_embedding_forward_pass(embedding, (num_dim,), 20)
 
     posterior_parameters = mcmc_params_fast if method in ("NLE", "NRE") else None
-    _test_helper_embedding_net(
+    _train_and_infer_with_embedding(
         prior,
         x_o,
         simulator,
@@ -161,7 +168,7 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
 
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
     _test_embedding_forward_pass(embedding_net, (num_channels, *input_shape), 20)
-    _test_helper_embedding_net(prior, xo, simulator, embedding_net, "maf", "NPE")
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "maf", "NPE")
 
 
 @pytest.mark.parametrize("input_shape", [(3, 30), (2, 3, 30)])
@@ -194,7 +201,7 @@ def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
     prior = MultivariateNormal(torch.zeros(n_points), torch.eye(n_points))
 
     _test_embedding_forward_pass(embedding_net, input_shape, 2 * modes)
-    _test_helper_embedding_net(prior, xo, simulator, embedding_net, "mdn", "NPE")
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 BASE_CONFIG = {
@@ -249,7 +256,7 @@ def test_transformer_embedding(config, seq_length):
         (seq_length, config["feature_space_dim"]),
         config["feature_space_dim"] // 2,
     )
-    _test_helper_embedding_net(prior, xo, simulator, embedding_net, "mdn", "NPE")
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize(
@@ -288,7 +295,7 @@ def test_transformer_vitembedding(config, img_shape):
         img_shape,
         config["feature_space_dim"] // 2,
     )
-    _test_helper_embedding_net(prior, xo, simulator, embedding_net, "mdn", "NPE")
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize("seq_length", (10, 20))
@@ -313,18 +320,20 @@ def test_transformer_embedding_scalar_timeseries(seq_length):
     prior = MultivariateNormal(torch.zeros(1), torch.eye(1))
 
     _test_embedding_forward_pass(net, (seq_length,), 16)
-    _test_helper_embedding_net(prior, xo, simulator, net, "mdn", "NPE")
+    _train_and_infer_with_embedding(prior, xo, simulator, net, "mdn", "NPE")
 
 
-def _test_helper_embedding_net(
-    prior,
-    xo,
-    simulator,
-    net,
-    model,
-    method,
-    posterior_parameters=None,
+def _train_and_infer_with_embedding(
+    prior: utils.BoxUniform | MultivariateNormal,
+    xo: Tensor,
+    simulator: Callable,
+    net: torch.nn.Module,
+    model: str,
+    method: str,
+    posterior_parameters: MCMCPosteriorParameters | None = None,
 ):
+    """Train a small inference pipeline and smoke test posterior sampling."""
+
     builders = {"NPE": posterior_nn, "NLE": likelihood_nn, "NRE": classifier_nn}
     trainers = {"NPE": NPE, "NLE": NLE, "NRE": NRE}
 
@@ -358,7 +367,9 @@ def _test_helper_embedding_net(
     _ = posterior.potential(s)
 
 
-def _test_embedding_forward_pass(net, input_shape, expected_output_dim):
+def _test_embedding_forward_pass(
+    net: torch.nn.Module, input_shape: tuple, expected_output_dim: int
+):
     """Fast test that embedding produces correct output shape."""
     x = torch.randn(4, *input_shape)
     output = net(x)
@@ -404,7 +415,7 @@ def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
 
     _test_embedding_forward_pass(embedding_net, (num_channels, *input_shape), 20)
-    _test_helper_embedding_net(prior, xo, simulator, embedding_net, "mdn", "NPE")
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.slow
@@ -530,7 +541,7 @@ def test_2d_ResNet_cnn_embedding_net(
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
 
     _test_embedding_forward_pass(embedding_net, (num_channels, *input_shape), 20)
-    _test_helper_embedding_net(prior, xo, simulator, embedding_net, "mdn", "NPE")
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
@@ -558,7 +569,7 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
 
     _test_embedding_forward_pass(embedding_net, input_shape, 20)
-    _test_helper_embedding_net(prior, xo, simulator, embedding_net, "mdn", "NPE")
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize("mode", ["loop", pytest.param("scan")], ids=["loop", "scan"])
