@@ -179,11 +179,8 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
 def test_1d_fc_embedding_net(
     input_shape, num_layers, num_hiddens, layer_norm, activation
 ):
-    estimator_provider = posterior_nn(
-        "mdn",
-        embedding_net=FCEmbedding(
-            input_shape[0], 20, num_layers, num_hiddens, layer_norm, activation
-        ),
+    embedding_net = FCEmbedding(
+        input_shape[0], 20, num_layers, num_hiddens, layer_norm, activation
     )
 
     num_dim = input_shape[0]
@@ -196,17 +193,8 @@ def test_1d_fc_embedding_net(
         xo = torch.ones(1, *input_shape)
 
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
-
-    num_simulations = 1000
-    theta = prior.sample(torch.Size((num_simulations,)))
-    x = simulator(theta)
-
-    trainer = NPE(prior=prior, density_estimator=estimator_provider)
-    trainer.append_simulations(theta, x).train(max_num_epochs=2)
-    posterior = trainer.build_posterior().set_default_x(xo)
-
-    s = posterior.sample((10,))
-    posterior.potential(s)
+    _test_embedding_forward_pass(embedding_net, input_shape, 20)
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize("input_shape", [(3, 30), (2, 3, 30)])
@@ -365,7 +353,7 @@ def _train_and_infer_with_embedding(
     prior: utils.BoxUniform | MultivariateNormal,
     xo: Tensor,
     simulator: Callable,
-    net: torch.nn.Module,
+    net: nn.Module,
     model: str,
     method: str,
     posterior_parameters: MCMCPosteriorParameters | None = None,
@@ -406,7 +394,7 @@ def _train_and_infer_with_embedding(
 
 
 def _test_embedding_forward_pass(
-    net: torch.nn.Module, input_shape: tuple, expected_output_dim: int
+    net: nn.Module, input_shape: tuple, expected_output_dim: int
 ):
     """Fast test that embedding produces correct output shape."""
     x = torch.randn(4, *input_shape)
