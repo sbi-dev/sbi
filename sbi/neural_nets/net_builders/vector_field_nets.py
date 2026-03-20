@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any, Literal, Optional, Sequence, Union
 
 import torch
@@ -16,6 +16,7 @@ from sbi.neural_nets.estimators.score_estimator import (
     VEScoreEstimator,
     VPScoreEstimator,
 )
+from sbi.neural_nets.net_builders.estimator_configs import _EstimatorConfigBase
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
@@ -27,9 +28,10 @@ from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 @dataclass
-class _VectorFieldBaseConfig:
+class _VectorFieldBaseConfig(_EstimatorConfigBase):
     """Shared configuration fields for all vector field estimator builders.
 
+    Inherits ``to_dict()`` from ``_EstimatorConfigBase``.
     Defaults are ``None`` so that only explicitly-set fields are forwarded — the
     actual default values live in the estimator / network constructors.
     """
@@ -64,10 +66,6 @@ class _VectorFieldBaseConfig:
     embedding_net: Optional[Any] = None
     time_emb_type: Optional[str] = None
 
-    def to_dict(self) -> dict:
-        """Return only explicitly-set (non-``None``) fields as a dict."""
-        return {k: v for k, v in asdict(self).items() if v is not None}
-
 
 @dataclass
 class ScoreEstimatorConfig(_VectorFieldBaseConfig):
@@ -91,9 +89,9 @@ class ScoreEstimatorConfig(_VectorFieldBaseConfig):
     beta_min: Optional[float] = None
     beta_max: Optional[float] = None
 
-    # SDE type (forwarded through **kwargs at the factory level)
-    sde_type: Optional[str] = None
-    estimator_type: Optional[str] = None
+    # Note: ``sde_type`` and ``estimator_type`` are intentionally absent.
+    # They are consumed at the factory level (``posterior_score_nn``) before
+    # config construction and are not forwarded through the config.
 
 
 @dataclass
@@ -106,10 +104,7 @@ class FlowEstimatorConfig(_VectorFieldBaseConfig):
     ``sigma_min``, ``beta_min``) are rejected early.
     """
 
-    estimator_type: Optional[str] = None
 
-
-# ==================== Building Flow/Score Matching Estimators =========================
 def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
