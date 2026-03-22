@@ -22,7 +22,6 @@ import pyknos.nflows.transforms as nflows_tf
 import torch
 import torch.distributions.transforms as torch_tf
 import zuko
-from pyro.distributions import Empirical
 from torch import Tensor, ones, zeros
 from torch import nn as nn
 from torch.distributions import (
@@ -879,7 +878,7 @@ def check_transform(
     ), "Original and re-transformed parameters must be close to each other."
 
 
-class ImproperEmpirical(Empirical):
+class ImproperEmpirical(Distribution):
     """
     Wrapper around pyro's `Emprirical` distribution that returns constant `log_prob()`.
 
@@ -893,7 +892,7 @@ class ImproperEmpirical(Empirical):
     """
 
     def __init__(self, values: Tensor, log_weights: Optional[Tensor] = None):
-        super().__init__(values, log_weights=log_weights)
+        super().__init__()
         # Warn if extremely large to inform about memory/serialization cost.
         self._mean = self._compute_mean(values, log_weights)
         self._variance = self._compute_variance(values, log_weights)
@@ -907,7 +906,7 @@ class ImproperEmpirical(Empirical):
 
     def log_prob(self, value: Tensor) -> Tensor:
         """
-        Return ones as a constant log-prob for each input.
+        Return ones as a constant log-prob(zeros) for each input.
 
         Args:
             value: The parameters at which to evaluate the log-probability.
@@ -915,11 +914,7 @@ class ImproperEmpirical(Empirical):
         Returns:
             Tensor of as many ones as there were parameter sets.
         """
-        raise NotImplementedError(
-            "Evaluating log_prob from ImproperEmpirical is not supported. If you are "
-            "using likelihood or ratio estimation, or multi-round inference, you need "
-            "to define a prior distribution."
-        )
+        return torch.zeros(value.shape[:-1], device=value.device, dtype=value.dtype)
 
     def _compute_mean(self, values: Tensor, weights: Optional[Tensor] = None) -> Tensor:
         """
@@ -975,7 +970,7 @@ class ImproperEmpirical(Empirical):
     def stddev(self) -> Tensor:
         return torch.sqrt(self._variance)
 
-    def to(self, device: Union[str, torch.device]) -> None:
+    def to(self, device: Union[str, torch.device]) -> "ImproperEmpirical":
         """
         Move the distribution to a different device.
 
@@ -987,7 +982,7 @@ class ImproperEmpirical(Empirical):
         """
         self._mean = self._mean.to(device)
         self._variance = self._variance.to(device)
-        super().to(device)
+        return self
 
 
 def mog_log_prob(
