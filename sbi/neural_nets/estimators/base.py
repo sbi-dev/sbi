@@ -141,6 +141,63 @@ class ConditionalEstimator(nn.Module, ABC):
                     "provided by input_shape. Please reshape it accordingly."
                 )
 
+    def _broadcast_and_align(
+        self, input: Tensor, condition: Tensor
+    ) -> Tuple[Tensor, Tensor, int]:
+        r"""Ensure input has sample_dim, broadcast batch dims, and expand both.
+
+        Args:
+            input: Inputs of shape `(sample_dim, batch_dim, *input_event_shape)`
+                or `(batch_dim, *input_event_shape)`.
+            condition: Conditions of shape `(batch_dim, *condition_event_shape)`
+                or `(sample_dim, batch_dim, *condition_event_shape)`.
+
+        Returns:
+            input: Expanded to `(sample_dim, batch_dim, *input_event_shape)`.
+            condition: Expanded to `(sample_dim, batch_dim, *condition_event_shape)`.
+            batch_dim: The broadcast batch dimension.
+        """
+        input_event_dims = len(self.input_shape)
+        condition_event_dims = len(self.condition_shape)
+
+        # Add sample_dim=1 if input lacks it.
+        if input.dim() <= input_event_dims + 1:
+            input = input.unsqueeze(0)
+
+        sample_dim = input.shape[0]
+        input_batch_dim = input.shape[1]
+
+        # Detect whether condition has a sample_dim.
+        condition_has_sample_dim = condition.dim() > condition_event_dims + 1
+        if condition_has_sample_dim:
+            condition_batch_dim = condition.shape[1]
+        else:
+            condition_batch_dim = condition.shape[0]
+
+        # Broadcast batch dimensions with an informative error.
+        try:
+            batch_dim = torch.broadcast_shapes(
+                (input_batch_dim,), (condition_batch_dim,)
+            )[0]
+        except RuntimeError as err:
+            raise RuntimeError(
+                f"Batch dimensions of input ({input_batch_dim}) and condition "
+                f"({condition_batch_dim}) are not broadcastable."
+            ) from err
+
+        input = input.expand(sample_dim, batch_dim, *self.input_shape)
+
+        if condition_has_sample_dim:
+            condition = condition.expand(sample_dim, batch_dim, *self.condition_shape)
+        else:
+            condition = (
+                condition.expand(batch_dim, *self.condition_shape)
+                .unsqueeze(0)
+                .expand(sample_dim, batch_dim, *self.condition_shape)
+            )
+
+        return input, condition, batch_dim
+
 
 class ConditionalDensityEstimator(ConditionalEstimator):
     r"""Base class for conditional density estimators.
