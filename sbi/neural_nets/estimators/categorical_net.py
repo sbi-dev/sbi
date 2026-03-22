@@ -279,36 +279,12 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
         Returns:
             Log-probabilities of shape `(sample_dim, batch_dim)`.
         """
-        input_event_dims = len(self.input_shape)
-        condition_event_dims = len(self.condition_shape)
-
-        # Allow input without explicit sample_dim.
-        has_sample_dim = input.dim() > input_event_dims + 1
-        if not has_sample_dim:
-            input = input.unsqueeze(0)
-
-        input_batch_dim = input.shape[1]
-
-        # Allow condition with or without sample_dim.
-        condition_has_sample_dim = condition.dim() > condition_event_dims + 1
-        if condition_has_sample_dim:
-            condition_batch_dim = condition.shape[1]
-        else:
-            condition_batch_dim = condition.shape[0]
-
-        batch_dim = torch.broadcast_shapes((input_batch_dim,), (condition_batch_dim,))[
-            0
-        ]
-        input = input.expand(input.shape[0], batch_dim, *self.input_shape)
-
-        if condition_has_sample_dim:
-            condition = condition.expand(
-                input.shape[0], batch_dim, *self.condition_shape
-            )
-        else:
-            condition = condition.expand(batch_dim, *self.condition_shape)
-
-        return self.net.log_prob(input, condition, **kwargs)
+        input, condition, batch_dim = self._broadcast_and_align(input, condition)
+        sample_dim = input.shape[0]
+        input = input.reshape(sample_dim * batch_dim, *self.input_shape)
+        condition = condition.reshape(sample_dim * batch_dim, *self.condition_shape)
+        log_probs = self.net.log_prob(input, condition, **kwargs)
+        return log_probs.reshape(sample_dim, batch_dim)
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         """Return samples from the conditional categorical distribution.

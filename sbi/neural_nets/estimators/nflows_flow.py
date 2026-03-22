@@ -88,47 +88,13 @@ class NFlowsFlow(ConditionalDensityEstimator):
         Returns:
             Sample-wise log probabilities, shape `(sample_dim, batch_dim)`.
         """
-        input_event_dims = len(self.input_shape)
-        condition_event_dims = len(self.condition_shape)
-
-        # Allow input without explicit sample_dim.
-        has_sample_dim = input.dim() > input_event_dims + 1
-        if not has_sample_dim:
-            input = input.unsqueeze(0)
-
-        input_sample_dim = input.shape[0]
-        input_batch_dim = input.shape[1]
-
-        # Allow condition with or without sample_dim.
-        condition_has_sample_dim = condition.dim() > condition_event_dims + 1
-        if condition_has_sample_dim:
-            condition_batch_dim = condition.shape[1]
-        else:
-            condition_batch_dim = condition.shape[0]
-
-        # Broadcast batch dimensions.
-        batch_dim = torch.broadcast_shapes((input_batch_dim,), (condition_batch_dim,))[
-            0
-        ]
-        input = input.expand(input_sample_dim, batch_dim, *self.input_shape)
-
-        if condition_has_sample_dim:
-            condition = condition.expand(
-                input_sample_dim, batch_dim, *self.condition_shape
-            )
-            condition = condition.reshape(
-                input_sample_dim * batch_dim, *self.condition_shape
-            )
-        else:
-            condition = condition.expand(batch_dim, *self.condition_shape)
-            ones_for_event_dims = (1,) * condition_event_dims
-            condition = condition.repeat(input_sample_dim, *ones_for_event_dims)
-
-        # Nflows needs a single batch dimension for condition and input.
-        input = input.reshape((batch_dim * input_sample_dim, -1))
+        input, condition, batch_dim = self._broadcast_and_align(input, condition)
+        sample_dim = input.shape[0]
+        input = input.reshape(sample_dim * batch_dim, -1)
+        condition = condition.reshape(sample_dim * batch_dim, *self.condition_shape)
 
         log_probs = self.net.log_prob(input, context=condition)
-        return log_probs.reshape((input_sample_dim, batch_dim))
+        return log_probs.reshape(sample_dim, batch_dim)
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the negative log-probability for training the density estimator.
