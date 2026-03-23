@@ -4,12 +4,23 @@
 """Various PyTorch utility functions."""
 
 import os
-from typing import Any, Optional, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    OrderedDict,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import torch
 from torch import Tensor, float32
 from torch.distributions import Independent, Uniform
+from torch.nn import Module
 
 from sbi.sbi_types import Array, OneOrMore
 from sbi.utils.typechecks import is_nonnegative_int, is_positive_int
@@ -104,7 +115,17 @@ def check_if_prior_on_device(
         )
 
 
-def tile(x, n):
+def tile(x: Tensor, n: int) -> Tensor:
+    """Tiles a tensor `x` by repeating it `n` times along a new leading dimension.
+
+    Args:
+        x: Input tensor to tile.
+        n: Number of times to tile the tensor.
+
+    Returns:
+        Tiled tensor.
+    """
+
     if not is_positive_int(n):
         raise TypeError("Argument `n` must be a positive integer.")
     x_ = x.reshape(-1)
@@ -115,23 +136,48 @@ def tile(x, n):
     return x_
 
 
-def sum_except_batch(x, num_batch_dims=1):
-    """Sums all elements of `x` except for the first `num_batch_dims` dimensions."""
+def sum_except_batch(x: Tensor, num_batch_dims: int = 1) -> Tensor:
+    """Sums all elements of `x` except for the first `num_batch_dims` dimensions.
+
+    Args:
+        x: Input tensor.
+        num_batch_dims: Number of batch dimensions to keep. Defaults to 1.
+
+    Returns:
+        Tensor with all non-batch dimensions summed.
+    """
+
     if not is_nonnegative_int(num_batch_dims):
         raise TypeError("Number of batch dimensions must be a non-negative integer.")
     reduce_dims = list(range(num_batch_dims, x.ndimension()))
     return torch.sum(x, dim=reduce_dims)
 
 
-def split_leading_dim(x, shape):
-    """Reshapes the leading dim of `x` to have the given shape."""
+def split_leading_dim(x: Tensor, shape: List[int]) -> Tensor:
+    """Reshapes the leading dim of `x` to have the given shape.
+
+    Args:
+        x: Input tensor.
+        shape: Desired shape for the leading dimension.
+
+    Returns:
+        Tensor with reshaped leading dimension.
+    """
     new_shape = torch.Size(shape) + x.shape[1:]
     return torch.reshape(x, new_shape)
 
 
-def merge_leading_dims(x, num_dims):
-    """Reshapes the tensor `x` such that the first `num_dims` dimensions are merged to
-    one."""
+def merge_leading_dims(x: Tensor, num_dims: int) -> Tensor:
+    """Reshapes the tensor `x` such that the first `num_dims` dimensions are merged
+    to one.
+
+    Args:
+        x: Input tensor.
+        num_dims: Number of leading dimensions to merge.
+
+    Returns:
+        Tensor with first `num_dims` dimensions merged into one.
+    """
     if not is_positive_int(num_dims):
         raise TypeError("Number of leading dims must be a positive integer.")
     if num_dims > x.dim():
@@ -142,8 +188,17 @@ def merge_leading_dims(x, num_dims):
     return torch.reshape(x, new_shape)
 
 
-def repeat_rows(x, num_reps):
-    """Each row of tensor `x` is repeated `num_reps` times along leading dimension."""
+def repeat_rows(x: Tensor, num_reps: int) -> Tensor:
+    """Each row of tensor `x` is repeated `num_reps` times along leading dimension.
+
+    Args:
+        x: Input tensor.
+        num_reps: Number of times to repeat each row.
+
+    Returns:
+        Tensor with each row repeated `num_reps` times.
+    """
+
     if not is_positive_int(num_reps):
         raise TypeError("Number of repetitions must be a positive integer.")
     shape = x.shape
@@ -152,20 +207,46 @@ def repeat_rows(x, num_reps):
     return merge_leading_dims(x, num_dims=2)
 
 
-def tensor2numpy(x):
+def tensor2numpy(x: Tensor) -> np.ndarray:
+    """Converts a PyTorch tensor to a NumPy array.
+
+    Detaches the tensor from the computation graph and moves it to CPU
+    before converting.
+
+    Args:
+        x: Input tensor.
+
+    Returns:
+        NumPy array with the same data as `x`.
+    """
     return x.detach().cpu().numpy()
 
 
-def logabsdet(x):
-    """Returns the log absolute determinant of square matrix x."""
+def logabsdet(x: Tensor) -> Tensor:
+    """Returns the log absolute determinant of square matrix x.
+
+    Args:
+        x: Square matrix tensor.
+
+    Returns:
+        Scalar tensor containing the log absolute determinant.
+    """
     # Note: torch.logdet() only works for positive determinant.
     _, res = torch.slogdet(x)
     return res
 
 
-def random_orthogonal(size):
-    """
-    Returns a random orthogonal matrix as a 2-dim tensor of shape [size, size].
+def random_orthogonal(size: int) -> Tensor:
+    """Returns a random orthogonal matrix as a 2-dim tensor of shape [size, size].
+
+    Uses the QR decomposition of a random Gaussian matrix to generate
+    a uniformly distributed orthogonal matrix.
+
+    Args:
+        size: Dimension of the square orthogonal matrix.
+
+    Returns:
+        Random orthogonal matrix of shape (size, size).
     """
 
     # Use the QR decomposition of a random Gaussian matrix.
@@ -174,11 +255,14 @@ def random_orthogonal(size):
     return q
 
 
-def get_num_parameters(model):
-    """
-    Returns the number of trainable parameters in a model of type nets.Module
-    :param model: nets.Module containing trainable parameters
-    :return: number of trainable parameters in model
+def get_num_parameters(model: Module) -> int:
+    """Returns the number of trainable parameters in a model of type nets.Module.
+
+    Args:
+        model: PyTorch module containing trainable parameters.
+
+    Returns:
+        Total number of trainable parameters.
     """
     num_parameters = 0
     for parameter in model.parameters():
@@ -186,13 +270,16 @@ def get_num_parameters(model):
     return num_parameters
 
 
-def create_alternating_binary_mask(features, even=True):
-    """
-    Creates a binary mask of a given dimension which alternates its masking.
+def create_alternating_binary_mask(features: int, even: bool = True) -> Tensor:
+    """Creates a binary mask of a given dimension which alternates its masking.
 
-    :param features: Dimension of mask.
-    :param even: If True, even values are assigned 1s, odd 0s. If False, vice versa.
-    :return: Alternating binary mask of type torch.Tensor.
+    Args:
+        features: Dimension of mask.
+        even: If True, even indices are assigned 1s and odd indices 0s.
+            If False, vice versa. Defaults to True.
+
+    Returns:
+        Alternating binary mask of type torch.Tensor.
     """
     mask = torch.zeros(features).byte()
     start = 0 if even else 1
@@ -200,12 +287,15 @@ def create_alternating_binary_mask(features, even=True):
     return mask
 
 
-def create_mid_split_binary_mask(features):
-    """
-    Creates a binary mask of a given dimension which splits its masking at the midpoint.
+def create_mid_split_binary_mask(features: int) -> Tensor:
+    """Creates a binary mask of a given dimension which splits its masking
+    at the midpoint
 
-    :param features: Dimension of mask.
-    :return: Binary mask split at midpoint of type torch.Tensor
+    Args:
+        features: Dimension of mask.
+
+    Returns:
+        Binary mask split at midpoint of type torch.Tensor.
     """
     mask = torch.zeros(features).byte()
     midpoint = features // 2 if features % 2 == 0 else features // 2 + 1
@@ -213,13 +303,15 @@ def create_mid_split_binary_mask(features):
     return mask
 
 
-def create_random_binary_mask(features):
-    """
-    Creates a random binary mask of a given dimension with half of its entries
+def create_random_binary_mask(features: int) -> Tensor:
+    """Creates a random binary mask of a given dimension with half of its entries
     randomly set to 1s.
 
-    :param features: Dimension of mask.
-    :return: Binary mask with half of its entries set to 1s, of type torch.Tensor.
+    Args:
+        features: Dimension of mask.
+
+    Returns:
+        Binary mask with half of its entries set to 1s, of type torch.Tensor.
     """
     mask = torch.zeros(features).byte()
     weights = torch.ones(features).float()
@@ -231,37 +323,71 @@ def create_random_binary_mask(features):
     return mask
 
 
-def searchsorted(bin_locations, inputs, eps=1e-6):
+def searchsorted(bin_locations: Tensor, inputs: Tensor, eps: float = 1e-6) -> Tensor:
+    """Finds the indices of the bins to which each input value belongs.
+
+    Args:
+        bin_locations: Tensor of bin edges.
+        inputs: Tensor of values to search for in the bins.
+        eps: Small value added to the last bin edge to ensure correct boundary
+            behavior. Defaults to 1e-6.
+
+    Returns:
+        Tensor of bin indices for each input value.
+    """
+
     bin_locations[..., -1] += eps
     return torch.sum(inputs[..., None] >= bin_locations, dim=-1) - 1
 
 
-def cbrt(x):
-    """Cube root. Equivalent to torch.pow(x, 1/3), but numerically stable."""
+def cbrt(x: Tensor) -> Tensor:
+    """Cube root. Equivalent to torch.pow(x, 1/3), but numerically stable.
+
+    Args:
+        x: Input tensor.
+
+    Returns:
+        Element-wise cube root of `x`.
+    """
     return torch.sign(x) * torch.exp(torch.log(torch.abs(x)) / 3.0)
 
 
-def get_temperature(max_value, bound=1 - 1e-3):
+def get_temperature(max_value: float, bound: float = 1 - 1e-3) -> Tensor:
+    """Returns the temperature such that sigmoid(temperature * max_value) = bound.
+
+    If the computed temperature is greater than 1, returns 1.
+
+    Args:
+        max_value: Maximum value of the dataset.
+        bound: Target value for sigmoid(temperature * max_value).
+            Defaults to 1 - 1e-3.
+
+    Returns:
+        Scalar tensor containing the temperature value, capped at 1.
     """
-    For a dataset with max value 'max_value', returns the temperature such that
-
-        sigmoid(temperature * max_value) = bound.
-
-    If temperature is greater than 1, returns 1.
-
-    :param max_value:
-    :param bound:
-    :return:
-    """
-    max_value = torch.Tensor([max_value])
-    bound = torch.Tensor([bound])
+    max_value_t = torch.Tensor([max_value])
+    bound_t = torch.Tensor([bound])
     temperature = torch.min(
-        -(1 / max_value) * (torch.log1p(-bound) - torch.log(bound)), 1
+        -(1 / max_value_t) * (torch.log1p(-bound_t) - torch.log(bound_t)),
+        torch.ones(1),
     )
     return temperature
 
 
-def gaussian_kde_log_eval(samples, query):
+def gaussian_kde_log_eval(samples: Tensor, query: Tensor) -> Tensor:
+    """Evaluates the log probability of query points under a Gaussian KDE.
+
+    Fits a Gaussian kernel density estimator to `samples` using
+    Silverman's rule of thumb for bandwidth selection, then evaluates
+    the log probability at each point in `query`.
+
+    Args:
+        samples: Tensor of shape (N, D) used to fit the KDE.
+        query: Tensor of shape (..., D) of points to evaluate.
+
+    Returns:
+        Tensor of log probabilities for each query point.
+    """
     N, D = samples.shape[0], samples.shape[-1]
     std = N ** (-1 / (D + 4))
     precision = (1 / (std**2)) * torch.eye(D)
@@ -497,3 +623,93 @@ def assert_not_nan_or_plus_inf(quantity: Tensor, description: str = "tensor") ->
     assert not (torch.isposinf(quantity).any()) and not (torch.isnan(quantity).any()), (
         msg
     )
+
+
+def _base_recursor(
+    obj: object,
+    parent: Optional[object] = None,
+    key: Optional[str] = None,
+    check: Callable[..., bool] = lambda obj: False,
+    action: Callable[..., object] = lambda obj: obj,
+):
+    """Recursive function that traverses objects (e.g. Distributions) and applies
+    an action to any encountered object that passes the check.
+
+    Used e.g. to move all tensors within a distribution to a given device.
+
+    Args:
+        obj: An object which serves as root of the traversal.
+        parent: The previously traversed object.
+        key: The name of the previously traversed object.
+        check: A function that inputs an object and outputs a boolean.
+            If the check evaluates to True, then ``action`` is applied.
+        action: A function that specifies an operation on an object and returns
+            a modified version.
+    """
+    if isinstance(obj, Module) and check(obj):
+        action(obj)
+    elif isinstance(obj, (Dict, OrderedDict)):
+        for k, o in obj.items():
+            if check(o):
+                obj[k] = action(o)
+            else:
+                _base_recursor(o, parent=obj, key=k, check=check, action=action)
+    elif isinstance(obj, type):
+        # Skip class/type objects to avoid modifying immutable C extension types
+        # (e.g. torch.LongTensor) which fail on Python 3.13+.
+        return
+    elif hasattr(obj, "__dict__"):
+        for k, o in obj.__dict__.items():
+            if check(o):
+                setattr(obj, k, action(o))
+            else:
+                _base_recursor(o, parent=obj, key=k, check=check, action=action)
+    elif isinstance(obj, (List, Tuple, Generator)):
+        new_obj = []
+        for o in obj:
+            if check(o):
+                new_obj.append(action(o))
+            else:
+                _base_recursor(o, check=check, action=action)
+                new_obj.append(o)
+        if parent is not None and key is not None:
+            setattr(parent, key, type(obj)(new_obj))  # type: ignore
+    else:
+        return
+
+
+def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> None:
+    """Recursively move all tensors and modules within an object to a device.
+
+    Traverses the object's attributes, dictionaries, lists, and tuples,
+    moving any encountered ``Tensor`` or ``Module`` to the specified device.
+
+    Note:
+        Leaf tensors with ``requires_grad=True`` cannot be moved in-place.
+        A ``ValueError`` is raised if such a tensor is on the wrong device.
+
+    Args:
+        obj: The root object to traverse.
+        device: The target device.
+    """
+
+    def check(o: object) -> bool:
+        return isinstance(o, (Tensor, Module))
+
+    def action(o: object) -> object:
+        if isinstance(o, Tensor) and o.requires_grad and o.is_leaf:
+            # Moving leaf tensors inplace is hard. Cant call .to as this would create a
+            # copy and thus results in non-leaf tensors.
+            if str(o.device) != str(device):
+                raise ValueError(
+                    f"Cannot move leaf tensor with requires_grad=True from "
+                    f"{o.device} to {device}. Please initialize it on the "
+                    f"correct device."
+                )
+            else:
+                return o
+        else:
+            return o.to(device)  # type: ignore
+
+    with torch.no_grad():
+        _base_recursor(obj, check=check, action=action)

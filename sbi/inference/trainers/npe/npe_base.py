@@ -39,7 +39,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
@@ -48,7 +48,7 @@ from sbi.utils import (
     npe_msg_on_invalid_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
-    warn_if_zscoring_changes_data,
+    warn_if_invalid_for_zscoring,
 )
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
@@ -68,6 +68,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
@@ -94,6 +95,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
         )
 
@@ -191,7 +193,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         theta = theta[is_valid_x]
 
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
+        warn_if_invalid_for_zscoring(x)
         if (
             type(self).__name__ == "SNPE_C"
             and current_round > 0
@@ -289,6 +291,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
+
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
 
         train_config = TrainConfig(
             max_num_epochs=max_num_epochs,
@@ -559,7 +567,19 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         """
         if proposal is not None:
             check_if_proposal_has_default_x(proposal)
-
+            if (
+                isinstance(proposal, NeuralPosterior)
+                and hasattr(proposal, "posterior_estimator")
+                and self._neural_net is not None
+                and proposal.posterior_estimator is self._neural_net  # type: ignore
+            ):
+                raise ValueError(
+                    "The proposal's posterior_estimator is the same object as the "
+                    "trainer's neural network. This will cause incorrect training "
+                    "because the proposal's weights will change during optimization. "
+                    "Use `deepcopy(estimator)` when creating the proposal, or use "
+                    "`trainer.build_posterior()` which handles this automatically."
+                )
             if isinstance(proposal, RestrictedPrior):
                 if proposal._prior is not self._prior:
                     warnings.warn(

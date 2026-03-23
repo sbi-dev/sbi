@@ -4,6 +4,7 @@
 from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -15,20 +16,49 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 
 
 class MNLE(LikelihoodEstimatorTrainer):
-    """Method that can infer parameters given discrete and continuous data (Mixed NLE).
+    r"""Mixed Neural Likelihood Estimation for discrete and continuous data [1].
 
-    Like NLE, but designed to be applied to data with mixed types, e.g., continuous
-    data and discrete data like they occur in decision-making experiments
-    (reation times and choices).
+    MNLE extends NLE to handle data with mixed types, such as continuous reaction
+    times and discrete choices in decision-making experiments. It trains a neural
+    network to approximate the likelihood $p(x|\theta)$ where $x$ contains both
+    discrete and continuous components.
 
-    Flexible and efficient simulation-based inference for models of
-    decision-making, Boelts et al. 2021,
-    https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
+    [1] Flexible and efficient simulation-based inference for models of
+        decision-making, Boelts et al., eLife 2022,
+        https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import MNLE
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate mixed-type data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        # First 5 dims continuous, last 3 dims discrete
+        x_continuous = torch.randn(100, 5)
+        x_discrete = torch.randint(0, 3, (100, 3))
+        x = torch.cat([x_continuous, x_discrete.float()], dim=1)
+
+        # 2. Train likelihood estimator
+        inference = MNLE(prior=prior)
+        likelihood_estimator = inference.append_simulations(theta, x).train()
+
+        # 3. Build posterior
+        posterior = inference.build_posterior(likelihood_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.cat([torch.randn(1, 5), torch.tensor([[1., 0., 2.]])], dim=1)
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(
@@ -40,7 +70,8 @@ class MNLE(LikelihoodEstimatorTrainer):
         ] = "mnle",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize MNLE.
@@ -60,8 +91,10 @@ class MNLE(LikelihoodEstimatorTrainer):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """

@@ -2,7 +2,8 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from typing import Literal, Optional, Sequence, Union
+from dataclasses import dataclass
+from typing import Any, Literal, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
@@ -15,6 +16,7 @@ from sbi.neural_nets.estimators.score_estimator import (
     VEScoreEstimator,
     VPScoreEstimator,
 )
+from sbi.neural_nets.net_builders.estimator_configs import _EstimatorConfigBase
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
@@ -25,7 +27,84 @@ from sbi.utils.user_input_checks import check_data_device
 from sbi.utils.vector_field_utils import VectorFieldNet
 
 
-# ==================== Building Flow/Score Matching Estimators =========================
+@dataclass
+class _VectorFieldBaseConfig(_EstimatorConfigBase):
+    """Shared configuration fields for all vector field estimator builders.
+
+    Inherits ``to_dict()`` from ``_EstimatorConfigBase``.
+    Defaults are ``None`` so that only explicitly-set fields are forwarded — the
+    actual default values live in the estimator / network constructors.
+    """
+
+    # Network architecture extras (shared)
+    activation: Optional[Any] = None
+    sinusoidal_max_freq: Optional[float] = None
+    fourier_scale: Optional[float] = None
+
+    # MLP-specific
+    layer_norm: Optional[bool] = None
+    skip_connections: Optional[bool] = None
+
+    # AdaMLP-specific
+    condition_emb_dim: Optional[int] = None
+    num_intermediate_mlp_layers: Optional[int] = None
+    adamlp_ratio: Optional[int] = None
+
+    # Transformer-specific
+    is_x_emb_seq: Optional[bool] = None
+
+    # Params that are explicit in build_vector_field_estimator but may be
+    # passed through **kwargs at the factory level
+    net: Optional[Any] = None
+    z_score_x: Optional[Any] = None
+    z_score_y: Optional[Any] = None
+    hidden_features: Optional[Any] = None
+    num_layers: Optional[int] = None
+    time_embedding_dim: Optional[int] = None
+    num_heads: Optional[int] = None
+    mlp_ratio: Optional[int] = None
+    embedding_net: Optional[Any] = None
+    time_emb_type: Optional[str] = None
+
+
+@dataclass
+class ScoreEstimatorConfig(_VectorFieldBaseConfig):
+    """Configuration for score-matching estimator builders (NPSE).
+
+    Extends the base config with SDE-specific parameters for VE, VP, and SubVP
+    noise schedules.  Constructing an instance from user-supplied ``**kwargs``
+    ensures that typos and unknown parameters raise ``TypeError`` immediately.
+    """
+
+    # VE schedule params (Karras et al. 2022)
+    train_schedule: Optional[Literal["uniform", "lognormal"]] = None
+    solve_schedule: Optional[Literal["uniform", "power_law"]] = None
+    sigma_min: Optional[float] = None
+    sigma_max: Optional[float] = None
+    lognormal_mean: Optional[float] = None
+    lognormal_std: Optional[float] = None
+    power_law_exponent: Optional[float] = None
+
+    # VP / SubVP params
+    beta_min: Optional[float] = None
+    beta_max: Optional[float] = None
+
+    # Note: ``sde_type`` and ``estimator_type`` are intentionally absent.
+    # They are consumed at the factory level (``posterior_score_nn``) before
+    # config construction and are not forwarded through the config.
+
+
+@dataclass
+class FlowEstimatorConfig(_VectorFieldBaseConfig):
+    """Configuration for flow-matching estimator builders (FMPE).
+
+    Currently identical to the base config.  Constructing an instance from
+    user-supplied ``**kwargs`` ensures that typos and unknown parameters raise
+    ``TypeError`` immediately — and that score-only parameters (e.g.
+    ``sigma_min``, ``beta_min``) are rejected early.
+    """
+
+
 def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
@@ -65,7 +144,10 @@ def build_vector_field_estimator(
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
             "transformer_cross_attention" or a custom network following the
             VectorFieldNet protocol.
-        **kwargs: Additional arguments for the network.
+        **kwargs: Additional arguments forwarded to the estimator and network
+            constructors.  Valid keys are defined by ``ScoreEstimatorConfig``
+            and ``FlowEstimatorConfig``; validation happens in the upstream
+            factory functions (``posterior_score_nn`` / ``posterior_flow_nn``).
 
     Returns:
         A vector field estimator (either FlowMatchingEstimator or
@@ -161,6 +243,25 @@ def build_vector_field_estimator(
         else:
             raise ValueError(f"Unknown SDE type: {sde_type}")
 
+        # Extract estimator-specific kwargs based on SDE type
+        estimator_kwargs = {}
+        if sde_type == "ve":
+            # VE-specific parameters: sigma bounds and EDM-style schedules
+            ve_keys = [
+                "sigma_min",
+                "sigma_max",
+                "train_schedule",
+                "solve_schedule",
+                "lognormal_mean",
+                "lognormal_std",
+                "power_law_exponent",
+            ]
+            estimator_kwargs = {k: kwargs[k] for k in ve_keys if k in kwargs}
+        elif sde_type in ("vp", "subvp"):
+            # VP/SubVP-specific beta parameters
+            vp_keys = ["beta_min", "beta_max"]
+            estimator_kwargs = {k: kwargs[k] for k in vp_keys if k in kwargs}
+
         return estimator_cls(
             net=vectorfield_net,
             input_shape=batch_x[0].shape,
@@ -168,6 +269,7 @@ def build_vector_field_estimator(
             embedding_net=embedding_net_y,
             mean_0=mean_0,
             std_0=std_0,
+            **estimator_kwargs,
         )
     else:
         raise ValueError(f"Unknown estimator type: {estimator_type}")

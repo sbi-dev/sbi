@@ -20,6 +20,7 @@ from sbi.analysis.plot import (
     sbc_rank_plot,
 )
 from sbi.analysis.plotting_classes import (
+    BarDiagOptions,
     ContourOffDiagOptions,
     FigOptions,
     HistDiagOptions,
