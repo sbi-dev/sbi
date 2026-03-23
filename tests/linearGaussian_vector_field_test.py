@@ -268,9 +268,9 @@ def test_fmpe_time_dependent_z_scoring_integration(vector_field_type):
     x = simulator(theta)
     density_estimator = inference.append_simulations(theta, x).train(max_num_epochs=1)
 
-    assert hasattr(density_estimator, "mean_1")
-    assert hasattr(density_estimator, "std_1")
-    assert torch.all(density_estimator.mean_1 > 8.0)
+    assert hasattr(density_estimator, "mean_0")
+    assert hasattr(density_estimator, "std_0")
+    assert torch.all(density_estimator.mean_0 > 8.0)
 
     batch_size = 10
     t = torch.rand(batch_size)
@@ -894,8 +894,8 @@ def test_fmpe_untrained_gaussian_baseline_samples_prior():
         net=ZeroNet(),
         input_shape=torch.Size([num_dim]),
         condition_shape=torch.Size([num_dim]),
-        mean_1=theta_mean,
-        std_1=theta_std,
+        mean_0=theta_mean,
+        std_0=theta_std,
         gaussian_baseline=True,
     )
 

@@ -21,6 +21,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     learned by matching the flow between the base and target distributions. The vector
     field represents the instantaneous change in the distribution at time t.
 
+    Note: Time convention and integration direction
+        - t=0 is data (θ_data ~ posterior), t=1 is noise (θ_noise ~ N(0, 1)).
+        - Training interpolates θ_t = (1 - t) * θ_data + t * θ_noise.
+        - The ODE integrates from t=1 → t=0 to generate samples.
+        - ``mean_0`` and ``std_0`` are statistics of the data distribution (at t=0).
+
     References
     ----------
     .. [1] Liu, X., Gong, C., & Liu, Q. (2023).
@@ -56,8 +62,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         noise_scale: float = 1e-3,
-        mean_1: float = 0.0,
-        std_1: float = 1.0,
+        mean_0: float = 0.0,
+        std_0: float = 1.0,
         gaussian_baseline: bool = False,
         **kwargs,
     ) -> None:
@@ -70,8 +76,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             embedding_net: Embedding network for the condition.
             noise_scale: Scale of the noise added to the vector field
                 (:math:`\sigma_{min}` in [2]_).
-            mean_1: Mean of the data distribution (used for time-dependent z-scoring).
-            std_1: Std of the data distribution (used for time-dependent z-scoring).
+            mean_0: Mean of the data distribution at t=0 (used for time-dependent
+                z-scoring). Convention: t=0 is data, t=1 is noise.
+            std_0: Std of the data distribution at t=0 (used for time-dependent
+                z-scoring).
             gaussian_baseline: If True, use analytical Gaussian baseline velocity
                 derived from Bayes' rule: v = factor * (x - μ_true) - mean.
                 The network then only learns the residual. Default: False.
@@ -95,11 +103,11 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         self.noise_scale = noise_scale
         self.gaussian_baseline = gaussian_baseline
 
-        # Register z-scoring parameters as buffers
-        mean_1_tensor = torch.as_tensor(mean_1).expand(input_shape).clone()
-        std_1_tensor = torch.as_tensor(std_1).expand(input_shape).clone()
-        self.register_buffer("mean_1", mean_1_tensor)
-        self.register_buffer("std_1", std_1_tensor)
+        # Register data distribution stats as buffers (t=0 = data, t=1 = noise).
+        mean_0_tensor = torch.as_tensor(mean_0).expand(input_shape).clone()
+        std_0_tensor = torch.as_tensor(std_0).expand(input_shape).clone()
+        self.register_buffer("mean_0", mean_0_tensor)
+        self.register_buffer("std_0", std_0_tensor)
 
     def _get_time_dependent_stats(self, time: Tensor) -> Tuple[Tensor, Tensor]:
         """Compute time-dependent mean and std for z-scoring.
@@ -122,8 +130,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             std_t: Time-dependent std for z-scoring, shape (batch, *input_shape)
         """
         t = time.view(-1, *([1] * len(self.input_shape)))
-        mean = self.mean_1.view(1, *self.input_shape)
-        std = self.std_1.view(1, *self.input_shape)
+        mean = self.mean_0.view(1, *self.input_shape)
+        std = self.std_0.view(1, *self.input_shape)
 
         mu_t = (1 - t) * mean
         var_t = ((1 - t) * std) ** 2 + t**2 + 1e-6
@@ -141,8 +149,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             v_mean: Mean of velocity, shape (1, *input_shape)
             v_std: Std of velocity, shape (1, *input_shape)
         """
-        mean = self.mean_1.view(1, *self.input_shape)
-        std = self.std_1.view(1, *self.input_shape)
+        mean = self.mean_0.view(1, *self.input_shape)
+        std = self.std_0.view(1, *self.input_shape)
         v_mean = -mean
         v_std = torch.sqrt(1 + std**2)
         return v_mean, v_std
@@ -172,8 +180,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         """
         t = time.view(-1, *([1] * len(self.input_shape)))
         one_minus_t = 1 - t
-        mean = self.mean_1.view(1, *self.input_shape)
-        std = self.std_1.view(1, *self.input_shape)
+        mean = self.mean_0.view(1, *self.input_shape)
+        std = self.std_0.view(1, *self.input_shape)
 
         # True marginal statistics (not z-scoring stats!)
         mu_true = one_minus_t * mean

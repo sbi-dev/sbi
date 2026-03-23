@@ -485,7 +485,7 @@ def posterior_flow_nn(
         z_score_y=z_score_x,
         hidden_features=hidden_features,
         num_layers=num_layers,
-        embedding_net=embedding_net,
+        embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
         time_embedding_dim=t_embedding_dim,
         time_emb_type=time_emb_type,
         net=model,
