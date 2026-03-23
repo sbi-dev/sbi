@@ -181,8 +181,9 @@ class ConditionalEstimator(nn.Module, ABC):
             )[0]
         except RuntimeError as err:
             raise RuntimeError(
-                f"Batch dimensions of input ({input_batch_dim}) and condition "
-                f"({condition_batch_dim}) are not broadcastable."
+                "Expected `input` and `condition` to have broadcastable batch dimensions: "
+                "their batch sizes must match, or one of them must be 1. "
+                f"Got input={input_batch_dim} and condition={condition_batch_dim}."
             ) from err
 
         input = input.expand(sample_dim, batch_dim, *self.input_shape)
