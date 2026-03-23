@@ -2176,7 +2176,7 @@ defined by <code>ScoreEstimatorConfig</code>; unknown keys raise
 
 
 <h2 id="sbi.neural_nets.factory.posterior_flow_nn" class="doc doc-heading">
-            <code class=" language-python"><span class="n">posterior_flow_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">z_score_theta</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">num_layers</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">time_emb_type</span><span class="o">=</span><span class="s1">&#39;sinusoidal&#39;</span><span class="p">,</span> <span class="n">t_embedding_dim</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+            <code class=" language-python"><span class="n">posterior_flow_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">&#39;mlp&#39;</span><span class="p">,</span> <span class="n">z_score_theta</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="s1">&#39;independent&#39;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">num_layers</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">time_emb_type</span><span class="o">=</span><span class="s1">&#39;sinusoidal&#39;</span><span class="p">,</span> <span class="n">t_embedding_dim</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">gaussian_baseline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
 <a href="#sbi.neural_nets.factory.posterior_flow_nn" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -2230,11 +2230,13 @@ Defaults to &lsquo;mlp&rsquo;.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>This is not supported for FMPE and will raise an error.</p>
+                <p>Whether to z-score theta for time-dependent normalization.
+This enables time-dependent z-scoring which helps FMPE learn when
+theta is far from N(0,1). Defaults to &lsquo;independent&rsquo;.</p>
               </div>
             </td>
             <td>
-                  <code>None</code>
+                  <code>&#39;independent&#39;</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -2246,8 +2248,8 @@ Defaults to &lsquo;mlp&rsquo;.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Whether to z-score xs passing into the network, same options as
-z_score_theta.</p>
+                <p>Whether to z-score observations (x) before passing to the
+embedding network. Defaults to &lsquo;independent&rsquo;.</p>
               </div>
             </td>
             <td>
@@ -2333,6 +2335,24 @@ nn.Identity().</p>
             </td>
             <td>
                   <code>32</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>gaussian_baseline</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If True, use analytical Gaussian baseline velocity
+derived from Bayes&rsquo; rule. The network then only learns the residual.
+Defaults to False.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -2466,7 +2486,7 @@ defined by <code>FlowEstimatorConfig</code>; unknown keys raise
     <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mlp&quot;</span><span class="p">,</span>
     <span class="n">z_score_theta</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;independent&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">,</span> <span class="s2">&quot;transform_to_unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
-    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;independent&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">,</span> <span class="s2">&quot;transform_to_unconstrained&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
     <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;independent&quot;</span><span class="p">,</span>
@@ -2475,6 +2495,7 @@ defined by <code>FlowEstimatorConfig</code>; unknown keys raise
     <span class="n">embedding_net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
     <span class="n">time_emb_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;sinusoidal&quot;</span><span class="p">,</span> <span class="s2">&quot;fourier&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;sinusoidal&quot;</span><span class="p">,</span>
     <span class="n">t_embedding_dim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
+    <span class="n">gaussian_baseline</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Build util function that builds a FlowMatchingEstimator object for flow-based</span>
@@ -2489,15 +2510,20 @@ defined by <code>FlowEstimatorConfig</code>; unknown keys raise
 <span class="sd">            - &#39;transformer_cross_attention&#39;: Transformer with cross-attention.</span>
 <span class="sd">            -  nn.Module: Custom network</span>
 <span class="sd">            Defaults to &#39;mlp&#39;.</span>
-<span class="sd">        z_score_theta: This is not supported for FMPE and will raise an error.</span>
-<span class="sd">        z_score_x: Whether to z-score xs passing into the network, same options as</span>
-<span class="sd">            z_score_theta.</span>
+<span class="sd">        z_score_theta: Whether to z-score theta for time-dependent normalization.</span>
+<span class="sd">            This enables time-dependent z-scoring which helps FMPE learn when</span>
+<span class="sd">            theta is far from N(0,1). Defaults to &#39;independent&#39;.</span>
+<span class="sd">        z_score_x: Whether to z-score observations (x) before passing to the</span>
+<span class="sd">            embedding network. Defaults to &#39;independent&#39;.</span>
 <span class="sd">        hidden_features: Number of hidden units per layer. Defaults to 100.</span>
 <span class="sd">        num_layers: Number of hidden layers. Defaults to 5.</span>
 <span class="sd">        embedding_net: Embedding network for x (conditioning variable). Defaults to</span>
 <span class="sd">            nn.Identity().</span>
 <span class="sd">        time_emb_type: Type of time embedding. Defaults to &#39;sinusoidal&#39;.</span>
 <span class="sd">        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.</span>
+<span class="sd">        gaussian_baseline: If True, use analytical Gaussian baseline velocity</span>
+<span class="sd">            derived from Bayes&#39; rule. The network then only learns the residual.</span>
+<span class="sd">            Defaults to False.</span>
 <span class="sd">        **kwargs: Additional estimator / network arguments.  Valid keys are</span>
 <span class="sd">            defined by ``FlowEstimatorConfig``; unknown keys raise</span>
 <span class="sd">            ``TypeError``.</span>
@@ -2505,23 +2531,17 @@ defined by <code>FlowEstimatorConfig</code>; unknown keys raise
 <span class="sd">    Returns:</span>
 <span class="sd">        Constructor function for FMPE.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">z_score_theta</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;z_score_theta is not supported for FMPE. For simulator &quot;</span>
-            <span class="s2">&quot;parameters with highly different scales, we recommend &quot;</span>
-            <span class="s2">&quot;z-scoring the inputs manually beforehand.&quot;</span>
-        <span class="p">)</span>
-
     <span class="c1"># Map user-facing parameter names to internal names.</span>
     <span class="n">mapped</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
-        <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
-        <span class="n">z_score_y</span><span class="o">=</span><span class="n">z_score_theta</span><span class="p">,</span>
+        <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_theta</span><span class="p">,</span>
+        <span class="n">z_score_y</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
         <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
         <span class="n">num_layers</span><span class="o">=</span><span class="n">num_layers</span><span class="p">,</span>
         <span class="n">embedding_net</span><span class="o">=</span><span class="n">check_net_device</span><span class="p">(</span><span class="n">embedding_net</span><span class="p">,</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="n">embedding_net_warn_msg</span><span class="p">),</span>
         <span class="n">time_embedding_dim</span><span class="o">=</span><span class="n">t_embedding_dim</span><span class="p">,</span>
         <span class="n">time_emb_type</span><span class="o">=</span><span class="n">time_emb_type</span><span class="p">,</span>
         <span class="n">net</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+        <span class="n">gaussian_baseline</span><span class="o">=</span><span class="n">gaussian_baseline</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="c1"># Validate against known fields — warns on unknown kwargs (typos)</span>
