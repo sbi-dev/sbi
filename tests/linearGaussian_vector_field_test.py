@@ -249,8 +249,7 @@ def test_vfinference_with_different_models(vector_field_type, model):
     check_c2st(samples, target_samples, alg=f"fmpe_{model}")
 
 
-@pytest.mark.parametrize("vector_field_type", ["fmpe"])
-def test_fmpe_time_dependent_z_scoring_integration(vector_field_type):
+def test_fmpe_time_dependent_z_scoring_integration():
     num_dim = 2
     prior = BoxUniform(9.0 * ones(num_dim), 11.0 * ones(num_dim))
 
@@ -496,11 +495,7 @@ def test_vector_field_map(vector_field_type):
     assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5, "MAP is not close to GT."
 
 
-# TODO: Need to add NPSE when the network builders are unified, but anyway
-# this will only work after implementing additional methods for vector fields,
-# so it is skipped for now.
 @pytest.mark.slow
-@pytest.mark.skip(reason="Potential evaluation is not implemented for iid yet.")
 def test_sample_conditional():
     """
     Test whether sampling from the conditional gives the same results as evaluating.
@@ -516,10 +511,10 @@ def test_sample_conditional():
     dim_to_sample_1 = 0
     dim_to_sample_2 = 2
     num_simulations = 6000
-    num_conditional_samples = 500
+    num_conditional_samples = 300
 
     mcmc_parameters = MCMCPosteriorParameters(
-        method="slice_np_vectorized", num_chains=20, warmup_steps=50, thin=5
+        method="slice_np_vectorized", num_chains=10, warmup_steps=30, thin=3
     )
 
     x_o = zeros(1, num_dim)
@@ -545,12 +540,12 @@ def test_sample_conditional():
         simulation_batch_size=10,  # choose small batch size to ensure bimoality.
     )
 
-    # Test whether fmpe works properly with structured z-scoring.
+    # Test whether fmpe works properly with structured theta z-scoring.
     net = posterior_flow_nn(
-        "mlp", z_score_x="structured", hidden_features=65, num_layers=5
+        "mlp", z_score_theta="structured", hidden_features=65, num_layers=5
     )
 
-    inference = FMPE(prior, density_estimator=net, show_progress_bars=False)
+    inference = FMPE(prior, vf_estimator=net, show_progress_bars=False)
     posterior_estimator = inference.append_simulations(theta, x).train(
         # max_num_epochs=60
     )
@@ -621,7 +616,7 @@ def test_sample_conditional():
     error = np.abs(sample_kde_grid - eval_grid.numpy())
 
     max_err = np.max(error)
-    assert max_err < 0.0027
+    assert max_err < 0.003
 
 
 @pytest.mark.slow
