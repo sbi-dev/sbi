@@ -80,34 +80,21 @@ class NFlowsFlow(ConditionalDensityEstimator):
 
         Args:
             input: Inputs to evaluate the log probability on. Of shape
+                `(sample_dim, batch_dim, *event_shape)` or
+                `(batch_dim, *event_shape)`.
+            condition: Conditions of shape `(batch_dim, *event_shape)` or
                 `(sample_dim, batch_dim, *event_shape)`.
-            condition: Conditions of shape `(batch_dim, *event_shape)`.
-
-        Raises:
-            AssertionError: If `input_batch_dim != condition_batch_dim`.
 
         Returns:
-            Sample-wise log probabilities, shape `(input_sample_dim, input_batch_dim)`.
+            Sample-wise log probabilities, shape `(sample_dim, batch_dim)`.
         """
-        input_sample_dim = input.shape[0]
-        input_batch_dim = input.shape[1]
-        condition_batch_dim = condition.shape[0]
-        condition_event_dims = len(condition.shape[1:])
-
-        assert condition_batch_dim == input_batch_dim, (
-            f"Batch shape of condition {condition_batch_dim} and input "
-            f"{input_batch_dim} do not match."
-        )
-
-        # Nflows needs to have a single batch dimension for condition and input.
-        input = input.reshape((input_batch_dim * input_sample_dim, -1))
-
-        # Repeat the condition to match `input_batch_dim * input_sample_dim`.
-        ones_for_event_dims = (1,) * condition_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
-        condition = condition.repeat(input_sample_dim, *ones_for_event_dims)
+        input, condition, batch_dim = self._broadcast_and_align(input, condition)
+        sample_dim = input.shape[0]
+        input = input.reshape(sample_dim * batch_dim, -1)
+        condition = condition.reshape(sample_dim * batch_dim, *self.condition_shape)
 
         log_probs = self.net.log_prob(input, context=condition)
-        return log_probs.reshape((input_sample_dim, input_batch_dim))
+        return log_probs.reshape(sample_dim, batch_dim)
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the negative log-probability for training the density estimator.
