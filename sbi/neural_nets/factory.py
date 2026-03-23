@@ -11,6 +11,11 @@ from sbi.neural_nets.net_builders.classifier import (
     build_mlp_classifier,
     build_resnet_classifier,
 )
+from sbi.neural_nets.net_builders.estimator_configs import (
+    ClassifierConfig,
+    ConditionalFlowConfig,
+    MarginalFlowConfig,
+)
 from sbi.neural_nets.net_builders.flow import (
     build_made,
     build_maf,
@@ -115,40 +120,41 @@ def classifier_nn(
         embedding_net_x:  Optional embedding network for simulation outputs $x$. This
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
-        kwargs: additional custom arguments passed to downstream build functions.
+        **kwargs: Additional classifier arguments.  Valid keys are defined by
+            ``ClassifierConfig``; unknown keys trigger a warning and are forwarded to
+            the builder.
     """
 
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "z_score_y",
-                "hidden_features",
-                "embedding_net_x",
-                "embedding_net_y",
-            ),
-            (
-                z_score_theta,
-                z_score_x,
-                hidden_features,
-                check_net_device(embedding_net_theta, "cpu", embedding_net_warn_msg),
-                check_net_device(embedding_net_x, "cpu", embedding_net_warn_msg),
-            ),
-            strict=False,
+    # Map user-facing parameter names to internal names.
+    mapped = dict(
+        z_score_x=z_score_theta,
+        z_score_y=z_score_x,
+        hidden_features=hidden_features,
+        embedding_net_x=check_net_device(
+            embedding_net_theta, "cpu", embedding_net_warn_msg
         ),
-        **kwargs,
+        embedding_net_y=check_net_device(
+            embedding_net_x, "cpu", embedding_net_warn_msg
+        ),
     )
+
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # # while still forwarding them to the underlying builder.
+    config = ClassifierConfig.from_kwargs(**mapped, **kwargs)
+    builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
         if model == "linear":
             return build_linear_classifier(
-                batch_x=batch_theta, batch_y=batch_x, **kwargs
+                batch_x=batch_theta, batch_y=batch_x, **builder_kwargs
             )
         if model == "mlp":
-            return build_mlp_classifier(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            return build_mlp_classifier(
+                batch_x=batch_theta, batch_y=batch_x, **builder_kwargs
+            )
         if model == "resnet":
             return build_resnet_classifier(
-                batch_x=batch_theta, batch_y=batch_x, **kwargs
+                batch_x=batch_theta, batch_y=batch_x, **builder_kwargs
             )
         else:
             raise NotImplementedError
@@ -198,39 +204,34 @@ def likelihood_nn(
         embedding_net: Optional embedding network for parameters $\theta$.
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
-        kwargs: additional custom arguments passed to downstream build functions.
+        **kwargs: Additional estimator arguments.  Valid keys are defined by
+            ``ConditionalFlowConfig``; unknown keys trigger a warning
+            and are forwarded to the builder.
     """
 
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "z_score_y",
-                "hidden_features",
-                "num_transforms",
-                "num_bins",
-                "embedding_net",
-                "num_components",
-            ),
-            (
-                z_score_x,
-                z_score_theta,
-                hidden_features,
-                num_transforms,
-                num_bins,
-                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-                num_components,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    # Map user-facing parameter names to internal names.
+    mapped = dict(
+        z_score_x=z_score_x,
+        z_score_y=z_score_theta,
+        hidden_features=hidden_features,
+        num_transforms=num_transforms,
+        num_bins=num_bins,
+        embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
+        num_components=num_components,
     )
+
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = ConditionalFlowConfig.from_kwargs(**mapped, **kwargs)
+    builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
         if model not in model_builders:
             raise NotImplementedError(f"Model {model} in not implemented")
 
-        return model_builders[model](batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        return model_builders[model](
+            batch_x=batch_x, batch_y=batch_theta, **builder_kwargs
+        )
 
     return build_fn
 
@@ -279,33 +280,26 @@ def posterior_nn(
             simulation outputs.
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
-        kwargs: additional custom arguments passed to downstream build functions.
+        **kwargs: Additional estimator arguments.  Valid keys are defined by
+            ``ConditionalFlowConfig``; unknown keys trigger a warning
+            and are forwarded to the builder.
     """
 
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "z_score_y",
-                "hidden_features",
-                "num_transforms",
-                "num_bins",
-                "embedding_net",
-                "num_components",
-            ),
-            (
-                z_score_theta,
-                z_score_x,
-                hidden_features,
-                num_transforms,
-                num_bins,
-                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-                num_components,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    # Map user-facing parameter names to internal names.
+    mapped = dict(
+        z_score_x=z_score_theta,
+        z_score_y=z_score_x,
+        hidden_features=hidden_features,
+        num_transforms=num_transforms,
+        num_bins=num_bins,
+        embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
+        num_components=num_components,
     )
+
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = ConditionalFlowConfig.from_kwargs(**mapped, **kwargs)
+    builder_kwargs = config.to_dict()
 
     def build_fn_snpe_a(batch_theta, batch_x, num_components):
         """Build function for SNPE-A
@@ -319,7 +313,7 @@ def posterior_nn(
             batch_x=batch_theta,
             batch_y=batch_x,
             num_components=num_components,
-            **kwargs,
+            **builder_kwargs,
         )
 
     def build_fn(batch_theta, batch_x):
@@ -329,7 +323,9 @@ def posterior_nn(
         # The naming might be a bit confusing.
         # batch_x are the latent variables, batch_y the conditioned variables.
         # batch_theta are the parameters and batch_x the observable variables.
-        return model_builders[model](batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        return model_builders[model](
+            batch_x=batch_theta, batch_y=batch_x, **builder_kwargs
+        )
 
     if model == "mdn_snpe_a":
         if num_components != 10:
@@ -338,7 +334,7 @@ def posterior_nn(
                 "instantiation of the inference object, i.e. "
                 "`inference = SNPE_A(..., num_components=20)`"
             )
-        kwargs.pop("num_components")
+        builder_kwargs.pop("num_components")
 
     return build_fn_snpe_a if model == "mdn_snpe_a" else build_fn
 
@@ -370,7 +366,7 @@ def posterior_score_nn(
             - 'vp': Variance preserving.
             - 'subvp': Sub-variance preserving.
             - 've': Variance exploding.
-            Defaults to 'vp'.
+            Defaults to 've'.
         model: Type of regression network. One of:
             - 'mlp': Fully connected feed-forward network.
             - 'ada_mlp': Fully connected feed-forward with adaptive
@@ -388,7 +384,7 @@ def posterior_score_nn(
             sample is, for example, a time series or an image.
         z_score_x: Whether to z-score xs passing into the network, same options as
             z_score_theta.
-        hidden_features: Number of hidden units per layer. Defaults to 50.
+        hidden_features: Number of hidden units per layer. Defaults to 100.
         embedding_net: Embedding network for x (conditioning variable). Defaults to
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
@@ -412,8 +408,9 @@ def posterior_score_nn(
         net=model,
     )
 
-    # Validate against known fields — raises TypeError on typos or
-    config = ScoreEstimatorConfig(**mapped, **kwargs)
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = ScoreEstimatorConfig.from_kwargs(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
@@ -492,8 +489,9 @@ def posterior_flow_nn(
         gaussian_baseline=gaussian_baseline,
     )
 
-    # Validate against known fields — raises TypeError on typos or
-    config = FlowEstimatorConfig(**mapped, **kwargs)
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = FlowEstimatorConfig.from_kwargs(**mapped, **kwargs)
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
@@ -528,33 +526,28 @@ def marginal_nn(
         num_transforms: Number of transforms when a flow is used.
         num_bins: Number of bins used for the splines in `nsf`.
         num_components: Number of mixture components for a mixture of Gaussians.
-        kwargs: additional custom arguments passed to downstream build functions.
+        **kwargs: Additional estimator arguments.  Valid keys are defined by
+            ``MarginalFlowConfig``; unknown keys trigger a warning and are forwarded to
+            the builder.
     """
 
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "hidden_features",
-                "num_transforms",
-                "num_bins",
-                "num_components",
-            ),
-            (
-                z_score_x,
-                hidden_features,
-                num_transforms,
-                num_bins,
-                num_components,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    # Map user-facing parameter names to internal names (no renaming needed here).
+    mapped = dict(
+        z_score_x=z_score_x,
+        hidden_features=hidden_features,
+        num_transforms=num_transforms,
+        num_bins=num_bins,
+        num_components=num_components,
     )
+
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = MarginalFlowConfig.from_kwargs(**mapped, **kwargs)
+    builder_kwargs = config.to_dict()
 
     def build_fn(batch_x: Tensor) -> Any:
         return build_zuko_unconditional_flow(
-            which_nf=model.value.upper(), batch_x=batch_x, **kwargs
+            which_nf=model.value.upper(), batch_x=batch_x, **builder_kwargs
         )
 
     return build_fn

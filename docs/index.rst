@@ -71,7 +71,7 @@ Then, check out our material:
       Practical recipes for common tasks.
 
    .. grid-item-card:: 📚 API Reference
-      :link: sbi
+      :link: api_reference
       :link-type: doc
 
       Full documentation of modules and functions.
@@ -255,7 +255,7 @@ Diagnostics
    :maxdepth: 2
    :caption: More guides/resources
 
-   sbi
+   api_reference
    faq
    contributor_guide
    changelog
