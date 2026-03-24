@@ -148,7 +148,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         combined_condition = combined_condition.reshape(combined_batch_size, -1)
 
         disc_log_prob = self.discrete_net.log_prob(
-            input=disc_input, condition=condition_flat
+            input=disc_input, condition=condition
         )
 
         cont_input_reshaped = cont_input.reshape((1, combined_batch_size, -1))
