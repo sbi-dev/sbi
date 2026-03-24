@@ -21,8 +21,9 @@ Related to: https://github.com/sbi-dev/sbi/issues/1468
 """
 
 import argparse
-import sys
+import importlib
 import time
+from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
@@ -42,10 +43,38 @@ from sbi.inference import NPSE
 from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
 from sbi.utils.metrics import c2st, unbiased_mmd_squared
 
-# Append tests/ to path so mini_sbibm is importable.
-_tests_dir = str(__import__("pathlib").Path(__file__).resolve().parent.parent / "tests")
-sys.path.insert(0, _tests_dir)
-from mini_sbibm import get_task  # noqa: E402
+
+def _load_mini_sbibm():
+    """Load mini_sbibm from tests/ without polluting sys.path.
+
+    mini_sbibm lives under tests/ and isn't an installed package, so we use
+    importlib to load it by file path. The module is registered in sys.modules
+    so that its internal relative imports (e.g., ``from .base_task import Task``)
+    resolve correctly.
+    """
+    import sys
+
+    tests_dir = Path(__file__).resolve().parent.parent / "tests"
+    pkg_dir = tests_dir / "mini_sbibm"
+    if not pkg_dir.exists():
+        raise ImportError(
+            "Could not find mini_sbibm. Run this script from the sbi repo root."
+        )
+
+    spec = importlib.util.spec_from_file_location(
+        "mini_sbibm",
+        pkg_dir / "__init__.py",
+        submodule_search_locations=[str(pkg_dir)],
+    )
+    module = importlib.util.module_from_spec(spec)
+    # Register before exec so relative imports inside the package work.
+    sys.modules["mini_sbibm"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_mini_sbibm = _load_mini_sbibm()
+get_task = _mini_sbibm.get_task
 
 # ---------------------------------------------------------------------------
 # Adapter classes: bridging sbi's score interface to azula's denoiser protocol
