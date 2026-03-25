@@ -4,13 +4,17 @@
 from typing import Callable, Dict, Literal, Optional, Union
 
 import torch
-from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal, Uniform
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
+)
+from sbi.inference.trainers.npe.npe_loss import (
+    AtomicLoss,
+    NPELossStrategy,
+    NonAtomicGaussianLoss,
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
@@ -132,6 +136,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        loss_strategy: Optional[NPELossStrategy] = None,
     ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
@@ -174,20 +179,12 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
-        # Load the strategy classes locally to avoid circular imports if any
-        from sbi.inference.trainers.npe.npe_c_loss import (
-            AtomicLoss,
-            NonAtomicGaussianLoss,
-        )
-
         if len(self._data_round_index) == 0:
             raise RuntimeError(
                 "No simulations found. You must call .append_simulations() "
                 "before calling .train()."
             )
 
-        self._num_atoms = num_atoms
-        self._use_combined_loss = use_combined_loss
         kwargs = del_entries(
             locals(),
             entries=("self", "__class__", "num_atoms", "use_combined_loss"),
@@ -195,10 +192,12 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         self._round = max(self._data_round_index)
 
-        if self._round > 0:
+        if loss_strategy is not None:
+            self._loss_strategy = loss_strategy
+        elif self._round > 0:
             # Set the proposal to the last proposal that was passed by the user.
             proposal = self._proposal_roundwise[-1]
-            self.use_non_atomic_loss = (
+            use_non_atomic_loss = (
                 isinstance(proposal, DirectPosterior)
                 and isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
                 and isinstance(self._neural_net, MixtureDensityEstimator)
@@ -207,10 +206,10 @@ class NPE_C(PosteriorEstimatorTrainer):
                 )[0]
             )
 
-            algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
+            algorithm = "non-atomic" if use_non_atomic_loss else "atomic"
             print(f"Using SNPE-C with {algorithm} loss")
 
-            if self.use_non_atomic_loss:
+            if use_non_atomic_loss:
                 # Take care of z-scoring, pre-compute and store prior terms.
                 self._set_state_for_mog_proposal()
 
@@ -234,17 +233,12 @@ class NPE_C(PosteriorEstimatorTrainer):
                 self._loss_strategy = AtomicLoss(
                     neural_net=self._neural_net,
                     prior=self._prior,
-                    num_atoms=self._num_atoms,
-                    use_combined_loss=self._use_combined_loss,
+                    num_atoms=num_atoms,
+                    use_combined_loss=use_combined_loss,
                 )
         else:
-            # Default to Atomic for first round (equivalent to MLE)
-            self._loss_strategy = AtomicLoss(
-                neural_net=self._neural_net,
-                prior=self._prior,
-                num_atoms=self._num_atoms,
-                use_combined_loss=self._use_combined_loss,
-            )
+            # Default to None for first round (equivalent to MLE)
+            self._loss_strategy = None
 
         return super().train(**kwargs)
 
@@ -290,19 +284,4 @@ class NPE_C(PosteriorEstimatorTrainer):
         else:
             self._maybe_z_scored_prior = self._prior
 
-    def _log_prob_proposal_posterior(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: DirectPosterior,
-    ) -> Tensor:
-        """Return the log-probability of the proposal posterior.
-        Delegates to the configured loss strategy.
-        """
-        # Ensure strategy is initialized
-        if hasattr(self, "_loss_strategy"):
-            return self._loss_strategy(theta, x, masks, proposal)
 
-        # Fallback if somehow called without train setup (unlikely)
-        raise RuntimeError("Loss strategy not initialized. Call train() first.")
