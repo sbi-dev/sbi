@@ -3,8 +3,6 @@
 
 from typing import Dict, Optional, Union
 
-import torch
-from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
@@ -12,11 +10,11 @@ from sbi.inference.trainers._contracts import LossArgsNRE_A
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
+from sbi.inference.trainers.nre.nre_loss import AALRLoss, NRELossStrategy
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
-from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_A(RatioEstimatorTrainer):
@@ -111,6 +109,7 @@ class NRE_A(RatioEstimatorTrainer):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         loss_kwargs: Optional[LossArgsNRE_A] = None,
+        loss_strategy: Optional[NRELossStrategy] = None,
     ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
@@ -154,30 +153,8 @@ class NRE_A(RatioEstimatorTrainer):
                 f" but got {type(loss_kwargs)}"
             )
 
+        if loss_strategy is None:
+            kwargs["loss_strategy"] = AALRLoss()
+
         return super().train(**kwargs)
 
-    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        """Returns the binary cross-entropy loss for the trained classifier.
-
-        The classifier takes as input a $(\theta,x)$ pair. It is trained to predict 1
-        if the pair was sampled from the joint $p(\theta,x)$, and to predict 0 if the
-        pair was sampled from the marginals $p(\theta)p(x)$.
-        """
-
-        assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
-        batch_size = theta.shape[0]
-
-        logits = self._classifier_logits(theta, x, num_atoms)
-        likelihood = torch.sigmoid(logits).squeeze()
-
-        # Alternating pairs where there is one sampled from the joint and one
-        # sampled from the marginals. The first element is sampled from the
-        # joint p(theta, x) and is labelled 1. The second element is sampled
-        # from the marginals p(theta)p(x) and is labelled 0. And so on.
-        labels = ones(2 * batch_size, device=self._device)  # two atoms
-        labels[1::2] = 0.0
-
-        # Binary cross entropy to learn the likelihood (AALR-specific)
-        loss = nn.BCELoss()(likelihood, labels)
-        assert_all_finite(loss, "NRE-A loss")
-        return loss
