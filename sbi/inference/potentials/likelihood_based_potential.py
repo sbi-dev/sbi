@@ -57,6 +57,40 @@ def likelihood_estimator_based_potential(
 
 
 class LikelihoodBasedPotential(BasePotential):
+    r"""Potential function for likelihood-based methods (NLE).
+
+    This potential computes $\log p(\theta|x)$ using a trained
+    likelihood estimator. It is used internally by NLE methods for posterior
+    sampling via MCMC, rejection sampling, or VI.
+
+    Example:
+    --------
+    ::
+
+        import torch
+        from sbi.inference import NLE_A
+        from sbi.inference.potentials import likelihood_estimator_based_potential
+        from sbi.utils import BoxUniform
+
+        # 1. Train a likelihood estimator
+        prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
+        theta = prior.sample((100,))
+        x = theta + 0.1 * torch.randn_like(theta)
+
+        trainer = NLE_A(prior=prior)
+        likelihood_estimator = trainer.append_simulations(theta, x).train()
+
+        # 2. Create potential function
+        x_o = torch.tensor([[0.5, 0.5]])
+        potential_fn, theta_transform = likelihood_estimator_based_potential(
+            likelihood_estimator, prior, x_o
+        )
+
+        # 3. Evaluate potential at a point
+        theta_test = torch.tensor([[0.4, 0.6]])
+        log_prob = potential_fn(theta_test)
+    """
+
     def __init__(
         self,
         likelihood_estimator: ConditionalDensityEstimator,
