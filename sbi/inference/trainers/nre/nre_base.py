@@ -443,6 +443,9 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
             del x, theta
 
+    def _loss(self, *args, **kwargs) -> Tensor:
+        raise NotImplementedError("NRE trainers use _loss_strategy inside _get_losses.")
+
     def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         """
         Compute losses for a batch of data.

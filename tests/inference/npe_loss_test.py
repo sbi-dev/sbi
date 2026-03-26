@@ -20,7 +20,7 @@ from sbi.utils.torchutils import BoxUniform
 
 class DummyEstimator(ConditionalDensityEstimator):
     def __init__(self, is_mixture=False):
-        super().__init__()
+        super().__init__(net=torch.nn.Identity(), input_shape=torch.Size((2,)), condition_shape=torch.Size((2,)))
         self.is_mixture = is_mixture
         self.condition_shape = torch.Size((2,))
         self.input_shape = torch.Size((2,))
