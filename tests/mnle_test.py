@@ -23,6 +23,7 @@ from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform, mcmc_transform
 from sbi.utils.metrics import check_c2st
+from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import atleast_2d, process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 
@@ -52,43 +53,53 @@ def mixed_simulator_with_conditions(
     return mixed_simulator(theta, condition)
 
 
+@pytest.fixture(scope="module")
+def mnle_prior():
+    """Gamma-Beta prior for MNLE tests."""
+    return MultipleIndependent(
+        [
+            Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
+            Beta(torch.tensor([2.0]), torch.tensor([2.0])),
+        ],
+        validate_args=False,
+    )
+
+
+@pytest.fixture(
+    scope="module",
+    params=[
+        pytest.param("nsf", id="nsf"),
+        pytest.param("zuko_nsf", id="zuko_nsf"),
+    ],
+)
+def mnle_trained_accurate(request, mnle_prior):
+    """MNLE trained with many simulations, parametrized by flow model."""
+    seed_all_backends(1)
+    flow_model = request.param
+    theta = mnle_prior.sample((4000,))
+    x = mixed_simulator(theta, stimulus_condition=1.0)
+    density_estimator = likelihood_nn(
+        model="mnle", flow_model=flow_model, log_transform_x=True
+    )
+    trainer = MNLE(mnle_prior, density_estimator=density_estimator)
+    trainer.append_simulations(theta, x).train(training_batch_size=200)
+    return trainer
+
+
 @pytest.mark.mcmc
 @pytest.mark.gpu
-@pytest.mark.parametrize("device", ("cpu", "gpu"))
-def test_mnle_on_device(
-    device,
-    mcmc_params_fast: MCMCPosteriorParameters,
-    num_simulations: int = 100,
-    mcmc_method: str = "slice_np",
-):
+def test_mnle_on_device(mnle_prior, mcmc_params_fast: MCMCPosteriorParameters):
     """Test MNLE API on device."""
+    device = process_device("gpu")
+    mnle_prior.to(device)
+    theta = mnle_prior.sample((100,))
+    x = mixed_simulator(theta)
 
-    device = process_device(device)
+    trainer = MNLE(prior=mnle_prior, device=device)
+    trainer.append_simulations(theta, x.to(device)).train(max_num_epochs=10)
 
-    # Generate mixed data.
-    theta = torch.rand(num_simulations, 2)
-    x = torch.cat(
-        (
-            torch.rand(num_simulations, 1),
-            torch.randint(0, 2, (num_simulations, 1)),
-        ),
-        dim=1,
-    ).to(device)
-
-    # Train and infer.
-    prior = BoxUniform(torch.zeros(2), torch.ones(2), device=device)
-    trainer = MNLE(prior=prior, device=device)
-    trainer.append_simulations(theta, x).train(max_num_epochs=1)
-
-    # Test sampling on device.
-    posterior = trainer.build_posterior()
-    posterior.sample(
-        (1,),
-        x=x[0],
-        show_progress_bars=False,
-        mcmc_method=mcmc_method,
-        **asdict(mcmc_params_fast),
-    )
+    posterior = trainer.build_posterior(posterior_parameters=mcmc_params_fast)
+    posterior.sample((1,), x=x[0].to(device))
 
 
 @pytest.mark.parametrize(
@@ -97,25 +108,15 @@ def test_mnle_on_device(
 @pytest.mark.parametrize("flow_model", ("mdn", "nsf", "zuko_nsf"))
 @pytest.mark.parametrize("z_score_theta", ("independent", "none"))
 def test_mnle_api(
+    mnle_prior,
     flow_model: str,
     sampler,
     mcmc_params_fast: MCMCPosteriorParameters,
     z_score_theta: str,
 ):
     """Test MNLE API."""
-    # Generate mixed data.
-    num_simulations = 10
-    theta = torch.rand(num_simulations, 2)
-    x = torch.cat(
-        (
-            torch.rand(num_simulations, 1),
-            torch.randint(0, 2, (num_simulations, 1)),
-        ),
-        dim=1,
-    )
-
-    # Train and infer.
-    prior = BoxUniform(torch.zeros(2), torch.ones(2))
+    theta = mnle_prior.sample((100,))
+    x = mixed_simulator(theta)
     x_o = x[0]
     # Build estimator manually.
     theta_embedding = FCEmbedding(2, 2)  # simple embedding net
@@ -129,7 +130,7 @@ def test_mnle_api(
     trainer.append_simulations(theta, x).train(max_num_epochs=1)
 
     # Test different samplers.
-    posterior = trainer.build_posterior(prior=prior, sample_with=sampler)
+    posterior = trainer.build_posterior(prior=mnle_prior, sample_with=sampler)
     posterior.set_default_x(x_o)
     if isinstance(posterior, VIPosterior):
         posterior.train().sample((1,))
@@ -150,50 +151,30 @@ def test_mnle_api(
     "sampler", (pytest.param("mcmc", marks=pytest.mark.mcmc), "rejection", "vi")
 )
 @pytest.mark.parametrize("num_trials", [5, 10])
-@pytest.mark.parametrize("flow_model", ("nsf", "zuko_nsf"))
 def test_mnle_accuracy_with_different_samplers_and_trials(
-    flow_model: str,
+    mnle_prior,
+    mnle_trained_accurate,
     sampler,
     num_trials: int,
     mcmc_params_accurate: MCMCPosteriorParameters,
 ):
     """Test MNLE c2st accuracy for different samplers and number of trials."""
-
-    num_simulations = 4000
     num_samples = 1000
 
-    prior = MultipleIndependent(
-        [
-            Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
-            Beta(torch.tensor([2.0]), torch.tensor([2.0])),
-        ],
-        validate_args=False,
-    )
-
-    theta = prior.sample((num_simulations,))
-    x = mixed_simulator(theta, stimulus_condition=1.0)
-
-    # MNLE
-    density_estimator = likelihood_nn(
-        model="mnle", flow_model=flow_model, log_transform_x=True
-    )
-    trainer = MNLE(prior, density_estimator=density_estimator)
-    trainer.append_simulations(theta, x).train(training_batch_size=200)
-
-    theta_o = prior.sample((1,))
+    theta_o = mnle_prior.sample((1,))
     x_o = mixed_simulator(theta_o.repeat(num_trials, 1))
 
     # True posterior samples
-    transform = mcmc_transform(prior)
+    transform = mcmc_transform(mnle_prior)
     true_posterior_samples = MCMCPosterior(
-        BinomialGammaPotential(prior, atleast_2d(x_o)),
+        BinomialGammaPotential(mnle_prior, atleast_2d(x_o)),
         theta_transform=transform,
-        proposal=prior,
+        proposal=mnle_prior,
         **asdict(mcmc_params_accurate),
     ).sample((num_samples,), show_progress_bars=False)
 
-    posterior = trainer.build_posterior(
-        prior=prior,
+    posterior = mnle_trained_accurate.build_posterior(
+        prior=mnle_prior,
         sample_with=sampler,
         posterior_parameters=mcmc_params_accurate if sampler == "mcmc" else None,
     )
@@ -210,7 +191,7 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     check_c2st(
         mnle_posterior_samples,
         true_posterior_samples,
-        alg=f"MNLE with {flow_model} and {sampler}",
+        alg=f"MNLE with {sampler}",
     )
 
 
@@ -254,7 +235,8 @@ class BinomialGammaPotential(BasePotential):
 
         # evaluate vectorized across batch of thetas.
         logprob_choices = (
-            torch.stack(
+            torch
+            .stack(
                 [
                     Binomial(probs=rhos[:, :, rho_idx]).log_prob(
                         self.x_o[:, 1 + rho_idx]

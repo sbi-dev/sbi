@@ -110,8 +110,9 @@ def check_if_prior_on_device(
             f"Prior device '{prior_device}' must match training device "
             f"'{training_device}'. When training on GPU make sure to "
             "pass a prior initialized on the GPU as well, e.g., "
+            "use `.to(device)` for sbi priors or "
             "prior = torch.distributions.Normal"
-            "(torch.zeros(2, device='cuda'), scale=1.0)`."
+            "(torch.zeros(2, device='cuda'), scale=1.0)`, or ."
         )
 
 
