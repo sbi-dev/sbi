@@ -236,8 +236,7 @@ class BinomialGammaPotential(BasePotential):
 
         # evaluate vectorized across batch of thetas.
         logprob_choices = (
-            torch
-            .stack(
+            torch.stack(
                 [
                     Binomial(probs=rhos[:, :, rho_idx]).log_prob(
                         self.x_o[:, 1 + rho_idx]
