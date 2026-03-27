@@ -771,43 +771,50 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
         ), "Prior transform is on the correct device."
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
-@pytest.mark.parametrize("device_inference", ["cpu", "gpu"])
-@pytest.mark.parametrize("num_trials", [1, 2])
-@pytest.mark.parametrize("vf_trainer", [FMPE, NPSE])
-def test_vector_field_methods_device_handling(
-    vf_trainer, device: str, device_inference: str, num_trials: int
-):
-    """Test VectorFieldPosterior on different devices training and inference devices.
-
-    Tests both ode and sde sampling for both FMPE and NPSE.
-
-    Tests iid methods for num_trials = 2.
-
-    Args:
-        vf_trainer: vector field trainer class to use.
-        device: device to train the model on.
-        device_inference: device to run the inference on.
-        iid_method: method to sample from the posterior.
-    """
-
+@pytest.fixture(
+    scope="module",
+    params=[
+        pytest.param((FMPE, "cpu"), id="FMPE-cpu"),
+        pytest.param((FMPE, "gpu"), id="FMPE-gpu"),
+        pytest.param((NPSE, "cpu"), id="NPSE-cpu"),
+        pytest.param((NPSE, "gpu"), id="NPSE-gpu"),
+    ],
+)
+def trained_vf_for_device_test(request):
+    """Train vector field model once per (trainer, device) combination."""
+    seed_all_backends(1)
+    vf_trainer, device_str = request.param
+    device = process_device(device_str)
     num_dims = 2
     num_simulations = 1000
+    prior = BoxUniform(-torch.ones(num_dims), torch.ones(num_dims), device=device)
+    theta = prior.sample((num_simulations,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    inference = vf_trainer(prior=prior, device=device)
+    inference.append_simulations(theta, x).train(max_num_epochs=10)
+    return vf_trainer, inference, device
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device_inference", ["cpu", "gpu"])
+@pytest.mark.parametrize("num_trials", [1, 2])
+def test_vector_field_methods_degvice_handling(
+    trained_vf_for_device_test, device_inference: str, num_trials: int
+):
+    """Test VectorFieldPosterior on different training and inference devices.
+
+    Tests both ode and sde sampling for both FMPE and NPSE.
+    Tests iid methods for num_trials = 2.
+    """
+    vf_trainer, inference, _ = trained_vf_for_device_test
+    device_inference = process_device(device_inference)
+    num_dims = 2
+
     if vf_trainer == NPSE:
         iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
     else:
         iid_methods = ["fnpe"]
 
-    device = process_device(device)
-    device_inference = process_device(device_inference)
-
-    prior = BoxUniform(torch.zeros(num_dims), torch.ones(num_dims), device=device)
-    theta = prior.sample((num_simulations,))
-    x = theta + 0.1 * torch.randn_like(theta)
-
-    inference = vf_trainer(prior=prior, device=device)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=10)
     posterior = inference.build_posterior(
         sample_with="sde" if num_trials > 1 else "ode"
     )
@@ -820,10 +827,16 @@ def test_vector_field_methods_device_handling(
         f"VectorFieldPosterior is not in device {device_inference}."
     )
 
-    x_o = torch.ones(num_trials, num_dims).to(device_inference)
+    x_o = torch.zeros(num_trials, num_dims).to(device_inference)
     if num_trials > 1:
         for iid_method in iid_methods:
-            samples = posterior.sample((2,), x=x_o, iid_method=iid_method)
+            samples = posterior.sample(
+                (2,),
+                x=x_o,
+                iid_method=iid_method,
+                steps=10,
+                reject_outside_prior=False,
+            )
             assert samples.device.type == device_inference.split(":")[0], (
                 f"Samples are not on device {device_inference}. "
                 f"{vf_trainer.__name__} with {iid_method}"
@@ -831,12 +844,11 @@ def test_vector_field_methods_device_handling(
     else:
         samples = posterior.sample((2,), x=x_o)
         assert samples.device.type == device_inference.split(":")[0], (
-            f"Samples are not on device {device_inference}. "
-            f"{vf_trainer.__name__} with {iid_method}"
+            f"Samples are not on device {device_inference}. {vf_trainer.__name__}"
         )
 
         log_probs = posterior.log_prob(samples, x=x_o)
         assert log_probs.device.type == device_inference.split(":")[0], (
             f"log_prob was not correctly moved to {device_inference}. "
-            f"{vf_trainer.__name__} with {iid_method}"
+            f"{vf_trainer.__name__}"
         )
