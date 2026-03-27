@@ -115,7 +115,8 @@ def test_mnle_api(
     z_score_theta: str,
 ):
     """Test MNLE API."""
-    theta = mnle_prior.sample((100,))
+    num_simulations = 1000
+    theta = mnle_prior.sample((num_simulations,))
     x = mixed_simulator(theta)
     x_o = x[0]
     # Build estimator manually.
@@ -127,7 +128,7 @@ def test_mnle_api(
         embedding_net=theta_embedding,
     )
     trainer = MNLE(density_estimator=density_estimator)
-    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
 
     # Test different samplers.
     posterior = trainer.build_posterior(prior=mnle_prior, sample_with=sampler)
@@ -235,7 +236,8 @@ class BinomialGammaPotential(BasePotential):
 
         # evaluate vectorized across batch of thetas.
         logprob_choices = (
-            torch.stack(
+            torch
+            .stack(
                 [
                     Binomial(probs=rhos[:, :, rho_idx]).log_prob(
                         self.x_o[:, 1 + rho_idx]
