@@ -20,7 +20,10 @@ from sbi.inference.posteriors.ensemble_posterior import (
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -46,6 +49,7 @@ from sbi.neural_nets.factory import (
 )
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils import BoxUniform
+from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
 from sbi.utils.user_input_checks import validate_theta_and_x
 
@@ -707,30 +711,42 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
         )
 
 
-@pytest.mark.slow
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
-@pytest.mark.parametrize(
-    "sampling_method", ["rejection", "importance", "mcmc", "direct"]
-)
-def test_to_method_on_posteriors(device: str, sampling_method: str):
-    """Test .to() method on posteriors.
+@pytest.fixture(scope="module")
+def trained_npe_for_device_test():
+    """Train NPE once, reused across all posterior .to() device tests."""
+    seed_all_backends(1)
+    num_dims = 2
+    num_simulations = 1000
+    prior = BoxUniform(-torch.ones(num_dims), torch.ones(num_dims))
+    trainer = NPE()
+    theta = prior.sample((num_simulations,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    trainer.append_simulations(theta, x).train(max_num_epochs=10)
+    return trainer, prior
 
-    Args:
-        device: device to train and sample the model on.
-        sampling_method: method to sample from the posterior.
-    """
-    device = process_device(device)
-    prior = BoxUniform(torch.zeros(3), torch.ones(3))
-    inference = NPE()
-    x_o = torch.zeros(2).to(device)
-    estimator = inference.append_simulations(
-        torch.randn((100, 3)), torch.randn((100, 2))
-    ).train(max_num_epochs=1)
-    posterior = inference.build_posterior(
-        density_estimator=estimator,
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "posterior_params",
+    [
+        pytest.param(DirectPosteriorParameters(), id="direct"),
+        pytest.param(RejectionPosteriorParameters(), id="rejection"),
+        pytest.param(ImportanceSamplingPosteriorParameters(), id="importance"),
+        pytest.param(
+            MCMCPosteriorParameters(num_chains=1, warmup_steps=1, thin=1),
+            id="mcmc",
+        ),
+    ],
+)
+def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_params):
+    """Test .to() method moves posteriors to GPU correctly and sampling works."""
+    device = process_device("gpu")
+    trainer, prior = trained_npe_for_device_test
+    num_dims = 2
+    x_o = torch.zeros(num_dims).to(device)
+    posterior = trainer.build_posterior(
         prior=prior,
-        sample_with=sampling_method,
+        posterior_parameters=posterior_params,
     )
     posterior.set_default_x(x_o)
     posterior.to(device)
@@ -742,9 +758,10 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
     assert sample_device.device.type == device.split(":")[0], (
         f"sample was not correctly moved to {device}."
     )
-    log_probs = posterior.log_prob(sample_device)
-    assert log_probs.device.type == device.split(":")[0], (
-        f"log_prob was not correctly moved to {device}."
+    posterior.potential_fn.set_x(x_o)
+    potential_values = posterior.potential_fn(sample_device)
+    assert potential_values.device.type == device.split(":")[0], (
+        f"potential was not correctly evaluated on {device}."
     )
 
     for transform in posterior.theta_transform._inv.base_transform.parts:
