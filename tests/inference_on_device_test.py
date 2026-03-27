@@ -519,11 +519,10 @@ def test_boxuniform_device_handling(arg_device, device):
 
 @pytest.mark.gpu
 @pytest.mark.parametrize("method", [NPE_A, NPE_C])
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
-def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: str):
+def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C]):
     num_dim = 2
     num_rounds = 2
-    num_simulations = 100
+    num_simulations = 1000
     device = process_device("gpu")
     prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim), device=device)
     simulator = diagonal_linear_gaussian
@@ -537,7 +536,7 @@ def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: 
 
     proposal = prior
     for _ in range(num_rounds):
-        trainer.append_simulations(theta, x, proposal=proposal).train(max_num_epochs=2)
+        trainer.append_simulations(theta, x, proposal=proposal).train(max_num_epochs=20)
         proposal = trainer.build_posterior().set_default_x(torch.zeros(num_dim))
         theta = proposal.sample((num_simulations,))
         x = simulator(theta)
