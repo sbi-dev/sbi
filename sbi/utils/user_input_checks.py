@@ -593,7 +593,7 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
     return batch_loop_simulator
 
 
-def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
+def process_x(x: Array, x_event_shape: Optional[torch.Size] = None, check_finite: bool = True) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
     This means that `x` is returned with a `batch_dim`.
@@ -611,7 +611,8 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
-    assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
+    if check_finite:
+        assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
 
     if x_event_shape is not None and len(x_event_shape) > len(x.shape):
         raise ValueError(
