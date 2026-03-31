@@ -63,12 +63,13 @@ def get_inference():
                 "proposal",
                 "device",
                 "init_strategy_num_candidates",
+                "theta_transform",
             },
         ),
         (
             RejectionPosteriorParameters,
             RejectionPosterior,
-            {"potential_fn", "device", "proposal"},
+            {"potential_fn", "device", "proposal", "theta_transform"},
         ),
         (
             VIPosteriorParameters,
@@ -81,6 +82,7 @@ def get_inference():
                 "x_shape",  # deprecated
                 "parameters",  # for custom q, use set_q() instead
                 "modules",  # for custom q, use set_q() instead
+                "theta_transform",
             },
         ),
         (
