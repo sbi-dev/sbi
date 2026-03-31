@@ -40,7 +40,7 @@
 * Refactoring noise_schedule and time schedule into base class by @janfb in https://github.com/sbi-dev/sbi/pull/1736
 
 ### 🐛 Bug Fixes
-
+* Fix ImproperEmpirical: remove Empirical inheritance, constant log_prob, fix to() by @patelshivani2283-lab in <https://github.com/sbi-dev/sbi/pull/1822>
 * fix: disable transform, add warning for empirical prior by @janfb in https://github.com/sbi-dev/sbi/pull/1669
 * MNPE fix for categorical variables by @dgedon in https://github.com/sbi-dev/sbi/pull/1671
 * Fix: Make NPSE picklable by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1679
