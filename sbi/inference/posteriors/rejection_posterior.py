@@ -200,6 +200,7 @@ class RejectionPosterior(NeuralPosterior):
             samples, _ = rejection_sample(
                 potential,
                 proposal=self.proposal,
+                theta_transform=self.theta_transform,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 warn_acceptance=0.01,

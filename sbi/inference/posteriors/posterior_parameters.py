@@ -251,8 +251,6 @@ class RejectionPosteriorParameters(PosteriorParameters):
     Parameters for initializing RejectionPosterior.
 
     Fields:
-        theta_transform: Transformation that is applied to parameters. Is not used
-            during but only when calling `.map()`.
         max_sampling_batch_size: The batchsize of samples being drawn from
             the proposal at every iteration.
         num_samples_to_find_max: The number of samples that are used to find the
@@ -262,7 +260,6 @@ class RejectionPosteriorParameters(PosteriorParameters):
         m: Multiplier to the `potential_fn / proposal` ratio.
     """
 
-    theta_transform: Optional[TorchTransform] = None
     max_sampling_batch_size: int = 10_000
     num_samples_to_find_max: int = 10_000
     num_iter_to_find_max: int = 100
@@ -270,14 +267,6 @@ class RejectionPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate RejectionPosteriorParameters fields."""
-
-        if not (
-            self.theta_transform is None
-            or isinstance(self.theta_transform, TorchTransform)
-        ):
-            raise TypeError(
-                "theta_transform must be either None or of type TorchTransform"
-            )
 
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
