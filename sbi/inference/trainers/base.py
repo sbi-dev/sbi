@@ -910,6 +910,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             elif isinstance(posterior_parameters, RejectionPosteriorParameters):
                 posterior = RejectionPosterior(
                     potential_fn=potential_fn,
+                    theta_transform=theta_transform,
                     proposal=prior,
                     device=device,
                     **asdict(posterior_parameters),
