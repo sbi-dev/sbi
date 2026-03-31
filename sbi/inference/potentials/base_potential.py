@@ -30,6 +30,12 @@ class BasePotential(metaclass=ABCMeta):
         self.device = device
         self.prior = prior
         self.set_x(x_o)
+        self._initialized = False
+        
+    def init(self, *args, **kwargs):
+        """Initialize potential (can be overridden by subclasses)."""
+        self._initialized = True
+        return self
 
     @abstractmethod
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
@@ -136,5 +142,7 @@ class CustomPotentialWrapper(BasePotential):
 
         Note, x_o is re-used from the initialization of the potential function.
         """
+        if not self._initialized:
+            raise RuntimeError("Call init() before using this potential.")
         with torch.set_grad_enabled(track_gradients):
             return self.potential_fn(theta, self.x_o)

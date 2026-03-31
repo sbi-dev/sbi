@@ -78,6 +78,15 @@ class NeuralPosterior:
         # already to the potential function builder. If so, this `x_o` will be used
         # as default x.
         self._x = self.potential_fn.return_x_o()
+        
+        self._initialized = False
+        
+    def init(self):
+        """Initialize the underlying potential before sampling."""
+        if hasattr(self.potential_fn, "init"):
+            self.potential_fn.init()
+        self._initialized = True
+        return self
 
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
@@ -93,6 +102,8 @@ class NeuralPosterior:
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
+        if not self._initialized:
+            raise RuntimeError("Call init() before using the posterior.")
         self.potential_fn.set_x(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
