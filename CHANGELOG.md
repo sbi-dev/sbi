@@ -36,6 +36,7 @@
 * Add protocols for sample proposal and accept/reject by @janfb in https://github.com/sbi-dev/sbi/pull/1722
 * Add Tracker protocol and training tracking guide by @janfb in https://github.com/sbi-dev/sbi/pull/1741
 * Use Literal for strict typing of z-scoring options by @satwiksps in https://github.com/sbi-dev/sbi/pull/1744
+* Support shape broadcasting and condition sample_dim in density estimators by @satwiksps in https://github.com/sbi-dev/sbi/pull/1791
 * Decouple hidden features and layers for mixed type nets by @janfb in https://github.com/sbi-dev/sbi/pull/1798
 * Refactoring noise_schedule and time schedule into base class by @janfb in https://github.com/sbi-dev/sbi/pull/1736
 
@@ -54,6 +55,7 @@
 * fix: pin PyMC version below 5.20.1 to avoid TypeError (closes #1397) by @Dev-Sudarshan in https://github.com/sbi-dev/sbi/pull/1697
 * Fix memory bloat in multi-round inference by @satwiksps in https://github.com/sbi-dev/sbi/pull/1749
 * Raise informative RuntimeError when training with empty simulations by @satwiksps in https://github.com/sbi-dev/sbi/pull/1750
+* Re-enable time-dependent z-scoring for Flow Matching by @satwiksps in https://github.com/sbi-dev/sbi/pull/1752
 * Fix: Improve error message for x_o shape mismatch by @XBastille in https://github.com/sbi-dev/sbi/pull/1759
 * Fix: forward dropout_probability to CategoricalMADE in mixed density estimator by @coschroeder in https://github.com/sbi-dev/sbi/pull/1789
 * Fix Gaussian Linear task in mini SBI-BM by @jsvetter in https://github.com/sbi-dev/sbi/pull/1782
@@ -61,6 +63,7 @@
 * fix: adjust leading dimension handling in log prob batched by @janfb in https://github.com/sbi-dev/sbi/pull/1799
 * fix: Check instance of prior so ValueError is raised after .append_simulations was executed (#1793) by @Jocho-Smith in https://github.com/sbi-dev/sbi/pull/1803
 * fix_mcmc_iid_for_npe by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1813
+* fix: quick error fix for broadcasting refactor by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1824
 * fix: rejection posterior should use theta_transform by @janfb in https://github.com/sbi-dev/sbi/pull/1827
 * Fix ImproperEmpirical: remove Empirical inheritance, constant log_prob, fix to() by @patelshivani2283-lab in <https://github.com/sbi-dev/sbi/pull/1822>
 
