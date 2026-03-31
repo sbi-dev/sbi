@@ -40,7 +40,7 @@
 * Refactoring noise_schedule and time schedule into base class by @janfb in https://github.com/sbi-dev/sbi/pull/1736
 
 ### 🐛 Bug Fixes
-* Fix ImproperEmpirical: remove Empirical inheritance, constant log_prob, fix to() by @patelshivani2283-lab in <https://github.com/sbi-dev/sbi/pull/1822>
+
 * fix: disable transform, add warning for empirical prior by @janfb in https://github.com/sbi-dev/sbi/pull/1669
 * MNPE fix for categorical variables by @dgedon in https://github.com/sbi-dev/sbi/pull/1671
 * Fix: Make NPSE picklable by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1679
@@ -61,6 +61,8 @@
 * fix: adjust leading dimension handling in log prob batched by @janfb in https://github.com/sbi-dev/sbi/pull/1799
 * fix: Check instance of prior so ValueError is raised after .append_simulations was executed (#1793) by @Jocho-Smith in https://github.com/sbi-dev/sbi/pull/1803
 * fix_mcmc_iid_for_npe by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1813
+* fix: rejection posterior should use theta_transform by @janfb in https://github.com/sbi-dev/sbi/pull/1827
+* Fix ImproperEmpirical: remove Empirical inheritance, constant log_prob, fix to() by @patelshivani2283-lab in <https://github.com/sbi-dev/sbi/pull/1822>
 
 ### 🛠️ Maintenance & Improvements
 
