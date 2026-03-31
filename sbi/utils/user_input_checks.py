@@ -593,7 +593,9 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
     return batch_loop_simulator
 
 
-def process_x(x: Array, x_event_shape: Optional[torch.Size] = None, check_finite: bool = True) -> Tensor:
+def process_x(
+    x: Array, x_event_shape: Optional[torch.Size] = None, check_finite: bool = True
+) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
     This means that `x` is returned with a `batch_dim`.
