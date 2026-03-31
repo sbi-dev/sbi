@@ -62,7 +62,6 @@ def get_inference():
                 "potential_fn",
                 "proposal",
                 "device",
-                "theta_transform",
                 "init_strategy_num_candidates",
             },
         ),
@@ -78,7 +77,6 @@ def get_inference():
                 # __init__ params not in dataclass
                 "potential_fn",
                 "prior",
-                "theta_transform",
                 "device",
                 "x_shape",  # deprecated
                 "parameters",  # for custom q, use set_q() instead
