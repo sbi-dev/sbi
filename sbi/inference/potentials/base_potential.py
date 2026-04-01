@@ -31,7 +31,7 @@ class BasePotential(metaclass=ABCMeta):
         self.prior = prior
         self.set_x(x_o)
         self._initialized = False
-        
+
     def init(self, *args, **kwargs):
         """Initialize potential (can be overridden by subclasses)."""
         self._initialized = True

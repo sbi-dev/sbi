@@ -78,9 +78,9 @@ class NeuralPosterior:
         # already to the potential function builder. If so, this `x_o` will be used
         # as default x.
         self._x = self.potential_fn.return_x_o()
-        
+
         self._initialized = False
-        
+
     def init(self):
         """Initialize the underlying potential before sampling."""
         if hasattr(self.potential_fn, "init"):
