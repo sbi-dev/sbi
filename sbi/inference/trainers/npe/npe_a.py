@@ -462,28 +462,7 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         return self._posterior
 
-    def _log_prob_proposal_posterior(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: Optional[Any],
-    ) -> Tensor:
-        """Return the log-probability of the proposal posterior.
 
-        For SNPE-A this is the same as `self._neural_net.log_prob(theta, x)` in
-        `_loss()` to be found in `snpe_base.py`.
-
-        Args:
-            theta: Batch of parameters θ.
-            x: Batch of data.
-            masks: Mask that is True for prior samples in the batch in order to train
-                them with prior loss.
-            proposal: Proposal distribution.
-
-        Returns: Log-probability of the proposal posterior.
-        """
-        return self._neural_net.log_prob(theta, x)
 
 
 def _correct_for_proposal(
