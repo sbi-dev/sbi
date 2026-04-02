@@ -86,6 +86,8 @@
 * Add code examples to trainer class docstrings by @XBastille in https://github.com/sbi-dev/sbi/pull/1763
 * Add type hints and standardize docstrings in torchutils by @khaledeslam20 in https://github.com/sbi-dev/sbi/pull/1815
 * refactor: fix docstrings and signatures of sample* methods by @janfb in https://github.com/sbi-dev/sbi/pull/1719
+* New abstraction level guide by @dgedon in https://github.com/sbi-dev/sbi/pull/1758
+* Unify vector field tutorials, fix legend in pairplot by @janfb in https://github.com/sbi-dev/sbi/pull/1830
 
 #### 🧪 Testing & CI/CD
 
@@ -108,6 +110,7 @@
 * Remove PyTorch upper version restriction by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1768
 * refactor: format pyro guide by @janfb in https://github.com/sbi-dev/sbi/pull/1746
 * fix ruff formatting in main by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1792
+* Fix GH workflow vulnerabilities: SHA-pin all actions, fix template injections, restrict permissions, remove legacy dependency pins (fixes CVE-2023-24816) by @janfb in https://github.com/sbi-dev/sbi/pull/1831
 
 ### 🎉 New Contributors
 
