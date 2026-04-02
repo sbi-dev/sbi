@@ -5,15 +5,20 @@ on:
     types: [ published ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      with:
+        persist-credentials: false
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
       with:
         python-version: "3.10"
     - name: Install pypa/build
@@ -25,7 +30,7 @@ jobs:
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
     - name: Store the distribution packages
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
         name: python-package-distributions
         path: dist/
@@ -45,12 +50,12 @@ jobs:
 
     steps:
     - name: Download all the dists
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         name: python-package-distributions
         path: dist/
     - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
 
   github-release:
     name: >-
@@ -66,12 +71,12 @@ jobs:
 
     steps:
     - name: Download all the dists
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         name: python-package-distributions
         path: dist/
     - name: Sign the dists with Sigstore
-      uses: sigstore/gh-action-sigstore-python@v3.0.0
+      uses: sigstore/gh-action-sigstore-python@f514d46b907ebcd5bedc05145c03b69c1edd8b46 # v3.0.0
       with:
         inputs: >-
           ./dist/*.tar.gz
@@ -79,17 +84,19 @@ jobs:
     - name: Ensure GitHub Release exists (no-op if already exists)
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        TAG_NAME: ${{ github.ref_name }}
       run: |
         # If a release for this tag already exists (e.g., created via GH UI), skip creation.
-        gh release view '${{ github.ref_name }}' --repo '${{ github.repository }}' >/dev/null 2>&1 || \
-          gh release create '${{ github.ref_name }}' --repo '${{ github.repository }}' --notes ""
+        gh release view "$TAG_NAME" --repo '${{ github.repository }}' >/dev/null 2>&1 || \
+          gh release create "$TAG_NAME" --repo '${{ github.repository }}' --notes ""
     - name: Upload artifact signatures to GitHub Release
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        TAG_NAME: ${{ github.ref_name }}
       # Upload to GitHub Release using the `gh` CLI.
       # `dist/` contains the built packages, and the
       # sigstore-produced signatures and certificates.
       run: >-
         gh release upload
-        '${{ github.ref_name }}' dist/**
+        "$TAG_NAME" dist/**
         --repo '${{ github.repository }}'
