@@ -7,6 +7,7 @@ Training
 .. toctree::
    :maxdepth: 1
 
+   24_abstraction_levels.ipynb
    06_choosing_inference_method.ipynb
    02_multiround_inference.ipynb
    07_gpu_training.ipynb
