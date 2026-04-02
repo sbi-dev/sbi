@@ -37,8 +37,7 @@ Neural nets
 - :doc:`advanced_tutorials/04_embedding_networks`
 - :doc:`advanced_tutorials/03_density_estimators`
 - :doc:`advanced_tutorials/12_iid_data_and_permutation_invariant_embeddings`
-- :doc:`advanced_tutorials/19_flowmatching_and_scorematching`
-- :doc:`advanced_tutorials/20_score_based_methods_new_features`
+- :doc:`advanced_tutorials/19_vector_field_methods`
 
 
 Training
