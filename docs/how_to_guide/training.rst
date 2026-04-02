@@ -15,4 +15,4 @@ Training
    07_resume_training.ipynb
    21_hyperparameter_tuning.ipynb
    22_experiment_tracking.ipynb
-   24_choosing_vector_field_options.ipynb
+   25_choosing_vector_field_options.ipynb
