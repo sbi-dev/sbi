@@ -1,5 +1,134 @@
 # Changelog
 
+## v0.26.0
+
+### ✨ Highlights
+
+#### 🚀 New Inference Methods & Posteriors
+
+* **Add AmortizedVIPosterior for amortized variational inference** by @janfb in https://github.com/sbi-dev/sbi/pull/1751
+* **Diffusion model guidance including PriorGuide** by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1482
+* **Add iid support for NPE via MCMC, VI, IS** by @satwiksps in https://github.com/sbi-dev/sbi/pull/1810
+
+#### 🧠 Neural Network Architectures
+
+* **Port MDN from pyknos, improve numerical stability** by @janfb in https://github.com/sbi-dev/sbi/pull/1724
+* **Add EDM-style noise schedules for VEScoreEstimator** by @janfb in https://github.com/sbi-dev/sbi/pull/1754
+* **Add 1D time-series support and automatic input projection to TransformerEmbedding** by @satwiksps in https://github.com/sbi-dev/sbi/pull/1703
+* **Optional LayerNorm and GELU activation for FC embedding** by @renecotyfanboy in https://github.com/sbi-dev/sbi/pull/1809
+* **Switch build_mlp_classifier to LayerNorm by default** by @rsvr76 in https://github.com/sbi-dev/sbi/pull/1806
+
+#### 🔧 Code Quality & Refactoring
+
+* **Config dataclasses for all net builders to fix kwargs chaining** by @janfb in https://github.com/sbi-dev/sbi/pull/1795
+* **Config classes for vectorfield kwargs** by @janfb in https://github.com/sbi-dev/sbi/pull/1777
+* **Refactor and modularize inference training method** by @abelaba in https://github.com/sbi-dev/sbi/pull/1651
+* **Training dataclasses** by @abelaba in https://github.com/sbi-dev/sbi/pull/1668
+* **Refactor Plotting functions** by @abelaba in https://github.com/sbi-dev/sbi/pull/1631
+
+### ⭐ New Features
+
+* Add max_sampling_time support to rejection samplers by @satwiksps in https://github.com/sbi-dev/sbi/pull/1705
+* Add return_partial_on_timeout option to rejection samplers by @janfb in https://github.com/sbi-dev/sbi/pull/1720
+* FMPE with higher-dim conditions by @gmoss13 in https://github.com/sbi-dev/sbi/pull/1704
+* LC2ST MLP GPU support (closes #1160) by @Dev-Sudarshan in https://github.com/sbi-dev/sbi/pull/1715
+* Pairplot support for mixed samples by @janfb in https://github.com/sbi-dev/sbi/pull/1808
+* Add protocols for sample proposal and accept/reject by @janfb in https://github.com/sbi-dev/sbi/pull/1722
+* Add Tracker protocol and training tracking guide by @janfb in https://github.com/sbi-dev/sbi/pull/1741
+* Use Literal for strict typing of z-scoring options by @satwiksps in https://github.com/sbi-dev/sbi/pull/1744
+* Support shape broadcasting and condition sample_dim in density estimators by @satwiksps in https://github.com/sbi-dev/sbi/pull/1791
+* Decouple hidden features and layers for mixed type nets by @janfb in https://github.com/sbi-dev/sbi/pull/1798
+* Refactoring noise_schedule and time schedule into base class by @janfb in https://github.com/sbi-dev/sbi/pull/1736
+
+### 🐛 Bug Fixes
+
+* fix: disable transform, add warning for empirical prior by @janfb in https://github.com/sbi-dev/sbi/pull/1669
+* MNPE fix for categorical variables by @dgedon in https://github.com/sbi-dev/sbi/pull/1671
+* Fix: Make NPSE picklable by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1679
+* Fix for z-scoring in vectorfield nets by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1681
+* fix: autoregressive sampling bug in categorical MADE by @janfb in https://github.com/sbi-dev/sbi/pull/1684
+* Remove gate_activation to allow pickling by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1694
+* assert finite x_o by @gmoss13 in https://github.com/sbi-dev/sbi/pull/1701
+* fix: ImproperEmpirical is inefficient by @gmoss13 in https://github.com/sbi-dev/sbi/pull/1700
+* Fix device mismatch in NPSE marginal mean/std computation by @satwiksps in https://github.com/sbi-dev/sbi/pull/1707
+* Fix misleading assertion message in NPE train by @satwiksps in https://github.com/sbi-dev/sbi/pull/1706
+* fix: pin PyMC version below 5.20.1 to avoid TypeError (closes #1397) by @Dev-Sudarshan in https://github.com/sbi-dev/sbi/pull/1697
+* Fix memory bloat in multi-round inference by @satwiksps in https://github.com/sbi-dev/sbi/pull/1749
+* Raise informative RuntimeError when training with empty simulations by @satwiksps in https://github.com/sbi-dev/sbi/pull/1750
+* Re-enable time-dependent z-scoring for Flow Matching by @satwiksps in https://github.com/sbi-dev/sbi/pull/1752
+* Fix: Improve error message for x_o shape mismatch by @XBastille in https://github.com/sbi-dev/sbi/pull/1759
+* Fix: forward dropout_probability to CategoricalMADE in mixed density estimator by @coschroeder in https://github.com/sbi-dev/sbi/pull/1789
+* Fix Gaussian Linear task in mini SBI-BM by @jsvetter in https://github.com/sbi-dev/sbi/pull/1782
+* Fix: Add fallback to move_distribution_to_device for complex distributions by @XBastille in https://github.com/sbi-dev/sbi/pull/1785
+* fix: adjust leading dimension handling in log prob batched by @janfb in https://github.com/sbi-dev/sbi/pull/1799
+* fix: Check instance of prior so ValueError is raised after .append_simulations was executed (#1793) by @Jocho-Smith in https://github.com/sbi-dev/sbi/pull/1803
+* fix_mcmc_iid_for_npe by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1813
+* fix: quick error fix for broadcasting refactor by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1824
+* fix: rejection posterior should use theta_transform by @janfb in https://github.com/sbi-dev/sbi/pull/1827
+* Fix ImproperEmpirical: remove Empirical inheritance, constant log_prob, fix to() by @patelshivani2283-lab in <https://github.com/sbi-dev/sbi/pull/1822>
+
+### 🛠️ Maintenance & Improvements
+
+#### 📖 Documentation & Website
+
+* Add how-to guide for embedding time-series by @satwiksps in https://github.com/sbi-dev/sbi/pull/1695
+* Improve docs of MNPE and EnsemblePosterior by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1677
+* Add SNPE-B to implemented methods by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1691
+* Fixups for the API of implemented methods by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1692
+* Fixups by @michaeldeistler in https://github.com/sbi-dev/sbi/pull/1693
+* Update Potentially Misleading Error Message in simulate_for_sbi by @vagechirkov in https://github.com/sbi-dev/sbi/pull/1689
+* Update README with tutorial paper reference by @jahma in https://github.com/sbi-dev/sbi/pull/1712
+* Fix Discord server link in README by @janfb in https://github.com/sbi-dev/sbi/pull/1729
+* How-to guide on Pyro with SBI by @touronc in https://github.com/sbi-dev/sbi/pull/1740
+* Add how-to-guide for hyperparameter optimization with Optuna by @janfb in https://github.com/sbi-dev/sbi/pull/1742
+* Remove arviz dependency, move arviz plotting to how-to-guide by @janfb in https://github.com/sbi-dev/sbi/pull/1743
+* Navigation subheadings for tutorials and API by @dgedon in https://github.com/sbi-dev/sbi/pull/1760
+* Add code examples to trainer class docstrings by @XBastille in https://github.com/sbi-dev/sbi/pull/1763
+* Add type hints and standardize docstrings in torchutils by @khaledeslam20 in https://github.com/sbi-dev/sbi/pull/1815
+* refactor: fix docstrings and signatures of sample* methods by @janfb in https://github.com/sbi-dev/sbi/pull/1719
+* New abstraction level guide by @dgedon in https://github.com/sbi-dev/sbi/pull/1758
+* Unify vector field tutorials, fix legend in pairplot by @janfb in https://github.com/sbi-dev/sbi/pull/1830
+
+#### 🧪 Testing & CI/CD
+
+* Refactor z-scoring tests to fix shapes and enable MNLE support by @satwiksps in https://github.com/sbi-dev/sbi/pull/1711
+* fix: skip GPU tests on MPS devices instead of failing by @XBastille in https://github.com/sbi-dev/sbi/pull/1769
+* fix: remove xfail; increase mcmc warmup by @janfb in https://github.com/sbi-dev/sbi/pull/1774
+* Trigger workflow when PR is marked ready for review by @satwiksps in https://github.com/sbi-dev/sbi/pull/1753
+* Refactor embedding net API tests with shared helper by @Dev-Sudarshan in https://github.com/sbi-dev/sbi/pull/1794
+* Fix failing test: Make prior more "within train" by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1800
+
+#### 🏗️ Infrastructure & Dependencies
+
+* fix release workflow, add sign workflow by @janfb in https://github.com/sbi-dev/sbi/pull/1663
+* Fix release workflow by @janfb in https://github.com/sbi-dev/sbi/pull/1664
+* An Enhancement Proposal Workflow by @janfb in https://github.com/sbi-dev/sbi/pull/1674
+* build: Move notebook dependency to 'notebook' extra by @matthewfeickert in https://github.com/sbi-dev/sbi/pull/1714
+* fix: add dependencies for tutorial tests; fix pymc errors by @janfb in https://github.com/sbi-dev/sbi/pull/1716
+* chore: update Codecov settings for coverage flags by @janfb in https://github.com/sbi-dev/sbi/pull/1726
+* Remove pyknos dependency by @janfb in https://github.com/sbi-dev/sbi/pull/1767
+* Remove PyTorch upper version restriction by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1768
+* refactor: format pyro guide by @janfb in https://github.com/sbi-dev/sbi/pull/1746
+* fix ruff formatting in main by @manuelgloeckler in https://github.com/sbi-dev/sbi/pull/1792
+* Fix GH workflow vulnerabilities: SHA-pin all actions, fix template injections, restrict permissions, remove legacy dependency pins (fixes CVE-2023-24816) by @janfb in https://github.com/sbi-dev/sbi/pull/1831
+
+### 🎉 New Contributors
+
+* @vagechirkov made their first contribution in https://github.com/sbi-dev/sbi/pull/1689
+* @satwiksps made their first contribution in https://github.com/sbi-dev/sbi/pull/1695
+* @jahma made their first contribution in https://github.com/sbi-dev/sbi/pull/1712
+* @Dev-Sudarshan made their first contribution in https://github.com/sbi-dev/sbi/pull/1697
+* @touronc made their first contribution in https://github.com/sbi-dev/sbi/pull/1740
+* @XBastille made their first contribution in https://github.com/sbi-dev/sbi/pull/1759
+* @coschroeder made their first contribution in https://github.com/sbi-dev/sbi/pull/1789
+* @jsvetter made their first contribution in https://github.com/sbi-dev/sbi/pull/1782
+* @renecotyfanboy made their first contribution in https://github.com/sbi-dev/sbi/pull/1809
+* @rsvr76 made their first contribution in https://github.com/sbi-dev/sbi/pull/1806
+* @khaledeslam20 made their first contribution in https://github.com/sbi-dev/sbi/pull/1815
+* @Jocho-Smith made their first contribution in https://github.com/sbi-dev/sbi/pull/1803
+
+**Full Changelog**: https://github.com/sbi-dev/sbi/compare/v0.25.0...v0.26.0
+
 ## v0.25.0
 
 ### ✨ Highlights
