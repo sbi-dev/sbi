@@ -46,21 +46,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-notebook = ["notebook<=6.4.12"]
+notebook = ["notebook"]
 doc = [
     "sbi[notebook]",
     # Documentation
-    "ipython <= 8.9.0",
-    "jupyter_contrib_nbextensions",
-    "mike",
-    "mkdocs",
-    "markdown-include",
-    "mkdocs-material",
-    "mkdocs-redirects",
-    "mkdocstrings[python] >= 0.18",
     "nbconvert",
     "nbformat",
-    "traitlets <= 5.9.0",
     "sphinx",
     "sphinx-autobuild",
     "sphinx_autodoc_typehints",
