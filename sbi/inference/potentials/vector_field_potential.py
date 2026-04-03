@@ -302,6 +302,69 @@ class VectorFieldBasedPotential(BasePotential):
             flows.append(flow)
         return flows
 
+        
+    def init(self, **kwargs: Any) -> "VectorFieldBasedPotential":
+        """Run one-time hyperparameter estimation before sampling.
+
+        For iid methods that need to estimate precision matrices (``auto_gauss``,
+        ``gauss``) or guidance methods that fit a GMM (``prior_guide``), calling
+        ``init()`` explicitly ensures that expensive preprocessing is done once,
+        up-front, before the sampler starts.
+
+        This is typically called automatically by the ``PosteriorBuilder`` API
+        (``posterior.with_iid(...).sample(...)``). It can also be called manually
+        when fine-grained control over initialization timing is desired::
+
+            potential_fn.set_x(x_o, x_is_iid=True)
+            potential_fn.init()          # precision estimation happens here
+            posterior.sample((1000,))    # no surprise overhead on first step
+
+        Args:
+            **kwargs: Forwarded to the underlying IID / guidance ``init()`` hooks.
+                Currently unused; reserved for future subclass customisation.
+
+        Returns:
+            ``self`` for method chaining.
+        """
+        x_o = self._x_o
+        if x_o is None:
+            return self
+
+        device = x_o.device
+
+        # --- guidance init ---
+        if self.guidance_method is not None:
+            score_wrapper, config_cls = get_guidance_method(self.guidance_method)
+            config_params = config_cls(**(self.guidance_params or {}))
+            vf_estimator = score_wrapper(
+                self.vector_field_estimator,
+                self.prior,
+                config=config_params,
+                device=device,
+            )
+        else:
+            vf_estimator = self.vector_field_estimator
+
+        # --- iid init (precision estimation) ---
+        if self.x_is_iid and x_o.shape[0] > 1:
+            assert self.prior is not None, "Prior is required for iid init."
+            iid_method = get_iid_method(self.iid_method)
+            # Constructing the iid method triggers precision estimation in
+            # GaussCorrectedScoreFn and AutoGaussCorrectedScoreFn (via
+            # estimate_prior_precision / estimate_posterior_precision which are
+            # lru_cache'd class methods).  After this call the cached results are
+            # warm, so the first gradient() call during sampling pays no extra cost.
+            iid_method(
+                vf_estimator,
+                self.prior,
+                device=device,
+                **(self.iid_params or {}),
+            )
+
+        return self
+
+
+
 
 def vector_field_estimator_based_potential(
     vector_field_estimator: ConditionalVectorFieldEstimator,
