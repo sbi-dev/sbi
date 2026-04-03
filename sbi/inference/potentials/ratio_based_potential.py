@@ -47,6 +47,40 @@ def ratio_estimator_based_potential(
 
 
 class RatioBasedPotential(BasePotential):
+    r"""Potential function for ratio-based methods (NRE).
+
+    This potential computes $\log(r(\theta, x_o) \cdot p(\theta))$ where
+    $r(\theta, x) = p(x|\theta)/p(x)$ is the likelihood-to-evidence ratio
+    estimated by a classifier.
+
+    Example:
+    --------
+    ::
+
+        import torch
+        from sbi.inference import NRE_A
+        from sbi.inference.potentials import ratio_estimator_based_potential
+        from sbi.utils import BoxUniform
+
+        # 1. Train a ratio estimator
+        prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
+        theta = prior.sample((100,))
+        x = theta + 0.1 * torch.randn_like(theta)
+
+        trainer = NRE_A(prior=prior)
+        ratio_estimator = trainer.append_simulations(theta, x).train()
+
+        # 2. Create potential function
+        x_o = torch.tensor([[0.5, 0.5]])
+        potential_fn, theta_transform = ratio_estimator_based_potential(
+            ratio_estimator, prior, x_o
+        )
+
+        # 3. Evaluate potential at a point
+        theta_test = torch.tensor([[0.4, 0.6]])
+        log_prob = potential_fn(theta_test)
+    """
+
     def __init__(
         self,
         ratio_estimator: nn.Module,
