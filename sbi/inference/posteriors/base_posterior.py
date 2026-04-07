@@ -102,7 +102,7 @@ class NeuralPosterior:
                 consumption.
         """
         if not self._initialized:
-            raise RuntimeError("Call init() before using the posterior.")
+            self.init()
         self.potential_fn.set_x(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
