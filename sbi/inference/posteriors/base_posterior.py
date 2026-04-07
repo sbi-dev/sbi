@@ -82,7 +82,7 @@ class NeuralPosterior:
         self._initialized = False
 
     def init(self):
-        """Initialize the underlying potential before sampling."""       
+        """Initialize the underlying potential before sampling."""
         self.potential_fn.init()
         self._initialized = True
         return self
