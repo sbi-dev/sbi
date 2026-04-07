@@ -82,9 +82,8 @@ class NeuralPosterior:
         self._initialized = False
 
     def init(self):
-        """Initialize the underlying potential before sampling."""
-        if hasattr(self.potential_fn, "init"):
-            self.potential_fn.init()
+        """Initialize the underlying potential before sampling."""       
+        self.potential_fn.init()
         self._initialized = True
         return self
 
@@ -103,7 +102,9 @@ class NeuralPosterior:
                 consumption.
         """
         if not self._initialized:
-            self.init()
+            raise RuntimeError(
+                "Call init() before using the posterior."
+            )
         self.potential_fn.set_x(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
