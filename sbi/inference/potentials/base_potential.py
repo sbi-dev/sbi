@@ -143,8 +143,6 @@ class CustomPotentialWrapper(BasePotential):
         Note, x_o is re-used from the initialization of the potential function.
         """
         if not self._initialized:
-            raise RuntimeError(
-                "Call init() before using this potential."
-            )
+            raise RuntimeError("Call init() before using this potential.")
         with torch.set_grad_enabled(track_gradients):
             return self.potential_fn(theta, self.x_o)
