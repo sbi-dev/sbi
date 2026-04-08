@@ -16,7 +16,8 @@ from sbi.inference import (
     likelihood_estimator_based_potential,
 )
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
-from sbi.samplers.mcmc import PyMCSampler, SliceSamplerSerial, SliceSamplerVectorized
+from sbi.samplers.mcmc import SliceSamplerSerial, SliceSamplerVectorized
+from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
 
