@@ -150,10 +150,10 @@ class FMPE(VectorFieldTrainer):
                 flow matching estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior.
-                Can be one of 'sde' (default) or 'ode'. The 'sde' method uses
-                the score to do a Langevin diffusion step, while the 'ode' method
-                uses the score to define a probabilistic ODE and solves it with
-                a numerical ODE solver.
+                Can be one of 'ode' (default) or 'sde'. The 'ode' method uses
+                the velocity field to define a probabilistic ODE and solves it
+                with a numerical ODE solver. The 'sde' method uses the score to
+                do a Langevin diffusion step.
             vectorfield_sampling_parameters: Additional keyword arguments passed to
                 `VectorFieldPosterior`.
             posterior_parameters: Configuration passed to the init method for
