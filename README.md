@@ -60,61 +60,24 @@ posterior = inference.build_posterior()
 
 ### Installation
 
-`sbi` requires Python 3.10 or higher. While a GPU isn't necessary, it can improve
-performance in some cases. We recommend using a virtual environment with
-[`conda`](https://docs.conda.io/en/latest/miniconda.html) for an easy setup.
-
-If `conda` is installed on the system, an environment for installing `sbi` can be created as follows:
+`sbi` requires Python 3.10 or higher. While a GPU isn't necessary, it can
+improve performance in some cases. We recommend using
+[`uv`](https://docs.astral.sh/uv/) for package management:
 
 ```bash
-conda create -n sbi_env python=3.10 && conda activate sbi_env
+uv pip install sbi
 ```
 
-### From PyPI
-
-To install `sbi` from PyPI run
+Pyro and PyMC MCMC samplers are optional. Install them as needed:
 
 ```bash
-python -m pip install sbi
+uv pip install "sbi[pyro]"   # for Pyro samplers (HMC, NUTS)
+uv pip install "sbi[pymc]"   # for PyMC samplers (HMC, NUTS, Slice)
+uv pip install "sbi[all]"    # both Pyro and PyMC
 ```
 
-### From conda-forge
-
-To install and add `sbi` to a project with [`pixi`](https://pixi.sh/), from the project directory run
-
-```bash
-pixi add sbi
-```
-
-and to install into a particular conda environment with [`conda`](https://docs.conda.io/projects/conda/), in the activated environment run
-
-```bash
-conda install --channel conda-forge sbi
-```
-
-If [`uv`](http://docs.astral.sh/uv/) is installed on the system, an environment for installing `sbi` can be created as follows:
-
-```bash
-uv venv -p 3.10
-```
-
-Then activate the virtual enviroment by running:
-
-- For `macOS` or `Linux` users
-  ```bash
-  source .venv/bin/activate
-  ```
-
-- For `Windows` users
-  ```bash
-  .venv\Scripts\activate
-  ```
-
-To install `sbi` run
-
-```bash
-uv add sbi
-```
+For conda, pixi, pip, and other installation methods, see the
+[full installation guide](https://sbi.readthedocs.io/en/latest/installation.html).
 
 ### Testing the installation
 
