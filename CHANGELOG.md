@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.26.1
+
+### ⚠️ Breaking Changes
+
+* **Make PyMC and Pyro optional dependencies** ([#1835](https://github.com/sbi-dev/sbi/issues/1835)): `pip install sbi` no longer installs `pymc` or `pyro-ppl`. Users who need Pyro or PyMC MCMC samplers should install extras:
+  * `pip install "sbi[pyro]"` for Pyro samplers (`hmc_pyro`, `nuts_pyro`)
+  * `pip install "sbi[pymc]"` for PyMC samplers (`slice_pymc`, `hmc_pymc`, `nuts_pymc`)
+  * `pip install "sbi[all]"` for both
+  * Using a Pyro/PyMC method without the dependency installed raises a clear `ImportError` with install instructions.
+
+### 🐛 Bug Fixes
+
+* **Fix TARP z-scoring bug** ([#1832](https://github.com/sbi-dev/sbi/issues/1832)): Reference points are now z-scored alongside `thetas` and `posterior_samples` when `z_score_theta=True`, fixing incorrect distance calculations that masked bias detection.
+* **Fix broken `biased_toy_gaussian` test helper**: Rewrote to create actual location bias (posterior mean shifted from truth) instead of the previous NaN-producing formula.
+
+### 📖 Documentation
+
+* Streamlined README installation section, recommend `uv` as default.
+* Added optional dependency install instructions to README, installation guide, and relevant tutorials.
+
+### 🔧 Improvements
+
+* **Change default `num_bins` in TARP**: `run_tarp` and `_run_tarp` now default to `num_bins=None` (auto-scales to `num_sims // 10`) instead of the hardcoded `30`, improving KS test power for larger sample sizes.
+
 ## v0.26.0
 
 ### ✨ Highlights
