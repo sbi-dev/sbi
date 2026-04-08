@@ -32,7 +32,7 @@ def run_tarp(
     num_workers: int = 1,
     show_progress_bar: bool = True,
     distance: Callable = l2,
-    num_bins: Optional[int] = 30,
+    num_bins: Optional[int] = None,
     z_score_theta: bool = True,
     use_batched_sampling: bool = True,
 ) -> Tuple[Tensor, Tensor]:
@@ -59,7 +59,9 @@ def run_tarp(
             Possible values: ``sbi.utils.metrics.l1`` or
             ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
-            If ``None``, then ``num_sims // 10`` bins are used.
+            If ``None``, then ``num_sims // 10`` bins are used, which ensures
+            at least 10 samples per bin for reliable histogram estimation while
+            maximizing the number of bins for KS test power.
         z_score_theta : whether to normalize parameters before coverage test.
         use_batched_sampling: whether to use batched sampling for posterior samples.
 
@@ -100,7 +102,7 @@ def _run_tarp(
     thetas: Tensor,
     references: Tensor,
     distance: Callable = l2,
-    num_bins: Optional[int] = 30,
+    num_bins: Optional[int] = None,
     z_score_theta: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """
@@ -155,6 +157,7 @@ def _run_tarp(
         hi = thetas.max(dim=0, keepdim=True).values  # max over batch
         posterior_samples = (posterior_samples - lo) / (hi - lo + 1e-10)
         thetas = (thetas - lo) / (hi - lo + 1e-10)
+        references = (references - lo) / (hi - lo + 1e-10)
 
     # distances between references and samples
     sample_dists = distance(references, posterior_samples)

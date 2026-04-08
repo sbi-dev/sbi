@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import pytest
-from scipy.stats import uniform
 from torch import allclose, device, exp, eye, ones, zeros
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
@@ -36,19 +35,20 @@ def generate_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
 
 
 def biased_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
-    """adopted from the tarp paper page 7, section 4.1 Gaussian Toy Model
-    correct case"""
+    """Adopted from the TARP paper page 7, section 4.1 Gaussian Toy Model.
+    Creates biased posteriors by shifting the posterior mean relative to truth."""
 
     base_mean = Uniform(-5, 5)
-    base_mean_ = uniform(-5, 5)
     base_log_var = Uniform(-5, -1)
 
-    locs_ = base_mean.sample((nsims, ndims))
+    locs = base_mean.sample((nsims, ndims))
     scales = exp(base_log_var.sample((nsims, ndims)))
-    locs = locs_ - locs_.sign() * base_mean_.isf(locs_) * scales
 
-    spdf = Normal(loc=locs, scale=covfactor * scales)
-    tpdf = Normal(loc=locs, scale=scales)
+    # Bias: shift posterior mean by 5 standard deviations from truth.
+    bias = 5.0 * scales
+
+    spdf = Normal(loc=locs + bias, scale=covfactor * scales)  # biased posterior
+    tpdf = Normal(loc=locs, scale=scales)  # true distribution
 
     samples = spdf.sample((nsamples,))
     theta_prime = tpdf.sample()
@@ -90,7 +90,7 @@ def overdispersed_samples():
 @pytest.fixture
 def biased_samples():
     nsamples = 100  # samples per simulation
-    nsims = 100
+    nsims = 500
     ndims = 5
 
     return biased_toy_gaussian(nsamples, nsims, ndims, covfactor=2.0)
@@ -221,7 +221,7 @@ def test_run_tarp_detect_bias(distance, biased_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(
-        samples, theta, references, distance=distance, num_bins=30, z_score_theta=True
+        samples, theta, references, distance=distance, z_score_theta=True
     )
 
     # TARP detects that this is NOT a correct representation of the posterior
@@ -273,12 +273,13 @@ def test_check_tarp_detect_bias(biased_samples):
     theta, samples = biased_samples
     references = get_tarp_references(theta)
 
-    ecp, alpha = _run_tarp(samples, theta, references, num_bins=30, z_score_theta=True)
-    atc, kspvals = check_tarp(ecp, alpha)
+    ecp, alpha = _run_tarp(samples, theta, references, z_score_theta=True)
+    _, kspvals = check_tarp(ecp, alpha)
 
-    assert atc != 0.0
-    assert atc > 1.0
-
+    # Unlike over/underdispersion, bias doesn't have a predictable ATC direction—
+    # it depends on the geometry of bias vs reference points. So we only check
+    # that the KS test rejects uniformity (the sum > 3.0 check is already covered
+    # by test_run_tarp_detect_bias).
     assert kspvals < 0.05  # samples are unlikely from the same PDF
 
 
