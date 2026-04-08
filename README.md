@@ -60,20 +60,20 @@ posterior = inference.build_posterior()
 
 ### Installation
 
-`sbi` requires Python 3.10 or higher. `sbi` requires Python 3.10 or higher. While a GPU
-isn't necessary, it can improve performance in some cases. We recommend using
+`sbi` requires Python 3.10 or higher. While a GPU isn't necessary, it can
+improve performance in some cases. We recommend using
 [`uv`](https://docs.astral.sh/uv/) for package management:
 
 ```bash
 uv pip install sbi
 ```
 
-This installs the core dependencies. For using Pyro or PyMC MCMC samplers, install the corresponding extras:
+Pyro and PyMC MCMC samplers are optional. Install them as needed:
 
 ```bash
 uv pip install "sbi[pyro]"   # for Pyro samplers (HMC, NUTS)
 uv pip install "sbi[pymc]"   # for PyMC samplers (HMC, NUTS, Slice)
-uv pip install "sbi[all]"    # for all optional dependencies
+uv pip install "sbi[all]"    # both Pyro and PyMC
 ```
 
 For conda, pixi, pip, and other installation methods, see the
