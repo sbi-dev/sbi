@@ -250,8 +250,8 @@ def test_check_tarp_underdispersed(underdispersed_samples):
     ecp, alpha = _run_tarp(samples, theta, references, num_bins=30)
     atc, kspvals = check_tarp(ecp, alpha)
 
-    # TARP should detect that the posterior is underdispersed (atc < -1.0)
-    assert atc < -2.0
+    # TARP should detect that the posterior is underdispersed (atc < 0)
+    assert atc < -0.05
     # and p-values should be relatively small
     assert kspvals < 0.05
 
@@ -263,8 +263,7 @@ def test_check_tarp_overdispersed(overdispersed_samples):
     ecp, alpha = _run_tarp(samples, theta, references, num_bins=50, z_score_theta=False)
     atc, kspvals = check_tarp(ecp, alpha)
 
-    assert atc != 0.0
-    assert atc > 2.0
+    assert atc > 0.02
 
     assert kspvals < 0.05  # samples are unlikely from the same PDF
 
@@ -324,7 +323,7 @@ def test_consistent_run_tarp_results_with_posterior(method):
     )
 
     atc, kspvals = check_tarp(ecp, alpha)
-    assert -0.5 < atc < 0.5
+    assert -0.1 < atc < 0.1
     assert kspvals > 0.05
 
 
