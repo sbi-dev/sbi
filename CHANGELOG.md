@@ -24,6 +24,13 @@
 
 * **Change default `num_bins` in TARP**: `run_tarp` and `_run_tarp` now default to `num_bins=None` (auto-scales to `num_sims // 10`) instead of the hardcoded `30`, improving KS test power for larger sample sizes.
 
+### 🔒 Security
+
+* Added SLSA build provenance attestations to the release workflow.
+* Added Dependabot for automated GitHub Actions version updates.
+* Added `SECURITY.md` with vulnerability disclosure policy.
+* Fixed release uploads with `--clobber` flag.
+
 ## v0.26.0
 
 ### ✨ Highlights

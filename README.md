@@ -186,7 +186,8 @@ We welcome any feedback on how `sbi` is working for your inference problems (see
 reports, pull requests, and other feedback (see
 [contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a
 positive and respectful community; please read our [Code of
-Conduct](CODE_OF_CONDUCT.md).
+Conduct](CODE_OF_CONDUCT.md). To report a security vulnerability, please see our
+[Security Policy](SECURITY.md).
 
 ## Acknowledgments
 
