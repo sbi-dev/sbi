@@ -66,8 +66,9 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write  # IMPORTANT: mandatory for making GitHub Releases
-      id-token: write  # IMPORTANT: mandatory for sigstore
+      contents: write  # mandatory for making GitHub Releases
+      id-token: write  # mandatory for sigstore
+      attestations: write  # mandatory for SLSA provenance
 
     steps:
     - name: Download all the dists
@@ -81,6 +82,10 @@ jobs:
         inputs: >-
           ./dist/*.tar.gz
           ./dist/*.whl
+    - name: Attest build provenance
+      uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+      with:
+        subject-path: "dist/*.tar.gz,dist/*.whl"
     - name: Ensure GitHub Release exists (no-op if already exists)
       env:
         GITHUB_TOKEN: ${{ github.token }}
@@ -100,3 +105,4 @@ jobs:
         gh release upload
         "$TAG_NAME" dist/**
         --repo '${{ github.repository }}'
+        --clobber
