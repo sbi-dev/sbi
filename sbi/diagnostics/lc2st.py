@@ -619,8 +619,9 @@ class LC2ST:
         )
         self.trained_clfs = trained_clfs
 
-        # Update state
-        if self._state == LC2STState.NULL_TRAINED:
+        # Update state: preserve READY (re-training is a valid workflow, e.g.
+        # looping over seeds to estimate classifier variance).
+        if self._state in (LC2STState.NULL_TRAINED, LC2STState.READY):
             self._state = LC2STState.READY
         else:
             self._state = LC2STState.OBSERVED_TRAINED
@@ -976,6 +977,11 @@ class LC2ST_NF(LC2ST):
         self.null_distribution = flow_base_dist
         self.permutation = False
         self.trained_clfs_null = trained_clfs_null
+
+        # If pretrained null classifiers were passed, advance the state machine
+        # so downstream methods recognize the null as already trained.
+        if trained_clfs_null is not None:
+            self._state = LC2STState.NULL_TRAINED
 
         # Draw samples from the base distribution for evaluation
         self.theta_o = flow_base_dist.sample(torch.Size([num_eval]))

@@ -258,6 +258,83 @@ def test_lc2st_state_transitions_reverse_order(cal_data):
     assert lc2st._state == LC2STState.READY
 
 
+def test_lc2st_retrain_observed_preserves_ready_state(
+    lc2st_instance, theta_o, x_o
+):
+    """Retraining the observed classifier must not downgrade READY -> OBSERVED_TRAINED.
+
+    Regression test for the workflow where users loop over seeds to estimate
+    classifier variance (as shown in the LC2ST tutorial notebook).
+    """
+    lc2st_instance.train_under_null_hypothesis()
+    lc2st_instance.train_on_observed_data(seed=0)
+    assert lc2st_instance._state == LC2STState.READY
+
+    # Works the first time
+    lc2st_instance.p_value(theta_o=theta_o, x_o=x_o)
+
+    # Retrain with a different seed (legitimate workflow)
+    lc2st_instance.train_on_observed_data(seed=1)
+    assert lc2st_instance._state == LC2STState.READY
+
+    # Must still work without RuntimeError after retrain
+    lc2st_instance.p_value(theta_o=theta_o, x_o=x_o)
+
+
+def test_lc2st_nf_with_pretrained_null_is_ready_after_observed_training(
+    cal_data, badly_trained_npe
+):
+    """LC2ST_NF constructed with pretrained null classifiers must reach READY.
+
+    Regression test for the primary documented use case of LC2ST_NF: reusing
+    expensive-to-train null classifiers across different estimators. Previously,
+    the state machine left the object at INITIALIZED, causing p_value() to raise.
+    """
+    npe = badly_trained_npe
+    kwargs_init = {
+        "flow_inverse_transform": lambda t, x: npe.net._transform(t, context=x)[0],
+        "flow_base_dist": torch.distributions.MultivariateNormal(
+            torch.zeros(2), torch.eye(2)
+        ),
+    }
+
+    # First, train null classifiers on one LC2ST_NF instance.
+    lc2st_source = LC2ST_NF(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.posterior_samples,
+        num_trials_null=2,
+        **kwargs_init,
+    )
+    lc2st_source.train_under_null_hypothesis()
+    pretrained_null = lc2st_source.trained_clfs_null
+
+    # Now construct a fresh LC2ST_NF reusing those null classifiers.
+    lc2st = LC2ST_NF(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.posterior_samples,
+        num_trials_null=2,
+        trained_clfs_null=pretrained_null,
+        **kwargs_init,
+    )
+    # State must already reflect that null classifiers are available.
+    assert lc2st._state == LC2STState.NULL_TRAINED
+
+    # Training observed must then advance straight to READY.
+    lc2st.train_on_observed_data()
+    assert lc2st._state == LC2STState.READY
+
+    # And p_value must succeed without a RuntimeError about the state machine.
+    x_o = cal_data.xs[0]
+    theta_o = (
+        badly_trained_npe.sample((100,), condition=x_o[None, :])
+        .reshape(-1, cal_data.thetas.shape[-1])
+        .detach()
+    )
+    lc2st.p_value(theta_o=theta_o, x_o=x_o)
+
+
 # =============================================================================
 # Input Validation Tests
 # =============================================================================
