@@ -324,12 +324,18 @@ class LC2ST:
         posterior (P) distribution. These parameters are used by _normalize_theta()
         and _normalize_x() when z_score=True.
 
+        Constant dimensions (std == 0) are left as pass-through by replacing
+        their std with 1.0, so normalization reduces to mean-centering for
+        those columns instead of producing NaN/Inf.
+
         This method should be called after self.theta_p and self.x_p are set.
         """
         self.theta_p_mean = torch.mean(self.theta_p, dim=0)
-        self.theta_p_std = torch.std(self.theta_p, dim=0)
+        theta_std = torch.std(self.theta_p, dim=0)
+        self.theta_p_std = theta_std.masked_fill(theta_std == 0, 1.0)
         self.x_p_mean = torch.mean(self.x_p, dim=0)
-        self.x_p_std = torch.std(self.x_p, dim=0)
+        x_std = torch.std(self.x_p, dim=0)
+        self.x_p_std = x_std.masked_fill(x_std == 0, 1.0)
 
     def _resolve_classifier(
         self, classifier: Union[str, Type[BaseEstimator]]
@@ -539,7 +545,7 @@ class LC2ST:
         x_o: Tensor,
         trained_clfs: List[BaseEstimator],
         return_probs: bool = False,
-    ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[LC2STScores, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores given the trained classifiers.
 
         Mean squared error (MSE) between 0.5 and the predicted probabilities
@@ -578,8 +584,10 @@ class LC2ST:
         # Backward compatibility: return tuple if return_probs=True
         if return_probs:
             warnings.warn(
-                "The 'return_probs' parameter is deprecated. "
-                "Use LC2STScores.probabilities attribute instead.",
+                "The 'return_probs' parameter is deprecated and will be "
+                "removed in a future release. It returns a (probs, scores) "
+                "tuple; use LC2STScores.probabilities and LC2STScores.scores "
+                "from the default return value instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -744,8 +752,10 @@ class LC2ST:
         """
         if self.trained_clfs_null is not None:
             raise ValueError(
-                "Classifiers have already been trained under the null "
-                "and can be used to evaluate any new estimator."
+                "Classifiers under the null hypothesis are already trained. "
+                "To retrain, create a new instance or reset `trained_clfs_null` "
+                "explicitly. Note that for LC2ST_NF the null classifiers are "
+                "data-independent and can be reused with new estimators."
             )
 
         trained_clfs_null: Dict[int, List[BaseEstimator]] = {}
@@ -799,7 +809,7 @@ class LC2ST:
         x_o: Tensor,
         return_probs: bool = False,
         verbosity: int = 0,
-    ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[LC2STScores, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
@@ -808,7 +818,7 @@ class LC2ST:
             x_o: The observation, of shape (, dim_x).
             return_probs: Whether to return the predicted probabilities of being in P,
                 defaults to False.
-            verbosity: Verbosity level, defaults to 1.
+            verbosity: Verbosity level, defaults to 0.
 
         Returns:
             LC2STScores object containing null statistics and probabilities.
@@ -861,8 +871,10 @@ class LC2ST:
 
         if return_probs:
             warnings.warn(
-                "The 'return_probs' parameter is deprecated. "
-                "Use the LC2STScores.probabilities attribute instead.",
+                "The 'return_probs' parameter is deprecated and will be "
+                "removed in a future release. It returns a (probs, scores) "
+                "tuple; use LC2STScores.probabilities and LC2STScores.scores "
+                "from the default return value instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -992,7 +1004,7 @@ class LC2ST_NF(LC2ST):
         trained_clfs: List[BaseEstimator],
         return_probs: bool = False,
         **kwargs: Any,
-    ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[LC2STScores, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores given the trained classifiers.
 
         Args:
@@ -1085,8 +1097,10 @@ class LC2ST_NF(LC2ST):
         """
         if self.trained_clfs_null is not None:
             raise ValueError(
-                "Classifiers have already been trained under the null "
-                "and can be used to evaluate any new estimator."
+                "Classifiers under the null hypothesis are already trained. "
+                "To retrain, create a new instance or reset `trained_clfs_null` "
+                "explicitly. Note that for LC2ST_NF the null classifiers are "
+                "data-independent and can be reused with new estimators."
             )
         super().train_under_null_hypothesis(verbosity=verbosity)
         return self
@@ -1097,7 +1111,7 @@ class LC2ST_NF(LC2ST):
         return_probs: bool = False,
         verbosity: int = 0,
         **kwargs: Any,
-    ) -> Union[LC2STScores, np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    ) -> Union[LC2STScores, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
@@ -1105,7 +1119,7 @@ class LC2ST_NF(LC2ST):
                 Shape (, dim_x)
             return_probs: Whether to return the predicted probabilities of being in P.
                 Defaults to False.
-            verbosity: Verbosity level, defaults to 1.
+            verbosity: Verbosity level, defaults to 0.
             kwargs: Additional arguments used in the parent class.
         """
         return super().get_statistics_under_null_hypothesis(

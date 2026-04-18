@@ -89,7 +89,11 @@ def cal_data(sim_setup, badly_trained_npe) -> CalibrationData:
 
 @pytest.fixture
 def lc2st_instance(cal_data) -> LC2ST:
-    """A fresh LC2ST instance for testing."""
+    """A fresh LC2ST instance for testing.
+
+    Function-scoped (not session) because tests mutate instance state via
+    training calls and state-machine transitions.
+    """
     return LC2ST(
         cal_data.thetas, cal_data.xs, cal_data.posterior_samples, num_trials_null=2
     )
@@ -331,6 +335,80 @@ def test_lc2st_nf_with_pretrained_null_is_ready_after_observed_training(
         .detach()
     )
     lc2st.p_value(theta_o=theta_o, x_o=x_o)
+
+
+def test_lc2st_normalization_runs_once_per_null_trial(cal_data):
+    """`_train()` must normalize the data exactly once per null trial.
+
+    Regression test for the double-normalization bug the refactor claimed to
+    fix: `train_under_null_hypothesis()` previously normalized data once in
+    the helper and again inside `_train()`. Asserts the helper is called only
+    during evaluation paths, not during null training (data is z-scored via
+    the stored mean/std inside `_train()`).
+    """
+    num_trials_null = 3
+    lc2st = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.posterior_samples,
+        num_trials_null=num_trials_null,
+        z_score=True,
+    )
+
+    call_counts = {"theta": 0, "x": 0}
+    original_theta = lc2st._normalize_theta
+    original_x = lc2st._normalize_x
+
+    def counting_theta(t):
+        call_counts["theta"] += 1
+        return original_theta(t)
+
+    def counting_x(x):
+        call_counts["x"] += 1
+        return original_x(x)
+
+    lc2st._normalize_theta = counting_theta
+    lc2st._normalize_x = counting_x
+
+    lc2st.train_under_null_hypothesis()
+
+    # _train() normalizes theta_p and theta_q (2 calls) + x_p and x_q (2 calls)
+    # per trial. If the old double-normalization bug returned, we'd see 2x this.
+    assert call_counts["theta"] == 2 * num_trials_null, (
+        f"Expected {2 * num_trials_null} theta normalizations "
+        f"(2 per trial * {num_trials_null} trials), got {call_counts['theta']}. "
+        f"The double-normalization bug may have regressed."
+    )
+    assert call_counts["x"] == 2 * num_trials_null, (
+        f"Expected {2 * num_trials_null} x normalizations, got {call_counts['x']}."
+    )
+
+
+def test_lc2st_normalization_handles_constant_dimensions(cal_data):
+    """Constant parameter or x dimensions must not produce NaN/Inf on z-scoring.
+
+    Regression test for divide-by-zero in `_setup_normalization`: when a
+    feature has std == 0, normalization must fall back to mean-centering
+    (std is replaced by 1.0) rather than producing NaN or Inf.
+    """
+    # theta_p is posterior_samples internally, so zero out that column.
+    posterior_with_constant = cal_data.posterior_samples.clone()
+    posterior_with_constant[:, 0] = 0.0
+
+    lc2st = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        posterior_with_constant,
+        num_trials_null=2,
+        z_score=True,
+    )
+
+    assert not torch.any(torch.isnan(lc2st.theta_p_std))
+    assert not torch.any(torch.isinf(lc2st.theta_p_std))
+    assert lc2st.theta_p_std[0] == 1.0
+
+    lc2st.train_on_observed_data()
+    assert lc2st.trained_clfs is not None
 
 
 # =============================================================================
