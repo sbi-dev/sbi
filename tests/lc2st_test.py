@@ -258,9 +258,7 @@ def test_lc2st_state_transitions_reverse_order(cal_data):
     assert lc2st._state == LC2STState.READY
 
 
-def test_lc2st_retrain_observed_preserves_ready_state(
-    lc2st_instance, theta_o, x_o
-):
+def test_lc2st_retrain_observed_preserves_ready_state(lc2st_instance, theta_o, x_o):
     """Retraining the observed classifier must not downgrade READY -> OBSERVED_TRAINED.
 
     Regression test for the workflow where users loop over seeds to estimate
