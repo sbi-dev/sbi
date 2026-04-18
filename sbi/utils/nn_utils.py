@@ -8,7 +8,7 @@ import nflows.nn.nde.made as made
 import numpy as np
 import torch
 import torch.nn.functional as F
-from pyknos.nflows import distributions as distributions_
+from nflows import distributions as distributions_
 from torch import Tensor, nn
 
 

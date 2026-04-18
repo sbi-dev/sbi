@@ -1263,11 +1263,12 @@ class EnsembleClassifier(BaseEstimator):
             disable=self.verbosity < 1,
         ):
             clf = clone(self.clf)
-            if clf.random_state is not None:  # type: ignore[union-attr]
-                clf.random_state += n  # type: ignore[union-attr]
-            else:
-                clf.random_state = n + 1  # type: ignore[union-attr]
-            clf.fit(X, y)  # type: ignore[union-attr]
+            if hasattr(clf, "random_state"):
+                if clf.random_state is not None:
+                    clf.random_state += n
+                else:
+                    clf.random_state = n + 1
+            clf.fit(X, y)  # type: ignore
             self.trained_clfs.append(clf)
         return self
 

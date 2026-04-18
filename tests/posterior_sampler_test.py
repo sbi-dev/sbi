@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import asdict
 
 import pytest
-from pyro.infer.mcmc import MCMC
 from torch import Tensor, eye, zeros
 from torch.distributions import MultivariateNormal
 
@@ -16,7 +15,7 @@ from sbi.inference import (
     likelihood_estimator_based_potential,
 )
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
-from sbi.samplers.mcmc import PyMCSampler, SliceSamplerSerial, SliceSamplerVectorized
+from sbi.samplers.mcmc import SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
 
@@ -77,8 +76,12 @@ def test_api_posterior_sampler_set(
     assert samples.shape == (num_samples, num_chains, num_dim)
 
     if "pyro" in sampling_method:
+        from pyro.infer.mcmc import MCMC
+
         assert type(posterior.posterior_sampler) is MCMC
     elif "pymc" in sampling_method:
+        from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
+
         assert type(posterior.posterior_sampler) is PyMCSampler
     elif sampling_method == "slice_np":
         assert type(posterior.posterior_sampler) is SliceSamplerSerial

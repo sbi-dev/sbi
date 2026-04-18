@@ -65,9 +65,11 @@ def _build_mixed_density_estimator(
     num_components: int = 5,
     num_bins: int = 5,
     hidden_features: int = 50,
-    hidden_layers: int = 2,
     tail_bound: float = 10.0,
     log_transform_x: bool = False,
+    discrete_hidden_features: Optional[int] = None,
+    discrete_hidden_layers: int = 2,
+    continuous_hidden_features: Optional[int] = None,
     **kwargs,
 ) -> MixedDensityEstimator:
     """Base function for building mixed neural density estimators.
@@ -118,18 +120,31 @@ def _build_mixed_density_estimator(
         num_transforms: number of transforms in the flow model.
         num_components: number of components in the mixture model.
         num_bins: bins per spline for NSF.
-        hidden_features: number of hidden features used in both nets.
-        hidden_layers: number of hidden layers in the categorical net.
+        hidden_features: number of hidden features shared across discrete and
+            continuous sub-nets. Use ``discrete_hidden_features`` and
+            ``continuous_hidden_features`` for independent control.
         tail_bound: spline tail bound for NSF.
         log_transform_x: whether to apply a log-transform to x to move it to unbounded
             space, e.g., in case x consists of reaction time data (bounded by
             zero).
-        kwargs: additional keyword arguments passed to the flow model.
+        discrete_hidden_features: number of hidden features for the discrete
+            (categorical) net. Defaults to ``hidden_features`` if not set.
+        discrete_hidden_layers: number of hidden layers for the discrete
+            (categorical) net.
+        continuous_hidden_features: number of hidden features for the continuous
+            (flow) net and the fallback combined embedding MLP. Defaults to
+            ``hidden_features`` if not set.
+        kwargs: additional keyword arguments passed to the flow model and the
+            categorical net.
 
     Returns:
         MixedDensityEstimator: nn.Module for performing MNLE or MNPE.
     """
     check_data_device(batch_x, batch_y)
+
+    # Resolve decoupled parameters, falling back to shared defaults.
+    _discrete_hf = discrete_hidden_features or hidden_features
+    _continuous_hf = continuous_hidden_features or hidden_features
 
     warnings.warn(
         "The mixed neural density estimator assumes that inferred variable contains "
@@ -164,21 +179,27 @@ def _build_mixed_density_estimator(
         batch_y,
         z_score_x="none",  # discrete data should not be z-scored
         z_score_y="none",  # y-embedding net already z-scores
-        num_hidden=hidden_features,
-        num_layers=hidden_layers,
+        num_hidden=_discrete_hf,
+        num_layers=discrete_hidden_layers,
         embedding_net=embedding_net,
         num_categories_per_variable=num_categories_per_variable,
+        dropout_probability=kwargs.get("dropout_probability", 0.0),
     )
 
     if combined_embedding_net is None:
         # set up linear embedding net for combining discrete and continuous
         # data.
         combined_embedding_net = nn.Sequential(
-            nn.Linear(combined_condition.shape[-1], hidden_features),
+            nn.Linear(combined_condition.shape[-1], _continuous_hf),
             nn.ReLU(),
-            nn.Linear(hidden_features, hidden_features),
+            nn.Linear(_continuous_hf, _continuous_hf),
             nn.ReLU(),
         )
+
+    # zuko-based flow models do not support dropout_probability; remove it from kwargs
+    # so it is only applied to the categorical net.
+    if flow_model.startswith("zuko"):
+        kwargs.pop("dropout_probability", None)
 
     # Set up a flow for modelling the continuous data, conditioned on the discrete data.
     continuous_net = model_builders[flow_model](
@@ -197,7 +218,7 @@ def _build_mixed_density_estimator(
         num_transforms=num_transforms,
         num_components=num_components,
         tail_bound=tail_bound,
-        hidden_features=hidden_features,
+        hidden_features=_continuous_hf,
         **kwargs,
     )
 

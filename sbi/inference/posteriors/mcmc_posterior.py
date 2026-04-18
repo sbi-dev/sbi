@@ -12,8 +12,6 @@ import torch
 import torch.distributions.transforms as torch_tf
 from joblib import Parallel, delayed
 from numpy import ndarray
-from pyro.infer.mcmc import HMC, NUTS
-from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
 from torch import multiprocessing as mp
 from tqdm.auto import tqdm
@@ -23,7 +21,6 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 from sbi.samplers.mcmc import (
     IterateParameters,
-    PyMCSampler,
     SliceSamplerSerial,
     SliceSamplerVectorized,
     proposal_init,
@@ -140,6 +137,7 @@ class MCMCPosterior(NeuralPosterior):
         self.num_workers = num_workers
         self.mp_context = mp_context
         self._posterior_sampler = None
+
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
         self.x_shape = x_shape
@@ -238,7 +236,8 @@ class MCMCPosterior(NeuralPosterior):
         )
         warn("The log-probability is unnormalized!", stacklevel=2)
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        x = self._x_else_default_x(x)
+        self.potential_fn.set_x(x, x_is_iid=True)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -291,7 +290,8 @@ class MCMCPosterior(NeuralPosterior):
             Samples from posterior.
         """
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        x = self._x_else_default_x(x)
+        self.potential_fn.set_x(x, x_is_iid=True)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -813,6 +813,15 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
+        try:
+            from pyro.infer.mcmc import HMC, NUTS
+            from pyro.infer.mcmc.api import MCMC
+        except ImportError:
+            raise ImportError(
+                "pyro-ppl is required for Pyro-based MCMC. "
+                "Install it with: pip install 'sbi[pyro]'"
+            ) from None
+
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
         kernels = dict(hmc_pyro=HMC, nuts_pyro=NUTS)
@@ -870,6 +879,14 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
+        try:
+            from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
+        except ImportError:
+            raise ImportError(
+                "pymc is required for PyMC-based MCMC. "
+                "Install it with: pip install 'sbi[pymc]'"
+            ) from None
+
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
         steps = dict(slice_pymc="slice", hmc_pymc="hmc", nuts_pymc="nuts")

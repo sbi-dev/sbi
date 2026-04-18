@@ -1,3 +1,6 @@
+.. This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+.. under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 .. _advanced_tutorials:
 
 
@@ -12,67 +15,56 @@ check our `how-to guide <https://sbi.readthedocs.io/en/latest/how_to_guide.html>
 
 .. toctree::
    :maxdepth: 1
+   :hidden:
+
+   advanced_tutorials/prior_and_simulator
+   advanced_tutorials/neural_nets
+   advanced_tutorials/training
+   advanced_tutorials/sampling
+   advanced_tutorials/diagnostics
+   advanced_tutorials/visualization
 
 
 Prior and simulator
 -------------------
 
-.. toctree::
-   :maxdepth: 1
+- :doc:`advanced_tutorials/06_restriction_estimator`
 
-   advanced_tutorials/06_restriction_estimator.ipynb
 
 Neural nets
 -----------
 
-.. toctree::
-   :maxdepth: 1
-
-   advanced_tutorials/04_embedding_networks.ipynb
-   advanced_tutorials/03_density_estimators.ipynb
-   advanced_tutorials/12_iid_data_and_permutation_invariant_embeddings.ipynb
-   advanced_tutorials/19_flowmatching_and_scorematching.ipynb
-   advanced_tutorials/20_score_based_methods_new_features.ipynb
+- :doc:`advanced_tutorials/04_embedding_networks`
+- :doc:`advanced_tutorials/03_density_estimators`
+- :doc:`advanced_tutorials/12_iid_data_and_permutation_invariant_embeddings`
+- :doc:`advanced_tutorials/19_vector_field_methods`
 
 
 Training
 --------
 
-.. toctree::
-   :maxdepth: 1
-
-   advanced_tutorials/18_training_interface.ipynb
-   advanced_tutorials/02_multiround_inference.ipynb
+- :doc:`advanced_tutorials/18_training_interface`
+- :doc:`advanced_tutorials/02_multiround_inference`
 
 
 Sampling
 --------
 
-.. toctree::
-   :maxdepth: 1
-
-   advanced_tutorials/15_importance_sampled_posteriors.ipynb
-
+- :doc:`advanced_tutorials/15_importance_sampled_posteriors`
 
 
 Diagnostics
 -----------
 
-.. toctree::
-   :maxdepth: 1
-
-   advanced_tutorials/10_diagnostics_posterior_predictive_checks.ipynb
-   advanced_tutorials/11_diagnostics_simulation_based_calibration.ipynb
-   advanced_tutorials/13_diagnostics_lc2st.ipynb
-   advanced_tutorials/21_diagnostics_misspecification_checks.ipynb
+- :doc:`advanced_tutorials/10_diagnostics_posterior_predictive_checks`
+- :doc:`advanced_tutorials/11_diagnostics_simulation_based_calibration`
+- :doc:`advanced_tutorials/13_diagnostics_lc2st`
+- :doc:`advanced_tutorials/21_diagnostics_misspecification_checks`
 
 
 Visualization
 -------------
 
-.. toctree::
-   :maxdepth: 1
-
-   advanced_tutorials/05_conditional_distributions.ipynb
-   advanced_tutorials/17_plotting_functionality.ipynb
-   advanced_tutorials/07_sensitivity_analysis.ipynb
+- :doc:`advanced_tutorials/05_conditional_distributions`
+- :doc:`advanced_tutorials/17_plotting_functionality`
+- :doc:`advanced_tutorials/07_sensitivity_analysis`

@@ -49,7 +49,7 @@ from sbi.utils.plotting_helpers import (
 
 UpperLiteral = Literal["hist", "scatter", "contour", "kde"]
 LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
-DiagLiteral = Literal["hist", "scatter", "kde"]
+DiagLiteral = Literal["hist", "scatter", "kde", "bar"]
 K = TypeVar("K")
 KwargsType = Union[List[Optional[Union[Dict, K]]], Dict, K, None]
 
@@ -173,6 +173,7 @@ def pairplot(
     fig_kwargs: Optional[Union[Dict, FigOptions]] = None,
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
+    discrete_indices: Optional[List[int]] = None,
     **kwargs: Optional[Any],
 ) -> Tuple[FigureBase, Axes]:
     """
@@ -194,14 +195,14 @@ def pairplot(
             None}.
         lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
             None}.
-        diag: Plotting style for diagonal, {hist, scatter, kde}.
+        diag: Plotting style for diagonal, {hist, scatter, kde, bar}.
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
         offdiag: deprecated, use upper instead.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `KdeDiagOptions`, `HistDiagOptions` or
-            `ScatterDiagOptions`.
+            see the source code in `KdeDiagOptions`, `HistDiagOptions`,
+            `ScatterDiagOptions` or `BarDiagOptions`.
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
             see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
             `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
@@ -212,6 +213,11 @@ def pairplot(
             see the source code in `FigOptions`
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
+        discrete_indices: List of dimension indices that contain discrete values.
+            When provided, discrete dimensions automatically use bar charts on the
+            diagonal (instead of kde/hist) and scatter with jitter on the
+            off-diagonal (instead of kde/contour). This prevents crashes from
+            KDE on integer-valued data.
         **kwargs: Additional arguments to adjust the plot (deprecated).
 
     Returns: figure and axis of posterior distribution plot
@@ -297,6 +303,7 @@ def pairplot(
         fig,
         axes,
         fig_kwargs_filled,
+        discrete_indices=discrete_indices,
     )
 
 
@@ -344,6 +351,20 @@ def plt_scatter_1d(
     """Plot vertical lines for each sample. Note: limits are not used."""
     for single_sample in samples:
         ax.axvline(single_sample, **diag_kwargs["mpl_kwargs"])
+
+
+def plt_bar_1d(
+    ax: Axes,
+    samples: np.ndarray,
+    limits: torch.Tensor,
+    diag_kwargs: Dict,
+) -> None:
+    """Bar chart for discrete-valued dimension."""
+    values, counts = np.unique(samples, return_counts=True)
+    freqs = counts / counts.sum()
+    bar_kwargs = copy.deepcopy(diag_kwargs["mpl_kwargs"])
+    width = diag_kwargs.get("width", 0.8)
+    ax.bar(values, freqs, width=width, **bar_kwargs)
 
 
 def plt_hist_2d(
@@ -539,6 +560,8 @@ def get_diag_funcs(
             diag_funcs.append(plt_kde_1d)
         elif diag == "scatter":
             diag_funcs.append(plt_scatter_1d)
+        elif diag == "bar":
+            diag_funcs.append(plt_bar_1d)
         else:
             diag_funcs.append(None)
 
@@ -670,6 +693,16 @@ def _format_subplot(
             str(fig_kwargs.tick_labels[col][0]),
             str(fig_kwargs.tick_labels[col][1]),
         ))
+
+
+def _place_legend_in_empty_cell(ax, handles, labels, legend_kw):
+    """Place a legend in an empty off-diagonal cell, hiding spines and ticks."""
+    ax.axis("on")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.legend(handles, labels, **legend_kw)
 
 
 def _format_axis(
@@ -1203,6 +1236,54 @@ def conditional_pairplot(
     )
 
 
+_OFFDIAG_NEEDS_DISCRETE_FALLBACK = {plt_kde_2d, plt_contour_2d, plt_hist_2d}
+
+
+def _min_spacing(samples: np.ndarray, default: float = 1.0) -> float:
+    """Return the minimum spacing between unique values in *samples*.
+
+    Falls back to *default* when fewer than two unique values exist.
+    """
+    unique = np.unique(samples)
+    if len(unique) < 2:
+        return default
+    return float(np.min(np.diff(unique)))
+
+
+def _discrete_offdiag_override(
+    func: Optional[Callable],
+    kwargs: Optional[Dict],
+    samples_a: np.ndarray,
+    samples_b: np.ndarray,
+    a_discrete: bool,
+    b_discrete: bool,
+    sample_ind: int,
+) -> Tuple[Optional[Callable], Optional[Dict], np.ndarray, np.ndarray]:
+    """Override off-diagonal function and add jitter for discrete dimensions.
+
+    When either dimension is discrete, KDE/contour/hist2d would fail or produce
+    misleading smooth densities. This falls back to scatter and adds small
+    uniform jitter to discrete axes so that overlapping points become visible.
+    """
+    if func in _OFFDIAG_NEEDS_DISCRETE_FALLBACK:
+        func = plt_scatter_2d
+        kwargs = get_default_offdiag_kwargs("scatter", sample_ind)
+
+    # Add jitter to discrete dimension(s) for scatter-like plots.
+    # Jitter magnitude is 15% of the minimum spacing between unique values,
+    # so points spread out but never overlap with neighbours.
+    # Seed varies by sample_ind so different sample sets get distinct jitter.
+    rng = np.random.default_rng(sample_ind)
+    if a_discrete:
+        jitter_a = 0.15 * _min_spacing(samples_a)
+        samples_a = samples_a + rng.uniform(-jitter_a, jitter_a, size=len(samples_a))
+    if b_discrete:
+        jitter_b = 0.15 * _min_spacing(samples_b)
+        samples_b = samples_b + rng.uniform(-jitter_b, jitter_b, size=len(samples_b))
+
+    return func, kwargs, samples_a, samples_b
+
+
 def _arrange_grid(
     diag_funcs: List[Optional[Callable]],
     upper_funcs: List[Optional[Callable]],
@@ -1222,6 +1303,7 @@ def _arrange_grid(
     fig: Optional[FigureBase],
     axes: Optional[Axes],
     fig_kwargs: FigOptions,
+    discrete_indices: Optional[List[int]] = None,
 ) -> Tuple[FigureBase, Axes]:
     """
     Arranges the plots for any function that plots parameters either in a row of 1D
@@ -1252,12 +1334,18 @@ def _arrange_grid(
         axes: matplotlib axes corresponding to fig.
         fig_kwargs: Additional arguments to adjust the overall figure,
             see the source code in `_get_default_fig_kwargs()`
+        discrete_indices: Optional list of dimension indices treated as discrete.
+            When provided, diagonal plots for these dimensions use bar charts,
+            and off-diagonal plots involving these dimensions fall back to
+            jittered scatter plots.
 
     Returns:
         Fig: matplotlib figure
         Axes: matplotlib axes
     """
     dim = samples[0].shape[1]
+    discrete_set = set(discrete_indices) if discrete_indices is not None else set()
+
     # Prepare points
     if points is None:
         points = []
@@ -1298,6 +1386,7 @@ def _arrange_grid(
     excl_diag = all(v is None for v in diag_funcs)
     flat = excl_lower and excl_upper
     one_dim = dim == 1
+    _legend_handles: Optional[tuple] = None  # type: ignore
     # select the subset of rows and cols to be plotted
     if flat:
         rows = 1
@@ -1355,10 +1444,33 @@ def _arrange_grid(
                 else:
                     for sample_ind, sample in enumerate(samples):
                         diag_f = diag_funcs[sample_ind]
-                        if callable(diag_f):  # is callable:
-                            diag_f(
-                                ax, sample[:, row], limits[row], diag_kwargs[sample_ind]
+                        diag_kw = diag_kwargs[sample_ind]
+                        # Override diagonal for discrete dimensions: use bar.
+                        if row in discrete_set and diag_f is not plt_bar_1d:
+                            diag_f = plt_bar_1d
+                            bar_defaults = get_default_diag_kwargs("bar", sample_ind)
+                            user_mpl = (diag_kw or {}).get("mpl_kwargs", {})
+                            if "color" in user_mpl:
+                                bar_defaults.setdefault("mpl_kwargs", {})["color"] = (
+                                    user_mpl["color"]
+                                )
+                            diag_kw = bar_defaults
+                        # Reverse: bar on a continuous dimension → fall back to hist.
+                        elif row not in discrete_set and diag_f is plt_bar_1d:
+                            diag_f = plt_hist_1d
+                            diag_kw = get_default_diag_kwargs("hist", sample_ind)
+                        # Add sample label on the first diagonal cell for legend.
+                        if (
+                            fig_kwargs.legend
+                            and col == subset[0]
+                            and diag_kw is not None
+                        ):
+                            diag_kw = copy.deepcopy(diag_kw)
+                            diag_kw.setdefault("mpl_kwargs", {})["label"] = (
+                                fig_kwargs.samples_labels[sample_ind]
                             )
+                        if callable(diag_f):
+                            diag_f(ax, sample[:, row], limits[row], diag_kw)
 
                 if len(points) > 0:
                     extent = ax.get_ylim()  # pyright: ignore reportOptionalMemberAccess
@@ -1370,8 +1482,8 @@ def _arrange_grid(
                             **fig_kwargs.points_diag,
                             label=fig_kwargs.points_labels[n],
                         )
-                if fig_kwargs.legend and col == 0:
-                    ax.legend(**fig_kwargs.legend_kwargs)  # pyright: ignore reportOptionalMemberAccess
+                if fig_kwargs.legend and col == subset[0]:
+                    _legend_handles = ax.get_legend_handles_labels()  # pyright: ignore reportOptionalMemberAccess
 
             # Off-diagonals
 
@@ -1380,16 +1492,33 @@ def _arrange_grid(
                 if excl_upper:
                     ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
+                    col_discrete = col in discrete_set
+                    row_discrete = row in discrete_set
                     for sample_ind, sample in enumerate(samples):
                         upper_f = upper_funcs[sample_ind]
+                        upper_kw = upper_kwargs[sample_ind]
+                        samples_col = sample[:, col]
+                        samples_row = sample[:, row]
+                        if col_discrete or row_discrete:
+                            upper_f, upper_kw, samples_col, samples_row = (
+                                _discrete_offdiag_override(
+                                    upper_f,
+                                    upper_kw,
+                                    samples_col,
+                                    samples_row,
+                                    col_discrete,
+                                    row_discrete,
+                                    sample_ind,
+                                )
+                            )
                         if callable(upper_f):
                             upper_f(
                                 ax,
-                                sample[:, col],
-                                sample[:, row],
+                                samples_col,
+                                samples_row,
                                 limits[col],
                                 limits[row],
-                                upper_kwargs[sample_ind],
+                                upper_kw,
                             )
                     if len(points) > 0:
                         for n, v in enumerate(points):
@@ -1404,16 +1533,33 @@ def _arrange_grid(
                 if excl_lower:
                     ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
+                    row_discrete = row in discrete_set
+                    col_discrete = col in discrete_set
                     for sample_ind, sample in enumerate(samples):
                         lower_f = lower_funcs[sample_ind]
+                        lower_kw = lower_kwargs[sample_ind]
+                        samples_row_l = sample[:, row]
+                        samples_col_l = sample[:, col]
+                        if row_discrete or col_discrete:
+                            lower_f, lower_kw, samples_row_l, samples_col_l = (
+                                _discrete_offdiag_override(
+                                    lower_f,
+                                    lower_kw,
+                                    samples_row_l,
+                                    samples_col_l,
+                                    row_discrete,
+                                    col_discrete,
+                                    sample_ind,
+                                )
+                            )
                         if callable(lower_f):
                             lower_f(
                                 ax,
-                                sample[:, row],
-                                sample[:, col],
+                                samples_row_l,
+                                samples_col_l,
                                 limits[row],
                                 limits[col],
-                                lower_kwargs[sample_ind],
+                                lower_kw,
                             )
                     if len(points) > 0:
                         for n, v in enumerate(points):
@@ -1423,6 +1569,34 @@ def _arrange_grid(
                                 color=fig_kwargs.points_colors[n],
                                 **fig_kwargs.points_offdiag,
                             )
+    # Place legend in an empty off-diagonal cell if available, otherwise on the
+    # first diagonal cell.
+    if fig_kwargs.legend and _legend_handles is not None:
+        handles, legend_labels = _legend_handles
+        if not one_dim and not flat:
+            legend_kw = fig_kwargs.legend_kwargs.copy()
+            legend_kw.setdefault("loc", "center")
+            legend_kw.setdefault("frameon", False)
+            if excl_lower and rows > 1:
+                # Lower triangle is empty: use bottom-left cell.
+                legend_ax = axes[-1, 0]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                _place_legend_in_empty_cell(
+                    legend_ax, handles, legend_labels, legend_kw
+                )
+            elif excl_upper and rows > 1:
+                # Upper triangle is empty: use top-right cell.
+                legend_ax = axes[0, -1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                _place_legend_in_empty_cell(
+                    legend_ax, handles, legend_labels, legend_kw
+                )
+            else:
+                # Both triangles plotted: fall back to first diagonal cell.
+                axes[0, 0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportIndexIssue, reportOptionalSubscript, reportOptionalMemberAccess]
+        elif one_dim:
+            axes.legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportOptionalMemberAccess]
+        elif flat:
+            axes[0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportIndexIssue, reportOptionalSubscript, reportOptionalMemberAccess]
+
     # Add dots if we subset
     if len(subset) < dim:
         if flat:
@@ -2411,6 +2585,7 @@ def get_diag_func(samples, limits, opts, **kwargs):
                         xs,
                         ys,
                         color=opts["samples_colors"][n],
+                        label=opts["samples_labels"][n],
                     )
                 elif "offdiag" in opts and opts["offdiag"][n] == "scatter":
                     for single_sample in v:
@@ -2520,6 +2695,8 @@ def _arrange_plots(
     fig.suptitle(opts["title"], **opts["title_format"])
 
     # Style axes
+    _dep_legend_handles: Optional[tuple] = None  # type: ignore
+    first_subset_col = subset[0]
     row_idx = -1
     for row in range(dim):
         if row not in subset:
@@ -2616,8 +2793,8 @@ def _arrange_plots(
                             **opts["points_diag"],
                             label=opts["points_labels"][n],
                         )
-                if opts["legend"] and col == 0:
-                    plt.legend(**opts["legend_kwargs"])
+                if opts["legend"] and col == first_subset_col:
+                    _dep_legend_handles = ax.get_legend_handles_labels()
 
             # Off-diagonals
             else:
@@ -2635,6 +2812,24 @@ def _arrange_plots(
                             color=opts["points_colors"][n],
                             **opts["points_offdiag"],
                         )
+
+    # Place legend in empty off-diagonal cell if available.
+    if opts["legend"] and _dep_legend_handles is not None:
+        handles, legend_labels = _dep_legend_handles
+        if not flat and dim > 1:
+            legend_kw = opts["legend_kwargs"].copy()
+            legend_kw.setdefault("loc", "center")
+            legend_kw.setdefault("frameon", False)
+            if opts["lower"] is None:
+                # Lower triangle is empty: use bottom-left cell.
+                _place_legend_in_empty_cell(
+                    axes[-1, 0], handles, legend_labels, legend_kw
+                )
+            else:
+                # Both triangles plotted: fall back to first diagonal.
+                axes[0, 0].legend(handles, legend_labels, **opts["legend_kwargs"])
+        else:
+            plt.legend(**opts["legend_kwargs"])
 
     if len(subset) < dim:
         if flat:

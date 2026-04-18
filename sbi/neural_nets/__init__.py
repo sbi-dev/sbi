@@ -1,10 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
-import warnings
 
 from sbi.neural_nets.factory import (
     classifier_nn,
-    flowmatching_nn,  # To be removed
     likelihood_nn,
     marginal_nn,
     posterior_flow_nn,
@@ -33,13 +31,10 @@ def __getattr__(name):
     elif name == "classifier_nn":
         return classifier_nn
     elif name == "flowmatching_nn":
-        warnings.warn(
-            "`flowmatching_nn` is deprecated and will be removed in the future. "
-            "Please use `posterior_flow_nn` instead.",
-            FutureWarning,
-            stacklevel=2,
+        raise ImportError(
+            "`flowmatching_nn` has been removed. "
+            "Please use `posterior_flow_nn` instead."
         )
-        return flowmatching_nn  # To be removed
     elif name == "posterior_flow_nn":
         return posterior_flow_nn
     elif name == "likelihood_nn":
@@ -60,5 +55,4 @@ __all__ = [
     "posterior_nn",
     "posterior_score_nn",
     "posterior_flow_nn",
-    "flowmatching_nn",  # To be removed
 ]

@@ -6,6 +6,7 @@ from typing import Dict, Optional, Sequence, Tuple, Union
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers._contracts import LossArgs, LossArgsNRE_C
 from sbi.inference.trainers.nre.nre_base import (
@@ -13,30 +14,47 @@ from sbi.inference.trainers.nre.nre_base import (
 )
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_C(RatioEstimatorTrainer):
-    r"""NRE-C [1] is a generalization of amortized versions of NRE_A and NRE_B.
+    r"""Neural Ratio Estimation (NRE-C / CNRE) as in Miller et al. (2022) [1].
 
-    NRE-C:
-    (1) Like NRE_B, features a "multiclass" loss function where several marginally
-    drawn parameter-data pairs are contrasted against a jointly drawn pair.
+    NRE-C generalizes NRE-A and NRE-B using a "multi-class sigmoid" loss that
+    ensures the estimated ratio $p(\theta,x)/p(\theta)p(x)$ is exact at optimum
+    in the first round. This addresses the issue that NRE-B's ratio is only defined
+    up to an arbitrary function of $x$. NRE-C provides more accurate ratio estimates
+    while maintaining the benefits of contrastive learning.
 
-    (2) Like AALR/NRE_A (i.e., the non-sequential version of NRE_A), it encourages
-    the approximate ratio :math:`p(\theta,x)/p(\theta)p(x)`, accessed through
-    `.potential()` within `sbi`, to be exact at optimum. This addresses the
-    issue that NRE_B estimates this ratio only up to an arbitrary function
-    (normalizing constant) of the data :math:`x`.
-
-    Just like for all ratio estimation algorithms, the sequential version of NRE_C
-    will be estimated only up to a function (normalizing constant) of the data
-    :math:`x` in rounds after the first.
-
-    [1] *Contrastive Neural Ratio Estimation*, Benajmin Kurt Miller, et. al.,
+    [1] *Contrastive Neural Ratio Estimation*, Benjamin Kurt Miller, et al.,
         NeurIPS 2022, https://arxiv.org/abs/2210.06170
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import NRE_C
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train ratio estimator
+        inference = NRE_C(prior=prior)
+        ratio_estimator = inference.append_simulations(theta, x).train(num_classes=5)
+
+        # 3. Build posterior
+        posterior = inference.build_posterior(ratio_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.randn(1, 3)
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(
@@ -45,7 +63,8 @@ class NRE_C(RatioEstimatorTrainer):
         classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NRE-C.
@@ -64,8 +83,10 @@ class NRE_C(RatioEstimatorTrainer):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """

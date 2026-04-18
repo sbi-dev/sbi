@@ -7,7 +7,7 @@ from dataclasses import fields
 import pytest
 import torch
 
-from sbi.inference import NRE
+from sbi.inference import NPE, NRE
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
@@ -62,19 +62,28 @@ def get_inference():
                 "potential_fn",
                 "proposal",
                 "device",
-                "theta_transform",
                 "init_strategy_num_candidates",
+                "theta_transform",
             },
         ),
         (
             RejectionPosteriorParameters,
             RejectionPosterior,
-            {"potential_fn", "device", "proposal"},
+            {"potential_fn", "device", "proposal", "theta_transform"},
         ),
         (
             VIPosteriorParameters,
             VIPosterior,
-            {"potential_fn", "prior", "theta_transform", "device"},
+            {
+                # __init__ params not in dataclass
+                "potential_fn",
+                "prior",
+                "device",
+                "x_shape",  # deprecated
+                "parameters",  # for custom q, use set_q() instead
+                "modules",  # for custom q, use set_q() instead
+                "theta_transform",
+            },
         ),
         (
             VectorFieldPosteriorParameters,
@@ -405,3 +414,37 @@ def test_if_warning_raised_for_deprecated_build_posterior_parameters(
 
     with pytest.warns(FutureWarning, match="The following arguments are deprecated"):
         get_inference.build_posterior(**params)
+
+
+@pytest.mark.parametrize(
+    "sample_with",
+    ["mcmc", "vi", "rejection", "importance"],
+)
+@pytest.mark.xfail(
+    raises=ValueError,
+    reason="Prior required for non-direct sampling methods",
+)
+def test_resolve_prior_missing_prior_npe(sample_with):
+    inference = NPE()  # no prior
+
+    theta = torch.randn(10, 2)
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+
+    inference.build_posterior(sample_with=sample_with)
+
+
+@pytest.mark.parametrize("sample_with", ["direct"])
+def test_resolve_prior_missing_prior_npe_direct_ok(sample_with):
+    inference = NPE()  # no prior
+
+    theta = torch.randn(10, 2)
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+
+    posterior = inference.build_posterior(sample_with=sample_with)
+
+    samples = posterior.sample((5,), x=x[:1])
+    assert samples.shape[0] == 5
