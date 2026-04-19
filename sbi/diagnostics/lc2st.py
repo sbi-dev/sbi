@@ -174,7 +174,7 @@ class LC2ST:
             warnings.warn(
                 "Parameter 'thetas' is deprecated and will be removed in a future "
                 "version. Use 'prior_samples' instead.",
-                DeprecationWarning,
+                FutureWarning,
                 stacklevel=2,
             )
             if prior_samples is not None:
@@ -588,7 +588,7 @@ class LC2ST:
                 "removed in a future release. It returns a (probs, scores) "
                 "tuple; use LC2STScores.probabilities and LC2STScores.scores "
                 "from the default return value instead.",
-                DeprecationWarning,
+                FutureWarning,
                 stacklevel=2,
             )
             return probs_arr, scores_arr
@@ -875,7 +875,7 @@ class LC2ST:
                 "removed in a future release. It returns a (probs, scores) "
                 "tuple; use LC2STScores.probabilities and LC2STScores.scores "
                 "from the default return value instead.",
-                DeprecationWarning,
+                FutureWarning,
                 stacklevel=2,
             )
             return probs_null_arr, stats_null_arr
@@ -948,7 +948,7 @@ class LC2ST_NF(LC2ST):
             warnings.warn(
                 "Parameter 'thetas' is deprecated and will be removed in a future "
                 "version. Use 'prior_samples' instead.",
-                DeprecationWarning,
+                FutureWarning,
                 stacklevel=2,
             )
             if prior_samples is not None:

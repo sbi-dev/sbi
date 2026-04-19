@@ -219,7 +219,7 @@ def test_lc2st_get_scores_returns_dataclass(lc2st_instance, theta_o, x_o):
 def test_lc2st_get_scores_deprecated_return_probs(lc2st_instance, theta_o, x_o):
     """Test that return_probs=True emits deprecation warning."""
     lc2st_instance.train_on_observed_data()
-    with pytest.warns(DeprecationWarning, match="return_probs"):
+    with pytest.warns(FutureWarning, match="return_probs"):
         probs, scores = lc2st_instance.get_scores(
             theta_o=theta_o,
             x_o=x_o,
@@ -521,8 +521,8 @@ def test_lc2st_null_training_requires_permutation_or_distribution(cal_data):
 
 
 def test_lc2st_thetas_parameter_deprecated(cal_data):
-    """Test that 'thetas' parameter emits DeprecationWarning."""
-    with pytest.warns(DeprecationWarning, match="thetas.*deprecated"):
+    """Test that 'thetas' parameter emits FutureWarning."""
+    with pytest.warns(FutureWarning, match="thetas.*deprecated"):
         lc2st = LC2ST(
             thetas=cal_data.thetas,
             xs=cal_data.xs,
@@ -533,7 +533,12 @@ def test_lc2st_thetas_parameter_deprecated(cal_data):
 
 def test_lc2st_both_thetas_and_prior_samples_error(cal_data):
     """Test that specifying both thetas and prior_samples raises ValueError."""
-    with pytest.raises(ValueError, match="Cannot specify both"):
+    # The deprecated `thetas` branch emits a FutureWarning before the
+    # ValueError fires; suppress it so the test output stays clean.
+    with (
+        pytest.warns(FutureWarning, match="thetas.*deprecated"),
+        pytest.raises(ValueError, match="Cannot specify both"),
+    ):
         LC2ST(
             prior_samples=cal_data.thetas,
             thetas=cal_data.thetas,
