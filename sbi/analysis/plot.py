@@ -1688,6 +1688,7 @@ def _sbc_rank_plot(
     num_cols: int = 4,
     params_in_subplots: bool = False,
     show_ylabel: bool = False,
+    ylim: Optional[Tuple[float, float]] = (-0.125, 0.125),
     sharey: bool = False,
     fig: Optional[FigureBase] = None,
     legend_kwargs: Optional[Dict] = None,
@@ -1702,7 +1703,8 @@ def _sbc_rank_plot(
             obtained from different methods.
         num_bins: number of bins used for binning the ranks, default is
             num_sbc_runs / 20.
-        plot_type: type of SBC plot, histograms ("hist") or empirical cdfs ("cdf").
+        plot_type: type of SBC plot, histograms ("hist"), empirical cdfs ("cdf") or
+            empirical cdf minus expected cdf ("cdf-diff")
         parameter_labels: list of labels for each parameter dimension.
         ranks_labels: list of labels for each set of ranks.
         colors: list of colors for each parameter dimension, or each set of ranks.
@@ -1718,6 +1720,7 @@ def _sbc_rank_plot(
         params_in_subplots: whether to show each parameter in a separate subplot, or
             all in one.
         show_ylabel: whether to show ylabels and ticks.
+        ylim: limits on the y-axis
         sharey: whether to share the y-labels, ticks, and limits across subplots.
         fig: figure object to plot in.
         ax: axis object, must contain as many sublpots as parameters or len(ranks).
@@ -1738,10 +1741,12 @@ def _sbc_rank_plot(
         if isinstance(rank, Tensor):
             ranks_list[idx]: np.ndarray = rank.numpy()  # type: ignore
 
-    plot_types = ["hist", "cdf", "ecdf"]
-    assert plot_type in plot_types, (
-        "plot type {plot_type} not implemented, use one in {plot_types}."
-    )
+    plot_types = ["hist", "cdf", "cdf-diff"]
+
+    if plot_type not in plot_types:
+        raise ValueError(
+            f"plot type {plot_type} not supported, use one in {plot_types}."
+        )
 
     if legend_kwargs is None:
         legend_kwargs = dict(loc="best", handlelength=0.8)
@@ -1814,7 +1819,7 @@ def _sbc_rank_plot(
                             num_repeats,
                             alpha=uniform_region_alpha,
                         )
-                elif plot_type == "ecdf":
+                elif plot_type == "cdf-diff":
                     _plot_ranks_as_ecdf(
                         ranki[:, jj],  # type: ignore
                         num_bins,
@@ -1826,6 +1831,7 @@ def _sbc_rank_plot(
                         # Show legend and ylabel only in first subplot.
                         show_ylabel=jj == 0,
                         alpha=line_alpha,
+                        ylim=ylim,
                     )
                     if ii == 0 and show_uniform_region:
                         _plot_ecdf_region_expected_under_uniformity(
@@ -1896,7 +1902,7 @@ def _sbc_rank_plot(
                     num_repeats,
                     alpha=uniform_region_alpha,
                 )
-        elif plot_type == "ecdf":
+        elif plot_type == "cdf-diff":
             for jj in range(num_parameters):
                 _plot_ranks_as_ecdf(
                     ranki[:, jj],  # type: ignore
@@ -1909,6 +1915,7 @@ def _sbc_rank_plot(
                     # Plot ylabel and legend at last.
                     show_ylabel=jj == (num_parameters - 1),
                     alpha=line_alpha,
+                    ylim=ylim,
                 )
             if show_uniform_region:
                 _plot_ecdf_region_expected_under_uniformity(
@@ -2036,6 +2043,7 @@ def _plot_ranks_as_ecdf(
     alpha: float = 0.8,
     show_ylabel: bool = True,
     num_ticks: int = 3,
+    ylim: Optional[tuple[float, float]] = None,
 ) -> None:
     """Plot ranks as a delta of the empirical CDFs to the expected CDF
 
@@ -2048,10 +2056,9 @@ def _plot_ranks_as_ecdf(
         xlabel: label for the current parameter
         color: line color for the cdf.
         alpha: line transparency.
-        show_ylabel: whether to show y-label "counts".
-        show_legend: whether to show the legend, e.g., when comparing multiple ranks.
+        show_ylabel: whether to show y-label.
         num_ticks: number of ticks on the x-axis.
-        legend_kwargs: kwargs for the legend.
+        ylim: limits on the y-axis
 
     """
     # Construct uniform histogram.
@@ -2079,6 +2086,11 @@ def _plot_ranks_as_ecdf(
 
     if show_ylabel:
         plt.ylabel("empirical CDF - expected CDF")
+
+    if ylim is not None:
+        plt.ylim(ylim)
+    else:
+        plt.ylim(-0.125, 0.125)
 
     plt.xlim(0, 1)
     plt.xticks(np.linspace(0, 1, num_ticks))
