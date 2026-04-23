@@ -2,12 +2,11 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import asdict, replace
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
-import torch
-from torch import Tensor, eye, ones
+from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
@@ -30,6 +29,7 @@ from sbi.inference.trainers.base import (
     LossArgs,
     NeuralInference,
 )
+from sbi.inference.trainers.nre.nre_loss import NRELossStrategy
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
@@ -38,7 +38,6 @@ from sbi.utils import (
     check_estimator_arg,
     clamp_and_warn,
 )
-from sbi.utils.torchutils import repeat_rows
 
 
 class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
@@ -90,6 +89,8 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             show_progress_bars=show_progress_bars,
         )
 
+        self._loss_strategy: Optional[NRELossStrategy] = None
+
         # As detailed in the docstring, `density_estimator` is either a string or
         # a callable. The function creating the neural network is attached to
         # `_build_neural_net`. It will be called in the first round and receive
@@ -100,9 +101,6 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             self._build_neural_net = classifier_nn(model=classifier)
         else:
             self._build_neural_net = classifier
-
-    @abstractmethod
-    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor: ...
 
     def append_simulations(
         self,
@@ -170,6 +168,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         loss_kwargs: Optional[LossArgsNRE] = None,
+        loss_strategy: Optional[NRELossStrategy] = None,
     ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
@@ -372,27 +371,6 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             importance_sampling_parameters=importance_sampling_parameters,
         )
 
-    def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        """Return logits obtained through classifier forward pass.
-
-        The logits are obtained from atomic sets of (theta,x) pairs.
-        """
-        batch_size = theta.shape[0]
-        repeated_x = repeat_rows(x, num_atoms)
-
-        # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
-        probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)
-
-        choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
-
-        contrasting_theta = theta[choices]
-
-        atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
-            batch_size * num_atoms, -1
-        )
-
-        return self._neural_net(atomic_theta, repeated_x)
-
     def _get_potential_function(
         self, prior: Distribution, estimator: RatioEstimator
     ) -> Tuple[RatioBasedPotential, TorchTransform]:
@@ -465,6 +443,9 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
             del x, theta
 
+    def _loss(self, *args, **kwargs) -> Tensor:
+        raise NotImplementedError("NRE trainers use _loss_strategy inside _get_losses.")
+
     def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         """
         Compute losses for a batch of data.
@@ -488,6 +469,8 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
                 f" but got {type(loss_args)}"
             )
 
-        losses = self._loss(theta_batch, x_batch, **asdict(loss_args))
+        if self._loss_strategy is None:
+            raise RuntimeError("Loss strategy not initialized.")
+        losses = self._loss_strategy(theta_batch, x_batch, **asdict(loss_args))
 
         return losses
