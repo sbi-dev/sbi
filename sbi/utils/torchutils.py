@@ -54,7 +54,7 @@ def process_device(device: Union[str, torch.device]) -> str:
             if isinstance(device, torch.device):
                 device = device.type
             check_device(device)
-            
+
         return device
 
 
