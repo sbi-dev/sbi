@@ -122,6 +122,7 @@ class DirectPosteriorParameters(PosteriorParameters):
 
     max_sampling_batch_size: int = 10_000
     enable_transform: bool = True
+    check_finite_x: bool = True
 
     def validate(self):
         """Validate DirectPosteriorParameters fields."""

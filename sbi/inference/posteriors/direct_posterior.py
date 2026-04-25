@@ -49,6 +49,7 @@ class DirectPosterior(NeuralPosterior):
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
         enable_transform: bool = True,
+        check_finite_x: bool = True,
     ):
         """
         Args:
@@ -81,6 +82,7 @@ class DirectPosterior(NeuralPosterior):
             theta_transform=theta_transform,
             device=device,
             x_shape=x_shape,
+            check_finite_x=check_finite_x,
         )
 
         self.device = device

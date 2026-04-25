@@ -35,6 +35,7 @@ class NeuralPosterior:
         theta_transform: Optional[TorchTransform] = None,
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
+        check_finite_x: bool = True,
     ):
         """
         Args:
@@ -180,7 +181,10 @@ class NeuralPosterior:
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        self._x = process_x(x, x_event_shape=None).to(self._device)
+        self._x = process_x(x,
+                            x_event_shape=None,
+                            check_finite=self._check_finite_x,
+                            ).to(self._device)
         self._map = None
         return self
 
@@ -188,7 +192,10 @@ class NeuralPosterior:
         if x is not None:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
-            return process_x(x, x_event_shape=None)
+            return process_x(x, 
+                             x_event_shape=None, 
+                             check_finite=self._check_finite_x,
+                             )
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."
