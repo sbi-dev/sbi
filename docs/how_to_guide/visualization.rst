@@ -8,4 +8,3 @@ Visualization
    :maxdepth: 1
 
    05_conditional_distributions.ipynb
-   24_plot_summary_training_logs.ipynb
