@@ -131,6 +131,83 @@ def test_plot_summary(method, tmp_path):
     close()
 
 
+@pytest.fixture
+def mock_inference(mocker, tmp_path):
+    """Patch event-data loading so unit tests don't need real tensorboard logs."""
+    steps = list(range(10))
+    scalars = {
+        "training_loss": {"step": steps, "value": [1.0 / (i + 1) for i in steps]},
+        "validation_loss": {"step": steps, "value": [1.2 / (i + 1) for i in steps]},
+    }
+    mocker.patch(
+        "sbi.analysis.tensorboard_output._get_event_data_from_log_dir",
+        return_value={"scalars": scalars},
+    )
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "overlay, plot_kwargs, colors, expected_n_axes",
+    (
+        (False, None, None, 2),
+        (True, None, None, 1),
+        (True, {"color": "red"}, None, 1),
+        (True, {"color": "red"}, ["blue", "green"], 1),
+    ),
+)
+def test_plot_summary_overlay_kwargs_precedence(
+    mock_inference, overlay, plot_kwargs, colors, expected_n_axes
+):
+    """Cover overlay shape, plot_kwargs forwarding, and the colors-vs-plot_kwargs
+    collision regression: passing both must not raise TypeError, and `colors`
+    must take precedence."""
+    fig, axes = plot_summary(
+        mock_inference,
+        tags=["training_loss", "validation_loss"],
+        overlay=overlay,
+        colors=colors,
+        plot_kwargs=plot_kwargs,
+        verbose=False,
+    )
+    assert axes.shape == (expected_n_axes,)
+    if colors is not None:
+        # colors wins over plot_kwargs["color"]
+        lines = axes[0].get_lines()
+        assert [line.get_color() for line in lines] == colors
+    close()
+
+
+def test_plot_summary_deprecated_kwargs(mock_inference):
+    """Old kwargs `inference` and `disable_tensorboard_prompt` still work but
+    emit a FutureWarning."""
+    with pytest.warns(FutureWarning, match="`inference` is deprecated"):
+        fig, _ = plot_summary(
+            inference=mock_inference,
+            tags=["training_loss"],
+            verbose=False,
+        )
+    close()
+    with pytest.warns(FutureWarning, match="`disable_tensorboard_prompt`"):
+        fig, _ = plot_summary(
+            mock_inference,
+            tags=["training_loss"],
+            disable_tensorboard_prompt=True,
+        )
+    close()
+
+
+@pytest.mark.parametrize("kwarg", ("colors", "labels", "ylabel"))
+def test_plot_summary_length_validation(mock_inference, kwarg):
+    """colors/labels/ylabel with wrong length must raise ValueError, not IndexError."""
+    with pytest.raises(ValueError, match="must have the same length as `tags`"):
+        plot_summary(
+            mock_inference,
+            tags=["training_loss", "validation_loss"],
+            **{kwarg: ["only_one_entry"]},
+            verbose=False,
+        )
+
+
 @pytest.mark.parametrize("num_parameters", (2, 4, 10))
 @pytest.mark.parametrize("num_cols", (2, 3, 4))
 @pytest.mark.parametrize("custom_figure", (False, True))

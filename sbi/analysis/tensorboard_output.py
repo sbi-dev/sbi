@@ -4,6 +4,7 @@
 
 import inspect
 import logging
+import warnings
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -21,67 +22,140 @@ from sbi.analysis.plot import _get_default_opts
 from sbi.inference import NeuralInference
 from sbi.utils.io import get_log_root
 
-# creating an alias for annotating, because sbi.inference.base.NeuralInference creates
-# a circular import error
-_NeuralInference = Any
-
 
 def plot_summary(
-    inference: Union[_NeuralInference, Path],
+    trainer: Union[NeuralInference, Path, None] = None,
     tags: Optional[List[str]] = None,
-    disable_tensorboard_prompt: bool = False,
-    tensorboard_scalar_limit: int = 10_000,
+    *,
+    overlay: bool = False,
+    colors: Optional[List[str]] = None,
+    labels: Optional[List[str]] = None,
     figsize: Sequence[int] = (20, 6),
     fontsize: float = 12,
-    fig: Optional[FigureBase] = None,
-    axes: Optional[Axes] = None,
     xlabel: str = "epochs_trained",
     ylabel: Optional[List[str]] = None,
+    fig: Optional[FigureBase] = None,
+    axes: Optional[Axes] = None,
     plot_kwargs: Optional[Dict[str, Any]] = None,
+    verbose: bool = True,
+    tensorboard_scalar_limit: int = 10_000,
+    inference: Union[NeuralInference, Path, None] = None,
+    disable_tensorboard_prompt: Optional[bool] = None,
 ) -> Tuple[Figure, Axes]:
-    """Plots data logged by the TensorBoard tracker of an inference object.
+    """Plot scalar data logged by the TensorBoard tracker of a trainer.
 
     Args:
-        inference: inference object that holds a tracker with a log_dir attribute.
-            Optionally the log_dir itself.
-        tags: list of summery writer tags to visualize.
-        disable_tensorboard_prompt: flag to disable the logging of how to run
-            tensorboard and valid tags. Default is False.
-        tensorboard_scalar_limit: overriding DEFAULT_SIZE_GUIDANCE.
-        figsize: determines the figure size. Defaults is [6, 6].
-        fontsize: determines the fontsize of axes ticks and labels. Default is 12.
-        fig: optional existing figure instance.
-        axes: optional existing axes instance.
-        xlabel: x-axis label describing 'steps' attribute of tensorboards ScalarEvent.
-        ylabel: list of alternative ylabels for items in tags. Optional.
-        plot_kwargs: will be passed to ax.plot.
+        trainer: trainer object (``NPE``/``NLE``/``NRE``/``NPSE``/``FMPE``/...)
+            whose tracker exposes a ``log_dir``, or a ``Path`` to a tensorboard
+            log directory.
+        tags: tensorboard tags to visualize. Defaults to ``["validation_loss"]``.
+        overlay: if True, plots all ``tags`` on a single axes (useful for
+            comparing training vs validation loss). Otherwise one subplot per tag.
+        colors: per-tag line colors. ``None`` uses matplotlib's defaults. Must
+            have the same length as ``tags`` if provided.
+        labels: per-tag legend labels. ``None`` uses tag names. Must have the
+            same length as ``tags`` if provided.
+        figsize: figure size in inches.
+        fontsize: fontsize for axis ticks and labels.
+        xlabel: x-axis label.
+        ylabel: per-tag y-axis labels. ``None`` uses tag names. Must have the
+            same length as ``tags`` if provided.
+        fig: existing figure instance to plot into. If ``None``, creates one.
+        axes: existing axes to plot into. If ``None``, creates them.
+        plot_kwargs: forwarded to ``ax.plot()``. ``colors`` and ``labels``
+            (when set) take precedence over ``"color"`` / ``"label"`` here.
+        verbose: if True (default), log the tensorboard launch hint and the
+            list of valid tags.
+        tensorboard_scalar_limit: max number of scalars loaded per tag.
+        inference: deprecated alias for ``trainer``. Will be removed in a
+            future release.
+        disable_tensorboard_prompt: deprecated, use ``verbose`` instead
+            (note the polarity flip). Will be removed in a future release.
 
-    Returns a tuple of Figure and Axes objects.
+    Returns:
+        ``(fig, axes)`` for further composition (e.g. ``axes[0].set_title(...)``,
+        ``axes[0].grid(True)``).
+
+    Examples:
+        Default — plot validation loss::
+
+            fig, axes = plot_summary(trainer)
+
+        Compare training vs validation loss in a single panel::
+
+            fig, axes = plot_summary(
+                trainer,
+                tags=["training_loss", "validation_loss"],
+                overlay=True,
+                colors=["C0", "C1"],
+                labels=["train", "val"],
+            )
+
+        Plot from a log directory directly::
+
+            fig, axes = plot_summary(Path("./sbi-logs/NPE_C/2026_04_26_12_00_00"))
+
+        Compose with matplotlib after the call::
+
+            fig, axes = plot_summary(trainer, overlay=True)
+            axes[0].set_title("Training progress")
+            axes[0].grid(True)
     """
     logger = logging.getLogger(__name__)
+
+    # Deprecation shims for renamed kwargs.
+    if inference is not None:
+        if trainer is not None:
+            raise TypeError(
+                "Pass either `trainer` or `inference` (deprecated), not both."
+            )
+        warnings.warn(
+            "`inference` is deprecated and will be removed in a future release; "
+            "use `trainer` instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        trainer = inference
+    if trainer is None:
+        raise TypeError("plot_summary() missing required argument: 'trainer'")
+    if disable_tensorboard_prompt is not None:
+        warnings.warn(
+            "`disable_tensorboard_prompt` is deprecated and will be removed in a "
+            "future release; use `verbose` instead (note the polarity flip).",
+            FutureWarning,
+            stacklevel=2,
+        )
+        verbose = not disable_tensorboard_prompt
 
     if tags is None:
         tags = ["validation_loss"]
 
+    for name, vals in (("colors", colors), ("labels", labels), ("ylabel", ylabel)):
+        if vals is not None and len(vals) != len(tags):
+            raise ValueError(
+                f"`{name}` must have the same length as `tags` "
+                f"(got {len(vals)} vs {len(tags)})."
+            )
+
     size_guidance = deepcopy(DEFAULT_SIZE_GUIDANCE)
     size_guidance.update(scalars=tensorboard_scalar_limit)
 
-    if isinstance(inference, NeuralInference):
-        log_dir = getattr(inference._tracker, "log_dir", None)
+    if isinstance(trainer, NeuralInference):
+        log_dir = getattr(trainer._tracker, "log_dir", None)
         if log_dir is None:
             raise ValueError(
-                "Inference tracker does not expose a log_dir. "
+                "Trainer's tracker does not expose a log_dir. "
                 "Use a TensorBoard tracker or pass a log directory directly."
             )
-    elif isinstance(inference, Path):
-        log_dir = inference
+    elif isinstance(trainer, Path):
+        log_dir = trainer
     else:
-        raise ValueError(f"inference {inference}")
+        raise ValueError(f"trainer {trainer}")
 
     all_event_data = _get_event_data_from_log_dir(log_dir, size_guidance)
     scalars = all_event_data["scalars"]
 
-    if not disable_tensorboard_prompt:
+    if verbose:
         logger.warning(
             (
                 "For an interactive, detailed view of the summary, launch tensorboard "
@@ -106,37 +180,68 @@ def plot_summary(
         )
 
     plot_options = _get_default_opts()
-
     plot_options.update(figsize=figsize, fontsize=fontsize)
+
     if fig is None or axes is None:
+        num_subplots = 1 if overlay else len(tags)
         fig, axes = plt.subplots(  # pyright: ignore[reportAssignmentType]
             1,
-            len(tags),
+            num_subplots,
             figsize=plot_options["figsize"],
             **plot_options["subplots"],
         )
     axes = np.atleast_1d(axes)  # type: ignore
+    assert fig is not None and axes is not None
 
-    ylabel = ylabel or tags
+    _labels = labels if labels is not None else tags
+    _ylabel = ylabel if ylabel is not None else tags
+    user_kwargs = plot_kwargs or {}
 
-    for i, ax in enumerate(axes):  # type: ignore
-        ax.plot(
-            scalars[tags[i]]["step"], scalars[tags[i]]["value"], **plot_kwargs or {}
-        )
+    # Build (axis, [(tag_index, tag), ...]) pairs so a single loop handles both
+    # overlay and per-tag-subplot modes.
+    if overlay:
+        subplot_specs = [(axes[0], list(enumerate(tags)))]
+    else:
+        subplot_specs = [(axes[i], [(i, tag)]) for i, tag in enumerate(tags)]
 
-        ax.set_ylabel(ylabel[i], fontsize=fontsize)
+    for ax, tag_items in subplot_specs:
+        for i, tag in tag_items:
+            # Precedence: explicit `colors`/`labels` > plot_kwargs > matplotlib default.
+            kw = {**user_kwargs, "label": _labels[i]}
+            if colors is not None:
+                kw["color"] = colors[i]
+            ax.plot(scalars[tag]["step"], scalars[tag]["value"], **kw)
+
         ax.set_xlabel(xlabel, fontsize=fontsize)
+        ax.set_ylabel(_resolve_ylabel(tag_items, _ylabel, overlay), fontsize=fontsize)
         ax.xaxis.set_tick_params(labelsize=fontsize)
         ax.yaxis.set_tick_params(labelsize=fontsize)
+
+        if labels is not None or (overlay and len(tags) > 1):
+            ax.legend(fontsize=fontsize)
 
     plt.subplots_adjust(wspace=0.3)
 
     return fig, axes  # type: ignore
 
 
-def list_all_logs(inference: _NeuralInference) -> List:
-    """Returns a list of all log dirs for an inference class."""
-    method = inference.__class__.__name__
+def _resolve_ylabel(
+    tag_items: List[Tuple[int, str]], ylabels: List[str], overlay: bool
+) -> str:
+    """Return the ylabel for one subplot.
+
+    Non-overlay: the single tag's ylabel. Overlay: distinct ylabels joined
+    by ``" / "`` (or the single label if all tags share it).
+    """
+    labels_for_subplot = [ylabels[i] for i, _ in tag_items]
+    if not overlay or len(set(labels_for_subplot)) == 1:
+        return labels_for_subplot[0]
+    return " / ".join(labels_for_subplot)
+
+
+def list_all_logs(trainer: NeuralInference) -> List:
+    """Returns a list of all log dirs for a trainer class."""
+    method = trainer.__class__.__name__
     log_dir = Path(get_log_root()) / method
     return sorted(log_dir.iterdir())
 
