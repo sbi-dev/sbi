@@ -4,6 +4,7 @@
 
 import inspect
 import logging
+import warnings
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -21,13 +22,9 @@ from sbi.analysis.plot import _get_default_opts
 from sbi.inference import NeuralInference
 from sbi.utils.io import get_log_root
 
-# creating an alias for annotating, because sbi.inference.base.NeuralInference creates
-# a circular import error
-_NeuralInference = Any
-
 
 def plot_summary(
-    inference: Union[_NeuralInference, Path],
+    trainer: Union[NeuralInference, Path, None] = None,
     tags: Optional[List[str]] = None,
     *,
     overlay: bool = False,
@@ -40,14 +37,17 @@ def plot_summary(
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     plot_kwargs: Optional[Dict[str, Any]] = None,
-    disable_tensorboard_prompt: bool = False,
+    verbose: bool = True,
     tensorboard_scalar_limit: int = 10_000,
+    inference: Union[NeuralInference, Path, None] = None,
+    disable_tensorboard_prompt: Optional[bool] = None,
 ) -> Tuple[Figure, Axes]:
-    """Plot scalar data logged by the TensorBoard tracker of an inference object.
+    """Plot scalar data logged by the TensorBoard tracker of a trainer.
 
     Args:
-        inference: inference object whose tracker exposes a ``log_dir``,
-            or a ``Path`` to a tensorboard log directory.
+        trainer: trainer object (``NPE``/``NLE``/``NRE``/``NPSE``/``FMPE``/...)
+            whose tracker exposes a ``log_dir``, or a ``Path`` to a tensorboard
+            log directory.
         tags: tensorboard tags to visualize. Defaults to ``["validation_loss"]``.
         overlay: if True, plots all ``tags`` on a single axes (useful for
             comparing training vs validation loss). Otherwise one subplot per tag.
@@ -64,8 +64,13 @@ def plot_summary(
         axes: existing axes to plot into. If ``None``, creates them.
         plot_kwargs: forwarded to ``ax.plot()``. ``colors`` and ``labels``
             (when set) take precedence over ``"color"`` / ``"label"`` here.
-        disable_tensorboard_prompt: silence the tensorboard launch hint.
+        verbose: if True (default), log the tensorboard launch hint and the
+            list of valid tags.
         tensorboard_scalar_limit: max number of scalars loaded per tag.
+        inference: deprecated alias for ``trainer``. Will be removed in a
+            future release.
+        disable_tensorboard_prompt: deprecated, use ``verbose`` instead
+            (note the polarity flip). Will be removed in a future release.
 
     Returns:
         ``(fig, axes)`` for further composition (e.g. ``axes[0].set_title(...)``,
@@ -74,12 +79,12 @@ def plot_summary(
     Examples:
         Default — plot validation loss::
 
-            fig, axes = plot_summary(inference)
+            fig, axes = plot_summary(trainer)
 
         Compare training vs validation loss in a single panel::
 
             fig, axes = plot_summary(
-                inference,
+                trainer,
                 tags=["training_loss", "validation_loss"],
                 overlay=True,
                 colors=["C0", "C1"],
@@ -92,11 +97,35 @@ def plot_summary(
 
         Compose with matplotlib after the call::
 
-            fig, axes = plot_summary(inference, overlay=True)
+            fig, axes = plot_summary(trainer, overlay=True)
             axes[0].set_title("Training progress")
             axes[0].grid(True)
     """
     logger = logging.getLogger(__name__)
+
+    # Deprecation shims for renamed kwargs.
+    if inference is not None:
+        if trainer is not None:
+            raise TypeError(
+                "Pass either `trainer` or `inference` (deprecated), not both."
+            )
+        warnings.warn(
+            "`inference` is deprecated and will be removed in a future release; "
+            "use `trainer` instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        trainer = inference
+    if trainer is None:
+        raise TypeError("plot_summary() missing required argument: 'trainer'")
+    if disable_tensorboard_prompt is not None:
+        warnings.warn(
+            "`disable_tensorboard_prompt` is deprecated and will be removed in a "
+            "future release; use `verbose` instead (note the polarity flip).",
+            FutureWarning,
+            stacklevel=2,
+        )
+        verbose = not disable_tensorboard_prompt
 
     if tags is None:
         tags = ["validation_loss"]
@@ -111,22 +140,22 @@ def plot_summary(
     size_guidance = deepcopy(DEFAULT_SIZE_GUIDANCE)
     size_guidance.update(scalars=tensorboard_scalar_limit)
 
-    if isinstance(inference, NeuralInference):
-        log_dir = getattr(inference._tracker, "log_dir", None)
+    if isinstance(trainer, NeuralInference):
+        log_dir = getattr(trainer._tracker, "log_dir", None)
         if log_dir is None:
             raise ValueError(
-                "Inference tracker does not expose a log_dir. "
+                "Trainer's tracker does not expose a log_dir. "
                 "Use a TensorBoard tracker or pass a log directory directly."
             )
-    elif isinstance(inference, Path):
-        log_dir = inference
+    elif isinstance(trainer, Path):
+        log_dir = trainer
     else:
-        raise ValueError(f"inference {inference}")
+        raise ValueError(f"trainer {trainer}")
 
     all_event_data = _get_event_data_from_log_dir(log_dir, size_guidance)
     scalars = all_event_data["scalars"]
 
-    if not disable_tensorboard_prompt:
+    if verbose:
         logger.warning(
             (
                 "For an interactive, detailed view of the summary, launch tensorboard "
@@ -210,9 +239,9 @@ def _resolve_ylabel(
     return " / ".join(labels_for_subplot)
 
 
-def list_all_logs(inference: _NeuralInference) -> List:
-    """Returns a list of all log dirs for an inference class."""
-    method = inference.__class__.__name__
+def list_all_logs(trainer: NeuralInference) -> List:
+    """Returns a list of all log dirs for a trainer class."""
+    method = trainer.__class__.__name__
     log_dir = Path(get_log_root()) / method
     return sorted(log_dir.iterdir())
 

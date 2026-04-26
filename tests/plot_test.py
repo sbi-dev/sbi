@@ -167,13 +167,32 @@ def test_plot_summary_overlay_kwargs_precedence(
         overlay=overlay,
         colors=colors,
         plot_kwargs=plot_kwargs,
-        disable_tensorboard_prompt=True,
+        verbose=False,
     )
     assert axes.shape == (expected_n_axes,)
     if colors is not None:
         # colors wins over plot_kwargs["color"]
         lines = axes[0].get_lines()
         assert [line.get_color() for line in lines] == colors
+    close()
+
+
+def test_plot_summary_deprecated_kwargs(mock_inference):
+    """Old kwargs `inference` and `disable_tensorboard_prompt` still work but
+    emit a FutureWarning."""
+    with pytest.warns(FutureWarning, match="`inference` is deprecated"):
+        fig, _ = plot_summary(
+            inference=mock_inference,
+            tags=["training_loss"],
+            verbose=False,
+        )
+    close()
+    with pytest.warns(FutureWarning, match="`disable_tensorboard_prompt`"):
+        fig, _ = plot_summary(
+            mock_inference,
+            tags=["training_loss"],
+            disable_tensorboard_prompt=True,
+        )
     close()
 
 
@@ -185,7 +204,7 @@ def test_plot_summary_length_validation(mock_inference, kwarg):
             mock_inference,
             tags=["training_loss", "validation_loss"],
             **{kwarg: ["only_one_entry"]},
-            disable_tensorboard_prompt=True,
+            verbose=False,
         )
 
 
