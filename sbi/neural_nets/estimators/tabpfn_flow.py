@@ -2,8 +2,15 @@ import logging
 from typing import Mapping, Optional, Tuple
 
 import torch
-from tabpfn import TabPFNRegressor
 from torch import Tensor, nn
+
+try:
+    from tabpfn import TabPFNRegressor
+except ImportError as e:
+    raise ImportError(
+        "TabPFN is required for TabPFNFlow but is not installed. "
+        "Install it with: pip install sbi[tabpfn]"
+    ) from e
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
@@ -55,8 +62,10 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
         self.max_context_size = int(max_context_size)
         self._input_numel = int(torch.Size(input_shape).numel())
-        self.register_buffer("_context_input", None, persistent=False)
-        self.register_buffer("_context_condition", None, persistent=False)
+        # Plain CPU tensors — not buffers. TabPFN's numpy API requires CPU, so these
+        # must never be moved with the module to another device.
+        self._context_input: Optional[Tensor] = None
+        self._context_condition: Optional[Tensor] = None
 
     @property
     def embedding_net(self) -> nn.Module:
@@ -119,9 +128,12 @@ class TabPFNFlow(ConditionalDensityEstimator):
     ) -> "TabPFNFlow":
         r"""Set flattened context directly.
 
+        Both tensors must be 2D and are always stored on CPU regardless of input
+        device, because TabPFN's numpy API requires CPU tensors.
+
         Args:
-            input_context_flat: Tensor of shape `(context_batch, input_numel)`.
-            condition_context_flat: Tensor of shape
+            input_context_flat: 2D tensor of shape `(context_batch, input_numel)`.
+            condition_context_flat: 2D tensor of shape
                 `(context_batch, condition_embed_numel)`.
         """
 
@@ -178,6 +190,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         dim_condition = context_condition.shape[1]
         log_prob = torch.zeros(input_flat.shape[0])
         test_joint = torch.cat([condition_flat, input_flat], dim=1)
+        log_eps = torch.log(torch.tensor(eps))
 
         for dim_idx in range(self._input_numel):
             features_end = dim_condition + dim_idx
@@ -197,7 +210,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
             dim_log_prob = torch.where(
                 dim_log_prob == float("-inf"),
-                torch.log(torch.tensor(eps)),
+                log_eps,
                 dim_log_prob,
             )
             log_prob += dim_log_prob
@@ -206,7 +219,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
     def _autoregressive_sample(
         self, condition_flat: Tensor, with_log_prob: bool = False, eps: float = 1e-15
-    ) -> tuple[Tensor, Optional[Tensor]]:
+    ) -> tuple[Tensor, Tensor]:
         r"""Draw autoregressive samples for flattened embedded conditions.
 
         Args:
@@ -226,6 +239,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         dim_condition = context_condition.shape[1]
         autoregressive_inputs = condition_flat
         log_prob = torch.zeros(condition_flat.shape[0]) if with_log_prob else None
+        log_eps = torch.log(torch.tensor(eps))
 
         for dim_idx in range(self._input_numel):
             features_end = dim_condition + dim_idx
@@ -250,7 +264,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
                 dim_log_prob = torch.where(
                     dim_log_prob == float("-inf"),
-                    torch.log(torch.tensor(eps)),
+                    log_eps,
                     dim_log_prob,
                 )
                 log_prob += dim_log_prob

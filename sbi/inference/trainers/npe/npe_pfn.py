@@ -4,7 +4,6 @@
 from copy import deepcopy
 from dataclasses import asdict
 from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
-from warnings import warn
 
 from torch import Tensor, ones
 from torch.distributions import Distribution
@@ -209,7 +208,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 ImportanceSamplingPosteriorParameters,
             ]
         ] = None,
-        discard_prior_samples=False,
+        discard_prior_samples: bool = False,
     ) -> NeuralPosterior:
         r"""Build a posterior from a `TabPFNFlow` estimator.
 
@@ -239,6 +238,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 - `DirectPosteriorParameters`
                 - `FilteredDirectPosteriorParameters`
                 - `RejectionPosteriorParameters`
+            discard_prior_samples: Whether to discard samples simulated in round 0 of
+                a multi-round procedure. Should only be `True` in a multi-round setting.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -258,7 +259,6 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         )
 
         full_theta, full_x, _ = self.get_simulations(starting_round=start_idx)
-        full_data_size = full_theta.shape[0]
         if density_estimator is None:
             self._neural_net = self._build_neural_net(
                 full_theta.to("cpu"), full_x.to("cpu")
@@ -271,9 +271,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             )
 
         if sample_with == "filtered_direct":
-            full_context_input, full_context_condition, _ = self.get_simulations(
-                starting_round=start_idx
-            )
+            full_context_input, full_context_condition = full_theta, full_x
 
             prior = self._resolve_prior(prior)
             estimator = deepcopy(estimator)
@@ -294,14 +292,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             )
             return self._posterior
 
-        if full_data_size > estimator.max_context_size:
-            warn(
-                "Number of simulations exceeds context capacity. "
-                f"Using only the first {estimator.max_context_size} "
-                f"of {full_data_size} "
-                "simulations.",
-                stacklevel=2,
-            )
+        estimator.set_context(full_theta, full_x)
 
         return super().build_posterior(
             estimator,

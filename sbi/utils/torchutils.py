@@ -106,6 +106,16 @@ def check_if_prior_on_device(
 
 
 def infer_module_device(module: torch.nn.Module, fallback: str) -> str:
+    """Infer device from module parameters or buffers, falling back to `fallback`.
+
+    Args:
+        module: The module to inspect.
+        fallback: Device string returned (with a warning) if the module has no
+            parameters or buffers.
+
+    Returns:
+        Device string, e.g. ``"cpu"`` or ``"cuda:0"``.
+    """
     try:
         return str(next(module.parameters()).device)
     except StopIteration:

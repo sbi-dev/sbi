@@ -43,10 +43,10 @@ dependencies = [
     "torch>=1.13.0",
     "tqdm",
     "zuko>=1.2.0",
-    "tabpfn",
 ]
 
 [project.optional-dependencies]
+tabpfn = ["tabpfn"]
 notebook = ["notebook<=6.4.12"]
 doc = [
     "sbi[notebook]",
