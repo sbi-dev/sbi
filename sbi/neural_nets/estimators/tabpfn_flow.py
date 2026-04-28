@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Mapping, Optional, Tuple
 
 import torch
@@ -6,6 +7,7 @@ from torch import Tensor, nn
 
 try:
     from tabpfn import TabPFNRegressor
+    from tabpfn.model_loading import prepend_cache_path
 except ImportError as e:
     raise ImportError(
         "TabPFN is required for TabPFNFlow but is not installed. "
@@ -44,7 +46,10 @@ class TabPFNFlow(ConditionalDensityEstimator):
             embedding_net: Optional embedding module applied to conditions before
                 TabPFN regression. Defaults to identity.
             regressor_init_kwargs: Optional keyword arguments forwarded to
-                `TabPFNRegressor`.
+                `TabPFNRegressor`. Defaults to TabPFN v2. The `model_path` key
+                accepts version shorthands ``"v2"`` / ``"2"`` / ``"v2.0"``
+                (default), ``"v2.5"`` / ``"2.5"``, ``"v2.6"`` / ``"2.6"``, full
+                checkpoint filenames, or ``"auto"`` for the latest version.
             max_context_size: Maximum number of context pairs that can be stored.
         """
         super().__init__(
@@ -57,8 +62,15 @@ class TabPFNFlow(ConditionalDensityEstimator):
             embedding_net if embedding_net is not None else nn.Identity()
         )
         self._regressor_init_kwargs = dict(regressor_init_kwargs or {})
+        self._regressor_init_kwargs["model_path"] = self._resolve_model_path(
+            self._regressor_init_kwargs.get("model_path", "v2")
+        )
         self._model = TabPFNRegressor(**self._regressor_init_kwargs)
-        self._log_license()
+        # Dummy fit to initialize the model
+        # Version > 2.0 need one time agreement from Prior Labs
+        self._model.fit(torch.zeros((2, 1)), torch.zeros(2))
+        # Log license information once per process when a TabPFN model is initialized.
+        self._log_license(self._model.model_path)
 
         self.max_context_size = int(max_context_size)
         self._input_numel = int(torch.Size(input_shape).numel())
@@ -378,11 +390,38 @@ class TabPFNFlow(ConditionalDensityEstimator):
             "Loss for potential fine-tuning is not implemented yet."
         )
 
-    def _log_license(self) -> None:
+    @staticmethod
+    def _resolve_model_path(model_path: str) -> str:
+        """Normalize version shorthands and resolve to a cache-prefixed absolute path.
+
+        Accepted shorthands (case-insensitive): "v2"/"2"/"v2.0"/"2.0" (default),
+        "v2.5"/"2.5", "v2.6"/"2.6". Bare checkpoint filenames are resolved into
+        the platform cache directory. Absolute paths and "auto" pass through unchanged.
+        """
+        _SHORTHANDS: dict[str, str] = {
+            "v2": "tabpfn-v2-regressor.ckpt",
+            "2": "tabpfn-v2-regressor.ckpt",
+            "v2.0": "tabpfn-v2-regressor.ckpt",
+            "2.0": "tabpfn-v2-regressor.ckpt",
+            "v2.5": "tabpfn-v2.5-regressor-v2.5_default.ckpt",
+            "2.5": "tabpfn-v2.5-regressor-v2.5_default.ckpt",
+            "v2.6": "tabpfn-v2.6-regressor-v2.6_default.ckpt",
+            "2.6": "tabpfn-v2.6-regressor-v2.6_default.ckpt",
+        }
+        resolved = _SHORTHANDS.get(str(model_path).strip().lower(), model_path)
+        # Prepend cache dir for bare filenames so the model is stored system-wide,
+        # not in the current working directory.
+        if resolved != "auto" and not Path(resolved).is_absolute():
+            return prepend_cache_path(resolved)
+        return resolved
+
+    def _log_license(self, model_path: str | Path) -> None:
+        # remove ckpt suffix if present for cleaner loggin
+        model_path = Path(model_path).with_suffix("").with_suffix("")
         global _HAS_LOGGED_TABPFN_LICENSE
         if not _HAS_LOGGED_TABPFN_LICENSE:
             logger.warning(
-                "TabPFN-2.5 is a NONCOMMERCIAL model. "
+                f"TabPFN {Path(model_path).name} is a NONCOMMERCIAL model. "
                 "Usage of this artifact (including through the sbi package) "
                 "is not permitted for commercial tasks unless granted "
                 "explicit permission by the model authors (PriorLabs)."
