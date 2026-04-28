@@ -80,7 +80,6 @@ class FMPE(VectorFieldTrainer):
         summary_writer: Optional[SummaryWriter] = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
-        **kwargs,
     ) -> None:
         """Initialization method for the FMPE class.
 
@@ -91,8 +90,9 @@ class FMPE(VectorFieldTrainer):
                 'transformer' or 'transformer_cross_attn') or a callable that implements
                 the `ConditionalEstimatorBuilder` protocol with `__call__` that receives
                 `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
-            density_estimator: Deprecated. Use `vf_estimator` instead. When passed, a
-                warning is raised and the `vf_estimator="mlp"` default is used.
+                To configure estimator-level options, use `posterior_flow_nn` to
+                build a custom callable and pass it here.
+            density_estimator: Deprecated. Use `vf_estimator` instead.
             device: Device to use for training.
             logging_level: Logging level.
             summary_writer: Deprecated alias for the TensorBoard summary writer.
@@ -100,8 +100,6 @@ class FMPE(VectorFieldTrainer):
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars.
-            **kwargs: Additional keyword arguments passed to the default builder if
-                `density_estimator` is a string.
         """
 
         if density_estimator is not None:
@@ -121,8 +119,11 @@ class FMPE(VectorFieldTrainer):
             tracker=tracker,
             show_progress_bars=show_progress_bars,
             vector_field_estimator_builder=vf_estimator,
-            **kwargs,
         )
+
+        # When vf_estimator is a string, build the default neural net.
+        if isinstance(vf_estimator, str):
+            self._build_neural_net = self._build_default_nn_fn(model=vf_estimator)
 
     def build_posterior(
         self,
@@ -149,10 +150,10 @@ class FMPE(VectorFieldTrainer):
                 flow matching estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior.
-                Can be one of 'sde' (default) or 'ode'. The 'sde' method uses
-                the score to do a Langevin diffusion step, while the 'ode' method
-                uses the score to define a probabilistic ODE and solves it with
-                a numerical ODE solver.
+                Can be one of 'ode' (default) or 'sde'. The 'ode' method uses
+                the velocity field to define a probabilistic ODE and solves it
+                with a numerical ODE solver. The 'sde' method uses the score to
+                do a Langevin diffusion step.
             vectorfield_sampling_parameters: Additional keyword arguments passed to
                 `VectorFieldPosterior`.
             posterior_parameters: Configuration passed to the init method for
@@ -173,6 +174,5 @@ class FMPE(VectorFieldTrainer):
     def _build_default_nn_fn(
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-        **kwargs,
     ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
-        return posterior_flow_nn(model=model, **kwargs)
+        return posterior_flow_nn(model=model)

@@ -68,7 +68,7 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
-from sbi.utils.sbiutils import get_simulations_since_round
+from sbi.utils.sbiutils import ImproperEmpirical, get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
 from sbi.utils.torchutils import (
     check_if_prior_on_device,
@@ -519,7 +519,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             NeuralPosterior object.
         """
 
-        prior = self._resolve_prior(prior)
+        prior = self._resolve_prior(prior, sample_with)
         estimator, device = self._resolve_estimator(estimator)
         estimator = deepcopy(estimator)
 
@@ -537,7 +537,13 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         return self._posterior
 
-    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
+    def _resolve_prior(
+        self,
+        prior: Optional[Distribution],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+    ) -> Distribution:
         """
         Resolves the prior distribution to use.
 
@@ -553,12 +559,16 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         """
 
         if prior is None:
-            if self._prior is None:
+            if self._prior is None or (
+                isinstance(self._prior, ImproperEmpirical)
+                and sample_with not in {'direct', 'sde', 'ode'}
+            ):
                 cls_name = self.__class__.__name__
                 raise ValueError(
                     f"""You did not pass a prior. You have to pass the prior either at
                     initialization `inference = {cls_name}(prior)` or to `
-                    .build_posterior (prior=prior)`."""
+                    .build_posterior (prior=prior)` for
+                    sample_with not in {'direct', 'sde', 'ode'}."""
                 )
             prior = self._prior
         else:
@@ -935,6 +945,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             elif isinstance(posterior_parameters, RejectionPosteriorParameters):
                 posterior = RejectionPosterior(
                     potential_fn=potential_fn,
+                    theta_transform=theta_transform,
                     proposal=prior,
                     device=device,
                     **asdict(posterior_parameters),

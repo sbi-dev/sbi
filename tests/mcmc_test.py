@@ -10,7 +10,6 @@ from torch import eye, ones, zeros
 
 from sbi.inference.posteriors.mcmc_posterior import build_from_potential
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
-from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,
@@ -149,6 +148,8 @@ def test_c2st_pymc_sampler_on_Gaussian(
     def lp_f(x, track_gradients=True):
         with torch.set_grad_enabled(track_gradients):
             return target_distribution.log_prob(x)
+
+    from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 
     sampler = PyMCSampler(
         potential_fn=lp_f,

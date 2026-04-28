@@ -74,13 +74,15 @@ class NPSE(VectorFieldTrainer):
                 ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
             ]
         ] = None,
+        density_estimator: Optional[
+            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]
+        ] = None,
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
-        **kwargs,
     ):
         r"""Initialize Neural Posterior Score Estimation.
 
@@ -92,9 +94,13 @@ class NPSE(VectorFieldTrainer):
                 'transformer' or 'transformer_cross_attn') or a callable that implements
                 the `ConditionalEstimatorBuilder` protocol with `__call__` that receives
                 `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
-            score_estimator: Deprecated, use `vf_estimator` instead. When passed,
-                a warning is raised and the new `vf_estimator` default is used.
+                To configure estimator-level options (e.g. noise schedules for VE),
+                use `posterior_score_nn` to build a custom callable and pass it here.
+            score_estimator: Deprecated, use `vf_estimator` instead.
+            density_estimator: Deprecated, use `vf_estimator` instead.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
+                Only used when `vf_estimator` is a string (i.e. when using the
+                default builder). Ignored when a custom callable is passed.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -103,8 +109,6 @@ class NPSE(VectorFieldTrainer):
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
-            kwargs: Additional keyword arguments passed to the default builder if
-                `score_estimator` is a string.
 
         References:
             - Geffner, Tomas, George Papamakarios, and Andriy Mnih. "Score modeling for
@@ -113,13 +117,22 @@ class NPSE(VectorFieldTrainer):
                 free inference with conditional score based diffusion models." ICML 2024
         """
         if score_estimator is not None:
-            vf_estimator = score_estimator
             warnings.warn(
                 "`score_estimator` is deprecated and will be removed in a future "
-                "release .Use `vf_estimator` instead.",
+                "release. Use `vf_estimator` instead.",
                 FutureWarning,
                 stacklevel=2,
             )
+            vf_estimator = score_estimator
+
+        if density_estimator is not None:
+            warnings.warn(
+                "`density_estimator` is deprecated and will be removed in a future "
+                "release. Use `vf_estimator` instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            vf_estimator = density_estimator
 
         super().__init__(
             prior=prior,
@@ -129,11 +142,14 @@ class NPSE(VectorFieldTrainer):
             summary_writer=summary_writer,
             tracker=tracker,
             show_progress_bars=show_progress_bars,
-            sde_type=sde_type,
-            **kwargs,
         )
-        # score_estimator name is kept since it is public API, but it is
-        # actually misleading since it is a builder for an estimator.
+
+        # When vf_estimator is a string, build the default neural net using
+        # the NPSE-specific builder which requires sde_type.
+        if isinstance(vf_estimator, str):
+            self._build_neural_net = self._build_default_nn_fn(
+                model=vf_estimator, sde_type=sde_type
+            )
 
     def build_posterior(
         self,
@@ -182,6 +198,6 @@ class NPSE(VectorFieldTrainer):
     def _build_default_nn_fn(
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-        **kwargs,
+        sde_type: Literal["vp", "ve", "subvp"] = "ve",
     ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
-        return posterior_score_nn(model=model, **kwargs)
+        return posterior_score_nn(model=model, sde_type=sde_type)

@@ -5,6 +5,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 defaults:
   run:
     shell: bash
@@ -29,18 +32,19 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 0
         lfs: false
+        persist-credentials: false
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Set up uv
-      uses: astral-sh/setup-uv@v5
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       with:
         enable-cache: true
         cache-dependency-glob: "pyproject.toml"
@@ -49,7 +53,7 @@ jobs:
       run: uv sync --extra dev --extra tabpfn
 
     - name: Cache uv dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ~/.cache/uv
         key: uv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
@@ -60,17 +64,19 @@ jobs:
       run: uv run pytest -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml --junitxml=junit.xml -o junit_family=legacy --splitting-algorithm least_duration --splits ${{ matrix.split_size }} --group ${{ matrix.group_number }} tests/
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
       with:
         env_vars: OS,PYTHON
         file: ./coverage.xml
         flags: fast
         name: codecov-sbi-fast-cpu
-        token: ${{ secrets.CODECOV_TOKEN }}
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Upload test results to Codecov
       if: ${{ !cancelled() }}
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
       with:
         report_type: test_results
-        token: ${{ secrets.CODECOV_TOKEN }}
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

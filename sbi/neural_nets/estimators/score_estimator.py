@@ -865,6 +865,31 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             t_max=t_max,
         )
 
+        self._warn_on_inappropriate_config()
+
+    def _warn_on_inappropriate_config(self) -> None:
+        """Warn at construction time if config parameters cause known issues."""
+        if self._train_schedule_type == "lognormal":
+            # Analytically compute the fraction of lognormal samples that will
+            # be clamped to [sigma_min, sigma_max] via the normal CDF.
+            log_sigma_min = math.log(self.sigma_min)
+            log_sigma_max = math.log(self.sigma_max)
+            z_lo = (log_sigma_min - self.lognormal_mean) / self.lognormal_std
+            z_hi = (log_sigma_max - self.lognormal_mean) / self.lognormal_std
+            frac_inside = 0.5 * (
+                math.erf(z_hi / math.sqrt(2)) - math.erf(z_lo / math.sqrt(2))
+            )
+            frac_clamped = 1.0 - frac_inside
+            if frac_clamped > 0.05:
+                warnings.warn(
+                    f"Lognormal schedule: ~{100 * frac_clamped:.1f}% of samples "
+                    f"will be clamped to [{self.sigma_min}, {self.sigma_max}]. "
+                    f"Consider adjusting lognormal_mean={self.lognormal_mean} or "
+                    f"lognormal_std={self.lognormal_std}.",
+                    UserWarning,
+                    stacklevel=3,
+                )
+
     def mean_t_fn(self, times: Tensor) -> Tensor:
         """Conditional mean function for variance exploding SDEs, which is always 1.
 
@@ -986,29 +1011,14 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             # stable than clamping sigma directly.
             log_sigma_min = math.log(self.sigma_min)
             log_sigma_max = math.log(self.sigma_max)
-
-            # Check if excessive clamping needed (warn if >5% out of bounds).
-            out_of_bounds = (
-                ((log_sigma < log_sigma_min) | (log_sigma > log_sigma_max)).sum().item()
-            )
-            if out_of_bounds > num_samples * 0.05:
-                warnings.warn(
-                    f"Lognormal schedule: {out_of_bounds}/{num_samples} samples "
-                    f"({100 * out_of_bounds / num_samples:.1f}%) clamped to "
-                    f"[{self.sigma_min}, {self.sigma_max}]. Consider adjusting "
-                    f"lognormal_mean={self.lognormal_mean} or "
-                    f"lognormal_std={self.lognormal_std}.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-
             log_sigma_clamped = torch.clamp(log_sigma, log_sigma_min, log_sigma_max)
 
-            # Convert log_sigma to time using VE's geometric relationship
+            # Convert log_sigma to a unit fraction in [0, 1], then rescale to
+            # [t_min, t_max] so that caller-supplied bounds are respected.
             log_ratio = log_sigma_max - log_sigma_min  # = log(sigma_max / sigma_min)
-            times = (log_sigma_clamped - log_sigma_min) / log_ratio
-
-            # Final clamp to handle any remaining edge cases from t_min/t_max bounds
+            unit = (log_sigma_clamped - log_sigma_min) / log_ratio  # in [0, 1]
+            times = unit * (t_max - t_min) + t_min
+            # Clamp at boundaries.
             return torch.clamp(times, t_min, t_max)
 
     def solve_schedule(
@@ -1061,12 +1071,15 @@ class VEScoreEstimator(ConditionalScoreEstimator):
                 sigma_max_inv_rho + steps * (sigma_min_inv_rho - sigma_max_inv_rho)
             ) ** rho
 
-            # Convert sigma to time using VE's geometric relationship
+            # Convert sigma to unit fraction in [0, 1], then rescale to
+            # [t_min, t_max] (descending: t_max -> t_min).
             log_ratio = math.log(self.sigma_max / self.sigma_min)
-            times = torch.log(sigmas / self.sigma_min) / log_ratio
+            unit = torch.log(sigmas / self.sigma_min) / log_ratio  # in [0, 1]
+            times = unit * (t_max - t_min) + t_min
 
-            # Ensure exact boundary values (avoid floating-point imprecision)
+            # Pin exact boundary values.
             times[0] = t_max
-            times[-1] = t_min
+            if num_steps > 1:
+                times[-1] = t_min
 
             return times

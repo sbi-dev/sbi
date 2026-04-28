@@ -44,6 +44,21 @@ class ScatterDiagOptions(DiagOptions): ...
 
 
 @dataclass(frozen=True)
+class BarDiagOptions(DiagOptions):
+    """Options for discrete bar charts on diagonal."""
+
+    width: float = 0.8
+
+    def __post_init__(self):
+        mpl_kwargs_defaults = {
+            "alpha": 0.7,
+            "edgecolor": "white",
+        }
+        updated = {**mpl_kwargs_defaults, **self.mpl_kwargs}
+        object.__setattr__(self, "mpl_kwargs", updated)
+
+
+@dataclass(frozen=True)
 class OffDiagOptions:
     """
     Base class for keyword arguments used in off-diagonal plots.
@@ -284,6 +299,8 @@ def get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict[str, Any]:
         diag_options = HistDiagOptions(mpl_kwargs=dict(color=_set_color(i)))
     elif diag == "scatter":
         diag_options = ScatterDiagOptions(mpl_kwargs=dict(color=_set_color(i)))
+    elif diag == "bar":
+        diag_options = BarDiagOptions(mpl_kwargs=dict(color=_set_color(i)))
     else:
         return {}
     return asdict(diag_options)

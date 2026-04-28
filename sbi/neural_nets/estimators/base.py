@@ -141,6 +141,64 @@ class ConditionalEstimator(nn.Module, ABC):
                     "provided by input_shape. Please reshape it accordingly."
                 )
 
+    def _broadcast_and_align(
+        self, input: Tensor, condition: Tensor
+    ) -> Tuple[Tensor, Tensor, int]:
+        r"""Ensure input has sample_dim, broadcast batch dims, and expand both.
+
+        Args:
+            input: Inputs of shape `(sample_dim, batch_dim, *input_event_shape)`
+                or `(batch_dim, *input_event_shape)`.
+            condition: Conditions of shape `(batch_dim, *condition_event_shape)`
+                or `(sample_dim, batch_dim, *condition_event_shape)`.
+
+        Returns:
+            input: Expanded to `(sample_dim, batch_dim, *input_event_shape)`.
+            condition: Expanded to `(sample_dim, batch_dim, *condition_event_shape)`.
+            batch_dim: The broadcast batch dimension.
+        """
+        input_event_dims = len(self.input_shape)
+        condition_event_dims = len(self.condition_shape)
+
+        # Add sample_dim=1 if input lacks it.
+        if input.dim() <= input_event_dims + 1:
+            input = input.unsqueeze(0)
+
+        sample_dim = input.shape[0]
+        input_batch_dim = input.shape[1]
+
+        # Detect whether condition has a sample_dim.
+        condition_has_sample_dim = condition.dim() > condition_event_dims + 1
+        if condition_has_sample_dim:
+            condition_batch_dim = condition.shape[1]
+        else:
+            condition_batch_dim = condition.shape[0]
+
+        # Broadcast batch dimensions with an informative error.
+        try:
+            batch_dim = torch.broadcast_shapes(
+                (input_batch_dim,), (condition_batch_dim,)
+            )[0]
+        except RuntimeError as err:
+            raise RuntimeError(
+                "Expected `input` and `condition` to have broadcastable batch "
+                "dimensions: their batch sizes must match, or one of them must be 1. "
+                f"Got input={input_batch_dim} and condition={condition_batch_dim}."
+            ) from err
+
+        input = input.expand(sample_dim, batch_dim, *self.input_shape)
+
+        if condition_has_sample_dim:
+            condition = condition.expand(sample_dim, batch_dim, *self.condition_shape)
+        else:
+            condition = (
+                condition.expand(batch_dim, *self.condition_shape)
+                .unsqueeze(0)
+                .expand(sample_dim, batch_dim, *self.condition_shape)
+            )
+
+        return input, condition, batch_dim
+
 
 class ConditionalDensityEstimator(ConditionalEstimator):
     r"""Base class for conditional density estimators.
@@ -184,15 +242,15 @@ class ConditionalDensityEstimator(ConditionalEstimator):
 
         Args:
             input: Inputs to evaluate the log probability on of shape
-                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+                    `(sample_dim, batch_dim, *event_shape_input)` or
+                    `(batch_dim, *event_shape_input)`.
             condition: Conditions of shape
-                `(batch_dim_condition, *event_shape_condition)`.
-
-        Raises:
-            RuntimeError: If batch_dim_input and batch_dim_condition do not match.
+                `(batch_dim, *event_shape_condition)` or
+                `(sample_dim, batch_dim, *event_shape_condition)`.
 
         Returns:
-            Sample-wise log probabilities.
+            Sample-wise log probabilities, shape `(sample_dim, batch_dim)`.
+            Batch dimensions of input and condition are broadcast.
         """
 
         pass
@@ -481,7 +539,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
 
     def solve_schedule(
         self,
-        steps: int,
+        num_steps: int,
         t_min: Optional[float] = None,
         t_max: Optional[float] = None,
     ) -> Tensor:
@@ -490,7 +548,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         Returns a uniform time stepping between t_max and t_min by default.
 
         Args:
-            steps: Number of discretization steps.
+            num_steps: Number of discretization steps.
             t_min: Minimum time value. Defaults to self.t_min.
             t_max: Maximum time value. Defaults to self.t_max.
 
@@ -499,7 +557,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         """
         t_min = self.t_min if t_min is None else t_min
         t_max = self.t_max if t_max is None else t_max
-        return torch.linspace(t_max, t_min, steps, device=self._mean_base.device)
+        return torch.linspace(t_max, t_min, num_steps, device=self._mean_base.device)
 
 
 class UnconditionalEstimator(nn.Module, ABC):
