@@ -830,6 +830,7 @@ def test_vector_field_methods_device_handling(
 @pytest.mark.gpu
 @pytest.mark.parametrize("prior_device", ["cpu", "gpu"])
 def test_npe_pfn_on_device(prior_device):
+    pytest.importorskip("tabpfn")
     """NPE_PFN should work correctly when prior/data come from different devices.
 
     TabPFN always runs on CPU, so the estimator context must remain on CPU

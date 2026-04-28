@@ -8,11 +8,10 @@ from torch import Tensor, nn
 try:
     from tabpfn import TabPFNRegressor
     from tabpfn.model_loading import prepend_cache_path
-except ImportError as e:
-    raise ImportError(
-        "TabPFN is required for TabPFNFlow but is not installed. "
-        "Install it with: pip install sbi[tabpfn]"
-    ) from e
+
+    _TABPFN_AVAILABLE = True
+except ImportError:
+    _TABPFN_AVAILABLE = False
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
@@ -52,6 +51,11 @@ class TabPFNFlow(ConditionalDensityEstimator):
                 checkpoint filenames, or ``"auto"`` for the latest version.
             max_context_size: Maximum number of context pairs that can be stored.
         """
+        if not _TABPFN_AVAILABLE:
+            raise ImportError(
+                "TabPFN is required for TabPFNFlow but is not installed. "
+                "Install it with: pip install 'sbi[tabpfn]'"
+            )
         super().__init__(
             net=nn.Identity(),
             input_shape=input_shape,

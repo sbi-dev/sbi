@@ -672,6 +672,7 @@ def test_trainers_with_valid_and_invalid_estimator_builders(
 @pytest.mark.parametrize("batch_dim", [1, 5])
 @pytest.mark.parametrize("input_sample_dim", [1, 2])
 def test_tabpfn_flow_shapes(batch_dim, input_sample_dim):
+    pytest.importorskip("tabpfn")
     """TabPFNFlow log_prob, sample, and sample_and_log_prob follow shape conventions."""
     input_shape = (2,)
     condition_shape = (2,)
