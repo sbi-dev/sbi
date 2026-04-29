@@ -13,6 +13,7 @@ from sbi.inference import (
     NLE_A,
     NPE_A,
     NPE_C,
+    NPE_PFN,
     NPSE,
     NRE,
     NRE_A,
@@ -589,3 +590,29 @@ def test_posterior_mcmc_iid_sampling(iid_batch_size: int, mcmc_params_fast):
     assert torch.allclose(sample_mean, true_mean, atol=0.5), (
         f"MCMC sample mean {sample_mean} too far from true mean {true_mean}"
     )
+
+
+@pytest.mark.slow
+def test_npe_pfn_sample_log_prob():
+    """Test NPE-PFN workflow: append_simulations, build_posterior, sample, log_prob."""
+    pytest.importorskip("tabpfn")
+
+    num_dim = 2
+    num_simulations = 20
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    simulator = diagonal_linear_gaussian
+
+    inference = NPE_PFN(prior=prior)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    inference.append_simulations(theta, x)
+
+    posterior = inference.build_posterior()
+
+    x_o = ones(num_dim)
+    samples = posterior.sample((10,), x=x_o)
+    assert samples.shape == (10, num_dim)
+
+    log_probs = posterior.log_prob(samples, x=x_o)
+    assert log_probs.shape == (10,)

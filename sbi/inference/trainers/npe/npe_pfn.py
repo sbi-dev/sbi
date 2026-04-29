@@ -273,7 +273,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         if sample_with == "filtered_direct":
             full_context_input, full_context_condition = full_theta, full_x
 
-            prior = self._resolve_prior(prior)
+            prior = self._resolve_prior(prior, sample_with)
             estimator = deepcopy(estimator)
 
             resolved_params = self._resolve_posterior_parameters(

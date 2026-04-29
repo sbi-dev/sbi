@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
+import warnings
 from pathlib import Path
 from typing import Mapping, Optional, Tuple
 
@@ -38,7 +39,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         regressor_init_kwargs: Optional[Mapping] = None,
-        max_context_size: int = 50_000,
+        max_context_size: int = 10_000,
     ) -> None:
         r"""Initialize a TabPFN-based conditional density estimator.
 
@@ -80,6 +81,9 @@ class TabPFNFlow(ConditionalDensityEstimator):
         self._log_license(self._model.model_path)
 
         self.max_context_size = int(max_context_size)
+        self._warn_if_context_exceeds_recommended(
+            self._model.model_path, self.max_context_size
+        )
         self._input_numel = int(torch.Size(input_shape).numel())
         # Plain CPU tensors — not buffers. TabPFN's numpy API requires CPU, so these
         # must never be moved with the module to another device.
@@ -396,6 +400,24 @@ class TabPFNFlow(ConditionalDensityEstimator):
         raise NotImplementedError(
             "Loss for potential fine-tuning is not implemented yet."
         )
+
+    @staticmethod
+    def _warn_if_context_exceeds_recommended(model_path, max_context_size: int) -> None:
+        """Warn if max_context_size exceeds the recommended limit."""
+        name = Path(model_path).name.lower()
+        if "v2.5" in name or "v2.6" in name:
+            recommended = 50_000
+        elif "v2" in name:
+            recommended = 10_000
+        else:
+            return
+        if max_context_size > recommended:
+            warnings.warn(
+                f"max_context_size={max_context_size} exceeds the recommended "
+                f"maximum of {recommended} for TabPFN version {name}.",
+                UserWarning,
+                stacklevel=3,
+            )
 
     @staticmethod
     def _resolve_model_path(model_path: str) -> str:

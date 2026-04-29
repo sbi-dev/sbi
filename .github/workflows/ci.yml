@@ -50,7 +50,7 @@ jobs:
         cache-dependency-glob: "pyproject.toml"
 
     - name: Install dependencies with uv
-      run: uv sync --extra dev --extra tabpfn
+      run: uv sync --extra dev
 
     - name: Cache uv dependencies
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
