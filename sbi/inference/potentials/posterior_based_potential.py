@@ -63,40 +63,6 @@ def posterior_estimator_based_potential(
 
 
 class PosteriorBasedPotential(BasePotential):
-    r"""Potential function for posterior-based methods (NPE).
-
-    This potential directly evaluates $\log(p(x_o|\theta)p(\theta))$
-    from a trained posterior estimator, returning $-\infty$ for
-    parameters outside prior support.
-
-    Example:
-    --------
-    ::
-
-        import torch
-        from sbi.inference import NPE_C
-        from sbi.inference.potentials import posterior_estimator_based_potential
-        from sbi.utils import BoxUniform
-
-        # 1. Train a posterior estimator
-        prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
-        theta = prior.sample((100,))
-        x = theta + 0.1 * torch.randn_like(theta)
-
-        trainer = NPE_C(prior=prior)
-        posterior_estimator = trainer.append_simulations(theta, x).train()
-
-        # 2. Create potential function
-        x_o = torch.tensor([[0.5, 0.5]])
-        potential_fn, theta_transform = posterior_estimator_based_potential(
-            posterior_estimator, prior, x_o
-        )
-
-        # 3. Evaluate potential at a point
-        theta_test = torch.tensor([[0.4, 0.6]])
-        log_prob = potential_fn(theta_test)
-    """
-
     def __init__(
         self,
         posterior_estimator: ConditionalDensityEstimator,
