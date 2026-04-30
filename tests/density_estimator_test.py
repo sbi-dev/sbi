@@ -255,6 +255,92 @@ def test_correctness_of_density_estimator_log_prob(
 
 @pytest.mark.parametrize(
     "density_estimator_build_fn",
+    [build_nsf, build_zuko_nsf],
+)
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("batch_dim", (1, 10))
+def test_log_prob_without_sample_dim(
+    density_estimator_build_fn,
+    input_event_shape,
+    condition_event_shape,
+    batch_dim,
+):
+    """Test log_prob when input has no explicit sample_dim."""
+    density_estimator, inputs, condition, _ = _build_density_estimator_and_tensors(
+        density_estimator_build_fn,
+        input_event_shape,
+        condition_event_shape,
+        batch_dim,
+        input_sample_dim=1,
+    )
+    # inputs shape (1, batch_dim, *event_shape), squeeze to (batch_dim, *event_shape)
+    inputs_no_sample = inputs.squeeze(0)
+    log_probs_with = density_estimator.log_prob(inputs, condition=condition)
+    log_probs_without = density_estimator.log_prob(
+        inputs_no_sample, condition=condition
+    )
+    assert log_probs_with.shape == log_probs_without.shape
+    assert torch.allclose(log_probs_with, log_probs_without, atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "density_estimator_build_fn",
+    [build_nsf, build_zuko_nsf],
+)
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+def test_log_prob_broadcasting_batch_dims(
+    density_estimator_build_fn,
+    input_event_shape,
+    condition_event_shape,
+):
+    """Test log_prob broadcasts when input batch_dim=1 and condition batch_dim>1."""
+    batch_dim = 5
+    density_estimator, _, condition, _ = _build_density_estimator_and_tensors(
+        density_estimator_build_fn,
+        input_event_shape,
+        condition_event_shape,
+        batch_dim,
+    )
+    # input with batch_dim=1, condition with batch_dim=5
+    single_input = torch.randn(2, 1, *input_event_shape)
+    log_probs = density_estimator.log_prob(single_input, condition=condition)
+    assert log_probs.shape == (2, batch_dim)
+
+
+@pytest.mark.parametrize(
+    "density_estimator_build_fn",
+    [build_nsf, build_zuko_nsf],
+)
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("batch_dim", (1, 5))
+def test_log_prob_condition_with_sample_dim(
+    density_estimator_build_fn,
+    input_event_shape,
+    condition_event_shape,
+    batch_dim,
+):
+    """Test log_prob when condition has sample_dim."""
+    sample_dim = 3
+    density_estimator, _, condition, _ = _build_density_estimator_and_tensors(
+        density_estimator_build_fn,
+        input_event_shape,
+        condition_event_shape,
+        batch_dim,
+    )
+    input = torch.randn(sample_dim, batch_dim, *input_event_shape)
+    # condition with sample_dim: (sample_dim, batch_dim, *event_shape)
+    condition_with_sample = condition.unsqueeze(0).expand(
+        sample_dim, batch_dim, *condition_event_shape
+    )
+    log_probs = density_estimator.log_prob(input, condition=condition_with_sample)
+    assert log_probs.shape == (sample_dim, batch_dim)
+
+
+@pytest.mark.parametrize(
+    "density_estimator_build_fn",
     [
         build_nsf,
         build_zuko_nsf,

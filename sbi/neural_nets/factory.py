@@ -431,7 +431,7 @@ def posterior_flow_nn(
     ] = "mlp",
     z_score_theta: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = None,
+    ] = "independent",
     z_score_x: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
     ] = "independent",
@@ -440,6 +440,7 @@ def posterior_flow_nn(
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
+    gaussian_baseline: bool = False,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a FlowMatchingEstimator object for flow-based
@@ -454,15 +455,20 @@ def posterior_flow_nn(
             - 'transformer_cross_attention': Transformer with cross-attention.
             -  nn.Module: Custom network
             Defaults to 'mlp'.
-        z_score_theta: This is not supported for FMPE and will raise an error.
-        z_score_x: Whether to z-score xs passing into the network, same options as
-            z_score_theta.
+        z_score_theta: Whether to z-score theta for time-dependent normalization.
+            This enables time-dependent z-scoring which helps FMPE learn when
+            theta is far from N(0,1). Defaults to 'independent'.
+        z_score_x: Whether to z-score observations (x) before passing to the
+            embedding network. Defaults to 'independent'.
         hidden_features: Number of hidden units per layer. Defaults to 100.
         num_layers: Number of hidden layers. Defaults to 5.
         embedding_net: Embedding network for x (conditioning variable). Defaults to
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
+        gaussian_baseline: If True, use analytical Gaussian baseline velocity
+            derived from Bayes' rule. The network then only learns the residual.
+            Defaults to False.
         **kwargs: Additional estimator / network arguments.  Valid keys are
             defined by ``FlowEstimatorConfig``; unknown keys raise
             ``TypeError``.
@@ -470,23 +476,17 @@ def posterior_flow_nn(
     Returns:
         Constructor function for FMPE.
     """
-    if z_score_theta is not None:
-        raise ValueError(
-            "z_score_theta is not supported for FMPE. For simulator "
-            "parameters with highly different scales, we recommend "
-            "z-scoring the inputs manually beforehand."
-        )
-
     # Map user-facing parameter names to internal names.
     mapped = dict(
-        z_score_x=z_score_x,
-        z_score_y=z_score_theta,
+        z_score_x=z_score_theta,
+        z_score_y=z_score_x,
         hidden_features=hidden_features,
         num_layers=num_layers,
         embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
         time_embedding_dim=t_embedding_dim,
         time_emb_type=time_emb_type,
         net=model,
+        gaussian_baseline=gaussian_baseline,
     )
 
     # Validate against known fields — warns on unknown kwargs (typos)

@@ -695,6 +695,16 @@ def _format_subplot(
         ))
 
 
+def _place_legend_in_empty_cell(ax, handles, labels, legend_kw):
+    """Place a legend in an empty off-diagonal cell, hiding spines and ticks."""
+    ax.axis("on")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.legend(handles, labels, **legend_kw)
+
+
 def _format_axis(
     ax: Axes,
     xhide: bool = True,
@@ -1376,6 +1386,7 @@ def _arrange_grid(
     excl_diag = all(v is None for v in diag_funcs)
     flat = excl_lower and excl_upper
     one_dim = dim == 1
+    _legend_handles: Optional[tuple] = None  # type: ignore
     # select the subset of rows and cols to be plotted
     if flat:
         rows = 1
@@ -1448,6 +1459,16 @@ def _arrange_grid(
                         elif row not in discrete_set and diag_f is plt_bar_1d:
                             diag_f = plt_hist_1d
                             diag_kw = get_default_diag_kwargs("hist", sample_ind)
+                        # Add sample label on the first diagonal cell for legend.
+                        if (
+                            fig_kwargs.legend
+                            and col == subset[0]
+                            and diag_kw is not None
+                        ):
+                            diag_kw = copy.deepcopy(diag_kw)
+                            diag_kw.setdefault("mpl_kwargs", {})["label"] = (
+                                fig_kwargs.samples_labels[sample_ind]
+                            )
                         if callable(diag_f):
                             diag_f(ax, sample[:, row], limits[row], diag_kw)
 
@@ -1461,8 +1482,8 @@ def _arrange_grid(
                             **fig_kwargs.points_diag,
                             label=fig_kwargs.points_labels[n],
                         )
-                if fig_kwargs.legend and col == 0:
-                    ax.legend(**fig_kwargs.legend_kwargs)  # pyright: ignore reportOptionalMemberAccess
+                if fig_kwargs.legend and col == subset[0]:
+                    _legend_handles = ax.get_legend_handles_labels()  # pyright: ignore reportOptionalMemberAccess
 
             # Off-diagonals
 
@@ -1548,6 +1569,34 @@ def _arrange_grid(
                                 color=fig_kwargs.points_colors[n],
                                 **fig_kwargs.points_offdiag,
                             )
+    # Place legend in an empty off-diagonal cell if available, otherwise on the
+    # first diagonal cell.
+    if fig_kwargs.legend and _legend_handles is not None:
+        handles, legend_labels = _legend_handles
+        if not one_dim and not flat:
+            legend_kw = fig_kwargs.legend_kwargs.copy()
+            legend_kw.setdefault("loc", "center")
+            legend_kw.setdefault("frameon", False)
+            if excl_lower and rows > 1:
+                # Lower triangle is empty: use bottom-left cell.
+                legend_ax = axes[-1, 0]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                _place_legend_in_empty_cell(
+                    legend_ax, handles, legend_labels, legend_kw
+                )
+            elif excl_upper and rows > 1:
+                # Upper triangle is empty: use top-right cell.
+                legend_ax = axes[0, -1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                _place_legend_in_empty_cell(
+                    legend_ax, handles, legend_labels, legend_kw
+                )
+            else:
+                # Both triangles plotted: fall back to first diagonal cell.
+                axes[0, 0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportIndexIssue, reportOptionalSubscript, reportOptionalMemberAccess]
+        elif one_dim:
+            axes.legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportOptionalMemberAccess]
+        elif flat:
+            axes[0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportIndexIssue, reportOptionalSubscript, reportOptionalMemberAccess]
+
     # Add dots if we subset
     if len(subset) < dim:
         if flat:
@@ -2536,6 +2585,7 @@ def get_diag_func(samples, limits, opts, **kwargs):
                         xs,
                         ys,
                         color=opts["samples_colors"][n],
+                        label=opts["samples_labels"][n],
                     )
                 elif "offdiag" in opts and opts["offdiag"][n] == "scatter":
                     for single_sample in v:
@@ -2645,6 +2695,8 @@ def _arrange_plots(
     fig.suptitle(opts["title"], **opts["title_format"])
 
     # Style axes
+    _dep_legend_handles: Optional[tuple] = None  # type: ignore
+    first_subset_col = subset[0]
     row_idx = -1
     for row in range(dim):
         if row not in subset:
@@ -2741,8 +2793,8 @@ def _arrange_plots(
                             **opts["points_diag"],
                             label=opts["points_labels"][n],
                         )
-                if opts["legend"] and col == 0:
-                    plt.legend(**opts["legend_kwargs"])
+                if opts["legend"] and col == first_subset_col:
+                    _dep_legend_handles = ax.get_legend_handles_labels()
 
             # Off-diagonals
             else:
@@ -2760,6 +2812,24 @@ def _arrange_plots(
                             color=opts["points_colors"][n],
                             **opts["points_offdiag"],
                         )
+
+    # Place legend in empty off-diagonal cell if available.
+    if opts["legend"] and _dep_legend_handles is not None:
+        handles, legend_labels = _dep_legend_handles
+        if not flat and dim > 1:
+            legend_kw = opts["legend_kwargs"].copy()
+            legend_kw.setdefault("loc", "center")
+            legend_kw.setdefault("frameon", False)
+            if opts["lower"] is None:
+                # Lower triangle is empty: use bottom-left cell.
+                _place_legend_in_empty_cell(
+                    axes[-1, 0], handles, legend_labels, legend_kw
+                )
+            else:
+                # Both triangles plotted: fall back to first diagonal.
+                axes[0, 0].legend(handles, legend_labels, **opts["legend_kwargs"])
+        else:
+            plt.legend(**opts["legend_kwargs"])
 
     if len(subset) < dim:
         if flat:

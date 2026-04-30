@@ -1083,7 +1083,13 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
                 prior, scale_from_prior_precision
             )
         assert posterior_precision is not None
-        self.posterior_precision = posterior_precision
+        self.posterior_precision = posterior_precision.to(device)
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Moves all tensors including posterior_precision to the given device."""
+        super().to(device)
+        if isinstance(self.posterior_precision, Tensor):
+            self.posterior_precision = self.posterior_precision.to(device)
 
     def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
         r"""
