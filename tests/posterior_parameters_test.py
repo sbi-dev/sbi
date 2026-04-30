@@ -7,7 +7,7 @@ from dataclasses import fields
 import pytest
 import torch
 
-from sbi.inference import NPE, NRE
+from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
@@ -62,14 +62,14 @@ def get_inference():
                 "potential_fn",
                 "proposal",
                 "device",
-                "theta_transform",
                 "init_strategy_num_candidates",
+                "theta_transform",
             },
         ),
         (
             RejectionPosteriorParameters,
             RejectionPosterior,
-            {"potential_fn", "device", "proposal"},
+            {"potential_fn", "device", "proposal", "theta_transform"},
         ),
         (
             VIPosteriorParameters,
@@ -78,11 +78,11 @@ def get_inference():
                 # __init__ params not in dataclass
                 "potential_fn",
                 "prior",
-                "theta_transform",
                 "device",
                 "x_shape",  # deprecated
                 "parameters",  # for custom q, use set_q() instead
                 "modules",  # for custom q, use set_q() instead
+                "theta_transform",
             },
         ),
         (
@@ -416,6 +416,7 @@ def test_if_warning_raised_for_deprecated_build_posterior_parameters(
         get_inference.build_posterior(**params)
 
 
+@pytest.mark.parametrize("inference_class", [NPE, NRE, NLE])
 @pytest.mark.parametrize(
     "sample_with",
     ["mcmc", "vi", "rejection", "importance"],
@@ -424,10 +425,14 @@ def test_if_warning_raised_for_deprecated_build_posterior_parameters(
     raises=ValueError,
     reason="Prior required for non-direct sampling methods",
 )
-def test_resolve_prior_missing_prior_npe(sample_with):
-    inference = NPE()  # no prior
+def test_resolve_prior_missing_prior(inference_class, sample_with):
+    """
+    Test that an error is raised when trying to build a posterior with a sampling method
+    that requires a prior, but no prior is provided to the inference method.
+    """
+    inference = inference_class()  # no prior
 
-    theta = torch.randn(10, 2)
+    theta = torch.randn(50, 2)
     x = theta + 0.1 * torch.randn_like(theta)
 
     inference.append_simulations(theta, x).train(max_num_epochs=1)
@@ -435,16 +440,53 @@ def test_resolve_prior_missing_prior_npe(sample_with):
     inference.build_posterior(sample_with=sample_with)
 
 
-@pytest.mark.parametrize("sample_with", ["direct"])
-def test_resolve_prior_missing_prior_npe_direct_ok(sample_with):
-    inference = NPE()  # no prior
+VALID_SAMPLE_WITH_AND_INFERENCE_METHOD = [
+    (NPE, "direct"),
+    (NPE, "mcmc"),
+    (NPE, "vi"),
+    (NPE, "rejection"),
+    (NPE, "importance"),
+    (NLE, "mcmc"),
+    (NLE, "vi"),
+    (NLE, "rejection"),
+    (NLE, "importance"),
+    (NRE, "mcmc"),
+    (NRE, "vi"),
+    (NRE, "rejection"),
+    (NRE, "importance"),
+    (NPSE, "sde"),
+    (NPSE, "ode"),
+    (FMPE, "sde"),
+    (FMPE, "ode"),
+]
 
-    theta = torch.randn(10, 2)
-    x = theta + 0.1 * torch.randn_like(theta)
+
+@pytest.mark.parametrize(
+    "inference_method, sample_with", VALID_SAMPLE_WITH_AND_INFERENCE_METHOD
+)
+def test_inference_method_with_valid_sample_with(inference_method, sample_with):
+    """
+    Test that the inference method works correctly with valid sample_with options.
+    """
+    num_samples = 2
+    dim_theta = 2
+    num_simulations = 50
+
+    prior = BoxUniform(low=-2 * torch.ones(dim_theta), high=2 * torch.ones(dim_theta))
+    inference = inference_method(prior=prior)
+
+    theta = prior.sample((num_simulations,))
+    x = theta + torch.randn_like(theta) * 0.1
 
     inference.append_simulations(theta, x).train(max_num_epochs=1)
 
     posterior = inference.build_posterior(sample_with=sample_with)
 
-    samples = posterior.sample((5,), x=x[:1])
-    assert samples.shape[0] == 5
+    if sample_with == "vi":
+        posterior.set_default_x(x[0])
+        posterior.train(max_num_iters=5, show_progress_bar=False, quality_control=False)
+        samples = posterior.sample((num_samples,))
+    else:
+        samples = posterior.sample((num_samples,), x=x[0])
+
+    assert samples.shape == torch.Size([num_samples, dim_theta])

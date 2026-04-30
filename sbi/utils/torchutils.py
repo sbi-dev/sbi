@@ -62,9 +62,10 @@ def process_device(device: Union[str, torch.device]) -> str:
                 )
         # Else, check whether the custom device is valid.
         else:
-            check_device(device)
             if isinstance(device, torch.device):
-                device = device.type
+                device = str(device)
+
+            check_device(device)
 
         return device
 
@@ -110,8 +111,9 @@ def check_if_prior_on_device(
             f"Prior device '{prior_device}' must match training device "
             f"'{training_device}'. When training on GPU make sure to "
             "pass a prior initialized on the GPU as well, e.g., "
+            "use `.to(device)` for sbi priors or "
             "prior = torch.distributions.Normal"
-            "(torch.zeros(2, device='cuda'), scale=1.0)`."
+            "(torch.zeros(2, device='cuda'), scale=1.0)`, or ."
         )
 
 
