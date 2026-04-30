@@ -13,4 +13,5 @@ Sampling
    12_mcmc_diagnostics_with_arviz.ipynb
    23_using_pyro_with_sbi.ipynb
    19_posterior_parameters.ipynb
+   24_variational_inference.ipynb
    25_choosing_vector_field_options.ipynb
