@@ -9,7 +9,7 @@ from sbi.inference.trainers.base import (
 )
 from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.inference.trainers.nle import MNLE, NLE_A
-from sbi.inference.trainers.npe import MNPE, NPE_A, NPE_B, NPE_C  # noqa: F401
+from sbi.inference.trainers.npe import MNPE, NPE_A, NPE_B, NPE_C, NPE_PFN  # noqa: F401
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C  # noqa: F401
 from sbi.inference.trainers.vfpe import FMPE, NPSE
 
@@ -20,7 +20,7 @@ _nle_family = ["NLE"]
 SNPE_A = NPE_A
 SNPE_B = NPE_B
 SNPE = APT = SNPE_C = NPE = NPE_C
-_npe_family = ["NPE_A", "NPE_B", "NPE_C"]
+_npe_family = ["NPE_A", "NPE_B", "NPE_C", "NPE_PFN"]
 
 
 SRE = SNRE = SNRE_B = NRE = NRE_B

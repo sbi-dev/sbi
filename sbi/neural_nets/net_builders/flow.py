@@ -17,6 +17,7 @@ from torch.distributions import Distribution
 from zuko.lazy import Flow, LazyDistribution
 
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow, ZukoUnconditionalFlow
+from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
     biject_transform_zuko,
@@ -1139,6 +1140,68 @@ def build_zuko_flow(
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
     )
+
+    return flow
+
+
+def build_tabpfn_flow(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ] = "none",
+    z_score_y: Literal[
+        "none", "independent", "structured", "transform_to_unconstrained"
+    ] = "independent",
+    embedding_net: nn.Module = nn.Identity(),
+    regressor_init_kwargs: Optional[dict] = None,
+    max_context_size: int = 10_000,
+    **kwargs,
+) -> TabPFNFlow:
+    r"""Build a TabPFN-based conditional density estimator.
+
+    This builder initializes a `TabPFNFlow` and sets its context dataset directly from
+    `batch_x` and `batch_y`.
+
+    Args:
+        batch_x: Batch of xs, used to infer input shape and set context inputs.
+        batch_y: Batch of ys, used to infer condition shape and set context conditions.
+        z_score_x: Included for API consistency. Must be `none`.
+        z_score_y: Whether to z-score ys before passing them to `embedding_net`.
+            If `embedding_net` is `nn.Identity`, this must be `none`.
+        embedding_net: Optional embedding network for y.
+        regressor_init_kwargs: Keyword arguments passed to `TabPFNRegressor`.
+        max_context_size: Maximum number of context samples stored in the estimator.
+            If `batch_x`/`batch_y` are larger, only the first `max_context_size`
+            samples are used.
+        **kwargs: Additional keyword arguments passed by higher-level builders and
+            ignored for TabPFN.
+
+    Returns:
+        Initialized `TabPFNFlow` with context set.
+    """
+
+    # TODO This is a sensible default for now because TabPFN handles substantial
+    # preprocessing internally, so the outer API defaults to no x z-scoring for NPE-PFN.
+    if z_score_x != "none":
+        raise ValueError(
+            "`build_tabpfn_flow` currently supports only `z_score_x='none'`, "
+            f"got '{z_score_x}'. TabPFN performs extensive preprocessing internally."
+        )
+
+    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    flow = TabPFNFlow(
+        input_shape=batch_x[0].shape,
+        condition_shape=batch_y[0].shape,
+        embedding_net=embedding_net,
+        regressor_init_kwargs=regressor_init_kwargs,
+        max_context_size=max_context_size,
+    )
+
+    batch_x = batch_x[:max_context_size]
+    batch_y = batch_y[:max_context_size]
+
+    flow.set_context(batch_x, batch_y)
 
     return flow
 

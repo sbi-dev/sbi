@@ -5,7 +5,7 @@ import pytest
 import torch
 from pytest_harvest import ResultsBag
 
-from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
+from sbi.inference import FMPE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
@@ -29,8 +29,9 @@ VF_ESTIMATORS = ["mlp", "ada_mlp", "transformer"]
 
 # Benchmarking method groups i.e. what to run for different --bm-mode
 METHOD_GROUPS = {
-    "none": [NPE, NRE, NLE, FMPE, NPSE],
+    "none": [NPE, NPE_PFN, NRE, NLE, FMPE, NPSE],
     "npe": [NPE],
+    "npe_pfn": [NPE_PFN],
     "nle": [NLE],
     "nre": [NRE_A, NRE_B, NRE_C, BNRE],
     "fmpe": [FMPE],
@@ -43,6 +44,7 @@ METHOD_GROUPS = {
 METHOD_PARAMS = {
     "none": [{}],
     "npe": [{"density_estimator": de} for de in DENSITY_ESTIMATORS],
+    "npe_pfn": [{}],
     "nle": [{"density_estimator": de} for de in ["maf", "nsf"]],
     "nre": [{"classifier": cl} for cl in CLASSIFIERS],
     "fmpe": [{"vf_estimator": nn} for nn in VF_ESTIMATORS],
