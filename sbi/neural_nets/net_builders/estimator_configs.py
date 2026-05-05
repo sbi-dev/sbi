@@ -134,6 +134,9 @@ class ConditionalFlowConfig(_EstimatorConfigBase):
     discrete_hidden_layers: Optional[int] = None
     continuous_hidden_features: Optional[int] = None
 
+    # --- TabPFN-specific ---
+    regressor_init_kwargs: Optional[dict] = None
+
     # --- Base distribution ---
     dtype: Optional[Any] = None
 
