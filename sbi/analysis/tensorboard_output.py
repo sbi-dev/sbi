@@ -103,7 +103,6 @@ def plot_summary(
     """
     logger = logging.getLogger(__name__)
 
-    # Deprecation shims for renamed kwargs.
     if inference is not None:
         if trainer is not None:
             raise TypeError(
@@ -135,6 +134,15 @@ def plot_summary(
             raise ValueError(
                 f"`{name}` must have the same length as `tags` "
                 f"(got {len(vals)} vs {len(tags)})."
+            )
+
+    if axes is not None:
+        n_axes = len(np.atleast_1d(axes))
+        expected_n_axes = 1 if overlay else len(tags)
+        if n_axes != expected_n_axes:
+            raise ValueError(
+                f"`axes` must have length {expected_n_axes} "
+                f"(got {n_axes}) for overlay={overlay} with {len(tags)} tag(s)."
             )
 
     size_guidance = deepcopy(DEFAULT_SIZE_GUIDANCE)

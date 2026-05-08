@@ -208,6 +208,29 @@ def test_plot_summary_length_validation(mock_inference, kwarg):
         )
 
 
+@pytest.mark.parametrize(
+    "overlay, n_axes_passed",
+    [
+        (False, 1),  # overlay=False, expects len(tags)=2 axes, got 1
+        (False, 3),  # overlay=False, expects len(tags)=2 axes, got 3
+        (True, 2),  # overlay=True, expects 1 axis, got 2
+    ],
+)
+def test_plot_summary_axes_length_validation(mock_inference, overlay, n_axes_passed):
+    """Mismatched user-provided `axes` must raise ValueError, not silently misbehave."""
+    fig, axes = subplots(1, n_axes_passed)
+    with pytest.raises(ValueError, match="`axes` must have length"):
+        plot_summary(
+            mock_inference,
+            tags=["training_loss", "validation_loss"],
+            overlay=overlay,
+            fig=fig,
+            axes=axes,
+            verbose=False,
+        )
+    close(fig)
+
+
 @pytest.mark.parametrize("num_parameters", (2, 4, 10))
 @pytest.mark.parametrize("num_cols", (2, 3, 4))
 @pytest.mark.parametrize("custom_figure", (False, True))
