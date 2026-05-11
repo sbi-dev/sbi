@@ -13,7 +13,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils
 from sbi.inference import NLE, NPE, NRE, simulate_for_sbi
-from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
+from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters , DirectPosteriorParameters
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
@@ -401,11 +401,6 @@ def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    raises=ValueError,
-    reason="Padding with NaNs causes error in new NaN check on x_o, see #1701, #1717",
-    strict=True,
-)
 def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     """Test inference accuracy with embeddings for varying number of trials.
 
@@ -455,7 +450,9 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(
         training_batch_size=100
     )
-    posterior = inference.build_posterior()
+    posterior = inference.build_posterior(
+        posterior_parameters=DirectPosteriorParameters(check_finite_x=False)
+    )
 
     num_samples = 1000
     # test different number of trials

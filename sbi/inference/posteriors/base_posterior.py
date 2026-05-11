@@ -16,7 +16,7 @@ from sbi.inference.potentials.base_potential import (
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import assert_all_finite, ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import process_x
 
 
@@ -62,6 +62,7 @@ class NeuralPosterior:
             )
 
         self._device = process_device(potential_fn.device if device is None else device)
+        self._check_finite_x = check_finite_x
 
         self.potential_fn = potential_fn
 
@@ -181,21 +182,27 @@ class NeuralPosterior:
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        self._x = process_x(x,
-                            x_event_shape=None,
-                            check_finite=self._check_finite_x,
-                            ).to(self._device)
+        x = process_x(x, x_event_shape=None)
+
+        if self._check_finite_x:
+           assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
+
+        self._x = x.to(self._device)
+
         self._map = None
         return self
-
+    
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
-            return process_x(x, 
-                             x_event_shape=None, 
-                             check_finite=self._check_finite_x,
-                             )
+            x = process_x(x, x_event_shape=None)
+
+            if self._check_finite_x:
+                assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
+
+            return x
+        
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."

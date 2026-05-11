@@ -129,6 +129,7 @@ class DirectPosterior(NeuralPosterior):
             theta_transform=theta_transform,
             device=device,
             x_shape=self.x_shape,
+            check_finite_x=self._check_finite_x,
         )
         # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:

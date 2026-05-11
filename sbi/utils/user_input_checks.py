@@ -13,7 +13,7 @@ from torch.distributions import Distribution, Uniform
 
 from sbi.sbi_types import Array
 from sbi.utils.sbiutils import within_support
-from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
+from sbi.utils.torchutils import BoxUniform,  atleast_2d
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
@@ -594,7 +594,7 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
 
 
 def process_x(
-    x: Array, x_event_shape: Optional[torch.Size] = None, check_finite: bool = True
+    x: Array, x_event_shape: Optional[torch.Size] = None
 ) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
@@ -613,9 +613,6 @@ def process_x(
     """
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
-    if check_finite:
-        assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
-
     if x_event_shape is not None and len(x_event_shape) > len(x.shape):
         raise ValueError(
             f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "

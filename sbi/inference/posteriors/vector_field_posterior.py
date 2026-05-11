@@ -59,6 +59,7 @@ class VectorFieldPosterior(NeuralPosterior):
         device: Optional[Union[str, torch.device]] = None,
         enable_transform: bool = True,
         sample_with: Literal["ode", "sde"] = "sde",
+        check_finite_x: bool = True,
         **kwargs,
     ):
         """
@@ -90,6 +91,7 @@ class VectorFieldPosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
+            check_finite_x=check_finite_x,
         )
         # Set the potential function type.
         self.potential_fn: VectorFieldBasedPotential = potential_fn
@@ -138,6 +140,7 @@ class VectorFieldPosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
+            check_finite_x=self._check_finite_x,
         )
         # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:

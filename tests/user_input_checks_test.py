@@ -19,8 +19,11 @@ from torch.distributions import (
     Uniform,
 )
 
-from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
+from sbi.inference import NPE, NPE_A, NPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+)
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
@@ -210,25 +213,57 @@ def test_process_prior(prior):
         (ones(10, 3), torch.Size([10, 3])),  # 2D data / iid NPE
         pytest.param(ones(10, 3), None),  # 2D data / iid NPE without x_shape
         (ones(10, 10), torch.Size([10])),  # iid likelihood based
-        pytest.param(
+        (
             torch.cat([ones(3), torch.tensor([float("nan")]), ones(3)]),  # contains nan
             torch.Size([7]),
-            marks=pytest.mark.xfail(
-                reason="process_x must raise error if x contains NaNs or Infs."
-            ),
+            
         ),
-        pytest.param(
+        (
             # contains inf
             torch.cat([ones(3), torch.tensor([float("inf")]), ones(3)]).expand(10, -1),
             torch.Size([7]),
-            marks=pytest.mark.xfail(
-                reason="process_x must raise error if x contains NaNs or Infs."
-            ),
+            
         ),
     ),
 )
 def test_process_x(x, x_shape):
     process_x(x, x_shape)
+    
+def test_set_default_x_check_finite():
+    prior = BoxUniform(zeros(2), ones(2))
+
+    inference = NPE_C(
+        prior=prior,
+        density_estimator="maf",
+        show_progress_bars=False,
+    )
+
+    theta = prior.sample((100,))
+    x = torch.randn(100, 2)
+
+    posterior_estimator = (
+        inference.append_simulations(theta, x)
+        .train(max_num_epochs=1)
+    )
+
+    x_with_nan = torch.tensor([0.0, float("nan")])
+
+    posterior = DirectPosterior(
+        posterior_estimator=posterior_estimator,
+        prior=prior,
+    )
+
+    with pytest.raises(ValueError):
+        posterior.set_default_x(x_with_nan)
+
+    posterior = inference.build_posterior(
+    posterior_parameters=DirectPosteriorParameters(
+        check_finite_x=False
+    ),
+)
+
+    posterior.set_default_x(x_with_nan)
+
 
 
 @pytest.mark.parametrize(
@@ -247,6 +282,7 @@ def test_process_x(x, x_shape):
         (lambda _: torch.randn(10, 2), BoxUniform(zeros(2), ones(2)), (10, 2)),
     ),
 )
+
 def test_process_simulator(simulator: Callable, prior: Distribution, x_shape: Tuple):
     prior, theta_dim, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
