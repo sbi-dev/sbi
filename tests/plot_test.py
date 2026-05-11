@@ -199,13 +199,28 @@ def test_plot_summary_deprecated_kwargs(mock_inference):
 @pytest.mark.parametrize("kwarg", ("colors", "labels", "ylabel"))
 def test_plot_summary_length_validation(mock_inference, kwarg):
     """colors/labels/ylabel with wrong length must raise ValueError, not IndexError."""
-    with pytest.raises(ValueError, match="must have the same length as `tags`"):
+    with pytest.raises(ValueError, match=f"`{kwarg}` must have length 2"):
         plot_summary(
             mock_inference,
             tags=["training_loss", "validation_loss"],
             **{kwarg: ["only_one_entry"]},
             verbose=False,
         )
+
+
+def test_plot_summary_length_validation_aggregates_errors(mock_inference):
+    """Multiple wrong-length kwargs are reported in one ValueError, not iteratively."""
+    with pytest.raises(ValueError) as exc:
+        plot_summary(
+            mock_inference,
+            tags=["training_loss", "validation_loss"],
+            colors=["red"],
+            labels=["only_one"],
+            ylabel=["a", "b", "c"],
+            verbose=False,
+        )
+    msg = str(exc.value)
+    assert "`colors`" in msg and "`labels`" in msg and "`ylabel`" in msg
 
 
 @pytest.mark.parametrize(

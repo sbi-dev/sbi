@@ -129,21 +129,21 @@ def plot_summary(
     if tags is None:
         tags = ["validation_loss"]
 
-    for name, vals in (("colors", colors), ("labels", labels), ("ylabel", ylabel)):
-        if vals is not None and len(vals) != len(tags):
-            raise ValueError(
-                f"`{name}` must have the same length as `tags` "
-                f"(got {len(vals)} vs {len(tags)})."
-            )
-
+    length_errors = [
+        f"`{name}` must have length {len(tags)} (got {len(vals)})"
+        for name, vals in (("colors", colors), ("labels", labels), ("ylabel", ylabel))
+        if vals is not None and len(vals) != len(tags)
+    ]
     if axes is not None:
         n_axes = len(np.atleast_1d(axes))
         expected_n_axes = 1 if overlay else len(tags)
         if n_axes != expected_n_axes:
-            raise ValueError(
-                f"`axes` must have length {expected_n_axes} "
-                f"(got {n_axes}) for overlay={overlay} with {len(tags)} tag(s)."
+            length_errors.append(
+                f"`axes` must have length {expected_n_axes} (got {n_axes}) "
+                f"for overlay={overlay} with {len(tags)} tag(s)"
             )
+    if length_errors:
+        raise ValueError("; ".join(length_errors) + ".")
 
     size_guidance = deepcopy(DEFAULT_SIZE_GUIDANCE)
     size_guidance.update(scalars=tensorboard_scalar_limit)
