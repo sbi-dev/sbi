@@ -74,9 +74,6 @@ class TabPFNFlow(ConditionalDensityEstimator):
             self._regressor_init_kwargs.get("model_path", "v2")
         )
         self._model = TabPFNRegressor(**self._regressor_init_kwargs)
-        # Dummy fit to initialize the model
-        # Version > 2.0 need one time agreement from Prior Labs
-        self._model.fit(torch.zeros((2, 1)), torch.zeros(2))
         # Log license information once per process when a TabPFN model is initialized.
         self._log_license(self._model.model_path)
 
