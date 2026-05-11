@@ -4,7 +4,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Mapping, Optional, Tuple
+from typing import Mapping, Optional, Tuple, Union
 
 import torch
 from torch import Tensor, nn
@@ -93,6 +93,21 @@ class TabPFNFlow(ConditionalDensityEstimator):
     def embedding_net(self) -> nn.Module:
         r"""Return the embedding network."""
         return self._embedding_net
+
+    def to(self, device: Union[str, torch.device]) -> "TabPFNFlow":
+        """Move the module to `device` in place.
+
+        Moves the embedding net and device anchor to `device` and updates
+        TabPFNRegressor's target device so subsequent fit() calls run on the
+        same device.
+
+        Note: Context tensors (_context_input, _context_condition) remain on
+        CPU as required by TabPFN's numpy API.
+        """
+        super().to(device)
+        # Sync TabPFNRegressor so its next fit() call uses the correct device.
+        self._model.device = device
+        return self
 
     def set_context(
         self, input_context: Tensor, condition_context: Tensor
