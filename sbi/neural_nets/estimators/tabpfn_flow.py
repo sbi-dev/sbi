@@ -65,6 +65,8 @@ class TabPFNFlow(ConditionalDensityEstimator):
             input_shape=input_shape,
             condition_shape=condition_shape,
         )
+        # Anchor buffer: gives infer_module_device a device to find
+        self.register_buffer('_device_anchor', torch.zeros(1))
 
         self._embedding_net = (
             embedding_net if embedding_net is not None else nn.Identity()
