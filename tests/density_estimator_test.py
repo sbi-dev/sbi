@@ -28,6 +28,7 @@ from sbi.neural_nets.net_builders import (
     build_mnpe,
     build_nsf,
     build_score_matching_estimator,
+    build_tabpfn_flow,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -749,3 +750,40 @@ def test_trainers_with_valid_and_invalid_estimator_builders(
     inference.append_simulations(theta, x)
 
     inference.train(max_num_epochs=1)
+
+
+# TabPFNFlow tests — separate block because build_tabpfn_flow requires pre-supplied
+# context data and does not support .loss() (training-free estimator).
+@pytest.mark.slow
+@pytest.mark.parametrize("batch_dim", [1, 5])
+@pytest.mark.parametrize("input_sample_dim", [1, 2])
+def test_tabpfn_flow_shapes(batch_dim, input_sample_dim):
+    pytest.importorskip("tabpfn")
+    """TabPFNFlow log_prob, sample, and sample_and_log_prob follow shape conventions."""
+    input_shape = (2,)
+    condition_shape = (2,)
+    context_size = 20
+
+    context_input = torch.randn(context_size, *input_shape)
+    context_condition = torch.randn(context_size, *condition_shape)
+    estimator = build_tabpfn_flow(
+        batch_x=context_input,
+        batch_y=context_condition,
+    )
+
+    inputs = torch.randn(input_sample_dim, batch_dim, *input_shape)
+    condition = torch.randn(batch_dim, *condition_shape)
+
+    log_probs = estimator.log_prob(inputs, condition=condition)
+    assert log_probs.shape == (input_sample_dim, batch_dim)
+
+    sample_shape = (3,)
+    samples = estimator.sample(sample_shape, condition=condition)
+    assert samples.shape == (*sample_shape, batch_dim, *input_shape)
+
+    samples2, lp2 = estimator.sample_and_log_prob(sample_shape, condition=condition)
+    assert samples2.shape == (*sample_shape, batch_dim, *input_shape)
+    assert lp2.shape == (*sample_shape, batch_dim)
+
+    with pytest.raises(NotImplementedError):
+        estimator.loss(inputs[0], condition=condition)

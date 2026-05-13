@@ -4,6 +4,7 @@
 """Various PyTorch utility functions."""
 
 import os
+import warnings
 from typing import (
     Any,
     Callable,
@@ -115,6 +116,31 @@ def check_if_prior_on_device(
             "prior = torch.distributions.Normal"
             "(torch.zeros(2, device='cuda'), scale=1.0)`, or ."
         )
+
+
+def infer_module_device(module: torch.nn.Module, fallback: str) -> str:
+    """Infer device from module parameters or buffers, falling back to `fallback`.
+
+    Args:
+        module: The module to inspect.
+        fallback: Device string returned (with a warning) if the module has no
+            parameters or buffers.
+
+    Returns:
+        Device string, e.g. ``"cpu"`` or ``"cuda:0"``.
+    """
+    try:
+        return str(next(module.parameters()).device)
+    except StopIteration:
+        try:
+            return str(next(module.buffers()).device)
+        except StopIteration:
+            warnings.warn(
+                f"{type(module).__name__} has no parameters/buffers; "
+                f"falling back to device='{fallback}'.",
+                stacklevel=2,
+            )
+            return fallback
 
 
 def tile(x: Tensor, n: int) -> Tensor:

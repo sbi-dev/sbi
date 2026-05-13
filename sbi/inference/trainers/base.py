@@ -39,6 +39,7 @@ from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPost
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+    FilteredDirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     PosteriorParameters,
@@ -69,7 +70,11 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import ImproperEmpirical, get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
-from sbi.utils.torchutils import check_if_prior_on_device, process_device
+from sbi.utils.torchutils import (
+    check_if_prior_on_device,
+    infer_module_device,
+    process_device,
+)
 from sbi.utils.tracking import TensorBoardTracker
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
@@ -476,7 +481,13 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         estimator: Optional[ConditionalEstimator],
         prior: Optional[Distribution],
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
         ],
         posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
@@ -596,14 +607,21 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                     f" got {type(estimator).__name__}",
                 )
             # Otherwise, infer it from the device of the net parameters.
-            device = str(next(estimator.parameters()).device)
+            device = infer_module_device(estimator, "cpu")
 
         return estimator, device
 
     def _resolve_posterior_parameters(
         self,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "filtered_direct",
         ],
         posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
@@ -650,7 +668,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     def _build_posterior_parameters(
         self,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "filtered_direct",
         ],
         **kwargs,
     ) -> PosteriorParameters:
@@ -669,6 +694,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         if sample_with == "direct":
             params = kwargs.get("direct_sampling_parameters", {}) or {}
             posterior_parameters = DirectPosteriorParameters(**params)
+        elif sample_with == "filtered_direct":
+            params = kwargs.get("filtered_direct_sampling_parameters", {}) or {}
+            posterior_parameters = FilteredDirectPosteriorParameters(**params)
         elif sample_with == "mcmc":
             params = kwargs.get("mcmc_parameters", {}) or {}
             posterior_parameters = MCMCPosteriorParameters(
@@ -711,6 +739,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         deprecated_params = {
             "direct_sampling_parameters",
+            "filtered_direct_sampling_parameters",
             "mcmc_parameters",
             "vectorfield_sampling_parameters",
             "rejection_sampling_parameters",
@@ -827,7 +856,13 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         estimator: ConditionalEstimator,
         prior: Distribution,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
         ],
         device: Union[str, torch.device],
         posterior_parameters: PosteriorParameters,

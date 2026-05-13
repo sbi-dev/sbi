@@ -37,7 +37,7 @@ from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
 from sbi.inference.trainers.nle import NLE
-from sbi.inference.trainers.npe import NPE, NPE_A, NPE_C
+from sbi.inference.trainers.npe import NPE, NPE_A, NPE_C, NPE_PFN
 from sbi.inference.trainers.nre import NRE_A, NRE_B, NRE_C
 from sbi.inference.trainers.vfpe import FMPE, NPSE
 from sbi.neural_nets.embedding_nets import FCEmbedding
@@ -852,3 +852,42 @@ def test_vector_field_methods_degvice_handling(
             f"log_prob was not correctly moved to {device_inference}. "
             f"{vf_trainer.__name__}"
         )
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+@pytest.mark.parametrize("prior_device", ["cpu", "gpu"])
+def test_npe_pfn_on_device(prior_device):
+    pytest.importorskip("tabpfn")
+    """NPE_PFN should work correctly when prior/data come from different devices.
+
+    TabPFN always runs on CPU, so the estimator context must remain on CPU
+    regardless of where the prior or observations live.
+    """
+    prior_device = process_device(prior_device)
+    num_dim = 2
+    num_simulations = 30
+
+    prior = BoxUniform(
+        low=-2 * torch.ones(num_dim).to(prior_device),
+        high=2 * torch.ones(num_dim).to(prior_device),
+        device=prior_device,
+    )
+    theta = prior.sample((num_simulations,)).to("cpu")
+    x = theta + torch.randn_like(theta)
+    x_o = torch.zeros(1, num_dim)
+
+    inferer = NPE_PFN(prior=prior, device="cpu")
+    inferer.append_simulations(theta, x)
+    posterior = inferer.build_posterior(sample_with="filtered_direct")
+    posterior.set_default_x(x_o)
+
+    samples = posterior.sample((5,))
+    assert samples.shape == (5, num_dim)
+
+    log_probs = posterior.log_prob(samples)
+    assert log_probs.shape == (5,)
+
+    assert posterior.estimator._context_input.device.type == "cpu", (
+        "TabPFN context must always remain on CPU."
+    )
