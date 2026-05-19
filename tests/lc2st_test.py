@@ -17,6 +17,7 @@ from sbi.simulators.gaussian_mixture import (
     gaussian_mixture,
     uniform_prior_gaussian_mixture,
 )
+from sbi.utils.sbiutils import seed_all_backends
 
 # =============================================================================
 # Fixtures
@@ -55,6 +56,8 @@ def sim_setup() -> SimulatorSetup:
 @pytest.fixture(scope="session")
 def badly_trained_npe(sim_setup):
     """A poorly trained NPE for testing LC2ST detection of bad posteriors."""
+    # seed explicitly to keep session scope deterministic.
+    seed_all_backends(42)
     theta_train = sim_setup.prior.sample((50,))
     x_train = sim_setup.simulator(theta_train)
 
@@ -66,6 +69,8 @@ def badly_trained_npe(sim_setup):
 @pytest.fixture(scope="session")
 def well_trained_npe(sim_setup):
     """A well-trained NPE for testing LC2ST false positive rate."""
+    # seed explicitly to keep session scope deterministic.
+    seed_all_backends(42)
     theta_train = sim_setup.prior.sample((5_000,))
     x_train = sim_setup.simulator(theta_train)
 
@@ -77,6 +82,8 @@ def well_trained_npe(sim_setup):
 @pytest.fixture(scope="session")
 def cal_data(sim_setup, badly_trained_npe) -> CalibrationData:
     """Calibration data for LC2ST tests."""
+    # seed explicitly to keep session scope deterministic.
+    seed_all_backends(42)
     num_cal = 100
     thetas = sim_setup.prior.sample((num_cal,))
     xs = sim_setup.simulator(thetas)
@@ -104,7 +111,8 @@ def theta_o(cal_data, badly_trained_npe) -> Tensor:
     """Evaluation samples from the posterior at a single observation."""
     # [None, :] adds batch dim for sample(); reshape flattens (1, n, dim) -> (n, dim)
     return (
-        badly_trained_npe.sample((100,), condition=cal_data.xs[0][None, :])
+        badly_trained_npe
+        .sample((100,), condition=cal_data.xs[0][None, :])
         .reshape(-1, cal_data.thetas.shape[-1])
         .detach()
     )
@@ -172,7 +180,8 @@ def test_lc2st_parameter_combinations(
 
     if method == LC2ST:
         theta_o = (
-            badly_trained_npe.sample((num_eval,), condition=cal_data.xs[0][None, :])
+            badly_trained_npe
+            .sample((num_eval,), condition=cal_data.xs[0][None, :])
             .reshape(-1, cal_data.thetas.shape[-1])
             .detach()
         )
@@ -330,7 +339,8 @@ def test_lc2st_nf_with_pretrained_null_is_ready_after_observed_training(
     # And p_value must succeed without a RuntimeError about the state machine.
     x_o = cal_data.xs[0]
     theta_o = (
-        badly_trained_npe.sample((100,), condition=x_o[None, :])
+        badly_trained_npe
+        .sample((100,), condition=x_o[None, :])
         .reshape(-1, cal_data.thetas.shape[-1])
         .detach()
     )
@@ -604,7 +614,8 @@ def test_lc2st_true_positive_rate(method, sim_setup, badly_trained_npe):
         kwargs_init, get_eval_kwargs = (
             {},
             lambda x: {
-                "theta_o": badly_trained_npe.sample((num_eval,), condition=x)
+                "theta_o": badly_trained_npe
+                .sample((num_eval,), condition=x)
                 .reshape(-1, thetas.shape[-1])
                 .detach()
             },
@@ -657,7 +668,8 @@ def test_lc2st_false_positive_rate(method, sim_setup, well_trained_npe, set_seed
         kwargs_init, get_eval_kwargs = (
             {},
             lambda x: {
-                "theta_o": well_trained_npe.sample((num_eval,), condition=x)
+                "theta_o": well_trained_npe
+                .sample((num_eval,), condition=x)
                 .reshape(-1, thetas.shape[-1])
                 .detach()
             },
