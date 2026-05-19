@@ -136,7 +136,7 @@ def test_lc2st_methods(method, cal_data, badly_trained_npe, theta_o, x_o):
     else:
         npe = badly_trained_npe
         kwargs_init = {
-            "flow_inverse_transform": lambda t, x: npe.net._transform(t, context=x)[0],
+            "flow_inverse_transform": npe.inverse_transform,
             "flow_base_dist": torch.distributions.MultivariateNormal(
                 torch.zeros(2), torch.eye(2)
             ),
@@ -187,7 +187,7 @@ def test_lc2st_parameter_combinations(
     else:
         npe = badly_trained_npe
         kwargs_init = {
-            "flow_inverse_transform": lambda t, x: npe.net._transform(t, context=x)[0],
+            "flow_inverse_transform": npe.inverse_transform,
             "flow_base_dist": torch.distributions.MultivariateNormal(
                 torch.zeros(2), torch.eye(2)
             ),
@@ -301,7 +301,7 @@ def test_lc2st_nf_with_pretrained_null_is_ready_after_observed_training(
     """
     npe = badly_trained_npe
     kwargs_init = {
-        "flow_inverse_transform": lambda t, x: npe.net._transform(t, context=x)[0],
+        "flow_inverse_transform": npe.inverse_transform,
         "flow_base_dist": torch.distributions.MultivariateNormal(
             torch.zeros(2), torch.eye(2)
         ),
@@ -619,7 +619,7 @@ def test_lc2st_true_positive_rate(method, sim_setup, badly_trained_npe):
     else:
         npe = badly_trained_npe
         kwargs_init = {
-            "flow_inverse_transform": lambda t, x: npe.net._transform(t, context=x)[0],
+            "flow_inverse_transform": npe.inverse_transform,
             "flow_base_dist": torch.distributions.MultivariateNormal(
                 torch.zeros(2), torch.eye(2)
             ),
@@ -672,7 +672,7 @@ def test_lc2st_false_positive_rate(method, sim_setup, well_trained_npe, set_seed
     else:
         npe = well_trained_npe
         kwargs_init = {
-            "flow_inverse_transform": lambda t, x: npe.net._transform(t, context=x)[0],
+            "flow_inverse_transform": npe.inverse_transform,
             "flow_base_dist": torch.distributions.MultivariateNormal(
                 torch.zeros(2), torch.eye(2)
             ),
