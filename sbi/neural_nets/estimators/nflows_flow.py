@@ -70,8 +70,8 @@ class NFlowsFlow(ConditionalDensityEstimator):
         input = input.reshape(-1, input.shape[-1])
         condition = condition.reshape(-1, *self.condition_shape)
 
-        noise, _ = self.net._transorm(input, context=condition)
-        noise = noise.reshape(batch_shape)
+        noise, _ = self.net._transform(input, context=condition)
+        noise = noise.reshape(batch_shape + (noise.shape[-1],))
         return noise
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
