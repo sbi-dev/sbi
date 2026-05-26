@@ -72,6 +72,10 @@ This repository is set up to be productive with any AI coding agent (Claude Code
 
 Read `ARCHITECTURE.md` before naming domain concepts (in issue titles, refactor proposals, hypotheses, test names) so your output uses sbi's vocabulary rather than inventing synonyms.
 
+### Documentation
+
+The built docs site exposes an `llms.txt` index at `sbi.readthedocs.io/en/latest/llms.txt` — useful for agents that need to navigate the documentation rather than the codebase. The source file lives at `docs/llms.txt`.
+
 ### Issues and PRs
 
 Issues and PRs are tracked on GitHub at `sbi-dev/sbi`. There is no prescribed agent-triage workflow — sbi uses standard maintainer-driven triage with the existing label set (`bug`, `enhancement`, `wontfix`, `help wanted`, etc.). When filing issues from an agent's output, use the `gh` CLI and write the issue in clear, human-reviewable form.
