@@ -9,8 +9,9 @@ Instructions for AI coding agents (Claude Code, Codex, Copilot, Aider, etc.) wor
 ## Environment
 
 ```bash
+uv venv --python 3.12      # First-time setup (creates .venv)
 source .venv/bin/activate
-pip install -e ".[dev]"
+uv pip install -e ".[dev]"
 ```
 
 ## Testing
