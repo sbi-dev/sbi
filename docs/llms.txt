@@ -1,0 +1,73 @@
+# sbi: Simulation-Based Inference
+
+> sbi is a PyTorch-based Python package for simulation-based inference (SBI).
+> It estimates full Bayesian posterior distributions over simulator parameters
+> from observed data, without requiring access to the simulator's likelihood
+> function. Methods include Neural Posterior Estimation (NPE), Neural Likelihood
+> Estimation (NLE), Neural Ratio Estimation (NRE), and flow/score matching (FMPE, NPSE).
+
+sbi provides both a simple one-line interface (`sbi.inference.infer`) and a
+flexible class-based interface (`NPE`, `NLE`, `NRE`, `FMPE`). The typical
+workflow is: define a prior and simulator, generate simulations, train a neural
+density estimator, build a posterior, and validate with diagnostics (SBC,
+expected coverage, TARP, L-C2ST). The default settings work well for most
+problems — start simple and tune only if diagnostics indicate issues.
+
+## Tutorials
+
+- [Getting Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html): Minimal NPE example from prior to posterior
+- [Bayesian Workflow](https://sbi.readthedocs.io/en/latest/tutorials/01_Bayesian_workflow.html): Full workflow with diagnostics and analysis
+- [Implemented Methods](https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html): All NPE, NLE, NRE, FMPE variants with code
+- [Vector Field Methods](https://sbi.readthedocs.io/en/latest/advanced_tutorials/19_vector_field_methods.html): FMPE and NPSE — flow matching and score matching for SBI
+
+## How-To Guides
+
+- [Custom Priors](https://sbi.readthedocs.io/en/latest/how_to_guide/00_custom_prior.html): MultipleIndependent, process_prior, non-torch priors
+- [Summary Statistics](https://sbi.readthedocs.io/en/latest/how_to_guide/01_crafting_summary_statistics.html): Hand-crafted features for high-dim data
+- [Multi-Round Inference](https://sbi.readthedocs.io/en/latest/how_to_guide/02_multiround_inference.html): Sequential methods (SNPE, SNLE, SNRE)
+- [Density Estimators](https://sbi.readthedocs.io/en/latest/how_to_guide/03_density_estimators.html): Choosing and configuring neural networks
+- [Embedding Networks](https://sbi.readthedocs.io/en/latest/how_to_guide/04_embedding_networks.html): FCEmbedding, CNNEmbedding, custom nn.Module
+- [Choosing Inference Method](https://sbi.readthedocs.io/en/latest/how_to_guide/06_choosing_inference_method.html): NPE vs NLE vs NRE decision guide
+- [Sampler Interface](https://sbi.readthedocs.io/en/latest/how_to_guide/09_sampler_interface.html): MCMC, VI, rejection for NLE/NRE posteriors
+- [i.i.d. Observations](https://sbi.readthedocs.io/en/latest/how_to_guide/11_iid_sampling_with_nle_or_nre.html): Multiple observations with NLE/NRE
+- [Hyperparameter Tuning](https://sbi.readthedocs.io/en/latest/how_to_guide/21_hyperparameter_tuning.html): Optuna integration for architecture search
+- [Abstraction Levels](https://sbi.readthedocs.io/en/latest/how_to_guide/24_abstraction_levels.html): Four levels of control over the density estimator (Trainer classes to custom `nn.Module`), plus sampling-control levels for NLE
+- [FMPE and NPSE Recommendations](https://sbi.readthedocs.io/en/latest/how_to_guide/25_choosing_vector_field_options.html): Practical guide for choosing between vector field methods and configuring them
+
+## Diagnostics
+
+- [Choosing a Diagnostic](https://sbi.readthedocs.io/en/latest/how_to_guide/14_choose_diagnostic_tool.html): Which validation tool to use
+- [Expected Coverage](https://sbi.readthedocs.io/en/latest/how_to_guide/15_expected_coverage.html): Joint posterior calibration check
+- [Simulation-Based Calibration](https://sbi.readthedocs.io/en/latest/how_to_guide/16_sbc.html): Per-parameter marginal calibration
+- [TARP](https://sbi.readthedocs.io/en/latest/how_to_guide/17_tarp.html): Calibration without density evaluation
+- [L-C2ST](https://sbi.readthedocs.io/en/latest/how_to_guide/13_diagnostics_lc2st.html): Per-observation local coverage test
+- [Model Misspecification](https://sbi.readthedocs.io/en/latest/how_to_guide/18_model_misspecification.html): Detecting if x_o is outside simulator range
+
+## Advanced Topics
+
+- [Time Series Embeddings](https://sbi.readthedocs.io/en/latest/how_to_guide/20_time_series_embedding.html): CausalCNN, Transformer for temporal data
+- [Restriction Estimator](https://sbi.readthedocs.io/en/latest/advanced_tutorials/06_restriction_estimator.html): Handling invalid simulations (NaN/Inf)
+- [Sensitivity Analysis](https://sbi.readthedocs.io/en/latest/advanced_tutorials/07_sensitivity_analysis.html): ActiveSubspace for parameter importance
+- [Posterior Parameters](https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html): Dataclass-based sampler configuration
+- [Experiment Tracking](https://sbi.readthedocs.io/en/latest/how_to_guide/22_experiment_tracking.html): TensorBoard, WandB, MLflow adapters
+- [Pyro Integration](https://sbi.readthedocs.io/en/latest/how_to_guide/23_using_pyro_with_sbi.html): Neural likelihoods in Pyro hierarchical models
+
+## API Reference
+
+- [Inference API](https://sbi.readthedocs.io/en/latest/api_reference.html): NPE, NLE, NRE, FMPE trainers and posteriors
+- [Installation](https://sbi.readthedocs.io/en/latest/installation.html): pip install sbi, optional dependencies
+- [Changelog](https://sbi.readthedocs.io/en/latest/changelog.html): Version history and migration notes
+- [FAQ](https://sbi.readthedocs.io/en/latest/faq.html): Common issues (leakage, NaNs, pickling, unconstrained space)
+
+## Optional
+
+- [Hodgkin-Huxley Example](https://sbi.readthedocs.io/en/latest/tutorials/Example_00_HodgkinHuxleyModel.html): Neuroscience application
+- [Decision-Making Model](https://sbi.readthedocs.io/en/latest/tutorials/Example_01_DecisionMakingModel.html): Cognitive science application
+- [GPU Training](https://sbi.readthedocs.io/en/latest/how_to_guide/07_gpu_training.html): CUDA and MPS device configuration
+- [Save and Load](https://sbi.readthedocs.io/en/latest/how_to_guide/07_save_and_load.html): Pickling posteriors, CPU_Unpickler
+- [Resume Training](https://sbi.readthedocs.io/en/latest/how_to_guide/07_resume_training.html): Checkpoint and resume
+- [MCMC Diagnostics](https://sbi.readthedocs.io/en/latest/how_to_guide/12_mcmc_diagnostics_with_arviz.html): ArviZ trace plots and R-hat
+- [Conditional Distributions](https://sbi.readthedocs.io/en/latest/how_to_guide/05_conditional_distributions.html): Conditional pairplots
+- [Importance Sampling](https://sbi.readthedocs.io/en/latest/how_to_guide/10_refine_posterior_with_importance_sampling.html): Refining posteriors
+- [Permutation-Invariant Embeddings](https://sbi.readthedocs.io/en/latest/how_to_guide/08_permutation_invariant_embeddings.html): i.i.d. data with NPE
+- [Contributing Guide](https://sbi.readthedocs.io/en/latest/contributing.html): How to contribute to sbi

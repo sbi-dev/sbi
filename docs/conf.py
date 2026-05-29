@@ -55,6 +55,9 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+# Serve llms.txt at the docs URL root for AI agent discoverability.
+html_extra_path = ['llms.txt']
+
 # Myst-NB
 myst_enable_extensions = [
     "dollarmath",
