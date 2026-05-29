@@ -698,3 +698,21 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
         samples = self.sample(sample_shape)
         log_probs = self.log_prob(samples)
         return samples, log_probs
+
+
+def __getattr__(name: str):
+    """Module-level __getattr__ (PEP 562) for deprecated import names."""
+    if name == "ConditionalEstimatorBuilder":
+        import warnings
+
+        warnings.warn(
+            "`ConditionalEstimatorBuilder` has been renamed to "
+            "`ConditionalEstimatorBuildFn`. The old name still works but will be "
+            "removed in a future release. Update your import to: "
+            "`from sbi.neural_nets.estimators.base import "
+            "ConditionalEstimatorBuildFn`.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        return ConditionalEstimatorBuildFn
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
