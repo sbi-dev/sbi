@@ -16,7 +16,7 @@ from sbi.neural_nets.estimators.score_estimator import (
     VEScoreEstimator,
     VPScoreEstimator,
 )
-from sbi.neural_nets.net_builders.estimator_configs import _EstimatorConfigBase
+from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
@@ -28,10 +28,10 @@ from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 @dataclass
-class _VectorFieldBaseConfig(_EstimatorConfigBase):
+class _VectorFieldBaseConfig(_EstimatorBuilderBase):
     """Shared configuration fields for all vector field estimator builders.
 
-    Inherits ``to_dict()`` from ``_EstimatorConfigBase``.
+    Inherits ``to_dict()`` from ``_EstimatorBuilderBase``.
     Defaults are ``None`` so that only explicitly-set fields are forwarded — the
     actual default values live in the estimator / network constructors.
     """

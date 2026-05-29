@@ -23,7 +23,7 @@ from sbi.inference.potentials.vector_field_potential import (
 from sbi.inference.trainers._contracts import LossArgsVF, StartIndexContext, TrainConfig
 from sbi.inference.trainers.base import LossArgs
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_estimator_arg,
@@ -43,7 +43,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         prior: Optional[Distribution] = None,
         vector_field_estimator_builder: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
+            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
         ] = "mlp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -62,7 +62,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             prior: Prior distribution.
             vector_field_estimator_builder: Neural network architecture for the
                 vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
-                callable that implements the `ConditionalEstimatorBuilder` protocol
+                callable that implements the `ConditionalEstimatorBuildFn` protocol
                 with `__call__` that receives `theta` and `x` and returns a
                 `ConditionalVectorFieldEstimator`.
             device: Device to run the training on.
@@ -101,7 +101,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
     def _build_default_nn_fn(
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]: ...
+    ) -> ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]: ...
 
     def append_simulations(
         self,

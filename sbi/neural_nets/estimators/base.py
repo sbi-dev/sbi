@@ -14,22 +14,20 @@ ConditionalEstimatorType = TypeVar(
 )
 
 
-class ConditionalEstimatorBuilder(Protocol[ConditionalEstimatorType]):
-    """Protocol for building a neural network from the data for the density
-    estimator."""
+class ConditionalEstimatorBuildFn(Protocol[ConditionalEstimatorType]):
+    """Protocol for a callable that builds a conditional estimator from data."""
 
     def __call__(self, theta: Tensor, x: Tensor) -> ConditionalEstimatorType:
-        """Build a density estimator from theta and x, which is mainly used for infering
-        shape and z-scoring. The density estimator should have the methods `.sample()`
-        and `.log_prob()`. The function should return an inheritance
-        of `ConditionalEstimator`.
+        """Build an estimator from theta and x, used for shape inference and
+        z-scoring. The returned object should be a ``ConditionalEstimator``
+        subclass.
 
         Args:
             theta: Parameter sets.
             x: Simulation outputs.
 
         Returns:
-            Density Estimator.
+            A conditional estimator.
         """
         ...
 
