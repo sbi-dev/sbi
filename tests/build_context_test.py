@@ -140,9 +140,7 @@ class TestComputeZScoreStats:
     def test_none_returns_none(self):
         theta = torch.randn(100, 5)
         x = torch.randn(100, 3)
-        stats = compute_z_score_stats(
-            theta, x, ZScoreConfig(theta="none", x="none")
-        )
+        stats = compute_z_score_stats(theta, x, ZScoreConfig(theta="none", x="none"))
         assert stats.theta_mean is None
         assert stats.theta_std is None
         assert stats.x_mean is None
@@ -222,7 +220,7 @@ class TestProtocolRename:
 
     def test_protocol_exists(self):
         # The protocol should be importable under the new name.
-        assert hasattr(ConditionalEstimatorBuildFn, "__call__")
+        assert callable(ConditionalEstimatorBuildFn)
 
     def test_callable_satisfies_protocol(self):
         """A simple callable with the right signature satisfies the protocol."""

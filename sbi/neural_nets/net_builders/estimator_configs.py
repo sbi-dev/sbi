@@ -80,9 +80,7 @@ class _EstimatorBuilderBase:
         Returns:
             A ``ConditionalEstimator`` subclass instance.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement build()."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not implement build().")
 
     def to_dict(self) -> dict:
         """Return only explicitly-set (non-``None``) fields as a dict.
