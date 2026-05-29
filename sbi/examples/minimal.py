@@ -46,6 +46,10 @@ def flexible():
     inference = SNPE(prior)
 
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=500)
+    # The simulator returns a Tensor,
+    # but `simulate_for_sbi` returns `Tensor | List[str]`.
+    # To satisfy type checking, we assert that x is a Tensor.
+    assert isinstance(x, torch.Tensor)
     density_estimator = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior(density_estimator)
     posterior.sample((100,), x=x_o)
