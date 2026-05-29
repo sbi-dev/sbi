@@ -44,11 +44,18 @@ class ZScoreConfig:
                 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class ZScoreStats:
     """Computed z-score statistics derived from training data.
 
     Fields are ``None`` when the corresponding axis was not z-scored.
+
+    .. note::
+        Equality and hashing use object identity (``a == b`` iff ``a is b``).
+        For *content* comparison of stats, compare each tensor field directly
+        with ``torch.equal`` or use ``torch.testing.assert_close`` in tests.
+        Custom value-equality may be added later if a concrete consumer
+        (e.g., a build cache) requires it.
     """
 
     theta_mean: Optional[Tensor] = None
@@ -57,7 +64,7 @@ class ZScoreStats:
     x_std: Optional[Tensor] = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class BuildContext:
     """All data-derived state needed to construct an estimator.
 
@@ -96,7 +103,15 @@ class BuildContext:
 
         Returns:
             A new ``BuildContext`` instance.
+
+        Raises:
+            ValueError: If ``theta`` and ``x`` are on different devices.
         """
+        if theta.device != x.device:
+            raise ValueError(
+                f"theta and x must be on the same device, got "
+                f"{theta.device} and {x.device}."
+            )
         return cls(
             theta_shape=torch.Size(theta.shape[1:]),
             x_shape=torch.Size(x.shape[1:]),
@@ -129,12 +144,12 @@ def compute_z_score_stats(
     x_mean, x_std = None, None
 
     if config.theta != "none":
-        structured = config.theta == "structured"
-        theta_mean, theta_std = z_standardization(theta, structured)
+        theta_mean, theta_std = z_standardization(
+            theta, structured_dims=(config.theta == "structured")
+        )
 
     if config.x != "none":
-        structured = config.x == "structured"
-        x_mean, x_std = z_standardization(x, structured)
+        x_mean, x_std = z_standardization(x, structured_dims=(config.x == "structured"))
 
     return ZScoreStats(
         theta_mean=theta_mean,
