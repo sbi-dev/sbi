@@ -50,7 +50,7 @@ class ZScoreStats:
 
     Fields are ``None`` when the corresponding axis was not z-scored.
 
-    .. note::
+    Note:
         Equality and hashing use object identity (``a == b`` iff ``a is b``).
         For *content* comparison of stats, compare each tensor field directly
         with ``torch.equal`` or use ``torch.testing.assert_close`` in tests.
