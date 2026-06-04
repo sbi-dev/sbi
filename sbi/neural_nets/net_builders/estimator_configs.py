@@ -199,3 +199,39 @@ class MarginalFlowConfig(_EstimatorBuilderBase):
     degree: Optional[int] = None  # zuko_sospf, zuko_bpf
     polynomials: Optional[int] = None  # zuko_sospf
     components: Optional[int] = None  # zuko_gf
+
+
+DENSITY_MODELS = Literal[
+    "mdn",
+    "made",
+    "maf",
+    "maf_rqs",
+    "nsf",
+    "zuko_nice",
+    "zuko_maf",
+    "zuko_nsf",
+    "zuko_ncsf",
+    "zuko_sospf",
+    "zuko_naf",
+    "zuko_unaf",
+    "zuko_gf",
+    "zuko_bpf",
+]
+
+_VALID_DENSITY_MODELS = {
+    "mdn",
+    "made",
+    "maf",
+    "maf_rqs",
+    "nsf",
+    "zuko_nice",
+    "zuko_maf",
+    "zuko_nsf",
+    "zuko_ncsf",
+    "zuko_sospf",
+    "zuko_naf",
+    "zuko_unaf",
+    "zuko_gf",
+    "zuko_bpf",
+}
+
