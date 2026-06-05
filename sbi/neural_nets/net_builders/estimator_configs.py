@@ -240,6 +240,13 @@ _VALID_DENSITY_MODELS = {
 
 @dataclass
 class DensityEstimatorBuilder(_EstimatorBuilderBase):
+    """Builder for continuous density estimators (NPE / NLE).
+
+    Covers NFlows (MAF, NSF, MAF-RQS, MADE), all Zuko flow variants, and MDN.
+    Mixed density estimators (MNLE / MNPE) are handled by a separate builder.
+    Fields mirror the parameters of the underlying ``build_*`` functions;
+    see ``ConditionalFlowConfig`` for the full set.
+    """
 
     model: DENSITY_MODELS = "maf"  # type: ignore[valid-type]
 
@@ -283,7 +290,23 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
             )
 
     def build(self, context: BuildContext, batch_theta: Tensor, batch_x: Tensor):
+        """Build the density estimator by dispatching to the appropriate
+        ``build_*`` function.
 
+        The naming follows the internal convention of ``posterior_nn``: the
+        caller passes ``batch_theta`` as the modeled variable and ``batch_x``
+        as the conditioning variable.
+
+        Args:
+            context: Data-derived build state (shapes, device, z-score stats).
+            batch_theta: Batch of parameters used for shape inference and
+                z-scoring.
+            batch_x: Batch of observations used for shape inference and
+                z-scoring.
+
+        Returns:
+            Neural network.
+        """
         from sbi.neural_nets.net_builders.flow import (
             build_made,
             build_maf,
@@ -323,7 +346,7 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
         return build_fn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
 
     def _build_kwargs(self) -> dict:
-
+        """Return non-None fields as a dict, excluding ``model``."""
         d = {
             f.name: getattr(self, f.name)
             for f in fields(self)
