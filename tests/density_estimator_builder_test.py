@@ -105,3 +105,32 @@ def test_density_estimator_builder_build_with_embedding_net(model):
     ctx = BuildContext.from_data(theta, x)
     estimator = builder.build(ctx, batch_theta=theta, batch_x=x)
     assert isinstance(estimator, ConditionalDensityEstimator)
+
+
+@pytest.mark.parametrize("model", ["maf", "zuko_maf"])
+def test_density_estimator_builder_loss_computable(model):
+    """Test that the built estimator can compute a finite loss."""
+    builder = DensityEstimatorBuilder(model=model, hidden_features=16, num_transforms=2)
+    theta = torch.randn(100, 3)
+    x = torch.randn(100, 2)
+    ctx = BuildContext.from_data(theta, x)
+    estimator = builder.build(ctx, batch_theta=theta, batch_x=x)
+
+    # Evaluate on a fresh batch.
+    batch_theta_eval = torch.randn(10, 3)
+    batch_x_eval = torch.randn(10, 2)
+    loss = estimator.loss(batch_theta_eval, condition=batch_x_eval)
+    assert loss.shape == (10,)
+    assert torch.isfinite(loss).all()
+
+
+def test_density_estimator_builder_z_score_none():
+    """Test that z_score_x='none' disables z-scoring."""
+    builder = DensityEstimatorBuilder(
+        model="maf", z_score_x="none", z_score_y="none", num_transforms=2
+    )
+    theta = torch.randn(100, 3)
+    x = torch.randn(100, 2)
+    ctx = BuildContext.from_data(theta, x)
+    estimator = builder.build(ctx, batch_theta=theta, batch_x=x)
+    assert isinstance(estimator, ConditionalDensityEstimator)
