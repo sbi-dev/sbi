@@ -13,7 +13,7 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldTrainer,
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.factory import posterior_score_nn
 from sbi.sbi_types import Tracker
 
@@ -66,16 +66,16 @@ class NPSE(VectorFieldTrainer):
         prior: Optional[Distribution] = None,
         vf_estimator: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
+            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
         ] = "mlp",
         score_estimator: Optional[
             Union[
                 Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-                ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
+                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
             ]
         ] = None,
         density_estimator: Optional[
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]
+            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]
         ] = None,
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
         device: str = "cpu",
@@ -92,7 +92,7 @@ class NPSE(VectorFieldTrainer):
                 vector field estimator aiming to estimate the marginal scores of the
                 target diffusion process. Can be a string (e.g. 'mlp', 'ada_mlp',
                 'transformer' or 'transformer_cross_attn') or a callable that implements
-                the `ConditionalEstimatorBuilder` protocol with `__call__` that receives
+                the `ConditionalEstimatorBuildFn` protocol with `__call__` that receives
                 `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
                 To configure estimator-level options (e.g. noise schedules for VE),
                 use `posterior_score_nn` to build a custom callable and pass it here.
@@ -199,5 +199,5 @@ class NPSE(VectorFieldTrainer):
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
-    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
+    ) -> ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]:
         return posterior_score_nn(model=model, sde_type=sde_type)
