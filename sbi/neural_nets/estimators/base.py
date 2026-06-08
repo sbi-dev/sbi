@@ -14,22 +14,20 @@ ConditionalEstimatorType = TypeVar(
 )
 
 
-class ConditionalEstimatorBuilder(Protocol[ConditionalEstimatorType]):
-    """Protocol for building a neural network from the data for the density
-    estimator."""
+class ConditionalEstimatorBuildFn(Protocol[ConditionalEstimatorType]):
+    """Protocol for a callable that builds a conditional estimator from data."""
 
     def __call__(self, theta: Tensor, x: Tensor) -> ConditionalEstimatorType:
-        """Build a density estimator from theta and x, which is mainly used for infering
-        shape and z-scoring. The density estimator should have the methods `.sample()`
-        and `.log_prob()`. The function should return an inheritance
-        of `ConditionalEstimator`.
+        """Build an estimator from theta and x, used for shape inference and
+        z-scoring. The returned object should be a ``ConditionalEstimator``
+        subclass.
 
         Args:
             theta: Parameter sets.
             x: Simulation outputs.
 
         Returns:
-            Density Estimator.
+            A conditional estimator.
         """
         ...
 
@@ -700,3 +698,21 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
         samples = self.sample(sample_shape)
         log_probs = self.log_prob(samples)
         return samples, log_probs
+
+
+def __getattr__(name: str):
+    """Module-level __getattr__ (PEP 562) for deprecated import names."""
+    if name == "ConditionalEstimatorBuilder":
+        import warnings
+
+        warnings.warn(
+            "`ConditionalEstimatorBuilder` has been renamed to "
+            "`ConditionalEstimatorBuildFn`. The old name still works but will be "
+            "removed in a future release. Update your import to: "
+            "`from sbi.neural_nets.estimators.base import "
+            "ConditionalEstimatorBuildFn`.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        return ConditionalEstimatorBuildFn
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
