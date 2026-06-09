@@ -33,12 +33,14 @@ from sbi.inference.trainers.base import (
     check_if_proposal_has_default_x,
 )
 from sbi.neural_nets import posterior_nn
+from sbi.neural_nets.build_context import BuildContext
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
+from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     RestrictedPrior,
@@ -63,6 +65,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
+            _EstimatorBuilderBase,
             ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
         ] = "maf",
         device: str = "cpu",
