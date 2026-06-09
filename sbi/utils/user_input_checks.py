@@ -570,6 +570,15 @@ def ensure_batched_simulator(simulator: Callable, prior) -> Callable:
         output_shape = simulator(prior.sample((batch_size,))).shape
         assert len(output_shape) > 1
         assert output_shape[0] == batch_size
+
+        # Avoid edge case:
+        # A simulator accepts an 1-D array with 2 numbers, and returns an 1-D array with 2 numbers
+        # See issue #1878
+        batch_size = 1
+        # The simulator must return a matching batch dimension and data.
+        output_shape = simulator(prior.sample((batch_size,))).shape
+        assert len(output_shape) > 1
+        assert output_shape[0] == batch_size
     except Exception:
         is_batched_simulator = False
 
