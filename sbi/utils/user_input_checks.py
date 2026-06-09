@@ -711,10 +711,13 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
 
 def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     """Check (density or ratio) estimator argument passed by the user."""
-    assert isinstance(estimator, str) or (
+    from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
+
+    assert isinstance(estimator, (str, _EstimatorBuilderBase)) or (
         isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
     ), (
-        "The passed density estimator / classifier must be a string or a function "
+        "The passed density estimator / classifier must be a string, "
+        "an _EstimatorBuilderBase, or a function "
         f"returning a nn.Module, but is {type(estimator)}"
     )
 
