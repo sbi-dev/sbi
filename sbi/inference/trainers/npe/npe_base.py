@@ -101,14 +101,22 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             show_progress_bars=show_progress_bars,
         )
 
-        # As detailed in the docstring, `density_estimator` is either a string or
-        # a callable. The function creating the neural network is attached to
+        # `density_estimator` is either a string, a builder, or a callable.
+        # The function creating the neural network is attached to
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
         check_estimator_arg(density_estimator)
         if isinstance(density_estimator, str):
+            warnings.warn(
+                "Passing a string for `density_estimator` is deprecated. "
+                "Use DensityEstimatorBuilder(model=...) instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
             self._build_neural_net = posterior_nn(model=density_estimator)
+        elif isinstance(density_estimator, _EstimatorBuilderBase):
+            self._build_neural_net = self._wrap_builder(density_estimator)
         else:
             self._build_neural_net = density_estimator
 
