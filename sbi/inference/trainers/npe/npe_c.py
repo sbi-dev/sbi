@@ -24,6 +24,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
+from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 from sbi.sbi_types import Tracker
 from sbi.utils import (
     batched_mixture_mv,
@@ -90,6 +91,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
+            _EstimatorBuilderBase,
             ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
         ] = "maf",
         device: str = "cpu",
