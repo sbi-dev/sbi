@@ -471,6 +471,8 @@ def process_simulator(
     is_numpy_simulator: bool,
 ) -> Callable:
     """Returns a simulator that meets the requirements for usage in sbi.
+    NOTE: This method is deprecated and will be removed in a future release. Please use
+    `sbi.utils.simulation_utils.parallelize_simulator` instead.
 
     Args:
         user_simulator (Callable):
@@ -502,6 +504,13 @@ def process_simulator(
         simulator = process_simulator(simulator, prior, prior_returns_numpy)
     """
 
+    warnings.warn(
+        "process_simulator is deprecated and will be removed in a future release. "
+        "Please use `sbi.utils.simulation_utils.parallelize_simulator` instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
+
     assert isinstance(user_simulator, Callable), "Simulator must be a function."
 
     joblib_simulator = wrap_as_joblib_efficient_simulator(
@@ -518,6 +527,7 @@ def process_simulator(
 # of the simulator. This is not efficient (~3 times slowdown), but is compatible
 # with the new joblib and, importantly, does not break previous code. It should
 # be removed with a future restructuring of the simulation pipeline.
+# TODO: delete when removing process_simulator and related functions.
 def wrap_as_joblib_efficient_simulator(
     simulator: Callable, prior, is_numpy_simulator
 ) -> Callable:
@@ -555,6 +565,7 @@ def wrap_as_pytorch_simulator(
     return pytorch_simulator
 
 
+# TODO: delete when removing process_simulator and related functions.
 def ensure_batched_simulator(simulator: Callable, prior) -> Callable:
     """Return a simulator with batched output.
 
