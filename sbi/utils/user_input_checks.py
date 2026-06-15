@@ -565,25 +565,12 @@ def ensure_batched_simulator(simulator: Callable, prior) -> Callable:
 
     is_batched_simulator = True
     try:
-        batch_size = 2
-        # The simulator must return a matching batch dimension and data.
-        output_shape = simulator(prior.sample((batch_size,))).shape
-        assert len(output_shape) > 1
-        assert output_shape[0] == batch_size
-
-        # Avoid edge case:
-        # A simulator accepts an 1-D array with 2 numbers, and returns an 1-D array with 2 numbers
-        # See issue #1878
-        batch_size = 1
-        # The simulator must return a matching batch dimension and data.
-        output_shape = simulator(prior.sample((batch_size,))).shape
-        assert len(output_shape) > 1
-      # Probe two distinct batch sizes (both > 1): a non-batched simulator whose
-      # output leading dim coincidentally matches one size cannot match both (#1878).
-      for batch_size in (2, 3):
-          output_shape = simulator(prior.sample((batch_size,))).shape
-          assert len(output_shape) > 1
-          assert output_shape[0] == batch_size
+        # Probe two distinct batch sizes (both > 1): a non-batched simulator whose
+        # output leading dim coincidentally matches one size cannot match both (#1878).
+        for batch_size in (2, 3):
+            output_shape = simulator(prior.sample((batch_size,))).shape
+            assert len(output_shape) > 1
+            assert output_shape[0] == batch_size
     except Exception:
         is_batched_simulator = False
 
