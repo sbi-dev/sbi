@@ -17,14 +17,17 @@ from sbi.utils.user_input_checks import check_estimator_arg
 
 @pytest.mark.parametrize("model", ("maf", "nsf", "mdn", "zuko_nsf"))
 def test_npe_accepts_builder(model):
+    """NPE_C.__init__ should accept a DensityEstimatorBuilder without warning."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     builder = DensityEstimatorBuilder(model=model)
+    # No FutureWarning expected for builder path.
     inference = NPE_C(prior, density_estimator=builder, show_progress_bars=False)
     assert inference._build_neural_net is not None
 
 
 def test_npe_string_emits_deprecation_warning():
+    """Passing a string to density_estimator should emit FutureWarning."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     with pytest.warns(FutureWarning, match="deprecated"):
@@ -32,11 +35,47 @@ def test_npe_string_emits_deprecation_warning():
 
 
 def test_npe_callable_no_warning():
+    """Passing a callable should not emit any FutureWarning."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     build_fn = posterior_nn(model="maf")
+    # Should not warn.
     inference = NPE_C(prior, density_estimator=build_fn, show_progress_bars=False)
     assert inference._build_neural_net is build_fn
+
+
+@pytest.mark.parametrize("model", ("maf", "nsf", "mdn"))
+def test_npe_train_with_builder(model):
+    """Train NPE_C with a DensityEstimatorBuilder and verify the result."""
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    builder = DensityEstimatorBuilder(model=model, hidden_features=16, num_transforms=2)
+    inference = NPE_C(prior, density_estimator=builder, show_progress_bars=False)
+
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    density_estimator = inference.append_simulations(theta, x).train(
+        max_num_epochs=2, training_batch_size=100
+    )
+    assert isinstance(density_estimator, ConditionalDensityEstimator)
+
+
+@pytest.mark.parametrize("model", ("maf", "nsf"))
+def test_npe_build_posterior_with_builder(model):
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    builder = DensityEstimatorBuilder(model=model, hidden_features=16, num_transforms=2)
+    inference = NPE_C(prior, density_estimator=builder, show_progress_bars=False)
+
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    inference.append_simulations(theta, x).train(
+        max_num_epochs=2, training_batch_size=100
+    )
+    posterior = inference.build_posterior()
+    x_o = zeros(1, num_dim)
+    samples = posterior.sample((10,), x=x_o)
+    assert samples.shape == (10, num_dim)
 
 
 @pytest.mark.parametrize(
@@ -49,9 +88,11 @@ def test_npe_callable_no_warning():
     ids=["builder", "string", "callable"],
 )
 def test_check_estimator_arg_accepts_valid_inputs(estimator):
+    """check_estimator_arg should accept builders, strings, and callables."""
     check_estimator_arg(estimator)
 
 
 def test_check_estimator_arg_rejects_module():
+    """check_estimator_arg should reject raw nn.Module instances."""
     with pytest.raises(AssertionError):
         check_estimator_arg(torch.nn.Linear(3, 3))
