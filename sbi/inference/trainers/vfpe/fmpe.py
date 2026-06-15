@@ -15,7 +15,7 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldTrainer,
 )
 from sbi.neural_nets.estimators.base import (
-    ConditionalEstimatorBuilder,
+    ConditionalEstimatorBuildFn,
     ConditionalVectorFieldEstimator,
 )
 from sbi.neural_nets.factory import posterior_flow_nn
@@ -70,10 +70,10 @@ class FMPE(VectorFieldTrainer):
         prior: Optional[Distribution] = None,
         vf_estimator: Union[
             Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
+            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
         ] = "mlp",
         density_estimator: Optional[
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]
+            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -88,7 +88,7 @@ class FMPE(VectorFieldTrainer):
             vf_estimator: Neural network architecture used to learn the
                 vector field estimator. Can be a string (e.g. 'mlp', 'ada_mlp',
                 'transformer' or 'transformer_cross_attn') or a callable that implements
-                the `ConditionalEstimatorBuilder` protocol with `__call__` that receives
+                the `ConditionalEstimatorBuildFn` protocol with `__call__` that receives
                 `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
                 To configure estimator-level options, use `posterior_flow_nn` to
                 build a custom callable and pass it here.
@@ -174,5 +174,5 @@ class FMPE(VectorFieldTrainer):
     def _build_default_nn_fn(
         self,
         model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
+    ) -> ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]:
         return posterior_flow_nn(model=model)

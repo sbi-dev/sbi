@@ -23,10 +23,13 @@ preserving typed field annotations.
 from dataclasses import dataclass, fields
 from typing import Any, Optional
 
+from sbi.neural_nets.build_context import BuildContext
+
 
 @dataclass
-class _EstimatorConfigBase:
-    """Shared base providing ``from_kwargs()`` and ``to_dict()`` for all configs."""
+class _EstimatorBuilderBase:
+    """Shared base providing ``from_kwargs()``, ``to_dict()``, and the abstract
+    ``build()`` contract for all estimator builders."""
 
     extra_kwargs: dict = None  # type: ignore
 
@@ -35,7 +38,7 @@ class _EstimatorConfigBase:
             self.extra_kwargs = {}
 
     @classmethod
-    def from_kwargs(cls, **kwargs) -> "_EstimatorConfigBase":
+    def from_kwargs(cls, **kwargs) -> "_EstimatorBuilderBase":
         """Create a config, forwarding unknown kwargs into ``extra_kwargs``.
 
         Known fields are set directly on the dataclass; any remaining kwargs
@@ -65,6 +68,20 @@ class _EstimatorConfigBase:
 
         return cls(**known, extra_kwargs=extra)
 
+    def build(self, context: BuildContext) -> Any:
+        """Build an estimator from a ``BuildContext``.
+
+        Subclasses must override this method to construct the appropriate
+        estimator using the shapes, device, and z-score stats in *context*.
+
+        Args:
+            context: Data-derived state (shapes, device, z-score stats).
+
+        Returns:
+            A ``ConditionalEstimator`` subclass instance.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not implement build().")
+
     def to_dict(self) -> dict:
         """Return only explicitly-set (non-``None``) fields as a dict.
 
@@ -82,7 +99,7 @@ class _EstimatorConfigBase:
 
 
 @dataclass
-class ConditionalFlowConfig(_EstimatorConfigBase):
+class ConditionalFlowConfig(_EstimatorBuilderBase):
     """Configuration for conditional normalizing-flow density estimator builders.
 
     Used by ``posterior_nn`` and ``likelihood_nn``.  Fields cover all parameters
@@ -142,7 +159,7 @@ class ConditionalFlowConfig(_EstimatorConfigBase):
 
 
 @dataclass
-class ClassifierConfig(_EstimatorConfigBase):
+class ClassifierConfig(_EstimatorBuilderBase):
     """Configuration for classifier builders (NRE).
 
     Covers parameters accepted by ``build_linear_classifier``,
@@ -162,7 +179,7 @@ class ClassifierConfig(_EstimatorConfigBase):
 
 
 @dataclass
-class MarginalFlowConfig(_EstimatorConfigBase):
+class MarginalFlowConfig(_EstimatorBuilderBase):
     """Configuration for marginal density estimator builders.
 
     Used by ``marginal_nn``.  Covers parameters accepted by
