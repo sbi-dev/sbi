@@ -10,7 +10,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers._contracts import LossArgs, LossArgsBNRE
 from sbi.inference.trainers.nre.nre_a import NRE_A
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
@@ -65,7 +65,7 @@ class BNRE(NRE_A):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
+        classifier: Union[str, ConditionalEstimatorBuildFn[RatioEstimator]] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -81,7 +81,7 @@ class BNRE(NRE_A):
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet), or a callable that implements the
-                `ConditionalEstimatorBuilder` protocol. The callable will
+                `ConditionalEstimatorBuildFn` protocol. The callable will
                 be called with the first batch of simulations (theta, x), which can thus
                 be used for shape inference and potentially for z-scoring. It returns a
                 `RatioEstimator`.

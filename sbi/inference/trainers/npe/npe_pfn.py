@@ -27,7 +27,7 @@ from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
-    ConditionalEstimatorBuilder,
+    ConditionalEstimatorBuildFn,
 )
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.sbi_types import TorchTransform, Tracker
@@ -53,7 +53,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Optional[ConditionalEstimatorBuilder[TabPFNFlow]] = None,
+        density_estimator: Optional[ConditionalEstimatorBuildFn[TabPFNFlow]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
