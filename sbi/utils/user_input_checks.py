@@ -578,7 +578,12 @@ def ensure_batched_simulator(simulator: Callable, prior) -> Callable:
         # The simulator must return a matching batch dimension and data.
         output_shape = simulator(prior.sample((batch_size,))).shape
         assert len(output_shape) > 1
-        assert output_shape[0] == batch_size
+      # Probe two distinct batch sizes (both > 1): a non-batched simulator whose
+      # output leading dim coincidentally matches one size cannot match both (#1878).
+      for batch_size in (2, 3):
+          output_shape = simulator(prior.sample((batch_size,))).shape
+          assert len(output_shape) > 1
+          assert output_shape[0] == batch_size
     except Exception:
         is_batched_simulator = False
 
