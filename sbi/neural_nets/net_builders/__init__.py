@@ -7,9 +7,7 @@ from sbi.neural_nets.net_builders.classifier import (
     build_mlp_classifier,
     build_resnet_classifier,
 )
-from sbi.neural_nets.net_builders.estimator_configs import (
-    DensityEstimatorBuilder,
-)
+from sbi.neural_nets.net_builders.estimator_configs import DensityEstimatorBuilder
 from sbi.neural_nets.net_builders.flow import (
     build_made,
     build_maf,
