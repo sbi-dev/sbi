@@ -7,11 +7,12 @@ This module provides Layer 2 utilities for binding observations to stateless
 potential functions, making them ready for MCMC/VI samplers.
 """
 
-from typing import Callable, Union
+from typing import Union
 
 import torch
 from torch import Tensor
 
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.protocol import PotentialFunction
 
 
@@ -19,7 +20,7 @@ def bind_observation(
     potential: PotentialFunction,
     x_o: Tensor,
     sum_iid: bool = True,
-) -> Callable[[Tensor], Tensor]:
+) -> "BoundPotential":
     """Create a sampler-compatible theta -> log_prob function.
 
     This utility binds observed data to a stateless potential function, producing
@@ -38,9 +39,9 @@ def bind_observation(
             compute log p(x_o | theta) = sum_i log p(x_i | theta).
 
     Returns:
-        A callable that takes theta (parameters) and returns the log-probability
-        log p(theta | x_o) + log p(theta). The returned function is stateless
-        from the sampler's perspective.
+        A BoundPotential instance that takes theta (parameters) and returns the
+        log-probability log p(theta | x_o) + log p(theta). The returned object
+        is compatible with samplers that expect set_x() method.
 
     Example:
         >>> # Create stateless potential
@@ -67,22 +68,10 @@ def bind_observation(
 
     x_o = x_o.to(device)
 
-    def bound_potential(theta: Tensor) -> Tensor:
-        theta = theta.to(device)
-
-        log_prob = potential(theta, x_o)
-
-        if sum_iid and x_o.ndim > 1:
-            log_prob = log_prob.sum(dim=0)
-        elif sum_iid and x_o.ndim == 0:
-            pass
-
-        return log_prob
-
-    return bound_potential
+    return BoundPotential(potential, x_o, sum_iid)
 
 
-class BoundPotential:
+class BoundPotential(BasePotential):
     """Wrapper class for binding observation to a potential function.
 
     This provides an alternative to the functional bind_observation, maintaining
@@ -100,6 +89,7 @@ class BoundPotential:
         self._x_o = x_o.to(x_o.device)
         self._sum_iid = sum_iid
         self._device = x_o.device
+        self._x_is_iid = True
 
     @property
     def device(self) -> torch.device:
@@ -114,7 +104,19 @@ class BoundPotential:
             if self._sum_iid and self._x_o.ndim > 1:
                 log_prob = log_prob.sum(dim=0)
 
-        return log_prob
+        return log_prob.reshape(-1) if log_prob.ndim > 0 else log_prob.unsqueeze(0)
+
+    def set_x(self, x_o: Tensor, x_is_iid: bool = True) -> None:
+        """Set observation for the potential function.
+
+        For BoundPotential, x_o is already bound in __init__, so this is a no-op
+        for backward compatibility with samplers.
+        """
+        pass
+
+    def return_x_o(self) -> Tensor:
+        """Return the bound observation."""
+        return self._x_o
 
     def to(self, device: Union[str, torch.device]) -> "BoundPotential":
         self._device = torch.device(device)
