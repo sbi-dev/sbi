@@ -21,6 +21,73 @@ from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
 
 
+def likelihood_potential(
+    likelihood_estimator: ConditionalDensityEstimator,
+    prior: Distribution,
+) -> Callable[[Tensor, Tensor], Tensor]:
+    r"""Create a stateless likelihood potential function.
+
+    This returns a function that satisfies the PotentialFunction protocol:
+    (theta, x) -> log p(x|theta) + log p(theta)
+
+    This is the new recommended API. For use with samplers, combine with
+    bind_observation().
+
+    Args:
+        likelihood_estimator: The density estimator modelling the likelihood.
+        prior: The prior distribution.
+
+    Returns:
+        A callable (theta, x) -> log_prob that computes the likelihood potential.
+        The returned function has a `device` attribute for compatibility with
+        bind_observation.
+    """
+    device = str(next(likelihood_estimator.parameters()).device)
+
+    def _potential(theta: Tensor, x: Tensor) -> Tensor:
+        theta = theta.to(device)
+        x = x.to(device)
+
+        x_batch_size = x.shape[0]
+        theta_batch_size = theta.shape[0]
+
+        with torch.set_grad_enabled(True):
+            if x_batch_size == 1:
+                x_for_eval = x
+                log_likelihood = likelihood_estimator.log_prob(
+                    x_for_eval, condition=theta
+                )
+                log_likelihood = log_likelihood.squeeze(1)
+            elif x_batch_size == theta_batch_size:
+                log_likelihood = likelihood_estimator.log_prob(x, condition=theta)
+                log_likelihood = log_likelihood.reshape(-1)
+            else:
+                x_expanded = reshape_to_sample_batch_event(
+                    x, event_shape=x.shape[1:], leading_is_sample=True
+                )
+                trailing_minus_ones = [-1 for _ in range(x_expanded.dim() - 2)]
+                x_expanded = x_expanded.expand(
+                    -1, theta_batch_size, *trailing_minus_ones
+                )
+
+                theta_batch = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
+
+                log_likelihood_batch = likelihood_estimator.log_prob(
+                    x_expanded, condition=theta_batch
+                )
+                log_likelihood = log_likelihood_batch.reshape(
+                    x_batch_size, theta_batch_size
+                )
+
+        prior_log_prob = prior.log_prob(theta)
+
+        return log_likelihood + prior_log_prob
+
+    _potential.device = torch.device(device)
+
+    return _potential
+
+
 def likelihood_estimator_based_potential(
     likelihood_estimator: ConditionalDensityEstimator,
     prior: Distribution,  # type: ignore

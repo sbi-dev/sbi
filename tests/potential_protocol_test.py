@@ -244,6 +244,60 @@ class TestIntegration:
         assert theta.grad is not None
 
 
+class TestNewStatelessAPI:
+    """Tests for the new stateless potential functions (likelihood_potential, etc.)."""
+
+    def test_likelihood_potential_creates_valid_function(self):
+        """Test that likelihood_potential returns a valid PotentialFunction."""
+        from sbi.inference import NLE
+        from sbi.inference.potentials import bind_observation, likelihood_potential
+        from sbi.utils import BoxUniform
+
+        torch.manual_seed(42)
+
+        prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
+        theta = prior.sample((50,))
+        x = theta + torch.randn_like(theta) * 0.1
+        x_o = torch.randn(1, 2)
+
+        trainer = NLE()
+        estimator = trainer.append_simulations(theta, x).train(
+            training_batch_size=16, max_num_epochs=2
+        )
+
+        stateless_fn = likelihood_potential(estimator, prior)
+
+        assert hasattr(stateless_fn, "device")
+        assert callable(stateless_fn)
+
+        bound_fn = bind_observation(stateless_fn, x_o)
+        theta_test = torch.rand(5, 2)
+        result = bound_fn(theta_test)
+
+        assert result.shape == (5,)
+        assert torch.isfinite(result).all()
+
+    def test_new_stateless_functions_satisfy_protocol(self):
+        """Test that new stateless functions satisfy PotentialFunction protocol."""
+        from sbi.inference import NLE
+        from sbi.inference.potentials import likelihood_potential, validate_potential
+        from sbi.utils import BoxUniform
+
+        torch.manual_seed(42)
+
+        prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
+        theta = prior.sample((30,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        trainer = NLE()
+        estimator = trainer.append_simulations(theta, x).train(
+            training_batch_size=16, max_num_epochs=2
+        )
+
+        stateless_fn = likelihood_potential(estimator, prior)
+        assert validate_potential(stateless_fn) is True
+
+
 class TestBackwardCompatibility:
     """Tests verifying backward compatibility with existing sbi workflows."""
 
