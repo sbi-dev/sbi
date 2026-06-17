@@ -45,7 +45,7 @@ def test_density_estimator_builder_build_kwargs_excludes_model():
 
 @pytest.mark.parametrize("model", sorted(_VALID_DENSITY_MODELS))
 def test_density_estimator_builder_build(model):
-    """Test that build() returns a ConditionalDensityEstimator for every supported model."""
+    """Test that build() returns correct estimator type for every supported model."""
     builder = DensityEstimatorBuilder(model=model)
     theta = torch.randn(100, 5)
     x = torch.randn(100, 3)
