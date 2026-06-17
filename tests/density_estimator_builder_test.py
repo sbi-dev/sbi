@@ -56,17 +56,24 @@ def test_density_estimator_builder_build(model):
 
 @pytest.mark.parametrize("model", ["maf", "nsf", "zuko_maf", "zuko_nsf", "mdn"])
 def test_density_estimator_builder_build_with_custom_features(model):
-    """Test that custom hidden_features are forwarded to the build function."""
-    builder = DensityEstimatorBuilder(model=model, hidden_features=32)
+    """Test that custom hidden_features are forwarded and wired into the estimator."""
+    custom_features = 32
+    builder = DensityEstimatorBuilder(model=model, hidden_features=custom_features)
     theta = torch.randn(100, 4)
     x = torch.randn(100, 2)
     ctx = BuildContext.from_data(theta, x)
     estimator = builder.build(ctx, batch_theta=theta, batch_x=x)
     assert isinstance(estimator, ConditionalDensityEstimator)
+    # Verify that at least one layer has the requested hidden size.
+    param_shapes = [p.shape for p in estimator.parameters()]
+    assert any(custom_features in s for s in param_shapes), (
+        f"No parameter with hidden_features={custom_features} found in {param_shapes}"
+    )
 
 
 @pytest.mark.parametrize("model", ["maf", "zuko_nsf"])
 def test_density_estimator_builder_build_with_embedding_net(model):
+    """Test that a custom embedding_net is wired into the built estimator."""
     emb = nn.Linear(3, 10)
     builder = DensityEstimatorBuilder(model=model, embedding_net=emb)
     theta = torch.randn(100, 5)
@@ -74,6 +81,8 @@ def test_density_estimator_builder_build_with_embedding_net(model):
     ctx = BuildContext.from_data(theta, x)
     estimator = builder.build(ctx, batch_theta=theta, batch_x=x)
     assert isinstance(estimator, ConditionalDensityEstimator)
+    # The embedding net must not be a plain Identity.
+    assert not isinstance(estimator.embedding_net, nn.Identity)
 
 
 @pytest.mark.parametrize("model", ["maf", "zuko_maf"])
@@ -93,13 +102,25 @@ def test_density_estimator_builder_loss_computable(model):
     assert torch.isfinite(loss).all()
 
 
-def test_density_estimator_builder_z_score_none():
-    """Test that z_score_x='none' disables z-scoring."""
+@pytest.mark.parametrize(
+    "z_score_x, z_score_y",
+    [
+        ("none", "none"),
+        ("independent", "independent"),
+        ("none", "independent"),
+    ],
+)
+def test_density_estimator_builder_z_score_modes(z_score_x, z_score_y):
+    """Test that z_score fields are forwarded and the estimator builds successfully."""
     builder = DensityEstimatorBuilder(
-        model="maf", z_score_x="none", z_score_y="none", num_transforms=2
+        model="maf", z_score_x=z_score_x, z_score_y=z_score_y, num_transforms=2
     )
     theta = torch.randn(100, 3)
     x = torch.randn(100, 2)
     ctx = BuildContext.from_data(theta, x)
     estimator = builder.build(ctx, batch_theta=theta, batch_x=x)
     assert isinstance(estimator, ConditionalDensityEstimator)
+    # When z_score is "none" for both, the estimator should still produce
+    # a finite loss (just without standardization).
+    loss = estimator.loss(theta[:10], condition=x[:10])
+    assert torch.isfinite(loss).all()
