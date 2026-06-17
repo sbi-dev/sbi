@@ -25,8 +25,6 @@ from typing import Any, Literal, Optional, Sequence, Union, get_args
 
 from torch import Tensor
 
-from sbi.neural_nets.build_context import BuildContext
-
 
 @dataclass
 class _EstimatorBuilderBase:
@@ -70,14 +68,16 @@ class _EstimatorBuilderBase:
 
         return cls(**known, extra_kwargs=extra)
 
-    def build(self, context: BuildContext) -> Any:
-        """Build an estimator from a ``BuildContext``.
+    def build(self, batch_theta: Tensor, batch_x: Tensor) -> Any:
+        """Build an estimator from training batches.
 
         Subclasses must override this method to construct the appropriate
-        estimator using the shapes, device, and z-score stats in *context*.
+        estimator.  Shape inference and z-scoring are derived from the
+        supplied batches by the downstream ``build_*`` functions.
 
         Args:
-            context: Data-derived state (shapes, device, z-score stats).
+            batch_theta: Batch of parameters.
+            batch_x: Batch of observations.
 
         Returns:
             A ``ConditionalEstimator`` subclass instance.
@@ -278,7 +278,7 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
                 f"Must be one of {sorted(_VALID_DENSITY_MODELS)}."
             )
 
-    def build(self, context: BuildContext, batch_theta: Tensor, batch_x: Tensor):
+    def build(self, batch_theta: Tensor, batch_x: Tensor):
         """Build the density estimator by dispatching to the appropriate
         ``build_*`` function.
 
@@ -287,7 +287,6 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
         as the conditioning variable.
 
         Args:
-            context: Data-derived build state (shapes, device, z-score stats).
             batch_theta: Batch of parameters used for shape inference and
                 z-scoring.
             batch_x: Batch of observations used for shape inference and
