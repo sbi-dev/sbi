@@ -103,14 +103,12 @@ class NPE_C(PosteriorEstimatorTrainer):
         Args:
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them.
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type (one of nsf, maf, mdn, made). Alternatively, a function
-                that builds a custom neural network, which adheres to
-                `ConditionalEstimatorBuildFn` protocol can be provided. The function
-                will be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. The
-                density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
+            density_estimator: If it is a string (deprecated), use a pre-configured
+                network of the provided type (one of nsf, maf, mdn, made). If it is
+                a ``_EstimatorBuilderBase`` (e.g. ``DensityEstimatorBuilder``), the
+                builder's ``build()`` method will be called with the first batch
+                of simulations. Alternatively, a function that builds a custom
+                neural network can be provided.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
