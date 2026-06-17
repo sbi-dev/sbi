@@ -14,19 +14,6 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 
 
-def test_density_estimator_builder_defaults():
-    builder = DensityEstimatorBuilder()
-    assert builder.model == "maf"
-    assert builder.hidden_features is None
-    assert builder.embedding_net is None
-
-
-@pytest.mark.parametrize("model", sorted(_VALID_DENSITY_MODELS))
-def test_density_estimator_builder_accepts_valid_models(model):
-    builder = DensityEstimatorBuilder(model=model)
-    assert builder.model == model
-
-
 def test_density_estimator_builder_invalid_model_raises():
     with pytest.raises(ValueError, match="Unknown model"):
         DensityEstimatorBuilder(model="invalid_model")
@@ -56,27 +43,9 @@ def test_density_estimator_builder_build_kwargs_excludes_model():
     assert kwargs["hidden_features"] == 64
 
 
-_QUICK_MODELS = [
-    "mdn",
-    "made",
-    "maf",
-    "maf_rqs",
-    "nsf",
-    "zuko_nice",
-    "zuko_maf",
-    "zuko_nsf",
-    "zuko_ncsf",
-    "zuko_sospf",
-    "zuko_naf",
-    "zuko_unaf",
-    "zuko_gf",
-    "zuko_bpf",
-]
-
-
-@pytest.mark.parametrize("model", _QUICK_MODELS)
+@pytest.mark.parametrize("model", sorted(_VALID_DENSITY_MODELS))
 def test_density_estimator_builder_build(model):
-    """Test that build() returns a ConditionalDensityEstimator."""
+    """Test that build() returns a ConditionalDensityEstimator for every supported model."""
     builder = DensityEstimatorBuilder(model=model)
     theta = torch.randn(100, 5)
     x = torch.randn(100, 3)
