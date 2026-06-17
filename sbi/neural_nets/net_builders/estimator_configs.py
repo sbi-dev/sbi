@@ -21,7 +21,7 @@ preserving typed field annotations.
 """
 
 from dataclasses import dataclass, fields
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Sequence, Union, get_args
 
 from torch import Tensor
 
@@ -220,22 +220,7 @@ DENSITY_MODELS = Literal[
     "zuko_bpf",
 ]
 
-_VALID_DENSITY_MODELS = {
-    "mdn",
-    "made",
-    "maf",
-    "maf_rqs",
-    "nsf",
-    "zuko_nice",
-    "zuko_maf",
-    "zuko_nsf",
-    "zuko_ncsf",
-    "zuko_sospf",
-    "zuko_naf",
-    "zuko_unaf",
-    "zuko_gf",
-    "zuko_bpf",
-}
+_VALID_DENSITY_MODELS = frozenset(get_args(DENSITY_MODELS))
 
 
 @dataclass
@@ -343,6 +328,8 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
 
         build_fn = builders[self.model]
         kwargs = self._build_kwargs()
+        # For NPE: batch_theta is the modeled variable (batch_x in the builder)
+        # and batch_x is the conditioning variable (batch_y in the builder).
         return build_fn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
 
     def _build_kwargs(self) -> dict:
