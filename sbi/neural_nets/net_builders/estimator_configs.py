@@ -236,9 +236,13 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
     model: DENSITY_MODELS = "maf"  # type: ignore[valid-type]
 
     # --- Shared across most builders ---
-    z_score_x: Optional[str] = None
-    z_score_y: Optional[str] = None
-    hidden_features: Optional[Any] = None
+    z_score_x: Optional[
+        Literal["none", "independent", "structured", "transform_to_unconstrained"]
+    ] = None
+    z_score_y: Optional[
+        Literal["none", "independent", "structured", "transform_to_unconstrained"]
+    ] = None
+    hidden_features: Optional[Union[int, Sequence[int]]] = None
     num_transforms: Optional[int] = None
     num_bins: Optional[int] = None
     embedding_net: Optional[Any] = None
