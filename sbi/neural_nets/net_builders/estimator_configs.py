@@ -300,7 +300,7 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
                 z-scoring.
 
         Returns:
-            Neural network.
+            A ``ConditionalDensityEstimator`` (e.g., ``NFlowsFlow``, ``ZukoFlow``, or MDN).
         """
         from sbi.neural_nets.net_builders.flow import (
             build_made,
