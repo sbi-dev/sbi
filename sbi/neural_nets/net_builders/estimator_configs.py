@@ -25,6 +25,11 @@ from typing import Any, Literal, Optional, Sequence, Union, get_args
 
 from torch import Tensor
 
+from sbi.neural_nets.estimators.base import (
+    ConditionalDensityEstimator,
+    ConditionalEstimator,
+)
+
 
 @dataclass
 class _EstimatorBuilderBase:
@@ -68,7 +73,7 @@ class _EstimatorBuilderBase:
 
         return cls(**known, extra_kwargs=extra)
 
-    def build(self, batch_theta: Tensor, batch_x: Tensor) -> Any:
+    def build(self, batch_theta: Tensor, batch_x: Tensor) -> ConditionalEstimator:
         """Build an estimator from training batches.
 
         Subclasses must override this method to construct the appropriate
@@ -278,7 +283,9 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
                 f"Must be one of {sorted(_VALID_DENSITY_MODELS)}."
             )
 
-    def build(self, batch_theta: Tensor, batch_x: Tensor):
+    def build(
+        self, batch_theta: Tensor, batch_x: Tensor
+    ) -> ConditionalDensityEstimator:
         """Build the density estimator by dispatching to the appropriate
         ``build_*`` function.
 
