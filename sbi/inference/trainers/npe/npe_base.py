@@ -78,14 +78,13 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         a sequential scheme.
 
         Args:
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type (one of nsf, maf, mdn, made). Alternatively, a function
-                that builds a custom neural network, which adheres to
-                `ConditionalEstimatorBuildFn` protocol can be provided. The function
-                will be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. The
-                density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
+            density_estimator: If it is a string (deprecated), use a pre-configured
+                network of the provided type (one of nsf, maf, mdn, made). If it is
+                a `_EstimatorBuilderBase` (e.g. `DensityEstimatorBuilder`), the
+                builder's `build()` method will be called with the first batch
+                of simulations. Alternatively, a function that builds a custom
+                neural network, which adheres to `ConditionalEstimatorBuildFn`
+                protocol can be provided.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -514,6 +513,22 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
         assert_all_finite(loss, "NPE loss")
         return calibration_kernel(x) * loss
+
+    @staticmethod
+    def _wrap_builder(
+        builder: _EstimatorBuilderBase,
+    ) -> Callable:
+        """Wrap a builder object as a legacy-compatible build function.
+
+        This allows the existing ``_initialize_neural_network`` flow to work
+        unchanged: the returned callable has the same ``(theta, x)`` signature
+        as the functions produced by ``posterior_nn``.
+        """
+
+        def build_fn(batch_theta, batch_x):
+            return builder.build(batch_theta=batch_theta, batch_x=batch_x)
+
+        return build_fn
 
     def _check_proposal(self, proposal):
         """
