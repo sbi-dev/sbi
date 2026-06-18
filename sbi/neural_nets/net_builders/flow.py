@@ -20,6 +20,7 @@ from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow, ZukoUnconditionalFl
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
+    assert_transform_to_unconstrained_supported,
     biject_transform_zuko,
     mcmc_transform,
     standardizing_net,
@@ -70,6 +71,12 @@ def build_made(
         Neural network.
     """
     check_data_device(batch_x, batch_y)
+    assert_transform_to_unconstrained_supported(
+        z_score_x,
+        "build_made",
+        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
+        "or one of 'none', 'independent', 'structured'.",
+    )
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
@@ -149,6 +156,12 @@ def build_maf(
         Neural network.
     """
     check_data_device(batch_x, batch_y)
+    assert_transform_to_unconstrained_supported(
+        z_score_x,
+        "build_maf",
+        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
+        "or one of 'none', 'independent', 'structured'.",
+    )
     x_numel = get_numel(
         batch_x,
         embedding_net=None,
@@ -257,6 +270,12 @@ def build_maf_rqs(
         Neural network.
     """
     check_data_device(batch_x, batch_y)
+    assert_transform_to_unconstrained_supported(
+        z_score_x,
+        "build_maf_rqs",
+        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
+        "or one of 'none', 'independent', 'structured'.",
+    )
     x_numel = get_numel(
         batch_x,
         embedding_net=None,
@@ -360,6 +379,12 @@ def build_nsf(
         Neural network.
     """
     check_data_device(batch_x, batch_y)
+    assert_transform_to_unconstrained_supported(
+        z_score_x,
+        "build_nsf",
+        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
+        "or one of 'none', 'independent', 'structured'.",
+    )
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
@@ -1321,6 +1346,12 @@ def build_zuko_unconditional_flow(
     """
 
     # check_data_device(batch_x)
+    assert_transform_to_unconstrained_supported(
+        z_score_x,
+        "build_zuko_unconditional_flow",
+        "It is not supported for unconditional / marginal flows. "
+        "Use one of 'none', 'independent', 'structured'.",
+    )
     x_numel = get_numel(batch_x, embedding_net=None)
 
     # keep only zuko kwargs

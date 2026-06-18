@@ -14,6 +14,7 @@
 
 * **Fix TARP z-scoring bug** ([#1832](https://github.com/sbi-dev/sbi/issues/1832)): Reference points are now z-scored alongside `thetas` and `posterior_samples` when `z_score_theta=True`, fixing incorrect distance calculations that masked bias detection.
 * **Fix broken `biased_toy_gaussian` test helper**: Rewrote to create actual location bias (posterior mean shifted from truth) instead of the previous NaN-producing formula.
+* **Raise on unsupported `transform_to_unconstrained` z-scoring**: `z_score_x="transform_to_unconstrained"` was silently ignored by the nflows builders (`maf`, `nsf`, `maf_rqs`, `made`), the MDN builder, the unconditional Zuko builder, and the ratio-based classifier builders (`linear`, `mlp`, `resnet`), producing a model with no reparametrization. These builders now raise a clear `ValueError`. The option remains supported by the conditional `zuko_*` models.
 
 ### 📖 Documentation
 

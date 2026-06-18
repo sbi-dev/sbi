@@ -471,6 +471,14 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     elif build_fn == classifier_nn:
         models = ["linear", "mlp", "resnet"]
 
+    # `transform_to_unconstrained` is only implemented for the conditional Zuko
+    # builders; nflows/mdn/mnle and the ratio-based classifiers now raise a
+    # ValueError instead of silently no-op-ing. The factory maps the *modeled*
+    # variable's z-scoring to the builder's z_score_x: theta for posterior_nn and
+    # classifier_nn (`z_score_x=z_score_theta`), x for likelihood_nn.
+    # posterior_nn and classifier_nn both map z_score_x <- z_score_theta.
+    modeled_z = z_x if build_fn == likelihood_nn else z_theta
+
     for model in models:
         if model == "mnle":
             x_cont, x_disc = x[:, :-1], torch.randint(0, 2, (batch_dim, 1)).float()
@@ -486,6 +494,14 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
         }
         if build_fn in [likelihood_nn, posterior_nn]:
             kwargs.update({"x_dist": dist, "num_transforms": 1})
+
+        # Unsupported combination: the modeled variable requests the unconstrained
+        # transform on a non-Zuko-conditional builder -> expect a clear ValueError.
+        if modeled_z == "transform_to_unconstrained" and not model.startswith("zuko"):
+            with pytest.raises(ValueError, match="transform_to_unconstrained"):
+                build_fun = build_fn(**kwargs)
+                build_fun(theta, model_x)
+            continue
 
         build_fun = build_fn(**kwargs)
         estimator = build_fun(theta, model_x)
@@ -524,6 +540,56 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     # plt.plot(x_zstructured.T)
     # plt.title('z-scored: structured dims');
     # plt.show()
+
+
+@pytest.mark.parametrize(
+    "builder_name",
+    [
+        "build_made",
+        "build_maf",
+        "build_maf_rqs",
+        "build_nsf",
+        "build_mdn",
+        "build_linear_classifier",
+        "build_mlp_classifier",
+        "build_resnet_classifier",
+    ],
+)
+def test_transform_to_unconstrained_raises_for_unsupported_builders(builder_name):
+    """nflows, MDN, and ratio-classifier builders raise a clear error for
+    `transform_to_unconstrained` instead of silently building a model without the
+    reparametrization."""
+    from sbi.neural_nets.net_builders import flow as flow_builders
+    from sbi.neural_nets.net_builders.classifier import (
+        build_linear_classifier,
+        build_mlp_classifier,
+        build_resnet_classifier,
+    )
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+
+    builders = {
+        "build_made": flow_builders.build_made,
+        "build_maf": flow_builders.build_maf,
+        "build_maf_rqs": flow_builders.build_maf_rqs,
+        "build_nsf": flow_builders.build_nsf,
+        "build_mdn": build_mdn,
+        "build_linear_classifier": build_linear_classifier,
+        "build_mlp_classifier": build_mlp_classifier,
+        "build_resnet_classifier": build_resnet_classifier,
+    }
+    theta, x = torch.rand(20, 3), torch.rand(20, 2)
+    with pytest.raises(ValueError, match="transform_to_unconstrained"):
+        builders[builder_name](theta, x, z_score_x="transform_to_unconstrained")
+
+
+def test_transform_to_unconstrained_raises_for_zuko_unconditional():
+    """The unconditional Zuko builder also raises rather than silently no-op-ing
+    (it has no prior to derive the bijection from)."""
+    from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
+
+    x = torch.rand(20, 3)
+    with pytest.raises(ValueError, match="unconditional"):
+        build_zuko_unconditional_flow("MAF", x, z_score_x="transform_to_unconstrained")
 
 
 class TestWarnIfInvalidForZscoring:

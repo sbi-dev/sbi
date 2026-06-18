@@ -199,6 +199,36 @@ def z_score_parser(
     return z_score_bool, structured_data
 
 
+def assert_transform_to_unconstrained_supported(
+    z_score_x: Optional[str],
+    builder_name: str,
+    suggestion: str,
+) -> None:
+    """Raise if ``z_score_x="transform_to_unconstrained"`` for a builder that does not
+    implement it.
+
+    The ``transform_to_unconstrained`` z-scoring option derives a bijection from the
+    prior's support (rather than batch statistics) and is only implemented for the
+    conditional Zuko builders. For the other builders, ``z_score_parser`` returns
+    ``(False, False)`` for this flag, which would otherwise make the option a silent
+    no-op (the model is built with no reparametrization at all). This guard turns that
+    silent no-op into a clear error.
+
+    Args:
+        z_score_x: The z-scoring option passed by the user.
+        builder_name: Name of the calling builder, for the error message.
+        suggestion: Builder-specific hint on what to use instead.
+
+    Raises:
+        ValueError: If ``z_score_x == "transform_to_unconstrained"``.
+    """
+    if z_score_x == "transform_to_unconstrained":
+        raise ValueError(
+            f"`z_score_x='transform_to_unconstrained'` is not supported by "
+            f"`{builder_name}`. {suggestion}"
+        )
+
+
 def standardizing_transform(
     batch_t: Tensor,
     structured_dims: bool = False,

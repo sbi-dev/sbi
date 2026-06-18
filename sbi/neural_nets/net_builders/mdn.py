@@ -12,6 +12,7 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
 )
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
+    assert_transform_to_unconstrained_supported,
     standardizing_net,
     z_score_parser,
     z_standardization,
@@ -52,6 +53,12 @@ def build_mdn(
         MixtureDensityEstimator for conditional density estimation.
     """
     check_data_device(batch_x, batch_y)
+    assert_transform_to_unconstrained_supported(
+        z_score_x,
+        "build_mdn",
+        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
+        "or one of 'none', 'independent', 'structured'.",
+    )
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
