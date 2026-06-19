@@ -142,9 +142,10 @@ def test_compute_z_score_stats_matches_z_standardization():
 def test_estimator_builder_base_build_raises():
     """Subclasses that don't override build() raise NotImplementedError."""
     cfg = ConditionalFlowConfig(hidden_features=64)
-    ctx = BuildContext(theta_shape=torch.Size([5]), x_shape=torch.Size([3]))
+    theta = torch.randn(10, 5)
+    x = torch.randn(10, 3)
     with pytest.raises(NotImplementedError, match="does not implement build"):
-        cfg.build(ctx)
+        cfg.build(theta, x)
 
 
 def test_estimator_builder_base_from_kwargs():
