@@ -104,7 +104,10 @@ class BoundPotential(BasePotential):
             if self._sum_iid and self._x_o.ndim > 1:
                 log_prob = log_prob.sum(dim=0)
 
-        return log_prob.reshape(-1) if log_prob.ndim > 0 else log_prob.unsqueeze(0)
+        if self._sum_iid:
+            return log_prob.reshape(-1) if log_prob.ndim > 0 else log_prob.unsqueeze(0)
+        else:
+            return log_prob
 
     def set_x(self, x_o: Tensor, x_is_iid: bool = True) -> None:
         """Set observation for the potential function.
