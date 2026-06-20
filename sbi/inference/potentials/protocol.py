@@ -25,7 +25,7 @@ class PotentialFunction(Protocol):
     - Easy testing (same inputs -> same outputs)
     - Simple serialization
     - Composable inference workflows
-    - Integration with external samplers (NumPyro, PyMC, custom PyTorch)
+    - Integration with external samplers (PyMC, custom PyTorch)
 
     Example:
         >>> def my_potential(theta: Tensor, x: Tensor) -> Tensor:

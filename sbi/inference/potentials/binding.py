@@ -125,25 +125,3 @@ class BoundPotential(BasePotential):
         self._device = torch.device(device)
         self._x_o = self._x_o.to(device)
         return self
-
-
-def bind_observation_class(
-    potential: PotentialFunction,
-    x_o: Tensor,
-    sum_iid: bool = True,
-) -> BoundPotential:
-    """Create a BoundPotential instance for sampler-compatible usage.
-
-    This is an alternative to bind_observation that returns a class instance
-    instead of a simple function. Useful when you need method chaining or
-    want to maintain compatibility with code that expects an object.
-
-    Args:
-        potential: Stateless (theta, x) -> log_prob function.
-        x_o: Observed data tensor.
-        sum_iid: If True, sum log probabilities over IID batch dimension.
-
-    Returns:
-        BoundPotential instance that can be called like a function.
-    """
-    return BoundPotential(potential, x_o, sum_iid)
