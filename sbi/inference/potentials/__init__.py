@@ -4,7 +4,6 @@
 from sbi.inference.potentials.binding import (
     BoundPotential,
     bind_observation,
-    bind_observation_class,
 )
 from sbi.inference.potentials.likelihood_based_potential import (
     likelihood_estimator_based_potential,
@@ -28,7 +27,6 @@ from sbi.inference.potentials.vector_field_potential import (
 
 __all__ = [
     "bind_observation",
-    "bind_observation_class",
     "BoundPotential",
     "likelihood_estimator_based_potential",
     "likelihood_potential",
