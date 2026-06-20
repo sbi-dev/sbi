@@ -349,3 +349,36 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
         }
         d.update(self.extra_kwargs)
         return d
+
+
+_VALID_MIXED_MODELS = frozenset({
+    "mdn",
+    "made",
+    "maf",
+    "maf_rqs",
+    "nsf",
+    "zuko_nice",
+    "zuko_maf",
+    "zuko_nsf",
+    "zuko_ncsf",
+    "zuko_sospf",
+    "zuko_naf",
+    "zuko_unaf",
+    "zuko_gf",
+    "zuko_bpf",
+})
+
+
+@dataclass
+class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
+
+    z_score_x: Optional[Literal["none", "independent", "structured"]] = None
+    z_score_y: Optional[Literal["none", "independent", "structured"]] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.model not in _VALID_MIXED_MODELS:
+            raise ValueError(
+                f"Unknown model {self.model!r}. "
+                f"Must be one of {sorted(_VALID_MIXED_MODELS)}."
+            )
