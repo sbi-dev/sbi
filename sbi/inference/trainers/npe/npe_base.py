@@ -33,7 +33,6 @@ from sbi.inference.trainers.base import (
     check_if_proposal_has_default_x,
 )
 from sbi.neural_nets import posterior_nn
-from sbi.neural_nets.build_context import BuildContext
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.estimators.shape_handling import (
