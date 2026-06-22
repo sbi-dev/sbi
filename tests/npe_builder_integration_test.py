@@ -58,6 +58,12 @@ def test_npe_train_with_builder(model):
         max_num_epochs=2, training_batch_size=100
     )
     assert isinstance(density_estimator, ConditionalDensityEstimator)
+    # Verify the trained estimator produces finite loss on a fresh batch.
+    fresh_theta = prior.sample((10,))
+    fresh_x = fresh_theta + 0.1 * torch.randn_like(fresh_theta)
+    loss = density_estimator.loss(fresh_theta, condition=fresh_x)
+    assert loss.shape == (10,)
+    assert torch.isfinite(loss).all()
 
 
 @pytest.mark.parametrize("model", ("maf", "nsf"))
