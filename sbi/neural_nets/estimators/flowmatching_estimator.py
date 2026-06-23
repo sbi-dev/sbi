@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 from torch import Tensor
+from torch.distributions import Transform as TorchTransform
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from sbi.utils.vector_field_utils import VectorFieldNet
@@ -65,6 +66,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         mean_0: float = 0.0,
         std_0: float = 1.0,
         gaussian_baseline: bool = False,
+        input_transform: Optional[TorchTransform] = None,
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -81,8 +83,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             std_0: Std of the data distribution at t=0 (used for time-dependent
                 z-scoring).
             gaussian_baseline: If True, use analytical Gaussian baseline velocity
-                derived from Bayes' rule: v = factor * (x - μ_true) - mean.
-                The network then only learns the residual. Default: False.
+                derived from Bayes' rule. The network then only learns the residual.
+                Default: False.
+            input_transform: Optional transform mapping constrained -> unconstrained
+                space. When set, ``ode_fn()`` applies this transform before calling
+                ``forward()``, so the ODE integrates in unconstrained space, and
+                ``loss()`` transforms training data accordingly.
         """
 
         if "num_freqs" in kwargs:
@@ -99,6 +105,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             input_shape=input_shape,
             condition_shape=condition_shape,
             embedding_net=embedding_net,
+            input_transform=input_transform,
         )
         self.noise_scale = noise_scale
         self.gaussian_baseline = gaussian_baseline
@@ -196,7 +203,13 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         """Forward pass of the FlowMatchingEstimator.
 
-        Returns velocity in ORIGINAL SPACE for ODE integration.
+        Returns velocity in internal space (unconstrained z-space when
+        ``input_transform`` is set).
+
+        Note:
+            This method does **not** apply ``input_transform`` internally. The
+            caller (e.g. ``ode_fn()``, ``loss()``) is responsible for transforming
+            inputs if needed.
 
         Args:
             input: Inputs to evaluate the vector field on of shape
@@ -207,7 +220,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
                 `(batch_dim_time, *event_shape_time)`.
 
         Returns:
-            The estimated vector field in original space.
+            The estimated vector field in internal space.
         """
         # Continue with standard processing (broadcast shapes etc.)
         batch_shape_input = input.shape[: -len(self.input_shape)]
@@ -274,6 +287,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             \theta_t = t \cdot \theta_1 + (1 - t) \cdot \theta_0,
             \left[ \| v(\theta_t, t; x_o = x_o) - (\theta_1 - \theta_0) \|^2 \right]
 
+        When ``input_transform`` is set, the input is first transformed to
+        unconstrained space, and all computations happen in that space.
+
         Args:
             input: Parameters (:math:`\theta_0`).
             condition: Observed data (:math:`x_o`).
@@ -288,12 +304,16 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             times = torch.rand(input.shape[:-1], device=input.device, dtype=input.dtype)
         times_ = times[..., None]
 
+        # Transform to unconstrained space if needed
+        if self._input_transform is not None:
+            input = self._input_transform(input)
+
         # Sample from probability path at time t
         # θ_t = (1-t) * θ_data + t * θ_noise, where θ_noise ~ N(0,1)
         theta_1 = torch.randn_like(input)
         theta_t = (1 - times_) * input + (times_ + self.noise_scale) * theta_1
 
-        # Target vector field in original space
+        # Target vector field in internal space
         vector_field = theta_1 - input
 
         # Embed condition
@@ -348,6 +368,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         flow matching neural network (see Equation 1 in [1]_ with added
         conditioning on :math:`x_o`).
 
+        When ``input_transform`` is set, this method transforms the input to
+        unconstrained space before calling ``forward()``, so the ODE integrates
+        in the unconstrained space.
+
         Args:
             input: :math:`\theta_t`.
             condition: Conditioning variable :math:`x_o`.
@@ -357,6 +381,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             Estimated vector field :math:`v(\theta_t, t; x_o)`.
             The shape is the same as the input.
         """
+        if self._input_transform is not None:
+            input = self._input_transform(input)
         return self.forward(input, condition, times)
 
     def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
@@ -371,6 +397,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Taking into account the noise scale :math:`\sigma_{min}`, the score function is
         :math:`\nabla_{\theta_t} \log p(\theta_t | x_o) =
             (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / (t + \sigma_{min})`.
+
+        Note:
+            This method does **not** apply ``input_transform`` internally. When
+            ``input_transform`` is set, this method expects input in unconstrained
+            (z) space. Use ``ode_fn()`` for automatic transform handling during
+            ODE/SDE sampling.
 
         Args:
             input: variable whose distribution is estimated.

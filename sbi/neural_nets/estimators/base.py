@@ -6,6 +6,7 @@ from typing import Optional, Protocol, Tuple, TypeVar, Union
 
 import torch
 from torch import Tensor, nn
+from torch.distributions import Transform as TorchTransform
 
 ConditionalEstimatorType = TypeVar(
     'ConditionalEstimatorType',
@@ -350,6 +351,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         embedding_net: Optional[nn.Module] = None,
         mean_base: Union[float, Tensor] = 0.0,
         std_base: Union[float, Tensor] = 1.0,
+        input_transform: Optional[TorchTransform] = None,
     ) -> None:
         r"""Base class for vector field estimators.
 
@@ -364,6 +366,9 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
                 condition.
             mean_base: Mean of the base distribution.
             std_base: Standard deviation of the base distribution.
+            input_transform: Optional transform mapping constrained -> unconstrained
+                space. When set, ``forward()`` operates in unconstrained space and
+                ``ode_fn()`` applies this transform before calling ``forward()``.
         """
         super().__init__(input_shape, condition_shape)
         self.net = net
@@ -385,11 +390,17 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         self._embedding_net = (
             embedding_net if embedding_net is not None else nn.Identity()
         )
+        self._input_transform = input_transform
 
     @property
     def embedding_net(self) -> nn.Module:
         r"""Return the embedding network if it exists."""
         return self._embedding_net
+
+    @property
+    def input_transform(self) -> Optional[TorchTransform]:
+        r"""Return the input transform (constrained -> unconstrained) if set."""
+        return self._input_transform
 
     @abstractmethod
     def forward(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:

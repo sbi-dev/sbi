@@ -395,6 +395,11 @@ class VectorFieldPosterior(NeuralPosterior):
         # Concatenate all batches and ensure we return exactly the requested number
         samples = torch.cat(all_samples, dim=0)[:total_samples_needed]
 
+        # Inverse-transform samples from unconstrained back to original space
+        input_transform = self.vector_field_estimator.input_transform
+        if input_transform is not None:
+            samples = input_transform.inv(samples)
+
         if torch.isnan(samples).all():
             raise RuntimeError(
                 "All samples NaN after diffusion sampling. "
@@ -412,7 +417,9 @@ class VectorFieldPosterior(NeuralPosterior):
         Return samples from posterior distribution with probability flow ODE.
 
         This builds the probability flow ODE and then samples from the corresponding
-        flow.
+        flow. When ``input_transform`` is set on the estimator, the ODE integrates
+        in unconstrained space and samples are inverse-transformed back to the
+        original constrained space.
 
         Args:
             sample_shape: The shape of the samples to be returned.
@@ -428,6 +435,11 @@ class VectorFieldPosterior(NeuralPosterior):
         samples = self.potential_fn.neural_ode(self.potential_fn.x_o, **kwargs).sample(
             torch.Size((num_samples,))
         )
+
+        # Inverse-transform samples from unconstrained back to original space
+        input_transform = self.vector_field_estimator.input_transform
+        if input_transform is not None:
+            samples = input_transform.inv(samples)
 
         return samples
 

@@ -17,9 +17,12 @@ from sbi.neural_nets.estimators.score_estimator import (
     VPScoreEstimator,
 )
 from sbi.neural_nets.net_builders.estimator_configs import _EstimatorConfigBase
+from torch.distributions import Distribution
+
+from sbi.sbi_types import TorchTransform
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
-    assert_transform_to_unconstrained_supported,
+    mcmc_transform,
     standardizing_net,
     z_score_parser,
     z_standardization,
@@ -58,6 +61,7 @@ class _VectorFieldBaseConfig(_EstimatorConfigBase):
     # passed through **kwargs at the factory level
     net: Optional[Any] = None
     z_score_x: Optional[Any] = None
+    x_dist: Optional[Any] = None
     z_score_y: Optional[Any] = None
     hidden_features: Optional[Any] = None
     num_layers: Optional[int] = None
@@ -127,6 +131,7 @@ def build_vector_field_estimator(
         VectorFieldNet,
     ] = "mlp",
     gaussian_baseline: bool = False,
+    x_dist: Optional[Distribution] = None,
     **kwargs,
 ) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
     """Builds a vector field estimator (flow matching or score matching) with the given
@@ -136,8 +141,16 @@ def build_vector_field_estimator(
         batch_x: Batch of xs, used to infer dimensionality.
         batch_y: Batch of ys, used to infer dimensionality.
         estimator_type: Type of estimator to build, either "flow" or "score".
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+            - `transform_to_unconstrained`: Transform inputs to unconstrained space
+            using the prior's support. Requires `x_dist` to be provided.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
         embedding_net: Embedding network for batch_y.
         sde_type: SDE type for score estimator, one of "vp", "subvp", or "ve".
         hidden_features: Number of hidden features in each layer (for MLP) or dimension
@@ -152,6 +165,8 @@ def build_vector_field_estimator(
         gaussian_baseline: If True, use analytical Gaussian baseline velocity
             derived from Bayes' rule. The network then only learns the residual.
             Only used when estimator_type="flow". Defaults to False.
+        x_dist: Distribution used for unconstrained transformation when
+            z_score_x="transform_to_unconstrained". Must have a `.support` attribute.
         **kwargs: Additional arguments forwarded to the estimator and network
             constructors.  Valid keys are defined by ``ScoreEstimatorConfig``
             and ``FlowEstimatorConfig``; validation happens in the upstream
@@ -163,12 +178,20 @@ def build_vector_field_estimator(
     """
     # Check inputs and device
     check_data_device(batch_x, batch_y)
-    assert_transform_to_unconstrained_supported(
-        z_score_x,
-        "build_vector_field_estimator",
-        "Vector field estimators (flow matching / score matching) do not implement "
-        "it; use one of 'none', 'independent', or 'structured' instead.",
-    )
+
+    # Build input transform for transform_to_unconstrained
+    input_transform: Optional[TorchTransform] = None
+    if z_score_x == "transform_to_unconstrained":
+        if x_dist is None:
+            raise ValueError(
+                "x_dist must be provided when z_score_x='transform_to_unconstrained'."
+            )
+        if not hasattr(x_dist, "support"):
+            raise ValueError(
+                "x_dist requires a `.support` attribute when using "
+                "z_score_x='transform_to_unconstrained'."
+            )
+        input_transform = mcmc_transform(x_dist, device=batch_x.device)
 
     # Build network if not provided
     if net == "mlp":
@@ -227,7 +250,12 @@ def build_vector_field_estimator(
 
     # Z-score setup
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
+    if input_transform is not None:
+        # Transform data to unconstrained space, then compute stats for
+        # time-dependent z-scoring in that space.
+        batch_x_transformed = input_transform(batch_x)
+        mean_0, std_0 = z_standardization(batch_x_transformed, structured_x)
+    elif z_score_x_bool:
         mean_0, std_0 = z_standardization(batch_x, structured_x)
     else:
         mean_0, std_0 = 0, 1
@@ -248,6 +276,7 @@ def build_vector_field_estimator(
             mean_0=mean_0,
             std_0=std_0,
             gaussian_baseline=gaussian_baseline,
+            input_transform=input_transform,
         )
     elif estimator_type == "score":
         # Choose the appropriate score estimator based on SDE type
@@ -286,6 +315,7 @@ def build_vector_field_estimator(
             embedding_net=embedding_net_y,
             mean_0=mean_0,
             std_0=std_0,
+            input_transform=input_transform,
             **estimator_kwargs,
         )
     else:
