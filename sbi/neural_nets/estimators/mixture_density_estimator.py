@@ -17,6 +17,7 @@ from typing import Optional
 import numpy as np
 import torch
 from torch import Tensor, nn
+from torch.distributions import Transform as TorchTransform
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
@@ -337,6 +338,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         condition_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         transform_input: Optional[Tensor] = None,
+        input_transform: Optional[TorchTransform] = None,
     ) -> None:
         """Initialize the mixture density estimator.
 
@@ -354,11 +356,21 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
                 evaluation, and samples are inverse transformed as:
                 x = z * scale + shift.
                 This is used for z-scoring inputs to improve numerical stability.
+            input_transform: Optional PyTorch Transform for general bijective
+                transformation of inputs (e.g., for transform_to_unconstrained).
+                If provided, inputs are transformed as z = transform(x) and samples
+                are inverse transformed as x = transform.inv(z). Mutually exclusive
+                with transform_input.
         """
         super().__init__(net, input_shape, condition_shape)
         self._embedding_net = (
             embedding_net if embedding_net is not None else nn.Identity()
         )
+
+        if transform_input is not None and input_transform is not None:
+            raise ValueError(
+                "Only one of transform_input and input_transform can be provided."
+            )
 
         # Validate that embedding_net output matches MDN input if embedding is provided
         if embedding_net is not None:
@@ -371,6 +383,9 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
                     f"embedding_net output dimension ({embedded_dim}) does not match "
                     f"MDN context_features ({net.context_features})"
                 )
+
+        # Store general bijective input transform (e.g., for transform_to_unconstrained)
+        self._input_transform = input_transform
 
         # Store z-score transform parameters as buffers (not trained, moved with model)
         if transform_input is not None:
@@ -399,28 +414,29 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
     @property
     def has_input_transform(self) -> bool:
-        """Whether input z-score transform is enabled."""
-        return self._transform_shift is not None
+        """Whether input transform is enabled (z-score or general transform)."""
+        return self._input_transform is not None or self._transform_shift is not None
 
     def _transform_input(self, input: Tensor) -> Tensor:
-        """Apply z-score transform to input: z = (x - shift) / scale."""
-        if not self.has_input_transform:
+        """Apply input transform: z = transform(x) or z = (x - shift) / scale."""
+        if self._input_transform is not None:
+            return self._input_transform(input)
+        if self._transform_shift is None:
             return input
         return (input - self._transform_shift) / self._transform_scale
 
     def _inverse_transform_input(self, z: Tensor) -> Tensor:
-        """Apply inverse z-score transform: x = z * scale + shift."""
-        if not self.has_input_transform:
+        """Apply inverse input transform: x = transform.inv(z) or x = z * scale + shift."""
+        if self._input_transform is not None:
+            return self._input_transform.inv(z)
+        if self._transform_shift is None:
             return z
         return z * self._transform_scale + self._transform_shift
 
-    def _log_det_jacobian_forward(self, input: Tensor) -> Tensor:
-        """Compute log determinant of Jacobian for the forward z-score transform.
-
-        For the forward affine transform z = (x - shift) / scale:
-            - The Jacobian matrix is: dz/dx = diag(1/scale)
-            - The determinant is: |det(dz/dx)| = prod(1/scale)
-            - The log determinant is: log|det(dz/dx)| = -sum(log(scale))
+    def _log_det_jacobian_forward(
+        self, input: Tensor, transformed_input: Tensor
+    ) -> Tensor:
+        """Compute log determinant of Jacobian for the forward input transform.
 
         Change of Variables Formula:
             When we have a density p_z(z) and want p_x(x), we use:
@@ -429,19 +445,25 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             In log space:
             log p_x(x) = log p_z(z(x)) + log|det(dz/dx)|
 
-            Since log|det(dz/dx)| = -sum(log(scale)), we have:
-            log p_x(x) = log p_z(z) - sum(log(scale))
+        For the forward affine transform z = (x - shift) / scale:
+            log|det(dz/dx)| = -sum(log(scale))
 
-        This method returns log|det(dz/dx)| = -sum(log(scale)), which should
-        be ADDED to log p_z(z) to get log p_x(x).
+        For a general bijective transform:
+            log|det(dz/dx)| = transform.log_abs_det_jacobian(x, z).sum(dim=-1)
 
         Args:
-            input: Input tensor, used to determine device and dtype.
+            input: Input in original space.
+            transformed_input: Input after forward transform.
 
         Returns:
-            Log determinant of forward Jacobian (scalar), on the same device as input.
+            Log determinant of forward Jacobian. Shape matches batch dimensions.
         """
-        if not self.has_input_transform:
+        if self._input_transform is not None:
+            jac = self._input_transform.log_abs_det_jacobian(
+                input, transformed_input
+            )
+            return jac.sum(dim=-1)
+        if self._transform_shift is None:
             return torch.zeros(1, device=input.device, dtype=input.dtype).squeeze()
         return -torch.log(self._transform_scale).sum()
 
@@ -476,9 +498,10 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
         # MoG.log_prob handles (sample_dim, batch_dim, dim) input
         # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
-        # where z = (x - shift) / scale and log|det(dz/dx)| = -sum(log(scale))
         log_probs = mog.log_prob(transformed_input)  # (sample_dim, batch_dim)
-        log_probs = log_probs + self._log_det_jacobian_forward(input)
+        log_probs = log_probs + self._log_det_jacobian_forward(
+            input, transformed_input
+        )
 
         if not has_sample_dim:
             log_probs = log_probs.squeeze(0)

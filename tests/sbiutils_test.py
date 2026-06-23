@@ -497,7 +497,12 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
 
         # Unsupported combination: the modeled variable requests the unconstrained
         # transform on a non-Zuko-conditional builder -> expect a clear ValueError.
-        if modeled_z == "transform_to_unconstrained" and not model.startswith("zuko"):
+        # MDN supports it (via input_transform), so it's excluded from this check.
+        if (
+            modeled_z == "transform_to_unconstrained"
+            and not model.startswith("zuko")
+            and model != "mdn"
+        ):
             with pytest.raises(ValueError, match="transform_to_unconstrained"):
                 build_fun = build_fn(**kwargs)
                 build_fun(theta, model_x)
@@ -549,30 +554,27 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
         "build_maf",
         "build_maf_rqs",
         "build_nsf",
-        "build_mdn",
         "build_linear_classifier",
         "build_mlp_classifier",
         "build_resnet_classifier",
     ],
 )
 def test_transform_to_unconstrained_raises_for_unsupported_builders(builder_name):
-    """nflows, MDN, and ratio-classifier builders raise a clear error for
+    """nflows and ratio-classifier builders raise a clear error for
     `transform_to_unconstrained` instead of silently building a model without the
-    reparametrization."""
+    reparametrization. MDN now supports it and is excluded."""
     from sbi.neural_nets.net_builders import flow as flow_builders
     from sbi.neural_nets.net_builders.classifier import (
         build_linear_classifier,
         build_mlp_classifier,
         build_resnet_classifier,
     )
-    from sbi.neural_nets.net_builders.mdn import build_mdn
 
     builders = {
         "build_made": flow_builders.build_made,
         "build_maf": flow_builders.build_maf,
         "build_maf_rqs": flow_builders.build_maf_rqs,
         "build_nsf": flow_builders.build_nsf,
-        "build_mdn": build_mdn,
         "build_linear_classifier": build_linear_classifier,
         "build_mlp_classifier": build_mlp_classifier,
         "build_resnet_classifier": build_resnet_classifier,
