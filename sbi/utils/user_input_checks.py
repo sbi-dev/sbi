@@ -713,13 +713,15 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     """Check (density or ratio) estimator argument passed by the user."""
     from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 
-    assert isinstance(estimator, (str, _EstimatorBuilderBase)) or (
-        isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
-    ), (
-        "The passed density estimator / classifier must be a string, "
-        "an _EstimatorBuilderBase, or a function "
-        f"returning a nn.Module, but is {type(estimator)}"
-    )
+    if not (
+        isinstance(estimator, (str, _EstimatorBuilderBase))
+        or (isinstance(estimator, Callable) and not isinstance(estimator, nn.Module))
+    ):
+        raise TypeError(
+            "The passed density estimator / classifier must be a string, "
+            "an _EstimatorBuilderBase, or a function "
+            f"returning a nn.Module, but is {type(estimator)}"
+        )
 
 
 def validate_theta_and_x(
