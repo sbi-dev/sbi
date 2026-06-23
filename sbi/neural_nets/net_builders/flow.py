@@ -1349,8 +1349,8 @@ def build_zuko_unconditional_flow(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_zuko_unconditional_flow",
-        "It is not supported for unconditional / marginal flows. "
-        "Use one of 'none', 'independent', 'structured'.",
+        "Unconditional / marginal flows do not implement it; "
+        "use one of 'none', 'independent', or 'structured' instead.",
     )
     x_numel = get_numel(batch_x, embedding_net=None)
 

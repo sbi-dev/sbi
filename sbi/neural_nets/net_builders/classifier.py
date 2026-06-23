@@ -84,8 +84,8 @@ def build_linear_classifier(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_linear_classifier",
-        "It is not supported for ratio-based classifiers (NRE). "
-        "Use one of 'none', 'independent', 'structured'.",
+        "Ratio-based classifiers (NRE) do not implement it; "
+        "use one of 'none', 'independent', or 'structured' instead.",
     )
     x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
     y_numel = get_numel(batch_y, embedding_net=embedding_net_y)
@@ -141,8 +141,8 @@ def build_mlp_classifier(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_mlp_classifier",
-        "It is not supported for ratio-based classifiers (NRE). "
-        "Use one of 'none', 'independent', 'structured'.",
+        "Ratio-based classifiers (NRE) do not implement it; "
+        "use one of 'none', 'independent', or 'structured' instead.",
     )
     x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
     y_numel = get_numel(batch_y, embedding_net=embedding_net_y)
@@ -206,8 +206,8 @@ def build_resnet_classifier(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_resnet_classifier",
-        "It is not supported for ratio-based classifiers (NRE). "
-        "Use one of 'none', 'independent', 'structured'.",
+        "Ratio-based classifiers (NRE) do not implement it; "
+        "use one of 'none', 'independent', or 'structured' instead.",
     )
     x_numel = get_numel(batch_x, embedding_net=embedding_net_x)
     y_numel = get_numel(batch_y, embedding_net=embedding_net_y)

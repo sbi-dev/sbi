@@ -592,6 +592,24 @@ def test_transform_to_unconstrained_raises_for_zuko_unconditional():
         build_zuko_unconditional_flow("MAF", x, z_score_x="transform_to_unconstrained")
 
 
+@pytest.mark.parametrize("estimator_type", ["flow", "score"])
+def test_transform_to_unconstrained_raises_for_vector_field(estimator_type):
+    """Vector field builders (FMPE / NPSE) raise rather than silently treating
+    `transform_to_unconstrained` as a no-op via `z_score_parser`."""
+    from sbi.neural_nets.net_builders.vector_field_nets import (
+        build_vector_field_estimator,
+    )
+
+    theta, x = torch.rand(20, 3), torch.rand(20, 2)
+    with pytest.raises(ValueError, match="transform_to_unconstrained"):
+        build_vector_field_estimator(
+            theta,
+            x,
+            estimator_type=estimator_type,
+            z_score_x="transform_to_unconstrained",
+        )
+
+
 class TestWarnIfInvalidForZscoring:
     """Test warn_if_invalid_for_zscoring function."""
 

@@ -204,8 +204,11 @@ def assert_transform_to_unconstrained_supported(
     builder_name: str,
     suggestion: str,
 ) -> None:
-    """Raise if ``z_score_x="transform_to_unconstrained"`` for a builder that does not
-    implement it.
+    """Raise whenever ``z_score_x == "transform_to_unconstrained"``.
+
+    This is a guard to be called from builders that do *not* implement the
+    ``transform_to_unconstrained`` option; it unconditionally raises when the flag is
+    set, so the caller is responsible for only invoking it from such builders.
 
     The ``transform_to_unconstrained`` z-scoring option derives a bijection from the
     prior's support (rather than batch statistics) and is only implemented for the
