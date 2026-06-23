@@ -357,10 +357,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
                 x = z * scale + shift.
                 This is used for z-scoring inputs to improve numerical stability.
             input_transform: Optional PyTorch Transform for general bijective
-                transformation of inputs (e.g., for transform_to_unconstrained).
-                If provided, inputs are transformed as z = transform(x) and samples
-                are inverse transformed as x = transform.inv(z). Mutually exclusive
-                with transform_input.
+                transformation of inputs. Mutually exclusive with transform_input.
         """
         super().__init__(net, input_shape, condition_shape)
         self._embedding_net = (
@@ -384,7 +381,6 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
                     f"MDN context_features ({net.context_features})"
                 )
 
-        # Store general bijective input transform (e.g., for transform_to_unconstrained)
         self._input_transform = input_transform
 
         # Store z-score transform parameters as buffers (not trained, moved with model)
@@ -436,27 +432,10 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
     def _log_det_jacobian_forward(
         self, input: Tensor, transformed_input: Tensor
     ) -> Tensor:
-        """Compute log determinant of Jacobian for the forward input transform.
+        """Log determinant of the forward input transform Jacobian.
 
-        Change of Variables Formula:
-            When we have a density p_z(z) and want p_x(x), we use:
-            p_x(x) = p_z(z(x)) * |det(dz/dx)|
-
-            In log space:
-            log p_x(x) = log p_z(z(x)) + log|det(dz/dx)|
-
-        For the forward affine transform z = (x - shift) / scale:
-            log|det(dz/dx)| = -sum(log(scale))
-
-        For a general bijective transform:
-            log|det(dz/dx)| = transform.log_abs_det_jacobian(x, z).sum(dim=-1)
-
-        Args:
-            input: Input in original space.
-            transformed_input: Input after forward transform.
-
-        Returns:
-            Log determinant of forward Jacobian. Shape matches batch dimensions.
+        For the affine z-score transform: -sum(log(scale)).
+        For a general transform: transform.log_abs_det_jacobian(x, z).sum(dim=-1).
         """
         if self._input_transform is not None:
             jac = self._input_transform.log_abs_det_jacobian(
