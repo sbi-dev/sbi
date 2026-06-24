@@ -434,22 +434,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
     def _log_det_jacobian_forward(
         self, input: Tensor, transformed_input: Tensor
     ) -> Tensor:
-        """Compute log determinant of Jacobian for the forward transform.
-
-        For the forward affine transform z = (x - shift) / scale:
-            log|det(dz/dx)| = -sum(log(scale))
-
-        For prior_transform (e.g., mcmc_transform), delegates to the transform's
-        log_abs_det_jacobian, which already sums over the event dimension.
-
-        Args:
-            input: Input tensor in original space.
-            transformed_input: Input tensor in transformed space.
-
-        Returns:
-            Log determinant of forward Jacobian, shape (sample_dim, batch_dim)
-            or scalar for the affine z-score path.
-        """
+        """Compute log|det J| for the forward transform."""
         if self._prior_transform is not None:
             return self._prior_transform.log_abs_det_jacobian(
                 input, transformed_input
@@ -476,20 +461,15 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         self._check_condition_shape(condition)
         self._check_input_shape(input)
 
-        # Handle input with or without sample dimension
         has_sample_dim = input.dim() > len(self.input_shape) + 1
         if not has_sample_dim:
             input = input.unsqueeze(0)
 
-        # Apply z-score transform to input if enabled
         transformed_input = self._transform_input(input)
 
-        # Get MoG from network
         mog = self.get_uncorrected_mog(condition)
 
-        # MoG.log_prob handles (sample_dim, batch_dim, dim) input
-        # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
-        log_probs = mog.log_prob(transformed_input)  # (sample_dim, batch_dim)
+        log_probs = mog.log_prob(transformed_input)
         log_probs = log_probs + self._log_det_jacobian_forward(
             input, transformed_input
         )
@@ -509,7 +489,6 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         Returns:
             Loss per batch element, shape (batch_dim,).
         """
-        # Add sample dimension, compute log_prob, remove sample dimension
         log_prob = self.log_prob(input.unsqueeze(0), condition)
         return -log_prob.squeeze(0)
 
@@ -527,13 +506,10 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         """
         self._check_condition_shape(condition)
 
-        # Get MoG from network
         mog = self.get_uncorrected_mog(condition)
 
-        # MoG.sample returns (*sample_shape, batch_dim, dim) - matches sbi convention
         samples = mog.sample(sample_shape)
 
-        # Apply inverse transform to get samples in original space
         samples = self._inverse_transform_input(samples)
 
         return samples
