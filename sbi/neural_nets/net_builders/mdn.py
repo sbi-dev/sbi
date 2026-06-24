@@ -5,6 +5,7 @@ from typing import Optional
 
 import torch
 from torch import Tensor, nn
+from torch.distributions import Distribution
 
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
@@ -12,7 +13,7 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
 )
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
-    assert_transform_to_unconstrained_supported,
+    mcmc_transform,
     standardizing_net,
     z_score_parser,
     z_standardization,
@@ -28,6 +29,7 @@ def build_mdn(
     hidden_features: int = 50,
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
+    x_dist: Optional[Distribution] = None,
     **kwargs,
 ) -> MixtureDensityEstimator:
     """Builds MDN p(x|y).
@@ -41,11 +43,15 @@ def build_mdn(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
+            - `transform_to_unconstrained`: transform inputs to unconstrained space
+            using the prior's support. Requires `x_dist` to be provided.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
         hidden_features: Number of hidden features.
         num_components: Number of components.
         embedding_net: Optional embedding network for y.
+        x_dist: Optional prior distribution. Required when
+            ``z_score_x="transform_to_unconstrained"``.
         kwargs: Additional arguments that are passed by the build function but are not
             relevant for MDNs and are therefore ignored.
 
@@ -53,19 +59,21 @@ def build_mdn(
         MixtureDensityEstimator for conditional density estimation.
     """
     check_data_device(batch_x, batch_y)
-    assert_transform_to_unconstrained_supported(
-        z_score_x,
-        "build_mdn",
-        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
-        "or one of 'none', 'independent', 'structured'.",
-    )
+
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
     # Handle z-scoring for x (input)
     transform_input = None
+    prior_transform = None
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
+    if z_score_x == "transform_to_unconstrained":
+        if x_dist is None:
+            raise ValueError(
+                "x_dist must be provided when z_score_x='transform_to_unconstrained'."
+            )
+        prior_transform = mcmc_transform(x_dist, device=batch_x.device)
+    elif z_score_x_bool:
         x_mean, x_std = z_standardization(batch_x, structured_x)
         # Store as [shift, scale] tensor for the estimator
         transform_input = torch.stack([x_mean, x_std], dim=0)
@@ -93,6 +101,7 @@ def build_mdn(
         condition_shape=batch_y[0].shape,
         embedding_net=embedding_net,
         transform_input=transform_input,
+        prior_transform=prior_transform,
     )
 
     return estimator
