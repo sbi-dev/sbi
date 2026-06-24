@@ -86,11 +86,7 @@ def test_npe_build_posterior_with_builder(model):
 
 @pytest.mark.parametrize(
     "estimator",
-    (
-        DensityEstimatorBuilder(model="maf"),
-        "maf",
-        posterior_nn(model="maf"),
-    ),
+    (DensityEstimatorBuilder(model="maf"), "maf", posterior_nn(model="maf")),
     ids=["builder", "string", "callable"],
 )
 def test_check_estimator_arg_accepts_valid_inputs(estimator):
@@ -100,5 +96,5 @@ def test_check_estimator_arg_accepts_valid_inputs(estimator):
 
 def test_check_estimator_arg_rejects_module():
     """check_estimator_arg should reject raw nn.Module instances."""
-    with pytest.raises(AssertionError):
+    with pytest.raises(TypeError):
         check_estimator_arg(torch.nn.Linear(3, 3))
