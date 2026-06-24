@@ -412,7 +412,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
     @property
     def has_input_transform(self) -> bool:
-        """Whether input z-score transform or prior transform is enabled."""
+        """Whether input z-score transform is enabled."""
         return self._prior_transform is not None or self._transform_shift is not None
 
     def _transform_input(self, input: Tensor) -> Tensor:
@@ -431,10 +431,34 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             return z
         return z * self._transform_scale + self._transform_shift
 
-    def _log_det_jacobian_forward(
-        self, input: Tensor, transformed_input: Tensor
-    ) -> Tensor:
-        """Compute log|det J| for the forward transform."""
+    def _log_det_jacobian_forward(self, input: Tensor, transformed_input: Tensor) -> Tensor:
+        """Compute log determinant of Jacobian for the forward z-score transform.
+
+        For the forward affine transform z = (x - shift) / scale:
+            - The Jacobian matrix is: dz/dx = diag(1/scale)
+            - The determinant is: |det(dz/dx)| = prod(1/scale)
+            - The log determinant is: log|det(dz/dx)| = -sum(log(scale))
+
+        Change of Variables Formula:
+            When we have a density p_z(z) and want p_x(x), we use:
+            p_x(x) = p_z(z(x)) * |det(dz/dx)|
+
+            In log space:
+            log p_x(x) = log p_z(z(x)) + log|det(dz/dx)|
+
+            Since log|det(dz/dx)| = -sum(log(scale)), we have:
+            log p_x(x) = log p_z(z) - sum(log(scale))
+
+        This method returns log|det(dz/dx)| = -sum(log(scale)), which should
+        be ADDED to log p_z(z) to get log p_x(x).
+
+        Args:
+            input: Input tensor, used to determine device and dtype.
+            transformed_input: Transformed input tensor (for prior_transform path).
+
+        Returns:
+            Log determinant of forward Jacobian (scalar for affine, same shape as input for prior_transform).
+        """
         if self._prior_transform is not None:
             return self._prior_transform.log_abs_det_jacobian(
                 input, transformed_input
