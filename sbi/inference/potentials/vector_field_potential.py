@@ -136,6 +136,10 @@ class VectorFieldBasedPotential(BasePotential):
         """
         Return the potential (posterior log prob) via probability flow ODE.
 
+        When ``input_transform`` is set on the estimator, theta is transformed
+        to unconstrained space before the flow evaluation, and the log-det-Jacobian
+        of the transform is added to account for the change of variables.
+
         Args:
             theta: The parameters at which to evaluate the potential.
             track_gradients: Whether to track gradients. Default is False.
@@ -155,6 +159,8 @@ class VectorFieldBasedPotential(BasePotential):
         )
         self.vector_field_estimator.eval()
 
+        input_transform = self.vector_field_estimator.input_transform
+
         with torch.set_grad_enabled(track_gradients):
             if self.x_is_iid:
                 assert self.prior is not None, (
@@ -164,10 +170,14 @@ class VectorFieldBasedPotential(BasePotential):
                     "Flows for each iid x are required for evaluating log_prob."
                 )
                 num_iid = self.x_o.shape[0]  # number of iid samples
+                if input_transform is not None:
+                    theta_z = input_transform(theta_density_estimator)
+                else:
+                    theta_z = theta_density_estimator
                 iid_posteriors_prob = torch.sum(
                     torch.stack(
                         [
-                            flow.log_prob(theta_density_estimator).squeeze(-1)
+                            flow.log_prob(theta_z).squeeze(-1)
                             for flow in self.flows
                         ],
                         dim=0,
@@ -180,7 +190,17 @@ class VectorFieldBasedPotential(BasePotential):
                     theta_density_estimator
                 ).squeeze(-1)
             else:
-                log_probs = self.flow.log_prob(theta_density_estimator).squeeze(-1)
+                if input_transform is not None:
+                    theta_z = input_transform(theta_density_estimator)
+                else:
+                    theta_z = theta_density_estimator
+                log_probs = self.flow.log_prob(theta_z).squeeze(-1)
+
+            if input_transform is not None:
+                log_probs = log_probs + input_transform.log_abs_det_jacobian(
+                    theta_density_estimator, theta_z
+                ).sum(dim=-1)
+
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
 

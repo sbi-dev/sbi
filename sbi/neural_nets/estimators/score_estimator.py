@@ -7,6 +7,7 @@ from typing import Callable, Literal, Optional, Union
 
 import torch
 from torch import Tensor, nn
+from torch.distributions import Transform as TorchTransform
 
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from sbi.utils.vector_field_utils import VectorFieldNet
@@ -73,6 +74,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-3,
         t_max: float = 1.0,
+        input_transform: Optional[TorchTransform] = None,
     ) -> None:
         r"""Score estimator class that estimates the
         conditional score function, i.e.,
@@ -94,6 +96,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             std_0: Starting standard deviation of the target distribution.
             t_min: Minimum time for diffusion (0 can be numerically unstable).
             t_max: Maximum time for diffusion.
+            input_transform: Optional transform mapping constrained -> unconstrained
+                space. When set, ``ode_fn()`` applies this transform before calling
+                ``forward()``, so the ODE integrates in unconstrained space, and
+                ``loss()`` transforms training data accordingly.
         """
 
         # Starting mean and std of the target distribution (otherwise assumes 0,1).
@@ -112,6 +118,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             embedding_net=embedding_net,
             t_min=t_min,
             t_max=t_max,
+            input_transform=input_transform,
         )
 
         # Min/max values for noise variance beta
@@ -140,6 +147,11 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         r"""Forward pass of the score estimator
         network to compute the conditional score
         at a given time.
+
+        Note:
+            This method does **not** apply ``input_transform`` internally. The
+            caller (e.g. ``ode_fn()``, ``loss()``) is responsible for transforming
+            inputs if needed.
 
         Args:
             input: Inputs to evaluate the score estimator on of shape
@@ -232,6 +244,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         which is equivalent to predicting the (scaled) Gaussian noise added to the
         input.
 
+        When ``input_transform`` is set, the input is first transformed to
+        unconstrained space, and all computations happen in that space.
+
         Args:
             input: Input variable i.e. theta.
             condition: Conditioning variable.
@@ -252,6 +267,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         if times is None:
             times = self.train_schedule(input.shape[0])
         times = times.to(input.device)
+
+        if self._input_transform is not None:
+            input = self._input_transform(input)
 
         # Sample noise.
         eps = torch.randn_like(input)
@@ -501,6 +519,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
         For reference, see Equation 13 in [1]_.
 
+        When ``input_transform`` is set, this method transforms the input to
+        unconstrained space before calling ``forward()`` / ``score()``, so the
+        ODE integrates in the unconstrained space.
+
         Args:
             input: variable whose distribution is estimated.
             condition: Conditioning variable.
@@ -509,6 +531,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             ODE flow function value at a given time.
         """
+        if self._input_transform is not None:
+            input = self._input_transform(input)
         score = self.score(input=input, condition=condition, t=times)
         f = self.drift_fn(input, times)
         g = self.diffusion_fn(input, times)
@@ -548,10 +572,11 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         weight_fn: Union[str, Callable] = "max_likelihood",
         beta_min: float = 0.01,
         beta_max: float = 10.0,
-        mean_0: Union[Tensor, float] = 0.0,
-        std_0: Union[Tensor, float] = 1.0,
+        mean_0: float = 0.0,
+        std_0: float = 1.0,
         t_min: float = 1e-3,
         t_max: float = 1.0,
+        input_transform: Optional[TorchTransform] = None,
     ) -> None:
         super().__init__(
             net,
@@ -565,6 +590,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             beta_max=beta_max,
             t_min=t_min,
             t_max=t_max,
+            input_transform=input_transform,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
@@ -665,6 +691,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         std_0: float = 1.0,
         t_min: float = 1e-2,
         t_max: float = 1.0,
+        input_transform: Optional[TorchTransform] = None,
     ) -> None:
         super().__init__(
             net,
@@ -678,6 +705,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             std_0=std_0,
             t_min=t_min,
             t_max=t_max,
+            input_transform=input_transform,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
@@ -811,6 +839,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         lognormal_mean: float = -1.2,
         lognormal_std: float = 1.2,
         power_law_exponent: float = 7.0,
+        input_transform: Optional[TorchTransform] = None,
     ) -> None:
         # Validate sigma bounds (required for VE SDE math and log computations).
         if sigma_min <= 0:
@@ -863,6 +892,7 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             std_0=std_0,
             t_min=t_min,
             t_max=t_max,
+            input_transform=input_transform,
         )
 
         self._warn_on_inappropriate_config()
