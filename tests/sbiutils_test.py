@@ -497,7 +497,6 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
 
         # Unsupported combination: the modeled variable requests the unconstrained
         # transform on a non-Zuko-conditional builder -> expect a clear ValueError.
-        # MDN supports it (via prior_transform), so it's excluded from this check.
         if (
             modeled_z == "transform_to_unconstrained"
             and not model.startswith("zuko")
