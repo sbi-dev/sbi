@@ -485,14 +485,18 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         self._check_condition_shape(condition)
         self._check_input_shape(input)
 
+        # Handle input with or without sample dimension
         has_sample_dim = input.dim() > len(self.input_shape) + 1
         if not has_sample_dim:
             input = input.unsqueeze(0)
 
+        # Apply z-score transform to input if enabled
         transformed_input = self._transform_input(input)
 
+        # Get MoG from network
         mog = self.get_uncorrected_mog(condition)
 
+        # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
         log_probs = mog.log_prob(transformed_input)
         log_probs = log_probs + self._log_det_jacobian_forward(
             input, transformed_input
@@ -513,6 +517,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         Returns:
             Loss per batch element, shape (batch_dim,).
         """
+        # Add sample dimension, compute log_prob, remove sample dimension
         log_prob = self.log_prob(input.unsqueeze(0), condition)
         return -log_prob.squeeze(0)
 
@@ -530,10 +535,13 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         """
         self._check_condition_shape(condition)
 
+        # Get MoG from network
         mog = self.get_uncorrected_mog(condition)
 
+        # MoG.sample returns (*sample_shape, batch_dim, dim) - matches sbi convention
         samples = mog.sample(sample_shape)
 
+        # Apply inverse transform to get samples in original space
         samples = self._inverse_transform_input(samples)
 
         return samples
