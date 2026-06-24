@@ -15,8 +15,10 @@ from sbi.inference.posteriors.posterior_parameters import (
     VIPosteriorParameters,
 )
 from sbi.inference.trainers.npe.npe_c import NPE_C
+from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 
@@ -101,11 +103,17 @@ class MNPE(NPE_C):
                 sampling.
         """
 
+        if isinstance(density_estimator, _EstimatorBuilderBase):
+            raise NotImplementedError(
+                "Builder support for MNPE is not yet implemented; pass 'mnpe'."
+            )
         if isinstance(density_estimator, str):
-            assert (
-                density_estimator == "mnpe"
-            ), f"""MNPE can be used with preconfigured 'mnpe' density estimator only,
-                not with {density_estimator}."""
+            if density_estimator != "mnpe":
+                raise ValueError(
+                    "MNPE supports only the preconfigured 'mnpe' density estimator, "
+                    f"not {density_estimator!r}."
+                )
+            density_estimator = posterior_nn(model="mnpe")
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 

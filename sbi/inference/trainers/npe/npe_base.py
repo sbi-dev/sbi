@@ -39,6 +39,10 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
+from sbi.neural_nets.net_builders.estimator_configs import (
+    DensityEstimatorBuilder,
+    _EstimatorBuilderBase,
+)
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     RestrictedPrior,
@@ -63,8 +67,10 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
+            DensityEstimatorBuilder,
             ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
-        ] = "maf",
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -78,14 +84,13 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         a sequential scheme.
 
         Args:
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type (one of nsf, maf, mdn, made). Alternatively, a function
+            density_estimator: If it is a string (deprecated), use a pre-configured
+                network of the provided type (one of nsf, maf, mdn, made). If it is
+                a ``DensityEstimatorBuilder``, the builder's ``build()`` method will be
+                called with the first batch of simulations. Alternatively, a function
                 that builds a custom neural network, which adheres to
-                `ConditionalEstimatorBuildFn` protocol can be provided. The function
-                will be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. The
-                density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
+                ``ConditionalEstimatorBuildFn`` protocol can be provided. If None,
+                it uses a default ``DensityEstimatorBuilder`` with ``"maf"``.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -99,14 +104,27 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             show_progress_bars=show_progress_bars,
         )
 
-        # As detailed in the docstring, `density_estimator` is either a string or
-        # a callable. The function creating the neural network is attached to
+        # `density_estimator` is either a string, a builder, or a callable.
+        # The function creating the neural network is attached to
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
-        check_estimator_arg(density_estimator)
-        if isinstance(density_estimator, str):
+        if density_estimator is not None:
+            check_estimator_arg(density_estimator)
+        if density_estimator is None:
+            self._build_neural_net = self._wrap_builder(
+                DensityEstimatorBuilder(model="maf")
+            )
+        elif isinstance(density_estimator, str):
+            warnings.warn(
+                "Passing a string for `density_estimator` is deprecated. "
+                "Use DensityEstimatorBuilder(model=...) instead.",
+                FutureWarning,
+                stacklevel=3,
+            )
             self._build_neural_net = posterior_nn(model=density_estimator)
+        elif isinstance(density_estimator, _EstimatorBuilderBase):
+            self._build_neural_net = self._wrap_builder(density_estimator)
         else:
             self._build_neural_net = density_estimator
 
@@ -514,6 +532,22 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
         assert_all_finite(loss, "NPE loss")
         return calibration_kernel(x) * loss
+
+    @staticmethod
+    def _wrap_builder(
+        builder: _EstimatorBuilderBase,
+    ) -> Callable:
+        """Wrap a builder object as a legacy-compatible build function.
+
+        This allows the existing ``_initialize_neural_network`` flow to work
+        unchanged: the returned callable has the same ``(batch_theta, batch_x)``
+        signature as the functions produced by ``posterior_nn``.
+        """
+
+        def build_fn(batch_theta, batch_x):
+            return builder.build(batch_theta=batch_theta, batch_x=batch_x)
+
+        return build_fn
 
     def _check_proposal(self, proposal):
         """
