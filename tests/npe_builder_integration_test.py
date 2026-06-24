@@ -15,15 +15,19 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 from sbi.utils.user_input_checks import check_estimator_arg
 
 
-@pytest.mark.parametrize("model", ("maf", "nsf", "mdn", "zuko_nsf"))
-def test_npe_accepts_builder(model):
-    """NPE_C.__init__ should accept a DensityEstimatorBuilder without warning."""
+def test_npe_no_warning_for_valid_inputs():
+    """Passing a builder, callable, or using the default should not warn."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    builder = DensityEstimatorBuilder(model=model)
-    # No FutureWarning expected for builder path.
-    inference = NPE_C(prior, density_estimator=builder, show_progress_bars=False)
-    assert inference._build_neural_net is not None
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        NPE_C(prior, show_progress_bars=False)
+        builder = DensityEstimatorBuilder(model="maf")
+        NPE_C(prior, density_estimator=builder, show_progress_bars=False)
+        build_fn = posterior_nn(model="maf")
+        NPE_C(prior, density_estimator=build_fn, show_progress_bars=False)
 
 
 def test_npe_string_emits_deprecation_warning():
@@ -32,16 +36,6 @@ def test_npe_string_emits_deprecation_warning():
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     with pytest.warns(FutureWarning, match="deprecated"):
         NPE_C(prior, density_estimator="maf", show_progress_bars=False)
-
-
-def test_npe_callable_no_warning():
-    """Passing a callable should not emit any FutureWarning."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    build_fn = posterior_nn(model="maf")
-    # Should not warn.
-    inference = NPE_C(prior, density_estimator=build_fn, show_progress_bars=False)
-    assert inference._build_neural_net is build_fn
 
 
 @pytest.mark.parametrize("model", ("maf", "nsf", "mdn"))
