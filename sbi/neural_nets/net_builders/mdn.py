@@ -85,6 +85,7 @@ def build_mdn(
             standardizing_net(batch_y, structured_y), embedding_net
         )
 
+    # Create the MDN network
     mdn_net = MultivariateGaussianMDN(
         features=x_numel,
         context_features=y_numel,
@@ -93,6 +94,7 @@ def build_mdn(
         custom_initialization=True,
     )
 
+    # Wrap in MixtureDensityEstimator
     estimator = MixtureDensityEstimator(
         net=mdn_net,
         input_shape=batch_x[0].shape,
