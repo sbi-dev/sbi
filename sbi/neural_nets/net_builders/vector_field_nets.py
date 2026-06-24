@@ -19,6 +19,7 @@ from sbi.neural_nets.estimators.score_estimator import (
 from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
+    assert_transform_to_unconstrained_supported,
     standardizing_net,
     z_score_parser,
     z_standardization,
@@ -162,6 +163,12 @@ def build_vector_field_estimator(
     """
     # Check inputs and device
     check_data_device(batch_x, batch_y)
+    assert_transform_to_unconstrained_supported(
+        z_score_x,
+        "build_vector_field_estimator",
+        "Vector field estimators (flow matching / score matching) do not implement "
+        "it; use one of 'none', 'independent', or 'structured' instead.",
+    )
 
     # Build network if not provided
     if net == "mlp":
