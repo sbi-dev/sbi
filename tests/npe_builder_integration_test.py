@@ -65,19 +65,7 @@ def test_npe_train_with_builder(model):
     assert loss.shape == (10,)
     assert torch.isfinite(loss).all()
 
-
-@pytest.mark.parametrize("model", ("maf", "nsf"))
-def test_npe_build_posterior_with_builder(model):
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    builder = DensityEstimatorBuilder(model=model, hidden_features=16, num_transforms=2)
-    inference = NPE_C(prior, density_estimator=builder, show_progress_bars=False)
-
-    theta = prior.sample((200,))
-    x = theta + 0.1 * torch.randn_like(theta)
-    inference.append_simulations(theta, x).train(
-        max_num_epochs=2, training_batch_size=100
-    )
+    # Also verify that a posterior can be constructed and sampled from.
     posterior = inference.build_posterior()
     x_o = zeros(1, num_dim)
     samples = posterior.sample((10,), x=x_o)
