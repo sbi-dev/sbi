@@ -17,8 +17,9 @@ from typing import Optional
 import numpy as np
 import torch
 from torch import Tensor, nn
-from sbi.sbi_types import TorchTransform
 from torch.nn import functional as F
+
+from sbi.sbi_types import TorchTransform
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import MoG
@@ -431,7 +432,9 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             return z
         return z * self._transform_scale + self._transform_shift
 
-    def _log_det_jacobian_forward(self, input: Tensor, transformed_input: Tensor) -> Tensor:
+    def _log_det_jacobian_forward(
+        self, input: Tensor, transformed_input: Tensor
+    ) -> Tensor:
         """Compute log determinant of Jacobian for the forward z-score transform.
 
         For the forward affine transform z = (x - shift) / scale:
@@ -457,12 +460,11 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             transformed_input: Transformed input tensor (for prior_transform path).
 
         Returns:
-            Log determinant of forward Jacobian (scalar for affine, same shape as input for prior_transform).
+            Log determinant of forward Jacobian (scalar for affine, same shape as
+            input for prior_transform).
         """
         if self._prior_transform is not None:
-            return self._prior_transform.log_abs_det_jacobian(
-                input, transformed_input
-            )
+            return self._prior_transform.log_abs_det_jacobian(input, transformed_input)
         if self._transform_shift is None:
             return torch.zeros(1, device=input.device, dtype=input.dtype).squeeze()
         return -torch.log(self._transform_scale).sum()
@@ -498,9 +500,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
         # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
         log_probs = mog.log_prob(transformed_input)
-        log_probs = log_probs + self._log_det_jacobian_forward(
-            input, transformed_input
-        )
+        log_probs = log_probs + self._log_det_jacobian_forward(input, transformed_input)
 
         if not has_sample_dim:
             log_probs = log_probs.squeeze(0)
