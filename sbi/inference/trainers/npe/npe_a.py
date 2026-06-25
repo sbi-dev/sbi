@@ -354,7 +354,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         prior_cov = self._prior.covariance_matrix
 
         # Apply z-score transform if enabled
-        if density_estimator.has_input_transform:
+        if density_estimator.has_affine_z_score:
             shift = density_estimator._transform_shift
             scale = density_estimator._transform_scale
 
@@ -364,6 +364,11 @@ class NPE_A(PosteriorEstimatorTrainer):
             # Z-scored covariance: Sigma_z[i,j] = Sigma[i,j] / (scale_i * scale_j)
             scale_outer = scale.unsqueeze(-1) * scale.unsqueeze(-2)
             z_cov = prior_cov / scale_outer
+        elif density_estimator.has_input_transform:
+            raise NotImplementedError(
+                "Analytic SNPE correction is not supported for "
+                "nonlinear prior_transform."
+            )
         else:
             z_mean = prior_mean
             z_cov = prior_cov

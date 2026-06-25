@@ -171,7 +171,7 @@ class NPE_A_Posterior(DirectPosterior):
 
         # Add log det jacobian for z-score transform
         log_probs = log_probs + self.posterior_estimator._log_det_jacobian_forward(
-            theta
+            theta, theta_transformed
         )
 
         return log_probs
