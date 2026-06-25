@@ -19,10 +19,9 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from sbi.sbi_types import TorchTransform
-
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import MoG
+from sbi.sbi_types import TorchTransform
 
 
 class MultivariateGaussianMDN(nn.Module):
