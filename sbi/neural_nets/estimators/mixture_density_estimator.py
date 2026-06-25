@@ -413,11 +413,6 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
     @property
     def has_input_transform(self) -> bool:
         """Whether input z-score transform is enabled."""
-        return self._prior_transform is not None or self._transform_shift is not None
-
-    @property
-    def has_affine_z_score(self) -> bool:
-        """Whether the affine z-score transform (shift/scale) is enabled."""
         return self._transform_shift is not None
 
     def _transform_input(self, input: Tensor) -> Tensor:

@@ -239,13 +239,13 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
         # Check if z-scoring is enabled on the MixtureDensityEstimator
         assert isinstance(self._neural_net, MixtureDensityEstimator)
-        if self._neural_net.has_input_transform and not self._neural_net.has_affine_z_score:
+        if getattr(self._neural_net, "_prior_transform", None) is not None:
             raise NotImplementedError(
-                "Analytic SNPE-C correction is not supported for "
-                "nonlinear prior_transform. Use single-round NPE or "
-                "affine z-scoring instead."
+                "NPE-C's analytic proposal correction does not support "
+                "z_score_theta='transform_to_unconstrained' (it assumes an affine "
+                "z-score). Use 'independent'/'structured', or single-round NPE."
             )
-        self.z_score_theta = self._neural_net.has_affine_z_score
+        self.z_score_theta = self._neural_net.has_input_transform
 
         self._set_maybe_z_scored_prior()
 
