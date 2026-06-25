@@ -497,8 +497,10 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         # Get MoG from network
         mog = self.get_uncorrected_mog(condition)
 
+        # MoG.log_prob handles (sample_dim, batch_dim, dim) input
         # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
-        log_probs = mog.log_prob(transformed_input)
+        # where z = (x - shift) / scale and log|det(dz/dx)| = -sum(log(scale))
+        log_probs = mog.log_prob(transformed_input)  # (sample_dim, batch_dim)
         log_probs = log_probs + self._log_det_jacobian_forward(input, transformed_input)
 
         if not has_sample_dim:
