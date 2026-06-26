@@ -42,10 +42,10 @@ jobs:
       uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       with:
         enable-cache: true
-        cache-dependency-glob: "pyproject.toml"
+        cache-dependency-glob: "uv.lock"
 
     - name: Install dependencies with uv
-      run: uv sync --extra dev
+      run: uv sync --locked --extra dev
 
     - name: Run the fast and the slow CPU tests with coverage
       run: uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/
