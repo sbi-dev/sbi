@@ -957,7 +957,6 @@ def mcmc_transform(
 
     check_transform(prior, transform)  # type: ignore
 
-    # Move transform tensors to the target device (check_transform runs on CPU)
     if enable_transform:
         _move_transform_tensors_to_device(transform, device)
 
