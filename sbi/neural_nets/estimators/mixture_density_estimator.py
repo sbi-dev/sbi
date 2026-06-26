@@ -432,9 +432,8 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
                         elif isinstance(item, TorchTransform):
                             _walk(item)
                     if changed:
-                        object.__setattr__(
-                            t, key, type(val)(items) if isinstance(val, tuple) else items
-                        )
+                        updated = type(val)(items) if isinstance(val, tuple) else items
+                        object.__setattr__(t, key, updated)
                 elif isinstance(val, TorchTransform):
                     _walk(val)
 
