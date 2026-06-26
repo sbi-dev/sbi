@@ -405,6 +405,45 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             self.register_buffer("_transform_shift", None)
             self.register_buffer("_transform_scale", None)
 
+    def _apply(self, fn):
+        super()._apply(fn)
+        if self._prior_transform is not None:
+            self._move_tensors(self._prior_transform, fn)
+        return self
+
+    @staticmethod
+    def _move_tensors(transform, fn):
+        seen = set()
+
+        def _walk(t):
+            if id(t) in seen:
+                return
+            seen.add(id(t))
+            for key, val in list(t.__dict__.items()):
+                if isinstance(val, Tensor):
+                    object.__setattr__(t, key, fn(val))
+                elif isinstance(val, (list, tuple)):
+                    changed = False
+                    items = list(val)
+                    for i, item in enumerate(items):
+                        if isinstance(item, Tensor):
+                            items[i] = fn(item)
+                            changed = True
+                        elif isinstance(item, TorchTransform):
+                            _walk(item)
+                    if changed:
+                        object.__setattr__(
+                            t,
+                            key,
+                            type(val)(items)
+                            if isinstance(val, tuple)
+                            else items,
+                        )
+                elif isinstance(val, TorchTransform):
+                    _walk(val)
+
+        _walk(transform)
+
     @property
     def embedding_net(self) -> nn.Module:
         """Return the embedding network."""

@@ -811,6 +811,38 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
     return theta_repeated, x_repeated
 
 
+def _move_transform_tensors_to_device(
+    transform: TorchTransform, device: Union[str, torch.device]
+) -> None:
+    """Move all tensors in a transform tree to the target device."""
+    seen = set()
+
+    def _walk(t):
+        if id(t) in seen:
+            return
+        seen.add(id(t))
+        for key, val in list(t.__dict__.items()):
+            if isinstance(val, Tensor):
+                object.__setattr__(t, key, val.to(device))
+            elif isinstance(val, TorchTransform):
+                _walk(val)
+            elif isinstance(val, (list, tuple)):
+                changed = False
+                items = list(val)
+                for i, item in enumerate(items):
+                    if isinstance(item, Tensor):
+                        items[i] = item.to(device)
+                        changed = True
+                    elif isinstance(item, TorchTransform):
+                        _walk(item)
+                if changed:
+                    object.__setattr__(
+                        t, key, type(val)(items) if isinstance(val, tuple) else items
+                    )
+
+    _walk(transform)
+
+
 def mcmc_transform(
     prior: Distribution,
     num_prior_samples_for_zscoring: int = 1000,
@@ -924,6 +956,10 @@ def mcmc_transform(
         )
 
     check_transform(prior, transform)  # type: ignore
+
+    # Move transform tensors to the target device (check_transform runs on CPU)
+    if enable_transform:
+        _move_transform_tensors_to_device(transform, device)
 
     return transform.inv  # type: ignore
 
