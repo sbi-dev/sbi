@@ -1,0 +1,59 @@
+name: Update uv lockfile
+
+# Because uv.lock is committed, dependencies stay pinned until something bumps
+# them. This workflow runs `uv lock --upgrade` on a schedule and opens a PR with
+# the refreshed lockfile, so CI (which runs `uv sync --locked`) validates the new
+# resolution before it lands.
+
+on:
+  schedule:
+    - cron: '0 5 1 * *'  # monthly, 1st of the month at 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  update-lock:
+    name: Refresh uv.lock
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 0
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+    - name: Upgrade lockfile
+      run: uv lock --upgrade
+
+    - name: Open pull request if the lockfile changed
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        if git diff --quiet -- uv.lock; then
+          echo "uv.lock is already up to date; nothing to do."
+          exit 0
+        fi
+
+        branch="chore/uv-lock-upgrade-${{ github.run_id }}"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b "$branch"
+        git add uv.lock
+        git commit -m "chore: upgrade uv lockfile"
+        git push origin "$branch"
+
+        gh pr create \
+          --title "chore: upgrade uv lockfile" \
+          --body "Automated monthly \`uv lock --upgrade\`. CI runs \`uv sync --locked\` against the refreshed resolution. Review the dependency diff before merging." \
+          --base main \
+          --head "$branch"
