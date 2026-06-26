@@ -816,11 +816,13 @@ class MCMCPosterior(NeuralPosterior):
         try:
             from pyro.infer.mcmc import HMC, NUTS
             from pyro.infer.mcmc.api import MCMC
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
-                "pyro-ppl is required for Pyro-based MCMC. "
-                "Install it with: pip install 'sbi[pyro]'"
-            ) from None
+                "Failed to import the Pyro sampler. If pyro-ppl is not installed, "
+                "install it with `pip install 'sbi[pyro]'`. If pyro-ppl is "
+                "installed, the import failed for another reason (e.g. an "
+                f"incompatible dependency); see the chained traceback above: {e}"
+            ) from e
 
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
@@ -881,11 +883,13 @@ class MCMCPosterior(NeuralPosterior):
         """
         try:
             from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
-                "pymc is required for PyMC-based MCMC. "
-                "Install it with: pip install 'sbi[pymc]'"
-            ) from None
+                "Failed to import the PyMC sampler. If pymc is not installed, "
+                "install it with `pip install 'sbi[pymc]'`. If pymc is installed, "
+                "the import failed for another reason (e.g. an incompatible "
+                f"dependency); see the chained traceback above: {e}"
+            ) from e
 
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
