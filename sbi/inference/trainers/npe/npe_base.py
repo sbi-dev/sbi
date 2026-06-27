@@ -545,7 +545,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         """
 
         def build_fn(batch_theta, batch_x):
-            return builder.build(batch_theta=batch_theta, batch_x=batch_x)
+            return builder.build(batch_input=batch_theta, batch_condition=batch_x)
 
         return build_fn
 
