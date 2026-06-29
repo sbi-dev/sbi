@@ -100,7 +100,8 @@ target/
 *.pyns
 
 # uv
-uv.lock
+# uv.lock is committed so CI installs a reproducible, pinned dependency set
+# (see .github/workflows/latest-deps.yml for the unpinned canary).
 .python-version
 
 # tools cache

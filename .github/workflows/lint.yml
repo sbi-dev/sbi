@@ -48,10 +48,10 @@ jobs:
         with:
           python-version: '3.10'
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies with uv
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Check types with pyright
         run: uv run pyright sbi
