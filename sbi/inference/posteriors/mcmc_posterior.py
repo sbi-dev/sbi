@@ -821,7 +821,7 @@ class MCMCPosterior(NeuralPosterior):
                 "Failed to import the Pyro sampler. If pyro-ppl is not installed, "
                 "install it with `pip install 'sbi[pyro]'`. If pyro-ppl is "
                 "installed, the import failed for another reason (e.g. an "
-                f"incompatible dependency); see the chained traceback above: {e}"
+                f"incompatible dependency): {e}"
             ) from e
 
         thin = _process_thin_default(thin)
@@ -871,7 +871,7 @@ class MCMCPosterior(NeuralPosterior):
                 is picklable for PyMC MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
             initial_params: Initial parameters for MCMC chain.
-            mcmc_method: mcmc_method: Pyro MCMC method to use, either `"hmc_pymc"` or
+            mcmc_method: PyMC MCMC method to use, either `"hmc_pymc"`,
                 `"slice_pymc"`, or `"nuts_pymc"` (default).
             thin: Thinning (subsampling) factor, default 1 (no thinning).
             warmup_steps: Initial number of samples to discard.
@@ -888,7 +888,7 @@ class MCMCPosterior(NeuralPosterior):
                 "Failed to import the PyMC sampler. If pymc is not installed, "
                 "install it with `pip install 'sbi[pymc]'`. If pymc is installed, "
                 "the import failed for another reason (e.g. an incompatible "
-                f"dependency); see the chained traceback above: {e}"
+                f"dependency): {e}"
             ) from e
 
         thin = _process_thin_default(thin)
