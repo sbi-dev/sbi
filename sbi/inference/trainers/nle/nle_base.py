@@ -390,6 +390,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         """
 
         def build_fn(batch_theta, batch_x):
+            # NLE models p(x|θ): input=x, condition=θ
             return builder.build(batch_input=batch_x, batch_condition=batch_theta)
 
         return build_fn
