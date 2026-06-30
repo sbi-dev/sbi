@@ -79,7 +79,7 @@ class NLE_A(LikelihoodEstimatorTrainer):
                 prior must be passed to `.build_posterior()`.
             density_estimator: If it is a string (deprecated), use a pre-configured
                 network of the provided type (one of nsf, maf, mdn, made). If it is
-                a `DensityEstimatorBuilder``, the builder's `build()` method will be
+                a `DensityEstimatorBuilder`, the builder's `build()` method will be
                 called with the first batch of simulations. Alternatively, a function
                 that builds a custom neural network can be provided. If None, it
                 uses a default `DensityEstimatorBuilder` with `"maf"`.

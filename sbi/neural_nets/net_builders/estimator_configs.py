@@ -291,7 +291,6 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
         """Build the density estimator by dispatching to the appropriate
         ``build_*`` function.
 
-
         Args:
             batch_input: Batch of the modeled variable used for
                 shape inference and z-scoring.
