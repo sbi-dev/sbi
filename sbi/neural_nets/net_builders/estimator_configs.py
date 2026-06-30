@@ -21,7 +21,7 @@ preserving typed field annotations.
 """
 
 from dataclasses import dataclass, fields
-from typing import Any, Literal, Optional, Sequence, Union, get_args
+from typing import Any, Callable, Literal, Optional, Sequence, Union, get_args
 
 from torch import Tensor
 
@@ -30,6 +30,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalEstimator,
 )
 from sbi.neural_nets.estimators.mixed_density_estimator import MixedDensityEstimator
+from sbi.neural_nets.ratio_estimators import RatioEstimator
 
 
 @dataclass
@@ -445,6 +446,86 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
             f.name: getattr(self, f.name)
             for f in fields(self)
             if f.name not in ("continuous_model", "extra_kwargs")
+            and getattr(self, f.name) is not None
+        }
+        d.update(self.extra_kwargs)
+        return d
+
+
+CLASSIFIER_MODELS = Literal["linear", "mlp", "resnet"]
+
+_VALID_CLASSIFIER_MODELS = frozenset(get_args(CLASSIFIER_MODELS))
+
+
+@dataclass
+class RatioEstimatorBuilder(_EstimatorBuilderBase):
+    """Builder for ratio estimators / classifiers (NRE).
+
+    Covers linear, MLP, and ResNet classifiers used by ``NRE_A``, ``NRE_B``,
+    ``NRE_C``, and ``BNRE``.  Fields mirror the parameters of the underlying
+    ``build_*_classifier`` functions.
+    """
+
+    model: CLASSIFIER_MODELS = "resnet"  # type: ignore[valid-type]
+
+    # --- Shared across classifiers ---
+    z_score_x: Optional[Literal["none", "independent", "structured"]] = None
+    z_score_y: Optional[Literal["none", "independent", "structured"]] = None
+    hidden_features: Optional[int] = None
+    embedding_net_x: Optional[Any] = None
+    embedding_net_y: Optional[Any] = None
+
+    # --- ResNet-specific ---
+    num_blocks: Optional[int] = None
+    dropout_probability: Optional[float] = None
+    use_batch_norm: Optional[bool] = None
+
+    # --- MLP-specific ---
+    norm_layer: Optional[Callable] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.model not in _VALID_CLASSIFIER_MODELS:
+            raise ValueError(
+                f"Unknown model {self.model!r}. "
+                f"Must be one of {sorted(_VALID_CLASSIFIER_MODELS)}."
+            )
+
+    def build(self, batch_input: Tensor, batch_condition: Tensor) -> RatioEstimator:
+        """Build the classifier by dispatching to the appropriate
+        ``build_*_classifier`` function.
+
+        Args:
+            batch_input: Batch of the modeled variable used for
+                shape inference and z-scoring.
+            batch_condition: Batch of the conditioning variable
+                used for shape inference and z-scoring.
+
+        Returns:
+            A ``RatioEstimator``.
+        """
+        from sbi.neural_nets.net_builders.classifier import (
+            build_linear_classifier,
+            build_mlp_classifier,
+            build_resnet_classifier,
+        )
+
+        builders = {
+            "linear": build_linear_classifier,
+            "mlp": build_mlp_classifier,
+            "resnet": build_resnet_classifier,
+        }
+
+        build_fn = builders[self.model]
+        kwargs = self._build_kwargs()
+        return build_fn(batch_x=batch_input, batch_y=batch_condition, **kwargs)
+
+    def _build_kwargs(self) -> dict:
+        """Return non-None fields as a dict, excluding ``model``."""
+        d = {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in ("model", "extra_kwargs")
             and getattr(self, f.name) is not None
         }
         d.update(self.extra_kwargs)
