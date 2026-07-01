@@ -351,7 +351,7 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
         return d
 
 
-_VALID_MIXED_MODELS = frozenset({
+_VALID_MIXED_CONTINUOUS_MODELS = frozenset({
     "mdn",
     "made",
     "maf",
@@ -371,14 +371,80 @@ _VALID_MIXED_MODELS = frozenset({
 
 @dataclass
 class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
+    """Builder for mixed (continuous + discrete) density estimators (MNLE / MNPE).
 
+    Sibling of ``DensityEstimatorBuilder`` with a field set tailored to
+    mixed-type data.  The continuous-component model is selected via
+    ``continuous_model``; there is no ``model`` field.
+    """
+
+    continuous_model: str = "nsf"
+
+    # --- Mixed-specific ---
+    num_categories_per_variable: Optional[Any] = None
+    embedding_net: Optional[Any] = None
+    combined_embedding_net: Optional[Any] = None
+    log_transform_x: bool = False
+
+    # --- Shared sizing ---
+    hidden_features: Optional[int] = None
+    discrete_hidden_features: Optional[int] = None
+    discrete_hidden_layers: Optional[int] = None
+    continuous_hidden_features: Optional[int] = None
+
+    # --- Flow-specific (forwarded to the continuous sub-net) ---
+    num_transforms: Optional[int] = None
+    num_components: Optional[int] = None
+    num_bins: Optional[int] = None
+    tail_bound: Optional[float] = None
+    dropout_probability: Optional[float] = None
+
+    # --- Z-scoring ---
     z_score_x: Optional[Literal["none", "independent", "structured"]] = None
     z_score_y: Optional[Literal["none", "independent", "structured"]] = None
 
     def __post_init__(self):
         super().__post_init__()
-        if self.model not in _VALID_MIXED_MODELS:
+        if self.continuous_model not in _VALID_MIXED_CONTINUOUS_MODELS:
             raise ValueError(
-                f"Unknown model {self.model!r}. "
-                f"Must be one of {sorted(_VALID_MIXED_MODELS)}."
+                f"Unknown continuous_model {self.continuous_model!r}. "
+                f"Must be one of {sorted(_VALID_MIXED_CONTINUOUS_MODELS)}."
             )
+
+    def build(
+        self, batch_input: Tensor, batch_condition: Tensor
+    ) -> ConditionalDensityEstimator:
+        """Build the mixed density estimator by dispatching to
+        ``_build_mixed_density_estimator``.
+
+        Args:
+            batch_input: Batch of the modeled variable used for
+                shape inference and z-scoring.
+            batch_condition: Batch of the conditioning variable
+                used for shape inference and z-scoring.
+
+        Returns:
+            A ``MixedDensityEstimator``.
+        """
+        from sbi.neural_nets.net_builders.mixed_nets import (
+            _build_mixed_density_estimator,
+        )
+
+        kwargs = self._build_kwargs()
+        return _build_mixed_density_estimator(
+            batch_x=batch_input,
+            batch_y=batch_condition,
+            flow_model=self.continuous_model,
+            **kwargs,
+        )
+
+    def _build_kwargs(self) -> dict:
+        """Return non-None fields as a dict, excluding ``continuous_model``."""
+        d = {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in ("continuous_model", "extra_kwargs")
+            and getattr(self, f.name) is not None
+        }
+        d.update(self.extra_kwargs)
+        return d
