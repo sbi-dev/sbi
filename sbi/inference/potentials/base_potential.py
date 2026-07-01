@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import inspect
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Protocol, Union
 
@@ -147,10 +148,18 @@ class CustomPotentialWrapper(BasePotential):
         super().to(device)
         return self
 
+    def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = True):
+        super().set_x(x_o, x_is_iid)
+
     def __call__(self, theta, track_gradients: bool = True):
         """Calls the custom potential function on given theta.
 
         Note, x_o is re-used from the initialization of the potential function.
         """
+        sig = inspect.signature(self.potential_fn)
+        num_params = len(sig.parameters)
         with torch.set_grad_enabled(track_gradients):
-            return self.potential_fn(theta, self.x_o)
+            if num_params == 1:
+                return self.potential_fn(theta)
+            else:
+                return self.potential_fn(theta, self.x_o)
