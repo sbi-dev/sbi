@@ -158,6 +158,10 @@ def test_c2st_pymc_sampler_on_Gaussian(
         draws=(int(num_samples / num_chains)),  # PyMC does not use thinning
         tune=warmup,
         chains=num_chains,
+        seed=0,  # reproducible sampling; PyMC is not covered by the global seed
+        # PyMC's HMC default (target_accept=0.65) is biased on this peaked
+        # target (c2st ~0.63); 0.95 samples it accurately. See #1894 follow-up.
+        target_accept=0.95,
     )
     samples = sampler.run()
     assert samples.shape == (
