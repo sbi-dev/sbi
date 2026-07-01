@@ -10,13 +10,13 @@ from torch.distributions import MultivariateNormal
 
 from sbi.inference import MNLE, MNPE, NLE_A, NPE_C
 from sbi.neural_nets import likelihood_nn, posterior_nn
-from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
     DensityEstimatorBuilder,
 )
 from sbi.utils.user_input_checks import check_estimator_arg
 
 _TRAINERS = [(NPE_C, posterior_nn, "theta"), (NLE_A, likelihood_nn, "x")]
+
 
 @pytest.mark.parametrize(
     "trainer_cls,factory_fn",
