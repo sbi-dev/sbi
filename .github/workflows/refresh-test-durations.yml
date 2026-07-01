@@ -56,6 +56,10 @@ jobs:
       continue-on-error: true
       run: uv run pytest -n auto -m "not gpu" --store-durations --durations-path .test_durations tests/
 
+    - name: Ensure trailing newline
+      # pytest-split omits the final newline, which fails the end-of-file-fixer hook.
+      run: '[ -z "$(tail -c1 .test_durations)" ] || printf "\n" >> .test_durations'
+
     - name: Open a PR if durations changed
       env:
         GH_TOKEN: ${{ github.token }}
