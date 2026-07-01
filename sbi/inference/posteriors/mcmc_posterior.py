@@ -894,10 +894,16 @@ class MCMCPosterior(NeuralPosterior):
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
         steps = dict(slice_pymc="slice", hmc_pymc="hmc", nuts_pymc="nuts")
+        step = steps[mcmc_method]
+
+        # PyMC's HamiltonianMC default (target_accept=0.65) mixes poorly on
+        # peaked targets and yields biased samples. Use a higher value for HMC;
+        # NUTS keeps PyMC's default (0.8), which already samples well.
+        target_accept = 0.9 if step == "hmc" else None
 
         sampler = PyMCSampler(
             potential_fn=potential_function,
-            step=steps[mcmc_method],
+            step=step,
             initvals=tensor2numpy(initial_params),
             draws=ceil((thin * num_samples) / num_chains),
             tune=warmup_steps,
@@ -906,6 +912,7 @@ class MCMCPosterior(NeuralPosterior):
             progressbar=show_progress_bars,
             param_name=self.param_name,
             device=self._device,
+            target_accept=target_accept,
         )
         samples = sampler.run()
         samples = torch.from_numpy(samples).to(dtype=torch.float32, device=self._device)
