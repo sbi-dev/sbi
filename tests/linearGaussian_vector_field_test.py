@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import random
 from dataclasses import asdict
 from typing import List, Literal
 
@@ -33,6 +34,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
+from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.user_input_checks import process_simulator
 
 from .test_utils import get_dkl_gaussian_prior
@@ -300,9 +302,14 @@ def train_vector_field_model(vector_field_type, prior_type):
     if cache_key in _trained_models_cache:
         return _trained_models_cache[cache_key]
 
+    # Fixed seed for a deterministic cached model; save/restore RNG so training
+    # leaves the caller's stream untouched (keeps tests order-independent).
+    rng_state = (random.getstate(), np.random.get_state(), torch.get_rng_state())
+    seed_all_backends(0)
+
     # Train the model
     num_dim = 2
-    num_simulations = 6000
+    num_simulations = 12000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -333,6 +340,11 @@ def train_vector_field_model(vector_field_type, prior_type):
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     estimator = inference.append_simulations(theta, x).train()
+
+    # Restore RNG (see above).
+    random.setstate(rng_state[0])
+    np.random.set_state(rng_state[1])
+    torch.set_rng_state(rng_state[2])
 
     result = {
         "estimator": estimator,
