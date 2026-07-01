@@ -1,0 +1,79 @@
+name: Refresh test durations
+
+# cd.yml shards the test suite with pytest-split, balanced by the committed
+# .test_durations. This job regenerates that file by running the FULL suite
+# UNSHARDED with --store-durations (so pytest-split writes complete, correct
+# timings with no per-shard merge), then opens a PR. Run monthly (durations
+# drift slowly) plus on demand. A PR is used because main requires review, so a
+# job cannot push to it directly.
+#
+# NOTE: requires "Allow GitHub Actions to create and approve pull requests" in
+# repo settings. GITHUB_TOKEN-created PRs do not trigger CI; close/reopen (or
+# push an empty commit) to run checks before merging.
+
+on:
+  schedule:
+    - cron: '0 4 1 * *'  # monthly, 1st at 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  refresh:
+    name: Regenerate .test_durations
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+    - name: Checkout
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      with:
+        python-version: '3.12'
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      with:
+        enable-cache: true
+        cache-dependency-glob: "uv.lock"
+
+    - name: Install dependencies with uv
+      run: uv sync --locked --extra dev
+
+    - name: Record test durations
+      # Full CPU suite, unsharded, so every test is timed in one file. No -x: a
+      # failing test must not truncate the recording (the durations are still
+      # valid), so this step is allowed to fail.
+      continue-on-error: true
+      run: uv run pytest -n auto -m "not gpu" --store-durations --durations-path .test_durations tests/
+
+    - name: Open a PR if durations changed
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        if git diff --quiet -- .test_durations; then
+          echo ".test_durations unchanged; nothing to do."
+          exit 0
+        fi
+        branch="chore/refresh-test-durations-${{ github.run_id }}"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b "$branch"
+        git add .test_durations
+        git commit -m "chore: refresh .test_durations"
+        git push origin "$branch"
+        gh pr create \
+          --title "chore: refresh .test_durations" \
+          --body "Automated refresh of the pytest-split timings that balance the CD test shards (see cd.yml). Regenerated from a full unsharded suite run with --store-durations." \
+          --base main \
+          --head "$branch"
