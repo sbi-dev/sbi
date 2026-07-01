@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 """Regression tests for scale-equivariance of FMPE / NPSE posteriors (#1680).
 
 Companion to ``tests/linearGaussian_vector_field_test.py``. A calibrated amortized

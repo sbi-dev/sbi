@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 """Tier-1 hardening unit tests for the opt-in ``compose_standardization`` feature.
 
 All tests here are training-free (build / wire only) and fast:

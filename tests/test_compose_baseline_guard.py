@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 """Guard tests for the ``gaussian_baseline`` + ``compose_standardization`` pair.
 
 ``gaussian_baseline`` (PR #1752) derives the network velocity from the
