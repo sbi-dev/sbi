@@ -24,6 +24,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13']
+        split_size: [4]
+        group_number: [1, 2, 3, 4]
 
     steps:
     - name: Checkout
@@ -48,7 +50,9 @@ jobs:
       run: uv sync --locked --extra dev
 
     - name: Run the fast and the slow CPU tests with coverage
-      run: uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/
+      # Shard the suite across runners with pytest-split, balanced by the
+      # committed .test_durations (refreshed by refresh-test-durations.yml).
+      run: uv run pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml --junitxml=junit.xml -o junit_family=legacy --splitting-algorithm least_duration --splits ${{ matrix.split_size }} --group ${{ matrix.group_number }} tests/
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
