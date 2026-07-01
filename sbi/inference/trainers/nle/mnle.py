@@ -14,6 +14,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     VIPosteriorParameters,
 )
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
+from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.sbi_types import Tracker
@@ -100,10 +101,12 @@ class MNLE(LikelihoodEstimatorTrainer):
         """
 
         if isinstance(density_estimator, str):
-            assert (
-                density_estimator == "mnle"
-            ), f"""MNLE can be used with preconfigured 'mnle' density estimator only,
-                not with {density_estimator}."""
+            if density_estimator != "mnle":
+                raise ValueError(
+                    "MNLE supports only the preconfigured 'mnle' density estimator, "
+                    f"not {density_estimator!r}."
+                )
+            density_estimator = likelihood_nn(model="mnle")
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 

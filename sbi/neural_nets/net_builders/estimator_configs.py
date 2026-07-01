@@ -73,7 +73,9 @@ class _EstimatorBuilderBase:
 
         return cls(**known, extra_kwargs=extra)
 
-    def build(self, batch_theta: Tensor, batch_x: Tensor) -> ConditionalEstimator:
+    def build(
+        self, batch_input: Tensor, batch_condition: Tensor
+    ) -> ConditionalEstimator:
         """Build an estimator from training batches.
 
         Subclasses must override this method to construct the appropriate
@@ -81,8 +83,8 @@ class _EstimatorBuilderBase:
         supplied batches by the downstream ``build_*`` functions.
 
         Args:
-            batch_theta: Batch of parameters.
-            batch_x: Batch of observations.
+            batch_input: Batch of the modeled variable (input to the density estimator)
+            batch_condition: Batch of the conditioning variable
 
         Returns:
             A ``ConditionalEstimator`` subclass instance.
@@ -284,20 +286,16 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
             )
 
     def build(
-        self, batch_theta: Tensor, batch_x: Tensor
+        self, batch_input: Tensor, batch_condition: Tensor
     ) -> ConditionalDensityEstimator:
         """Build the density estimator by dispatching to the appropriate
         ``build_*`` function.
 
-        The naming follows the internal convention of ``posterior_nn``: the
-        caller passes ``batch_theta`` as the modeled variable and ``batch_x``
-        as the conditioning variable.
-
         Args:
-            batch_theta: Batch of parameters used for shape inference and
-                z-scoring.
-            batch_x: Batch of observations used for shape inference and
-                z-scoring.
+            batch_input: Batch of the modeled variable used for
+                shape inference and z-scoring.
+            batch_condition: Batch of the conditioning variable
+                used for shape inference and z-scoring.
 
         Returns:
             A ``ConditionalDensityEstimator`` (e.g., ``NFlowsFlow``,
@@ -339,9 +337,7 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
 
         build_fn = builders[self.model]
         kwargs = self._build_kwargs()
-        # For NPE: batch_theta is the modeled variable (batch_x in the builder)
-        # and batch_x is the conditioning variable (batch_y in the builder).
-        return build_fn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        return build_fn(batch_x=batch_input, batch_y=batch_condition, **kwargs)
 
     def _build_kwargs(self) -> dict:
         """Return non-None fields as a dict, excluding ``model``."""
