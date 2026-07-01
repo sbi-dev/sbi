@@ -152,6 +152,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
         """
+        self._check_compose_internal_stats_unit()
 
         # Continue with standard processing (broadcast shapes etc.)
         batch_shape_input = input.shape[: -len(self.input_shape)]
@@ -248,6 +249,13 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             MSE between target score and network output, scaled by the weight function.
 
         """
+        # Composed standardization (opt-in): the estimator is trained PURELY in
+        # z-space. Standardize theta -> z at the very top; everything below is
+        # unchanged. When the flag is off, this is a no-op (shift=0, scale=1).
+        self._check_compose_internal_stats_unit()
+        if self._compose_standardization:
+            input = self.to_z(input)
+
         # Sample times from the Markov chain, use batch dimension
         if times is None:
             times = self.train_schedule(input.shape[0])
