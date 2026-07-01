@@ -8,7 +8,7 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import NLE_A, NPE_C
+from sbi.inference import MNLE, MNPE, NLE_A, NPE_C
 from sbi.neural_nets import likelihood_nn, posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
@@ -16,132 +16,94 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.utils.user_input_checks import check_estimator_arg
 
+_TRAINERS = [(NPE_C, posterior_nn, "theta"), (NLE_A, likelihood_nn, "x")]
 
-def test_npe_no_warning_for_valid_inputs():
-    """Passing a builder, callable, or using the default should not warn."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", FutureWarning)
-        NPE_C(prior, show_progress_bars=False)
-        builder = DensityEstimatorBuilder(model="maf")
-        NPE_C(prior, density_estimator=builder, show_progress_bars=False)
-        build_fn = posterior_nn(model="maf")
-        NPE_C(prior, density_estimator=build_fn, show_progress_bars=False)
-
-
-def test_npe_string_emits_deprecation_warning():
-    """Passing a string to density_estimator should emit FutureWarning."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    with pytest.warns(FutureWarning, match="deprecated"):
-        NPE_C(prior, density_estimator="maf", show_progress_bars=False)
-
-
-@pytest.mark.parametrize("model", ("maf", "nsf", "mdn"))
-def test_npe_train_with_builder(model):
-    """Train NPE_C with a DensityEstimatorBuilder and verify the result."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    builder = DensityEstimatorBuilder(model=model, hidden_features=16, num_transforms=2)
-    inference = NPE_C(prior, density_estimator=builder, show_progress_bars=False)
-
-    theta = prior.sample((200,))
-    x = theta + 0.1 * torch.randn_like(theta)
-    density_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2, training_batch_size=100
-    )
-    assert isinstance(density_estimator, ConditionalDensityEstimator)
-    # Verify the trained estimator produces finite loss on a fresh batch.
-    fresh_theta = prior.sample((10,))
-    fresh_x = fresh_theta + 0.1 * torch.randn_like(fresh_theta)
-    loss = density_estimator.loss(fresh_theta, condition=fresh_x)
-    assert loss.shape == (10,)
-    assert torch.isfinite(loss).all()
-
-    # Also verify that a posterior can be constructed and sampled from.
-    posterior = inference.build_posterior()
-    x_o = zeros(1, num_dim)
-    samples = posterior.sample((10,), x=x_o)
-    assert samples.shape == (10, num_dim)
-
-
-def test_npe_builder_role_shapes():
-    """NPE models p(θ|x): input_shape must match θ, condition_shape must match x."""
-    num_dim_theta = 2
-    num_dim_x = 5
-    prior = MultivariateNormal(zeros(num_dim_theta), eye(num_dim_theta))
-    builder = DensityEstimatorBuilder(model="maf", hidden_features=16, num_transforms=2)
-    inference = NPE_C(prior, density_estimator=builder, show_progress_bars=False)
-
-    theta = prior.sample((200,))
-    x = torch.randn(200, num_dim_x)
-    estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2, training_batch_size=100
-    )
-
-    assert estimator.input_shape == torch.Size([num_dim_theta])
-    assert estimator.condition_shape == torch.Size([num_dim_x])
-
-
-def test_nle_no_warning_for_valid_inputs():
-    """Passing a builder, callable, or using the default should not warn."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+@pytest.mark.parametrize(
+    "trainer_cls,factory_fn",
+    [(t, f) for t, f, _ in _TRAINERS],
+    ids=["npe", "nle"],
+)
+def test_no_warning_for_valid_inputs(trainer_cls, factory_fn):
+    """None default, builder, and callable should not emit FutureWarning."""
+    prior = MultivariateNormal(zeros(2), eye(2))
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
-        NLE_A(prior, show_progress_bars=False)
-        builder = DensityEstimatorBuilder(model="maf")
-        NLE_A(prior, density_estimator=builder, show_progress_bars=False)
-        build_fn = likelihood_nn(model="maf")
-        NLE_A(prior, density_estimator=build_fn, show_progress_bars=False)
+        trainer_cls(prior, show_progress_bars=False)
+        trainer_cls(
+            prior,
+            density_estimator=DensityEstimatorBuilder(model="maf"),
+            show_progress_bars=False,
+        )
+        trainer_cls(
+            prior,
+            density_estimator=factory_fn(model="maf"),
+            show_progress_bars=False,
+        )
 
 
-def test_nle_string_emits_deprecation_warning():
+@pytest.mark.parametrize(
+    "trainer_cls",
+    [t for t, _, _ in _TRAINERS],
+    ids=["npe", "nle"],
+)
+def test_string_emits_deprecation_warning(trainer_cls):
     """Passing a string to density_estimator should emit FutureWarning."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    prior = MultivariateNormal(zeros(2), eye(2))
     with pytest.warns(FutureWarning, match="deprecated"):
-        NLE_A(prior, density_estimator="maf", show_progress_bars=False)
+        trainer_cls(prior, density_estimator="maf", show_progress_bars=False)
 
 
+@pytest.mark.parametrize(
+    "trainer_cls,factory_fn,input_var",
+    _TRAINERS,
+    ids=["npe", "nle"],
+)
 @pytest.mark.parametrize("model", ("maf", "nsf"))
-def test_nle_train_with_builder(model):
-    """Train NLE_A with a DensityEstimatorBuilder, build posterior, and sample."""
+def test_train_with_builder(trainer_cls, factory_fn, input_var, model):
+    """Train with a DensityEstimatorBuilder, verify loss and posterior sampling."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     builder = DensityEstimatorBuilder(model=model, hidden_features=16, num_transforms=2)
-    inference = NLE_A(prior, density_estimator=builder, show_progress_bars=False)
+    inference = trainer_cls(prior, density_estimator=builder, show_progress_bars=False)
 
     theta = prior.sample((200,))
     x = theta + 0.1 * torch.randn_like(theta)
     density_estimator = inference.append_simulations(theta, x).train(
         max_num_epochs=2, training_batch_size=100
     )
-    assert isinstance(density_estimator, ConditionalDensityEstimator)
-    # Verify the trained estimator produces finite loss on a fresh batch.
+
+    # Verify finite loss on a fresh batch with correct role order.
     fresh_theta = prior.sample((10,))
     fresh_x = fresh_theta + 0.1 * torch.randn_like(fresh_theta)
-    loss = density_estimator.loss(fresh_x, condition=fresh_theta)
+    if input_var == "theta":
+        # NPE: loss(input=θ, condition=x)
+        loss = density_estimator.loss(fresh_theta, condition=fresh_x)
+    else:
+        # NLE: loss(input=x, condition=θ)
+        loss = density_estimator.loss(fresh_x, condition=fresh_theta)
     assert loss.shape == (10,)
     assert torch.isfinite(loss).all()
 
-    # Also verify that a posterior can be constructed and sampled from.
+    # Posterior should be constructable and produce correct-shaped samples.
     posterior = inference.build_posterior()
     x_o = zeros(1, num_dim)
     samples = posterior.sample((10,), x=x_o)
     assert samples.shape == (10, num_dim)
 
 
-def test_nle_builder_role_shapes():
-    """NLE models p(x|θ): input_shape must match x, condition_shape must match θ."""
+@pytest.mark.parametrize(
+    "trainer_cls,input_var",
+    [(t, v) for t, _, v in _TRAINERS],
+    ids=["npe", "nle"],
+)
+def test_builder_role_shapes(trainer_cls, input_var):
+    """Verify input_shape matches the modeled variable, not the condition."""
     num_dim_theta = 2
     num_dim_x = 5
     prior = MultivariateNormal(zeros(num_dim_theta), eye(num_dim_theta))
     builder = DensityEstimatorBuilder(model="maf", hidden_features=16, num_transforms=2)
-    inference = NLE_A(prior, density_estimator=builder, show_progress_bars=False)
+    inference = trainer_cls(prior, density_estimator=builder, show_progress_bars=False)
 
     theta = prior.sample((200,))
     x = torch.randn(200, num_dim_x)
@@ -149,8 +111,23 @@ def test_nle_builder_role_shapes():
         max_num_epochs=2, training_batch_size=100
     )
 
-    assert estimator.input_shape == torch.Size([num_dim_x])
-    assert estimator.condition_shape == torch.Size([num_dim_theta])
+    if input_var == "theta":
+        # NPE models p(θ|x): input=θ, condition=x
+        assert estimator.input_shape == torch.Size([num_dim_theta])
+        assert estimator.condition_shape == torch.Size([num_dim_x])
+    else:
+        # NLE models p(x|θ): input=x, condition=θ
+        assert estimator.input_shape == torch.Size([num_dim_x])
+        assert estimator.condition_shape == torch.Size([num_dim_theta])
+
+
+@pytest.mark.parametrize("trainer_cls", [MNLE, MNPE], ids=["mnle", "mnpe"])
+def test_mixed_trainer_default_no_warning(trainer_cls):
+    """MNLE/MNPE default must not emit FutureWarning (string converted to callable)."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        trainer_cls(prior, show_progress_bars=False)
 
 
 @pytest.mark.parametrize(
