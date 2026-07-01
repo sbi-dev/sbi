@@ -48,7 +48,7 @@ def test_density_estimator_builder_build(model):
     builder = DensityEstimatorBuilder(model=model)
     theta = torch.randn(100, 5)
     x = torch.randn(100, 3)
-    estimator = builder.build(batch_theta=theta, batch_x=x)
+    estimator = builder.build(batch_input=theta, batch_condition=x)
     assert isinstance(estimator, ConditionalDensityEstimator)
 
 
@@ -59,7 +59,7 @@ def test_density_estimator_builder_build_with_custom_features(model):
     builder = DensityEstimatorBuilder(model=model, hidden_features=custom_features)
     theta = torch.randn(100, 4)
     x = torch.randn(100, 2)
-    estimator = builder.build(batch_theta=theta, batch_x=x)
+    estimator = builder.build(batch_input=theta, batch_condition=x)
     assert isinstance(estimator, ConditionalDensityEstimator)
     # Verify that at least one layer has the requested hidden size.
     param_shapes = [p.shape for p in estimator.parameters()]
@@ -75,7 +75,7 @@ def test_density_estimator_builder_build_with_embedding_net(model):
     builder = DensityEstimatorBuilder(model=model, embedding_net=emb)
     theta = torch.randn(100, 5)
     x = torch.randn(100, 3)
-    estimator = builder.build(batch_theta=theta, batch_x=x)
+    estimator = builder.build(batch_input=theta, batch_condition=x)
     assert isinstance(estimator, ConditionalDensityEstimator)
     # The embedding net must not be a plain Identity.
     assert not isinstance(estimator.embedding_net, nn.Identity)
@@ -87,7 +87,7 @@ def test_density_estimator_builder_loss_computable(model):
     builder = DensityEstimatorBuilder(model=model, hidden_features=16, num_transforms=2)
     theta = torch.randn(100, 3)
     x = torch.randn(100, 2)
-    estimator = builder.build(batch_theta=theta, batch_x=x)
+    estimator = builder.build(batch_input=theta, batch_condition=x)
 
     # Evaluate on a fresh batch.
     batch_theta_eval = torch.randn(10, 3)
@@ -112,7 +112,7 @@ def test_density_estimator_builder_z_score_modes(z_score_x, z_score_y):
     )
     theta = torch.randn(100, 3)
     x = torch.randn(100, 2)
-    estimator = builder.build(batch_theta=theta, batch_x=x)
+    estimator = builder.build(batch_input=theta, batch_condition=x)
     assert isinstance(estimator, ConditionalDensityEstimator)
     # When z_score is "none" for both, the estimator should still produce
     # a finite loss (just without standardization).
