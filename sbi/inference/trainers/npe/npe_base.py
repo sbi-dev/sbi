@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import asdict
 from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
 
@@ -32,6 +32,7 @@ from sbi.inference.trainers.base import (
     NeuralInference,
     check_if_proposal_has_default_x,
 )
+from sbi.inference.trainers.npe.npe_loss import NPELossStrategy
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
@@ -111,16 +112,9 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             self._build_neural_net = density_estimator
 
         self._proposal_roundwise = []
-        self.use_non_atomic_loss = False
+        self._loss_strategy: Optional[NPELossStrategy] = None
 
-    @abstractmethod
-    def _log_prob_proposal_posterior(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: Optional[Any],
-    ) -> Tensor: ...
+
 
     def append_simulations(
         self,
@@ -194,10 +188,11 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
         # Check for problematic z-scoring
         warn_if_invalid_for_zscoring(x)
+        is_atomic = self._loss_strategy is None or not getattr(self._loss_strategy, "uses_only_latest_round", True)
         if (
-            type(self).__name__ == "SNPE_C"
+            type(self).__name__ in ("SNPE_C", "NPE_C")
             and current_round > 0
-            and not self.use_non_atomic_loss
+            and is_atomic
         ):
             nle_nre_apt_msg_on_invalid_x(
                 num_nans,
@@ -254,6 +249,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
+        loss_strategy: Optional[NPELossStrategy] = None,
     ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
@@ -508,9 +504,11 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             # Use posterior log prob (without proposal correction) for first round.
             loss = self._neural_net.loss(theta, x)
         else:
+            if self._loss_strategy is None:
+                raise ValueError("Loss strategy is None but round > 0.")
             # Currently only works for `DensityEstimator` objects.
             # Must be extended ones other Estimators are implemented. See #966,
-            loss = -self._log_prob_proposal_posterior(theta, x, masks, proposal)
+            loss = -self._loss_strategy(theta, x, masks, proposal)
 
         assert_all_finite(loss, "NPE loss")
         return calibration_kernel(x) * loss
@@ -608,7 +606,10 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         # SNPE-A can, by construction of the algorithm, only use samples from the last
         # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
         # so this is how we check for whether or not we are using SNPE-A.
-        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
+        if (
+            self._loss_strategy is not None
+            and self._loss_strategy.uses_only_latest_round
+        ) or hasattr(self, "_ran_final_round"):
             start_idx = self._round
 
         return start_idx

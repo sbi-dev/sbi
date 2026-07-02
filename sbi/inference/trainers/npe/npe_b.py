@@ -1,22 +1,22 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Literal, Optional, Union
+from typing import Callable, Dict, Literal, Optional, Union
 
-import torch
-from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
-import sbi.utils as utils
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
+)
+from sbi.inference.trainers.npe.npe_loss import (
+    ImportanceWeightedLoss,
+    NPELossStrategy,
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuilder,
 )
-from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 
@@ -107,72 +107,48 @@ class NPE_B(PosteriorEstimatorTrainer):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
-    def _log_prob_proposal_posterior(
+    def train(
         self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: Optional[Any],
-    ) -> Tensor:
-        """
-        Return importance-weighted log probability (Lueckmann, Goncalves et al., 2017).
+        training_batch_size: int = 200,
+        learning_rate: float = 5e-4,
+        validation_fraction: float = 0.1,
+        stop_after_epochs: int = 20,
+        max_num_epochs: int = 2**31 - 1,
+        clip_max_norm: Optional[float] = 5.0,
+        calibration_kernel: Optional[Callable] = None,
+        resume_training: bool = False,
+        force_first_round_loss: bool = False,
+        discard_prior_samples: bool = False,
+        retrain_from_scratch: bool = False,
+        show_train_summary: bool = False,
+        dataloader_kwargs: Optional[Dict] = None,
+        loss_strategy: Optional[NPELossStrategy] = None,
+    ) -> ConditionalDensityEstimator:
 
-        Args:
-            theta: Batch of parameters θ.
-            x: Batch of data.
-            masks: Mask that is True for prior samples in the batch in order to train
-                them with prior loss.
-            proposal: Proposal distribution.
-
-        Returns:
-            Importance-weighted log-probability of the proposal posterior.
-        """
-
-        # Evaluate prior
-        # we accept prior log prob to be -Inf at theta
-        # meaning that theta is out of the prior range (the weight is thus 0)
-        utils.assert_not_nan_or_plus_inf(
-            self._prior.log_prob(theta), "prior log probs of proposal samples"
+        kwargs = del_entries(
+            locals(),
+            entries=("self", "__class__", "loss_strategy"),
         )
-        prior = torch.exp(self._prior.log_prob(theta))
 
-        # Evaluate proposal
-        # (as theta comes from prior and proposal from previous rounds,
-        # the last proposal is actually a mixture of the prior
-        # and of all the previous proposals with coefficients representing
-        # the proportion of the new theta added at each round)
-        prop = torch.zeros(self._round + 1, device=theta.device)
-        nb_samples = 0  # total number of theta from all the rounds
-
-        for k in range(self._round + 1):
-            nb_samples += self._theta_roundwise[k].size(0)
-            # the number of new theta sampled in the round k
-            prop[k] = self._theta_roundwise[k].size(0)
-
-        prop /= nb_samples
-        log_prop = torch.log(prop).repeat(theta.size(0), 1)
-
-        log_previous_proposals = torch.zeros(
-            (theta.size(0), self._round + 1), device=theta.device
-        )
-        for k, density in enumerate(self._proposal_roundwise):
-            # we accept the k th proposal log prob to be -Inf at theta
-            # meaning that theta is out of the k th proposal range
-            log_previous_proposals[:, k] = density.log_prob(theta)
-            utils.assert_not_nan_or_plus_inf(
-                log_previous_proposals[:, k], "proposal log probs of proposal samples"
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
             )
 
-        log_proposal = torch.logsumexp(log_prop + log_previous_proposals, dim=1)
-        proposal = torch.exp(log_proposal)
+        self._round = max(self._data_round_index)
 
-        # Construct the importance weights and normalize them
-        importance_weights = prior / proposal
-        importance_weights /= importance_weights.sum()
+        if loss_strategy is not None:
+            self._loss_strategy = loss_strategy
+        elif self._round > 0:
+            self._loss_strategy = ImportanceWeightedLoss(
+                neural_net=self._neural_net,
+                prior=self._prior,
+                round_idx=self._round,
+                theta_roundwise=self._theta_roundwise,
+                proposal_roundwise=self._proposal_roundwise,
+            )
+        else:
+            self._loss_strategy = None
 
-        theta = reshape_to_sample_batch_event(theta, theta.shape[1:])
-        # Reshape the density estimator log probs
-        # from (sample_shape, batch_shape) to (batch_shape)
-        posterior_log_probs = self._neural_net.log_prob(theta, x).squeeze(dim=0)
-
-        return importance_weights * posterior_log_probs
+        return super().train(**kwargs)
