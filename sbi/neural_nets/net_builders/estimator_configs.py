@@ -29,6 +29,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
 )
+from sbi.neural_nets.estimators.mixed_density_estimator import MixedDensityEstimator
 
 
 @dataclass
@@ -413,7 +414,7 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
 
     def build(
         self, batch_input: Tensor, batch_condition: Tensor
-    ) -> ConditionalDensityEstimator:
+    ) -> MixedDensityEstimator:
         """Build the mixed density estimator by dispatching to
         ``_build_mixed_density_estimator``.
 
