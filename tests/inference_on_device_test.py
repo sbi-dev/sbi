@@ -891,3 +891,27 @@ def test_npe_pfn_on_device(prior_device):
     assert posterior.estimator._context_input.device.type == "cpu", (
         "TabPFN context must always remain on CPU."
     )
+
+
+@pytest.mark.gpu
+def test_mdn_device_transform():
+    """MDN with transform_to_unconstrained moves transform tensors on .to()."""
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+
+    device = process_device("gpu")
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((512,)), torch.randn(512, 3)
+    est = build_mdn(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+    est.to(device)
+
+    for key, val in list(est._prior_transform.__dict__.items()):
+        if isinstance(val, torch.Tensor):
+            assert val.device.type == device.split(":")[0], (
+                f"Transform tensor '{key}' on {val.device}, expected {device}"
+            )
+    theta = prior.sample((5,)).to(device)
+    cond = torch.randn(1, 3).to(device)
+    lp = est.log_prob(theta.unsqueeze(1), cond)
+    assert lp.device.type == device.split(":")[0]
+    s = est.sample((10,), cond)
+    assert s.device.type == device.split(":")[0]

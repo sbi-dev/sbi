@@ -811,6 +811,44 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
     return theta_repeated, x_repeated
 
 
+def _apply_to_transform(
+    transform: TorchTransform, fn: Callable[[Tensor], Tensor]
+) -> None:
+    """Apply fn to all tensors in a transform tree.
+
+    Walks ComposeTransform.parts, IndependentTransform.base_transform,
+    etc., so .to() calls propagate into the transform.
+
+    Args:
+        transform: Root of the transform tree.
+        fn: Callable applied to each tensor (e.g. ``lambda t: t.to(device)``).
+    """
+    seen = set()
+
+    def _walk(t):
+        if id(t) in seen:
+            return
+        seen.add(id(t))
+        for key, val in list(t.__dict__.items()):
+            if isinstance(val, Tensor):
+                object.__setattr__(t, key, fn(val))
+            elif isinstance(val, (list, tuple)):
+                changed = False
+                items = list(val)
+                for _i, item in enumerate(items):
+                    if isinstance(item, TorchTransform):
+                        _walk(item)
+                        changed = True
+                if changed:
+                    object.__setattr__(
+                        t, key, tuple(items) if isinstance(val, tuple) else items
+                    )
+            elif isinstance(val, TorchTransform):
+                _walk(val)
+
+    _walk(transform)
+
+
 def mcmc_transform(
     prior: Distribution,
     num_prior_samples_for_zscoring: int = 1000,
@@ -924,6 +962,9 @@ def mcmc_transform(
         )
 
     check_transform(prior, transform)  # type: ignore
+
+    if enable_transform:
+        _apply_to_transform(transform, lambda t: t.to(device))
 
     return transform.inv  # type: ignore
 
