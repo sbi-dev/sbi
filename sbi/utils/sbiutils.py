@@ -814,27 +814,7 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
 def _apply_to_transform(
     transform: TorchTransform, fn: Callable[[Tensor], Tensor]
 ) -> None:
-    """Walk a transform tree and apply ``fn`` to every leaf tensor.
-
-    Handles ``ComposeTransform.parts``, ``IndependentTransform.base_transform``,
-    and any other transform attribute stored as a ``Tensor``, ``Transform``,
-    or ``list``/``tuple`` of ``Transform``s. Uses identity-tracking to avoid
-    infinite loops from cyclic references, though transforms are not expected
-    to have cycles.
-
-    This is a public utility because multiple call sites need it:
-
-    *  :func:`mcmc_transform` moves the freshly-built transform onto the
-       caller's target device.
-    *  ``MixtureDensityEstimator._apply`` propagates ``nn.Module`` device
-       moves into the transform so that ``.to()`` / ``.cuda()`` / ``.mps()``
-       work correctly.
-
-    Args:
-        transform: Root of the transform tree to walk.
-        fn: Callable applied to every ``Tensor`` encountered. Must return the
-            transformed tensor (e.g. ``lambda t: t.to(device)``).
-    """
+    """Apply fn to all tensors in a transform tree."""
     seen = set()
 
     def _walk(t):
