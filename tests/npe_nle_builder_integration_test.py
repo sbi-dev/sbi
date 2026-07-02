@@ -236,3 +236,12 @@ def test_check_estimator_arg_rejects_module():
     """check_estimator_arg should reject raw nn.Module instances."""
     with pytest.raises(TypeError):
         check_estimator_arg(torch.nn.Linear(3, 3))
+
+
+@pytest.mark.parametrize("trainer_cls", [MNLE, MNPE], ids=["mnle", "mnpe"])
+def test_mixed_trainer_rejects_plain_density_builder(trainer_cls):
+    """Passing a DensityEstimatorBuilder to MNLE/MNPE should raise TypeError early."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    wrong_builder = DensityEstimatorBuilder(model="maf")
+    with pytest.raises(TypeError, match="MixedDensityEstimatorBuilder"):
+        trainer_cls(prior, density_estimator=wrong_builder, show_progress_bars=False)
