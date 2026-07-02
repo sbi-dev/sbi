@@ -6,7 +6,6 @@
 
 # Development files and python cache
 /*.pyc
-junit.xml
 /*.egg
 /*.egg-info
 .venv*
