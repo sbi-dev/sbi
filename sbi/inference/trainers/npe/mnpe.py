@@ -19,9 +19,7 @@ from sbi.inference.trainers.npe.npe_c import NPE_C
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
-from sbi.neural_nets.net_builders.estimator_configs import (
-    MixedDensityEstimatorBuilder,
-)
+from sbi.neural_nets.net_builders.estimator_configs import MixedDensityEstimatorBuilder
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 
