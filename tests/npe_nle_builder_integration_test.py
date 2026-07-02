@@ -245,3 +245,13 @@ def test_mixed_trainer_rejects_plain_density_builder(trainer_cls):
     wrong_builder = DensityEstimatorBuilder(model="maf")
     with pytest.raises(TypeError, match="MixedDensityEstimatorBuilder"):
         trainer_cls(prior, density_estimator=wrong_builder, show_progress_bars=False)
+
+
+def test_valid_continuous_models_match_builders():
+    """Guard against drift between _VALID_MIXED_CONTINUOUS_MODELS and mixed_nets."""
+    from sbi.neural_nets.net_builders.estimator_configs import (
+        _VALID_MIXED_CONTINUOUS_MODELS,
+    )
+    from sbi.neural_nets.net_builders.mixed_nets import model_builders
+
+    assert frozenset(model_builders) == _VALID_MIXED_CONTINUOUS_MODELS
