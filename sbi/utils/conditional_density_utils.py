@@ -193,6 +193,12 @@ def extract_and_transform_mog(
     assert precfs is not None  # For type checker
 
     # Transform means and precision factors to original space if z-scoring is enabled
+    if getattr(estimator, "_prior_transform", None) is not None:
+        raise NotImplementedError(
+            "Conditional density extraction is not supported for "
+            "z_score='transform_to_unconstrained' (it assumes an affine "
+            "z-score)."
+        )
     if estimator.has_input_transform:
         # The z-score transform is: z = (theta - shift) / scale
         # To transform means: theta = z * scale + shift

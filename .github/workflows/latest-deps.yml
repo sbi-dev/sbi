@@ -1,0 +1,95 @@
+name: Latest Deps Canary
+
+# Reproducibility lives in the committed uv.lock (used by CI/CD). This workflow
+# is the counterpart: it deliberately ignores the lockfile and resolves the
+# newest compatible versions of every dependency, so we get an early warning
+# when an upstream release breaks sbi. It is non-blocking by design and opens /
+# updates a tracking issue on failure.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # weekly, Mondays at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  latest-deps:
+    name: Latest deps (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Lowest and highest supported versions bracket the compatibility range
+        # where most upstream breakages surface (e.g. requires-python bumps).
+        python-version: ['3.10', '3.13']
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 0
+        lfs: false
+        persist-credentials: false
+
+    - name: Set up Python
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+    - name: Install latest resolvable dependencies
+      # --upgrade ignores the pinned versions in uv.lock and resolves the newest
+      # compatible release of every package.
+      run: uv sync --upgrade --extra dev
+
+    - name: Run fast CPU tests
+      run: uv run pytest -n auto -m "not slow and not gpu" tests/
+
+  report:
+    name: Report failure
+    needs: latest-deps
+    # Only file an issue for scheduled runs that failed; manual dispatch stays quiet.
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+    - name: Open or update tracking issue
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        set -euo pipefail
+        LABEL="latest-deps-failure"
+        TITLE="Latest-deps canary is failing"
+
+        # Ensure the dedup label exists (no-op if it already does).
+        gh label create "$LABEL" --repo "$REPO" --color "B60205" \
+          --description "Tracks failures of the latest-deps canary workflow" 2>/dev/null || true
+
+        body=$(printf '%s\n\n%s\n\n%s' \
+          "The scheduled Latest Deps Canary workflow failed when resolving the newest compatible versions of the dependencies. This usually means a recently released upstream package is incompatible with the current code." \
+          "Failing run: ${RUN_URL}" \
+          "This issue auto-updates on each subsequent failure and should be closed once the canary is green again.")
+
+        existing=$(gh issue list --repo "$REPO" --label "$LABEL" --state open \
+          --json number --jq '.[0].number // empty')
+
+        if [ -n "$existing" ]; then
+          gh issue comment "$existing" --repo "$REPO" --body "$body"
+        else
+          gh issue create --repo "$REPO" --title "$TITLE" --label "$LABEL" --body "$body"
+        fi

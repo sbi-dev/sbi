@@ -497,7 +497,11 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
 
         # Unsupported combination: the modeled variable requests the unconstrained
         # transform on a non-Zuko-conditional builder -> expect a clear ValueError.
-        if modeled_z == "transform_to_unconstrained" and not model.startswith("zuko"):
+        if (
+            modeled_z == "transform_to_unconstrained"
+            and not model.startswith("zuko")
+            and model != "mdn"
+        ):
             with pytest.raises(ValueError, match="transform_to_unconstrained"):
                 build_fun = build_fn(**kwargs)
                 build_fun(theta, model_x)
@@ -549,30 +553,27 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
         "build_maf",
         "build_maf_rqs",
         "build_nsf",
-        "build_mdn",
         "build_linear_classifier",
         "build_mlp_classifier",
         "build_resnet_classifier",
     ],
 )
 def test_transform_to_unconstrained_raises_for_unsupported_builders(builder_name):
-    """nflows, MDN, and ratio-classifier builders raise a clear error for
+    """nflows and ratio-classifier builders raise a clear error for
     `transform_to_unconstrained` instead of silently building a model without the
-    reparametrization."""
+    reparametrization. MDN now supports it and is excluded."""
     from sbi.neural_nets.net_builders import flow as flow_builders
     from sbi.neural_nets.net_builders.classifier import (
         build_linear_classifier,
         build_mlp_classifier,
         build_resnet_classifier,
     )
-    from sbi.neural_nets.net_builders.mdn import build_mdn
 
     builders = {
         "build_made": flow_builders.build_made,
         "build_maf": flow_builders.build_maf,
         "build_maf_rqs": flow_builders.build_maf_rqs,
         "build_nsf": flow_builders.build_nsf,
-        "build_mdn": build_mdn,
         "build_linear_classifier": build_linear_classifier,
         "build_mlp_classifier": build_mlp_classifier,
         "build_resnet_classifier": build_resnet_classifier,
@@ -690,3 +691,21 @@ class TestWarnIfInvalidForZscoring:
         x_3d_outlier[0, 2, 3] = 10000.0  # Extreme outlier at position [2,3]
         with pytest.warns(UserWarning, match="extreme outliers"):
             warn_if_invalid_for_zscoring(x_3d_outlier)
+
+
+def test_mdn_transform_to_unconstrained():
+    """MDN with transform_to_unconstrained produces valid log_probs and samples."""
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((512,)), torch.randn(512, 3)
+    est = build_mdn(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+    theta, cond = prior.sample((5,)), torch.randn(1, 3)
+    lp = est.log_prob(theta.unsqueeze(1), cond)
+    assert lp.shape == (5, 1)
+    z = est._prior_transform(theta.unsqueeze(1))
+    mog = est.get_uncorrected_mog(cond)
+    ldj = est._prior_transform.log_abs_det_jacobian(theta.unsqueeze(1), z)
+    assert torch.allclose(lp, mog.log_prob(z) + ldj, atol=1e-5)
+    s = est.sample((10,), cond)
+    assert s.shape[0] == 10 and torch.isfinite(s).all()
