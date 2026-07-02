@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 """Scope-guard and boundary tests for opt-in ``compose_standardization``.
 
 These cover the patch lines that the build/checkpoint tests in
