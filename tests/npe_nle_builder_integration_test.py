@@ -125,21 +125,14 @@ def test_builder_role_shapes(trainer_cls, input_var):
 
 
 @pytest.mark.parametrize("trainer_cls", [MNLE, MNPE], ids=["mnle", "mnpe"])
-def test_mixed_trainer_default_no_warning(trainer_cls):
-    """MNLE/MNPE default must not emit FutureWarning (string converted to callable)."""
+def test_mixed_no_warning_for_valid_inputs(trainer_cls):
+    """None default and builder should not emit FutureWarning."""
     prior = MultivariateNormal(zeros(2), eye(2))
+    builder = MixedDensityEstimatorBuilder(continuous_model="nsf")
+
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
         trainer_cls(prior, show_progress_bars=False)
-
-
-@pytest.mark.parametrize("trainer_cls", [MNLE, MNPE], ids=["mnle", "mnpe"])
-def test_mixed_trainer_builder_no_warning(trainer_cls):
-    """Passing a MixedDensityEstimatorBuilder must not emit FutureWarning."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    builder = MixedDensityEstimatorBuilder(continuous_model="nsf")
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", FutureWarning)
         trainer_cls(prior, density_estimator=builder, show_progress_bars=False)
 
 
@@ -155,49 +148,73 @@ def test_mixed_string_emits_deprecation_warning(trainer_cls, string):
         trainer_cls(prior, density_estimator=string, show_progress_bars=False)
 
 
+@pytest.mark.parametrize(
+    "trainer_cls,wrong_string",
+    [(MNLE, "maf"), (MNPE, "nsf")],
+    ids=["mnle", "mnpe"],
+)
+def test_mixed_wrong_string_raises(trainer_cls, wrong_string):
+    """Passing a non-mnle/mnpe string should raise ValueError."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.raises(ValueError, match="supports only"):
+        trainer_cls(prior, density_estimator=wrong_string, show_progress_bars=False)
+
+
 def test_mixed_builder_invalid_continuous_model():
     """Invalid continuous_model should raise ValueError."""
     with pytest.raises(ValueError, match="continuous_model"):
         MixedDensityEstimatorBuilder(continuous_model="invalid")
 
 
-def test_mnle_train_with_mixed_builder():
-    """MNLE trains end-to-end with MixedDensityEstimatorBuilder."""
-    prior = BoxUniform(low=zeros(2), high=torch.ones(2))
+@pytest.mark.parametrize(
+    "trainer_cls,make_data,input_var",
+    [
+        (
+            MNLE,
+            # MNLE: theta=continuous params, x=mixed observations
+            lambda n: (
+                BoxUniform(low=zeros(2), high=torch.ones(2)).sample((n,)),
+                torch.cat(
+                    [torch.randn(n, 3), torch.randint(0, 3, (n, 2)).float()], dim=-1
+                ),
+            ),
+            "x",
+        ),
+        (
+            MNPE,
+            # MNPE: theta=mixed params, x=continuous observations
+            lambda n: (
+                torch.cat(
+                    [torch.randn(n, 2), torch.randint(0, 3, (n, 1)).float()], dim=-1
+                ),
+                torch.randn(n, 4),
+            ),
+            "theta",
+        ),
+    ],
+    ids=["mnle", "mnpe"],
+)
+def test_mixed_train_with_builder(trainer_cls, make_data, input_var):
+    """Train MNLE/MNPE with MixedDensityEstimatorBuilder end-to-end."""
     builder = MixedDensityEstimatorBuilder(
         continuous_model="nsf", hidden_features=16, num_transforms=2
     )
-    trainer = MNLE(prior, density_estimator=builder, show_progress_bars=False)
+    trainer = trainer_cls(density_estimator=builder, show_progress_bars=False)
 
-    # mixed data: continuous first, discrete last
-    theta = prior.sample((200,))
-    x_cont = torch.randn(200, 3)
-    x_disc = torch.randint(0, 3, (200, 2)).float()
-    x = torch.cat([x_cont, x_disc], dim=-1)
-
+    theta, x = make_data(200)
     estimator = trainer.append_simulations(theta, x).train(
         max_num_epochs=2, training_batch_size=100
     )
     assert isinstance(estimator, MixedDensityEstimator)
 
-
-def test_mnpe_train_with_mixed_builder():
-    """MNPE trains end-to-end with MixedDensityEstimatorBuilder."""
-    # theta has mixed types: continuous first, discrete last
-    n = 200
-    theta_cont = torch.randn(n, 2)
-    theta_disc = torch.randint(0, 3, (n, 1)).float()
-    theta = torch.cat([theta_cont, theta_disc], dim=-1)
-    x = torch.randn(n, 4)
-
-    builder = MixedDensityEstimatorBuilder(
-        continuous_model="nsf", hidden_features=16, num_transforms=2
-    )
-    trainer = MNPE(density_estimator=builder, show_progress_bars=False)
-    estimator = trainer.append_simulations(theta, x).train(
-        max_num_epochs=2, training_batch_size=100
-    )
-    assert isinstance(estimator, MixedDensityEstimator)
+    # verify the estimator actually evaluates with finite loss
+    theta_fresh, x_fresh = make_data(10)
+    if input_var == "theta":
+        loss = estimator.loss(theta_fresh, condition=x_fresh)
+    else:
+        loss = estimator.loss(x_fresh, condition=theta_fresh)
+    assert loss.shape == (10,)
+    assert torch.isfinite(loss).all()
 
 
 @pytest.mark.parametrize(
