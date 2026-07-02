@@ -814,7 +814,15 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
 def _apply_to_transform(
     transform: TorchTransform, fn: Callable[[Tensor], Tensor]
 ) -> None:
-    """Apply fn to all tensors in a transform tree."""
+    """Apply fn to all tensors in a transform tree.
+
+    Walks ComposeTransform.parts, IndependentTransform.base_transform,
+    etc., so .to() calls propagate into the transform.
+
+    Args:
+        transform: Root of the transform tree.
+        fn: Callable applied to each tensor (e.g. ``lambda t: t.to(device)``).
+    """
     seen = set()
 
     def _walk(t):
