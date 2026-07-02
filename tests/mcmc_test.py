@@ -158,6 +158,10 @@ def test_c2st_pymc_sampler_on_Gaussian(
         draws=(int(num_samples / num_chains)),  # PyMC does not use thinning
         tune=warmup,
         chains=num_chains,
+        seed=0,  # reproducible sampling; PyMC is not covered by the global seed
+        # PyMC's HMC default (target_accept=0.65) is biased on this peaked
+        # target (c2st ~0.63); 0.95 samples it accurately. See #1894 follow-up.
+        target_accept=0.95,
     )
     samples = sampler.run()
     assert samples.shape == (
@@ -171,6 +175,36 @@ def test_c2st_pymc_sampler_on_Gaussian(
     alg = f"pymc_{step}"
 
     check_c2st(samples, target_samples, alg=alg)
+
+
+@pytest.mark.mcmc
+@pytest.mark.parametrize(
+    ("method", "target_accept", "expected"),
+    [
+        ("hmc_pymc", None, 0.9),  # HMC default is raised (PyMC's 0.65 is biased)
+        ("hmc_pymc", 0.99, 0.99),  # user override wins
+        ("nuts_pymc", None, None),  # NUTS keeps PyMC's own default
+    ],
+)
+def test_pymc_target_accept_forwarded(method, target_accept, expected):
+    """target_accept from the user reaches the PyMC sampler with the right default."""
+    theta_dim = 2
+    prior = BoxUniform(low=-2 * ones(theta_dim), high=2 * ones(theta_dim))
+
+    def potential_fn(theta):
+        return -0.5 * (theta**2).sum(axis=-1)
+
+    mcmc_posterior = build_from_potential(potential_fn, prior)
+    mcmc_posterior.sample(
+        (10,),
+        method=method,
+        target_accept=target_accept,
+        num_chains=1,
+        warmup_steps=10,
+        thin=1,
+        show_progress_bars=False,
+    )
+    assert mcmc_posterior._posterior_sampler._target_accept == expected
 
 
 @pytest.mark.mcmc

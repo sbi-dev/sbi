@@ -244,6 +244,13 @@ class MCMCPosteriorParameters(PosteriorParameters):
             (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
             faster than `"spawn"` but is only supported on POSIX-based systems
             (e.g. Linux and macOS, not Windows).
+        target_accept: Target acceptance probability for the gradient-based
+            samplers (`hmc_pymc`, `nuts_pymc`, `hmc_pyro`, `nuts_pyro`), controlling
+            the step-size adaptation during warmup. Higher values take smaller,
+            more accurate steps at the cost of speed. Ignored by the slice samplers.
+            If `None`, HMC uses `0.9` (PyMC's default of `0.65` mixes poorly on
+            peaked targets and yields biased samples), while NUTS and the Pyro
+            samplers keep their respective backend defaults.
     """
 
     method: Literal[
@@ -262,9 +269,13 @@ class MCMCPosteriorParameters(PosteriorParameters):
     init_strategy_parameters: Optional[Dict[str, Any]] = None
     num_workers: int = 1
     mp_context: Literal["fork", "spawn"] = "spawn"
+    target_accept: Optional[float] = None
 
     def validate(self):
         """Validate MCMCPosteriorParameters fields."""
+
+        if self.target_accept is not None and not (0.0 < self.target_accept < 1.0):
+            raise ValueError("target_accept must be between 0 and 1, or None.")
 
         if not (
             self.init_strategy_parameters is None
