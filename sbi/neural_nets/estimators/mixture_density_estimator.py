@@ -22,6 +22,7 @@ from torch.nn import functional as F
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.sbi_types import TorchTransform
+from sbi.utils.sbiutils import _apply_to_transform
 
 
 class MultivariateGaussianMDN(nn.Module):
@@ -408,36 +409,8 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
     def _apply(self, fn):
         super()._apply(fn)
         if self._prior_transform is not None:
-            self._move_tensors(self._prior_transform, fn)
+            _apply_to_transform(self._prior_transform, fn)
         return self
-
-    @staticmethod
-    def _move_tensors(transform, fn):
-        seen = set()
-
-        def _walk(t):
-            if id(t) in seen:
-                return
-            seen.add(id(t))
-            for key, val in list(t.__dict__.items()):
-                if isinstance(val, Tensor):
-                    object.__setattr__(t, key, fn(val))
-                elif isinstance(val, (list, tuple)):
-                    changed = False
-                    items = list(val)
-                    for i, item in enumerate(items):
-                        if isinstance(item, Tensor):
-                            items[i] = fn(item)
-                            changed = True
-                        elif isinstance(item, TorchTransform):
-                            _walk(item)
-                    if changed:
-                        updated = type(val)(items) if isinstance(val, tuple) else items
-                        object.__setattr__(t, key, updated)
-                elif isinstance(val, TorchTransform):
-                    _walk(val)
-
-        _walk(transform)
 
     @property
     def embedding_net(self) -> nn.Module:

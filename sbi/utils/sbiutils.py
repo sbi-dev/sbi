@@ -811,10 +811,30 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
     return theta_repeated, x_repeated
 
 
-def _move_transform_tensors_to_device(
-    transform: TorchTransform, device: Union[str, torch.device]
+def _apply_to_transform(
+    transform: TorchTransform, fn: Callable[[Tensor], Tensor]
 ) -> None:
-    """Move all tensors in a transform tree to the target device."""
+    """Walk a transform tree and apply ``fn`` to every leaf tensor.
+
+    Handles ``ComposeTransform.parts``, ``IndependentTransform.base_transform``,
+    and any other transform attribute stored as a ``Tensor``, ``Transform``,
+    or ``list``/``tuple`` of ``Transform``s. Uses identity-tracking to avoid
+    infinite loops from cyclic references, though transforms are not expected
+    to have cycles.
+
+    This is a public utility because multiple call sites need it:
+
+    *  :func:`mcmc_transform` moves the freshly-built transform onto the
+       caller's target device.
+    *  ``MixtureDensityEstimator._apply`` propagates ``nn.Module`` device
+       moves into the transform so that ``.to()`` / ``.cuda()`` / ``.mps()``
+       work correctly.
+
+    Args:
+        transform: Root of the transform tree to walk.
+        fn: Callable applied to every ``Tensor`` encountered. Must return the
+            transformed tensor (e.g. ``lambda t: t.to(device)``).
+    """
     seen = set()
 
     def _walk(t):
@@ -823,22 +843,20 @@ def _move_transform_tensors_to_device(
         seen.add(id(t))
         for key, val in list(t.__dict__.items()):
             if isinstance(val, Tensor):
-                object.__setattr__(t, key, val.to(device))
-            elif isinstance(val, TorchTransform):
-                _walk(val)
+                object.__setattr__(t, key, fn(val))
             elif isinstance(val, (list, tuple)):
                 changed = False
                 items = list(val)
-                for i, item in enumerate(items):
-                    if isinstance(item, Tensor):
-                        items[i] = item.to(device)
-                        changed = True
-                    elif isinstance(item, TorchTransform):
+                for _i, item in enumerate(items):
+                    if isinstance(item, TorchTransform):
                         _walk(item)
+                        changed = True
                 if changed:
                     object.__setattr__(
-                        t, key, type(val)(items) if isinstance(val, tuple) else items
+                        t, key, tuple(items) if isinstance(val, tuple) else items
                     )
+            elif isinstance(val, TorchTransform):
+                _walk(val)
 
     _walk(transform)
 
@@ -958,7 +976,7 @@ def mcmc_transform(
     check_transform(prior, transform)  # type: ignore
 
     if enable_transform:
-        _move_transform_tensors_to_device(transform, device)
+        _apply_to_transform(transform, lambda t: t.to(device))
 
     return transform.inv  # type: ignore
 
