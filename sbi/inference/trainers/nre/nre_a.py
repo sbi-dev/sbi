@@ -82,11 +82,13 @@ class NRE_A(RatioEstimatorTrainer):
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. If `None`, the
                 prior must be passed to `.build_posterior()`.
-            classifier: If `None` (default), uses a `RatioEstimatorBuilder` with 
-                default settings. A `RatioEstimatorBuilder` can be passed to configure 
-                the classifier. If it is a string (deprecated), use a pre-configured 
-                network of the provided type (one of linear, mlp, resnet). Alternatively, 
-                a function that builds a custom neural network can be provided.            
+            classifier: If `None` (default), uses a
+                `RatioEstimatorBuilder` with default settings. A
+                `RatioEstimatorBuilder` can be passed to configure
+                the classifier. If it is a string (deprecated), use a
+                pre-configured network of the provided type (one of
+                linear, mlp, resnet). Alternatively, a function that
+                builds a custom neural network can be provided.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.

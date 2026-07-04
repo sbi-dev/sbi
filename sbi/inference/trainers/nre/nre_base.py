@@ -79,11 +79,13 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
           (normalizing constant) of the data $x$.
 
         Args:
-            classifier: If `None` (default), uses a `RatioEstimatorBuilder` with 
-                default settings. A `RatioEstimatorBuilder` can be passed to configure 
-                the classifier. If it is a string (deprecated), use a pre-configured 
-                network of the provided type (one of linear, mlp, resnet). Alternatively, 
-                a function that builds a custom neural network can be provided.
+            classifier: If `None` (default), uses a
+                `RatioEstimatorBuilder` with default settings. A
+                `RatioEstimatorBuilder` can be passed to configure
+                the classifier. If it is a string (deprecated), use a
+                pre-configured network of the provided type (one of
+                linear, mlp, resnet). Alternatively, a function that
+                builds a custom neural network can be provided.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
