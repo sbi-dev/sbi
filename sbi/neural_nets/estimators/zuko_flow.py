@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 import torch
 from torch import Tensor, nn
@@ -11,7 +11,8 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     UnconditionalDensityEstimator,
 )
-from sbi.sbi_types import Shape
+from sbi.sbi_types import Shape, TorchTransform
+from sbi.utils.sbiutils import _apply_to_transform
 
 
 class ZukoFlow(ConditionalDensityEstimator):
@@ -27,6 +28,7 @@ class ZukoFlow(ConditionalDensityEstimator):
         embedding_net: nn.Module,
         input_shape: torch.Size,
         condition_shape: torch.Size,
+        prior_transform: Optional[TorchTransform] = None,
     ):
         r"""Initialize the conditional density estimator.
 
@@ -36,6 +38,10 @@ class ZukoFlow(ConditionalDensityEstimator):
                 density is being evaluated (and which is also the event_shape
                 of samples).
             condition_shape: Event shape of the condition.
+            prior_transform: Optional unconstrained prior transform prepended to the
+                flow (for ``z_score_x="transform_to_unconstrained"``). Kept as a
+                reference so it follows ``.to()``/``.double()``; its tensors are
+                buried in a plain attribute that ``nn.Module`` cannot reach.
         """
 
         # assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
@@ -43,6 +49,13 @@ class ZukoFlow(ConditionalDensityEstimator):
             net=net, input_shape=input_shape, condition_shape=condition_shape
         )
         self._embedding_net = embedding_net
+        self._prior_transform = prior_transform
+
+    def _apply(self, fn):
+        super()._apply(fn)
+        if self._prior_transform is not None:
+            _apply_to_transform(self._prior_transform, fn)
+        return self
 
     @property
     def embedding_net(self) -> nn.Module:

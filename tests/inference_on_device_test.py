@@ -944,3 +944,52 @@ def test_mdn_transform_follows_dtype():
     cond = torch.randn(1, 3).double()
     lp = est.log_prob(theta.unsqueeze(1), cond)
     assert lp.dtype == torch.float64
+
+
+@pytest.mark.gpu
+def test_zuko_device_transform():
+    """Zuko flow with transform_to_unconstrained moves transform tensors on .to()."""
+    from sbi.neural_nets.net_builders.flow import build_zuko_maf
+    from sbi.utils.sbiutils import _transform_tensors
+
+    device = process_device("gpu")
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((512,)), torch.randn(512, 3)
+    est = build_zuko_maf(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+    est.to(device)
+
+    transform_tensors = _transform_tensors(est._prior_transform)
+    assert transform_tensors, "expected the prior transform to hold tensors"
+    for t in transform_tensors:
+        assert t.device.type == device.split(":")[0], (
+            f"transform tensor on {t.device}, expected {device}"
+        )
+
+    theta = prior.sample((5,)).to(device)
+    cond = torch.randn(1, 3).to(device)
+    lp = est.log_prob(theta.unsqueeze(1), cond)
+    assert lp.device.type == device.split(":")[0]
+    s = est.sample((10,), cond)
+    assert s.device.type == device.split(":")[0]
+
+
+def test_zuko_transform_follows_dtype():
+    """Zuko transform_to_unconstrained transform follows dtype casts.
+
+    Runs on every CI (no GPU needed): guards that the prior transform is reachable
+    by nn.Module._apply through the estimator's _apply override. Unlike the network
+    weights, the transform lives behind a plain attribute, so without the override a
+    .double()/.to() cast would silently leave it on the old dtype/device.
+    """
+    from sbi.neural_nets.net_builders.flow import build_zuko_maf
+    from sbi.utils.sbiutils import _transform_tensors
+
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((256,)), torch.randn(256, 3)
+    est = build_zuko_maf(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+
+    est.double()
+
+    transform_tensors = _transform_tensors(est._prior_transform)
+    assert transform_tensors, "expected the prior transform to hold tensors"
+    assert all(t.dtype == torch.float64 for t in transform_tensors)

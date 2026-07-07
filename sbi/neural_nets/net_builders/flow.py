@@ -18,6 +18,7 @@ from zuko.lazy import Flow, LazyDistribution
 
 from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow, ZukoUnconditionalFlow
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
+from sbi.sbi_types import TorchTransform
 from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
     assert_transform_to_unconstrained_supported,
@@ -1148,7 +1149,7 @@ def build_zuko_flow(
     )
 
     # Get x transforms (z-score or logit transform)
-    x_transforms = _prepare_x_transforms(z_score_x, batch_x, x_dist)
+    x_transforms, prior_transform = _prepare_x_transforms(z_score_x, batch_x, x_dist)
 
     # Combine all transforms
     transforms = x_transforms + base_transforms
@@ -1164,6 +1165,7 @@ def build_zuko_flow(
         embedding_net,
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
+        prior_transform=prior_transform,
     )
 
     return flow
@@ -1281,7 +1283,7 @@ def _prepare_x_transforms(
     ],
     batch_x: Tensor,
     x_dist: Optional[Distribution],
-) -> tuple:
+) -> Tuple[Tuple, Optional[TorchTransform]]:
     """
     Prepare transforms to prepend for x processing.
 
@@ -1291,9 +1293,14 @@ def _prepare_x_transforms(
         x_dist: Distribution for unconstrained transformation.
 
     Returns:
-        Tuple of transforms to prepend (empty tuple if no preprocessing).
+        Tuple ``(transforms, prior_transform)``: the transforms to prepend (empty
+        tuple if no preprocessing) and the raw unconstrained prior transform
+        (``None`` unless ``z_score_x == "transform_to_unconstrained"``). The latter
+        is returned so the estimator can keep a reference and move it with ``.to()``
+        (it is otherwise buried in a plain attribute invisible to ``nn.Module``).
     """
     transforms = ()
+    prior_transform = None
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x == "transform_to_unconstrained":
         if x_dist is None:
@@ -1306,13 +1313,13 @@ def _prepare_x_transforms(
                 "`x_dist` requires a `.support` attribute for"
                 "an unconstrained transformation."
             )
-        transform_to_unconstrained = biject_transform_zuko(mcmc_transform(x_dist))
-        transforms = (transform_to_unconstrained,)
+        prior_transform = mcmc_transform(x_dist, device=batch_x.device)
+        transforms = (biject_transform_zuko(prior_transform),)
     elif z_score_x_bool:
         z_score_transform = standardizing_transform_zuko(batch_x, structured_x)
         transforms = (z_score_transform,)
 
-    return transforms
+    return transforms, prior_transform
 
 
 def build_zuko_unconditional_flow(
