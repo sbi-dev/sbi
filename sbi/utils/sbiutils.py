@@ -811,17 +811,19 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
     return theta_repeated, x_repeated
 
 
-def _apply_to_transform(
-    transform: TorchTransform, fn: Callable[[Tensor], Tensor]
+def _walk_transform_tensors(
+    transform: TorchTransform, visit: Callable[[object, str, Tensor], None]
 ) -> None:
-    """Apply fn to all tensors in a transform tree.
+    """Walk a transform tree, calling ``visit(holder, key, tensor)`` per tensor.
 
-    Walks ComposeTransform.parts, IndependentTransform.base_transform,
-    etc., so .to() calls propagate into the transform.
+    Traverses ``ComposeTransform.parts``, ``IndependentTransform.base_transform``,
+    etc., so callers can move (``.to()``) or collect the tensors held inside a
+    transform, which are otherwise invisible to ``nn.Module._apply``.
 
     Args:
         transform: Root of the transform tree.
-        fn: Callable applied to each tensor (e.g. ``lambda t: t.to(device)``).
+        visit: Callback invoked for each tensor with its holder object and
+            attribute name, e.g. to reassign or accumulate it.
     """
     seen = set()
 
@@ -831,7 +833,7 @@ def _apply_to_transform(
         seen.add(id(t))
         for key, val in list(t.__dict__.items()):
             if isinstance(val, Tensor):
-                object.__setattr__(t, key, fn(val))
+                visit(t, key, val)
             elif isinstance(val, (list, tuple)):
                 for item in val:
                     if isinstance(item, TorchTransform):
@@ -842,10 +844,27 @@ def _apply_to_transform(
     _walk(transform)
 
 
-def _transform_tensors(
-    transform: TorchTransform,
-) -> List[Tensor]:
-    """Collect every tensor in a transform tree (mirror of _apply_to_transform).
+def _apply_to_transform(
+    transform: TorchTransform, fn: Callable[[Tensor], Tensor]
+) -> None:
+    """Apply fn to all tensors in a transform tree.
+
+    So ``.to()``/``.double()`` calls propagate into a transform held as a plain
+    attribute (e.g. a prior transform on an estimator).
+
+    Args:
+        transform: Root of the transform tree.
+        fn: Callable applied to each tensor (e.g. ``lambda t: t.to(device)``).
+    """
+
+    def _move(holder, key, tensor):
+        object.__setattr__(holder, key, fn(tensor))
+
+    _walk_transform_tensors(transform, _move)
+
+
+def _transform_tensors(transform: TorchTransform) -> List[Tensor]:
+    """Collect every tensor in a transform tree.
 
     Args:
         transform: Root of the transform tree.
@@ -853,24 +872,10 @@ def _transform_tensors(
     Returns:
         List of all tensors found in the transform tree.
     """
-    seen = set()
     tensors: List[Tensor] = []
-
-    def _walk(t):
-        if id(t) in seen:
-            return
-        seen.add(id(t))
-        for val in t.__dict__.values():
-            if isinstance(val, Tensor):
-                tensors.append(val)
-            elif isinstance(val, (list, tuple)):
-                for item in val:
-                    if isinstance(item, TorchTransform):
-                        _walk(item)
-            elif isinstance(val, TorchTransform):
-                _walk(val)
-
-    _walk(transform)
+    _walk_transform_tensors(
+        transform, lambda _holder, _key, tensor: tensors.append(tensor)
+    )
     return tensors
 
 
