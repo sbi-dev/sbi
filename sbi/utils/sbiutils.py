@@ -833,20 +833,45 @@ def _apply_to_transform(
             if isinstance(val, Tensor):
                 object.__setattr__(t, key, fn(val))
             elif isinstance(val, (list, tuple)):
-                changed = False
-                items = list(val)
-                for _i, item in enumerate(items):
+                for item in val:
                     if isinstance(item, TorchTransform):
                         _walk(item)
-                        changed = True
-                if changed:
-                    object.__setattr__(
-                        t, key, tuple(items) if isinstance(val, tuple) else items
-                    )
             elif isinstance(val, TorchTransform):
                 _walk(val)
 
     _walk(transform)
+
+
+def _transform_tensors(
+    transform: TorchTransform,
+) -> List[Tensor]:
+    """Collect every tensor in a transform tree (mirror of _apply_to_transform).
+
+    Args:
+        transform: Root of the transform tree.
+
+    Returns:
+        List of all tensors found in the transform tree.
+    """
+    seen = set()
+    tensors: List[Tensor] = []
+
+    def _walk(t):
+        if id(t) in seen:
+            return
+        seen.add(id(t))
+        for val in t.__dict__.values():
+            if isinstance(val, Tensor):
+                tensors.append(val)
+            elif isinstance(val, (list, tuple)):
+                for item in val:
+                    if isinstance(item, TorchTransform):
+                        _walk(item)
+            elif isinstance(val, TorchTransform):
+                _walk(val)
+
+    _walk(transform)
+    return tensors
 
 
 def mcmc_transform(
