@@ -12,7 +12,7 @@ from sbi.neural_nets.estimators.base import (
     UnconditionalDensityEstimator,
 )
 from sbi.sbi_types import Shape, TorchTransform
-from sbi.utils.sbiutils import _apply_to_transform
+from sbi.utils.sbiutils import CallableTransform, _apply_to_transform
 
 
 class ZukoFlow(ConditionalDensityEstimator):
@@ -55,6 +55,28 @@ class ZukoFlow(ConditionalDensityEstimator):
         if self._prior_transform is not None:
             _apply_to_transform(self._prior_transform, fn)
         return self
+
+    def __getstate__(self):
+        # `_prior_transform` is the same inverse-transform object the flow holds
+        # (inside a CallableTransform). Torch would drop its data on pickling, so
+        # don't pickle this redundant reference — the CallableTransform pickles the
+        # transform correctly, and we re-link to it on load (see __setstate__).
+        state = dict(super().__getstate__())
+        if self._prior_transform is not None:
+            state["_prior_transform"] = None
+        return state
+
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        self._prior_transform = self._find_prior_transform()
+
+    def _find_prior_transform(self) -> Optional[TorchTransform]:
+        """Recover the prior transform from the flow's CallableTransform, if any."""
+        for module in self.net.modules():
+            wrapped = getattr(module, "f", None)
+            if isinstance(wrapped, CallableTransform):
+                return wrapped.transform
+        return None
 
     @property
     def embedding_net(self) -> nn.Module:

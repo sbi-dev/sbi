@@ -295,6 +295,16 @@ class CallableTransform:
     def __call__(self):
         return self.transform
 
+    def __getstate__(self):
+        # `transform` is an inverse transform whose data lives behind its `_inv`
+        # link, which torch's Transform.__getstate__ nulls on pickling. Store the
+        # forward instead (it pickles cleanly, keeping device/dtype) and re-invert
+        # on load, so a pickled Zuko flow keeps a working transform.
+        return {"transform": self.transform.inv}
+
+    def __setstate__(self, state):
+        self.transform = state["transform"].inv
+
 
 def biject_transform_zuko(
     transform: TorchTransform,

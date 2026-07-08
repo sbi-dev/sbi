@@ -92,3 +92,26 @@ def test_mdn_transform_to_unconstrained_picklable():
     actual = reloaded.log_prob(theta, cond)
 
     assert torch.allclose(expected, actual)
+
+
+def test_zuko_transform_to_unconstrained_picklable():
+    """A Zuko flow using transform_to_unconstrained survives a pickle round-trip.
+
+    Same root cause as the MDN case, but the transform is wrapped in a
+    CallableTransform inside the flow, and is additionally referenced by
+    ZukoFlow._prior_transform — both must come back consistent.
+    """
+    from sbi.neural_nets.net_builders.flow import build_zuko_maf
+    from sbi.utils import BoxUniform
+
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((256,)), torch.randn(256, 3)
+    est = build_zuko_maf(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+
+    theta, cond = prior.sample((5,)).unsqueeze(1), torch.randn(1, 3)
+    expected = est.log_prob(theta, cond)
+
+    reloaded = pickle.loads(pickle.dumps(est))
+    actual = reloaded.log_prob(theta, cond)
+
+    assert torch.allclose(expected, actual)
