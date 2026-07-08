@@ -68,3 +68,27 @@ def test_picklability(
         pickle.dump(inference, handle)
     with open(f"{tmp_path}/saved_inference.pickle", "rb") as handle:
         _ = pickle.load(handle)
+
+
+def test_mdn_transform_to_unconstrained_picklable():
+    """An MDN using transform_to_unconstrained survives a pickle round-trip.
+
+    Regression: sbi stores the prior transform as an inverse transform, whose data
+    lives behind the `_inv` link that torch's Transform.__getstate__ nulls on
+    pickling. Naively pickling therefore discards the transform's tensors and yields
+    an object that raises "_inv must not be None" on first use.
+    """
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+    from sbi.utils import BoxUniform
+
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((256,)), torch.randn(256, 3)
+    est = build_mdn(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+
+    theta, cond = prior.sample((5,)).unsqueeze(1), torch.randn(1, 3)
+    expected = est.log_prob(theta, cond)
+
+    reloaded = pickle.loads(pickle.dumps(est))
+    actual = reloaded.log_prob(theta, cond)
+
+    assert torch.allclose(expected, actual)

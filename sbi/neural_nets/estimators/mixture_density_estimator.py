@@ -412,6 +412,21 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             _apply_to_transform(self._prior_transform, fn)
         return self
 
+    def __getstate__(self):
+        # `_prior_transform` is an inverse transform whose data lives behind its
+        # `_inv` link; torch's Transform.__getstate__ nulls `_inv` on pickling,
+        # which would discard the transform. Store the forward instead (it pickles
+        # cleanly, carrying device/dtype) and re-invert it on load.
+        state = dict(super().__getstate__())
+        if self._prior_transform is not None:
+            state["_prior_transform"] = self._prior_transform.inv
+        return state
+
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        if self._prior_transform is not None:
+            self._prior_transform = self._prior_transform.inv
+
     @property
     def embedding_net(self) -> nn.Module:
         """Return the embedding network."""
