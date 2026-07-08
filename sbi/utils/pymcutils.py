@@ -106,7 +106,12 @@ class NeuralLikelihoodOp(Op):
     # We define outputs explicitly in make_node and only use default_output here.
     default_output: int = 0  # Return only log-likelihood by default when called
 
-    __props__ = ("observation_shape", "observation_digest")
+    __props__ = (
+        "observation_shape",
+        "observation_digest",
+        "observation_dtype",
+        "estimator_id",
+    )
 
     def __init__(
         self,
@@ -120,6 +125,10 @@ class NeuralLikelihoodOp(Op):
             observation: Observed data x_o to condition on, shape (n_obs, *event_shape)
         """
         self.estimator = estimator
+        # Identity for Op equality: two Ops with the same observation but
+        # different estimators must NOT be merged by PyTensor. id() is stable for
+        # the estimator's lifetime, which spans the graph.
+        self.estimator_id = id(estimator)
 
         # Infer device & dtype from estimator parameters
         self._torch_device, self._torch_dtype = _get_estimator_device_dtype(estimator)
@@ -130,6 +139,7 @@ class NeuralLikelihoodOp(Op):
         )
         self.observation_shape = tuple(observation.shape)
         self.observation_digest = _compute_observation_digest(observation)
+        self.observation_dtype = str(np.asarray(observation).dtype)
 
         # Ensure single observation has an explicit leading n_obs dimension.
         # Shapes after this:
@@ -289,6 +299,8 @@ class HierarchicalNeuralLikelihoodOp(Op):
     __props__ = (
         "observation_shape",
         "observation_digest",
+        "observation_dtype",
+        "estimator_id",
         "num_trials",
         "num_subjects",
         "num_groups",
@@ -313,6 +325,9 @@ class HierarchicalNeuralLikelihoodOp(Op):
             num_groups: Number of groups for 3-level hierarchy (None for 2-level)
         """
         self.estimator = estimator
+        # See NeuralLikelihoodOp.estimator_id: prevents PyTensor from merging Ops
+        # that share an observation but wrap different estimators.
+        self.estimator_id = id(estimator)
         self.num_trials = num_trials
         self.num_subjects = num_subjects
         self.num_groups = num_groups
@@ -361,6 +376,7 @@ class HierarchicalNeuralLikelihoodOp(Op):
             obs_flat = obs_flat.reshape(-1, *obs_np.shape[2:])  # (S*T, *E)
 
         self.observation_digest = _compute_observation_digest(obs_np)
+        self.observation_dtype = str(np.asarray(obs_np).dtype)
 
         self.observation = torch.as_tensor(
             obs_flat, dtype=self._torch_dtype, device=self._torch_device
@@ -657,7 +673,10 @@ def neural_likelihood_to_pymc(
     if num_trials is not None and num_subjects is not None:
         # Hierarchical mode (2-level or 3-level)
         op = HierarchicalNeuralLikelihoodOp(
-            likelihood_nn, observed, num_trials, num_subjects,
+            likelihood_nn,
+            observed,
+            num_trials,
+            num_subjects,
             num_groups=num_groups,
         )
     elif num_trials is None and num_subjects is None and num_groups is None:
