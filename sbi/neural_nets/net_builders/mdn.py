@@ -44,7 +44,10 @@ def build_mdn(
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
             - `transform_to_unconstrained`: transform inputs to unconstrained space
-            using the prior's support. Requires `x_dist` to be provided.
+            using the prior's support. Requires `x_dist` to be provided. This
+            transform follows `.to()`/`.cuda()`/`.double()` and is preserved by
+            pickling the estimator (the standard sbi save path), but is not part of
+            `state_dict()`; reconstruct via the builder before `load_state_dict()`.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
         hidden_features: Number of hidden features.

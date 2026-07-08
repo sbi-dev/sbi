@@ -40,7 +40,9 @@ class ZukoFlow(ConditionalDensityEstimator):
             condition_shape: Event shape of the condition.
             prior_transform: Optional unconstrained prior transform prepended to the
                 flow (for ``z_score_x="transform_to_unconstrained"``). Kept as a
-                reference so it follows ``.to()``/``.double()``.
+                reference so it follows ``.to()``/``.double()``. Preserved by
+                pickling the estimator (sbi's save path), not by ``state_dict()``;
+                reconstruct via the builder before ``load_state_dict()``.
         """
 
         # assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
@@ -60,18 +62,34 @@ class ZukoFlow(ConditionalDensityEstimator):
         # `_prior_transform` is the same inverse-transform object the flow holds
         # (inside a CallableTransform). Torch would drop its data on pickling, so
         # don't pickle this redundant reference — the CallableTransform pickles the
-        # transform correctly, and we re-link to it on load (see __setstate__).
+        # transform correctly, and we re-link to it on load (see __setstate__). Keep
+        # a flag so __setstate__ can fail loudly if the re-link ever comes up empty.
         state = dict(super().__getstate__())
-        if self._prior_transform is not None:
-            state["_prior_transform"] = None
+        state["_had_prior_transform"] = self._prior_transform is not None
+        state["_prior_transform"] = None
         return state
 
     def __setstate__(self, state):
+        had_prior_transform = state.pop("_had_prior_transform", False)
         super().__setstate__(state)
         self._prior_transform = self._find_prior_transform()
+        if had_prior_transform and self._prior_transform is None:
+            raise RuntimeError(
+                "ZukoFlow lost its prior transform while unpickling: it could not "
+                "be recovered from the flow. This likely means the installed `zuko` "
+                "version changed the flow's internal structure (the transform is "
+                "located via `zuko`'s `Partial.f` attribute in "
+                "`_find_prior_transform`)."
+            )
 
     def _find_prior_transform(self) -> Optional[TorchTransform]:
-        """Recover the prior transform from the flow's CallableTransform, if any."""
+        """Recover the prior transform from the flow's CallableTransform, if any.
+
+        Assumes at most one `CallableTransform` in the flow (true today: only the
+        single `transform_to_unconstrained` prior transform is wrapped this way).
+        Returns the first match; revisit if `_prepare_x_transforms` ever composes
+        multiple `CallableTransform`s.
+        """
         for module in self.net.modules():
             wrapped = getattr(module, "f", None)
             if isinstance(wrapped, CallableTransform):
