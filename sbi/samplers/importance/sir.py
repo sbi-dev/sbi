@@ -52,6 +52,7 @@ def sampling_importance_resampling(
         batch_size = min(sampling_batch_size, num_remaining)
         with torch.no_grad():
             from sbi.utils.pbar import nested_pbar_context
+
             with nested_pbar_context():
                 thetas, log_weights = importance_sample(
                     potential_fn=potential_fn,
