@@ -320,9 +320,8 @@ def accept_reject_sample(
     pbar = tqdm(
         disable=not show_progress_bars,
         total=num_samples,
-        desc=f"Drawing {num_samples} samples for {num_xos} observation" + "s"
-        if num_xos > 1
-        else "",
+        desc=f"Drawing {num_samples} samples"
+        + (f" for {num_xos} observations" if num_xos > 1 else ""),
     )
 
     accepted = [[] for _ in range(num_xos)]
