@@ -113,15 +113,13 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
                 stacklevel=3,
             )
             self._build_neural_net = classifier_nn(model=classifier)
-        elif isinstance(classifier, _EstimatorBuilderBase) and not isinstance(
-            classifier, RatioEstimatorBuilder
-        ):
-            raise TypeError(
-                "NRE requires a RatioEstimatorBuilder; got "
-                f"{type(classifier).__name__}. Use "
-                "RatioEstimatorBuilder(model=...)."
-            )
         elif isinstance(classifier, _EstimatorBuilderBase):
+            if not isinstance(classifier, RatioEstimatorBuilder):
+                raise TypeError(
+                    "NRE requires a RatioEstimatorBuilder; got "
+                    f"{type(classifier).__name__}. Use "
+                    "RatioEstimatorBuilder(model=...)."
+                )
             self._build_neural_net = self._wrap_builder(classifier)
         else:
             self._build_neural_net = classifier

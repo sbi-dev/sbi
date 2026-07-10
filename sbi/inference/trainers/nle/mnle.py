@@ -123,14 +123,13 @@ class MNLE(LikelihoodEstimatorTrainer):
                 stacklevel=2,
             )
             density_estimator = likelihood_nn(model="mnle")
-        elif isinstance(density_estimator, _EstimatorBuilderBase) and not isinstance(
-            density_estimator, MixedDensityEstimatorBuilder
-        ):
-            raise TypeError(
-                "MNLE requires a MixedDensityEstimatorBuilder; got "
-                f"{type(density_estimator).__name__}. Use "
-                "MixedDensityEstimatorBuilder(continuous_model=...)."
-            )
+        elif isinstance(density_estimator, _EstimatorBuilderBase):
+            if not isinstance(density_estimator, MixedDensityEstimatorBuilder):
+                raise TypeError(
+                    "MNLE requires a MixedDensityEstimatorBuilder; got "
+                    f"{type(density_estimator).__name__}. Use "
+                    "MixedDensityEstimatorBuilder(continuous_model=...)."
+                )
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 

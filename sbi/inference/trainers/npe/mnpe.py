@@ -125,14 +125,13 @@ class MNPE(NPE_C):
                 stacklevel=2,
             )
             density_estimator = posterior_nn(model="mnpe")
-        elif isinstance(density_estimator, _EstimatorBuilderBase) and not isinstance(
-            density_estimator, MixedDensityEstimatorBuilder
-        ):
-            raise TypeError(
-                "MNPE requires a MixedDensityEstimatorBuilder; got "
-                f"{type(density_estimator).__name__}. Use "
-                "MixedDensityEstimatorBuilder(continuous_model=...)."
-            )
+        elif isinstance(density_estimator, _EstimatorBuilderBase):
+            if not isinstance(density_estimator, MixedDensityEstimatorBuilder):
+                raise TypeError(
+                    "MNPE requires a MixedDensityEstimatorBuilder; got "
+                    f"{type(density_estimator).__name__}. Use "
+                    "MixedDensityEstimatorBuilder(continuous_model=...)."
+                )
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
