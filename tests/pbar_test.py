@@ -1,7 +1,5 @@
 import threading
 
-import pytest
-
 from sbi.utils.pbar import is_nested, nested_pbar_context
 
 
