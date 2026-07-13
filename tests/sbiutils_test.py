@@ -711,14 +711,13 @@ def test_mdn_transform_to_unconstrained():
     assert s.shape[0] == 10 and torch.isfinite(s).all()
 
 
-def test_walk_transform_tensors_reaches_nested_tensors():
-    """The shared transform walker reaches tensors behind lists, nesting and .inv.
+def test_apply_to_transform_reaches_nested_tensors():
+    """`_apply_to_transform` reaches tensors behind lists, nesting and .inv.
 
-    Guards `_walk_transform_tensors` (and its `_apply_to_transform` /
-    `_transform_tensors` wrappers), which move a prior transform onto a device.
     The leaf `loc`/`scale` sit behind `_InverseTransform -> IndependentTransform ->
     ComposeTransform.parts (a list) -> AffineTransform`, so a walk that missed the
-    list branch or the inverse would silently move nothing.
+    list branch or the inverse would silently touch nothing. A dtype cast is the
+    observable effect: both leaves must change.
     """
     from torch.distributions.transforms import (
         AffineTransform,
@@ -726,22 +725,15 @@ def test_walk_transform_tensors_reaches_nested_tensors():
         SigmoidTransform,
     )
 
-    from sbi.utils.sbiutils import _apply_to_transform, _transform_tensors
+    from sbi.utils.sbiutils import _apply_to_transform
 
-    loc, scale = torch.zeros(3), torch.ones(3)
-    affine = AffineTransform(loc, scale)
+    affine = AffineTransform(torch.zeros(3), torch.ones(3))
     # matches the shape mcmc_transform produces for a bounded prior, then inverted.
     transform = IndependentTransform(
         ComposeTransform([SigmoidTransform(), affine]), 1
     ).inv
 
-    # collector reaches exactly the two leaf tensors (same objects), not zero.
-    tensors = _transform_tensors(transform)
-    assert len(tensors) == 2
-    assert any(t is loc for t in tensors)
-    assert any(t is scale for t in tensors)
-
-    # apply reaches every tensor via the same walk (dtype cast as an observable op).
+    assert affine.loc.dtype == torch.float32 and affine.scale.dtype == torch.float32
     _apply_to_transform(transform, lambda t: t.double())
     assert affine.loc.dtype == torch.float64
     assert affine.scale.dtype == torch.float64

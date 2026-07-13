@@ -58,6 +58,25 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _collect_transform_tensors(transform):
+    """Collect every tensor in a transform tree, reusing the production walk.
+
+    Test helper for the transform_to_unconstrained device/dtype checks: drives
+    ``_apply_to_transform`` with a recording identity fn so we don't duplicate the
+    tree-walk in the tests.
+    """
+    from sbi.utils.sbiutils import _apply_to_transform
+
+    collected = []
+
+    def _record(tensor):
+        collected.append(tensor)
+        return tensor
+
+    _apply_to_transform(transform, _record)
+    return collected
+
+
 @pytest.mark.slow
 @pytest.mark.gpu
 @pytest.mark.parametrize(
@@ -897,7 +916,6 @@ def test_npe_pfn_on_device(prior_device):
 def test_mdn_device_transform():
     """MDN with transform_to_unconstrained moves transform tensors on .to()."""
     from sbi.neural_nets.net_builders.mdn import build_mdn
-    from sbi.utils.sbiutils import _transform_tensors
 
     device = process_device("gpu")
     prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
@@ -905,7 +923,7 @@ def test_mdn_device_transform():
     est = build_mdn(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
     est.to(device)
 
-    transform_tensors = _transform_tensors(est._prior_transform)
+    transform_tensors = _collect_transform_tensors(est._prior_transform)
     assert transform_tensors, "expected the prior transform to hold tensors"
     for t in transform_tensors:
         assert t.device.type == device.split(":")[0], (
@@ -928,7 +946,6 @@ def test_mdn_transform_follows_dtype():
     Runs on every CI (no GPU needed).
     """
     from sbi.neural_nets.net_builders.mdn import build_mdn
-    from sbi.utils.sbiutils import _transform_tensors
 
     prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
     bx, by = prior.sample((256,)), torch.randn(256, 3)
@@ -936,7 +953,7 @@ def test_mdn_transform_follows_dtype():
 
     est.double()
 
-    transform_tensors = _transform_tensors(est._prior_transform)
+    transform_tensors = _collect_transform_tensors(est._prior_transform)
     assert transform_tensors, "expected the prior transform to hold tensors"
     assert all(t.dtype == torch.float64 for t in transform_tensors)
 
@@ -950,7 +967,6 @@ def test_mdn_transform_follows_dtype():
 def test_zuko_device_transform():
     """Zuko flow with transform_to_unconstrained moves transform tensors on .to()."""
     from sbi.neural_nets.net_builders.flow import build_zuko_maf
-    from sbi.utils.sbiutils import _transform_tensors
 
     device = process_device("gpu")
     prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
@@ -958,7 +974,7 @@ def test_zuko_device_transform():
     est = build_zuko_maf(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
     est.to(device)
 
-    transform_tensors = _transform_tensors(est._prior_transform)
+    transform_tensors = _collect_transform_tensors(est._prior_transform)
     assert transform_tensors, "expected the prior transform to hold tensors"
     for t in transform_tensors:
         assert t.device.type == device.split(":")[0], (
@@ -982,7 +998,6 @@ def test_zuko_transform_follows_dtype():
     .double()/.to() cast would silently leave it on the old dtype/device.
     """
     from sbi.neural_nets.net_builders.flow import build_zuko_maf
-    from sbi.utils.sbiutils import _transform_tensors
 
     prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
     bx, by = prior.sample((256,)), torch.randn(256, 3)
@@ -990,6 +1005,6 @@ def test_zuko_transform_follows_dtype():
 
     est.double()
 
-    transform_tensors = _transform_tensors(est._prior_transform)
+    transform_tensors = _collect_transform_tensors(est._prior_transform)
     assert transform_tensors, "expected the prior transform to hold tensors"
     assert all(t.dtype == torch.float64 for t in transform_tensors)
