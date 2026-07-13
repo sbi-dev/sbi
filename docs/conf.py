@@ -24,11 +24,11 @@ import datetime
 
 project = 'sbi'
 
-today = datetime.datetime.today()
-current_year = today.strftime('%Y')
+start_year = 2020
+current_year = datetime.date.today().year
 
 author = 'sbi team'
-copyright = f'2020-{current_year}, {author}'
+copyright = f'{start_year}, {author}' if current_year == start_year else f'{start_year}-{current_year}, {author}'
 
 
 # -- General configuration ---------------------------------------------------
