@@ -18,17 +18,12 @@
 # sys.path.insert(0, os.path.abspath('.'))
 import os
 import shutil
-import datetime
 
 # -- Project information -----------------------------------------------------
 
 project = 'sbi'
-
-start_year = 2020
-current_year = datetime.date.today().year
-
 author = 'sbi team'
-copyright = f'{start_year}, {author}' if current_year == start_year else f'{start_year}-{current_year}, {author}'
+copyright = f'2020-%Y, {author}'
 
 
 # -- General configuration ---------------------------------------------------
