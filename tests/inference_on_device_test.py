@@ -912,9 +912,12 @@ def test_npe_pfn_on_device(prior_device):
     )
 
 
-@pytest.mark.gpu
 def test_mdn_device_transform():
-    """MDN with transform_to_unconstrained moves transform tensors on .to()."""
+    """MDN with transform_to_unconstrained moves transform tensors on .to().
+
+    Runs on any available accelerator (CUDA or MPS); the module-level skipif
+    gates it off on CPU-only machines.
+    """
     from sbi.neural_nets.net_builders.mdn import build_mdn
 
     device = process_device("gpu")
@@ -963,9 +966,12 @@ def test_mdn_transform_follows_dtype():
     assert lp.dtype == torch.float64
 
 
-@pytest.mark.gpu
 def test_zuko_device_transform():
-    """Zuko flow with transform_to_unconstrained moves transform tensors on .to()."""
+    """Zuko flow with transform_to_unconstrained moves transform tensors on .to().
+
+    Runs on any available accelerator (CUDA or MPS); the module-level skipif
+    gates it off on CPU-only machines.
+    """
     from sbi.neural_nets.net_builders.flow import build_zuko_maf
 
     device = process_device("gpu")
