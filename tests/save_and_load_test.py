@@ -94,6 +94,35 @@ def test_mdn_transform_to_unconstrained_picklable():
     assert torch.allclose(expected, actual)
 
 
+def test_mdn_pickle_preserves_concrete_prior_transform():
+    """A concrete (non-inverse) prior transform on an MDN survives pickling.
+
+    The `_inv`-dropping workaround only applies to inverse transforms. A concrete
+    forward transform (e.g. a user-supplied AffineTransform, as the __init__ contract
+    allows) must be pickled as-is; inverting it would wrap it in an inverse whose data
+    torch then drops on pickle.
+    """
+    from torch.distributions.transforms import AffineTransform
+
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+    from sbi.utils import BoxUniform
+
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((256,)), torch.randn(256, 3)
+    est = build_mdn(bx, by)
+    # A concrete forward transform (maps constrained -> unconstrained), not the
+    # inverse wrapper that mcmc_transform produces.
+    est._prior_transform = AffineTransform(torch.zeros(2), 2 * torch.ones(2))
+
+    theta, cond = prior.sample((5,)).unsqueeze(1), torch.randn(1, 3)
+    expected = est.log_prob(theta, cond)
+
+    reloaded = pickle.loads(pickle.dumps(est))
+    actual = reloaded.log_prob(theta, cond)
+
+    assert torch.allclose(expected, actual)
+
+
 def test_zuko_transform_to_unconstrained_picklable():
     """A Zuko flow using transform_to_unconstrained survives a pickle round-trip.
 

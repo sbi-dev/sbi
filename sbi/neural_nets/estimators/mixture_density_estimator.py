@@ -17,6 +17,7 @@ from typing import Optional
 import numpy as np
 import torch
 from torch import Tensor, nn
+from torch.distributions.transforms import _InverseTransform
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
@@ -413,17 +414,20 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         return self
 
     def __getstate__(self):
-        # torch drops an inverse transform's tensors on pickling; store the forward
-        # and re-invert on load.
         state = dict(super().__getstate__())
-        if self._prior_transform is not None:
-            state["_prior_transform"] = self._prior_transform.inv
+        t = self._prior_transform
+        # torch drops an inverse transform's data (its `_inv`) on pickling; stash the
+        # wrapped forward and rebuild on load. Concrete transforms pickle fine as-is.
+        if isinstance(t, _InverseTransform):
+            state["_prior_transform"] = None
+            state["_prior_transform_forward"] = t.inv
         return state
 
     def __setstate__(self, state):
+        forward = state.pop("_prior_transform_forward", None)
         super().__setstate__(state)
-        if self._prior_transform is not None:
-            self._prior_transform = self._prior_transform.inv
+        if forward is not None:
+            self._prior_transform = forward.inv
 
     @property
     def embedding_net(self) -> nn.Module:
