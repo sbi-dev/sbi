@@ -1295,9 +1295,7 @@ def _prepare_x_transforms(
     Returns:
         Tuple ``(transforms, prior_transform)``: the transforms to prepend (empty
         tuple if no preprocessing) and the raw unconstrained prior transform
-        (``None`` unless ``z_score_x == "transform_to_unconstrained"``). The latter
-        is returned so the estimator can keep a reference and move it with ``.to()``
-        (it is otherwise buried in a plain attribute invisible to ``nn.Module``).
+        (``None`` unless ``z_score_x == "transform_to_unconstrained"``).
     """
     transforms = ()
     prior_transform = None

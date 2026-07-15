@@ -40,8 +40,7 @@ class ZukoFlow(ConditionalDensityEstimator):
             condition_shape: Event shape of the condition.
             prior_transform: Optional unconstrained prior transform prepended to the
                 flow (for ``z_score_x="transform_to_unconstrained"``). Kept as a
-                reference so it follows ``.to()``/``.double()``; its tensors are
-                buried in a plain attribute that ``nn.Module`` cannot reach.
+                reference so it follows ``.to()``/``.double()``.
         """
 
         # assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
