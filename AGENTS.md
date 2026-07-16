@@ -43,7 +43,7 @@ pre-commit run --all-files
 
 - Classes: `PascalCase` (e.g., `NPE_A`, `SNPE_C`)
 - Functions/methods: `snake_case`, private: `_leading_underscore`
-- Estimator strings: lowercase (`"maf"`, `"nsf"`, `"mdn"`)
+- Estimator strings: lowercase (e.g., `"maf"`, `"nsf"`, `"mdn"`)
 - Type aliases: `sbi/sbi_types.py`
 - Docstrings: Google style
 - Import sorting: `ruff` / isort rules
@@ -62,8 +62,7 @@ pre-commit run --all-files
 
 - `sbi/` — Main package (inference, neural_nets, samplers, utils, analysis, diagnostics)
 - `tests/` — Test suite (pytest)
-- `docs/` — Sphinx documentation
-- `mkdocs/` — MkDocs configuration
+- `docs/` — Sphinx documentation source (built to readthedocs; serves `llms.txt`)
 
 ## Working with AI Agents
 
@@ -84,10 +83,10 @@ Issues and PRs are tracked on GitHub at `sbi-dev/sbi`. There is no prescribed ag
 ### AI assistance best practices
 
 - Review AI-generated code carefully; do not accept blindly
-- Ensure generated code is correct, efficient, and secure
+- Ensure AI-generated code is correct, efficient, and secure
 - Add or update tests to verify behavior
 - Mention AI assistance in PR/commit summaries when substantial
 
 ### Personal agent conventions
 
-Individual maintainers may layer on their own AI-tooling conventions (custom skills, triage workflows, path-scoped rules) in their personal `.claude/`, `.codex/`, or equivalent local configs. These are not enforced repo-wide.
+Individual contributors may layer on their own AI-tooling conventions (custom skills, triage workflows, path-scoped rules) in their personal `.claude/`, `.codex/`, or equivalent local configs. These are not enforced repo-wide.
