@@ -6,6 +6,20 @@
 played a significant role in shaping `sbi`. Their valuable input, suggestions, and
 direct contributions to the codebase have been instrumental in the development of `sbi`.
 
+## Maintainers
+
+`sbi` is maintained by the following people. Current maintainers are
+
+- [Jan Teusen](https://github.com/janfb)
+- [Manuel Gloeckler](https://github.com/manuelgloeckler)
+- [Daniel Gedon](https://github.com/dgedon)
+- [Stefan Wahl](https://github.com/StefanWahl)
+
+Former maintainers are
+
+- [Michael Deistler](https://github.com/michaeldeistler)
+- [Guy Moss](https://github.com/gmoss13)
+
 ## License
 
 `sbi` is licensed under the [Apache License
