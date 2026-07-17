@@ -106,7 +106,6 @@ class _EstimatorBuilderBase:
                 parts.append(f"{f.name}={val!r}")
         return f"{cls.__name__}({', '.join(parts)})"
 
-
     @staticmethod
     @lru_cache(maxsize=None)
     def _fn_param_names(build_fn) -> frozenset:
@@ -531,7 +530,8 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
 
     Sibling of ``DensityEstimatorBuilder`` with a field set tailored to
     mixed-type data.  The continuous-component model is selected via
-    ``continuous_model``; there is no ``model`` field.
+    ``continuous_model`` (density-estimator model for the continuous
+    variables); there is no ``model`` field.
     """
 
     continuous_model: str = "nsf"

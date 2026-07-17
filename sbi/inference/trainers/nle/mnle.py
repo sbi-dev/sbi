@@ -118,12 +118,13 @@ class MNLE(LikelihoodEstimatorTrainer):
                 )
             warnings.warn(
                 "Passing a string for `density_estimator` is deprecated. "
-                "Use MixedDensityEstimatorBuilder(...) instead.",
+                "Use MixedDensityEstimatorBuilder(...) instead, e.g. "
+                "`from sbi.neural_nets import MixedDensityEstimatorBuilder`.",
                 FutureWarning,
                 stacklevel=2,
             )
             density_estimator = likelihood_nn(model="mnle")
-        elif isinstance(density_estimator, _EstimatorBuilderBase):
+        elif isinstance(density_estimator, _EstimatorBuilderBase):  # noqa: SIM102
             if not isinstance(density_estimator, MixedDensityEstimatorBuilder):
                 raise TypeError(
                     "MNLE requires a MixedDensityEstimatorBuilder; got "

@@ -108,7 +108,8 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         elif isinstance(classifier, str):
             warnings.warn(
                 "Passing a string for `classifier` is deprecated. "
-                "Use RatioEstimatorBuilder(model=...) instead.",
+                "Use RatioEstimatorBuilder(model=...) instead, e.g. "
+                "`from sbi.neural_nets import RatioEstimatorBuilder`.",
                 FutureWarning,
                 stacklevel=3,
             )
