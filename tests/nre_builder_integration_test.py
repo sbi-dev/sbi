@@ -76,7 +76,10 @@ def test_train_with_builder(trainer_cls, model):
     """Train with a RatioEstimatorBuilder end-to-end."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    builder = RatioEstimatorBuilder(model=model, hidden_features=16)
+    kwargs = {"model": model}
+    if model != "linear":
+        kwargs["hidden_features"] = 16
+    builder = RatioEstimatorBuilder(**kwargs)
     inference = trainer_cls(prior, classifier=builder, show_progress_bars=False)
 
     theta = prior.sample((200,))
@@ -137,3 +140,98 @@ def test_builder_role_shapes(trainer_cls):
 def test_check_estimator_arg_accepts_valid_inputs(estimator):
     """check_estimator_arg accepts ratio builders, strings, and callables."""
     check_estimator_arg(estimator)
+
+
+def test_literal_field_validation():
+    """Typos in Literal fields should raise ValueError at construction."""
+    with pytest.raises(ValueError, match="Invalid value.*z_score_input"):
+        RatioEstimatorBuilder(z_score_input="typo")
+    with pytest.raises(ValueError, match="Invalid value.*z_score_condition"):
+        RatioEstimatorBuilder(z_score_condition="typo")
+
+
+def test_inapplicable_fields_rejected():
+    """Fields not accepted by the chosen model's build_fn raise ValueError."""
+    # linear doesn't accept hidden_features
+    with pytest.raises(ValueError, match="silently ignored"):
+        RatioEstimatorBuilder(model="linear", hidden_features=64)
+    # linear doesn't accept num_blocks
+    with pytest.raises(ValueError, match="silently ignored"):
+        RatioEstimatorBuilder(model="linear", num_blocks=5)
+    # mlp doesn't accept num_blocks
+    with pytest.raises(ValueError, match="silently ignored"):
+        RatioEstimatorBuilder(model="mlp", num_blocks=5)
+
+
+def test_applicable_fields_accepted():
+    """Fields that ARE accepted by the chosen model should not raise."""
+    # resnet accepts all of these
+    RatioEstimatorBuilder(
+        model="resnet",
+        hidden_features=64,
+        num_blocks=3,
+        dropout_probability=0.1,
+        use_batch_norm=True,
+    )
+    # mlp accepts hidden_features and norm_layer
+    RatioEstimatorBuilder(model="mlp", hidden_features=64)
+
+
+def test_frozen_immutability():
+    """Builder instances should be frozen (immutable)."""
+    builder = RatioEstimatorBuilder(model="resnet")
+    with pytest.raises(AttributeError):
+        builder.model = "mlp"
+    with pytest.raises(AttributeError):
+        builder.hidden_features = 42
+
+
+def test_repr_shows_discriminator_and_set_fields():
+    """__repr__ should show model + only non-default fields."""
+    builder = RatioEstimatorBuilder(model="resnet", hidden_features=64)
+    r = repr(builder)
+    assert "model='resnet'" in r
+    assert "hidden_features=64" in r
+    assert "z_score_input" not in r
+    assert "extra_kwargs" not in r
+
+
+def test_repr_always_shows_discriminator_even_if_default():
+    """Discriminator field should appear even when it equals the default."""
+    builder = RatioEstimatorBuilder()
+    r = repr(builder)
+    assert "model='resnet'" in r
+
+
+def test_sync_classifier_build_fns():
+    """_VALID_CLASSIFIER_MODELS must match _classifier_build_fns() keys."""
+    from sbi.neural_nets.net_builders.estimator_configs import (
+        _VALID_CLASSIFIER_MODELS,
+        _classifier_build_fns,
+    )
+
+    assert set(_classifier_build_fns().keys()) == _VALID_CLASSIFIER_MODELS
+
+
+def test_z_score_alias_in_build_kwargs():
+    """z_score_input → z_score_x and z_score_condition → z_score_y."""
+    builder = RatioEstimatorBuilder(
+        model="resnet",
+        z_score_input="independent",
+        z_score_condition="structured",
+    )
+    kwargs = builder._build_kwargs()
+    assert "z_score_x" in kwargs
+    assert "z_score_y" in kwargs
+    assert kwargs["z_score_x"] == "independent"
+    assert kwargs["z_score_y"] == "structured"
+    # Original names should NOT appear
+    assert "z_score_input" not in kwargs
+    assert "z_score_condition" not in kwargs
+
+
+def test_warning_includes_import_path():
+    """String deprecation warning should include the import path."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.warns(FutureWarning, match="from sbi.neural_nets import"):
+        NRE_A(prior, classifier="resnet", show_progress_bars=False)
