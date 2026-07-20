@@ -19,6 +19,8 @@ Former maintainers are
 
 - [Michael Deistler](https://github.com/michaeldeistler)
 - [Guy Moss](https://github.com/gmoss13)
+- [Jan-Matthis Lückmann](https://github.com/jan-matthis)
+- [Alvaro Tejero-Cantero](https://github.com/alvorithm)
 
 ## License
 
