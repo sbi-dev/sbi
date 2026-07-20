@@ -1,8 +1,8 @@
 name: Docs Link Check
 
-# Validates the hard-coded URLs in the AI-tooling docs (llms.txt, ARCHITECTURE.md,
-# AGENTS.md), which are not covered by any other CI. Runs monthly rather than per-PR
-# so transient/rate-limited external responses don't block contributors.
+# Validates the hard-coded URLs in llms.txt and AGENTS.md, which are not covered by
+# any other CI. Runs monthly rather than per-PR so transient or rate-limited external
+# responses don't block contributors.
 
 on:
   schedule:
@@ -34,5 +34,5 @@ jobs:
         with:
           args: >-
             --no-progress --verbose
-            docs/llms.txt ARCHITECTURE.md AGENTS.md
+            docs/llms.txt AGENTS.md
           fail: true

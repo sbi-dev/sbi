@@ -10,8 +10,7 @@ sbi provides both a simple one-line interface (`sbi.inference.infer`) and a
 flexible class-based interface (`NPE`, `NLE`, `NRE`, `FMPE`). The typical
 workflow is: define a prior and simulator, generate simulations, train a neural
 density estimator, build a posterior, and validate with diagnostics (SBC,
-expected coverage, TARP, L-C2ST). The default settings work well for most
-problems — start simple and tune only if diagnostics indicate issues.
+expected coverage, TARP, L-C2ST).
 
 ## Tutorials
 

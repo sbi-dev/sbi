@@ -1,92 +1,55 @@
 # AGENTS.md — sbi
 
-Instructions for AI coding agents (Claude Code, Codex, Copilot, Aider, etc.) working in this repository.
+Shared guidance for coding agents working in this repository.
 
-**Repository:** https://github.com/sbi-dev/sbi
-**Documentation:** https://sbi.readthedocs.io/en/latest/
-**Python:** >=3.10 | **License:** Apache 2.0
-
-## Environment
+## Setup
 
 ```bash
-uv venv --python 3.12      # First-time setup (creates .venv)
-source .venv/bin/activate
+uv venv --python 3.12
 uv pip install -e ".[dev]"
 ```
 
-## Testing
+Run validation commands through `uv run`; activating the virtual environment is
+optional. See `docs/contributing.md` for the full development workflow and
+`pyproject.toml` for the authoritative tool configuration.
+
+## Validation
+
+Start with checks targeted to the files and behavior you changed, then broaden as
+appropriate:
 
 ```bash
-pytest tests/                              # Full suite
-pytest -m "not slow and not gpu"           # Fast tests
-pytest -n auto -m "not slow and not gpu"   # Fast + parallel
-pytest --bm                                # mini-sbibm benchmarks
-pytest --bm -n auto --bm-mode npe         # Single benchmark mode
+uv run pytest tests/path_to_relevant_test.py
+uv run pytest -n auto -m "not slow and not gpu"
+uv run ruff check <changed Python paths>
+uv run ruff format --check <changed Python paths>
+uv run pyright sbi
+uv run pre-commit run --files <changed files>
 ```
 
-**Markers:** `@pytest.mark.slow`, `.gpu`, `.mcmc`, `.benchmark`
-**Test naming:** `*_test.py` files, `test_<description>` functions
-**Fixtures (from `tests/conftest.py`):** `set_seed` (auto, seed=1), `mcmc_params_accurate` (20 chains), `mcmc_params_fast` (1 chain)
+Tests live in `*_test.py` files. Available markers include `slow`, `gpu`, `mcmc`, and
+`benchmark`; their definitions are in `pyproject.toml`.
 
-## Linting & Formatting
+## Code conventions
 
-```bash
-ruff check sbi/ --fix     # Lint (auto-fix)
-ruff format sbi/          # Format
-pyright sbi/              # Type check (basic mode)
-pre-commit run --all-files
-```
+- Use Google-style docstrings.
+- Put shared public type aliases in `sbi/sbi_types.py`.
+- Keep string identifiers for estimators lowercase (for example, `"maf"`, `"nsf"`,
+  and `"mdn"`).
+- Add or update tests when behavior changes.
+- Preserve unrelated local changes. If a checkout is already in use, work in a
+  separate Git worktree.
 
-**Config:** Ruff line length 88, Pyright basic mode.
+## Code map
 
-## Code Style
+Inspect the current code rather than relying on a duplicated class inventory:
 
-- Classes: `PascalCase` (e.g., `NPE_A`, `SNPE_C`)
-- Functions/methods: `snake_case`, private: `_leading_underscore`
-- Estimator strings: lowercase (e.g., `"maf"`, `"nsf"`, `"mdn"`)
-- Type aliases: `sbi/sbi_types.py`
-- Docstrings: Google style
-- Import sorting: `ruff` / isort rules
-- Per-file ignores: `__init__.py` allows unused imports; `test_*.py` allows star imports
+- `sbi/inference/__init__.py` — public inference methods
+- `sbi/inference/trainers/` — training workflows
+- `sbi/inference/posteriors/` — posterior implementations
+- `sbi/inference/potentials/` — estimator-to-sampler bridges
+- `sbi/neural_nets/estimators/` — estimator contracts and implementations
+- `sbi/samplers/` — sampling backends
 
-## Important Files
-
-- `ARCHITECTURE.md` — Domain glossary (trainer hierarchy, posterior types, design patterns)
-- `sbi/inference/__init__.py` — Main inference exports
-- `sbi/neural_nets/factory.py` — Network builder factory
-- `sbi/utils/user_input_checks.py` — Input validation
-- `sbi/__version__.py` — Version string
-- `tests/conftest.py` — Test fixtures and configuration
-
-## Repository Structure
-
-- `sbi/` — Main package (inference, neural_nets, samplers, utils, analysis, diagnostics)
-- `tests/` — Test suite (pytest)
-- `docs/` — Sphinx documentation source (built to readthedocs; serves `llms.txt`)
-
-## Working with AI Agents
-
-This repository is set up to be productive with any AI coding agent (Claude Code, Codex, Copilot, Aider, etc.). The instructions above are intentionally tool-agnostic — use whatever fits your workflow.
-
-### Domain reference
-
-Read `ARCHITECTURE.md` before naming domain concepts (in issue titles, refactor proposals, hypotheses, test names) so your output uses sbi's vocabulary rather than inventing synonyms.
-
-### Documentation
-
-The built docs site exposes an `llms.txt` index at `sbi.readthedocs.io/en/latest/llms.txt` — useful for agents that need to navigate the documentation rather than the codebase. The source file lives at `docs/llms.txt`.
-
-### Issues and PRs
-
-Issues and PRs are tracked on GitHub at `sbi-dev/sbi`. There is no prescribed agent-triage workflow — sbi uses standard maintainer-driven triage with the existing label set (`bug`, `enhancement`, `wontfix`, `help wanted`, etc.). When filing issues from an agent's output, use the `gh` CLI and write the issue in clear, human-reviewable form.
-
-### AI assistance best practices
-
-- Review AI-generated code carefully; do not accept blindly
-- Ensure AI-generated code is correct, efficient, and secure
-- Add or update tests to verify behavior
-- Mention AI assistance in PR/commit summaries when substantial
-
-### Personal agent conventions
-
-Individual contributors may layer on their own AI-tooling conventions (custom skills, triage workflows, path-scoped rules) in their personal `.claude/`, `.codex/`, or equivalent local configs. These are not enforced repo-wide.
+The documentation is built from `docs/`. Its curated `docs/llms.txt` index is served
+at `https://sbi.readthedocs.io/en/latest/llms.txt` for tools that support it.
