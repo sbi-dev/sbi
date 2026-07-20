@@ -98,17 +98,20 @@ def test_density_estimator_builder_loss_computable(model):
 
 
 @pytest.mark.parametrize(
-    "z_score_x, z_score_y",
+    "z_score_input, z_score_condition",
     [
         ("none", "none"),
         ("independent", "independent"),
         ("none", "independent"),
     ],
 )
-def test_density_estimator_builder_z_score_modes(z_score_x, z_score_y):
+def test_density_estimator_builder_z_score_modes(z_score_input, z_score_condition):
     """Test that z_score fields are forwarded and the estimator builds successfully."""
     builder = DensityEstimatorBuilder(
-        model="maf", z_score_x=z_score_x, z_score_y=z_score_y, num_transforms=2
+        model="maf",
+        z_score_input=z_score_input,
+        z_score_condition=z_score_condition,
+        num_transforms=2,
     )
     theta = torch.randn(100, 3)
     x = torch.randn(100, 2)
