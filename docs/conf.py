@@ -22,8 +22,8 @@ import shutil
 # -- Project information -----------------------------------------------------
 
 project = 'sbi'
-copyright = '2020, sbi team'
 author = 'sbi team'
+copyright = f'2020-%Y, {author}'
 
 
 # -- General configuration ---------------------------------------------------

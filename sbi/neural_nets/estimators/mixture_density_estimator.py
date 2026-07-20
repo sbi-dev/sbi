@@ -22,6 +22,7 @@ from torch.nn import functional as F
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.sbi_types import TorchTransform
+from sbi.utils.sbiutils import _apply_to_transform
 
 
 class MultivariateGaussianMDN(nn.Module):
@@ -404,6 +405,12 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         else:
             self.register_buffer("_transform_shift", None)
             self.register_buffer("_transform_scale", None)
+
+    def _apply(self, fn):
+        super()._apply(fn)
+        if self._prior_transform is not None:
+            _apply_to_transform(self._prior_transform, fn)
+        return self
 
     @property
     def embedding_net(self) -> nn.Module:
