@@ -23,6 +23,7 @@ from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_float,
     is_positive_int,
+    validate_float_range,
 )
 
 
@@ -244,13 +245,12 @@ class MCMCPosteriorParameters(PosteriorParameters):
             (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
             faster than `"spawn"` but is only supported on POSIX-based systems
             (e.g. Linux and macOS, not Windows).
-        target_accept: Target acceptance probability for the gradient-based
-            samplers (`hmc_pymc`, `nuts_pymc`, `hmc_pyro`, `nuts_pyro`), controlling
-            the step-size adaptation during warmup. Higher values take smaller,
-            more accurate steps at the cost of speed. Ignored by the slice samplers.
-            If `None`, HMC uses `0.9` (PyMC's default of `0.65` mixes poorly on
-            peaked targets and yields biased samples), while NUTS and the Pyro
-            samplers keep their respective backend defaults.
+        target_accept: Target acceptance probability for `hmc_pymc` and `nuts_pymc`,
+            controlling step-size adaptation during warmup. Higher values generally
+            result in smaller steps and fewer rejections, at the cost of speed. If
+            `None`, HMC uses `0.9` because PyMC's `0.65` default mixed poorly in sbi's
+            Gaussian regression test; NUTS keeps PyMC's backend default. Ignored by
+            other samplers.
     """
 
     method: Literal[
@@ -274,8 +274,14 @@ class MCMCPosteriorParameters(PosteriorParameters):
     def validate(self):
         """Validate MCMCPosteriorParameters fields."""
 
-        if self.target_accept is not None and not (0.0 < self.target_accept < 1.0):
-            raise ValueError("target_accept must be between 0 and 1, or None.")
+        if self.target_accept is not None:
+            validate_float_range(
+                self.target_accept,
+                "target_accept",
+                min_val=0.0,
+                max_val=1.0,
+                range_inclusive=False,
+            )
 
         if not (
             self.init_strategy_parameters is None

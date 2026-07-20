@@ -31,6 +31,7 @@ from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
+from sbi.utils.typechecks import validate_float_range
 
 
 class MCMCPosterior(NeuralPosterior):
@@ -108,9 +109,10 @@ class MCMCPosterior(NeuralPosterior):
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Deprecated, should not be passed.
-            target_accept: Target acceptance probability for the gradient-based
-                samplers (HMC/NUTS). See `MCMCPosteriorParameters` for details. If
-                `None`, HMC uses `0.9` and NUTS/Pyro keep their backend defaults.
+            target_accept: Target acceptance probability for PyMC's HMC and NUTS
+                samplers. See `MCMCPosteriorParameters` for details. If `None`, PyMC
+                HMC uses `0.9` and PyMC NUTS keeps its backend default. Ignored by
+                other samplers.
         """
         if method == "slice":
             warn(
@@ -140,6 +142,14 @@ class MCMCPosterior(NeuralPosterior):
         self.init_strategy_parameters = init_strategy_parameters or {}
         self.num_workers = num_workers
         self.mp_context = mp_context
+        if target_accept is not None:
+            validate_float_range(
+                target_accept,
+                "target_accept",
+                min_val=0.0,
+                max_val=1.0,
+                range_inclusive=False,
+            )
         self.target_accept = target_accept
         self._posterior_sampler = None
 
@@ -291,9 +301,9 @@ class MCMCPosterior(NeuralPosterior):
             mp_context: Multiprocessing context (`fork` or `spawn`). If not provided,
                 uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
-            target_accept: Target acceptance probability for the gradient-based
-                samplers (HMC/NUTS). If not provided, uses the value specified at
-                initialization.
+            target_accept: Target acceptance probability for PyMC's HMC and NUTS
+                samplers. If not provided, uses the value specified at initialization.
+                Ignored by other samplers.
 
         Returns:
             Samples from posterior.
@@ -311,6 +321,14 @@ class MCMCPosterior(NeuralPosterior):
         num_workers = self.num_workers if num_workers is None else num_workers
         mp_context = self.mp_context if mp_context is None else mp_context
         target_accept = self.target_accept if target_accept is None else target_accept
+        if target_accept is not None:
+            validate_float_range(
+                target_accept,
+                "target_accept",
+                min_val=0.0,
+                max_val=1.0,
+                range_inclusive=False,
+            )
         init_strategy_parameters = (
             self.init_strategy_parameters
             if init_strategy_parameters is None
@@ -352,7 +370,6 @@ class MCMCPosterior(NeuralPosterior):
                     num_chains=num_chains,
                     show_progress_bars=show_progress_bars,
                     mp_context=mp_context,
-                    target_accept=target_accept,
                 )
             elif method in ("hmc_pymc", "nuts_pymc", "slice_pymc"):
                 transformed_samples = self._pymc_mcmc(
@@ -806,7 +823,6 @@ class MCMCPosterior(NeuralPosterior):
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
         mp_context: str = "spawn",
-        target_accept: Optional[float] = None,
     ) -> Tensor:
         r"""Return samples obtained using Pyro's HMC or NUTS sampler.
 
@@ -822,8 +838,6 @@ class MCMCPosterior(NeuralPosterior):
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progress_bars: Whether to show a progressbar during sampling.
-            target_accept: Target acceptance probability for step-size adaptation.
-                If None, Pyro's default is used.
 
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
@@ -842,12 +856,8 @@ class MCMCPosterior(NeuralPosterior):
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
         kernels = dict(hmc_pyro=HMC, nuts_pyro=NUTS)
-        kernel_kwargs = {"potential_fn": potential_function}
-        if target_accept is not None:
-            kernel_kwargs["target_accept_prob"] = target_accept
-
         sampler = MCMC(
-            kernel=kernels[mcmc_method](**kernel_kwargs),
+            kernel=kernels[mcmc_method](potential_fn=potential_function),
             num_samples=ceil((thin * num_samples) / num_chains),
             warmup_steps=warmup_steps,
             initial_params={self.param_name: initial_params},
@@ -896,8 +906,8 @@ class MCMCPosterior(NeuralPosterior):
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progress_bars: Whether to show a progressbar during sampling.
-            target_accept: Target acceptance probability for HMC/NUTS. If None,
-                HMC uses 0.9 and NUTS keeps PyMC's default. Ignored by the slice
+            target_accept: Target acceptance probability for HMC/NUTS. If `None`,
+                HMC uses `0.9` and NUTS keeps PyMC's default. Ignored by the slice
                 sampler.
 
         Returns:
@@ -917,9 +927,6 @@ class MCMCPosterior(NeuralPosterior):
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
         steps = dict(slice_pymc="slice", hmc_pymc="hmc", nuts_pymc="nuts")
         step = steps[mcmc_method]
-
-        if target_accept is None and step == "hmc":
-            target_accept = 0.9
 
         sampler = PyMCSampler(
             potential_fn=potential_function,

@@ -9,6 +9,7 @@ import pytensor.tensor as pt
 import torch
 
 from sbi.utils.torchutils import tensor2numpy
+from sbi.utils.typechecks import validate_float_range
 
 
 class PyMCPotential(pt.Op):  # type: ignore
@@ -133,10 +134,10 @@ class PyMCSampler:
             seed: Random seed passed to `pymc.sample` for reproducible sampling.
                 If None (default), PyMC seeds from system entropy.
             target_accept: Target acceptance probability for the `"hmc"` and
-                `"nuts"` step methods. If None (default), PyMC's own default is
-                used. PyMC's HMC default (0.65) mixes poorly on peaked targets;
-                a higher value (e.g. 0.9-0.95) gives markedly less biased samples.
-                Ignored for the `"slice"` step.
+                `"nuts"` step methods. If `None`, HMC uses sbi's default of `0.9`,
+                while NUTS keeps PyMC's backend default. The HMC default avoids poor
+                finite-chain mixing observed with PyMC's `0.65` default in sbi's
+                Gaussian regression test. Ignored for the `"slice"` step.
         """
         self.param_name = param_name
         self._step = step
@@ -148,7 +149,17 @@ class PyMCSampler:
         self._progressbar = progressbar
         self._device = device
         self._seed = seed
-        self._target_accept = target_accept
+        if target_accept is not None:
+            validate_float_range(
+                target_accept,
+                "target_accept",
+                min_val=0.0,
+                max_val=1.0,
+                range_inclusive=False,
+            )
+        self._target_accept = (
+            0.9 if target_accept is None and step == "hmc" else target_accept
+        )
 
         # create PyMC model object
         track_gradients = step in ("nuts", "hmc")

@@ -159,9 +159,6 @@ def test_c2st_pymc_sampler_on_Gaussian(
         tune=warmup,
         chains=num_chains,
         seed=0,  # reproducible sampling; PyMC is not covered by the global seed
-        # PyMC's HMC default (target_accept=0.65) is biased on this peaked
-        # target (c2st ~0.63); 0.95 samples it accurately. See #1894 follow-up.
-        target_accept=0.95,
     )
     samples = sampler.run()
     assert samples.shape == (
@@ -179,32 +176,47 @@ def test_c2st_pymc_sampler_on_Gaussian(
 
 @pytest.mark.mcmc
 @pytest.mark.parametrize(
-    ("method", "target_accept", "expected"),
+    ("step", "target_accept", "expected"),
     [
-        ("hmc_pymc", None, 0.9),  # HMC default is raised (PyMC's 0.65 is biased)
-        ("hmc_pymc", 0.99, 0.99),  # user override wins
-        ("nuts_pymc", None, None),  # NUTS keeps PyMC's own default
+        ("hmc", None, 0.9),
+        ("hmc", 0.99, 0.99),
+        ("nuts", None, None),
     ],
 )
-def test_pymc_target_accept_forwarded(method, target_accept, expected):
-    """target_accept from the user reaches the PyMC sampler with the right default."""
+def test_pymc_target_accept_default_and_override(step, target_accept, expected):
+    """PyMC HMC uses sbi's default and explicit user values take precedence."""
+    from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
+
+    theta_dim = 2
+
+    def potential_fn(theta):
+        return -0.5 * (theta**2).sum(axis=-1)
+
+    sampler = PyMCSampler(
+        potential_fn=potential_fn,
+        initvals=np.zeros((1, theta_dim)),
+        step=step,
+        target_accept=target_accept,
+        draws=1,
+        tune=1,
+        chains=1,
+    )
+    assert sampler._target_accept == expected
+
+
+@pytest.mark.mcmc
+def test_mcmc_posterior_rejects_invalid_target_accept():
+    """Per-call overrides validate target_accept at the public API boundary."""
     theta_dim = 2
     prior = BoxUniform(low=-2 * ones(theta_dim), high=2 * ones(theta_dim))
 
     def potential_fn(theta):
         return -0.5 * (theta**2).sum(axis=-1)
 
-    mcmc_posterior = build_from_potential(potential_fn, prior)
-    mcmc_posterior.sample(
-        (10,),
-        method=method,
-        target_accept=target_accept,
-        num_chains=1,
-        warmup_steps=10,
-        thin=1,
-        show_progress_bars=False,
-    )
-    assert mcmc_posterior._posterior_sampler._target_accept == expected
+    with pytest.warns(UserWarning, match="unconditional potential"):
+        posterior = build_from_potential(potential_fn, prior)
+    with pytest.raises(ValueError, match="target_accept"):
+        posterior.sample((1,), method="hmc_pymc", target_accept=0.0)
 
 
 @pytest.mark.mcmc
