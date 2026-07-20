@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 import numpy as np
 import pytest
 import torch
@@ -14,6 +16,49 @@ from torch import eye, ones, zeros
 
 from sbi.utils import torchutils
 from tests.test_utils import kl_d_via_monte_carlo
+
+
+def test_base_recursor_handles_cyclic_object_graph():
+    class CyclicObject:
+        pass
+
+    root = CyclicObject()
+    tensor = torch.tensor(1.0)
+    root.tensor = tensor
+    root.self = root
+    root.mapping = {"root": root, "tensor": tensor}
+
+    processed = []
+
+    def process(obj):
+        processed.append(obj)
+        return obj
+
+    torchutils._base_recursor(root, check=torch.is_tensor, action=process)
+
+    assert len(processed) == 2
+    assert all(obj is tensor for obj in processed)
+
+
+def test_base_recursor_processes_aliased_containers():
+    class AliasedObject:
+        pass
+
+    root = AliasedObject()
+    tensor = torch.tensor(1.0, requires_grad=True) * 2
+    shared = [tensor]
+    root.first = shared
+    root.second = shared
+
+    torchutils._base_recursor(
+        root,
+        check=lambda obj: torch.is_tensor(obj) and not obj.is_leaf,
+        action=lambda obj: obj.detach(),
+    )
+
+    assert root.first[0].is_leaf
+    assert root.second[0].is_leaf
+    deepcopy(root)
 
 
 # XXX move to pytest? - investigate how to derive from TorchTestCase
