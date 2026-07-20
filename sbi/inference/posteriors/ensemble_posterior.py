@@ -398,7 +398,7 @@ class EnsemblePosterior(NeuralPosterior):
             return log_weights, maps
 
         else:
-            self.potential_fn.set_x(self._x_else_default_x(x))
+            self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
             if init_method == "posterior":
                 inits = self.sample((num_init_samples,), self._x_else_default_x(x))
