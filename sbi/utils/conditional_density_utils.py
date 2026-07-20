@@ -412,7 +412,7 @@ class ConditionedPotential(BasePotential):
             return self._x_is_iid
         else:
             raise ValueError(
-                "No observed data is available. Use `potential_fn.set_x(x_o)`."
+                "No observed data is available. Use `potential_fn.bind(x_o)`."
             )
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = True):
@@ -420,7 +420,15 @@ class ConditionedPotential(BasePotential):
         if x_o is not None:
             x_o = process_x(x_o).to(self.device)
         self._x_is_iid = x_is_iid
-        self.potential_fn.set_x(x_o, x_is_iid=x_is_iid)
+        self.potential_fn = self.potential_fn.bind(x_o, x_is_iid=x_is_iid)
+
+    def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "ConditionedPotential":
+        """Create new potential with x bound, without mutable state."""
+        return ConditionedPotential(
+            potential_fn=self.potential_fn.bind(x_o, x_is_iid),
+            condition=self.condition,
+            dims_to_sample=self.dims_to_sample,
+        )
 
     @property
     def x_o(self) -> Tensor:
