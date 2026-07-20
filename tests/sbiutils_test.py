@@ -709,3 +709,29 @@ def test_mdn_transform_to_unconstrained():
     assert torch.allclose(lp, mog.log_prob(z) + ldj, atol=1e-5)
     s = est.sample((10,), cond)
     assert s.shape[0] == 10 and torch.isfinite(s).all()
+
+
+@pytest.mark.parametrize("orientation", ["concrete", "inverse", "composed_inverse"])
+def test_callable_transform_preserves_orientation_and_dtype(orientation):
+    """CallableTransform safely owns concrete and inverse transforms."""
+    import pickle
+
+    from torch.distributions.transforms import AffineTransform, ComposeTransform
+
+    from sbi.utils.sbiutils import CallableTransform
+
+    transform = AffineTransform(torch.zeros(2), 2 * torch.ones(2))
+    if orientation == "inverse":
+        transform = transform.inv
+    elif orientation == "composed_inverse":
+        transform = ComposeTransform([
+            transform,
+            AffineTransform(torch.ones(2), 3 * torch.ones(2)),
+        ]).inv
+
+    wrapped = pickle.loads(pickle.dumps(CallableTransform(transform)))
+    x = torch.ones(2)
+    assert torch.allclose(wrapped.transform(x), transform(x))
+
+    wrapped.double()
+    assert wrapped.transform(x.double()).dtype == torch.float64

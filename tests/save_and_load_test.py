@@ -68,3 +68,26 @@ def test_picklability(
         pickle.dump(inference, handle)
     with open(f"{tmp_path}/saved_inference.pickle", "rb") as handle:
         _ = pickle.load(handle)
+
+
+@pytest.mark.parametrize("builder_name", ["mdn", "zuko"])
+def test_unconstraining_transform_survives_pickle_and_dtype_cast(builder_name):
+    """Transformed MDN and Zuko estimators remain usable after serialization."""
+    from sbi.neural_nets.net_builders.flow import build_zuko_maf
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+    from sbi.utils import BoxUniform
+
+    builder = build_mdn if builder_name == "mdn" else build_zuko_maf
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((256,)), torch.randn(256, 3)
+    estimator = builder(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+
+    theta, condition = prior.sample((5,)).unsqueeze(1), torch.randn(1, 3)
+    expected = estimator.log_prob(theta, condition)
+    reloaded = pickle.loads(pickle.dumps(estimator))
+    assert torch.allclose(reloaded.log_prob(theta, condition), expected)
+
+    reloaded.double()
+    actual = reloaded.log_prob(theta.double(), condition.double())
+    assert actual.dtype == torch.float64
+    assert torch.isfinite(actual).all()

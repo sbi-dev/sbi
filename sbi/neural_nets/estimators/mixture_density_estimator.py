@@ -22,7 +22,7 @@ from torch.nn import functional as F
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.sbi_types import TorchTransform
-from sbi.utils.sbiutils import _apply_to_transform
+from sbi.utils.sbiutils import CallableTransform
 
 
 class MultivariateGaussianMDN(nn.Module):
@@ -384,7 +384,9 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
                     f"MDN context_features ({net.context_features})"
                 )
 
-        self._prior_transform = prior_transform
+        self._prior_transform_module = (
+            CallableTransform(prior_transform) if prior_transform is not None else None
+        )
 
         # Store z-score transform parameters as buffers (not trained, moved with model)
         if transform_input is not None:
@@ -406,11 +408,12 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             self.register_buffer("_transform_shift", None)
             self.register_buffer("_transform_scale", None)
 
-    def _apply(self, fn):
-        super()._apply(fn)
-        if self._prior_transform is not None:
-            _apply_to_transform(self._prior_transform, fn)
-        return self
+    @property
+    def _prior_transform(self) -> Optional[TorchTransform]:
+        """Return the constrained-to-unconstrained input transform, if configured."""
+        if self._prior_transform_module is None:
+            return None
+        return self._prior_transform_module.transform
 
     @property
     def embedding_net(self) -> nn.Module:
