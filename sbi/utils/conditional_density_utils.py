@@ -430,11 +430,6 @@ class ConditionedPotential(BasePotential):
         else:
             raise ValueError("No observed data is available.")
 
-    @x_o.setter
-    def x_o(self, x_o: Optional[Tensor]) -> None:
-        """Check the shape of the observed data and, if valid, set it."""
-        self.set_x(x_o)
-
     def return_x_o(self) -> Optional[Tensor]:
         """Return the observed data at which the potential is evaluated.
 
