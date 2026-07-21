@@ -54,12 +54,6 @@ class BasePotential(metaclass=ABCMeta):
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = True):
         """Check the shape of the observed data and, if valid, set it."""
-        # import warnings
-        # warnings.warn(
-        #     "set_x() is deprecated, use .bind(x) instead for stateless binding",
-        #     FutureWarning,
-        #     stacklevel=2,
-        # )
         if x_o is not None:
             x_o = process_x(x_o).to(self.device)
         self._x_o = x_o
