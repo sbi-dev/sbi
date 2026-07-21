@@ -3,7 +3,7 @@
 
 import math
 import warnings
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Dict, Literal, Optional, Union
 
 import torch
 from torch import Tensor
@@ -106,42 +106,8 @@ class VectorFieldPosterior(NeuralPosterior):
         ], f"sample_with must be 'ode' or 'sde', but is {self.sample_with}."
         self.max_sampling_batch_size = max_sampling_batch_size
 
-        self._last_bound_potential: Optional[VectorFieldBasedPotential] = None
-        self._last_bound_x: Optional[Tensor] = None
-
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
-
-    def _get_bound_potential(
-        self,
-        x: Tensor,
-        x_is_iid: bool = False,
-        iid_method: Optional[str] = None,
-        iid_params: Optional[Dict[str, Any]] = None,
-        guidance_method: Optional[str] = None,
-        guidance_params: Optional[Dict[str, Any]] = None,
-        **ode_kwargs,
-    ) -> VectorFieldBasedPotential:
-        """Get or create a bound potential, reusing cached one if x matches."""
-        if (
-            self._last_bound_potential is not None
-            and self._last_bound_x is not None
-            and torch.equal(x, self._last_bound_x)
-        ):
-            return self._last_bound_potential
-
-        bound = self.potential_fn.bind(
-            x,
-            x_is_iid=x_is_iid,
-            iid_method=iid_method or self.potential_fn.iid_method,
-            iid_params=iid_params,
-            guidance_method=guidance_method,
-            guidance_params=guidance_params,
-            **ode_kwargs,
-        )
-        self._last_bound_potential = bound
-        self._last_bound_x = x
-        return bound
 
     def to(self, device: Union[str, torch.device]) -> None:
         """Move posterior to device.
@@ -269,10 +235,10 @@ class VectorFieldPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
-        self.potential_fn = self._get_bound_potential(
+        self.potential_fn.set_x(
             x,
             x_is_iid=is_iid,
-            iid_method=iid_method,
+            iid_method=iid_method or self.potential_fn.iid_method,
             iid_params=iid_params,
             guidance_method=guidance_method,
             guidance_params=guidance_params,
@@ -491,9 +457,7 @@ class VectorFieldPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
-        self.potential_fn = self._get_bound_potential(
-            x, x_is_iid=is_iid, **(ode_kwargs or {})
-        )
+        self.potential_fn.set_x(x, x_is_iid=is_iid, **(ode_kwargs or {}))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -557,7 +521,7 @@ class VectorFieldPosterior(NeuralPosterior):
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()
-        self.potential_fn = self._get_bound_potential(x)
+        self.potential_fn.set_x(x, x_is_iid=batch_size > 1)
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -697,8 +661,8 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if self._map is None or force_update:
             # rebuild coarse flow fast for MAP optimization.
-            self.potential_fn = self._get_bound_potential(
-                self.default_x, atol=1e-2, rtol=1e-3, exact=True
+            self.potential_fn.set_x(
+                self.default_x, x_is_iid=False, atol=1e-2, rtol=1e-3, exact=True
             )
             callable_potential_fn = CallableDifferentiablePotentialFunction(
                 self.potential_fn
