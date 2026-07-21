@@ -10,7 +10,7 @@ direct contributions to the codebase have been instrumental in the development o
 
 `sbi` is maintained by the following people. Current maintainers are
 
-- [Jan Teusen](https://github.com/janfb)
+- [Jan Teusen (né Boelts)](https://github.com/janfb)
 - [Manuel Gloeckler](https://github.com/manuelgloeckler)
 - [Daniel Gedon](https://github.com/dgedon)
 - [Stefan Wahl](https://github.com/StefanWahl)
