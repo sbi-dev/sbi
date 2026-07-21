@@ -659,6 +659,7 @@ def _base_recursor(
     key: Optional[str] = None,
     check: Callable[..., bool] = lambda obj: False,
     action: Callable[..., object] = lambda obj: obj,
+    _active: Optional[set[int]] = None,
 ):
     """Recursive function that traverses objects (e.g. Distributions) and applies
     an action to any encountered object that passes the check.
@@ -673,7 +674,16 @@ def _base_recursor(
             If the check evaluates to True, then ``action`` is applied.
         action: A function that specifies an operation on an object and returns
             a modified version.
+        _active: Object identities on the active recursion path. Used internally
+            to avoid infinite recursion in cyclic object graphs.
     """
+    if _active is None:
+        _active = set()
+    obj_id = id(obj)
+    if obj_id in _active:
+        return
+    _active.add(obj_id)
+
     if isinstance(obj, Module) and check(obj):
         action(obj)
     elif isinstance(obj, (Dict, OrderedDict)):
@@ -681,7 +691,9 @@ def _base_recursor(
             if check(o):
                 obj[k] = action(o)
             else:
-                _base_recursor(o, parent=obj, key=k, check=check, action=action)
+                _base_recursor(
+                    o, parent=obj, key=k, check=check, action=action, _active=_active
+                )
     elif isinstance(obj, type):
         # Skip class/type objects to avoid modifying immutable C extension types
         # (e.g. torch.LongTensor) which fail on Python 3.13+.
@@ -691,19 +703,23 @@ def _base_recursor(
             if check(o):
                 setattr(obj, k, action(o))
             else:
-                _base_recursor(o, parent=obj, key=k, check=check, action=action)
+                _base_recursor(
+                    o, parent=obj, key=k, check=check, action=action, _active=_active
+                )
     elif isinstance(obj, (List, Tuple, Generator)):
         new_obj = []
         for o in obj:
             if check(o):
                 new_obj.append(action(o))
             else:
-                _base_recursor(o, check=check, action=action)
+                _base_recursor(o, check=check, action=action, _active=_active)
                 new_obj.append(o)
         if parent is not None and key is not None:
             setattr(parent, key, type(obj)(new_obj))  # type: ignore
     else:
         return
+
+    _active.remove(obj_id)
 
 
 def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> None:
