@@ -659,7 +659,6 @@ def _base_recursor(
     key: Optional[str] = None,
     check: Callable[..., bool] = lambda obj: False,
     action: Callable[..., object] = lambda obj: obj,
-    _active: Optional[set[int]] = None,
 ):
     """Recursive function that traverses objects (e.g. Distributions) and applies
     an action to any encountered object that passes the check.
@@ -723,7 +722,7 @@ def _base_recursor(
             if check(o):
                 new_obj.append(action(o))
             else:
-                _base_recursor(o, check=check, action=action, _active=_active)
+                _base_recursor(o, check=check, action=action)
                 new_obj.append(o)
         if parent is not None and key is not None:
             setattr(parent, key, type(obj)(new_obj))  # type: ignore
