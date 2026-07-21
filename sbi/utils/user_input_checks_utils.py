@@ -182,17 +182,14 @@ class PytorchReturnTypeWrapper(Distribution):
         event_shape=torch.Size(),
         validate_args=None,
     ):
-        super().__init__(
-            batch_shape=batch_shape,
-            event_shape=event_shape,
-            validate_args=(
-                prior._validate_args if validate_args is None else validate_args
-            ),
-        )
-
         self.prior = prior
         self.device = None
         self.return_type = return_type
+        super().__init__(
+            batch_shape=batch_shape,
+            event_shape=event_shape,
+            validate_args=False,
+        )
 
     def log_prob(self, value) -> Tensor:
         return torch.as_tensor(
@@ -547,9 +544,7 @@ class OneDimPriorWrapper(Distribution):
         super().__init__(
             batch_shape=prior.batch_shape,
             event_shape=prior.event_shape,
-            validate_args=(
-                prior._validate_args if validate_args is None else validate_args
-            ),
+            validate_args=False,
         )
 
     def to(self, device: Union[str, torch.device]) -> None:
