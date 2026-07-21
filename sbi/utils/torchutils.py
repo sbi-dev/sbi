@@ -659,6 +659,7 @@ def _base_recursor(
     key: Optional[str] = None,
     check: Callable[..., bool] = lambda obj: False,
     action: Callable[..., object] = lambda obj: obj,
+    _active: Optional[set[int]] = None,
 ):
     """Recursive function that traverses objects (e.g. Distributions) and applies
     an action to any encountered object that passes the check.
@@ -676,13 +677,13 @@ def _base_recursor(
         _active: Object identities on the active recursion path. Used internally
             to avoid infinite recursion in cyclic object graphs.
     """
-    if _active is None:
-        _active = set()
-
+    _active_holder: Optional[set[int]] = _active
+    if _active_holder is None:
+        _active_holder = set()
     obj_id = id(obj)
-    if obj_id in _active:
+    if obj_id in _active_holder:
         return
-    _active.add(obj_id)
+    _active_holder.add(obj_id)
 
     if isinstance(obj, Module) and check(obj):
         action(obj)
@@ -697,7 +698,7 @@ def _base_recursor(
                     key=k,
                     check=check,
                     action=action,
-                    _active=_active,
+                    _active=_active_holder,
                 )
     elif isinstance(obj, type):
         # Skip class/type objects to avoid modifying immutable C extension types
@@ -714,7 +715,7 @@ def _base_recursor(
                     key=k,
                     check=check,
                     action=action,
-                    _active=_active,
+                    _active=_active_holder,
                 )
     elif isinstance(obj, (List, Tuple, Generator)):
         new_obj = []
@@ -722,12 +723,12 @@ def _base_recursor(
             if check(o):
                 new_obj.append(action(o))
             else:
-                _base_recursor(o, check=check, action=action)
+                _base_recursor(o, check=check, action=action, _active=_active_holder)
                 new_obj.append(o)
         if parent is not None and key is not None:
             setattr(parent, key, type(obj)(new_obj))  # type: ignore
 
-    _active.remove(obj_id)
+    _active_holder.remove(obj_id)
 
 
 def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> None:
