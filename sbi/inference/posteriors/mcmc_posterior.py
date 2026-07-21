@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 import inspect
 import warnings
-from copy import deepcopy
 from functools import partial
 from math import ceil
 from typing import Any, Callable, Dict, Literal, Optional, Union
@@ -662,25 +661,25 @@ class MCMCPosterior(NeuralPosterior):
             Tensor: initial parameters, one for each chain
         """
 
-        potential_ = deepcopy(self.potential_fn)
+        potential_ = self.potential_fn
         initial_params = []
-        init_fn = self._build_mcmc_init_fn(
-            self.proposal,
-            potential_fn=potential_,
-            transform=self.theta_transform,
-            init_strategy=init_strategy,  # type: ignore
-            **kwargs,
-        )
         for xi in x:
-            # Build init function
-            potential_ = potential_.bind(xi)
+            # Build init function with bound potential for this specific xi
+            potential_bound = potential_.bind(xi)
+            init_fn = self._build_mcmc_init_fn(
+                self.proposal,
+                potential_fn=potential_bound,
+                transform=self.theta_transform,
+                init_strategy=init_strategy,  # type: ignore
+                **kwargs,
+            )
 
             # Parallelize inits for resampling or sir.
             if num_workers > 1 and (
                 init_strategy == "resample" or init_strategy == "sir"
             ):
 
-                def seeded_init_fn(seed):
+                def seeded_init_fn(seed, init_fn=init_fn):
                     torch.manual_seed(seed)
                     return init_fn()
 
