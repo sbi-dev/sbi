@@ -1,0 +1,38 @@
+name: Docs Link Check
+
+# Validates the hard-coded URLs in llms.txt and AGENTS.md, which are not covered by
+# any other CI. Runs monthly rather than per-PR so transient or rate-limited external
+# responses don't block contributors.
+
+on:
+  schedule:
+    - cron: '0 6 1 * *'  # 06:00 UTC on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  link-check:
+    name: Check documentation links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          lfs: false
+          persist-credentials: false
+
+      - name: Check links with lychee
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # authenticate github.com links (avoid 60/hr rate limit)
+        with:
+          args: >-
+            --no-progress --verbose
+            docs/llms.txt AGENTS.md
+          fail: true
