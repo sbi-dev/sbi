@@ -237,7 +237,7 @@ class MCMCPosterior(NeuralPosterior):
         warn("The log-probability is unnormalized!", stacklevel=2)
 
         x = self._x_else_default_x(x)
-        self.potential_fn.set_x(x, x_is_iid=True)
+        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -291,7 +291,7 @@ class MCMCPosterior(NeuralPosterior):
         """
 
         x = self._x_else_default_x(x)
-        self.potential_fn.set_x(x, x_is_iid=True)
+        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -451,7 +451,7 @@ class MCMCPosterior(NeuralPosterior):
         # in the order of the observations.
         x_ = x.repeat_interleave(num_chains, dim=0)
 
-        self.potential_fn.set_x(x_, x_is_iid=False)
+        self.potential_fn = self.potential_fn.bind(x_, x_is_iid=False)
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
         # For each observation in the batch, we have num_chains independent chains.
@@ -673,7 +673,7 @@ class MCMCPosterior(NeuralPosterior):
         )
         for xi in x:
             # Build init function
-            potential_.set_x(xi)
+            potential_ = potential_.bind(xi)
 
             # Parallelize inits for resampling or sir.
             if num_workers > 1 and (
