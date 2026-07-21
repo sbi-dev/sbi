@@ -269,7 +269,7 @@ class VectorFieldPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
-        self.potential_fn = self.potential_fn.bind(
+        self.potential_fn = self._get_bound_potential(
             x,
             x_is_iid=is_iid,
             iid_method=iid_method,
@@ -491,7 +491,7 @@ class VectorFieldPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
-        self.potential_fn = self.potential_fn.bind(
+        self.potential_fn = self._get_bound_potential(
             x, x_is_iid=is_iid, **(ode_kwargs or {})
         )
 
@@ -557,7 +557,7 @@ class VectorFieldPosterior(NeuralPosterior):
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()
-        self.potential_fn = self.potential_fn.bind(x)
+        self.potential_fn = self._get_bound_potential(x)
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -697,7 +697,7 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if self._map is None or force_update:
             # rebuild coarse flow fast for MAP optimization.
-            self.potential_fn = self.potential_fn.bind(
+            self.potential_fn = self._get_bound_potential(
                 self.default_x, atol=1e-2, rtol=1e-3, exact=True
             )
             callable_potential_fn = CallableDifferentiablePotentialFunction(
