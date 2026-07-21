@@ -296,7 +296,9 @@ def _contains_inverse_transform(transform: TorchTransform) -> bool:
         seen.add(id(current))
         if isinstance(current, torch_tf._InverseTransform):
             return True
-        for value in current.__dict__.values():
+        for key, value in current.__dict__.items():
+            if key == "_inv":
+                continue
             if isinstance(value, TorchTransform) and contains_inverse(value):
                 return True
             if isinstance(value, (list, tuple)) and any(
