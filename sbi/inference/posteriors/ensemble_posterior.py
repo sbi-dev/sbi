@@ -488,6 +488,28 @@ class EnsemblePotential(BasePotential):
         for comp_potential in self.potential_fns:
             comp_potential.set_x(x_o)
 
+    def bind(
+        self,
+        x_o: Tensor,
+        x_is_iid: bool = True,
+        **kwargs,
+    ) -> "EnsemblePotential":
+        """Return a new EnsemblePotential with x_o bound to all component potentials."""
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+
+        bound_potentials = [
+            p.bind(x_o, x_is_iid=x_is_iid, **kwargs) for p in self.potential_fns
+        ]
+
+        return EnsemblePotential(
+            potential_fns=bound_potentials,
+            weights=self._weights,
+            prior=self.prior,
+            x_o=x_o,
+            device=self.device,
+        )
+
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.
 
