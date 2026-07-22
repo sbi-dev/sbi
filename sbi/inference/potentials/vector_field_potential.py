@@ -149,6 +149,7 @@ class VectorFieldBasedPotential(BasePotential):
             iid_params=self.iid_params,
             neural_ode_backend=self.neural_ode_backend,
         )
+        bound.neural_ode.params.update(self.neural_ode.params)
         bound.set_x(
             x_o,
             x_is_iid=x_is_iid,
