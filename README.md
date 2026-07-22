@@ -1,6 +1,6 @@
 [![PyPI version](https://badge.fury.io/py/sbi.svg)](https://badge.fury.io/py/sbi)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/sbi.svg)](https://github.com/conda-forge/sbi-feedstock)
-[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://sbi.readthedocs.io/en/latest/contributing.html)
+[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://sbi.readthedocs.io/en/stable/contributing.html)
 [![Tests](https://github.com/sbi-dev/sbi/actions/workflows/cd.yml/badge.svg)](https://github.com/sbi-dev/sbi/actions)
 [![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
 [![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
@@ -9,8 +9,8 @@
 
 ## `sbi`: Simulation-Based Inference
 
-[Getting Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html) |
-[Documentation](https://sbi.readthedocs.io/en/latest/) | [Discord Server](https://discord.gg/VPkV7XPj7k)
+[Getting Started](https://sbi.readthedocs.io/en/stable/tutorials/00_getting_started.html) |
+[Documentation](https://sbi.readthedocs.io/en/stable/) | [Discord Server](https://discord.gg/VPkV7XPj7k)
 
 `sbi` is a Python package for simulation-based inference, designed to meet the needs of
 both researchers and practitioners. Whether you need fine-grained control or an
@@ -77,7 +77,7 @@ uv pip install "sbi[all]"    # both Pyro and PyMC
 ```
 
 For conda, pixi, pip, and other installation methods, see the
-[full installation guide](https://sbi.readthedocs.io/en/latest/installation.html).
+[full installation guide](https://sbi.readthedocs.io/en/stable/installation.html).
 
 ### Testing the installation
 

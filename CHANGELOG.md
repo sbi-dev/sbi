@@ -1,5 +1,53 @@
 # Changelog
 
+## v0.27.0
+
+### ✨ Highlights
+
+#### 🚀 New Inference Methods & Features
+
+* Add NPE-PFN by @jsvetter in https://github.com/sbi-dev/sbi/pull/1778
+* feat(mdn): implement transform_to_unconstrained z-scoring for MDN by @BHARATH0153 in https://github.com/sbi-dev/sbi/pull/1888
+
+#### 🔧 Code Quality & Refactoring
+
+* LC2ST Module Refactoring by @janfb in https://github.com/sbi-dev/sbi/pull/1727
+
+### 🐛 Bug Fixes
+
+* fix: raise on unsupported unconstrained space transform by @janfb in https://github.com/sbi-dev/sbi/pull/1886
+* fix: transform_to_unconstrained device mdn device handling (#1893) by @BHARATH0153 in https://github.com/sbi-dev/sbi/pull/1896
+* fix: extend batched simulator detection to fix #1878 by @PC-DOS in https://github.com/sbi-dev/sbi/pull/1879
+* fix: guard recursive object traversal against cycles by @janfb in https://github.com/sbi-dev/sbi/pull/1938
+* add parametrized sample_with coverage across all inference methods and remove redundant NPE rejection prior guard by @Dev-Sudarshan in https://github.com/sbi-dev/sbi/pull/1839
+* fix: constrain pymc to avoid arviz-1.x import break, test CI on py3.13 by @janfb in https://github.com/sbi-dev/sbi/pull/1909
+* fix: improve plot summary arguments by @janfb in https://github.com/sbi-dev/sbi/pull/1861
+
+### 🛠️ Maintenance & Improvements
+
+#### 📖 Documentation & Website
+
+* docs(tutorials): Add note on posterior modes in "Getting Started" by @nicholasjng in https://github.com/sbi-dev/sbi/pull/1847
+* docs: add guidance for coding agents by @janfb in https://github.com/sbi-dev/sbi/pull/1868
+* docs: add list of maintainers to docs by @dgedon in https://github.com/sbi-dev/sbi/pull/1934
+* Point README documentation links at `/stable/` instead of `/latest/`, so they always match the installed release rather than the current `main` branch, by @janfb
+
+#### 🧪 Testing & CI/CD
+
+* fix: make VF tests deterministic and order-independent by @janfb in https://github.com/sbi-dev/sbi/pull/1913
+
+#### 🏗️ Infrastructure & Dependencies
+
+* fix: make CI reproducible via committed uv.lock and clarify pymc/pyro import errors by @janfb in https://github.com/sbi-dev/sbi/pull/1894
+
+### 🎉 New Contributors
+
+* @nicholasjng made their first contribution in https://github.com/sbi-dev/sbi/pull/1847
+* @PC-DOS made their first contribution in https://github.com/sbi-dev/sbi/pull/1879
+* @BHARATH0153 made their first contribution in https://github.com/sbi-dev/sbi/pull/1888
+
+**Full Changelog**: https://github.com/sbi-dev/sbi/compare/v0.26.1...v0.27.0
+
 ## v0.26.1
 
 ### ⚠️ Breaking Changes
