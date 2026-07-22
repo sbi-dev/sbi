@@ -145,8 +145,10 @@ class VectorFieldBasedPotential(BasePotential):
         self.iid_params = bound.iid_params
         self.guidance_method = bound.guidance_method
         self.guidance_params = bound.guidance_params
-        self.flow = bound.flow
-        self.flows = bound.flows
+        if not x_is_iid and (bound._x_o is not None):
+            self.flow = bound.flow
+        elif bound._x_o is not None:
+            self.flows = bound.flows
 
     def bind(
         self,
