@@ -84,13 +84,17 @@ class RatioBasedPotential(BasePotential):
 
     def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "RatioBasedPotential":
         """Create new potential with x bound, without mutable state."""
+        from sbi.utils.user_input_checks import process_x
+
         bound = RatioBasedPotential(
             ratio_estimator=self.ratio_estimator,
             prior=self.prior,
             x_o=None,
             device=self.device,
         )
-        bound.set_x(x_o, x_is_iid=x_is_iid)
+        x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
         return bound
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:

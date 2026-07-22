@@ -119,7 +119,12 @@ class VectorFieldBasedPotential(BasePotential):
                 `IIDScoreFunction`.
             ode_kwargs: Additional keyword arguments for the neural ODE.
         """
-        super().set_x(x_o, x_is_iid)
+        if x_o is not None:
+            from sbi.utils.user_input_checks import process_x
+
+            x_o = process_x(x_o).to(self.device)
+        self._x_o = x_o
+        self._x_is_iid = x_is_iid
         self.iid_method = iid_method or self.iid_method
         self.iid_params = iid_params
         self.guidance_method = guidance_method
@@ -140,25 +145,27 @@ class VectorFieldBasedPotential(BasePotential):
         **ode_kwargs,
     ) -> "VectorFieldBasedPotential":
         """Create new potential with x bound, without mutable state."""
+        from sbi.utils.user_input_checks import process_x
+
         bound = VectorFieldBasedPotential(
             vector_field_estimator=self.vector_field_estimator,
             prior=self.prior,
             x_o=None,
             device=self.device,
-            iid_method=self.iid_method,
-            iid_params=self.iid_params,
+            iid_method=iid_method or self.iid_method,
+            iid_params=iid_params,
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)
-        bound.set_x(
-            x_o,
-            x_is_iid=x_is_iid,
-            iid_method=iid_method,
-            iid_params=iid_params,
-            guidance_method=guidance_method,
-            guidance_params=guidance_params,
-            **ode_kwargs,
-        )
+        x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        bound.guidance_method = guidance_method
+        bound.guidance_params = guidance_params
+        if not x_is_iid and (bound._x_o is not None):
+            bound.flow = bound.rebuild_flow(**ode_kwargs)
+        elif bound._x_o is not None:
+            bound.flows = bound.rebuild_flows_for_batch(**ode_kwargs)
         return bound
 
     def __call__(

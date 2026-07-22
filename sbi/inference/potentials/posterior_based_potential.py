@@ -102,20 +102,29 @@ class PosteriorBasedPotential(BasePotential):
 
     def bind(self, x_o: Tensor, x_is_iid: bool = False) -> "PosteriorBasedPotential":
         """Create new potential with x bound, without mutable state."""
+        from sbi.utils.user_input_checks import process_x
+
         bound = PosteriorBasedPotential(
             posterior_estimator=self.posterior_estimator,
             prior=self.prior,
             x_o=None,
             device=self.device,
         )
-        bound.set_x(x_o, x_is_iid=x_is_iid)
+        x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
         return bound
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = False):
         """
         Check the shape of the observed data and, if valid, set it.
         """
-        super().set_x(x_o, x_is_iid=x_is_iid)
+        if x_o is not None:
+            from sbi.utils.user_input_checks import process_x
+
+            x_o = process_x(x_o).to(self.device)
+        self._x_o = x_o
+        self._x_is_iid = x_is_iid
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.
