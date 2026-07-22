@@ -129,6 +129,10 @@ class VectorFieldPosterior(NeuralPosterior):
             x_o=None,
             enable_transform=self.enable_transform,
         )
+        # Copy neural_ode params from old potential to new potential to preserve
+        # runtime parameter modifications (e.g., exact, atol, rtol) set during training
+        if hasattr(self, "potential_fn") and hasattr(self.potential_fn, "neural_ode"):
+            potential_fn.neural_ode.params.update(self.potential_fn.neural_ode.params)
         x_o = None
         if hasattr(self, "_x") and (self._x is not None):
             x_o = self._x.to(device)
