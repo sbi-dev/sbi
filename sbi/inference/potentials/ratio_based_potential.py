@@ -99,6 +99,7 @@ class RatioBasedPotential(BasePotential):
         Returns:
             The potential.
         """
+        self._check_on_device(self.device)
         if self.x_is_iid:
             # For each theta, calculate likelihood ratio sum over all x in batch.
             log_ratio_trial_sum = _log_ratios_over_trials(

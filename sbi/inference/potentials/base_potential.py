@@ -120,13 +120,13 @@ class BasePotential(metaclass=ABCMeta):
         issues = []
 
         try:
-            est_device = next(self._get_estimator_parameters_device())
+            est_device = self._get_estimator_parameters_device()
             if est_device != torch.device(device):
                 issues.append(
                     f"estimator is on {est_device}, expected {device}. "
                     "Move it explicitly: estimator.to(device)"
                 )
-        except (NotImplementedError, StopIteration):
+        except NotImplementedError:
             pass
 
         if self.prior is not None and hasattr(self.prior, "sample"):
@@ -197,6 +197,7 @@ class CustomPotentialWrapper(BasePotential):
 
         Note, x_o is re-used from the initialization of the potential function.
         """
+        self._check_on_device(self.device)
         with torch.set_grad_enabled(track_gradients):
             return self.potential_fn(theta, self.x_o)
 

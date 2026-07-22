@@ -111,6 +111,7 @@ class LikelihoodBasedPotential(BasePotential):
         Returns:
             The potential $\log(p(x_o|\theta)p(\theta))$.
         """
+        self._check_on_device(self.device)
         if self.x_is_iid:
             # For each theta, calculate the likelihood sum over all x in batch.
             log_likelihood_trial_sum = _log_likelihoods_over_trials(

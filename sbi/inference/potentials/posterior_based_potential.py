@@ -123,6 +123,7 @@ class PosteriorBasedPotential(BasePotential):
         Returns:
             The potential.
         """
+        self._check_on_device(self.device)
 
         if self._x_o is None:
             raise ValueError(

@@ -170,6 +170,7 @@ class VectorFieldBasedPotential(BasePotential):
         Returns:
             The potential function, i.e., the log probability of the posterior.
         """
+        self._check_on_device(self.device)
 
         if self.guidance_method is not None:
             raise NotImplementedError(
