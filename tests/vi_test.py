@@ -59,8 +59,12 @@ class FakePotential(BasePotential):
 
     def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
         """Create new potential with x bound, without mutable state."""
+        from sbi.utils.user_input_checks import process_x
+
         bound = FakePotential(prior=self.prior, device=self.device)
-        bound.set_x(x_o, x_is_iid=x_is_iid)
+        x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
         return bound
 
 
@@ -80,8 +84,12 @@ def make_tractable_potential(target_distribution, prior):
             self, x_o: torch.Tensor, x_is_iid: bool = True
         ) -> "TractablePotential":
             """Create new potential with x bound, without mutable state."""
+            from sbi.utils.user_input_checks import process_x
+
             bound = TractablePotential(prior=self.prior, device=self.device)
-            bound.set_x(x_o, x_is_iid=x_is_iid)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
             return bound
 
     return TractablePotential(prior=prior)
