@@ -248,13 +248,13 @@ def test_mixed_trainer_rejects_plain_density_builder(trainer_cls):
 
 
 def test_valid_continuous_models_match_builders():
-    """Guard against drift between _VALID_MIXED_CONTINUOUS_MODELS and mixed_nets."""
+    """Guard against drift between _VALID_DENSITY_MODELS and mixed_nets."""
     from sbi.neural_nets.net_builders.estimator_configs import (
-        _VALID_MIXED_CONTINUOUS_MODELS,
+        _VALID_DENSITY_MODELS,
     )
     from sbi.neural_nets.net_builders.mixed_nets import model_builders
 
-    assert frozenset(model_builders) == _VALID_MIXED_CONTINUOUS_MODELS
+    assert frozenset(model_builders) == _VALID_DENSITY_MODELS
 
 
 def test_valid_density_models_match_builders():
