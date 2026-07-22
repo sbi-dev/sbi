@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from copy import deepcopy
 from typing import Dict, Optional, Sequence, Union
 
 import torch
@@ -234,15 +233,6 @@ class PytorchReturnTypeWrapper(Distribution):
         self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
-    def __deepcopy__(self, memo):
-        """Ensure prior attribute is preserved during deepcopy."""
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            setattr(result, k, deepcopy(v, memo))
-        return result
-
 
 class MultipleIndependent(Distribution):
     """Wrap a sequence of PyTorch distributions into a joint PyTorch distribution."""
@@ -441,15 +431,6 @@ class MultipleIndependent(Distribution):
             self.dists[i] = move_distribution_to_device(self.dists[i], device)
         self.device = device
 
-    def __deepcopy__(self, memo):
-        """Ensure dists attribute is preserved during deepcopy."""
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            setattr(result, k, deepcopy(v, memo))
-        return result
-
 
 def build_support(
     lower_bound: Optional[Tensor] = None, upper_bound: Optional[Tensor] = None
@@ -559,15 +540,6 @@ class OneDimPriorWrapper(Distribution):
         """
         self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
-
-    def __deepcopy__(self, memo):
-        """Ensure prior attribute is preserved during deepcopy."""
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            setattr(result, k, deepcopy(v, memo))
-        return result
 
     def sample(self, *args, **kwargs) -> Tensor:
         return self.prior.sample(*args, **kwargs)
