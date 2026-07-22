@@ -120,7 +120,8 @@ class MNPE(NPE_C):
                 )
             warnings.warn(
                 "Passing a string for `density_estimator` is deprecated. "
-                "Use MixedDensityEstimatorBuilder(...) instead.",
+                "Use MixedDensityEstimatorBuilder(...) instead, e.g. "
+                "`from sbi.neural_nets import MixedDensityEstimatorBuilder`.",
                 FutureWarning,
                 stacklevel=2,
             )

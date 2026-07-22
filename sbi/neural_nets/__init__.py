@@ -9,6 +9,11 @@ from sbi.neural_nets.factory import (
     posterior_nn,
     posterior_score_nn,
 )
+from sbi.neural_nets.net_builders.estimator_configs import (
+    DensityEstimatorBuilder,
+    MixedDensityEstimatorBuilder,
+    RatioEstimatorBuilder,
+)
 
 
 def __getattr__(name):
@@ -55,4 +60,7 @@ __all__ = [
     "posterior_nn",
     "posterior_score_nn",
     "posterior_flow_nn",
+    "DensityEstimatorBuilder",
+    "MixedDensityEstimatorBuilder",
+    "RatioEstimatorBuilder",
 ]

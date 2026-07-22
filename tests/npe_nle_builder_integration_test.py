@@ -248,10 +248,34 @@ def test_mixed_trainer_rejects_plain_density_builder(trainer_cls):
 
 
 def test_valid_continuous_models_match_builders():
-    """Guard against drift between _VALID_MIXED_CONTINUOUS_MODELS and mixed_nets."""
+    """Guard against drift between _VALID_DENSITY_MODELS and mixed_nets."""
     from sbi.neural_nets.net_builders.estimator_configs import (
-        _VALID_MIXED_CONTINUOUS_MODELS,
+        _VALID_DENSITY_MODELS,
     )
     from sbi.neural_nets.net_builders.mixed_nets import model_builders
 
-    assert frozenset(model_builders) == _VALID_MIXED_CONTINUOUS_MODELS
+    assert frozenset(model_builders) == _VALID_DENSITY_MODELS
+
+
+def test_valid_density_models_match_builders():
+    """Guard against drift between _VALID_DENSITY_MODELS and _density_build_fns."""
+    from sbi.neural_nets.net_builders.estimator_configs import (
+        _VALID_DENSITY_MODELS,
+        _density_build_fns,
+    )
+
+    assert set(_density_build_fns().keys()) == _VALID_DENSITY_MODELS
+
+
+def test_density_z_score_alias():
+    """z_score_input to z_score_x and z_score_condition to z_score_y."""
+    builder = DensityEstimatorBuilder(
+        model="maf",
+        z_score_input="independent",
+        z_score_condition="structured",
+    )
+    kwargs = builder._build_kwargs()
+    assert "z_score_x" in kwargs
+    assert "z_score_y" in kwargs
+    assert "z_score_input" not in kwargs
+    assert "z_score_condition" not in kwargs
