@@ -150,6 +150,8 @@ class VectorFieldBasedPotential(BasePotential):
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)
+        # Transfer learned neural ODE parameters (e.g., from training) to the bound
+        # potential. This preserves the trained flow model when conditioning on new x.
         bound.set_x(
             x_o,
             x_is_iid=x_is_iid,
