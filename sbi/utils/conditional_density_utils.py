@@ -15,7 +15,6 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
 from sbi.utils.torchutils import ensure_theta_batched
-from sbi.utils.user_input_checks import process_x
 
 
 def compute_corrcoeff(probs: Tensor, limits: Tensor):
@@ -416,11 +415,20 @@ class ConditionedPotential(BasePotential):
             )
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = True):
-        """Check the shape of the observed data and, if valid, set it."""
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        self._x_is_iid = x_is_iid
-        self.potential_fn = self.potential_fn.bind(x_o, x_is_iid=x_is_iid)
+        """Check the shape of the observed data and, if valid, set it.
+
+        DEPRECATED: Use bind() instead. This method delegates to bind() internally.
+        """
+        import warnings
+
+        warnings.warn(
+            "set_x() is deprecated, use bind() instead",
+            FutureWarning,
+            stacklevel=2,
+        )
+        bound = self.bind(x_o, x_is_iid=x_is_iid)
+        self._x_is_iid = bound._x_is_iid
+        self.potential_fn = bound.potential_fn
 
     def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "ConditionedPotential":
         """Create new potential with x bound, without mutable state."""
