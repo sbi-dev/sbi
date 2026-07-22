@@ -88,7 +88,12 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             device: Device on which to move the posterior to.
         """
         self.device = device
-        self.potential_fn.to(device)  # type: ignore
+        self.potential_fn._move_estimator_to_device(device)  # type: ignore
+        self.potential_fn.device = device
+        if self.potential_fn.prior is not None:
+            self.potential_fn.prior = self.potential_fn.prior.to(device)
+        if self.potential_fn._x_o is not None:
+            self.potential_fn._x_o = self.potential_fn._x_o.to(device)
         self.proposal.to(device)
         x_o = None
         if hasattr(self, "_x") and (self._x is not None):

@@ -9,7 +9,6 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.utils.user_input_checks import process_x
-from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class BasePotential(metaclass=ABCMeta):
@@ -91,24 +90,73 @@ class BasePotential(metaclass=ABCMeta):
         """
         return self._x_o
 
-    def to(self, device: Union[str, torch.device]) -> "BasePotential":
-        """Move prior and x_o to the given device.
+    def _move_estimator_to_device(
+        self, device: Union[str, torch.device]
+    ) -> "BasePotential":
+        """Move the neural estimator to the given device.
 
-        It also sets the device attribute to the given device.
+        Subclasses must override this if they have an estimator attribute.
 
         Args:
-            device: Device to move the prior and x_o to.
+            device: Device to move the estimator to.
 
         Returns:
             Self for method chaining.
         """
-
-        self.device = device
-        if self.prior is not None:
-            self.prior = move_distribution_to_device(self.prior, device)
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
         return self
+
+    def _check_on_device(self, device: Union[str, torch.device]) -> None:
+        """Check that estimator, prior and x_o are on the expected device.
+
+        Raises an informative error if any component is on a different device,
+        guiding users to move components explicitly before creating the potential.
+
+        Args:
+            device: Expected device.
+
+        Raises:
+            RuntimeError: If any component is on a different device.
+        """
+        issues = []
+
+        try:
+            est_device = next(self._get_estimator_parameters_device())
+            if est_device != torch.device(device):
+                issues.append(
+                    f"estimator is on {est_device}, expected {device}. "
+                    "Move it explicitly: estimator.to(device)"
+                )
+        except (NotImplementedError, StopIteration):
+            pass
+
+        if self.prior is not None and hasattr(self.prior, "sample"):
+            try:
+                prior_device = self.prior.sample((1,)).device
+                if prior_device != torch.device(device):
+                    issues.append(
+                        f"prior is on {prior_device}, expected {device}. "
+                        "Move it explicitly: prior = prior.to(device)"
+                    )
+            except Exception:
+                pass
+
+        if self._x_o is not None:
+            x_o_device = self._x_o.device
+            if x_o_device != torch.device(device):
+                issues.append(
+                    f"x_o is on {x_o_device}, expected {device}. "
+                    "Move it explicitly: x_o = x_o.to(device)"
+                )
+
+        if issues:
+            raise RuntimeError(
+                "Device mismatch detected. Move components explicitly before creating "
+                "the potential:\n  " + "\n  ".join(issues)
+            )
+
+    def _get_estimator_parameters_device(self):
+        """Yield device of estimator parameters. Subclasses override."""
+        raise NotImplementedError
 
 
 class CustomPotential(Protocol):
@@ -143,18 +191,6 @@ class CustomPotentialWrapper(BasePotential):
         super().__init__(prior, x_o, device)
 
         self.potential_fn = potential_fn
-
-    def to(self, device: Union[str, torch.device]) -> "CustomPotentialWrapper":
-        """Move prior and x_o to the given device.
-
-        Args:
-            device: Device to move the prior and x_o to.
-
-        Returns:
-            Self for method chaining.
-        """
-        super().to(device)
-        return self
 
     def __call__(self, theta, track_gradients: bool = True):
         """Calls the custom potential function on given theta.

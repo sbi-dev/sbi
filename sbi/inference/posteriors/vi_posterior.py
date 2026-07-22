@@ -156,7 +156,7 @@ class VIPosterior(NeuralPosterior):
         self.theta_transform = theta_transform
         self.x_shape = x_shape
         self.potential_fn.device = device
-        self.potential_fn.to(device)
+        self.potential_fn._move_estimator_to_device(device)  # type: ignore
 
         # Get prior and previous builds
         if prior is not None:
@@ -223,8 +223,13 @@ class VIPosterior(NeuralPosterior):
         """
         self._device = device
 
-        # Move potential (which moves prior, x_o, and estimator).
-        self.potential_fn.to(device)  # type: ignore
+        # Move potential components explicitly.
+        self.potential_fn._move_estimator_to_device(device)  # type: ignore
+        self.potential_fn.device = device
+        if self.potential_fn.prior is not None:
+            self.potential_fn.prior = self.potential_fn.prior.to(device)
+        if self.potential_fn._x_o is not None:
+            self.potential_fn._x_o = self.potential_fn._x_o.to(device)
         self._prior = move_distribution_to_device(self._prior, device)
 
         # Rebuild link_transform on new device (same logic as __init__).
@@ -1109,7 +1114,11 @@ class VIPosterior(NeuralPosterior):
             )
 
         # Ensure potential_fn is on the correct device for amortized training
-        self.potential_fn.to(self._device)
+        self.potential_fn._move_estimator_to_device(self._device)  # type: ignore
+        if self.potential_fn.prior is not None:
+            self.potential_fn.prior = self.potential_fn.prior.to(self._device)
+        if self.potential_fn._x_o is not None:
+            self.potential_fn._x_o = self.potential_fn._x_o.to(self._device)
 
         # Setup optimizer
         optimizer = Adam(self._amortized_q.parameters(), lr=learning_rate)

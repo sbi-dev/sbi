@@ -69,18 +69,14 @@ class RatioBasedPotential(BasePotential):
         self.ratio_estimator = ratio_estimator
         self.ratio_estimator.eval()
 
-    def to(self, device: Union[str, torch.device]) -> "RatioBasedPotential":
-        """Move ratio estimator, prior and x_o to the given device.
-
-        Args:
-            device: Device to move the ratio_estimator, prior and x_o to.
-
-        Returns:
-            Self for method chaining.
-        """
-        super().to(device)
-        self.ratio_estimator.to(device)
+    def _move_estimator_to_device(
+        self, device: Union[str, torch.device]
+    ) -> "RatioBasedPotential":
+        self.ratio_estimator = self.ratio_estimator.to(device)
         return self
+
+    def _get_estimator_parameters_device(self):
+        return next(self.ratio_estimator.parameters()).device
 
     def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "RatioBasedPotential":
         """Create new potential with x bound, without mutable state."""

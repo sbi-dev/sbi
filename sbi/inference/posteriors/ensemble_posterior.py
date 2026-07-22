@@ -464,7 +464,12 @@ class EnsemblePotential(BasePotential):
         """
         self.device = device
         for i in range(len(self.potential_fns)):
-            self.potential_fns[i].to(device)
+            self.potential_fns[i]._move_estimator_to_device(device)  # type: ignore
+            self.potential_fns[i].device = device
+            if self.potential_fns[i].prior is not None:
+                self.potential_fns[i].prior = self.potential_fns[i].prior.to(device)
+            if self.potential_fns[i]._x_o is not None:
+                self.potential_fns[i]._x_o = self.potential_fns[i]._x_o.to(device)
         self._weights = self._weights.to(device)
         self.prior.to(device)  # type: ignore
         if self._x_o is not None:
