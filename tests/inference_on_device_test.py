@@ -398,8 +398,12 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str):
 
         def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
             """Create new potential with x bound, without mutable state."""
+            from sbi.utils.user_input_checks import process_x
+
             bound = FakePotential(prior=self.prior, device=self.device)
-            bound.set_x(x_o, x_is_iid=x_is_iid)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
             return bound
 
     potential_fn = FakePotential(
@@ -458,8 +462,12 @@ def test_amortized_vi_on_gpu(num_dim: int, flow_type: str):
 
         def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
             """Create new potential with x bound, without mutable state."""
+            from sbi.utils.user_input_checks import process_x
+
             bound = FakePotential(prior=self.prior, device=self.device)
-            bound.set_x(x_o, x_is_iid=x_is_iid)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
             return bound
 
     potential_fn = FakePotential(prior=prior, device=device)
@@ -770,8 +778,8 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
     assert sample_device.device.type == device.split(":")[0], (
         f"sample was not correctly moved to {device}."
     )
-    posterior.potential_fn.set_x(x_o)
-    potential_values = posterior.potential_fn(sample_device)
+    bound_potential = posterior.potential_fn.bind(x_o)
+    potential_values = bound_potential(sample_device)
     assert potential_values.device.type == device.split(":")[0], (
         f"potential was not correctly evaluated on {device}."
     )
