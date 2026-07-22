@@ -61,6 +61,8 @@ class VectorFieldBasedPotential(BasePotential):
         self.vector_field_estimator.eval()
         self.iid_method = iid_method
         self.iid_params = iid_params
+        self.guidance_method: Optional[str] = None
+        self.guidance_params: Optional[Dict[str, Any]] = None
         self.neural_ode_backend = neural_ode_backend
 
         neural_ode_kwargs = neural_ode_kwargs or {}
@@ -153,15 +155,19 @@ class VectorFieldBasedPotential(BasePotential):
             x_o=None,
             device=self.device,
             iid_method=iid_method or self.iid_method,
-            iid_params=iid_params,
+            iid_params=iid_params if iid_params is not None else self.iid_params,
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)
         x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
         bound._x_is_iid = x_is_iid
-        bound.guidance_method = guidance_method
-        bound.guidance_params = guidance_params
+        bound.guidance_method = (
+            guidance_method if guidance_method is not None else self.guidance_method
+        )
+        bound.guidance_params = (
+            guidance_params if guidance_params is not None else self.guidance_params
+        )
         if not x_is_iid and (bound._x_o is not None):
             bound.flow = bound.rebuild_flow(**ode_kwargs)
         elif bound._x_o is not None:
