@@ -22,6 +22,7 @@ from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import check_prior
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class DirectPosterior(NeuralPosterior):
@@ -103,10 +104,7 @@ class DirectPosterior(NeuralPosterior):
             device: device where to move the posterior to.
         """
         self.device = device
-        if hasattr(self.prior, "to"):
-            self.prior.to(device)  # type: ignore
-        else:
-            raise ValueError("""Prior has no attribute to(device).""")
+        self.prior = move_distribution_to_device(self.prior, device)
         if hasattr(self.posterior_estimator, "to"):
             self.posterior_estimator.to(device)
         else:

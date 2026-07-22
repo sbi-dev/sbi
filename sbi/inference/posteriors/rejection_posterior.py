@@ -14,6 +14,7 @@ from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -85,7 +86,9 @@ class RejectionPosterior(NeuralPosterior):
         self.potential_fn._move_estimator_to_device(device)  # type: ignore
         self.potential_fn.device = device
         if self.potential_fn.prior is not None:
-            self.potential_fn.prior = self.potential_fn.prior.to(device)
+            self.potential_fn.prior = move_distribution_to_device(
+                self.potential_fn.prior, device
+            )
         if self.potential_fn._x_o is not None:
             self.potential_fn._x_o = self.potential_fn._x_o.to(device)
         self.proposal.to(device)

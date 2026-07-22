@@ -31,6 +31,7 @@ from sbi.utils.sbiutils import (
     within_support,
 )
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class VectorFieldPosterior(NeuralPosterior):
@@ -116,10 +117,7 @@ class VectorFieldPosterior(NeuralPosterior):
             device: device where to move the posterior to.
         """
         self.device = device
-        if hasattr(self.prior, "to"):
-            self.prior.to(device)  # type: ignore
-        else:
-            raise ValueError("""Prior has no attribute to(device).""")
+        self.prior = move_distribution_to_device(self.prior, device)
         if hasattr(self.vector_field_estimator, "to"):
             self.vector_field_estimator.to(device)
         else:

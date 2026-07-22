@@ -227,7 +227,9 @@ class VIPosterior(NeuralPosterior):
         self.potential_fn._move_estimator_to_device(device)  # type: ignore
         self.potential_fn.device = device
         if self.potential_fn.prior is not None:
-            self.potential_fn.prior = self.potential_fn.prior.to(device)
+            self.potential_fn.prior = move_distribution_to_device(
+                self.potential_fn.prior, device
+            )
         if self.potential_fn._x_o is not None:
             self.potential_fn._x_o = self.potential_fn._x_o.to(device)
         self._prior = move_distribution_to_device(self._prior, device)
@@ -1116,7 +1118,9 @@ class VIPosterior(NeuralPosterior):
         # Ensure potential_fn is on the correct device for amortized training
         self.potential_fn._move_estimator_to_device(self._device)  # type: ignore
         if self.potential_fn.prior is not None:
-            self.potential_fn.prior = self.potential_fn.prior.to(self._device)
+            self.potential_fn.prior = move_distribution_to_device(
+                self.potential_fn.prior, self._device
+            )
         if self.potential_fn._x_o is not None:
             self.potential_fn._x_o = self.potential_fn._x_o.to(self._device)
 

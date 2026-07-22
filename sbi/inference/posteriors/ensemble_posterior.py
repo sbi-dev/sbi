@@ -14,6 +14,7 @@ from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class EnsemblePosterior(NeuralPosterior):
@@ -108,7 +109,7 @@ class EnsemblePosterior(NeuralPosterior):
         self._device = device
         for i in range(len(self.posteriors)):
             self.posteriors[i].to(device)
-        self.prior.to(device)
+        self.prior = move_distribution_to_device(self.prior, device)
         self.theta_transform = mcmc_transform(self.prior, device=device)
         self._weights.to(device)
         self._build_potential_fns()
@@ -467,11 +468,13 @@ class EnsemblePotential(BasePotential):
             self.potential_fns[i]._move_estimator_to_device(device)  # type: ignore
             self.potential_fns[i].device = device
             if self.potential_fns[i].prior is not None:
-                self.potential_fns[i].prior = self.potential_fns[i].prior.to(device)
+                self.potential_fns[i].prior = move_distribution_to_device(
+                    self.potential_fns[i].prior, device
+                )
             if self.potential_fns[i]._x_o is not None:
                 self.potential_fns[i]._x_o = self.potential_fns[i]._x_o.to(device)
         self._weights = self._weights.to(device)
-        self.prior.to(device)  # type: ignore
+        self.prior = move_distribution_to_device(self.prior, device)
         if self._x_o is not None:
             self._x_o = self._x_o.to(device)
 
