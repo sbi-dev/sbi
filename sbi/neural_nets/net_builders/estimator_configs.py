@@ -20,9 +20,22 @@ intentionally forward ``None`` to override a non-None builder default (e.g.
 preserving typed field annotations.
 """
 
-from dataclasses import dataclass, fields
-from typing import Any, Literal, Optional, Sequence, Union, get_args
+import inspect
+from dataclasses import MISSING, dataclass, field, fields
+from functools import lru_cache
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Literal,
+    Optional,
+    Sequence,
+    Union,
+    get_args,
+    get_origin,
+)
 
+import torch.nn as nn
 from torch import Tensor
 
 from sbi.neural_nets.estimators.base import (
@@ -30,18 +43,135 @@ from sbi.neural_nets.estimators.base import (
     ConditionalEstimator,
 )
 from sbi.neural_nets.estimators.mixed_density_estimator import MixedDensityEstimator
+from sbi.neural_nets.ratio_estimators import RatioEstimator
+
+_BUILD_KWARG_ALIASES: dict = {
+    "z_score_input": "z_score_x",
+    "z_score_condition": "z_score_y",
+}
+"""Maps user-facing field names to the legacy kwarg names expected by the
+downstream ``build_*`` functions."""
 
 
-@dataclass
+def _literal_values(tp) -> frozenset:
+    """Extract allowed values from a (possibly nested) ``Literal`` type.
+    Unwraps ``Optional[Literal[...]]`` and ``Union[Literal[...], ...]``
+    recursively.
+    """
+    if get_origin(tp) is Literal:
+        return frozenset(get_args(tp))
+    out: frozenset = frozenset()
+    for a in get_args(tp):
+        out = out | _literal_values(a)
+    return out
+
+
+@dataclass(frozen=True, eq=False, repr=False)
 class _EstimatorBuilderBase:
     """Shared base providing ``from_kwargs()``, ``to_dict()``, and the abstract
     ``build()`` contract for all estimator builders."""
 
-    extra_kwargs: dict = None  # type: ignore
+    extra_kwargs: dict = field(default_factory=dict)
 
     def __post_init__(self):
-        if self.extra_kwargs is None:
-            self.extra_kwargs = {}
+        for f in fields(self):
+            allowed = _literal_values(f.type)
+            val = getattr(self, f.name)
+            if allowed and val is not None and val not in allowed:
+                raise ValueError(
+                    f"Invalid value {val!r} for `{f.name}`. "
+                    f"Must be one of {sorted(map(str, allowed))} or None."
+                )
+
+    _DISCRIMINATORS: ClassVar[frozenset] = frozenset({
+        "model",
+        "continuous_model",
+        "estimator_type",
+    })
+
+    def __repr__(self) -> str:
+        cls = type(self)
+        parts: list[str] = []
+        for f in fields(self):
+            val = getattr(self, f.name)
+            if f.name == "extra_kwargs":
+                if val:
+                    parts.append(f"extra_kwargs={val!r}")
+                continue
+            if f.name in self._DISCRIMINATORS:
+                parts.append(f"{f.name}={val!r}")
+            elif f.default is not MISSING and val is f.default:
+                continue
+            elif val is not None:
+                parts.append(f"{f.name}={val!r}")
+        return f"{cls.__name__}({', '.join(parts)})"
+
+    def _build_kwargs(self) -> dict:
+        """Non-None fields as builder kwargs, alias-translated, minus discriminators.
+
+        Field names are translated via ``_BUILD_KWARG_ALIASES`` so that
+        user-facing names (e.g. ``z_score_input``) map to the legacy
+        kwarg names (``z_score_x``) expected by ``build_*`` functions.
+        """
+        d = {
+            _BUILD_KWARG_ALIASES.get(f.name, f.name): getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in self._DISCRIMINATORS
+            and f.name != "extra_kwargs"
+            and getattr(self, f.name) is not None
+        }
+        d.update(self.extra_kwargs)
+        return d
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _fn_param_names(build_fn) -> frozenset:
+        """Return the set of explicit parameter names for *build_fn*,
+        excluding ``batch_x``, ``batch_y`` and ``**kwargs``."""
+        return frozenset(
+            p.name
+            for p in inspect.signature(build_fn).parameters.values()
+            if p.kind is not inspect.Parameter.VAR_KEYWORD
+            and p.name not in ("batch_x", "batch_y")
+        )
+
+    def _reject_inapplicable_fields(
+        self,
+        build_fn,
+        *,
+        discriminator: str,
+        always_ok: frozenset = frozenset(),
+    ) -> None:
+        """Raise ``ValueError`` if any non-None field would be silently
+        ignored by *build_fn*.
+
+        Args:
+            build_fn: The downstream builder function whose signature
+                defines the set of accepted parameter names.
+            discriminator: Name of the field that selects which build
+                function is used (e.g. ``"model"``).
+            always_ok: Additional field names that are always
+                acceptable regardless of *build_fn*'s signature.
+        """
+        allowed = self._fn_param_names(build_fn) | always_ok
+        set_fields = {
+            f.name
+            for f in fields(self)
+            if f.name not in ("extra_kwargs", discriminator)
+            and getattr(self, f.name) is not None
+        }
+        bad = {
+            n
+            for n in set_fields
+            if n not in allowed and _BUILD_KWARG_ALIASES.get(n, n) not in allowed
+        }
+        if bad:
+            raise ValueError(
+                f"Field(s) {sorted(bad)} are not used by "
+                f"{discriminator}={getattr(self, discriminator)!r} and would "
+                "be silently ignored. To forward library-specific options, "
+                "use `extra_kwargs`."
+            )
 
     @classmethod
     def from_kwargs(cls, **kwargs) -> "_EstimatorBuilderBase":
@@ -108,7 +238,7 @@ class _EstimatorBuilderBase:
         return d
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class ConditionalFlowConfig(_EstimatorBuilderBase):
     """Configuration for conditional normalizing-flow density estimator builders.
 
@@ -168,7 +298,7 @@ class ConditionalFlowConfig(_EstimatorBuilderBase):
     dtype: Optional[Any] = None
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class ClassifierConfig(_EstimatorBuilderBase):
     """Configuration for classifier builders (NRE).
 
@@ -188,7 +318,7 @@ class ClassifierConfig(_EstimatorBuilderBase):
     use_batch_norm: Optional[bool] = None
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class MarginalFlowConfig(_EstimatorBuilderBase):
     """Configuration for marginal density estimator builders.
 
@@ -211,6 +341,58 @@ class MarginalFlowConfig(_EstimatorBuilderBase):
     components: Optional[int] = None  # zuko_gf
 
 
+def _density_build_fns() -> dict:
+    """Build-function mapping for density estimators."""
+    from sbi.neural_nets.net_builders.flow import (
+        build_made,
+        build_maf,
+        build_maf_rqs,
+        build_nsf,
+        build_zuko_bpf,
+        build_zuko_gf,
+        build_zuko_maf,
+        build_zuko_naf,
+        build_zuko_ncsf,
+        build_zuko_nice,
+        build_zuko_nsf,
+        build_zuko_sospf,
+        build_zuko_unaf,
+    )
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+
+    return {
+        "mdn": build_mdn,
+        "made": build_made,
+        "maf": build_maf,
+        "maf_rqs": build_maf_rqs,
+        "nsf": build_nsf,
+        "zuko_nice": build_zuko_nice,
+        "zuko_maf": build_zuko_maf,
+        "zuko_nsf": build_zuko_nsf,
+        "zuko_ncsf": build_zuko_ncsf,
+        "zuko_sospf": build_zuko_sospf,
+        "zuko_naf": build_zuko_naf,
+        "zuko_unaf": build_zuko_unaf,
+        "zuko_gf": build_zuko_gf,
+        "zuko_bpf": build_zuko_bpf,
+    }
+
+
+def _classifier_build_fns() -> dict:
+    """Build-function mapping for ratio estimators."""
+    from sbi.neural_nets.net_builders.classifier import (
+        build_linear_classifier,
+        build_mlp_classifier,
+        build_resnet_classifier,
+    )
+
+    return {
+        "linear": build_linear_classifier,
+        "mlp": build_mlp_classifier,
+        "resnet": build_resnet_classifier,
+    }
+
+
 DENSITY_MODELS = Literal[
     "mdn",
     "made",
@@ -231,7 +413,7 @@ DENSITY_MODELS = Literal[
 _VALID_DENSITY_MODELS = frozenset(get_args(DENSITY_MODELS))
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class DensityEstimatorBuilder(_EstimatorBuilderBase):
     """Builder for continuous density estimators (NPE / NLE).
 
@@ -244,16 +426,16 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
     model: DENSITY_MODELS = "maf"  # type: ignore[valid-type]
 
     # --- Shared across most builders ---
-    z_score_x: Optional[
+    z_score_input: Optional[
         Literal["none", "independent", "structured", "transform_to_unconstrained"]
     ] = None
-    z_score_y: Optional[
+    z_score_condition: Optional[
         Literal["none", "independent", "structured", "transform_to_unconstrained"]
     ] = None
     hidden_features: Optional[Union[int, Sequence[int]]] = None
     num_transforms: Optional[int] = None
     num_bins: Optional[int] = None
-    embedding_net: Optional[Any] = None
+    embedding_net: Optional[nn.Module] = None
     num_components: Optional[int] = None
 
     # --- NFlows-specific (MAF, NSF, MAF-RQS) ---
@@ -279,12 +461,16 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
     components: Optional[int] = None  # zuko_gf
 
     def __post_init__(self):
-        super().__post_init__()
         if self.model not in _VALID_DENSITY_MODELS:
             raise ValueError(
                 f"Unknown model {self.model!r}. "
                 f"Must be one of {sorted(_VALID_DENSITY_MODELS)}."
             )
+        super().__post_init__()
+        self._reject_inapplicable_fields(
+            _density_build_fns()[self.model],
+            discriminator="model",
+        )
 
     def build(
         self, batch_input: Tensor, batch_condition: Tensor
@@ -302,89 +488,42 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
             A ``ConditionalDensityEstimator`` (e.g., ``NFlowsFlow``,
             ``ZukoFlow``, or MDN).
         """
-        from sbi.neural_nets.net_builders.flow import (
-            build_made,
-            build_maf,
-            build_maf_rqs,
-            build_nsf,
-            build_zuko_bpf,
-            build_zuko_gf,
-            build_zuko_maf,
-            build_zuko_naf,
-            build_zuko_ncsf,
-            build_zuko_nice,
-            build_zuko_nsf,
-            build_zuko_sospf,
-            build_zuko_unaf,
-        )
-        from sbi.neural_nets.net_builders.mdn import build_mdn
-
-        builders = {
-            "mdn": build_mdn,
-            "made": build_made,
-            "maf": build_maf,
-            "maf_rqs": build_maf_rqs,
-            "nsf": build_nsf,
-            "zuko_nice": build_zuko_nice,
-            "zuko_maf": build_zuko_maf,
-            "zuko_nsf": build_zuko_nsf,
-            "zuko_ncsf": build_zuko_ncsf,
-            "zuko_sospf": build_zuko_sospf,
-            "zuko_naf": build_zuko_naf,
-            "zuko_unaf": build_zuko_unaf,
-            "zuko_gf": build_zuko_gf,
-            "zuko_bpf": build_zuko_bpf,
-        }
-
-        build_fn = builders[self.model]
+        build_fn = _density_build_fns()[self.model]
         kwargs = self._build_kwargs()
         return build_fn(batch_x=batch_input, batch_y=batch_condition, **kwargs)
 
-    def _build_kwargs(self) -> dict:
-        """Return non-None fields as a dict, excluding ``model``."""
-        d = {
-            f.name: getattr(self, f.name)
-            for f in fields(self)
-            if f.name not in ("model", "extra_kwargs")
-            and getattr(self, f.name) is not None
-        }
-        d.update(self.extra_kwargs)
-        return d
 
-
-_VALID_MIXED_CONTINUOUS_MODELS = frozenset({
-    "mdn",
-    "made",
-    "maf",
-    "maf_rqs",
-    "nsf",
-    "zuko_nice",
-    "zuko_maf",
-    "zuko_nsf",
-    "zuko_ncsf",
-    "zuko_sospf",
-    "zuko_naf",
-    "zuko_unaf",
-    "zuko_gf",
-    "zuko_bpf",
+_MIXED_ALWAYS_OK: frozenset = frozenset({
+    "num_categories_per_variable",
+    "embedding_net",
+    "combined_embedding_net",
+    "log_transform_x",
+    "hidden_features",
+    "discrete_hidden_features",
+    "discrete_hidden_layers",
+    "continuous_hidden_features",
+    "dropout_probability",
+    "z_score_input",
+    "z_score_condition",
 })
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
     """Builder for mixed (continuous + discrete) density estimators (MNLE / MNPE).
 
     Sibling of ``DensityEstimatorBuilder`` with a field set tailored to
     mixed-type data.  The continuous-component model is selected via
-    ``continuous_model``; there is no ``model`` field.
+    ``continuous_model`` (density-estimator model for the continuous
+    variables); there is no ``model`` field.
     """
 
-    continuous_model: str = "nsf"
+    continuous_model: DENSITY_MODELS = "nsf"  # type: ignore[valid-type]
 
     # --- Mixed-specific ---
-    num_categories_per_variable: Optional[Any] = None
-    embedding_net: Optional[Any] = None
-    combined_embedding_net: Optional[Any] = None
+    num_categories_per_variable: Optional[Tensor] = None
+    embedding_net: Optional[nn.Module] = None
+    combined_embedding_net: Optional[nn.Module] = None
     log_transform_x: bool = False
 
     # --- Shared sizing ---
@@ -401,16 +540,23 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
     dropout_probability: Optional[float] = None
 
     # --- Z-scoring ---
-    z_score_x: Optional[Literal["none", "independent", "structured"]] = None
-    z_score_y: Optional[Literal["none", "independent", "structured"]] = None
+    z_score_input: Optional[Literal["none", "independent", "structured"]] = None
+    z_score_condition: Optional[Literal["none", "independent", "structured"]] = None
 
     def __post_init__(self):
-        super().__post_init__()
-        if self.continuous_model not in _VALID_MIXED_CONTINUOUS_MODELS:
+        if self.continuous_model not in _VALID_DENSITY_MODELS:
             raise ValueError(
                 f"Unknown continuous_model {self.continuous_model!r}. "
-                f"Must be one of {sorted(_VALID_MIXED_CONTINUOUS_MODELS)}."
+                f"Must be one of {sorted(_VALID_DENSITY_MODELS)}."
             )
+        super().__post_init__()
+        from sbi.neural_nets.net_builders.mixed_nets import model_builders
+
+        self._reject_inapplicable_fields(
+            model_builders[self.continuous_model],
+            discriminator="continuous_model",
+            always_ok=_MIXED_ALWAYS_OK,
+        )
 
     def build(
         self, batch_input: Tensor, batch_condition: Tensor
@@ -439,13 +585,63 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
             **kwargs,
         )
 
-    def _build_kwargs(self) -> dict:
-        """Return non-None fields as a dict, excluding ``continuous_model``."""
-        d = {
-            f.name: getattr(self, f.name)
-            for f in fields(self)
-            if f.name not in ("continuous_model", "extra_kwargs")
-            and getattr(self, f.name) is not None
-        }
-        d.update(self.extra_kwargs)
-        return d
+
+CLASSIFIER_MODELS = Literal["linear", "mlp", "resnet"]
+
+_VALID_CLASSIFIER_MODELS = frozenset(get_args(CLASSIFIER_MODELS))
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class RatioEstimatorBuilder(_EstimatorBuilderBase):
+    """Builder for ratio estimators / classifiers (NRE).
+
+    Covers linear, MLP, and ResNet classifiers used by ``NRE_A``, ``NRE_B``,
+    ``NRE_C``, and ``BNRE``.  Fields mirror the parameters of the underlying
+    ``build_*_classifier`` functions.
+    """
+
+    model: CLASSIFIER_MODELS = "resnet"  # type: ignore[valid-type]
+
+    # --- Shared across classifiers ---
+    z_score_input: Optional[Literal["none", "independent", "structured"]] = None
+    z_score_condition: Optional[Literal["none", "independent", "structured"]] = None
+    hidden_features: Optional[int] = None
+    embedding_net_x: Optional[nn.Module] = None
+    embedding_net_y: Optional[nn.Module] = None
+
+    # --- ResNet-specific ---
+    num_blocks: Optional[int] = None
+    dropout_probability: Optional[float] = None
+    use_batch_norm: Optional[bool] = None
+
+    # --- MLP-specific ---
+    norm_layer: Optional[Callable[[int], nn.Module]] = None
+
+    def __post_init__(self):
+        if self.model not in _VALID_CLASSIFIER_MODELS:
+            raise ValueError(
+                f"Unknown model {self.model!r}. "
+                f"Must be one of {sorted(_VALID_CLASSIFIER_MODELS)}."
+            )
+        super().__post_init__()
+        self._reject_inapplicable_fields(
+            _classifier_build_fns()[self.model],
+            discriminator="model",
+        )
+
+    def build(self, batch_input: Tensor, batch_condition: Tensor) -> RatioEstimator:
+        """Build the classifier by dispatching to the appropriate
+        ``build_*_classifier`` function.
+
+        Args:
+            batch_input: Batch of the modeled variable used for
+                shape inference and z-scoring.
+            batch_condition: Batch of the conditioning variable
+                used for shape inference and z-scoring.
+
+        Returns:
+            A ``RatioEstimator``.
+        """
+        build_fn = _classifier_build_fns()[self.model]
+        kwargs = self._build_kwargs()
+        return build_fn(batch_x=batch_input, batch_y=batch_condition, **kwargs)

@@ -29,7 +29,7 @@ from sbi.utils.user_input_checks import check_data_device
 from sbi.utils.vector_field_utils import VectorFieldNet
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class _VectorFieldBaseConfig(_EstimatorBuilderBase):
     """Shared configuration fields for all vector field estimator builders.
 
@@ -72,7 +72,7 @@ class _VectorFieldBaseConfig(_EstimatorBuilderBase):
     time_emb_type: Optional[str] = None
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class ScoreEstimatorConfig(_VectorFieldBaseConfig):
     """Configuration for score-matching estimator builders (NPSE).
 
@@ -99,7 +99,7 @@ class ScoreEstimatorConfig(_VectorFieldBaseConfig):
     # config construction and are not forwarded through the config.
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class FlowEstimatorConfig(_VectorFieldBaseConfig):
     """Configuration for flow-matching estimator builders (FMPE).
 

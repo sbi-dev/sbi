@@ -118,7 +118,8 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         elif isinstance(density_estimator, str):
             warnings.warn(
                 "Passing a string for `density_estimator` is deprecated. "
-                "Use DensityEstimatorBuilder(model=...) instead.",
+                "Use DensityEstimatorBuilder(model=...) instead, e.g. "
+                "`from sbi.neural_nets import DensityEstimatorBuilder`.",
                 FutureWarning,
                 stacklevel=3,
             )
