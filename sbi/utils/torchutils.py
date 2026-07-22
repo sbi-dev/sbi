@@ -677,14 +677,13 @@ def _base_recursor(
         _active: Object identities on the active recursion path. Used internally
             to avoid infinite recursion in cyclic object graphs.
     """
-    _active_holder: Optional[set[int]] = _active
-    if _active_holder is None:
-        _active_holder = set()
+    if _active is None:
+        _active = set()
 
     obj_id = id(obj)
-    if obj_id in _active_holder:
+    if obj_id in _active:
         return
-    _active_holder.add(obj_id)
+    _active.add(obj_id)
 
     if isinstance(obj, Module) and check(obj):
         action(obj)
@@ -699,7 +698,7 @@ def _base_recursor(
                     key=k,
                     check=check,
                     action=action,
-                    _active=_active_holder,
+                    _active=_active,
                 )
     elif isinstance(obj, type):
         # Skip class/type objects to avoid modifying immutable C extension types
@@ -716,7 +715,7 @@ def _base_recursor(
                     key=k,
                     check=check,
                     action=action,
-                    _active=_active_holder,
+                    _active=_active,
                 )
     elif isinstance(obj, (List, Tuple, Generator)):
         new_obj = []
@@ -724,12 +723,12 @@ def _base_recursor(
             if check(o):
                 new_obj.append(action(o))
             else:
-                _base_recursor(o, check=check, action=action, _active=_active_holder)
+                _base_recursor(o, check=check, action=action, _active=_active)
                 new_obj.append(o)
         if parent is not None and key is not None:
             setattr(parent, key, type(obj)(new_obj))  # type: ignore
 
-    _active_holder.remove(obj_id)
+    _active.remove(obj_id)
 
 
 def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> None:
