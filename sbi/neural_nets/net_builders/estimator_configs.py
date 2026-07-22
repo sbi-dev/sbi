@@ -492,6 +492,7 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
         kwargs = self._build_kwargs()
         return build_fn(batch_x=batch_input, batch_y=batch_condition, **kwargs)
 
+
 _MIXED_ALWAYS_OK: frozenset = frozenset({
     "num_categories_per_variable",
     "embedding_net",
@@ -584,6 +585,7 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
             **kwargs,
         )
 
+
 CLASSIFIER_MODELS = Literal["linear", "mlp", "resnet"]
 
 _VALID_CLASSIFIER_MODELS = frozenset(get_args(CLASSIFIER_MODELS))
@@ -643,4 +645,3 @@ class RatioEstimatorBuilder(_EstimatorBuilderBase):
         build_fn = _classifier_build_fns()[self.model]
         kwargs = self._build_kwargs()
         return build_fn(batch_x=batch_input, batch_y=batch_condition, **kwargs)
-
