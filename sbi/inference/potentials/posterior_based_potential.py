@@ -93,9 +93,6 @@ class PosteriorBasedPotential(BasePotential):
         self.posterior_estimator = self.posterior_estimator.to(device)
         return self
 
-    def _get_estimator_parameters_device(self):
-        return next(self.posterior_estimator.parameters()).device
-
     def bind(self, x_o: Tensor, x_is_iid: bool = False) -> "PosteriorBasedPotential":
         """Create new potential with x bound, without mutable state."""
         bound = PosteriorBasedPotential(
@@ -123,8 +120,6 @@ class PosteriorBasedPotential(BasePotential):
         Returns:
             The potential.
         """
-        self._check_on_device(self.device)
-
         if self._x_o is None:
             raise ValueError(
                 "No observed data x_o is available. Please reinitialize \

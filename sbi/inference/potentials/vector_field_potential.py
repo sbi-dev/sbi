@@ -84,9 +84,6 @@ class VectorFieldBasedPotential(BasePotential):
         self.vector_field_estimator = self.vector_field_estimator.to(device)
         return self
 
-    def _get_estimator_parameters_device(self):
-        return next(self.vector_field_estimator.parameters()).device
-
     def set_x(
         self,
         x_o: Optional[Tensor],
@@ -170,8 +167,6 @@ class VectorFieldBasedPotential(BasePotential):
         Returns:
             The potential function, i.e., the log probability of the posterior.
         """
-        self._check_on_device(self.device)
-
         if self.guidance_method is not None:
             raise NotImplementedError(
                 "Potential evaluation for guidance is not supported yet."

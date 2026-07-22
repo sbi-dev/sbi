@@ -105,59 +105,6 @@ class BasePotential(metaclass=ABCMeta):
         """
         return self
 
-    def _check_on_device(self, device: Union[str, torch.device]) -> None:
-        """Check that estimator, prior and x_o are on the expected device.
-
-        Raises an informative error if any component is on a different device,
-        guiding users to move components explicitly before creating the potential.
-
-        Args:
-            device: Expected device.
-
-        Raises:
-            RuntimeError: If any component is on a different device.
-        """
-        issues = []
-
-        try:
-            est_device = self._get_estimator_parameters_device()
-            if est_device != torch.device(device):
-                issues.append(
-                    f"estimator is on {est_device}, expected {device}. "
-                    "Move it explicitly: estimator.to(device)"
-                )
-        except NotImplementedError:
-            pass
-
-        if self.prior is not None and hasattr(self.prior, "sample"):
-            try:
-                prior_device = self.prior.sample((1,)).device
-                if prior_device != torch.device(device):
-                    issues.append(
-                        f"prior is on {prior_device}, expected {device}. "
-                        "Move it explicitly: prior = prior.to(device)"
-                    )
-            except Exception:
-                pass
-
-        if self._x_o is not None:
-            x_o_device = self._x_o.device
-            if x_o_device != torch.device(device):
-                issues.append(
-                    f"x_o is on {x_o_device}, expected {device}. "
-                    "Move it explicitly: x_o = x_o.to(device)"
-                )
-
-        if issues:
-            raise RuntimeError(
-                "Device mismatch detected. Move components explicitly before creating "
-                "the potential:\n  " + "\n  ".join(issues)
-            )
-
-    def _get_estimator_parameters_device(self):
-        """Yield device of estimator parameters. Subclasses override."""
-        raise NotImplementedError
-
 
 class CustomPotential(Protocol):
     """Protocol for custom potential functions."""
@@ -197,7 +144,6 @@ class CustomPotentialWrapper(BasePotential):
 
         Note, x_o is re-used from the initialization of the potential function.
         """
-        self._check_on_device(self.device)
         with torch.set_grad_enabled(track_gradients):
             return self.potential_fn(theta, self.x_o)
 
