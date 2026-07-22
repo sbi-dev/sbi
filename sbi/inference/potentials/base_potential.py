@@ -69,11 +69,6 @@ class BasePotential(metaclass=ABCMeta):
                 "No observed data is available. Use `potential_fn.bind(x_o)`."
             )
 
-    @x_o.setter
-    def x_o(self, x_o: Optional[Tensor]) -> None:
-        """Check the shape of the observed data and, if valid, set it."""
-        self.set_x(x_o)
-
     def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "BasePotential":
         """Create new potential with x bound, without mutable state.
 
