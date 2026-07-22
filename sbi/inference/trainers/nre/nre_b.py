@@ -82,9 +82,10 @@ class NRE_B(RatioEstimatorTrainer):
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. If `None`, the
                 prior must be passed to `.build_posterior()`.
-            classifier: If `None` (default), uses a
-                `RatioEstimatorBuilder` with default settings. A
-                `RatioEstimatorBuilder` can be passed to configure
+            classifier: The classifier used to approximate the
+                likelihood-to-evidence ratio. If ``None`` (default), uses a
+                ``RatioEstimatorBuilder`` with default settings. A
+                ``RatioEstimatorBuilder`` can be passed to configure
                 the classifier. If it is a string (deprecated), use a
                 pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that

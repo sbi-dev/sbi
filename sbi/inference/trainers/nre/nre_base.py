@@ -79,9 +79,10 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
           (normalizing constant) of the data $x$.
 
         Args:
-            classifier: If `None` (default), uses a
-                `RatioEstimatorBuilder` with default settings. A
-                `RatioEstimatorBuilder` can be passed to configure
+            classifier: The classifier used to approximate the
+                likelihood-to-evidence ratio. If ``None`` (default), uses a
+                ``RatioEstimatorBuilder`` with default settings. A
+                ``RatioEstimatorBuilder`` can be passed to configure
                 the classifier. If it is a string (deprecated), use a
                 pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that
