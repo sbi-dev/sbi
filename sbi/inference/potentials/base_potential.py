@@ -49,7 +49,7 @@ class BasePotential(metaclass=ABCMeta):
             return self._x_is_iid
         else:
             raise ValueError(
-                "No observed data is available. Use `potential_fn.set_x(x_o)`."
+                "No observed data is available. Use `potential_fn.bind(x_o)`."
             )
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = True):
@@ -66,8 +66,22 @@ class BasePotential(metaclass=ABCMeta):
             return self._x_o
         else:
             raise ValueError(
-                "No observed data is available. Use `potential_fn.set_x(x_o)`."
+                "No observed data is available. Use `potential_fn.bind(x_o)`."
             )
+
+    def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "BasePotential":
+        """Create new potential with x bound, without mutable state.
+
+        Args:
+            x_o: Observed data to bind.
+            x_is_iid: Whether x represents iid observations.
+
+        Returns:
+            New potential instance with x bound.
+
+        Subclasses must implement this method.
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} must implement bind()")
 
     def return_x_o(self) -> Optional[Tensor]:
         """Return the observed data at which the potential is evaluated.
@@ -149,3 +163,12 @@ class CustomPotentialWrapper(BasePotential):
         """
         with torch.set_grad_enabled(track_gradients):
             return self.potential_fn(theta, self.x_o)
+
+    def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "CustomPotentialWrapper":
+        """Create new potential with x bound, without mutable state."""
+        return CustomPotentialWrapper(
+            potential_fn=self.potential_fn,
+            prior=self.prior,
+            x_o=x_o,
+            device=self.device,
+        )

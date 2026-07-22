@@ -61,6 +61,7 @@ class VectorFieldBasedPotential(BasePotential):
         self.vector_field_estimator.eval()
         self.iid_method = iid_method
         self.iid_params = iid_params
+        self.neural_ode_backend = neural_ode_backend
 
         neural_ode_kwargs = neural_ode_kwargs or {}
         self.neural_ode = build_neural_ode(
@@ -127,6 +128,40 @@ class VectorFieldBasedPotential(BasePotential):
             self.flow = self.rebuild_flow(**ode_kwargs)
         elif self._x_o is not None:
             self.flows = self.rebuild_flows_for_batch(**ode_kwargs)
+
+    def bind(
+        self,
+        x_o: Tensor,
+        x_is_iid: bool = False,
+        iid_method: Optional[str] = None,
+        iid_params: Optional[Dict[str, Any]] = None,
+        guidance_method: Optional[str] = None,
+        guidance_params: Optional[Dict[str, Any]] = None,
+        **ode_kwargs,
+    ) -> "VectorFieldBasedPotential":
+        """Create new potential with x bound, without mutable state."""
+        bound = VectorFieldBasedPotential(
+            vector_field_estimator=self.vector_field_estimator,
+            prior=self.prior,
+            x_o=None,
+            device=self.device,
+            iid_method=self.iid_method,
+            iid_params=self.iid_params,
+            neural_ode_backend=self.neural_ode_backend,
+        )
+        bound.neural_ode.params.update(self.neural_ode.params)
+        # Transfer learned neural ODE parameters (e.g., from training) to the bound
+        # potential. This preserves the trained flow model when conditioning on new x.
+        bound.set_x(
+            x_o,
+            x_is_iid=x_is_iid,
+            iid_method=iid_method,
+            iid_params=iid_params,
+            guidance_method=guidance_method,
+            guidance_params=guidance_params,
+            **ode_kwargs,
+        )
+        return bound
 
     def __call__(
         self,
