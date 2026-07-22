@@ -58,6 +58,12 @@ class FakePotential(BasePotential):
     def allow_iid_x(self) -> bool:
         return True
 
+    def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
+        """Create new potential with x bound, without mutable state."""
+        bound = FakePotential(prior=self.prior, device=self.device)
+        bound.set_x(x_o, x_is_iid=x_is_iid)
+        return bound
+
 
 def make_tractable_potential(target_distribution, prior):
     """Create a potential function from a known target distribution."""
@@ -70,6 +76,14 @@ def make_tractable_potential(target_distribution, prior):
 
         def allow_iid_x(self) -> bool:
             return True
+
+        def bind(
+            self, x_o: torch.Tensor, x_is_iid: bool = True
+        ) -> "TractablePotential":
+            """Create new potential with x bound, without mutable state."""
+            bound = TractablePotential(prior=self.prior, device=self.device)
+            bound.set_x(x_o, x_is_iid=x_is_iid)
+            return bound
 
     return TractablePotential(prior=prior)
 

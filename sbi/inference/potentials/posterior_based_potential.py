@@ -100,6 +100,17 @@ class PosteriorBasedPotential(BasePotential):
         self.posterior_estimator.to(device)
         return self
 
+    def bind(self, x_o: Tensor, x_is_iid: bool = False) -> "PosteriorBasedPotential":
+        """Create new potential with x bound, without mutable state."""
+        bound = PosteriorBasedPotential(
+            posterior_estimator=self.posterior_estimator,
+            prior=self.prior,
+            x_o=None,
+            device=self.device,
+        )
+        bound.set_x(x_o, x_is_iid=x_is_iid)
+        return bound
+
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = False):
         """
         Check the shape of the observed data and, if valid, set it.

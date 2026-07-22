@@ -101,7 +101,7 @@ class NeuralPosterior:
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -310,7 +310,7 @@ class NeuralPosterior:
             )
 
         if self._map is None or force_update:
-            self.potential_fn.set_x(self.default_x)
+            self.potential_fn = self.potential_fn.bind(self.default_x)
             self._map = self._calculate_map(
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,
