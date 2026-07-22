@@ -408,8 +408,10 @@ class ConditionedPotential(BasePotential):
     def x_is_iid(self) -> bool:
         """If x has batch dimension greater than 1, whether to intepret the batch as iid
         samples or batch of data points."""
-        if self._x_is_iid is not None:
+        if hasattr(self, "_x_is_iid") and self._x_is_iid is not None:
             return self._x_is_iid
+        elif hasattr(self, "potential_fn") and self.potential_fn is not None:
+            return self.potential_fn.x_is_iid
         else:
             raise ValueError(
                 "No observed data is available. Use `potential_fn.bind(x_o)`."
@@ -424,11 +426,13 @@ class ConditionedPotential(BasePotential):
 
     def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "ConditionedPotential":
         """Create new potential with x bound, without mutable state."""
-        return ConditionedPotential(
+        bound = ConditionedPotential(
             potential_fn=self.potential_fn.bind(x_o, x_is_iid),
             condition=self.condition,
             dims_to_sample=self.dims_to_sample,
         )
+        bound._x_is_iid = x_is_iid
+        return bound
 
     @property
     def x_o(self) -> Tensor:
