@@ -519,6 +519,7 @@ _MIXED_ALWAYS_OK: frozenset = frozenset({
     "discrete_hidden_features",
     "discrete_hidden_layers",
     "continuous_hidden_features",
+    "dropout_probability",
     "z_score_input",
     "z_score_condition",
 })
