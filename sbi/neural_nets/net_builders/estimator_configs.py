@@ -106,6 +106,23 @@ class _EstimatorBuilderBase:
                 parts.append(f"{f.name}={val!r}")
         return f"{cls.__name__}({', '.join(parts)})"
 
+    def _build_kwargs(self) -> dict:
+        """Non-None fields as builder kwargs, alias-translated, minus discriminators.
+
+        Field names are translated via ``_BUILD_KWARG_ALIASES`` so that
+        user-facing names (e.g. ``z_score_input``) map to the legacy
+        kwarg names (``z_score_x``) expected by ``build_*`` functions.
+        """
+        d = {
+            _BUILD_KWARG_ALIASES.get(f.name, f.name): getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in self._DISCRIMINATORS
+            and f.name != "extra_kwargs"
+            and getattr(self, f.name) is not None
+        }
+        d.update(self.extra_kwargs)
+        return d
+
     @staticmethod
     @lru_cache(maxsize=None)
     def _fn_param_names(build_fn) -> frozenset:
@@ -475,41 +492,6 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
         kwargs = self._build_kwargs()
         return build_fn(batch_x=batch_input, batch_y=batch_condition, **kwargs)
 
-    def _build_kwargs(self) -> dict:
-        """Return non-None fields as a dict, excluding ``model``.
-
-        Field names are translated via ``_BUILD_KWARG_ALIASES`` so that
-        user-facing names (e.g. ``z_score_input``) map to the legacy
-        kwarg names (``z_score_x``) expected by ``build_*`` functions.
-        """
-        d = {
-            _BUILD_KWARG_ALIASES.get(f.name, f.name): getattr(self, f.name)
-            for f in fields(self)
-            if f.name not in ("model", "extra_kwargs")
-            and getattr(self, f.name) is not None
-        }
-        d.update(self.extra_kwargs)
-        return d
-
-
-_VALID_MIXED_CONTINUOUS_MODELS = frozenset({
-    "mdn",
-    "made",
-    "maf",
-    "maf_rqs",
-    "nsf",
-    "zuko_nice",
-    "zuko_maf",
-    "zuko_nsf",
-    "zuko_ncsf",
-    "zuko_sospf",
-    "zuko_naf",
-    "zuko_unaf",
-    "zuko_gf",
-    "zuko_bpf",
-})
-
-
 _MIXED_ALWAYS_OK: frozenset = frozenset({
     "num_categories_per_variable",
     "embedding_net",
@@ -535,7 +517,7 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
     variables); there is no ``model`` field.
     """
 
-    continuous_model: str = "nsf"
+    continuous_model: DENSITY_MODELS = "nsf"  # type: ignore[valid-type]
 
     # --- Mixed-specific ---
     num_categories_per_variable: Optional[Tensor] = None
@@ -561,10 +543,10 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
     z_score_condition: Optional[Literal["none", "independent", "structured"]] = None
 
     def __post_init__(self):
-        if self.continuous_model not in _VALID_MIXED_CONTINUOUS_MODELS:
+        if self.continuous_model not in _VALID_DENSITY_MODELS:
             raise ValueError(
                 f"Unknown continuous_model {self.continuous_model!r}. "
-                f"Must be one of {sorted(_VALID_MIXED_CONTINUOUS_MODELS)}."
+                f"Must be one of {sorted(_VALID_DENSITY_MODELS)}."
             )
         super().__post_init__()
         from sbi.neural_nets.net_builders.mixed_nets import model_builders
@@ -601,18 +583,6 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
             flow_model=self.continuous_model,
             **kwargs,
         )
-
-    def _build_kwargs(self) -> dict:
-        """Return non-None fields as a dict, excluding ``continuous_model``."""
-        d = {
-            _BUILD_KWARG_ALIASES.get(f.name, f.name): getattr(self, f.name)
-            for f in fields(self)
-            if f.name not in ("continuous_model", "extra_kwargs")
-            and getattr(self, f.name) is not None
-        }
-        d.update(self.extra_kwargs)
-        return d
-
 
 CLASSIFIER_MODELS = Literal["linear", "mlp", "resnet"]
 
@@ -674,13 +644,3 @@ class RatioEstimatorBuilder(_EstimatorBuilderBase):
         kwargs = self._build_kwargs()
         return build_fn(batch_x=batch_input, batch_y=batch_condition, **kwargs)
 
-    def _build_kwargs(self) -> dict:
-        """Return non-None fields as a dict, excluding ``model``."""
-        d = {
-            _BUILD_KWARG_ALIASES.get(f.name, f.name): getattr(self, f.name)
-            for f in fields(self)
-            if f.name not in ("model", "extra_kwargs")
-            and getattr(self, f.name) is not None
-        }
-        d.update(self.extra_kwargs)
-        return d
