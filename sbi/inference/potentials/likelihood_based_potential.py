@@ -94,6 +94,17 @@ class LikelihoodBasedPotential(BasePotential):
         self.likelihood_estimator.to(device)
         return self
 
+    def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "LikelihoodBasedPotential":
+        """Create new potential with x bound, without mutable state."""
+        bound = LikelihoodBasedPotential(
+            likelihood_estimator=self.likelihood_estimator,
+            prior=self.prior,
+            x_o=None,
+            device=self.device,
+        )
+        bound.set_x(x_o, x_is_iid=x_is_iid)
+        return bound
+
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential $\log(p(x_o|\theta)p(\theta))$.
 
