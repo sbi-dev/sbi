@@ -22,6 +22,7 @@ from sbi.samplers.ode_solvers import build_neural_ode
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks import process_x
 
 
 class VectorFieldBasedPotential(BasePotential):
@@ -61,6 +62,8 @@ class VectorFieldBasedPotential(BasePotential):
         self.vector_field_estimator.eval()
         self.iid_method = iid_method
         self.iid_params = iid_params
+        self.guidance_method: Optional[str] = None
+        self.guidance_params: Optional[Dict[str, Any]] = None
         self.neural_ode_backend = neural_ode_backend
 
         neural_ode_kwargs = neural_ode_kwargs or {}
@@ -119,7 +122,10 @@ class VectorFieldBasedPotential(BasePotential):
                 `IIDScoreFunction`.
             ode_kwargs: Additional keyword arguments for the neural ODE.
         """
-        super().set_x(x_o, x_is_iid)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        self._x_o = x_o
+        self._x_is_iid = x_is_iid
         self.iid_method = iid_method or self.iid_method
         self.iid_params = iid_params
         self.guidance_method = guidance_method
@@ -145,22 +151,24 @@ class VectorFieldBasedPotential(BasePotential):
             prior=self.prior,
             x_o=None,
             device=self.device,
-            iid_method=self.iid_method,
-            iid_params=self.iid_params,
+            iid_method=iid_method if iid_method is not None else self.iid_method,
+            iid_params=iid_params if iid_params is not None else self.iid_params,
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)
-        # Transfer learned neural ODE parameters (e.g., from training) to the bound
-        # potential. This preserves the trained flow model when conditioning on new x.
-        bound.set_x(
-            x_o,
-            x_is_iid=x_is_iid,
-            iid_method=iid_method,
-            iid_params=iid_params,
-            guidance_method=guidance_method,
-            guidance_params=guidance_params,
-            **ode_kwargs,
+        x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        bound.guidance_method = (
+            guidance_method if guidance_method is not None else self.guidance_method
         )
+        bound.guidance_params = (
+            guidance_params if guidance_params is not None else self.guidance_params
+        )
+        if not x_is_iid and (bound._x_o is not None):
+            bound.flow = bound.rebuild_flow(**ode_kwargs)
+        elif bound._x_o is not None:
+            bound.flows = bound.rebuild_flows_for_batch(**ode_kwargs)
         return bound
 
     def __call__(
