@@ -31,7 +31,10 @@ class BasePotential(metaclass=ABCMeta):
         """
         self.device = process_device(device)
         self.prior = prior
-        self.set_x(x_o)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        self._x_o = x_o
+        self._x_is_iid = True
 
     @abstractmethod
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:

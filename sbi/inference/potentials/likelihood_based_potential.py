@@ -19,6 +19,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 )
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
+from sbi.utils.user_input_checks import process_x
 
 
 def likelihood_estimator_based_potential(
@@ -102,7 +103,9 @@ class LikelihoodBasedPotential(BasePotential):
             x_o=None,
             device=self.device,
         )
-        bound.set_x(x_o, x_is_iid=x_is_iid)
+        x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
         return bound
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:

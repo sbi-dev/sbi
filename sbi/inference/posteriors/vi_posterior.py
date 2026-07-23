@@ -927,6 +927,10 @@ class VIPosterior(NeuralPosterior):
                 break
         # Training finished:
         self._trained_on = x
+
+        # Bind potential_fn to the trained x so it can be used for sampling/evaluation
+        self.potential_fn = self.potential_fn.bind(x)
+
         if self._mode == "amortized":
             warnings.warn(
                 "Switching from amortized to single-x mode. "
