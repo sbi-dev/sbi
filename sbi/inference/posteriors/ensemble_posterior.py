@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -484,7 +485,6 @@ class EnsemblePotential(BasePotential):
         DEPRECATED: Use bind() instead. This method delegates to bind() internally.
         It will be removed in a future release.
         """
-        import warnings
 
         warnings.warn(
             "set_x() is deprecated and will be removed in a future release. "

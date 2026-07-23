@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
@@ -124,7 +125,6 @@ class VectorFieldBasedPotential(BasePotential):
                 `IIDScoreFunction`.
             ode_kwargs: Additional keyword arguments for the neural ODE.
         """
-        import warnings
 
         warnings.warn(
             "set_x() is deprecated and will be removed in a future release. "
