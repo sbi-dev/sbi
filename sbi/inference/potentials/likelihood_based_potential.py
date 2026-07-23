@@ -19,6 +19,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 )
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
+from sbi.utils.user_input_checks import process_x
 
 
 def likelihood_estimator_based_potential(
@@ -96,8 +97,6 @@ class LikelihoodBasedPotential(BasePotential):
 
     def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "LikelihoodBasedPotential":
         """Create new potential with x bound, without mutable state."""
-        from sbi.utils.user_input_checks import process_x
-
         bound = LikelihoodBasedPotential(
             likelihood_estimator=self.likelihood_estimator,
             prior=self.prior,
