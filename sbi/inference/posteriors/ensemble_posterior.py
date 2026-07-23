@@ -482,11 +482,13 @@ class EnsemblePotential(BasePotential):
         """Check the shape of the observed data and, if valid, set it.
 
         DEPRECATED: Use bind() instead. This method delegates to bind() internally.
+        It will be removed in a future release.
         """
         import warnings
 
         warnings.warn(
-            "set_x() is deprecated, use bind() instead",
+            "set_x() is deprecated and will be removed in a future release. "
+            "Use bind() instead.",
             FutureWarning,
             stacklevel=2,
         )

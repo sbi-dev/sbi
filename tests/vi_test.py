@@ -34,6 +34,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import MultipleIndependent
 from sbi.utils.metrics import c2st, check_c2st
+from sbi.utils.user_input_checks import process_x
 
 # Supported variational families for VI
 FLOWS = ["maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"]
@@ -59,8 +60,6 @@ class FakePotential(BasePotential):
 
     def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
         """Create new potential with x bound, without mutable state."""
-        from sbi.utils.user_input_checks import process_x
-
         bound = FakePotential(prior=self.prior, device=self.device)
         x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
@@ -84,8 +83,6 @@ def make_tractable_potential(target_distribution, prior):
             self, x_o: torch.Tensor, x_is_iid: bool = True
         ) -> "TractablePotential":
             """Create new potential with x bound, without mutable state."""
-            from sbi.utils.user_input_checks import process_x
-
             bound = TractablePotential(prior=self.prior, device=self.device)
             x_o = process_x(x_o).to(self.device)
             bound._x_o = x_o
