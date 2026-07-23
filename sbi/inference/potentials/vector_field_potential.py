@@ -22,6 +22,7 @@ from sbi.samplers.ode_solvers import build_neural_ode
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks import process_x
 
 
 class VectorFieldBasedPotential(BasePotential):
@@ -122,8 +123,6 @@ class VectorFieldBasedPotential(BasePotential):
             ode_kwargs: Additional keyword arguments for the neural ODE.
         """
         if x_o is not None:
-            from sbi.utils.user_input_checks import process_x
-
             x_o = process_x(x_o).to(self.device)
         self._x_o = x_o
         self._x_is_iid = x_is_iid
@@ -147,14 +146,12 @@ class VectorFieldBasedPotential(BasePotential):
         **ode_kwargs,
     ) -> "VectorFieldBasedPotential":
         """Create new potential with x bound, without mutable state."""
-        from sbi.utils.user_input_checks import process_x
-
         bound = VectorFieldBasedPotential(
             vector_field_estimator=self.vector_field_estimator,
             prior=self.prior,
             x_o=None,
             device=self.device,
-            iid_method=iid_method or self.iid_method,
+            iid_method=iid_method if iid_method is not None else self.iid_method,
             iid_params=iid_params if iid_params is not None else self.iid_params,
             neural_ode_backend=self.neural_ode_backend,
         )

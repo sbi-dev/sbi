@@ -21,6 +21,7 @@ from sbi.utils.sbiutils import (
     within_support,
 )
 from sbi.utils.torchutils import ensure_theta_batched, infer_module_device
+from sbi.utils.user_input_checks import process_x
 
 
 def posterior_estimator_based_potential(
@@ -102,8 +103,6 @@ class PosteriorBasedPotential(BasePotential):
 
     def bind(self, x_o: Tensor, x_is_iid: bool = False) -> "PosteriorBasedPotential":
         """Create new potential with x bound, without mutable state."""
-        from sbi.utils.user_input_checks import process_x
-
         bound = PosteriorBasedPotential(
             posterior_estimator=self.posterior_estimator,
             prior=self.prior,
@@ -120,8 +119,6 @@ class PosteriorBasedPotential(BasePotential):
         Check the shape of the observed data and, if valid, set it.
         """
         if x_o is not None:
-            from sbi.utils.user_input_checks import process_x
-
             x_o = process_x(x_o).to(self.device)
         self._x_o = x_o
         self._x_is_iid = x_is_iid

@@ -11,6 +11,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, mcmc_transform
 from sbi.utils.torchutils import atleast_2d
+from sbi.utils.user_input_checks import process_x
 
 
 def ratio_estimator_based_potential(
@@ -84,8 +85,6 @@ class RatioBasedPotential(BasePotential):
 
     def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "RatioBasedPotential":
         """Create new potential with x bound, without mutable state."""
-        from sbi.utils.user_input_checks import process_x
-
         bound = RatioBasedPotential(
             ratio_estimator=self.ratio_estimator,
             prior=self.prior,
