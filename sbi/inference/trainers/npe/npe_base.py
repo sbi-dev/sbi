@@ -562,22 +562,6 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         assert_all_finite(loss, "NPE loss")
         return calibration_kernel(x) * loss
 
-    @staticmethod
-    def _wrap_builder(
-        builder: _EstimatorBuilderBase,
-    ) -> Callable:
-        """Wrap a builder object as a legacy-compatible build function.
-
-        This allows the existing ``_initialize_neural_network`` flow to work
-        unchanged: the returned callable has the same ``(batch_theta, batch_x)``
-        signature as the functions produced by ``posterior_nn``.
-        """
-
-        def build_fn(batch_theta, batch_x):
-            return builder.build(batch_input=batch_theta, batch_condition=batch_x)
-
-        return build_fn
-
     def _check_proposal(self, proposal):
         """
         Check for validity of the provided proposal distribution.

@@ -5,7 +5,6 @@ import warnings
 from abc import ABC
 from typing import (
     Any,
-    Callable,
     ClassVar,
     Dict,
     Literal,
@@ -48,6 +47,7 @@ from sbi.utils.torchutils import assert_all_finite
 
 class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
     _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (DensityEstimatorBuilder,)
+    _INPUT_IS_THETA = False  # NLE models p(x|θ): input=x, condition=θ
 
     def __init__(
         self,
@@ -396,23 +396,6 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         start_idx = int(context.discard_prior_samples and self._round > 0)
 
         return start_idx
-
-    @staticmethod
-    def _wrap_builder(
-        builder: _EstimatorBuilderBase,
-    ) -> Callable:
-        """Wrap a builder object as a legacy-compatible build function.
-
-        This allows the existing `_initialize_neural_network` flow to work
-        unchanged: the returned callable has the same `(batch_theta, batch_x)`
-        signature as the functions produced by `likelihood_nn`.
-        """
-
-        def build_fn(batch_theta, batch_x):
-            # NLE models p(x|θ): input=x, condition=θ
-            return builder.build(batch_input=batch_x, batch_condition=batch_theta)
-
-        return build_fn
 
     def _initialize_neural_network(
         self,
