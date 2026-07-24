@@ -115,13 +115,22 @@ class PosteriorBasedPotential(BasePotential):
         return bound
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = False):
+        """Check the shape of the observed data and, if valid, set it.
+
+        DEPRECATED: Use bind() instead. This method delegates to bind() internally.
+        It will be removed in a future release.
         """
-        Check the shape of the observed data and, if valid, set it.
-        """
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        self._x_o = x_o
-        self._x_is_iid = x_is_iid
+        import warnings
+
+        warnings.warn(
+            "set_x() is deprecated and will be removed in a future release. "
+            "Use bind() instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        bound = self.bind(x_o, x_is_iid=x_is_iid)
+        self._x_o = bound._x_o
+        self._x_is_iid = bound._x_is_iid
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.
