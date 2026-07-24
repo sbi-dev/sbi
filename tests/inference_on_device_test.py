@@ -51,7 +51,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaus
 from sbi.utils import BoxUniform
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
-from sbi.utils.user_input_checks import validate_theta_and_x
+from sbi.utils.user_input_checks import process_x, validate_theta_and_x
 
 pytestmark = pytest.mark.skipif(
     not gpu_available(), reason="No CUDA or MPS device available."
@@ -399,7 +399,9 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str):
         def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
             """Create new potential with x bound, without mutable state."""
             bound = FakePotential(prior=self.prior, device=self.device)
-            bound.set_x(x_o, x_is_iid=x_is_iid)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
             return bound
 
     potential_fn = FakePotential(
@@ -459,7 +461,9 @@ def test_amortized_vi_on_gpu(num_dim: int, flow_type: str):
         def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
             """Create new potential with x bound, without mutable state."""
             bound = FakePotential(prior=self.prior, device=self.device)
-            bound.set_x(x_o, x_is_iid=x_is_iid)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
             return bound
 
     potential_fn = FakePotential(prior=prior, device=device)

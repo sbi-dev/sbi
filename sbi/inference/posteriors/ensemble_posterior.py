@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -479,14 +480,21 @@ class EnsemblePotential(BasePotential):
         )
 
     def set_x(self, x_o: Optional[Tensor]):
-        """Check the shape of the observed data and, if valid, set it."""
-        if x_o is not None:
-            x_o = process_x(x_o).to(  # type: ignore
-                self.device
-            )
-        self._x_o = x_o
-        for comp_potential in self.potential_fns:
-            comp_potential.set_x(x_o)
+        """Check the shape of the observed data and, if valid, set it.
+
+        DEPRECATED: Use bind() instead. This method delegates to bind() internally.
+        It will be removed in a future release.
+        """
+
+        warnings.warn(
+            "set_x() is deprecated and will be removed in a future release. "
+            "Use bind() instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        bound = self.bind(x_o)
+        self._x_o = bound._x_o
+        self.potential_fns = bound.potential_fns
 
     def bind(
         self,

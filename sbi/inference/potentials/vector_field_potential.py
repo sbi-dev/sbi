@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
@@ -113,6 +114,8 @@ class VectorFieldBasedPotential(BasePotential):
 
         Rebuilds the continuous normalizing flow if the observed data is set.
 
+        DEPRECATED: Use bind() instead. This method delegates to bind() internally.
+        It will be removed in a future release.
         Args:
             x_o: The observed data.
             x_is_iid: Whether the observed data is IID (if batch_dim>1).
@@ -122,18 +125,32 @@ class VectorFieldBasedPotential(BasePotential):
                 `IIDScoreFunction`.
             ode_kwargs: Additional keyword arguments for the neural ODE.
         """
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        self._x_o = x_o
-        self._x_is_iid = x_is_iid
-        self.iid_method = iid_method or self.iid_method
-        self.iid_params = iid_params
-        self.guidance_method = guidance_method
-        self.guidance_params = guidance_params
-        if not x_is_iid and (self._x_o is not None):
-            self.flow = self.rebuild_flow(**ode_kwargs)
-        elif self._x_o is not None:
-            self.flows = self.rebuild_flows_for_batch(**ode_kwargs)
+
+        warnings.warn(
+            "set_x() is deprecated and will be removed in a future release. "
+            "Use bind() instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        bound = self.bind(
+            x_o,
+            x_is_iid=x_is_iid,
+            iid_method=iid_method,
+            iid_params=iid_params,
+            guidance_method=guidance_method,
+            guidance_params=guidance_params,
+            **ode_kwargs,
+        )
+        self._x_o = bound._x_o
+        self._x_is_iid = bound._x_is_iid
+        self.iid_method = bound.iid_method
+        self.iid_params = bound.iid_params
+        self.guidance_method = bound.guidance_method
+        self.guidance_params = bound.guidance_params
+        if not x_is_iid and (bound._x_o is not None):
+            self.flow = bound.flow
+        elif bound._x_o is not None:
+            self.flows = bound.flows
 
     def bind(
         self,
