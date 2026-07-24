@@ -60,6 +60,7 @@ class FakePotential(BasePotential):
 
     def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
         """Create new potential with x bound, without mutable state."""
+
         bound = FakePotential(prior=self.prior, device=self.device)
         x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
@@ -83,6 +84,7 @@ def make_tractable_potential(target_distribution, prior):
             self, x_o: torch.Tensor, x_is_iid: bool = True
         ) -> "TractablePotential":
             """Create new potential with x bound, without mutable state."""
+
             bound = TractablePotential(prior=self.prior, device=self.device)
             x_o = process_x(x_o).to(self.device)
             bound._x_o = x_o
