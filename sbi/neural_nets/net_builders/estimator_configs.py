@@ -39,6 +39,7 @@ import torch.nn as nn
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
@@ -157,11 +158,11 @@ class _EstimatorBuilderBase:
                 acceptable regardless of *build_fn*'s signature.
         """
         allowed = self._fn_param_names(build_fn) | always_ok
+        skip = self._DISCRIMINATORS | {"extra_kwargs"}
         set_fields = {
             f.name
             for f in fields(self)
-            if f.name not in ("extra_kwargs", discriminator)
-            and getattr(self, f.name) is not None
+            if f.name not in skip and getattr(self, f.name) is not None
         }
         bad = {
             n
@@ -699,3 +700,182 @@ class RatioEstimatorBuilder(_EstimatorBuilderBase):
         build_fn = _classifier_build_fns()[self.model]
         kwargs = self._build_kwargs()
         return build_fn(batch_x=batch_input, batch_y=batch_condition, **kwargs)
+
+
+VF_MODELS = Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"]
+
+_VALID_VF_MODELS = frozenset(get_args(VF_MODELS))
+
+
+def _vector_field_build_fns() -> dict:
+    """Build-function mapping for vector field estimators (per architecture)."""
+    from sbi.neural_nets.net_builders.vector_field_nets import (
+        build_adamlp_network,
+        build_standard_mlp_network,
+        build_transformer_network,
+    )
+
+    return {
+        "mlp": build_standard_mlp_network,
+        "ada_mlp": build_adamlp_network,
+        "transformer": build_transformer_network,
+        "transformer_cross_attn": build_transformer_network,
+    }
+
+
+_SCORE_ONLY_FIELDS: frozenset = frozenset({
+    "sde_type",
+    "train_schedule",
+    "solve_schedule",
+    "sigma_min",
+    "sigma_max",
+    "lognormal_mean",
+    "lognormal_std",
+    "power_law_exponent",
+    "beta_min",
+    "beta_max",
+})
+
+_FLOW_ONLY_FIELDS: frozenset = frozenset({"gaussian_baseline"})
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class VectorFieldEstimatorBuilder(_EstimatorBuilderBase):
+    """Builder for vector-field estimators (FMPE / NPSE).
+
+    Covers MLP, AdaMLP, Transformer, and cross-attention Transformer
+    architectures used by ``FMPE`` (flow matching) and ``NPSE`` (score
+    matching).  The ``estimator_type`` field selects between the two:
+    ``"flow"`` dispatches to ``build_flow_matching_estimator`` and
+    ``"score"`` dispatches to ``build_score_matching_estimator``.
+    """
+
+    _DISCRIMINATORS: ClassVar[frozenset] = frozenset({
+        "model",
+        "estimator_type",
+    })
+
+    model: VF_MODELS = "mlp"  # type: ignore[valid-type]
+    estimator_type: Optional[Literal["flow", "score"]] = None
+    sde_type: Optional[Literal["vp", "ve", "subvp"]] = None
+
+    # --- Shared fields ---
+    z_score_input: Optional[Literal["none", "independent", "structured"]] = None
+    z_score_condition: Optional[Literal["none", "independent", "structured"]] = None
+    hidden_features: Optional[Union[Sequence[int], int]] = None
+    num_layers: Optional[int] = None
+    time_embedding_dim: Optional[int] = None
+    embedding_net: Optional[nn.Module] = None
+
+    # --- Transformer-specific ---
+    num_heads: Optional[int] = None
+    mlp_ratio: Optional[int] = None
+
+    # --- Flow-matching-specific ---
+    gaussian_baseline: Optional[bool] = None
+
+    # --- Score-matching-specific (VE schedule) ---
+    train_schedule: Optional[Literal["uniform", "lognormal"]] = None
+    solve_schedule: Optional[Literal["uniform", "power_law"]] = None
+    sigma_min: Optional[float] = None
+    sigma_max: Optional[float] = None
+    lognormal_mean: Optional[float] = None
+    lognormal_std: Optional[float] = None
+    power_law_exponent: Optional[float] = None
+
+    # --- Score-matching-specific (VP / SubVP) ---
+    beta_min: Optional[float] = None
+    beta_max: Optional[float] = None
+
+    def __post_init__(self):
+        if self.model not in _VALID_VF_MODELS:
+            raise ValueError(
+                f"Unknown model {self.model!r}. "
+                f"Must be one of {sorted(_VALID_VF_MODELS)}."
+            )
+        super().__post_init__()
+
+        # Reject fields that don't apply to the chosen estimator_type.
+        # Skip this guard when estimator_type is None (resolved by the trainer).
+        if self.estimator_type is not None:
+            blocked = (
+                _SCORE_ONLY_FIELDS
+                if self.estimator_type == "flow"
+                else _FLOW_ONLY_FIELDS
+            )
+            bad = {
+                f.name
+                for f in fields(self)
+                if f.name in blocked and getattr(self, f.name) is not None
+            }
+            if bad:
+                raise ValueError(
+                    f"Field(s) {sorted(bad)} do not apply to "
+                    f"estimator_type={self.estimator_type!r}. Remove them or "
+                    f"change estimator_type."
+                )
+
+        # Reject fields inapplicable to the chosen model architecture.
+        always_ok = (
+            frozenset({"z_score_input", "z_score_condition"})
+            | _SCORE_ONLY_FIELDS
+            | _FLOW_ONLY_FIELDS
+        )
+        self._reject_inapplicable_fields(
+            _vector_field_build_fns()[self.model],
+            discriminator="model",
+            always_ok=always_ok,
+        )
+
+    def build(
+        self, batch_input: Tensor, batch_condition: Tensor
+    ) -> ConditionalVectorFieldEstimator:
+        """Build the vector-field estimator by dispatching to
+        ``build_flow_matching_estimator`` or
+        ``build_score_matching_estimator``.
+
+        Args:
+            batch_input: Batch of the modeled variable used for
+                shape inference and z-scoring.
+            batch_condition: Batch of the conditioning variable
+                used for shape inference and z-scoring.
+
+        Returns:
+            A ``ConditionalVectorFieldEstimator``.
+        """
+        from sbi.neural_nets.net_builders.vector_field_nets import (
+            build_vector_field_estimator,
+        )
+
+        if self.estimator_type is None:
+            raise ValueError(
+                "estimator_type is None. The trainer should resolve this "
+                "before calling build(). Use dataclasses.replace() to set "
+                "estimator_type='flow' or 'score'."
+            )
+
+        kwargs = self._build_kwargs()
+        # sde_type is excluded from _build_kwargs() and passed
+        # explicitly to build_vector_field_estimator.
+        sde_type = self.sde_type or "ve"
+
+        return build_vector_field_estimator(
+            batch_x=batch_input,
+            batch_y=batch_condition,
+            estimator_type=self.estimator_type,
+            sde_type=sde_type,
+            **kwargs,
+        )
+
+    def _build_kwargs(self) -> dict:
+        """Non-None fields minus discriminators and sde_type, alias-translated."""
+        excluded = self._DISCRIMINATORS | {"sde_type", "extra_kwargs"}
+        d = {
+            _BUILD_KWARG_ALIASES.get(f.name, f.name): getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in excluded and getattr(self, f.name) is not None
+        }
+        # The build function expects `net` for the architecture name.
+        d["net"] = self.model
+        d.update(self.extra_kwargs)
+        return d
