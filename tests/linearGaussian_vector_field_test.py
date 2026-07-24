@@ -583,7 +583,7 @@ def test_sample_conditional():
         condition=samples[0],
         dims_to_sample=[dim_to_sample_1, dim_to_sample_2],
     )
-    conditioned_potential_fn.set_x(x_o, x_is_iid=False)
+    conditioned_potential_fn = conditioned_potential_fn.bind(x_o, x_is_iid=False)
     mcmc_posterior = MCMCPosterior(
         potential_fn=conditioned_potential_fn,
         theta_transform=restricted_tf,
