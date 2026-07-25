@@ -4,7 +4,7 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict, replace
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -24,6 +24,11 @@ from sbi.inference.trainers._contracts import LossArgsVF, StartIndexContext, Tra
 from sbi.inference.trainers.base import LossArgs
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.net_builders.estimator_configs import (
+    VF_MODELS,
+    VectorFieldEstimatorBuilder,
+    _EstimatorBuilderBase,
+)
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_estimator_arg,
@@ -42,9 +47,10 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         self,
         prior: Optional[Distribution] = None,
         vector_field_estimator_builder: Union[
-            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+            VF_MODELS,
+            VectorFieldEstimatorBuilder,
             ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
-        ] = "mlp",
+        ] = None,  # type: ignore[assignment]  # Subclasses always provide a value.
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -60,11 +66,15 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
 
         Args:
             prior: Prior distribution.
-            vector_field_estimator_builder: Neural network architecture for the
-                vector field estimator. Can be a string (e.g. 'mlp' or 'ada_mlp') or a
-                callable that implements the `ConditionalEstimatorBuildFn` protocol
-                with `__call__` that receives `theta` and `x` and returns a
-                `ConditionalVectorFieldEstimator`.
+            vector_field_estimator_builder: The vector-field estimator
+                used for flow-matching or score-matching inference.
+                Subclasses resolve a default ``VectorFieldEstimatorBuilder``
+                before calling the base. A ``VectorFieldEstimatorBuilder``
+                can be passed to configure the estimator. If it is a string
+                (deprecated), use a pre-configured network of the provided
+                type (one of mlp, ada_mlp, transformer,
+                transformer_cross_attn). Alternatively, a function that
+                builds a custom neural network can be provided.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -82,17 +92,19 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             show_progress_bars=show_progress_bars,
         )
 
-        # The `vector_field_estimator_builder` is either a string or a callable.
-        # The function creating the neural network is attached to
-        # `_build_neural_net`. It will be called in the first round and receive
-        # thetas and xs as inputs, so that they can be used for shape inference and
-        # potentially for z-scoring.
-        #
-        # When it's a callable, we use it directly. When it's a string, subclasses
-        # are responsible for calling `_build_default_nn_fn` with the appropriate
-        # subclass-specific arguments (e.g. sde_type for NPSE).
         check_estimator_arg(vector_field_estimator_builder)
-        if not isinstance(vector_field_estimator_builder, str):
+
+        if isinstance(vector_field_estimator_builder, _EstimatorBuilderBase):
+            if not isinstance(
+                vector_field_estimator_builder, VectorFieldEstimatorBuilder
+            ):
+                raise TypeError(
+                    "VF trainers require a VectorFieldEstimatorBuilder; got "
+                    f"{type(vector_field_estimator_builder).__name__}. Use "
+                    "VectorFieldEstimatorBuilder(model=...)."
+                )
+            self._build_neural_net = self._wrap_builder(vector_field_estimator_builder)
+        elif not isinstance(vector_field_estimator_builder, str):
             self._build_neural_net = vector_field_estimator_builder
 
         self._proposal_roundwise = []
@@ -100,7 +112,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
     @abstractmethod
     def _build_default_nn_fn(
         self,
-        model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        model: VF_MODELS,
     ) -> ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]: ...
 
     def append_simulations(
@@ -361,9 +373,9 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         assert self._neural_net is not None
         neural_net = self._neural_net
 
-        # A stale best-val-loss would stop this run early on the earlier run's weights.
-        if epoch == 0:
-            self._best_val_loss = float("inf")
+        # Initialize tracking variables if not exists
+        if not hasattr(self, '_best_val_loss'):
+            self._best_val_loss = float('inf')
             self._epochs_since_last_improvement = 0
             self._best_model_state_dict = None
 

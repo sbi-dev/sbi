@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
+from dataclasses import replace
 from typing import Any, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
@@ -15,6 +16,10 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.factory import posterior_score_nn
+from sbi.neural_nets.net_builders.estimator_configs import (
+    VF_MODELS,
+    VectorFieldEstimatorBuilder,
+)
 from sbi.sbi_types import Tracker
 
 
@@ -65,12 +70,14 @@ class NPSE(VectorFieldTrainer):
         self,
         prior: Optional[Distribution] = None,
         vf_estimator: Union[
-            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+            VF_MODELS,
+            VectorFieldEstimatorBuilder,
             ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
-        ] = "mlp",
+            None,
+        ] = None,
         score_estimator: Optional[
             Union[
-                Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+                VF_MODELS,
                 ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
             ]
         ] = None,
@@ -88,14 +95,15 @@ class NPSE(VectorFieldTrainer):
 
         Args:
             prior: Prior distribution.
-            vf_estimator: Neural network architecture for the
-                vector field estimator aiming to estimate the marginal scores of the
-                target diffusion process. Can be a string (e.g. 'mlp', 'ada_mlp',
-                'transformer' or 'transformer_cross_attn') or a callable that implements
-                the `ConditionalEstimatorBuildFn` protocol with `__call__` that receives
-                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
-                To configure estimator-level options (e.g. noise schedules for VE),
-                use `posterior_score_nn` to build a custom callable and pass it here.
+            vf_estimator: The vector-field estimator used for score-matching
+                inference. If ``None`` (default), uses a
+                ``VectorFieldEstimatorBuilder`` with default settings. A
+                ``VectorFieldEstimatorBuilder`` can be passed to configure
+                the estimator. If it is a string (deprecated), use a
+                pre-configured network of the provided type (one of
+                mlp, ada_mlp, transformer, transformer_cross_attn).
+                Alternatively, a function that builds a custom neural
+                network can be provided.
             score_estimator: Deprecated, use `vf_estimator` instead.
             density_estimator: Deprecated, use `vf_estimator` instead.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
@@ -117,6 +125,11 @@ class NPSE(VectorFieldTrainer):
                 free inference with conditional score based diffusion models." ICML 2024
         """
         if score_estimator is not None:
+            if vf_estimator is not None:
+                raise ValueError(
+                    "Cannot pass both `score_estimator` and `vf_estimator`. "
+                    "Use `vf_estimator` only; `score_estimator` is deprecated."
+                )
             warnings.warn(
                 "`score_estimator` is deprecated and will be removed in a future "
                 "release. Use `vf_estimator` instead.",
@@ -126,6 +139,11 @@ class NPSE(VectorFieldTrainer):
             vf_estimator = score_estimator
 
         if density_estimator is not None:
+            if vf_estimator is not None:
+                raise ValueError(
+                    "Cannot pass both `density_estimator` and `vf_estimator`. "
+                    "Use `vf_estimator` only; `density_estimator` is deprecated."
+                )
             warnings.warn(
                 "`density_estimator` is deprecated and will be removed in a future "
                 "release. Use `vf_estimator` instead.",
@@ -133,6 +151,37 @@ class NPSE(VectorFieldTrainer):
                 stacklevel=2,
             )
             vf_estimator = density_estimator
+
+        # Builder owns sde_type; reject conflicting trainer-level value.
+        if isinstance(vf_estimator, VectorFieldEstimatorBuilder) and sde_type != "ve":
+            raise ValueError(
+                f"Cannot pass `sde_type={sde_type!r}` when a "
+                "VectorFieldEstimatorBuilder is provided. Set `sde_type` on "
+                "the builder instead: "
+                f"VectorFieldEstimatorBuilder(sde_type={sde_type!r})."
+            )
+
+        if vf_estimator is None:
+            vf_estimator = VectorFieldEstimatorBuilder(
+                estimator_type="score",
+                sde_type=sde_type,
+            )
+        elif isinstance(vf_estimator, VectorFieldEstimatorBuilder):
+            if vf_estimator.estimator_type is None:
+                vf_estimator = replace(vf_estimator, estimator_type="score")
+            elif vf_estimator.estimator_type != "score":
+                raise ValueError(
+                    "NPSE builds score estimators; got a builder with "
+                    f"estimator_type={vf_estimator.estimator_type!r}."
+                )
+        elif isinstance(vf_estimator, str):
+            warnings.warn(
+                "Passing a string for `vf_estimator` is deprecated. "
+                "Use VectorFieldEstimatorBuilder(model=...) instead, e.g. "
+                "`from sbi.neural_nets import VectorFieldEstimatorBuilder`.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
         super().__init__(
             prior=prior,
@@ -144,8 +193,7 @@ class NPSE(VectorFieldTrainer):
             show_progress_bars=show_progress_bars,
         )
 
-        # When vf_estimator is a string, build the default neural net using
-        # the NPSE-specific builder which requires sde_type.
+        # When vf_estimator is a string (deprecated path), build the default.
         if isinstance(vf_estimator, str):
             self._build_neural_net = self._build_default_nn_fn(
                 model=vf_estimator, sde_type=sde_type
@@ -197,7 +245,7 @@ class NPSE(VectorFieldTrainer):
 
     def _build_default_nn_fn(
         self,
-        model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        model: VF_MODELS,
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
     ) -> ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]:
         return posterior_score_nn(model=model, sde_type=sde_type)
