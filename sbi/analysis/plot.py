@@ -1769,9 +1769,8 @@ def _sbc_rank_plot(
     if ranks_labels is None:
         ranks_labels = [f"rank set {i + 1}" for i in range(num_ranks)]
     if num_bins is None:
-        # Use more bins for CDFs to get smoother curves, fewer for histograms
         num_bins = num_sbc_runs // 10 if plot_type == "cdf" else num_sbc_runs // 20
-    num_bins = max(num_bins, 1)  # ensure at least 1 bin
+    num_bins = max(num_bins, 1)
     assert isinstance(num_bins, int)
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
@@ -1853,9 +1852,7 @@ def _sbc_rank_plot(
                         alpha=line_alpha,
                     )
                     if ii == 0 and show_uniform_region:
-                        # Show expected deviation band
                         x_fill = np.linspace(0, num_bins, num_repeats * num_bins)
-                        # Approximate 95% confidence band for uniform CDF difference
                         lower_bound = -1.96 * np.sqrt(
                             np.linspace(0, 1, num_repeats * num_bins)
                             * (1 - np.linspace(0, 1, num_repeats * num_bins))
@@ -2081,9 +2078,6 @@ def _plot_ranks_as_ecdf_diff(
 ) -> None:
     """Plot eCDF differences showing deviation from uniformity.
 
-    Plots the empirical CDF minus the expected uniform CDF, showing how
-    the posterior ranks deviate from perfect calibration.
-
     Args:
         ranks: SBC ranks in shape (num_sbc_runs, )
         num_bins: number of bins for the histogram.
@@ -2095,14 +2089,10 @@ def _plot_ranks_as_ecdf_diff(
         show_ylabel: whether to show y-label.
         num_ticks: number of ticks on the x-axis.
     """
-    # Generate histogram of ranks.
     hist, *_ = np.histogram(ranks, bins=num_bins, density=False)
-    # Construct empirical CDF.
     histcs = hist.cumsum()
     ecdf = histcs / histcs.max()
-    # Expected uniform CDF.
     uniform_cdf = np.linspace(0, 1, num_bins)
-    # Difference from uniform.
     diff = ecdf - uniform_cdf
 
     x = np.linspace(0, num_bins, num_repeats * num_bins)
