@@ -110,17 +110,9 @@ def validate_target_accept(x: Any) -> None:
 
     Args:
         x: The value to validate. `None` means "use the sampler default".
-
-    Raises:
-        TypeError: If x is neither `None` nor a number.
-        ValueError: If x is not strictly between 0.0 and 1.0.
     """
 
-    if x is None:
-        return
-
-    if not isinstance(x, (float, int)):
-        raise TypeError(f"target_accept must be a float, but got {type(x).__name__}")
-
-    if not 0.0 < x < 1.0:
-        raise ValueError("target_accept must be strictly between 0.0 and 1.0.")
+    if x is not None:
+        validate_float_range(
+            x, "target_accept", min_val=0.0, max_val=1.0, range_inclusive=False
+        )
