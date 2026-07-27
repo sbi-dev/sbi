@@ -17,7 +17,10 @@ from sbi.neural_nets.estimators.score_estimator import (
     VEScoreEstimator,
     VPScoreEstimator,
 )
-from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
+from sbi.neural_nets.net_builders.estimator_configs import (
+    VF_MODELS,
+    _EstimatorBuilderBase,
+)
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     assert_transform_to_unconstrained_supported,
@@ -77,8 +80,8 @@ class ScoreEstimatorConfig(_VectorFieldBaseConfig):
     """Configuration for score-matching estimator builders (NPSE).
 
     Extends the base config with SDE-specific parameters for VE, VP, and SubVP
-    noise schedules.  Constructing an instance from user-supplied ``**kwargs``
-    ensures that typos and unknown parameters raise ``TypeError`` immediately.
+    noise schedules.  Unknown parameters raise ``TypeError`` on direct
+    construction but are warned-and-forwarded via ``from_kwargs()``.
     """
 
     # VE schedule params (Karras et al. 2022)
@@ -103,13 +106,11 @@ class ScoreEstimatorConfig(_VectorFieldBaseConfig):
 class FlowEstimatorConfig(_VectorFieldBaseConfig):
     """Configuration for flow-matching estimator builders (FMPE).
 
-    Currently identical to the base config.  Constructing an instance from
-    user-supplied ``**kwargs`` ensures that typos and unknown parameters raise
-    ``TypeError`` immediately — and that score-only parameters (e.g.
-    ``sigma_min``, ``beta_min``) are rejected early.
+    Currently identical to the base config.  Unknown parameters raise
+    ``TypeError`` on direct construction but are warned-and-forwarded
+    via ``from_kwargs()``.
     """
 
-    estimator_type: Optional[str] = None
     gaussian_baseline: Optional[bool] = None
 
 
@@ -136,8 +137,8 @@ def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
     estimator_type: Literal["flow", "score"] = "flow",
-    z_score_x: Optional[str] = None,
-    z_score_y: Optional[str] = None,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     embedding_net: nn.Module = nn.Identity(),
     sde_type: str = "ve",  # Only used for score estimator
     hidden_features: Union[Sequence[int], int] = 100,
@@ -145,10 +146,7 @@ def build_vector_field_estimator(
     num_layers: int = 5,
     num_heads: int = 10,
     mlp_ratio: int = 4,
-    net: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-        VectorFieldNet,
-    ] = "mlp",
+    net: Union[VF_MODELS, VectorFieldNet] = "mlp",
     gaussian_baseline: bool = False,
     compose_standardization: bool = False,
     **kwargs,
@@ -229,7 +227,7 @@ def build_vector_field_estimator(
             embedding_net=embedding_net,
             **kwargs,
         )
-    elif net == "transformer":
+    elif net in ("transformer", "transformer_cross_attn"):
         # For transformer, hidden_features must be an int
         hidden_features_int = (
             hidden_features if isinstance(hidden_features, int) else hidden_features[0]
@@ -243,6 +241,7 @@ def build_vector_field_estimator(
             mlp_ratio=mlp_ratio,
             time_embedding_dim=time_embedding_dim,
             embedding_net=embedding_net,
+            is_x_emb_seq=(net == "transformer_cross_attn"),
             **kwargs,
         )
     else:
@@ -1279,7 +1278,7 @@ def build_standard_mlp_network(
     activation: type[nn.Module] = nn.GELU,
     layer_norm: bool = True,
     skip_connections: bool = True,
-    time_emb_type: str = "random_fourier",
+    time_emb_type: str = "sinusoidal",
     sinusoidal_max_freq: float = 1000.0,
     fourier_scale: float = 30.0,
     **kwargs,

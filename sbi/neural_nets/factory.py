@@ -12,6 +12,7 @@ from sbi.neural_nets.net_builders.classifier import (
     build_resnet_classifier,
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
+    VF_MODELS,
     ClassifierConfig,
     ConditionalFlowConfig,
     MarginalFlowConfig,
@@ -342,7 +343,7 @@ def posterior_nn(
 
 def posterior_score_nn(
     model: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VF_MODELS,
         VectorFieldNet,
     ] = "mlp",
     sde_type: str = "ve",
@@ -438,7 +439,7 @@ def posterior_score_nn(
 
 def posterior_flow_nn(
     model: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VF_MODELS,
         VectorFieldNet,
     ] = "mlp",
     z_score_theta: Optional[

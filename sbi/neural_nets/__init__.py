@@ -13,6 +13,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     DensityEstimatorBuilder,
     MixedDensityEstimatorBuilder,
     RatioEstimatorBuilder,
+    VectorFieldEstimatorBuilder,
 )
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "posterior_nn",
     "posterior_score_nn",
     "posterior_flow_nn",
+    "VectorFieldEstimatorBuilder",
     "DensityEstimatorBuilder",
     "MixedDensityEstimatorBuilder",
     "RatioEstimatorBuilder",
