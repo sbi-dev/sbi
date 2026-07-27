@@ -100,3 +100,19 @@ def validate_float_range(
             raise ValueError(
                 f"{field_name} must be strictly between {min_val} and {max_val}."
             )
+
+
+def validate_target_accept(x: Any) -> None:
+    """Validate that x is `None` or a target acceptance probability in (0, 1).
+
+    `target_accept` is validated at several public boundaries (`MCMCPosterior`,
+    `MCMCPosteriorParameters`, `PyMCSampler`), so the policy lives here.
+
+    Args:
+        x: The value to validate. `None` means "use the sampler default".
+    """
+
+    if x is not None:
+        validate_float_range(
+            x, "target_accept", min_val=0.0, max_val=1.0, range_inclusive=False
+        )

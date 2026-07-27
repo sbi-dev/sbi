@@ -23,6 +23,7 @@ from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_float,
     is_positive_int,
+    validate_target_accept,
 )
 
 
@@ -244,6 +245,14 @@ class MCMCPosteriorParameters(PosteriorParameters):
             (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
             faster than `"spawn"` but is only supported on POSIX-based systems
             (e.g. Linux and macOS, not Windows).
+        target_accept: Target acceptance probability used only by the PyMC samplers
+            `hmc_pymc` and `nuts_pymc`, controlling step-size adaptation during
+            warmup. Higher values generally result in smaller steps and fewer
+            rejections, at the cost of speed. If `None`, `hmc_pymc` uses `0.9`
+            because PyMC's `0.65` default mixed poorly in sbi's Gaussian regression
+            test, and `nuts_pymc` keeps PyMC's backend default. Ignored by
+            `slice_pymc`, the Pyro samplers (`hmc_pyro`, `nuts_pyro`) and the numpy
+            slice samplers.
     """
 
     method: Literal[
@@ -262,9 +271,12 @@ class MCMCPosteriorParameters(PosteriorParameters):
     init_strategy_parameters: Optional[Dict[str, Any]] = None
     num_workers: int = 1
     mp_context: Literal["fork", "spawn"] = "spawn"
+    target_accept: Optional[float] = None
 
     def validate(self):
         """Validate MCMCPosteriorParameters fields."""
+
+        validate_target_accept(self.target_accept)
 
         if not (
             self.init_strategy_parameters is None
