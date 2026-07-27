@@ -178,6 +178,8 @@ def test_c2st_pymc_sampler_on_Gaussian(
 @pytest.mark.parametrize(
     ("step", "target_accept", "expected"),
     [
+        # 0.9 is spelled out rather than imported from `_DEFAULT_HMC_TARGET_ACCEPT` so
+        # that changing the documented default has to be a deliberate test update.
         ("hmc", None, 0.9),
         ("hmc", 0.99, 0.99),
         ("nuts", None, None),

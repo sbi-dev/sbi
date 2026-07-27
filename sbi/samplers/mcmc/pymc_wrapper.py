@@ -9,7 +9,12 @@ import pytensor.tensor as pt
 import torch
 
 from sbi.utils.torchutils import tensor2numpy
-from sbi.utils.typechecks import validate_float_range
+from sbi.utils.typechecks import validate_target_accept
+
+# PyMC's `HamiltonianMC` defaults to `target_accept=0.65`, which mixes poorly on
+# peaked posteriors and biases the samples (see sbi #1908). NUTS is unaffected and
+# keeps PyMC's own default.
+_DEFAULT_HMC_TARGET_ACCEPT = 0.9
 
 
 class PyMCPotential(pt.Op):  # type: ignore
@@ -134,10 +139,11 @@ class PyMCSampler:
             seed: Random seed passed to `pymc.sample` for reproducible sampling.
                 If None (default), PyMC seeds from system entropy.
             target_accept: Target acceptance probability for the `"hmc"` and
-                `"nuts"` step methods. If `None`, HMC uses sbi's default of `0.9`,
-                while NUTS keeps PyMC's backend default. The HMC default avoids poor
-                finite-chain mixing observed with PyMC's `0.65` default in sbi's
-                Gaussian regression test. Ignored for the `"slice"` step.
+                `"nuts"` step methods. If `None`, HMC uses sbi's default of `0.9`
+                (`_DEFAULT_HMC_TARGET_ACCEPT`), while NUTS keeps PyMC's backend
+                default. The HMC default avoids poor finite-chain mixing observed
+                with PyMC's `0.65` default in sbi's Gaussian regression test.
+                Ignored for the `"slice"` step.
         """
         self.param_name = param_name
         self._step = step
@@ -149,16 +155,11 @@ class PyMCSampler:
         self._progressbar = progressbar
         self._device = device
         self._seed = seed
-        if target_accept is not None:
-            validate_float_range(
-                target_accept,
-                "target_accept",
-                min_val=0.0,
-                max_val=1.0,
-                range_inclusive=False,
-            )
+        validate_target_accept(target_accept)
         self._target_accept = (
-            0.9 if target_accept is None and step == "hmc" else target_accept
+            _DEFAULT_HMC_TARGET_ACCEPT
+            if target_accept is None and step == "hmc"
+            else target_accept
         )
 
         # create PyMC model object

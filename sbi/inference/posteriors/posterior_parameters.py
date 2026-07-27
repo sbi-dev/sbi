@@ -23,7 +23,7 @@ from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_float,
     is_positive_int,
-    validate_float_range,
+    validate_target_accept,
 )
 
 
@@ -245,12 +245,14 @@ class MCMCPosteriorParameters(PosteriorParameters):
             (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
             faster than `"spawn"` but is only supported on POSIX-based systems
             (e.g. Linux and macOS, not Windows).
-        target_accept: Target acceptance probability for `hmc_pymc` and `nuts_pymc`,
-            controlling step-size adaptation during warmup. Higher values generally
-            result in smaller steps and fewer rejections, at the cost of speed. If
-            `None`, HMC uses `0.9` because PyMC's `0.65` default mixed poorly in sbi's
-            Gaussian regression test; NUTS keeps PyMC's backend default. Ignored by
-            other samplers.
+        target_accept: Target acceptance probability used only by the PyMC samplers
+            `hmc_pymc` and `nuts_pymc`, controlling step-size adaptation during
+            warmup. Higher values generally result in smaller steps and fewer
+            rejections, at the cost of speed. If `None`, `hmc_pymc` uses `0.9`
+            because PyMC's `0.65` default mixed poorly in sbi's Gaussian regression
+            test, and `nuts_pymc` keeps PyMC's backend default. Ignored by
+            `slice_pymc`, the Pyro samplers (`hmc_pyro`, `nuts_pyro`) and the numpy
+            slice samplers.
     """
 
     method: Literal[
@@ -274,14 +276,7 @@ class MCMCPosteriorParameters(PosteriorParameters):
     def validate(self):
         """Validate MCMCPosteriorParameters fields."""
 
-        if self.target_accept is not None:
-            validate_float_range(
-                self.target_accept,
-                "target_accept",
-                min_val=0.0,
-                max_val=1.0,
-                range_inclusive=False,
-            )
+        validate_target_accept(self.target_accept)
 
         if not (
             self.init_strategy_parameters is None
