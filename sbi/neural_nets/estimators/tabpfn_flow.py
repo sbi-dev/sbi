@@ -224,6 +224,10 @@ class TabPFNFlow(ConditionalDensityEstimator):
         context_input, context_condition = self._require_context()
         joint_data = torch.cat([context_condition, context_input], dim=1)
 
+        # Match the context: TabPFN's fit/predict API consumes CPU arrays.
+        input_flat = input_flat.to("cpu")
+        condition_flat = condition_flat.to("cpu")
+
         dim_condition = context_condition.shape[1]
         log_prob = torch.zeros(input_flat.shape[0])
         test_joint = torch.cat([condition_flat, input_flat], dim=1)
@@ -272,6 +276,9 @@ class TabPFNFlow(ConditionalDensityEstimator):
         """
         context_input, context_condition = self._require_context()
         joint_data = torch.cat([context_condition, context_input], dim=1)
+
+        # Match the context: TabPFN's fit/predict API consumes CPU arrays.
+        condition_flat = condition_flat.to("cpu")
 
         dim_condition = context_condition.shape[1]
         autoregressive_inputs = condition_flat

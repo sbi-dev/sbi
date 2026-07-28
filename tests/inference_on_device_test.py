@@ -882,12 +882,12 @@ def test_vector_field_methods_degvice_handling(
 @pytest.mark.gpu
 @pytest.mark.parametrize("prior_device", ["cpu", "gpu"])
 def test_npe_pfn_on_device(prior_device):
-    pytest.importorskip("tabpfn")
     """NPE_PFN should work correctly when prior/data come from different devices.
 
     TabPFN always runs on CPU, so the estimator context must remain on CPU
     regardless of where the prior or observations live.
     """
+    pytest.importorskip("tabpfn")
     prior_device = process_device(prior_device)
     num_dim = 2
     num_simulations = 30
@@ -901,7 +901,7 @@ def test_npe_pfn_on_device(prior_device):
     x = theta + torch.randn_like(theta)
     x_o = torch.zeros(1, num_dim)
 
-    inferer = NPE_PFN(prior=prior, device="cpu")
+    inferer = NPE_PFN(prior=prior, device=prior_device)
     inferer.append_simulations(theta, x)
     posterior = inferer.build_posterior(sample_with="filtered_direct")
     posterior.set_default_x(x_o)
@@ -912,7 +912,7 @@ def test_npe_pfn_on_device(prior_device):
     log_probs = posterior.log_prob(samples)
     assert log_probs.shape == (5,)
 
-    assert posterior.estimator._context_input.device.type == "cpu", (
+    assert posterior.posterior_estimator._context_input.device.type == "cpu", (
         "TabPFN context must always remain on CPU."
     )
 
