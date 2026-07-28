@@ -386,7 +386,8 @@ class AdaptedVariationalDistribution(Distribution):
             modules: Modules, for a `q` that does not expose them itself.
 
         Raises:
-            ValueError: If no trainable tensors can be found.
+            ValueError: If no trainable tensors can be found, or if some sit somewhere
+                sbi does not look and were not passed as `parameters`.
         """
         self._user_parameters = list(parameters) if parameters is not None else []
         self._user_modules = list(modules) if modules is not None else []
@@ -400,6 +401,13 @@ class AdaptedVariationalDistribution(Distribution):
                     "The variational distribution has no parameters to optimize. Pass "
                     "the trainable tensors as `parameters` (and any modules as "
                     "`modules`)."
+                )
+            if any(hasattr(t, "parameters") for t in getattr(q, "transforms", [])):
+                raise ValueError(
+                    "The variational distribution keeps trainable tensors in its "
+                    "transforms, which sbi does not collect on its own. Pass all of "
+                    "them as `parameters` (and any modules as `modules`), so that none "
+                    "are silently left out of training."
                 )
             self._source = base
 
