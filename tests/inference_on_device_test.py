@@ -528,7 +528,9 @@ def test_boxuniform_device_handling(arg_device, device):
     Also tests torch.device as argument of process_device."""
 
     arg_device = process_device(arg_device)
-    device = process_device(device)
+    # `device=None` asks BoxUniform to infer the device from low and high, so it must
+    # stay None rather than being resolved to the CPU.
+    device = None if device is None else process_device(device)
 
     prior = BoxUniform(
         low=zeros(1).to(arg_device), high=ones(1).to(arg_device), device=device
