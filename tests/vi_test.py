@@ -452,6 +452,55 @@ def test_custom_distribution_q_survives_pickle():
     reloaded.train(**kwargs, retrain_from_scratch=True)
 
 
+@pytest.mark.parametrize("kind", ["flow", "gaussian", "distribution"])
+def test_retrain_from_scratch_semantics_per_kind(kind: str):
+    """Pin the deliberate per-kind asymmetry of `retrain_from_scratch`.
+
+    sbi builds its own families fresh, but cannot re-randomize an opaque user
+    `Distribution`, so that kind returns to the snapshot taken when `q` was set.
+    """
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    extra = {}
+    if kind == "distribution":
+        mu = zeros(num_dim, requires_grad=True)
+        scale = ones(num_dim, requires_grad=True)
+        q = torch.distributions.Independent(torch.distributions.Normal(mu, scale), 1)
+        extra = {"parameters": [mu, scale]}
+    else:
+        q = "maf" if kind == "flow" else "gaussian"
+
+    posterior = VIPosterior(
+        FakePotential(prior=prior),
+        prior,
+        theta_transform=torch_tf.identity_transform,
+        q=q,
+        **extra,
+    )
+    posterior.set_default_x(zeros(1, num_dim))
+    kwargs = dict(max_num_iters=10, check_for_convergence=False, quality_control=False)
+
+    initial = [p.detach().clone() for p in posterior._q.parameters()]
+    posterior.train(**kwargs)
+    trained = [p.detach().clone() for p in posterior._q.parameters()]
+    assert any(
+        not torch.allclose(a, b) for a, b in zip(initial, trained, strict=True)
+    ), "training should move the parameters"
+
+    # Inspect the rebuild itself: `train(retrain_from_scratch=True)` would immediately
+    # move the parameters again, hiding what the rebuild produced.
+    rebuilt = [p.detach().clone() for p in posterior._build_q_from_spec().parameters()]
+
+    if kind == "distribution":
+        # Restored from the pre-training snapshot.
+        assert all(torch.allclose(a, b) for a, b in zip(initial, rebuilt, strict=True))
+    else:
+        # Freshly initialised, so no longer the trained values.
+        assert any(
+            not torch.allclose(a, b) for a, b in zip(trained, rebuilt, strict=True)
+        )
+
+
 def test_amortized_posterior_survives_pickle_and_deepcopy():
     """Amortized mode had no serialization coverage at all."""
     num_dim = 2

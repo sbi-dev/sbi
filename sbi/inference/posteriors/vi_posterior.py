@@ -797,7 +797,10 @@ class VIPosterior(NeuralPosterior):
             clip_value: Gradient clipping value, decreasing may help if you see invalid
                 values.
             warm_up_rounds: Initialize the posterior as the prior.
-            retrain_from_scratch: Retrain the variational distributions from scratch.
+            retrain_from_scratch: Rebuild the variational distribution before training.
+                For a family name or a `Callable` builder this re-initialises with fresh
+                random weights. For a user-supplied `Distribution` it restores the copy
+                taken when `q` was set, since sbi cannot re-randomize an opaque object.
             reset_optimizer: Reset the divergence optimizer
             show_progress_bar: If any progress report should be displayed.
             quality_control: If False quality control is skipped.
