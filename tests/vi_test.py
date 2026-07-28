@@ -29,6 +29,7 @@ from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
 from sbi.neural_nets.factory import ZukoFlowType
+from sbi.samplers.vi.vi_utils import LearnableGaussian
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -312,22 +313,6 @@ def test_deepcopy_support(q: str):
         posterior.q.sample((1,))
     deepcopy(posterior)  # Should not raise
 
-    # A *trained* posterior must survive deepcopy and stay usable through the public
-    # API. Sampling `_q` directly, as above, bypasses the `_trained_on` guard in
-    # `sample()` and so cannot see serialization damage.
-    posterior.train(
-        max_num_iters=10, check_for_convergence=False, quality_control=False
-    )
-    trained_copy = deepcopy(posterior)
-    assert trained_copy.sample((5,)).shape == (5, num_dim)
-    # The optimizer is transient and is rebuilt on demand, wired to the copy's own q
-    # rather than the original's.
-    trained_copy.train(
-        max_num_iters=1, check_for_convergence=False, quality_control=False
-    )
-    assert trained_copy._optimizer.q is trained_copy._q
-    assert trained_copy._optimizer.q is not posterior._q
-
 
 @pytest.mark.parametrize("q", FLOWS)
 def test_pickle_support(q: str):
@@ -359,107 +344,28 @@ def test_pickle_support(q: str):
 
     assert torch.allclose(s1, s2), "Samples should match after unpickling"
 
-    # A *trained* posterior must round-trip and stay usable through the public API.
-    posterior.train(
-        max_num_iters=10, check_for_convergence=False, quality_control=False
+
+# =============================================================================
+# Serialization
+#
+# VI used to store build closures and `__deepcopy__` overrides as instance
+# attributes, so `__getstate__` stripped them from `self` and `__setstate__`
+# rebuilt them by re-running the public `set_q`. These cover what that broke.
+# =============================================================================
+
+
+def _build_diag_gaussian_q(event_shape, link_transform, device="cpu"):
+    """A user-style `q` builder. Module-level, since pickling cannot capture a local."""
+    return LearnableGaussian(
+        dim=event_shape[0],
+        full_covariance=False,
+        link_transform=link_transform,
+        device=device,
     )
-    reloaded = pickle.loads(pickle.dumps(posterior))
-    assert reloaded._trained_on is not None
-    assert reloaded.sample((5,)).shape == (5, num_dim)
 
 
-def test_pickling_does_not_mutate_the_original():
-    """`pickle.dumps` must leave the posterior it serializes fully usable.
-
-    `__getstate__` used to strip `_optimizer` and the build closure from `self` rather
-    than from the copied state, so merely saving a posterior broke the live one.
-    """
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    posterior = VIPosterior(
-        FakePotential(prior=prior),
-        prior,
-        theta_transform=torch_tf.identity_transform,
-        q="gaussian",
-    )
-    posterior.set_default_x(zeros(1, num_dim))
-    kwargs = dict(max_num_iters=10, check_for_convergence=False, quality_control=False)
-    posterior.train(**kwargs)
-    trained_on, optimizer = posterior._trained_on, posterior._optimizer
-
-    pickle.dumps(posterior)  # Discard the bytes: the original is what matters here.
-
-    assert posterior._trained_on is trained_on
-    assert posterior._optimizer is optimizer
-    assert posterior.sample((5,)).shape == (5, num_dim)
-    posterior.train(**kwargs, retrain_from_scratch=True)
-
-
-@pytest.mark.parametrize("q", ["maf", "gaussian"])
-def test_retrain_from_scratch_survives_pickle(q: str):
-    """`retrain_from_scratch` still works after a round trip.
-
-    The rebuild recipe used to be a closure that pickling had to discard, and the
-    branch handling a pre-built flow never restored it.
-    """
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    posterior = VIPosterior(
-        FakePotential(prior=prior),
-        prior,
-        theta_transform=torch_tf.identity_transform,
-        q=q,
-    )
-    posterior.set_default_x(zeros(1, num_dim))
-    kwargs = dict(max_num_iters=10, check_for_convergence=False, quality_control=False)
-    posterior.train(**kwargs)
-    # Retraining swaps `q` for a fresh instance, which is the state that used to make
-    # the recipe unrecoverable.
-    posterior.train(**kwargs, retrain_from_scratch=True)
-
-    reloaded = pickle.loads(pickle.dumps(posterior))
-    reloaded.train(**kwargs, retrain_from_scratch=True)
-
-    assert reloaded.sample((5,)).shape == (5, num_dim)
-
-
-def test_custom_distribution_q_survives_pickle():
-    """A user-supplied `Distribution` q must pickle; its accessors are now methods."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    mu = zeros(num_dim, requires_grad=True)
-    scale = ones(num_dim, requires_grad=True)
-    q = torch.distributions.Independent(torch.distributions.Normal(mu, scale), 1)
-    posterior = VIPosterior(
-        FakePotential(prior=prior),
-        prior,
-        theta_transform=torch_tf.identity_transform,
-        q=q,
-        parameters=[mu, scale],
-    )
-    posterior.set_default_x(zeros(1, num_dim))
-    kwargs = dict(max_num_iters=10, check_for_convergence=False, quality_control=False)
-    posterior.train(**kwargs)
-    # The user's parameters must reach the optimizer, not just any parameters.
-    assert len(list(posterior._q.parameters())) == 2
-
-    torch.manual_seed(0)
-    expected = posterior.sample((5,))
-    reloaded = pickle.loads(pickle.dumps(posterior))
-    torch.manual_seed(0)
-    assert torch.allclose(reloaded.sample((5,)), expected)
-
-    reloaded.train(**kwargs, retrain_from_scratch=True)
-
-
-@pytest.mark.parametrize("kind", ["flow", "gaussian", "distribution"])
-def test_retrain_from_scratch_semantics_per_kind(kind: str):
-    """Pin the deliberate per-kind asymmetry of `retrain_from_scratch`.
-
-    sbi builds its own families fresh, but cannot re-randomize an opaque user
-    `Distribution`, so that kind returns to the snapshot taken when `q` was set.
-    """
-    num_dim = 2
+def _make_posterior(kind: str, num_dim: int = 2):
+    """Build an untrained VIPosterior for each way of specifying `q`."""
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     extra = {}
     if kind == "distribution":
@@ -467,6 +373,8 @@ def test_retrain_from_scratch_semantics_per_kind(kind: str):
         scale = ones(num_dim, requires_grad=True)
         q = torch.distributions.Independent(torch.distributions.Normal(mu, scale), 1)
         extra = {"parameters": [mu, scale]}
+    elif kind == "callable":
+        q = _build_diag_gaussian_q
     else:
         q = "maf" if kind == "flow" else "gaussian"
 
@@ -478,31 +386,88 @@ def test_retrain_from_scratch_semantics_per_kind(kind: str):
         **extra,
     )
     posterior.set_default_x(zeros(1, num_dim))
-    kwargs = dict(max_num_iters=10, check_for_convergence=False, quality_control=False)
-
-    initial = [p.detach().clone() for p in posterior._q.parameters()]
-    posterior.train(**kwargs)
-    trained = [p.detach().clone() for p in posterior._q.parameters()]
-    assert any(
-        not torch.allclose(a, b) for a, b in zip(initial, trained, strict=True)
-    ), "training should move the parameters"
-
-    # Inspect the rebuild itself: `train(retrain_from_scratch=True)` would immediately
-    # move the parameters again, hiding what the rebuild produced.
-    rebuilt = [p.detach().clone() for p in posterior._build_q_from_spec().parameters()]
-
-    if kind == "distribution":
-        # Restored from the pre-training snapshot.
-        assert all(torch.allclose(a, b) for a, b in zip(initial, rebuilt, strict=True))
-    else:
-        # Freshly initialised, so no longer the trained values.
-        assert any(
-            not torch.allclose(a, b) for a, b in zip(trained, rebuilt, strict=True)
-        )
+    return posterior
 
 
-def test_amortized_posterior_survives_pickle_and_deepcopy():
-    """Amortized mode had no serialization coverage at all."""
+TRAIN_KWARGS = dict(
+    max_num_iters=10, check_for_convergence=False, quality_control=False
+)
+Q_KINDS = ["flow", "gaussian", "callable", "distribution"]
+
+
+@pytest.mark.parametrize("kind", Q_KINDS)
+def test_trained_posterior_survives_roundtrip(kind: str):
+    """Pickling preserves training and leaves the copy fully usable.
+
+    Covers every way of specifying `q`: a custom `Distribution` could not be pickled
+    at all, and `retrain_from_scratch` afterwards had a separate failure per kind.
+    """
+    num_dim = 2
+    posterior = _make_posterior(kind, num_dim)
+    posterior.train(**TRAIN_KWARGS)
+
+    torch.manual_seed(0)
+    expected = posterior.sample((5,))
+    reloaded = pickle.loads(pickle.dumps(posterior))
+
+    assert reloaded._trained_on is not None
+    torch.manual_seed(0)
+    assert torch.allclose(reloaded.sample((5,)), expected)
+    # The rebuild recipe must survive too, including a second retrain.
+    reloaded.train(**TRAIN_KWARGS, retrain_from_scratch=True)
+    assert reloaded.sample((5,)).shape == (5, num_dim)
+
+
+def test_pickling_does_not_mutate_the_original():
+    """`pickle.dumps` must leave the posterior it serializes untouched.
+
+    `__getstate__` used to strip state from `self` rather than from the copy, so
+    merely saving a posterior broke the live one.
+    """
+    posterior = _make_posterior("gaussian")
+    posterior.train(**TRAIN_KWARGS)
+    trained_on, optimizer = posterior._trained_on, posterior._optimizer
+
+    pickle.dumps(posterior)  # Discard the bytes; the original is what matters.
+
+    assert posterior._trained_on is trained_on
+    assert posterior._optimizer is optimizer
+    posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
+
+
+def test_deepcopy_of_trained_posterior_rewires_optimizer():
+    """A copy must own its `q`, not share the original's.
+
+    The old per-instance `__deepcopy__` closed over the source object, so a copy's
+    optimizer stepped a different `q` than its `sample()` read.
+    """
+    posterior = _make_posterior("gaussian")
+    posterior.train(**TRAIN_KWARGS)
+
+    copied = deepcopy(posterior)
+    copied.train(**TRAIN_KWARGS)
+
+    assert copied._optimizer.q is copied._q
+    assert copied._optimizer.q is not posterior._q
+
+
+def test_multi_round_q_is_an_independent_warm_start():
+    """Passing a trained posterior as `q` copies its flow rather than aliasing it."""
+    first = _make_posterior("flow")
+    first.train(**TRAIN_KWARGS)
+
+    prior = MultivariateNormal(zeros(2), eye(2))
+    second = VIPosterior(FakePotential(prior=prior), prior, q=first)
+
+    assert second._q is not first._q
+    assert all(
+        torch.allclose(a, b)
+        for a, b in zip(second._q.parameters(), first._q.parameters(), strict=True)
+    )
+
+
+def test_amortized_posterior_survives_roundtrip():
+    """Amortized mode had no serialization coverage."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     posterior = VIPosterior(
@@ -511,13 +476,41 @@ def test_amortized_posterior_survives_pickle_and_deepcopy():
         theta_transform=torch_tf.identity_transform,
         q="maf",
     )
-    theta, x = prior.sample((128,)), torch.randn(128, num_dim)
-    posterior.train_amortized(theta, x, max_num_iters=3, batch_size=16)
+    posterior.train_amortized(
+        prior.sample((128,)), torch.randn(128, num_dim), max_num_iters=3, batch_size=16
+    )
 
-    x_o = torch.zeros(1, num_dim)
+    x_o = zeros(1, num_dim)
     for candidate in (pickle.loads(pickle.dumps(posterior)), deepcopy(posterior)):
         assert candidate._mode == "amortized"
         assert candidate.sample((5,), x=x_o).shape == (5, num_dim)
+
+
+@pytest.mark.parametrize("kind", Q_KINDS)
+def test_retrain_from_scratch_semantics_per_kind(kind: str):
+    """Pin the documented per-kind asymmetry of `retrain_from_scratch`.
+
+    sbi rebuilds its own families fresh, but cannot re-randomize an opaque user
+    `Distribution`, so that kind returns to the snapshot taken when `q` was set.
+    """
+    posterior = _make_posterior(kind)
+    initial = [p.detach().clone() for p in posterior._q.parameters()]
+    posterior.train(**TRAIN_KWARGS)
+    trained = [p.detach().clone() for p in posterior._q.parameters()]
+    assert any(
+        not torch.allclose(a, b) for a, b in zip(initial, trained, strict=True)
+    ), "training should move the parameters"
+
+    # Inspect the rebuild directly: `train(retrain_from_scratch=True)` would move the
+    # parameters again, hiding what the rebuild produced.
+    rebuilt = [p.detach().clone() for p in posterior._build_q_from_spec().parameters()]
+
+    if kind == "distribution":
+        assert all(torch.allclose(a, b) for a, b in zip(initial, rebuilt, strict=True))
+    else:
+        assert any(
+            not torch.allclose(a, b) for a, b in zip(trained, rebuilt, strict=True)
+        )
 
 
 def test_vi_posterior_interface():
