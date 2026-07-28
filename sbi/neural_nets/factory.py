@@ -401,6 +401,11 @@ def posterior_score_nn(
     Returns:
         Constructor function for NPSE.
     """
+    if compose_standardization and z_score_theta != "independent":
+        raise ValueError(
+            "compose_standardization=True requires z_score_theta='independent'."
+        )
+
     # Map user-facing parameter names to internal names.
     mapped = dict(
         z_score_x=z_score_x,
@@ -485,6 +490,11 @@ def posterior_flow_nn(
     Returns:
         Constructor function for FMPE.
     """
+    if compose_standardization and z_score_theta != "independent":
+        raise ValueError(
+            "compose_standardization=True requires z_score_theta='independent'."
+        )
+
     # Map user-facing parameter names to internal names.
     mapped = dict(
         z_score_x=z_score_theta,

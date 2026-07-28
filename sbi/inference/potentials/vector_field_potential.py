@@ -118,14 +118,8 @@ class VectorFieldBasedPotential(BasePotential):
                 `IIDScoreFunction`.
             ode_kwargs: Additional keyword arguments for the neural ODE.
         """
-        # Composed standardization runs the SDE/ODE in z-space; the iid and guided
-        # score combinations evaluate the (theta-space) prior on the z-space state,
-        # which is not transformed. Guard at this chokepoint so the broken combination
-        # cannot be reached even via direct potential use (not just via
-        # VectorFieldPosterior.sample/log_prob).
-        if bool(
-            getattr(self.vector_field_estimator, "_compose_standardization", False)
-        ):
+        # IID and guidance require transforming the prior to standardized space.
+        if self.vector_field_estimator.compose_enabled:
             if x_is_iid:
                 raise NotImplementedError(
                     "compose_standardization does not yet support iid (x with "
@@ -174,11 +168,7 @@ class VectorFieldBasedPotential(BasePotential):
         )
         self.vector_field_estimator.eval()
 
-        # Composed standardization (opt-in): the flow operates in z-space. Map the
-        # incoming theta -> z for the flow, and correct the log-prob with the
-        # affine Jacobian: log p_theta(theta) = log p_z(z) - sum(log scale).
-        # within_support below still uses the ORIGINAL theta. No-op when off.
-        compose = self.vector_field_estimator._compose_standardization
+        compose = self.vector_field_estimator.compose_enabled
         if compose:
             flow_input = self.vector_field_estimator.to_z(theta_density_estimator)
             log_abs_det = self.vector_field_estimator.log_abs_det()
@@ -187,27 +177,6 @@ class VectorFieldBasedPotential(BasePotential):
 
         with torch.set_grad_enabled(track_gradients):
             if self.x_is_iid:
-                if compose:
-                    # Backstop for a directly-forced `_x_is_iid`: compose + iid is
-                    # unreachable through the public API (guarded in `set_x`).
-                    # Reaching here means `_x_is_iid` was set directly, and continuing
-                    # would return a partially-incorrect log-prob -- the affine
-                    # Jacobian is applied but the prior is not yet expressed in
-                    # z-space. Raise rather than return quiet wrong numbers, matching
-                    # the set_x guards.
-                    raise NotImplementedError(
-                        "compose_standardization does not yet support iid (x with "
-                        "batch>1) log_prob. This path is guarded in set_x; reaching "
-                        "it means _x_is_iid was set directly, which would return a "
-                        "partially-incorrect log-prob (affine Jacobian applied, prior "
-                        "not yet expressed in z). Use a single observation, or disable "
-                        "compose_standardization."
-                    )
-                    # future iid support: lift this backstop AND the set_x guard
-                    # once the prior is transformed to z (see
-                    # followup/compose-iid-guidance-map). Retained z-space affine-
-                    # Jacobian correction to restore then:
-                    #   iid_posteriors_prob -= num_iid * log_abs_det
                 assert self.prior is not None, (
                     "Prior is required for evaluating log_prob with iid observations."
                 )
@@ -248,11 +217,6 @@ class VectorFieldBasedPotential(BasePotential):
         track_gradients: bool = False,
     ) -> Tensor:
         r"""Returns the potential function gradient for score-based methods.
-
-        Coordinate convention: under compose_standardization the SDE sampler calls
-        gradient() on a z-space state, while MAP (which would need theta-space
-        gradients) is guarded; so gradient() always operates in the estimator's
-        current coordinate.
 
         Args:
             theta: The parameters at which to evaluate the potential gradient.

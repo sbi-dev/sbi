@@ -41,9 +41,7 @@ class _VectorFieldBaseConfig(_EstimatorConfigBase):
     sinusoidal_max_freq: Optional[float] = None
     fourier_scale: Optional[float] = None
 
-    # Composed standardization (opt-in scale-equivariance for FMPE / NPSE).
-    # When True, the estimator is trained/sampled in standardized z-space with an
-    # invertible per-dim affine transform applied only at the boundaries.
+    # Apply a per-dimension boundary affine around the vector-field estimator.
     compose_standardization: Optional[bool] = None
 
     # MLP-specific
@@ -118,47 +116,18 @@ def _compute_theta_standardization(
     z_score_x: Optional[str],
     compose_standardization: bool,
 ):
-    """Single source of truth for the theta-standardization stats.
+    """Return internal normalization and optional boundary-affine statistics."""
+    if compose_standardization:
+        shift, scale = z_standardization(batch_x, structured_dims=False)
+        scale = scale.clamp_min(1e-20)
+        return torch.zeros_like(shift), torch.ones_like(scale), shift, scale
 
-    This is the ONLY place that computes the standardization statistics from the
-    training theta, replacing the two previously-parallel ``z_standardization``
-    call sites (maintainer feedback: "don't maintain two parallel mechanisms").
-
-    Returns ``(mean_0, std_0, compose_shift, compose_scale)``:
-
-    * compose OFF: ``mean_0``/``std_0`` are the per-dim z-score stats (or scalar
-      ``0``/``1`` when z-scoring is disabled); ``compose_shift``/``compose_scale``
-      are ``None`` (no boundary affine).
-    * compose ON: the estimator stays PURE z-space, so the boundary affine
-      ``theta = shift + scale * z`` carries the per-dim z-score stats
-      (``compose_shift``/``compose_scale``, scale clamped to ``1e-20``), and the
-      internal input-norm stats are forced to unit (``mean_0=0``/``std_0=1``) so
-      the network sees unit-z input. The unit invariant is asserted here.
-    """
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x_bool:
         mean_0, std_0 = z_standardization(batch_x, structured_x)
     else:
         mean_0, std_0 = 0, 1
-
-    compose_shift = None
-    compose_scale = None
-    if compose_standardization:
-        # Per-dim standardization (independent), matching the validated reference.
-        compose_shift, compose_scale = z_standardization(batch_x, structured_dims=False)
-        compose_scale = compose_scale.clamp_min(1e-20)
-        # Force the internal input-norm stats to unit (the estimator now sees z).
-        # Use PER-DIM tensors (not scalars) so the VE base buffers (mean_t/std_t,
-        # computed via broadcast_to) stay contiguous and load_state_dict-safe.
-        mean_0 = torch.zeros_like(compose_shift)
-        std_0 = torch.ones_like(compose_scale)
-        # Invariant: under composition the internal stats MUST be unit-z.
-        assert (mean_0 == 0).all() and (std_0 == 1).all(), (
-            "compose_standardization invariant violated: internal mean_0/std_0 "
-            "must be 0/1 (unit z) when composition is enabled."
-        )
-
-    return mean_0, std_0, compose_shift, compose_scale
+    return mean_0, std_0, None, None
 
 
 def build_vector_field_estimator(
@@ -205,12 +174,8 @@ def build_vector_field_estimator(
         gaussian_baseline: If True, use analytical Gaussian baseline velocity
             derived from Bayes' rule. The network then only learns the residual.
             Only used when estimator_type="flow". Defaults to False.
-        compose_standardization: If True (opt-in), compose an invertible per-dim
-            affine standardization with the flow so the estimator becomes
-            scale-equivariant. The estimator is trained and sampled in
-            standardized z-space (per-dim mean/std computed from training theta),
-            and theta = shift + scale * z is applied only at the boundaries.
-            Defaults to False (behavior identical to current sbi).
+        compose_standardization: Whether to train and sample in per-dimension
+            standardized theta coordinates. Defaults to False.
         **kwargs: Additional arguments forwarded to the estimator and network
             constructors.  Valid keys are defined by ``ScoreEstimatorConfig``
             and ``FlowEstimatorConfig``; validation happens in the upstream
@@ -278,14 +243,6 @@ def build_vector_field_estimator(
         else:
             raise ValueError(f"Unknown architecture: {net}")
 
-    # Z-score + composed-standardization setup (single source of truth). The
-    # helper computes the internal input-norm stats (mean_0/std_0) and, when
-    # composition is enabled, the per-dim boundary affine theta = shift + scale*z
-    # (forcing mean_0=0/std_0=1 so the network sees unit-z input). The base
-    # distribution is left in z-space: FMPE uses N(0, 1), and VE uses
-    # approx_marginal_std(t_max) = sqrt(std_0**2 + sigma_max**2) = sqrt(1 +
-    # sigma_max**2) since compose forces std_0=1. The base is NOT scaled by
-    # `scale` — sampling happens in z, and from_z then maps z -> theta.
     mean_0, std_0, compose_shift, compose_scale = _compute_theta_standardization(
         batch_x, z_score_x, compose_standardization
     )
@@ -298,33 +255,17 @@ def build_vector_field_estimator(
     )
 
     def _wire_compose(estimator):
-        """Wire the per-dim affine standardization onto the estimator (opt-in)."""
+        """Attach and validate the boundary affine."""
         if compose_shift is not None and compose_scale is not None:
-            # gaussian_baseline derives the network velocity from the
-            # (original-space) data statistics mean_0/std_0; composed
-            # standardization instead maps theta -> z so the network sees
-            # unit-scale inputs. The two are mutually exclusive. Refuse the
-            # (untested) pair explicitly at this public-API chokepoint rather than
-            # silently producing an inconsistent estimator. Score estimators have
-            # no gaussian_baseline attribute (getattr default False).
-            if getattr(estimator, "gaussian_baseline", False):
-                raise ValueError(
-                    "gaussian_baseline and compose_standardization cannot be "
-                    "enabled together: gaussian_baseline assumes non-standardized "
-                    "data (its analytical velocity is derived from mean_0/std_0), "
-                    "while compose_standardization standardizes theta -> z before "
-                    "the network. Enable only one (set gaussian_baseline=False to "
-                    "use composed standardization)."
-                )
             shift = compose_shift.reshape(1, *estimator.input_shape).float()
             scale = compose_scale.reshape(1, *estimator.input_shape).float()
             estimator._theta_shift.copy_(shift)
             estimator._theta_scale.copy_(scale)
             estimator._compose_standardization.fill_(True)
-            # Sync the plain-Python mirror so the hot-path guard in
-            # _check_compose_internal_stats_unit short-circuits without a
-            # tensor truth-test on the compose-OFF (default) path.
-            estimator._compose_enabled = True
+        estimator._check_compose_internal_stats_unit()
+        baseline_check = getattr(estimator, "_check_compose_baseline_compatible", None)
+        if baseline_check is not None:
+            baseline_check()
         return estimator
 
     if estimator_type == "flow":

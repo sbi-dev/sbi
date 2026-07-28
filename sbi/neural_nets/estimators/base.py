@@ -386,43 +386,19 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
             embedding_net if embedding_net is not None else nn.Identity()
         )
 
-        # ---- Composed standardization (opt-in; default OFF) ----
-        # When enabled, the estimator stays PURE z-space and an invertible per-dim
-        # affine transform theta = shift + scale * z is applied ONLY at the
-        # boundaries (loss input, sample output, log_prob input). Buffers default
-        # to the identity transform so the flag-OFF path is byte-identical.
+        # Boundary affine for estimators trained and sampled in standardized space.
         self.register_buffer(
             "_theta_shift", torch.zeros(1, *self.input_shape, dtype=torch.float32)
         )
         self.register_buffer(
             "_theta_scale", torch.ones(1, *self.input_shape, dtype=torch.float32)
         )
-        # Persisted as a buffer (not a plain attribute) so that compose mode survives
-        # save/load: a checkpoint trained with composition reloads as compose-enabled.
         self.register_buffer(
             "_compose_standardization", torch.tensor(False), persistent=True
         )
-        # Plain Python bool mirror — NOT a buffer, NOT persisted. Allows hot-path
-        # guards to short-circuit before touching the tensor buffer (a tensor
-        # truth-test forces a host/device sync on CUDA). Kept in sync by
-        # _wire_compose (build path) and _load_from_state_dict (checkpoint path).
-        self._compose_enabled: bool = False
 
     def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
-        r"""Gracefully load checkpoints from before composed standardization existed.
-
-        The three compose buffers (``_theta_shift``/``_theta_scale``/
-        ``_compose_standardization``) are handled atomically:
-
-        * NONE present (legacy pre-compose checkpoint): inject the current
-          identity / disabled defaults so the estimator loads as composition-OFF
-          (its original behavior).
-        * ALL present (compose-aware checkpoint): load normally.
-        * PARTIAL (some present, some missing): raise rather than silently inject
-          identity defaults — a checkpoint with ``_compose_standardization=True``
-          but a missing ``_theta_shift``/``_theta_scale`` would otherwise load a
-          silently-wrong identity affine.
-        """
+        r"""Load legacy checkpoints as compose-off and reject partial affines."""
         compose_names = ("_theta_shift", "_theta_scale", "_compose_standardization")
         present = [n for n in compose_names if prefix + n in state_dict]
         if present and len(present) != len(compose_names):
@@ -436,14 +412,16 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
                 "buffers or none of them."
             )
         if not present:
-            # Legacy checkpoint: inject identity / disabled defaults (compose-OFF).
-            for name in compose_names:
-                if hasattr(self, name):
-                    state_dict[prefix + name] = getattr(self, name).clone()
+            state_dict[prefix + "_theta_shift"] = torch.zeros_like(self._theta_shift)
+            state_dict[prefix + "_theta_scale"] = torch.ones_like(self._theta_scale)
+            state_dict[prefix + "_compose_standardization"] = torch.tensor(
+                False, device=self._compose_standardization.device
+            )
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
-        # Sync the plain-Python mirror AFTER the buffer is loaded so the hot-path
-        # short-circuit in _check_compose_internal_stats_unit stays correct.
-        self._compose_enabled = bool(self._compose_standardization)
+        self._check_compose_internal_stats_unit()
+        baseline_check = getattr(self, "_check_compose_baseline_compatible", None)
+        if baseline_check is not None:
+            baseline_check()
 
     @property
     def embedding_net(self) -> nn.Module:
@@ -479,57 +457,31 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         (the initial noise at time t=T)."""
         return self._std_base
 
-    # -------------------------- COMPOSED STANDARDIZATION HELPERS ----------------
+    @property
+    def compose_enabled(self) -> bool:
+        r"""Whether composed standardization is active."""
+        return bool(getattr(self, "_compose_standardization", False))
 
     def to_z(self, theta: Tensor) -> Tensor:
-        r"""Map original-space parameters to standardized z-space.
-
-        ``z = (theta - shift) / scale``. Identity when composed standardization
-        is disabled (shift=0, scale=1).
-        """
+        r"""Map original-space parameters to standardized space."""
         return (theta - self._theta_shift) / self._theta_scale
 
     def from_z(self, z: Tensor) -> Tensor:
-        r"""Map standardized z-space parameters back to original space.
-
-        ``theta = shift + scale * z``. Identity when composed standardization
-        is disabled (shift=0, scale=1).
-        """
+        r"""Map standardized parameters back to original space."""
         return self._theta_shift + self._theta_scale * z
 
     def log_abs_det(self) -> Tensor:
-        r"""Log absolute determinant of the affine z->theta Jacobian.
-
-        ``sum(log scale)`` over the input dimensions. Used to correct the
-        flow log-prob (which is computed in z-space) back to theta-space:
-        ``log p_theta(theta) = log p_z(z) - sum(log scale)``.
-        """
+        r"""Return the log absolute determinant of the z-to-theta affine."""
         return torch.log(self._theta_scale).sum()
 
     def _check_compose_internal_stats_unit(self) -> None:
-        r"""Enforce the composed-standardization invariant: unit internal stats.
-
-        When composition is enabled the estimator must stay PURE z-space, which
-        requires the internal input-norm stats ``mean_0``/``std_0`` to be exactly
-        ``0``/``1`` (the network sees unit-z input; the boundary affine carries the
-        original-space scale). The build path forces this, but a manually assembled
-        estimator or a tampered checkpoint could re-enable composition with
-        non-unit stats, silently producing an inconsistent model. Reject it at
-        use-time. Short-circuits cheaply when composition is off (the common path).
-        """
-        # Short-circuit on the plain Python bool mirror (no tensor truth-test,
-        # no host/device sync). The compose-OFF path (the common case, called on
-        # every ODE/SDE step) pays zero tensor access.
-        if not self._compose_enabled:
+        r"""Require unit internal statistics when the boundary affine is active."""
+        if not self.compose_enabled:
             return
         if not ((self.mean_0 == 0).all() and (self.std_0 == 1).all()):
             raise ValueError(
                 "compose_standardization is enabled but the internal input-norm "
-                "stats mean_0/std_0 are not unit (0/1). Under composition the "
-                "estimator must stay pure z-space (the boundary affine carries the "
-                "original-space scale). This estimator is internally inconsistent "
-                "— rebuild it via build_vector_field_estimator(..., "
-                "compose_standardization=True), which forces unit stats."
+                "stats mean_0/std_0 are not unit (0/1)."
             )
 
     # -------------------------- ODE METHODS --------------------------
