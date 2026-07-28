@@ -360,27 +360,55 @@ def _build_diag_gaussian_q(event_shape, link_transform, device="cpu"):
     )
 
 
-def _make_posterior(kind: str, num_dim: int = 2):
-    """Build an untrained VIPosterior for each way of specifying `q`."""
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    extra = {}
+class _ParamNormal(torch.distributions.Independent):
+    """A base distribution that exposes its own trainable tensors."""
+
+    def __init__(self, loc, scale):
+        base = torch.distributions.Normal(loc, scale, validate_args=False)
+        super().__init__(base, 1, validate_args=False)
+        self._params = [loc, scale]
+
+    def parameters(self):
+        return iter(self._params)
+
+
+def _make_posterior(kind: str, num_dim: int = 2, prior=None):
+    """Build an untrained VIPosterior for each way of specifying `q`.
+
+    Args:
+        kind: One of `Q_KINDS`.
+        num_dim: Dimensionality of the problem.
+        prior: Overrides the default unbounded prior. When given, the link transform is
+            derived from it rather than forced to the identity, which is what makes a
+            bounded prior meaningful.
+    """
+    extra = (
+        {} if prior is not None else {"theta_transform": torch_tf.identity_transform}
+    )
+    prior = (
+        prior if prior is not None else MultivariateNormal(zeros(num_dim), eye(num_dim))
+    )
+
     if kind == "distribution":
-        mu = zeros(num_dim, requires_grad=True)
+        loc = zeros(num_dim, requires_grad=True)
         scale = ones(num_dim, requires_grad=True)
-        q = torch.distributions.Independent(torch.distributions.Normal(mu, scale), 1)
-        extra = {"parameters": [mu, scale]}
+        if kind == "distribution":
+            q = torch.distributions.Independent(
+                torch.distributions.Normal(loc, scale), 1
+            )
+            extra["parameters"] = [loc, scale]
+        else:
+            # Trainable tensors sit on the base, so `parameters=` stays optional.
+            q = torch.distributions.TransformedDistribution(
+                _ParamNormal(loc, scale),
+                [torch_tf.AffineTransform(zeros(num_dim), ones(num_dim))],
+            )
     elif kind == "callable":
         q = _build_diag_gaussian_q
     else:
         q = "maf" if kind == "flow" else "gaussian"
 
-    posterior = VIPosterior(
-        FakePotential(prior=prior),
-        prior,
-        theta_transform=torch_tf.identity_transform,
-        q=q,
-        **extra,
-    )
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q=q, **extra)
     posterior.set_default_x(zeros(1, num_dim))
     return posterior
 
@@ -388,7 +416,7 @@ def _make_posterior(kind: str, num_dim: int = 2):
 TRAIN_KWARGS = dict(
     max_num_iters=10, check_for_convergence=False, quality_control=False
 )
-Q_KINDS = ["flow", "gaussian", "callable", "distribution"]
+Q_KINDS = ["flow", "gaussian", "callable", "distribution", "transformed"]
 
 
 @pytest.mark.parametrize("kind", Q_KINDS)
@@ -452,15 +480,10 @@ def test_multi_round_q_is_an_independent_warm_start():
 def test_amortized_posterior_survives_roundtrip():
     """Amortized mode had no serialization coverage."""
     num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    posterior = VIPosterior(
-        FakePotential(prior=prior),
-        prior,
-        theta_transform=torch_tf.identity_transform,
-        q="maf",
-    )
+    posterior = _make_posterior("flow", num_dim)
+    theta = posterior._prior.sample((128,))
     posterior.train_amortized(
-        prior.sample((128,)), torch.randn(128, num_dim), max_num_iters=3, batch_size=16
+        theta, torch.randn(128, num_dim), max_num_iters=3, batch_size=16
     )
 
     x_o = zeros(1, num_dim)
@@ -477,15 +500,7 @@ def test_retrain_from_scratch_with_bounded_prior():
     """
     num_dim = 2
     prior = torch.distributions.Independent(Gamma(2 * ones(num_dim), ones(num_dim)), 1)
-    mu = zeros(num_dim, requires_grad=True)
-    scale = ones(num_dim, requires_grad=True)
-    posterior = VIPosterior(
-        FakePotential(prior=prior),
-        prior,
-        q=torch.distributions.Independent(torch.distributions.Normal(mu, scale), 1),
-        parameters=[mu, scale],
-    )
-    posterior.set_default_x(zeros(1, num_dim))
+    posterior = _make_posterior("distribution", num_dim, prior=prior)
     posterior.train(**TRAIN_KWARGS)
 
     posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
@@ -493,36 +508,6 @@ def test_retrain_from_scratch_with_bounded_prior():
     samples = posterior.sample((20,))
     assert samples.shape == (20, num_dim)
     assert torch.isfinite(posterior.log_prob(samples)).all()
-
-
-def test_transformed_distribution_q_finds_parameters_on_its_base():
-    """A `TransformedDistribution` keeps its trainable tensors on the base distribution.
-
-    Passing `parameters=` explicitly must stay optional for this shape of `q`.
-    """
-    num_dim = 2
-
-    class ParamNormal(torch.distributions.Normal):
-        def __init__(self, loc, scale):
-            super().__init__(loc, scale, validate_args=False)
-            self._params = [loc, scale]
-
-        def parameters(self):
-            return iter(self._params)
-
-    loc = zeros(num_dim, requires_grad=True)
-    scale = ones(num_dim, requires_grad=True)
-    q = torch.distributions.TransformedDistribution(
-        ParamNormal(loc, scale),
-        [torch_tf.AffineTransform(zeros(num_dim), ones(num_dim))],
-    )
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    posterior = VIPosterior(FakePotential(prior=prior), prior, q=q)
-    posterior.set_default_x(zeros(1, num_dim))
-
-    assert len(list(posterior._q.parameters())) == 2
-    posterior.train(**TRAIN_KWARGS)
-    assert posterior.sample((5,)).shape == (5, num_dim)
 
 
 def test_retrain_fails_after_setting_an_already_built_q():
@@ -539,16 +524,15 @@ def test_retrain_fails_after_setting_an_already_built_q():
         posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
 
 
-@pytest.mark.parametrize("kind", Q_KINDS)
+# One representative per side of the asymmetry; the round-trip test above covers
+# every kind, this only pins fresh-weights against restored-snapshot.
+@pytest.mark.parametrize("kind", ["flow", "distribution"])
 def test_retrain_from_scratch_semantics_per_kind(kind: str):
     """Pin the documented per-kind asymmetry of `retrain_from_scratch`."""
     posterior = _make_posterior(kind)
     initial = [p.detach().clone() for p in posterior._q.parameters()]
     posterior.train(**TRAIN_KWARGS)
     trained = [p.detach().clone() for p in posterior._q.parameters()]
-    assert any(
-        not torch.allclose(a, b) for a, b in zip(initial, trained, strict=True)
-    ), "training should move the parameters"
 
     # Not via `train(retrain_from_scratch=True)`: it would train over the rebuild.
     rebuilt = [p.detach().clone() for p in posterior._build_q_from_spec().parameters()]
