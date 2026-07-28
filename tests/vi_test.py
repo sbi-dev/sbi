@@ -11,6 +11,7 @@ This module tests both:
 
 from __future__ import annotations
 
+import pickle
 import tempfile
 from copy import deepcopy
 
@@ -311,6 +312,22 @@ def test_deepcopy_support(q: str):
         posterior.q.sample((1,))
     deepcopy(posterior)  # Should not raise
 
+    # A *trained* posterior must survive deepcopy and stay usable through the public
+    # API. Sampling `_q` directly, as above, bypasses the `_trained_on` guard in
+    # `sample()` and so cannot see serialization damage.
+    posterior.train(
+        max_num_iters=10, check_for_convergence=False, quality_control=False
+    )
+    trained_copy = deepcopy(posterior)
+    assert trained_copy.sample((5,)).shape == (5, num_dim)
+    # The optimizer is transient and is rebuilt on demand, wired to the copy's own q
+    # rather than the original's.
+    trained_copy.train(
+        max_num_iters=1, check_for_convergence=False, quality_control=False
+    )
+    assert trained_copy._optimizer.q is trained_copy._q
+    assert trained_copy._optimizer.q is not posterior._q
+
 
 @pytest.mark.parametrize("q", FLOWS)
 def test_pickle_support(q: str):
@@ -341,6 +358,117 @@ def test_pickle_support(q: str):
         s2 = posterior_loaded._q.sample((1,)).squeeze(0)
 
     assert torch.allclose(s1, s2), "Samples should match after unpickling"
+
+    # A *trained* posterior must round-trip and stay usable through the public API.
+    posterior.train(
+        max_num_iters=10, check_for_convergence=False, quality_control=False
+    )
+    reloaded = pickle.loads(pickle.dumps(posterior))
+    assert reloaded._trained_on is not None
+    assert reloaded.sample((5,)).shape == (5, num_dim)
+
+
+def test_pickling_does_not_mutate_the_original():
+    """`pickle.dumps` must leave the posterior it serializes fully usable.
+
+    `__getstate__` used to strip `_optimizer` and the build closure from `self` rather
+    than from the copied state, so merely saving a posterior broke the live one.
+    """
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    posterior = VIPosterior(
+        FakePotential(prior=prior),
+        prior,
+        theta_transform=torch_tf.identity_transform,
+        q="gaussian",
+    )
+    posterior.set_default_x(zeros(1, num_dim))
+    kwargs = dict(max_num_iters=10, check_for_convergence=False, quality_control=False)
+    posterior.train(**kwargs)
+    trained_on, optimizer = posterior._trained_on, posterior._optimizer
+
+    pickle.dumps(posterior)  # Discard the bytes: the original is what matters here.
+
+    assert posterior._trained_on is trained_on
+    assert posterior._optimizer is optimizer
+    assert posterior.sample((5,)).shape == (5, num_dim)
+    posterior.train(**kwargs, retrain_from_scratch=True)
+
+
+@pytest.mark.parametrize("q", ["maf", "gaussian"])
+def test_retrain_from_scratch_survives_pickle(q: str):
+    """`retrain_from_scratch` still works after a round trip.
+
+    The rebuild recipe used to be a closure that pickling had to discard, and the
+    branch handling a pre-built flow never restored it.
+    """
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    posterior = VIPosterior(
+        FakePotential(prior=prior),
+        prior,
+        theta_transform=torch_tf.identity_transform,
+        q=q,
+    )
+    posterior.set_default_x(zeros(1, num_dim))
+    kwargs = dict(max_num_iters=10, check_for_convergence=False, quality_control=False)
+    posterior.train(**kwargs)
+    # Retraining swaps `q` for a fresh instance, which is the state that used to make
+    # the recipe unrecoverable.
+    posterior.train(**kwargs, retrain_from_scratch=True)
+
+    reloaded = pickle.loads(pickle.dumps(posterior))
+    reloaded.train(**kwargs, retrain_from_scratch=True)
+
+    assert reloaded.sample((5,)).shape == (5, num_dim)
+
+
+def test_custom_distribution_q_survives_pickle():
+    """A user-supplied `Distribution` q must pickle; its accessors are now methods."""
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    mu = zeros(num_dim, requires_grad=True)
+    scale = ones(num_dim, requires_grad=True)
+    q = torch.distributions.Independent(torch.distributions.Normal(mu, scale), 1)
+    posterior = VIPosterior(
+        FakePotential(prior=prior),
+        prior,
+        theta_transform=torch_tf.identity_transform,
+        q=q,
+        parameters=[mu, scale],
+    )
+    posterior.set_default_x(zeros(1, num_dim))
+    kwargs = dict(max_num_iters=10, check_for_convergence=False, quality_control=False)
+    posterior.train(**kwargs)
+    # The user's parameters must reach the optimizer, not just any parameters.
+    assert len(list(posterior._q.parameters())) == 2
+
+    torch.manual_seed(0)
+    expected = posterior.sample((5,))
+    reloaded = pickle.loads(pickle.dumps(posterior))
+    torch.manual_seed(0)
+    assert torch.allclose(reloaded.sample((5,)), expected)
+
+    reloaded.train(**kwargs, retrain_from_scratch=True)
+
+
+def test_amortized_posterior_survives_pickle_and_deepcopy():
+    """Amortized mode had no serialization coverage at all."""
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    posterior = VIPosterior(
+        FakePotential(prior=prior),
+        prior,
+        theta_transform=torch_tf.identity_transform,
+        q="maf",
+    )
+    theta, x = prior.sample((128,)), torch.randn(128, num_dim)
+    posterior.train_amortized(theta, x, max_num_iters=3, batch_size=16)
+
+    x_o = torch.zeros(1, num_dim)
+    for candidate in (pickle.loads(pickle.dumps(posterior)), deepcopy(posterior)):
+        assert candidate._mode == "amortized"
+        assert candidate.sample((5,), x=x_o).shape == (5, num_dim)
 
 
 def test_vi_posterior_interface():

@@ -65,9 +65,7 @@ def test_picklability(
         loaded_posterior = pickle.load(handle)
 
     # A corrupted `theta_transform` unpickles fine and only fails on use (#1952).
-    # VIPosterior is skipped: `__setstate__` resets `_trained_on`, a separate gap.
-    if not isinstance(posterior, VIPosterior):
-        assert loaded_posterior.sample((1,)).shape == (1, num_dim)
+    assert loaded_posterior.sample((1,)).shape == (1, num_dim)
 
     with open(f"{tmp_path}/saved_inference.pickle", "wb") as handle:
         pickle.dump(inference, handle)
