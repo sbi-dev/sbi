@@ -49,9 +49,17 @@ def process_device(device: Union[str, torch.device]) -> str:
                 torch.cuda.set_device(device)
             elif torch.backends.mps.is_available():
                 device = "mps:0"
-                # MPS support is not implemented for a number of operations.
-                # use CPU as fallback.
-                os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+                # PyTorch registers the CPU fallback at import time, so it cannot
+                # be enabled from here.
+                if os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK", "0") != "1":
+                    warnings.warn(
+                        "Using the MPS backend, for which PyTorch does not "
+                        "implement all operations. To fall back to the CPU for "
+                        "those instead of raising, set the environment variable "
+                        "PYTORCH_ENABLE_MPS_FALLBACK=1 before importing torch.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
                 # MPS framework does not support double precision.
                 torch.set_default_dtype(torch.float32)
                 check_device(device)
