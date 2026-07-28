@@ -825,19 +825,18 @@ def test_vector_field_methods_degvice_handling(
     device_inference = process_device(device_inference)
     num_dims = 2
 
-    if vf_trainer == NPSE:
-        iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
+    iid_methods = ["fnpe"]
+    if vf_trainer == NPSE and num_trials > 1:
         if mps_fallback_disabled(device_inference):
-            iid_methods = ["fnpe"]
             warnings.warn(
                 "Testing only fnpe: the Gaussian iid methods need "
                 "aten::_linalg_eigh.eigenvalues, which MPS does not implement. "
                 "Re-run with PYTORCH_ENABLE_MPS_FALLBACK=1 to cover them.",
                 UserWarning,
-                stacklevel=2,
+                stacklevel=1,
             )
-    else:
-        iid_methods = ["fnpe"]
+        else:
+            iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
 
     posterior = inference.build_posterior(
         sample_with="sde" if num_trials > 1 else "ode"
@@ -906,11 +905,19 @@ def test_npe_pfn_on_device(prior_device):
     posterior = inferer.build_posterior(sample_with="filtered_direct")
     posterior.set_default_x(x_o)
 
+    expected_device = prior_device.split(":")[0]
+
     samples = posterior.sample((5,))
     assert samples.shape == (5, num_dim)
+    assert samples.device.type == expected_device, (
+        f"Samples are on {samples.device}, expected {prior_device}."
+    )
 
     log_probs = posterior.log_prob(samples)
     assert log_probs.shape == (5,)
+    assert log_probs.device.type == expected_device, (
+        f"log_prob is on {log_probs.device}, expected {prior_device}."
+    )
 
     assert posterior.posterior_estimator._context_input.device.type == "cpu", (
         "TabPFN context must always remain on CPU."
