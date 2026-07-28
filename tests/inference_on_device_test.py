@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import asdict
 from typing import Tuple, Union
 
@@ -52,6 +53,7 @@ from sbi.utils import BoxUniform
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
 from sbi.utils.user_input_checks import validate_theta_and_x
+from tests.test_utils import mps_fallback_disabled
 
 pytestmark = pytest.mark.skipif(
     not gpu_available(), reason="No CUDA or MPS device available."
@@ -825,6 +827,15 @@ def test_vector_field_methods_degvice_handling(
 
     if vf_trainer == NPSE:
         iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
+        if mps_fallback_disabled(device_inference):
+            iid_methods = ["fnpe"]
+            warnings.warn(
+                "Testing only fnpe: the Gaussian iid methods need "
+                "aten::_linalg_eigh.eigenvalues, which MPS does not implement. "
+                "Re-run with PYTORCH_ENABLE_MPS_FALLBACK=1 to cover them.",
+                UserWarning,
+                stacklevel=2,
+            )
     else:
         iid_methods = ["fnpe"]
 
