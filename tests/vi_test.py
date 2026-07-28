@@ -486,6 +486,52 @@ def test_amortized_posterior_survives_roundtrip():
         assert candidate.sample((5,), x=x_o).shape == (5, num_dim)
 
 
+def test_retrain_from_scratch_with_bounded_prior():
+    """Retraining must not re-apply `link_transform` to an already-adapted `q`.
+
+    Goes through the public `train()` and uses a bounded prior, so the link transform
+    is non-trivial. With an unbounded prior it is the identity and applying it twice
+    would be harmless.
+    """
+    num_dim = 2
+    # Gamma gives positive support, so the link transform is a real transform and its
+    # constraint does not compare equal to the adapted `q`'s.
+    prior = torch.distributions.Independent(Gamma(2 * ones(num_dim), ones(num_dim)), 1)
+    mu = zeros(num_dim, requires_grad=True)
+    scale = ones(num_dim, requires_grad=True)
+    posterior = VIPosterior(
+        FakePotential(prior=prior),
+        prior,
+        q=torch.distributions.Independent(torch.distributions.Normal(mu, scale), 1),
+        parameters=[mu, scale],
+    )
+    posterior.set_default_x(zeros(1, num_dim))
+    posterior.train(**TRAIN_KWARGS)
+
+    posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
+
+    samples = posterior.sample((20,))
+    assert samples.shape == (20, num_dim)
+    assert torch.isfinite(posterior.log_prob(samples)).all()
+
+
+def test_set_q_with_instance_clears_the_rebuild_recipe():
+    """A hand-built `q` has no recipe, so retraining must fail loudly.
+
+    Silently keeping the previous recipe would rebuild the wrong family.
+    """
+    posterior = _make_posterior("flow")
+    replacement = LearnableGaussian(
+        dim=2, full_covariance=False, link_transform=posterior.link_transform
+    )
+
+    posterior.set_q(replacement)
+
+    assert posterior.q is replacement
+    with pytest.raises(ValueError, match="no construction recipe"):
+        posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
+
+
 @pytest.mark.parametrize("kind", Q_KINDS)
 def test_retrain_from_scratch_semantics_per_kind(kind: str):
     """Pin the documented per-kind asymmetry of `retrain_from_scratch`.

@@ -392,7 +392,10 @@ class VIPosterior(NeuralPosterior):
             )
         if spec.kind == "distribution":
             assert spec.init_snapshot is not None
-            return spec.init_snapshot
+            # Copy rather than hand out the stored snapshot itself, so callers cannot
+            # train on it. `set_q` re-snapshots anyway, but not relying on that keeps
+            # this method self-contained.
+            return detach_and_deepcopy(spec.init_snapshot)
         raise ValueError(
             "Cannot rebuild `q`: it was passed as a pre-built distribution instance, "
             "which carries no construction recipe. Pass `q` as a family name, a "
@@ -509,23 +512,27 @@ class VIPosterior(NeuralPosterior):
             modules = []
         _flow_types = (ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian)
         if isinstance(q, _flow_types):
-            # Flow/Gaussian passed directly (e.g. from `_build_q_from_spec` during
-            # retrain). Keep any existing spec: the instance carries no recipe of its
-            # own, and overwriting it would make `retrain_from_scratch` a one-shot.
-            if getattr(self, "_q_spec", None) is None:
-                self._q_spec = _QSpec(kind="instance")
+            # A pre-built instance carries no recipe of its own. `train` restores the
+            # spec around its own rebuild, so keeping a stale one here would silently
+            # rebuild the wrong family for an external caller.
+            self._q_spec = _QSpec(kind="instance")
             self._trained_on = None
         elif isinstance(q, Distribution):
-            q = AdaptedVariationalDistribution(
-                q,
-                self._prior,
-                self.link_transform,
-                parameters=parameters,
-                modules=modules,
-            )
+            # An already-adapted `q` comes back from `_build_q_from_spec`; re-wrapping
+            # it would apply `link_transform` a second time.
+            if not isinstance(q, AdaptedVariationalDistribution):
+                q = AdaptedVariationalDistribution(
+                    q,
+                    self._prior,
+                    self.link_transform,
+                    parameters=parameters,
+                    modules=modules,
+                )
             # sbi cannot re-randomize an opaque user distribution, so `retrain_from
             # _scratch` returns to this pre-training snapshot.
-            self._q_spec = _QSpec(kind="distribution", init_snapshot=deepcopy(q))
+            self._q_spec = _QSpec(
+                kind="distribution", init_snapshot=detach_and_deepcopy(q)
+            )
             self._trained_on = None
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
@@ -801,6 +808,8 @@ class VIPosterior(NeuralPosterior):
                 For a family name or a `Callable` builder this re-initialises with fresh
                 random weights. For a user-supplied `Distribution` it restores the copy
                 taken when `q` was set, since sbi cannot re-randomize an opaque object.
+                Raises `ValueError` if `q` was given as a pre-built flow instance, which
+                carries no construction recipe.
             reset_optimizer: Reset the divergence optimizer
             show_progress_bar: If any progress report should be displayed.
             quality_control: If False quality control is skipped.
@@ -846,7 +855,11 @@ class VIPosterior(NeuralPosterior):
 
         # Init q and the optimizer if necessary
         if retrain_from_scratch:
+            # The `q` setter reclassifies by type, which would downgrade the recipe to
+            # `kind="instance"`; keep ours so repeated retrains stay possible.
+            spec = self._q_spec
             self.q = self._build_q_from_spec()
+            self._q_spec = spec
             self._optimizer = self._optimizer_builder(
                 self.potential_fn,
                 self.q,
