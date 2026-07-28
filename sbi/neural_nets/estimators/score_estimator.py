@@ -152,7 +152,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
         """
-
         # Continue with standard processing (broadcast shapes etc.)
         batch_shape_input = input.shape[: -len(self.input_shape)]
         batch_shape_cond = condition.shape[: -len(self.condition_shape)]
@@ -248,6 +247,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             MSE between target score and network output, scaled by the weight function.
 
         """
+        if self.compose_enabled:
+            input = self.to_z(input)
+
         # Sample times from the Markov chain, use batch dimension
         if times is None:
             times = self.train_schedule(input.shape[0])

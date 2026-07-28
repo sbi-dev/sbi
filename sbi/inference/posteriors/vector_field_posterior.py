@@ -235,6 +235,15 @@ class VectorFieldPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
+        # IID and guidance require transforming the prior to standardized space.
+        if self.vector_field_estimator.compose_enabled and (
+            is_iid or guidance_method is not None
+        ):
+            raise NotImplementedError(
+                "compose_standardization does not yet support iid (x with batch>1) or "
+                "guided sampling. Use a single observation, or disable "
+                "compose_standardization."
+            )
         self.potential_fn.set_x(
             x,
             x_is_iid=is_iid,
@@ -401,6 +410,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 "This may indicate numerical instability in the vector field."
             )
 
+        if self.vector_field_estimator.compose_enabled:
+            samples = self.vector_field_estimator.from_z(samples)
+
         return samples
 
     def sample_via_ode(
@@ -428,6 +440,9 @@ class VectorFieldPosterior(NeuralPosterior):
         samples = self.potential_fn.neural_ode(self.potential_fn.x_o, **kwargs).sample(
             torch.Size((num_samples,))
         )
+
+        if self.vector_field_estimator.compose_enabled:
+            samples = self.vector_field_estimator.from_z(samples)
 
         return samples
 
@@ -457,6 +472,12 @@ class VectorFieldPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
+        if self.vector_field_estimator.compose_enabled and is_iid:
+            raise NotImplementedError(
+                "compose_standardization does not yet support iid (x with batch>1) "
+                "log_prob. Use a single observation, or disable "
+                "compose_standardization."
+            )
         self.potential_fn.set_x(x, x_is_iid=is_iid, **(ode_kwargs or {}))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
@@ -516,6 +537,12 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
+        if self.vector_field_estimator.compose_enabled:
+            raise NotImplementedError(
+                "compose_standardization does not yet support sample_batched "
+                "(batched / multi-observation sampling). Use a single observation "
+                "via sample(), or disable compose_standardization."
+            )
         num_samples = torch.Size(sample_shape).numel()
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         condition_dim = len(self.vector_field_estimator.condition_shape)
@@ -647,6 +674,13 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             The MAP estimate.
         """
+        if self.vector_field_estimator.compose_enabled:
+            raise NotImplementedError(
+                "MAP is not yet supported with compose_standardization. "
+                "The potential gradient is computed in standardized z-space, so "
+                "gradient ascent in theta-space would be incorrect."
+            )
+
         if x is not None:
             raise ValueError(
                 "Passing `x` directly to `.map()` has been deprecated."
