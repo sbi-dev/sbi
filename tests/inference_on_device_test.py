@@ -906,6 +906,7 @@ def test_npe_pfn_on_device(prior_device):
     )
 
 
+@pytest.mark.gpu
 def test_mdn_device_transform():
     """MDN with transform_to_unconstrained moves transform tensors on .to()."""
     from sbi.neural_nets.net_builders.mdn import build_mdn
@@ -931,6 +932,7 @@ def test_mdn_device_transform():
     assert s.device.type == device.split(":")[0]
 
 
+@pytest.mark.gpu
 def test_zuko_device_transform():
     """Zuko's unconstraining transform follows accelerator device moves."""
     from sbi.neural_nets.net_builders.flow import build_zuko_maf
