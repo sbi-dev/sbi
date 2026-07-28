@@ -7,6 +7,7 @@ from typing import (
     Dict,
     Iterable,
     Optional,
+    TypeVar,
     Union,
 )
 
@@ -25,6 +26,9 @@ from torch.nn import Module
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
 from sbi.utils.torchutils import _base_recursor
+
+# Preserves the argument's concrete type through `detach_and_deepcopy`.
+_CopyableT = TypeVar("_CopyableT")
 
 
 class TransformedZukoFlow(nn.Module):
@@ -511,23 +515,18 @@ def detach_all_non_leaf_tensors(obj: object) -> None:
         _base_recursor(obj, check=check, action=action)
 
 
-def make_object_deepcopy_compatible(obj: object):
-    """This function overwrites the `__deepcopy__` attribute. This is required if e.g.
-    the object contains non leaf PyTorch tensors.
+def detach_and_deepcopy(obj: _CopyableT) -> _CopyableT:
+    """Deep-copy `obj`, detaching any non-leaf tensors it caches first.
+
+    Only needed for objects built from `torch.distributions` constructors, which call
+    `.expand()` internally and cache non-leaf tensors that `deepcopy` refuses to touch.
+    `nn.Module`-based variational families hold only leaf parameters and copy fine.
 
     Args:
-        obj: An object where a corresponding `__deepcopy__` attributed is added.
+        obj: Object to copy.
 
+    Returns:
+        An independent copy of `obj`.
     """
-
-    def __deepcopy__(memo):
-        detach_all_non_leaf_tensors(obj)
-        cls = obj.__class__
-        result = cls.__new__(cls)
-        memo[id(obj)] = result
-        for k, v in obj.__dict__.items():
-            setattr(result, k, deepcopy(v, memo))
-        return result
-
-    obj.__deepcopy__ = __deepcopy__  # type: ignore
-    return obj
+    detach_all_non_leaf_tensors(obj)
+    return deepcopy(obj)

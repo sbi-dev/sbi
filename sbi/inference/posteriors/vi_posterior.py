@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import copy
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
@@ -34,7 +33,7 @@ from sbi.samplers.vi.vi_utils import (
     LearnableGaussian,
     TransformedZukoFlow,
     check_variational_distribution,
-    make_object_deepcopy_compatible,
+    detach_and_deepcopy,
 )
 from sbi.sbi_types import (
     Shape,
@@ -515,7 +514,6 @@ class VIPosterior(NeuralPosterior):
             # own, and overwriting it would make `retrain_from_scratch` a one-shot.
             if getattr(self, "_q_spec", None) is None:
                 self._q_spec = _QSpec(kind="instance")
-            make_object_deepcopy_compatible(q)
             self._trained_on = None
         elif isinstance(q, Distribution):
             q = AdaptedVariationalDistribution(
@@ -549,7 +547,6 @@ class VIPosterior(NeuralPosterior):
                 # Callable provided - use as-is
                 self._q_spec = _QSpec(kind="callable", builder=q)
                 q = self._build_q_from_spec()
-            make_object_deepcopy_compatible(q)
             self._trained_on = None
         elif isinstance(q, VIPosterior):
             self._q_spec = q._q_spec
@@ -558,8 +555,7 @@ class VIPosterior(NeuralPosterior):
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
-            make_object_deepcopy_compatible(q.q)
-            q = deepcopy(q.q)
+            q = detach_and_deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
             if hasattr(q, "to"):
                 q.to(self._device)  # type: ignore[union-attr]
@@ -1367,57 +1363,25 @@ class VIPosterior(NeuralPosterior):
             force_update=force_update,
         )
 
-    def __deepcopy__(self, memo: Optional[Dict] = None) -> "VIPosterior":
-        """This method is called when using `copy.deepcopy` on the object.
-
-        It defines how the object is copied. We need to overwrite this method, since the
-        default implementation does use __getstate__ and __setstate__ which we overwrite
-        to enable pickling (and in particular the necessary modifications are
-        incompatible deep copying).
-
-        Args:
-            memo (Optional[Dict], optional): Deep copy internal memo. Defaults to None.
-
-        Returns:
-            VIPosterior: Deep copy of the VIPosterior.
-        """
-        if memo is None:
-            memo = {}
-
-        # Create a new instance of the class
-        cls = self.__class__
-        result = cls.__new__(cls)
-        # Add to memo
-        memo[id(self)] = result
-        # Copy attributes
-        for k, v in self.__dict__.items():
-            setattr(result, k, copy.deepcopy(v, memo))
-        return result
-
     def __getstate__(self) -> Dict:
-        """This method is called when pickling the object.
+        """Return the state to pickle.
 
-        It defines what is pickled. We need to overwrite this method, since some parts
-        do not support pickle protocols (e.g. due to local functions).
+        Copies first and nulls in the copy, so serializing never mutates the live
+        object. `_optimizer` is dropped as transient training state; `train()` rebuilds
+        it on demand. `copy.deepcopy` routes through here too, so both protocols share
+        one path.
 
         Returns:
-            Dict: All attributes of the VIPosterior.
+            The attributes to pickle.
         """
-        self._optimizer = None
-        self.__deepcopy__ = None  # type: ignore
-        self._q.__deepcopy__ = None  # type: ignore
         state = self.__dict__.copy()
+        state["_optimizer"] = None
         return state
 
-    def __setstate__(self, state_dict: Dict):
-        """This method is called when unpickling the object.
+    def __setstate__(self, state_dict: Dict) -> None:
+        """Restore from pickled state.
 
         Args:
-            state_dict: Given state dictionary, we will restore the object from it.
+            state_dict: State produced by `__getstate__`.
         """
         self.__dict__ = state_dict
-        make_object_deepcopy_compatible(self)
-        make_object_deepcopy_compatible(self.q)
-        # Handle amortized mode
-        if self._mode == "amortized" and self._amortized_q is not None:
-            make_object_deepcopy_compatible(self._amortized_q)

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -32,8 +31,8 @@ from sbi.neural_nets.estimators import ZukoUnconditionalFlow
 from sbi.samplers.vi.vi_utils import (
     LearnableGaussian,
     TransformedZukoFlow,
+    detach_and_deepcopy,
     filter_kwargs_for_func,
-    make_object_deepcopy_compatible,
 )
 from sbi.sbi_types import Array
 from sbi.utils.user_input_checks import check_prior
@@ -443,8 +442,7 @@ class ElboOptimizer(DivergenceOptimizer):
         super().__init__(*args, **kwargs)
 
         self.stick_the_landing = stick_the_landing
-        make_object_deepcopy_compatible(self.q)
-        self._surrogate_q = deepcopy(self.q)
+        self._surrogate_q = detach_and_deepcopy(self.q)
 
         self.eps = 1e-5
         self.HYPER_PARAMETERS += ["stick_the_landing"]
