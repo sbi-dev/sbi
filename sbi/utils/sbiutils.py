@@ -286,6 +286,25 @@ def standardizing_transform_zuko(
     )
 
 
+def _patch_inverse_transform_pickling() -> None:
+    """Keep ``_inv`` when pickling ``_InverseTransform`` (pytorch/pytorch#191197).
+
+    ``Transform.__getstate__`` clears ``_inv`` as a reciprocal cache, but
+    ``_InverseTransform`` stores its wrapped transform there, so pickling it yields
+    ``Inverse(None)``. Applied at import since ``__getstate__`` runs when writing.
+    """
+    if "__getstate__" in torch_tf._InverseTransform.__dict__:
+        return
+
+    def __getstate__(self) -> Dict[str, Any]:
+        return self.__dict__.copy()  # Keep `_inv`: wrapped transform, not a cache.
+
+    torch_tf._InverseTransform.__getstate__ = __getstate__
+
+
+_patch_inverse_transform_pickling()
+
+
 def _contains_inverse_transform(transform: TorchTransform) -> bool:
     """Return whether a transform tree contains an inverse wrapper."""
     seen = set()
