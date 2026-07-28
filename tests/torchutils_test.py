@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -277,3 +278,20 @@ def test_process_device(device_input: str) -> None:
         # should only happen if no gpu is available
         if device_input == "gpu":
             assert not torchutils.gpu_available()
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device_input", ("gpu", "mps"))
+def test_process_device_warns_on_mps_without_fallback(device_input, monkeypatch):
+    """Test that MPS users are told how to enable PyTorch's CPU fallback."""
+    if not torch.backends.mps.is_available() or torch.cuda.is_available():
+        pytest.skip("Requires a machine whose only GPU backend is MPS.")
+
+    monkeypatch.delenv("PYTORCH_ENABLE_MPS_FALLBACK", raising=False)
+    with pytest.warns(UserWarning, match="PYTORCH_ENABLE_MPS_FALLBACK"):
+        torchutils.process_device(device_input)
+
+    monkeypatch.setenv("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        torchutils.process_device(device_input)

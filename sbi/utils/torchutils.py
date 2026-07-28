@@ -49,17 +49,7 @@ def process_device(device: Union[str, torch.device]) -> str:
                 torch.cuda.set_device(device)
             elif torch.backends.mps.is_available():
                 device = "mps:0"
-                # PyTorch registers the CPU fallback at import time, so it cannot
-                # be enabled from here.
-                if os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK", "0") != "1":
-                    warnings.warn(
-                        "Using the MPS backend, for which PyTorch does not "
-                        "implement all operations. To fall back to the CPU for "
-                        "those instead of raising, set the environment variable "
-                        "PYTORCH_ENABLE_MPS_FALLBACK=1 before importing torch.",
-                        UserWarning,
-                        stacklevel=2,
-                    )
+                _warn_if_mps_fallback_disabled()
                 # MPS framework does not support double precision.
                 torch.set_default_dtype(torch.float32)
                 check_device(device)
@@ -74,9 +64,36 @@ def process_device(device: Union[str, torch.device]) -> str:
             if isinstance(device, torch.device):
                 device = str(device)
 
+            if device.startswith("mps"):
+                _warn_if_mps_fallback_disabled()
+
             check_device(device)
 
         return device
+
+
+def mps_fallback_enabled() -> bool:
+    """Whether PyTorch falls back to the CPU for operators missing on MPS.
+
+    Returns:
+        Whether `PYTORCH_ENABLE_MPS_FALLBACK` is set to a non-zero value. Note that
+        PyTorch only honors it if it was set before torch was imported.
+    """
+    return os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK", "0").strip() not in ("", "0")
+
+
+def _warn_if_mps_fallback_disabled() -> None:
+    """Warn that operators PyTorch does not implement for MPS will raise."""
+    if not mps_fallback_enabled():
+        warnings.warn(
+            "Using the MPS backend, for which PyTorch does not implement all "
+            "operations. To fall back to the CPU for those instead of raising, set "
+            "the environment variable PYTORCH_ENABLE_MPS_FALLBACK=1 before importing "
+            "torch. PyTorch registers the fallback at import time, so sbi cannot "
+            "enable it for you.",
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 def gpu_available() -> bool:

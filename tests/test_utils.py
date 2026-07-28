@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import pytest
@@ -17,14 +16,11 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, within_support
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, mps_fallback_enabled
 
 
 def mps_fallback_disabled(device: str) -> bool:
     """Whether `device` is MPS without PyTorch's CPU fallback for missing operators.
-
-    The fallback is only registered if `PYTORCH_ENABLE_MPS_FALLBACK=1` is set before
-    torch is imported.
 
     Args:
         device: processed device string, e.g., the return of `process_device("gpu")`.
@@ -32,9 +28,7 @@ def mps_fallback_disabled(device: str) -> bool:
     Returns:
         Whether operators missing on MPS raise instead of falling back to CPU.
     """
-    return device.startswith("mps") and (
-        os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK", "0") != "1"
-    )
+    return str(device).startswith("mps") and not mps_fallback_enabled()
 
 
 def skip_if_mps_op_unsupported(device: str, op_name: str) -> None:
