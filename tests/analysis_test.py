@@ -12,8 +12,7 @@ from tests.test_utils import skip_if_mps_op_unsupported
 
 
 @pytest.mark.slow
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 def test_analysis_modules(device: str) -> None:
     """Tests sensitivity analysis and conditional posterior utils on GPU and CPU.
 
