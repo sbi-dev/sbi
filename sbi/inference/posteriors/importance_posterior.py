@@ -12,7 +12,7 @@ from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
@@ -87,6 +87,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Args:
             device: Device on which to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
