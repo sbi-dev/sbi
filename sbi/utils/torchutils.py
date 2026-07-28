@@ -26,6 +26,8 @@ from torch.nn import Module
 from sbi.sbi_types import Array, OneOrMore
 from sbi.utils.typechecks import is_nonnegative_int, is_positive_int
 
+_HAS_WARNED_MPS_FALLBACK: bool = False
+
 
 def process_device(device: Optional[Union[str, torch.device]]) -> str:
     """Resolve `device` to a canonical device string and set torch up to use it.
@@ -45,7 +47,7 @@ def process_device(device: Optional[Union[str, torch.device]]) -> str:
         RuntimeError: if `"gpu"` is requested without a GPU backend, if `device`
             cannot be interpreted, or if it cannot hold a tensor.
     """
-    if device is None or device == "cpu":
+    if device is None:
         return "cpu"
 
     # If the user just passes 'gpu', search for CUDA or MPS.
@@ -63,16 +65,18 @@ def process_device(device: Optional[Union[str, torch.device]]) -> str:
 
     device = canonical_device(device)
 
+    if device == "cpu":
+        # `check_device` allocates via `torch.randn`, which would consume the CPU
+        # RNG and perturb seeded runs.
+        return "cpu"
+
     if device.startswith("mps"):
         _warn_if_mps_fallback_disabled()
-        # MPS framework does not support double precision, and check_device below
-        # allocates a tensor.
+        # MPS framework does not support double precision, and `check_device`
+        # below allocates a tensor.
         torch.set_default_dtype(torch.float32)
 
     check_device(device)
-
-    if device.startswith("cuda"):
-        torch.cuda.set_device(device)
 
     return device
 
@@ -101,6 +105,9 @@ def canonical_device(device: Union[str, torch.device]) -> str:
             "something like 'cpu', 'cuda', 'cuda:0', or 'mps'."
         ) from exc
 
+    if resolved.type == "cpu":
+        return "cpu"
+
     if resolved.index is None:
         if resolved.type == "cuda":
             index = torch.cuda.current_device() if torch.cuda.is_available() else 0
@@ -122,8 +129,10 @@ def mps_fallback_enabled() -> bool:
 
 
 def _warn_if_mps_fallback_disabled() -> None:
-    """Warn that operators PyTorch does not implement for MPS will raise."""
-    if not mps_fallback_enabled():
+    """Warn once per process that operators missing on MPS will raise."""
+    global _HAS_WARNED_MPS_FALLBACK
+    if not _HAS_WARNED_MPS_FALLBACK and not mps_fallback_enabled():
+        _HAS_WARNED_MPS_FALLBACK = True
         warnings.warn(
             "Using the MPS backend, for which PyTorch does not implement all "
             "operations. To fall back to the CPU for those instead of raising, set "
@@ -558,7 +567,7 @@ class BoxUniform(Independent):
             )
 
         # Device handling
-        device = low.device.type if device is None else device
+        device = str(low.device) if device is None else device
         device = process_device(device)
         self.device = device
         self.reinterpreted_batch_ndims = reinterpreted_batch_ndims
