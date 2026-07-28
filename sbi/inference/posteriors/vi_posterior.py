@@ -61,10 +61,8 @@ QType = Union[VariationalFamily, Distribution, "VIPosterior", Callable]
 class _QSpec:
     """Serializable recipe for rebuilding the variational distribution.
 
-    Holds data only, so it pickles by value; the matching builder is
-    `VIPosterior._build_q_from_spec`, a method and therefore pickled by reference.
-    Storing a build *closure* on the instance instead is what made pickling
-    unrecoverable.
+    Must hold data only, so that it pickles by value; the builder that consumes it,
+    `VIPosterior._build_q_from_spec`, is a method and so pickles by reference.
 
     Attributes:
         kind: Which family `q` came from.
@@ -72,8 +70,7 @@ class _QSpec:
         full_covariance: Whether the Gaussian is full-rank, for `kind="gaussian"`.
         builder: The user's own builder, for `kind="callable"`.
         init_snapshot: Pre-training copy of a user distribution, for
-            `kind="distribution"`. sbi cannot re-randomize an opaque user object, so
-            returning to this snapshot is the only reproducible option.
+            `kind="distribution"`.
     """
 
     kind: Literal["flow", "gaussian", "callable", "distribution", "instance"]
@@ -392,9 +389,6 @@ class VIPosterior(NeuralPosterior):
             )
         if spec.kind == "distribution":
             assert spec.init_snapshot is not None
-            # Copy rather than hand out the stored snapshot itself, so callers cannot
-            # train on it. `set_q` re-snapshots anyway, but not relying on that keeps
-            # this method self-contained.
             return detach_and_deepcopy(spec.init_snapshot)
         raise ValueError(
             "Cannot rebuild `q`: it was passed as a pre-built distribution instance, "
@@ -512,14 +506,11 @@ class VIPosterior(NeuralPosterior):
             modules = []
         _flow_types = (ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian)
         if isinstance(q, _flow_types):
-            # A pre-built instance carries no recipe of its own. `train` restores the
-            # spec around its own rebuild, so keeping a stale one here would silently
-            # rebuild the wrong family for an external caller.
+            # A pre-built instance carries no recipe; `train` restores its own spec.
             self._q_spec = _QSpec(kind="instance")
             self._trained_on = None
         elif isinstance(q, Distribution):
-            # An already-adapted `q` comes back from `_build_q_from_spec`; re-wrapping
-            # it would apply `link_transform` a second time.
+            # Re-wrapping would apply `link_transform` twice.
             if not isinstance(q, AdaptedVariationalDistribution):
                 q = AdaptedVariationalDistribution(
                     q,
@@ -528,8 +519,6 @@ class VIPosterior(NeuralPosterior):
                     parameters=parameters,
                     modules=modules,
                 )
-            # sbi cannot re-randomize an opaque user distribution, so `retrain_from
-            # _scratch` returns to this pre-training snapshot.
             self._q_spec = _QSpec(
                 kind="distribution", init_snapshot=detach_and_deepcopy(q)
             )
@@ -855,8 +844,7 @@ class VIPosterior(NeuralPosterior):
 
         # Init q and the optimizer if necessary
         if retrain_from_scratch:
-            # The `q` setter reclassifies by type, which would downgrade the recipe to
-            # `kind="instance"`; keep ours so repeated retrains stay possible.
+            # The `q` setter reclassifies by type, so restore our recipe afterwards.
             spec = self._q_spec
             self.q = self._build_q_from_spec()
             self._q_spec = spec
@@ -1380,12 +1368,10 @@ class VIPosterior(NeuralPosterior):
         )
 
     def __getstate__(self) -> Dict:
-        """Return the state to pickle.
+        """Return the state to pickle, also used by `copy.deepcopy`.
 
-        Copies first and nulls in the copy, so serializing never mutates the live
-        object. `_optimizer` is dropped as transient training state; `train()` rebuilds
-        it on demand. `copy.deepcopy` routes through here too, so both protocols share
-        one path.
+        Must null in the copy rather than on `self`, so that serializing cannot mutate
+        the live posterior. `train()` rebuilds the dropped `_optimizer` on demand.
 
         Returns:
             The attributes to pickle.

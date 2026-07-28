@@ -27,7 +27,6 @@ from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
 from sbi.utils.torchutils import _base_recursor
 
-# Preserves the argument's concrete type through `detach_and_deepcopy`.
 _CopyableT = TypeVar("_CopyableT")
 
 
@@ -402,11 +401,10 @@ class AdaptedVariationalDistribution(Distribution):
     """Wraps a user-supplied distribution for use with `DivergenceOptimizer`s.
 
     Ensures the support matches the prior's, and exposes `parameters`/`modules` as real
-    methods. Attaching them as per-instance closures instead is what made a custom-`q`
-    posterior unpicklable, since instance attributes are pickled by value.
+    methods so that the wrapper pickles by reference.
 
-    Deliberately mirrors the surface of `TransformedDistribution` and no more: it is not
-    an `nn.Module` and defines neither `to` nor `sample_and_log_prob`, because
+    Must mirror the surface of `TransformedDistribution` and no more: it is not an
+    `nn.Module` and defines neither `to` nor `sample_and_log_prob`, because
     `DivergenceOptimizer` branches on all three.
     """
 
@@ -518,9 +516,9 @@ def detach_all_non_leaf_tensors(obj: object) -> None:
 def detach_and_deepcopy(obj: _CopyableT) -> _CopyableT:
     """Deep-copy `obj`, detaching any non-leaf tensors it caches first.
 
-    Only needed for objects built from `torch.distributions` constructors, which call
-    `.expand()` internally and cache non-leaf tensors that `deepcopy` refuses to touch.
-    `nn.Module`-based variational families hold only leaf parameters and copy fine.
+    Only needed for `torch.distributions` objects, whose constructors call `.expand()`
+    and cache non-leaf tensors that `deepcopy` refuses. `nn.Module`-based families hold
+    only leaf parameters and copy fine.
 
     Args:
         obj: Object to copy.

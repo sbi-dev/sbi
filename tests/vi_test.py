@@ -347,10 +347,6 @@ def test_pickle_support(q: str):
 
 # =============================================================================
 # Serialization
-#
-# VI used to store build closures and `__deepcopy__` overrides as instance
-# attributes, so `__getstate__` stripped them from `self` and `__setstate__`
-# rebuilt them by re-running the public `set_q`. These cover what that broke.
 # =============================================================================
 
 
@@ -397,11 +393,7 @@ Q_KINDS = ["flow", "gaussian", "callable", "distribution"]
 
 @pytest.mark.parametrize("kind", Q_KINDS)
 def test_trained_posterior_survives_roundtrip(kind: str):
-    """Pickling preserves training and leaves the copy fully usable.
-
-    Covers every way of specifying `q`: a custom `Distribution` could not be pickled
-    at all, and `retrain_from_scratch` afterwards had a separate failure per kind.
-    """
+    """Pickling preserves training and leaves the copy fully usable."""
     num_dim = 2
     posterior = _make_posterior(kind, num_dim)
     posterior.train(**TRAIN_KWARGS)
@@ -413,17 +405,12 @@ def test_trained_posterior_survives_roundtrip(kind: str):
     assert reloaded._trained_on is not None
     torch.manual_seed(0)
     assert torch.allclose(reloaded.sample((5,)), expected)
-    # The rebuild recipe must survive too, including a second retrain.
     reloaded.train(**TRAIN_KWARGS, retrain_from_scratch=True)
     assert reloaded.sample((5,)).shape == (5, num_dim)
 
 
 def test_pickling_does_not_mutate_the_original():
-    """`pickle.dumps` must leave the posterior it serializes untouched.
-
-    `__getstate__` used to strip state from `self` rather than from the copy, so
-    merely saving a posterior broke the live one.
-    """
+    """`pickle.dumps` must leave the posterior it serializes untouched."""
     posterior = _make_posterior("gaussian")
     posterior.train(**TRAIN_KWARGS)
     trained_on, optimizer = posterior._trained_on, posterior._optimizer
@@ -436,11 +423,7 @@ def test_pickling_does_not_mutate_the_original():
 
 
 def test_deepcopy_of_trained_posterior_rewires_optimizer():
-    """A copy must own its `q`, not share the original's.
-
-    The old per-instance `__deepcopy__` closed over the source object, so a copy's
-    optimizer stepped a different `q` than its `sample()` read.
-    """
+    """A copy's optimizer must step the copy's own `q`, not the original's."""
     posterior = _make_posterior("gaussian")
     posterior.train(**TRAIN_KWARGS)
 
@@ -489,13 +472,10 @@ def test_amortized_posterior_survives_roundtrip():
 def test_retrain_from_scratch_with_bounded_prior():
     """Retraining must not re-apply `link_transform` to an already-adapted `q`.
 
-    Goes through the public `train()` and uses a bounded prior, so the link transform
-    is non-trivial. With an unbounded prior it is the identity and applying it twice
-    would be harmless.
+    Needs a bounded prior: with an unbounded one the link transform is the identity
+    and applying it twice is unobservable.
     """
     num_dim = 2
-    # Gamma gives positive support, so the link transform is a real transform and its
-    # constraint does not compare equal to the adapted `q`'s.
     prior = torch.distributions.Independent(Gamma(2 * ones(num_dim), ones(num_dim)), 1)
     mu = zeros(num_dim, requires_grad=True)
     scale = ones(num_dim, requires_grad=True)
@@ -516,10 +496,7 @@ def test_retrain_from_scratch_with_bounded_prior():
 
 
 def test_set_q_with_instance_clears_the_rebuild_recipe():
-    """A hand-built `q` has no recipe, so retraining must fail loudly.
-
-    Silently keeping the previous recipe would rebuild the wrong family.
-    """
+    """A hand-built `q` has no rebuild recipe, so retraining must fail loudly."""
     posterior = _make_posterior("flow")
     replacement = LearnableGaussian(
         dim=2, full_covariance=False, link_transform=posterior.link_transform
@@ -534,11 +511,7 @@ def test_set_q_with_instance_clears_the_rebuild_recipe():
 
 @pytest.mark.parametrize("kind", Q_KINDS)
 def test_retrain_from_scratch_semantics_per_kind(kind: str):
-    """Pin the documented per-kind asymmetry of `retrain_from_scratch`.
-
-    sbi rebuilds its own families fresh, but cannot re-randomize an opaque user
-    `Distribution`, so that kind returns to the snapshot taken when `q` was set.
-    """
+    """Pin the documented per-kind asymmetry of `retrain_from_scratch`."""
     posterior = _make_posterior(kind)
     initial = [p.detach().clone() for p in posterior._q.parameters()]
     posterior.train(**TRAIN_KWARGS)
@@ -547,8 +520,7 @@ def test_retrain_from_scratch_semantics_per_kind(kind: str):
         not torch.allclose(a, b) for a, b in zip(initial, trained, strict=True)
     ), "training should move the parameters"
 
-    # Inspect the rebuild directly: `train(retrain_from_scratch=True)` would move the
-    # parameters again, hiding what the rebuild produced.
+    # Not via `train(retrain_from_scratch=True)`: it would train over the rebuild.
     rebuilt = [p.detach().clone() for p in posterior._build_q_from_spec().parameters()]
 
     if kind == "distribution":
