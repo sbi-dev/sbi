@@ -4,6 +4,7 @@
 import copy
 import warnings
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
@@ -55,6 +56,32 @@ VariationalFamily = Literal[
 
 # Type for the q parameter in VIPosterior
 QType = Union[VariationalFamily, Distribution, "VIPosterior", Callable]
+
+
+@dataclass
+class _QSpec:
+    """Serializable recipe for rebuilding the variational distribution.
+
+    Holds data only, so it pickles by value; the matching builder is
+    `VIPosterior._build_q_from_spec`, a method and therefore pickled by reference.
+    Storing a build *closure* on the instance instead is what made pickling
+    unrecoverable.
+
+    Attributes:
+        kind: Which family `q` came from.
+        flow_type: Zuko flow name, for `kind="flow"`.
+        full_covariance: Whether the Gaussian is full-rank, for `kind="gaussian"`.
+        builder: The user's own builder, for `kind="callable"`.
+        init_snapshot: Pre-training copy of a user distribution, for
+            `kind="distribution"`. sbi cannot re-randomize an opaque user object, so
+            returning to this snapshot is the only reproducible option.
+    """
+
+    kind: Literal["flow", "gaussian", "callable", "distribution", "instance"]
+    flow_type: Optional[str] = None
+    full_covariance: Optional[bool] = None
+    builder: Optional[Callable] = None
+    init_snapshot: Optional[Distribution] = None
 
 
 class VIPosterior(NeuralPosterior):
@@ -338,6 +365,41 @@ class VIPosterior(NeuralPosterior):
 
         return transformed_flow.to(self._device)
 
+    def _build_q_from_spec(self) -> Distribution:
+        """Build a fresh variational distribution from `self._q_spec`.
+
+        Returns:
+            An untrained `q` of the family originally requested.
+
+        Raises:
+            ValueError: If `q` was supplied as a pre-built flow instance, which carries
+                no recipe to rebuild from.
+        """
+        spec = self._q_spec
+        if spec.kind == "flow":
+            assert spec.flow_type is not None
+            return self._build_unconditional_flow(spec.flow_type)
+        if spec.kind == "gaussian":
+            return LearnableGaussian(
+                dim=self._prior.event_shape[0],
+                full_covariance=bool(spec.full_covariance),
+                link_transform=self.link_transform,
+                device=self._device,
+            )
+        if spec.kind == "callable":
+            assert spec.builder is not None
+            return spec.builder(
+                self._prior.event_shape, self.link_transform, device=self._device
+            )
+        if spec.kind == "distribution":
+            assert spec.init_snapshot is not None
+            return spec.init_snapshot
+        raise ValueError(
+            "Cannot rebuild `q`: it was passed as a pre-built distribution instance, "
+            "which carries no construction recipe. Pass `q` as a family name, a "
+            "`Callable` builder, or a `Distribution` to use `retrain_from_scratch`."
+        )
+
     def _build_conditional_flow(
         self,
         theta: Tensor,
@@ -446,10 +508,13 @@ class VIPosterior(NeuralPosterior):
             parameters = []
         if modules is None:
             modules = []
-        self._q_arg = (q, parameters, modules)
         _flow_types = (ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian)
         if isinstance(q, _flow_types):
-            # Flow/Gaussian passed directly (e.g., from _q_build_fn during retrain)
+            # Flow/Gaussian passed directly (e.g. from `_build_q_from_spec` during
+            # retrain). Keep any existing spec: the instance carries no recipe of its
+            # own, and overwriting it would make `retrain_from_scratch` a one-shot.
+            if getattr(self, "_q_spec", None) is None:
+                self._q_spec = _QSpec(kind="instance")
             make_object_deepcopy_compatible(q)
             self._trained_on = None
         elif isinstance(q, Distribution):
@@ -462,37 +527,20 @@ class VIPosterior(NeuralPosterior):
             )
             make_object_deepcopy_compatible(q)
             self_custom_q_init_cache = deepcopy(q)
-            self._q_build_fn = lambda *args, **kwargs: self_custom_q_init_cache
+            self._q_spec = _QSpec(
+                kind="distribution", init_snapshot=self_custom_q_init_cache
+            )
             self._trained_on = None
-            self._zuko_flow_type = None
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
                 if q in _ZUKO_FLOW_TYPES:
-                    q_flow = self._build_unconditional_flow(q)
-                    self._zuko_flow_type = q
-                    self._q_build_fn = lambda *args, ft=q, **kwargs: (
-                        self._build_unconditional_flow(ft)
-                    )
-                    q = q_flow
+                    self._q_spec = _QSpec(kind="flow", flow_type=q)
+                    q = self._build_unconditional_flow(q)
                 elif q in ("gaussian", "gaussian_diag"):
-                    self._zuko_flow_type = None
-                    full_cov = q == "gaussian"
-                    dim = self._prior.event_shape[0]
-                    q_dist = LearnableGaussian(
-                        dim=dim,
-                        full_covariance=full_cov,
-                        link_transform=self.link_transform,
-                        device=self._device,
+                    self._q_spec = _QSpec(
+                        kind="gaussian", full_covariance=q == "gaussian"
                     )
-                    self._q_build_fn = lambda *args, fc=full_cov, d=dim, **kwargs: (
-                        LearnableGaussian(
-                            dim=d,
-                            full_covariance=fc,
-                            link_transform=self.link_transform,
-                            device=self._device,
-                        )
-                    )
-                    q = q_dist
+                    q = self._build_q_from_spec()
                 else:
                     supported = sorted(_ZUKO_FLOW_TYPES) + ["gaussian", "gaussian_diag"]
                     raise ValueError(
@@ -501,24 +549,17 @@ class VIPosterior(NeuralPosterior):
                     )
             else:
                 # Callable provided - use as-is
-                self._zuko_flow_type = None
-                self._q_build_fn = q
-                q = self._q_build_fn(
-                    self._prior.event_shape,
-                    self.link_transform,
-                    device=self._device,
-                )
+                self._q_spec = _QSpec(kind="callable", builder=q)
+                q = self._build_q_from_spec()
             make_object_deepcopy_compatible(q)
             self._trained_on = None
         elif isinstance(q, VIPosterior):
-            self._q_build_fn = q._q_build_fn
+            self._q_spec = q._q_spec
             self._trained_on = q._trained_on
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
-            self._zuko_flow_type = getattr(q, "_zuko_flow_type", None)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
-            self._q_arg = q._q_arg
             make_object_deepcopy_compatible(q.q)
             q = deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
@@ -808,7 +849,7 @@ class VIPosterior(NeuralPosterior):
 
         # Init q and the optimizer if necessary
         if retrain_from_scratch:
-            self.q = self._q_build_fn()  # type: ignore
+            self.q = self._build_q_from_spec()
             self._optimizer = self._optimizer_builder(
                 self.potential_fn,
                 self.q,
@@ -1366,7 +1407,6 @@ class VIPosterior(NeuralPosterior):
         """
         self._optimizer = None
         self.__deepcopy__ = None  # type: ignore
-        self._q_build_fn = None
         self._q.__deepcopy__ = None  # type: ignore
         state = self.__dict__.copy()
         return state
@@ -1374,17 +1414,10 @@ class VIPosterior(NeuralPosterior):
     def __setstate__(self, state_dict: Dict):
         """This method is called when unpickling the object.
 
-        Especially, we need to restore the removed attributes and ensure that the object
-        e.g. remains deep copy compatible.
-
         Args:
             state_dict: Given state dictionary, we will restore the object from it.
         """
         self.__dict__ = state_dict
-        q = deepcopy(self._q)
-        # Restore removed attributes
-        self.set_q(*self._q_arg)
-        self._q = q
         make_object_deepcopy_compatible(self)
         make_object_deepcopy_compatible(self.q)
         # Handle amortized mode
