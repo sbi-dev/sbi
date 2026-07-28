@@ -334,3 +334,33 @@ class NeuralPosterior:
             state_dict: State to be restored.
         """
         self.__dict__ = state_dict
+        # Reconcile _device after torch.load(map_location=...).
+        # PyTorch's map_location remaps tensor storages during unpickling, but
+        # _device (a plain string) is left untouched. Detect the true device
+        # from the neural network's parameters and update _device accordingly.
+        device = self._infer_device_from_potential()
+        if device is not None:
+            self._device = device
+            self.potential_fn.device = device
+
+    def _infer_device_from_potential(self) -> Optional[str]:
+        """Infer the actual device from the neural network inside the potential fn.
+
+        After torch.load(map_location=...), _device may be stale. This method
+        detects the true device from the estimator's parameters.
+
+        Returns:
+            Device string (e.g. ``"cpu"``, ``"cuda:0"``, ``"mps:0"``) or None
+            if no estimator with parameters is found.
+        """
+        for attr_name in [
+            "posterior_estimator",
+            "likelihood_estimator",
+            "ratio_estimator",
+        ]:
+            try:
+                module = getattr(self.potential_fn, attr_name)
+                return str(next(module.parameters()).device)
+            except (AttributeError, StopIteration):
+                continue
+        return None

@@ -132,3 +132,44 @@ def test_unconstraining_transform_follows_dtype_cast(builder_name):
     log_probs = estimator.log_prob(theta.double(), condition.double())
     assert log_probs.dtype == torch.float64
     assert torch.isfinite(log_probs).all()
+
+
+def test_device_reconciliation_after_pickle(tmp_path, mcmc_params_fast):
+    """Test that ``_device`` is reconciled after ``torch.load(map_location=...)``.
+
+    ``NeuralPosterior.__setstate__`` detects the actual device from the neural
+    network's parameters and updates ``_device`` and ``potential_fn.device``.
+    """
+    num_dim = 2
+    prior = utils.BoxUniform(
+        low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim)
+    )
+    x_o = torch.zeros(1, num_dim)
+
+    theta = prior.sample((500,))
+    x = theta + 1.0 + torch.randn_like(theta) * 0.1
+
+    inference = NPE(prior=prior, show_progress_bars=False)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = inference.build_posterior(
+        posterior_parameters=DirectPosteriorParameters()
+    ).set_default_x(x_o)
+
+    # Verify initial device is cpu
+    assert posterior._device == "cpu"
+    assert posterior.potential_fn.device == "cpu"
+
+    # Save and load via pickle (same device, no map_location)
+    loaded = pickle.loads(pickle.dumps(posterior))
+
+    # _device must be preserved
+    assert loaded._device == "cpu", (
+        f"Expected _device='cpu', got {loaded._device!r}"
+    )
+    assert loaded.potential_fn.device == "cpu", (
+        f"Expected potential_fn.device='cpu', got {loaded.potential_fn.device!r}"
+    )
+
+    # Sampling must still work after pickle load
+    samples = loaded.sample((10,))
+    assert samples.shape == (10, num_dim)
