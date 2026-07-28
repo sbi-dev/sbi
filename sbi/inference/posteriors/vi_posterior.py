@@ -61,10 +61,6 @@ QType = Union[VariationalFamily, Distribution, "VIPosterior", Callable]
 class _QSpec:
     """Stores how to rebuild the variational distribution.
 
-    Must contain only data, never a function defined inside a method: those cannot be
-    pickled, which is why the construction itself lives in
-    `VIPosterior._build_q_from_spec`.
-
     Attributes:
         kind: Which variational family `q` was built from.
         flow_type: Zuko flow name, for `kind="flow"`.
@@ -507,11 +503,12 @@ class VIPosterior(NeuralPosterior):
             modules = []
         _flow_types = (ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian)
         if isinstance(q, _flow_types):
-            # A ready-made distribution says nothing about how to build a new one.
+            # Nothing records how to build another one, so retraining will refuse.
             self._q_spec = _QSpec(kind="instance")
             self._trained_on = None
         elif isinstance(q, Distribution):
-            # Re-wrapping would apply `link_transform` twice.
+            # Wrapping an already-wrapped `q`, as `retrain_from_scratch` hands back,
+            # would apply the link transform twice and break sampling.
             if not isinstance(q, AdaptedVariationalDistribution):
                 q = AdaptedVariationalDistribution(
                     q,

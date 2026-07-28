@@ -20,7 +20,6 @@ from torch.distributions import (
     Normal,
     TransformedDistribution,
 )
-from torch.distributions.transforms import ComposeTransform, IndependentTransform
 from torch.nn import Module
 
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
@@ -259,48 +258,6 @@ def filter_kwargs_for_func(f: Callable, kwargs: Dict) -> Dict:
     return new_kwargs
 
 
-def get_parameters(t: Union[TorchTransform, Module]) -> Iterable:
-    """Recursive helper function which can be used to extract parameters from
-    TransformedDistributions.
-
-    Args:
-        t: A TorchTransform object, which is scanned for the "parameters" attribute.
-
-    Yields:
-        Iterator[Iterable]: Generator of parameters.
-    """
-    if hasattr(t, "parameters"):
-        yield from t.parameters()  # type: ignore
-    elif isinstance(t, ComposeTransform):
-        for part in t.parts:
-            yield from get_parameters(part)
-    elif isinstance(t, IndependentTransform):
-        yield from get_parameters(t.base_transform)
-    else:
-        pass
-
-
-def get_modules(t: Union[TorchTransform, Module]) -> Iterable:
-    """Recursive helper function which can be used to extract modules from
-    TransformedDistributions.
-
-    Args:
-        t: A TorchTransform object, which is scanned for the "modules" attribute.
-
-    Yields:
-        Iterator[Iterable]: Generator of Modules
-    """
-    if isinstance(t, Module):
-        yield t
-    elif isinstance(t, ComposeTransform):
-        for part in t.parts:
-            yield from get_modules(part)
-    elif isinstance(t, IndependentTransform):
-        yield from get_modules(t.base_transform)
-    else:
-        pass
-
-
 def check_parameters_modules_attribute(q: VariationalDistribution) -> None:
     """Checks a parameterized distribution object for valid `parameters` and `modules`.
 
@@ -425,9 +382,19 @@ class AdaptedVariationalDistribution(Distribution):
             link_transform: Applied when `q`'s support differs from the prior's.
             parameters: Trainable tensors, for a `q` that does not expose them itself.
             modules: Modules, for a `q` that does not expose them itself.
+
+        Raises:
+            ValueError: If neither `parameters` nor `q.parameters()` provides tensors to
+                optimize.
         """
         self._user_parameters = list(parameters) if parameters is not None else []
         self._user_modules = list(modules) if modules is not None else []
+        self._source = q
+        if not self._user_parameters and not hasattr(q, "parameters"):
+            raise ValueError(
+                "The variational distribution has no parameters to optimize. Pass the "
+                "trainable tensors as `parameters` (and any modules as `modules`)."
+            )
 
         if hasattr(prior, "support") and q.support != prior.support:
             if isinstance(q, TransformedDistribution):
@@ -445,32 +412,18 @@ class AdaptedVariationalDistribution(Distribution):
         )
 
     def parameters(self) -> Iterable:
-        """Yield trainable tensors: the user's if given, else `q`'s own."""
+        """Yield the trainable tensors, as given or as `q` exposes them."""
         if self._user_parameters:
-            yield from self._user_parameters
-            return
-        base = self._q
-        if isinstance(base, TransformedDistribution):
-            if hasattr(base.base_dist, "parameters"):
-                yield from base.base_dist.parameters()  # type: ignore[attr-defined]
-            for transform in base.transforms:
-                yield from get_parameters(transform)
-        elif hasattr(base, "parameters"):
-            yield from base.parameters()  # type: ignore[attr-defined]
+            return iter(self._user_parameters)
+        return self._source.parameters()  # type: ignore[attr-defined]
 
     def modules(self) -> Iterable:
-        """Yield modules: the user's if given, else `q`'s own."""
+        """Yield the modules, as given or as `q` exposes them."""
         if self._user_modules:
-            yield from self._user_modules
-            return
-        base = self._q
-        if isinstance(base, TransformedDistribution):
-            if hasattr(base.base_dist, "modules"):
-                yield from base.base_dist.modules()  # type: ignore[attr-defined]
-            for transform in base.transforms:
-                yield from get_modules(transform)
-        elif hasattr(base, "modules"):
-            yield from base.modules()  # type: ignore[attr-defined]
+            return iter(self._user_modules)
+        if hasattr(self._source, "modules"):
+            return self._source.modules()  # type: ignore[attr-defined]
+        return iter(())
 
     @property
     def support(self):  # type: ignore[override]
