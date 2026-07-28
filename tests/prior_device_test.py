@@ -10,6 +10,7 @@ from sbi.utils.user_input_checks_utils import (
     MultipleIndependent,
     PytorchReturnTypeWrapper,
 )
+from tests.test_utils import skip_if_mps_op_unsupported
 
 
 @pytest.mark.gpu
@@ -28,19 +29,19 @@ def test_BoxUniform(device: str):
 
     prior.to(device)
     assert prior.device == device, f"Prior was not moved to {device}."
-    assert prior.low.device.type == device.strip(":0"), (
+    assert prior.low.device.type == device.split(":")[0], (
         f"BoxUniform low tensor is not in {device}."
     )
-    assert prior.high.device.type == device.strip(":0"), (
+    assert prior.high.device.type == device.split(":")[0], (
         f"BoxUniform high tensor is not in {device}."
     )
 
     sample_device = prior.sample((100,))
-    assert sample_device.device.type == device.strip(":0"), (
+    assert sample_device.device.type == device.split(":")[0], (
         f"sample tensor is not in {device}."
     )
     log_probs = prior.log_prob(sample_device)
-    assert log_probs.device.type == device.strip(":0"), (
+    assert log_probs.device.type == device.split(":")[0], (
         f"log_prob tensor is not in {device}."
     )
 
@@ -61,17 +62,19 @@ def test_PytorchReturnTypeWrapper(device: str, prior: torch.distributions):
     Asserts that samples, prior, and log_probs are in device.
     """
     device = process_device(device)
+    if isinstance(prior, Binomial):
+        skip_if_mps_op_unsupported(device, "aten::binomial")
     prior = PytorchReturnTypeWrapper(prior)
 
     prior.to(device)
     assert prior.device == device, f"Prior was not correctly moved to {device}."
 
     sample_device = prior.sample((100,))
-    assert sample_device.device.type == device.strip(":0"), (
+    assert sample_device.device.type == device.split(":")[0], (
         f"sample was not correctly moved to {device}."
     )
     log_probs = prior.log_prob(sample_device)
-    assert log_probs.device.type == device.strip(":0"), (
+    assert log_probs.device.type == device.split(":")[0], (
         f"log_prob was not correctly moved to {device}."
     )
 
@@ -86,6 +89,7 @@ def test_MultipleIndependent(device: str):
     torch.distributions and BoxUniform form sbi.
     """
     device = process_device(device)
+    skip_if_mps_op_unsupported(device, "aten::binomial")
     dists = [
         Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
         Beta(torch.tensor([2.0]), torch.tensor([2.0])),
@@ -100,10 +104,10 @@ def test_MultipleIndependent(device: str):
     assert prior.device == device, f"Prior was not correctly moved to {device}."
 
     sample_device = prior.sample((100,))
-    assert sample_device.device.type == device.strip(":0"), (
+    assert sample_device.device.type == device.split(":")[0], (
         f"sample was not correctly moved to {device}."
     )
     log_probs = prior.log_prob(sample_device)
-    assert log_probs.device.type == device.strip(":0"), (
+    assert log_probs.device.type == device.split(":")[0], (
         f"log_prob was not correctly moved to {device}."
     )
