@@ -394,101 +394,101 @@ def check_variational_distribution(q: Distribution, prior: Distribution) -> None
     check_sample_shape_and_support(q, prior)
 
 
-def add_parameters_module_attributes(
-    q: Distribution, parameters: Callable, modules: Callable
-):
-    """Sets the attribute `parameters` and `modules` on q
+class AdaptedVariationalDistribution(Distribution):
+    """Wraps a user-supplied distribution for use with `DivergenceOptimizer`s.
 
-    Args:
-        q: Variational distribution which is checked
-        parameters: A function which returns an iterable of leaf tensors.
-        modules: A function which returns an iterable of nn.Module
+    Ensures the support matches the prior's, and exposes `parameters`/`modules` as real
+    methods. Attaching them as per-instance closures instead is what made a custom-`q`
+    posterior unpicklable, since instance attributes are pickled by value.
 
-
-    """
-    q.parameters = parameters  # type: ignore
-    q.modules = modules  # type: ignore
-
-
-def add_parameter_attributes_to_transformed_distribution(
-    q: TransformedDistribution,
-) -> None:
-    """A function that will add `parameters` and `modules` to q automatically, if q is a
-    TransformedDistribution.
-
-    Args:
-        q: Variational distribution instances TransformedDistribution.
-
-
+    Deliberately mirrors the surface of `TransformedDistribution` and no more: it is not
+    an `nn.Module` and defines neither `to` nor `sample_and_log_prob`, because
+    `DivergenceOptimizer` branches on all three.
     """
 
-    def parameters():
-        """Returns the parameters of the distribution."""
-        if hasattr(q.base_dist, "parameters"):
-            yield from q.base_dist.parameters()  # type: ignore[attr-defined]
-        for t in q.transforms:
-            yield from get_parameters(t)
+    arg_constraints: Dict = {}
 
-    def modules():
-        """Returns the modules of the distribution."""
-        if hasattr(q.base_dist, "modules"):
-            yield from q.base_dist.modules()  # type: ignore[attr-defined]
-        for t in q.transforms:
-            yield from get_modules(t)
+    def __init__(
+        self,
+        q: Distribution,
+        prior: Distribution,
+        link_transform: Callable,
+        parameters: Optional[Iterable] = None,
+        modules: Optional[Iterable] = None,
+    ) -> None:
+        """
+        Args:
+            q: The user's variational distribution.
+            prior: Prior, used only to compare supports.
+            link_transform: Applied when `q`'s support differs from the prior's.
+            parameters: Trainable tensors, for a `q` that does not expose them itself.
+            modules: Modules, for a `q` that does not expose them itself.
+        """
+        self._user_parameters = list(parameters) if parameters is not None else []
+        self._user_modules = list(modules) if modules is not None else []
 
-    add_parameters_module_attributes(q, parameters, modules)
-
-
-def adapt_variational_distribution(
-    q: VariationalDistribution,
-    prior: Distribution,
-    link_transform: Callable,
-    parameters: Optional[Iterable] = None,
-    modules: Optional[Iterable] = None,
-) -> Distribution:
-    """This will adapt a distribution to be compatible with DivergenceOptimizers.
-    Especially it will make sure that the distribution has parameters and that it
-    satisfies obvious contraints which a posterior must satisfy i.e. the support must be
-    equal to that of the prior.
-
-    Args:
-        q: Variational distribution.
-        prior: Prior distribution
-        theta_transform: Theta transformation.
-        parameters: List of parameters.
-        modules: List of modules.
-
-    Returns:
-        TransformedDistribution: Compatible variational distribution.
-
-    """
-    if parameters is None:
-        parameters = []
-    if modules is None:
-        modules = []
-
-    # Extract user define parameters
-    def parameters_fn():
-        """Returns the parameters of the distribution."""
-        return parameters
-
-    def modules_fn():
-        """Returns the modules of the distribution."""
-        return modules
-
-    if isinstance(q, TransformedDistribution):
-        if parameters == [] or modules_fn == []:
-            add_parameter_attributes_to_transformed_distribution(q)
-        else:
-            add_parameters_module_attributes(q, parameters_fn, modules_fn)
         if hasattr(prior, "support") and q.support != prior.support:
-            q = TransformedDistribution(q.base_dist, q.transforms + [link_transform])
-    else:
-        if hasattr(prior, "support") and q.support != prior.support:
-            q = TransformedDistribution(q, [link_transform])
-        add_parameters_module_attributes(q, parameters_fn, modules_fn)
+            if isinstance(q, TransformedDistribution):
+                q = TransformedDistribution(
+                    q.base_dist, list(q.transforms) + [link_transform]
+                )
+            else:
+                q = TransformedDistribution(q, [link_transform])
+        self._q = q
 
-    return q
+        super().__init__(
+            batch_shape=q.batch_shape,
+            event_shape=q.event_shape,
+            validate_args=False,
+        )
+
+    def parameters(self) -> Iterable:
+        """Yield trainable tensors: the user's if given, else `q`'s own."""
+        if self._user_parameters:
+            yield from self._user_parameters
+            return
+        base = self._q
+        if isinstance(base, TransformedDistribution):
+            if hasattr(base.base_dist, "parameters"):
+                yield from base.base_dist.parameters()  # type: ignore[attr-defined]
+            for transform in base.transforms:
+                yield from get_parameters(transform)
+        elif hasattr(base, "parameters"):
+            yield from base.parameters()  # type: ignore[attr-defined]
+
+    def modules(self) -> Iterable:
+        """Yield modules: the user's if given, else `q`'s own."""
+        if self._user_modules:
+            yield from self._user_modules
+            return
+        base = self._q
+        if isinstance(base, TransformedDistribution):
+            if hasattr(base.base_dist, "modules"):
+                yield from base.base_dist.modules()  # type: ignore[attr-defined]
+            for transform in base.transforms:
+                yield from get_modules(transform)
+        elif hasattr(base, "modules"):
+            yield from base.modules()  # type: ignore[attr-defined]
+
+    @property
+    def support(self):  # type: ignore[override]
+        return self._q.support
+
+    @property
+    def has_rsample(self) -> bool:  # type: ignore[override]
+        return self._q.has_rsample
+
+    def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
+        return self._q.sample(sample_shape)
+
+    def rsample(self, sample_shape: Shape = torch.Size()) -> Tensor:
+        return self._q.rsample(sample_shape)
+
+    def log_prob(self, value: Tensor) -> Tensor:
+        return self._q.log_prob(value)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self._q})"
 
 
 def detach_all_non_leaf_tensors(obj: object) -> None:

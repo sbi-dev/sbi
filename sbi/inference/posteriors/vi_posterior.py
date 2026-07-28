@@ -30,9 +30,9 @@ from sbi.neural_nets.net_builders.flow import (
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
 from sbi.samplers.vi.vi_quality_control import get_quality_metric
 from sbi.samplers.vi.vi_utils import (
+    AdaptedVariationalDistribution,
     LearnableGaussian,
     TransformedZukoFlow,
-    adapt_variational_distribution,
     check_variational_distribution,
     make_object_deepcopy_compatible,
 )
@@ -518,18 +518,16 @@ class VIPosterior(NeuralPosterior):
             make_object_deepcopy_compatible(q)
             self._trained_on = None
         elif isinstance(q, Distribution):
-            q = adapt_variational_distribution(
+            q = AdaptedVariationalDistribution(
                 q,
                 self._prior,
                 self.link_transform,
                 parameters=parameters,
                 modules=modules,
             )
-            make_object_deepcopy_compatible(q)
-            self_custom_q_init_cache = deepcopy(q)
-            self._q_spec = _QSpec(
-                kind="distribution", init_snapshot=self_custom_q_init_cache
-            )
+            # sbi cannot re-randomize an opaque user distribution, so `retrain_from
+            # _scratch` returns to this pre-training snapshot.
+            self._q_spec = _QSpec(kind="distribution", init_snapshot=deepcopy(q))
             self._trained_on = None
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
