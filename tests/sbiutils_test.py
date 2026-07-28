@@ -709,3 +709,91 @@ def test_mdn_transform_to_unconstrained():
     assert torch.allclose(lp, mog.log_prob(z) + ldj, atol=1e-5)
     s = est.sample((10,), cond)
     assert s.shape[0] == 10 and torch.isfinite(s).all()
+
+
+def test_inverse_transform_survives_pickle():
+    """Inverse transforms keep their wrapped transform through pickling (#1952)."""
+    import pickle
+
+    import torch.distributions.transforms as torch_tf
+
+    # Mirrors `mcmc_transform` output: IndependentTransform does not override `.inv`,
+    # so this is a true inverse wrapper (unlike `ComposeTransform.inv`).
+    transform = torch_tf.IndependentTransform(
+        torch_tf.ComposeTransform([
+            torch_tf.SigmoidTransform(),
+            torch_tf.AffineTransform(-3 * torch.ones(1), 6 * torch.ones(1)),
+        ]),
+        1,
+    ).inv
+    assert isinstance(transform, torch_tf._InverseTransform)
+    x = torch.tensor([[0.5]])
+
+    reloaded = pickle.loads(pickle.dumps(transform))
+
+    assert reloaded._inv is not None
+    assert torch.allclose(reloaded(x), transform(x))
+    assert torch.allclose(reloaded.inv(reloaded(x)), x, atol=1e-5)
+    assert torch.isfinite(reloaded.log_abs_det_jacobian(x, reloaded(x))).all()
+
+
+def test_mcmc_transform_survives_pickle():
+    """`mcmc_transform` output stays usable after pickling (#1952)."""
+    import pickle
+
+    from sbi.utils.sbiutils import mcmc_transform
+
+    prior = BoxUniform(-3 * torch.ones(2), 3 * torch.ones(2))
+    transform = mcmc_transform(prior)
+    theta = prior.sample((4,))
+
+    reloaded = pickle.loads(pickle.dumps(transform))
+
+    assert torch.allclose(reloaded(theta), transform(theta))
+    assert torch.allclose(reloaded.inv(reloaded(theta)), theta, atol=1e-4)
+
+
+def test_mdn_prior_transform_is_read_only():
+    """Assigning `_prior_transform` fails loudly instead of shadowing the module.
+
+    `nn.Module.__setattr__` must not absorb the assignment, and pyright cannot catch
+    it here because `reportAttributeAccessIssue` is disabled repo-wide.
+    """
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((256,)), torch.randn(256, 3)
+    est = build_mdn(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+
+    # No `match`: the wording differs across Python versions ("can't set attribute"
+    # before 3.11, "has no setter" after).
+    with pytest.raises(AttributeError):
+        est._prior_transform = None
+
+    assert est._prior_transform is not None
+
+
+@pytest.mark.parametrize("orientation", ["concrete", "inverse", "composed_inverse"])
+def test_callable_transform_preserves_orientation_and_dtype(orientation):
+    """CallableTransform safely owns concrete and inverse transforms."""
+    import pickle
+
+    from torch.distributions.transforms import AffineTransform, ComposeTransform
+
+    from sbi.utils.sbiutils import CallableTransform
+
+    transform = AffineTransform(torch.zeros(2), 2 * torch.ones(2))
+    if orientation == "inverse":
+        transform = transform.inv
+    elif orientation == "composed_inverse":
+        transform = ComposeTransform([
+            transform,
+            AffineTransform(torch.ones(2), 3 * torch.ones(2)),
+        ]).inv
+
+    wrapped = pickle.loads(pickle.dumps(CallableTransform(transform)))
+    x = torch.ones(2)
+    assert torch.allclose(wrapped.transform(x), transform(x))
+
+    wrapped.double()
+    assert wrapped.transform(x.double()).dtype == torch.float64

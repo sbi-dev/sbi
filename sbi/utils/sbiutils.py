@@ -286,14 +286,81 @@ def standardizing_transform_zuko(
     )
 
 
-class CallableTransform:
-    """Wraps a PyTorch Transform to be used in Zuko UnconditionalTransform."""
+def _patch_inverse_transform_pickling() -> None:
+    """Keep ``_inv`` when pickling ``_InverseTransform`` (pytorch/pytorch#191197).
 
-    def __init__(self, transform):
-        self.transform = transform
+    ``Transform.__getstate__`` clears ``_inv`` as a reciprocal cache, but
+    ``_InverseTransform`` stores its wrapped transform there, so pickling it yields
+    ``Inverse(None)``. Applied at import since ``__getstate__`` runs when writing.
+    """
+    if "__getstate__" in torch_tf._InverseTransform.__dict__:
+        return
 
-    def __call__(self):
+    def __getstate__(self) -> Dict[str, Any]:
+        return self.__dict__.copy()  # Keep `_inv`: wrapped transform, not a cache.
+
+    torch_tf._InverseTransform.__getstate__ = __getstate__
+
+
+_patch_inverse_transform_pickling()
+
+
+def _contains_inverse_transform(transform: TorchTransform) -> bool:
+    """Return whether a transform tree contains an inverse wrapper."""
+    seen = set()
+
+    def contains_inverse(current: TorchTransform) -> bool:
+        if id(current) in seen:
+            return False
+        seen.add(id(current))
+        if isinstance(current, torch_tf._InverseTransform):
+            return True
+        for key, value in current.__dict__.items():
+            if key == "_inv":
+                continue
+            if isinstance(value, TorchTransform) and contains_inverse(value):
+                return True
+            if isinstance(value, (list, tuple)) and any(
+                isinstance(item, TorchTransform) and contains_inverse(item)
+                for item in value
+            ):
+                return True
+        return False
+
+    return contains_inverse(transform)
+
+
+class CallableTransform(nn.Module):
+    """Own a PyTorch transform as a movable, picklable module.
+
+    Transform tensors are intentionally absent from ``state_dict``; callers rebuild
+    the transform before loading estimator weights.
+    """
+
+    def __init__(self, transform: TorchTransform):
+        super().__init__()
+        self._is_inverse = _contains_inverse_transform(transform)
+        self._transform = transform.inv if self._is_inverse else transform
+        if not isinstance(
+            self._transform, TorchTransform
+        ) or _contains_inverse_transform(self._transform):
+            raise ValueError(
+                "CallableTransform requires one transform orientation without "
+                "nested inverse wrappers."
+            )
+
+    @property
+    def transform(self) -> TorchTransform:
+        """Return the transform in the orientation supplied at construction."""
+        return self._transform.inv if self._is_inverse else self._transform
+
+    def forward(self) -> TorchTransform:
         return self.transform
+
+    def _apply(self, fn):
+        super()._apply(fn)
+        _apply_to_transform(self._transform, fn)
+        return self
 
 
 def biject_transform_zuko(
@@ -840,38 +907,6 @@ def _apply_to_transform(
                 _walk(val)
 
     _walk(transform)
-
-
-def _transform_tensors(
-    transform: TorchTransform,
-) -> List[Tensor]:
-    """Collect every tensor in a transform tree (mirror of _apply_to_transform).
-
-    Args:
-        transform: Root of the transform tree.
-
-    Returns:
-        List of all tensors found in the transform tree.
-    """
-    seen = set()
-    tensors: List[Tensor] = []
-
-    def _walk(t):
-        if id(t) in seen:
-            return
-        seen.add(id(t))
-        for val in t.__dict__.values():
-            if isinstance(val, Tensor):
-                tensors.append(val)
-            elif isinstance(val, (list, tuple)):
-                for item in val:
-                    if isinstance(item, TorchTransform):
-                        _walk(item)
-            elif isinstance(val, TorchTransform):
-                _walk(val)
-
-    _walk(transform)
-    return tensors
 
 
 def mcmc_transform(
