@@ -510,13 +510,19 @@ def test_retrain_from_scratch_with_bounded_prior():
     assert torch.isfinite(posterior.log_prob(samples)).all()
 
 
-def test_parameters_outside_q_and_its_base_must_be_passed():
-    """sbi only looks on `q` and its base, so anything else must fail loudly."""
+@pytest.mark.parametrize("nested", [False, True])
+def test_parameters_outside_q_and_its_base_must_be_passed(nested: bool):
+    """sbi only looks on `q` and its base, so anything else must fail loudly.
+
+    Torch keeps a `ComposeTransform` as one entry in `q.transforms`, so a transform
+    nested inside one has to be found too.
+    """
     num_dim = 2
     transform = torch_tf.AffineTransform(zeros(num_dim), ones(num_dim))
     transform.parameters = lambda: iter(())  # A transform owning trainable tensors.
     q = torch.distributions.TransformedDistribution(
-        _ParamNormal(zeros(num_dim, requires_grad=True), ones(num_dim)), [transform]
+        _ParamNormal(zeros(num_dim, requires_grad=True), ones(num_dim)),
+        [torch_tf.ComposeTransform([transform]) if nested else transform],
     )
 
     with pytest.raises(ValueError, match="transforms"):

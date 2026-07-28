@@ -354,6 +354,16 @@ def check_variational_distribution(q: Distribution, prior: Distribution) -> None
     check_sample_shape_and_support(q, prior)
 
 
+def _owns_parameters(transform: TorchTransform) -> bool:
+    """Whether a transform, or one it is built from, holds trainable tensors."""
+    if hasattr(transform, "parameters"):
+        return True
+    parts = getattr(transform, "parts", None) or [
+        t for t in [getattr(transform, "base_transform", None)] if t is not None
+    ]
+    return any(_owns_parameters(part) for part in parts)
+
+
 class AdaptedVariationalDistribution(Distribution):
     """Wraps a user-supplied variational distribution for the `DivergenceOptimizer`s.
 
@@ -402,7 +412,7 @@ class AdaptedVariationalDistribution(Distribution):
                     "the trainable tensors as `parameters` (and any modules as "
                     "`modules`)."
                 )
-            if any(hasattr(t, "parameters") for t in getattr(q, "transforms", [])):
+            if any(_owns_parameters(t) for t in getattr(q, "transforms", [])):
                 raise ValueError(
                     "The variational distribution keeps trainable tensors in its "
                     "transforms, which sbi does not collect on its own. Pass all of "
