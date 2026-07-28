@@ -64,7 +64,7 @@ def process_device(device: Union[str, torch.device]) -> str:
             if isinstance(device, torch.device):
                 device = str(device)
 
-            if device.startswith("mps"):
+            if str(device).startswith("mps"):
                 _warn_if_mps_fallback_disabled()
 
             check_device(device)
