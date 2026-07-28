@@ -352,17 +352,17 @@ class LC2ST:
             ValueError: If classifier string is invalid.
             TypeError: If classifier is not a BaseEstimator subclass.
         """
+        # Compare device types, since device strings may carry an index, e.g. "mps:0".
+        device_type = torch.device(self.device).type
         if isinstance(classifier, str):
             if classifier.lower() == "mlp":
-                use_gpu = (
-                    self.device.lower() == "cuda" and torch.cuda.is_available()
-                ) or (
-                    self.device.lower() == "mps" and torch.backends.mps.is_available()
+                use_gpu = (device_type == "cuda" and torch.cuda.is_available()) or (
+                    device_type == "mps" and torch.backends.mps.is_available()
                 )
                 if use_gpu:
                     return NeuralNetBinaryClassifier
                 else:
-                    if self.device.lower() in ("cuda", "mps"):
+                    if device_type in ("cuda", "mps"):
                         warnings.warn(
                             f"The requested device '{self.device}' is not available. "
                             "For the MLP classifier, computation will proceed on CPU.",
@@ -371,7 +371,7 @@ class LC2ST:
                         )
                     return MLPClassifier
             elif classifier.lower() == "random_forest":
-                if self.device.lower() in ("cuda", "mps"):
+                if device_type in ("cuda", "mps"):
                     warnings.warn(
                         "RandomForestClassifier does not support GPU or MPS training. "
                         "Computation will proceed on CPU.",
