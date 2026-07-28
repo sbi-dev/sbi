@@ -13,8 +13,7 @@ from sbi.utils.user_input_checks_utils import (
 from tests.test_utils import skip_if_mps_op_unsupported
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 def test_BoxUniform(device: str):
     """Test moving BoxUniform prior between devices."""
     device = process_device(device)
@@ -46,8 +45,7 @@ def test_BoxUniform(device: str):
     )
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 @pytest.mark.parametrize(
     "prior",
     [
@@ -79,8 +77,7 @@ def test_PytorchReturnTypeWrapper(device: str, prior: torch.distributions):
     )
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 def test_MultipleIndependent(device: str):
     """Test moving MultipleIndependent objects between devices.
 
