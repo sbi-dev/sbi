@@ -251,13 +251,16 @@ def test_dkl_gauss():
         )
 
 
-@pytest.mark.parametrize("device_input", ("cpu", "gpu", "cuda", "cuda:0", "mps"))
-def test_process_device(device_input: str) -> None:
-    """Test whether the device is processed correctly."""
+@pytest.mark.parametrize(
+    "device_input",
+    ("cpu", None, torch.device("cpu"), "gpu", "cuda", "cuda:0", "mps", "mps:0"),
+)
+def test_process_device(device_input) -> None:
+    """Test whether the device is processed into a canonical device string."""
 
     try:
         device_output = torchutils.process_device(device_input)
-        if device_input == "cpu":
+        if device_input in ("cpu", None, torch.device("cpu")):
             assert device_output == "cpu"
         elif device_input == "gpu":
             if torch.cuda.is_available():
@@ -266,10 +269,12 @@ def test_process_device(device_input: str) -> None:
             elif torch.backends.mps.is_available():
                 assert device_output == "mps:0"
 
-        if device_input.startswith("cuda") and torch.cuda.is_available():
-            assert device_output == device_input
-        if device_input == "mps" and torch.backends.mps.is_available():
-            assert device_output == "mps"
+        # GPU devices are returned with an explicit index, whichever way they are
+        # spelled, so that device strings can be compared directly.
+        if str(device_input).startswith("cuda") and torch.cuda.is_available():
+            assert device_output == f"cuda:{torch.cuda.current_device()}"
+        if str(device_input).startswith("mps") and torch.backends.mps.is_available():
+            assert device_output == "mps:0"
 
     except RuntimeError:
         # this should not happen for cpu
@@ -278,6 +283,30 @@ def test_process_device(device_input: str) -> None:
         # should only happen if no gpu is available
         if device_input == "gpu":
             assert not torchutils.gpu_available()
+
+
+def test_process_device_rejects_unknown_device() -> None:
+    """Test that an uninterpretable device raises a helpful error."""
+    with pytest.raises(RuntimeError, match="Could not interpret"):
+        torchutils.process_device("not-a-device")
+
+
+@pytest.mark.parametrize("device_input", ("gpu", "mps", "mps:0"))
+def test_process_device_allows_mps_with_float64_default(device_input) -> None:
+    """Test that MPS is usable while torch defaults to double precision.
+
+    MPS does not support double precision, so `process_device` has to set the
+    default dtype for every spelling of the device, not just for "gpu".
+    """
+    if not torch.backends.mps.is_available():
+        pytest.skip("Requires an MPS device.")
+
+    torch.set_default_dtype(torch.float64)
+    try:
+        assert torchutils.process_device(device_input) == "mps:0"
+        assert torch.get_default_dtype() == torch.float32
+    finally:
+        torch.set_default_dtype(torch.float32)
 
 
 @pytest.mark.gpu

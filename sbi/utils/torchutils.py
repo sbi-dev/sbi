@@ -27,49 +27,88 @@ from sbi.sbi_types import Array, OneOrMore
 from sbi.utils.typechecks import is_nonnegative_int, is_positive_int
 
 
-def process_device(device: Union[str, torch.device]) -> str:
-    """Set and return the default device to cpu or gpu (cuda, mps).
+def process_device(device: Optional[Union[str, torch.device]]) -> str:
+    """Resolve `device` to a canonical device string and set torch up to use it.
+
+    All spellings of the same device are treated identically, so `"gpu"`, `"mps"`,
+    `"mps:0"` and `torch.device("mps")` are interchangeable on Apple silicon.
 
     Args:
-        device: target torch device
+        device: target torch device. Either `"gpu"`, which selects CUDA if available
+            and MPS otherwise, `None` for the CPU, or an explicit device such as
+            `"cpu"`, `"cuda"`, `"cuda:1"`, `"mps"`, or a `torch.device`.
+
     Returns:
-        device: processed string, e.g., "cuda" is mapped to "cuda:0".
+        Canonical device string, i.e. `"cpu"`, `"cuda:{index}"` or `"mps:0"`.
+
+    Raises:
+        RuntimeError: if `"gpu"` is requested without a GPU backend, if `device`
+            cannot be interpreted, or if it cannot hold a tensor.
     """
-
-    if device == "cpu":
+    if device is None or device == "cpu":
         return "cpu"
-    else:
-        # If user just passes 'gpu', search for CUDA or MPS.
-        if device == "gpu":
-            # check whether either pytorch cuda or mps is available
-            if torch.cuda.is_available():
-                current_gpu_index = torch.cuda.current_device()
-                device = f"cuda:{current_gpu_index}"
-                check_device(device)
-                torch.cuda.set_device(device)
-            elif torch.backends.mps.is_available():
-                device = "mps:0"
-                _warn_if_mps_fallback_disabled()
-                # MPS framework does not support double precision.
-                torch.set_default_dtype(torch.float32)
-                check_device(device)
-            else:
-                raise RuntimeError(
-                    "Neither CUDA nor MPS is available. "
-                    "Please make sure to install a version of PyTorch that supports "
-                    "CUDA or MPS."
-                )
-        # Else, check whether the custom device is valid.
+
+    # If the user just passes 'gpu', search for CUDA or MPS.
+    if device == "gpu":
+        if torch.cuda.is_available():
+            device = f"cuda:{torch.cuda.current_device()}"
+        elif torch.backends.mps.is_available():
+            device = "mps:0"
         else:
-            if isinstance(device, torch.device):
-                device = str(device)
+            raise RuntimeError(
+                "Neither CUDA nor MPS is available. "
+                "Please make sure to install a version of PyTorch that supports "
+                "CUDA or MPS."
+            )
 
-            if str(device).startswith("mps"):
-                _warn_if_mps_fallback_disabled()
+    device = canonical_device(device)
 
-            check_device(device)
+    if device.startswith("mps"):
+        _warn_if_mps_fallback_disabled()
+        # MPS framework does not support double precision, and check_device below
+        # allocates a tensor.
+        torch.set_default_dtype(torch.float32)
 
-        return device
+    check_device(device)
+
+    if device.startswith("cuda"):
+        torch.cuda.set_device(device)
+
+    return device
+
+
+def canonical_device(device: Union[str, torch.device]) -> str:
+    """Return `device` as a string carrying an explicit index for GPU devices.
+
+    Device strings can only be compared once the index is resolved, because
+    `torch.device("cuda")` and `torch.device("cuda:0")` are not equal even though
+    both refer to the same device.
+
+    Args:
+        device: any torch device or device string, e.g. `"cuda"` or `"mps:0"`.
+
+    Returns:
+        Device string, e.g. `"cpu"`, `"cuda:0"` or `"mps:0"`.
+
+    Raises:
+        RuntimeError: if `device` cannot be interpreted as a torch device.
+    """
+    try:
+        resolved = torch.device(device)
+    except (RuntimeError, TypeError) as exc:
+        raise RuntimeError(
+            f"Could not interpret '{device}' as a torch device. It should be "
+            "something like 'cpu', 'cuda', 'cuda:0', or 'mps'."
+        ) from exc
+
+    if resolved.index is None:
+        if resolved.type == "cuda":
+            index = torch.cuda.current_device() if torch.cuda.is_available() else 0
+            return f"cuda:{index}"
+        if resolved.type == "mps":
+            return "mps:0"
+
+    return str(resolved)
 
 
 def mps_fallback_enabled() -> bool:
@@ -557,8 +596,8 @@ class BoxUniform(Independent):
             prior.to(device) #inplace
         """
         # Update the device attribute
-        self.device = device
         device = process_device(device)
+        self.device = device
 
         # Move tensors to the new device
         self.low = self.low.to(device=device)
@@ -778,7 +817,7 @@ def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> 
         if isinstance(o, Tensor) and o.requires_grad and o.is_leaf:
             # Moving leaf tensors inplace is hard. Cant call .to as this would create a
             # copy and thus results in non-leaf tensors.
-            if str(o.device) != str(device):
+            if canonical_device(o.device) != canonical_device(device):
                 raise ValueError(
                     f"Cannot move leaf tensor with requires_grad=True from "
                     f"{o.device} to {device}. Please initialize it on the "
