@@ -29,7 +29,7 @@ from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
 from sbi.neural_nets.factory import ZukoFlowType
-from sbi.samplers.vi.vi_utils import LearnableGaussian
+from sbi.samplers.vi.vi_utils import AdaptedVariationalDistribution, LearnableGaussian
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -389,7 +389,7 @@ def _make_posterior(kind: str, num_dim: int = 2, prior=None):
         prior if prior is not None else MultivariateNormal(zeros(num_dim), eye(num_dim))
     )
 
-    if kind == "distribution":
+    if kind in ("distribution", "transformed"):
         loc = zeros(num_dim, requires_grad=True)
         scale = ones(num_dim, requires_grad=True)
         if kind == "distribution":
@@ -508,6 +508,23 @@ def test_retrain_from_scratch_with_bounded_prior():
     samples = posterior.sample((20,))
     assert samples.shape == (20, num_dim)
     assert torch.isfinite(posterior.log_prob(samples)).all()
+
+
+def test_parameters_outside_q_and_its_base_must_be_passed():
+    """sbi only looks on `q` and its base, so anything else must fail loudly."""
+    num_dim = 2
+    transform = torch_tf.AffineTransform(zeros(num_dim), ones(num_dim))
+    transform.parameters = lambda: iter(())  # A transform owning trainable tensors.
+    q = torch.distributions.TransformedDistribution(
+        _ParamNormal(zeros(num_dim, requires_grad=True), ones(num_dim)), [transform]
+    )
+
+    with pytest.raises(ValueError, match="transforms"):
+        AdaptedVariationalDistribution(
+            q,
+            MultivariateNormal(zeros(num_dim), eye(num_dim)),
+            torch_tf.identity_transform,
+        )
 
 
 def test_retrain_fails_after_setting_an_already_built_q():
