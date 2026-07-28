@@ -381,20 +381,27 @@ class AdaptedVariationalDistribution(Distribution):
             prior: Prior, used only to compare supports.
             link_transform: Applied when `q`'s support differs from the prior's.
             parameters: Trainable tensors, for a `q` that does not expose them itself.
+                Required if the tensors live anywhere other than `q` or, for a
+                `TransformedDistribution`, its base distribution.
             modules: Modules, for a `q` that does not expose them itself.
 
         Raises:
-            ValueError: If neither `parameters` nor `q.parameters()` provides tensors to
-                optimize.
+            ValueError: If no trainable tensors can be found.
         """
         self._user_parameters = list(parameters) if parameters is not None else []
         self._user_modules = list(modules) if modules is not None else []
+
         self._source = q
         if not self._user_parameters and not hasattr(q, "parameters"):
-            raise ValueError(
-                "The variational distribution has no parameters to optimize. Pass the "
-                "trainable tensors as `parameters` (and any modules as `modules`)."
-            )
+            # A `TransformedDistribution` holds its trainable tensors on the base.
+            base = getattr(q, "base_dist", None)
+            if base is None or not hasattr(base, "parameters"):
+                raise ValueError(
+                    "The variational distribution has no parameters to optimize. Pass "
+                    "the trainable tensors as `parameters` (and any modules as "
+                    "`modules`)."
+                )
+            self._source = base
 
         if hasattr(prior, "support") and q.support != prior.support:
             if isinstance(q, TransformedDistribution):

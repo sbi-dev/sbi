@@ -495,6 +495,36 @@ def test_retrain_from_scratch_with_bounded_prior():
     assert torch.isfinite(posterior.log_prob(samples)).all()
 
 
+def test_transformed_distribution_q_finds_parameters_on_its_base():
+    """A `TransformedDistribution` keeps its trainable tensors on the base distribution.
+
+    Passing `parameters=` explicitly must stay optional for this shape of `q`.
+    """
+    num_dim = 2
+
+    class ParamNormal(torch.distributions.Normal):
+        def __init__(self, loc, scale):
+            super().__init__(loc, scale, validate_args=False)
+            self._params = [loc, scale]
+
+        def parameters(self):
+            return iter(self._params)
+
+    loc = zeros(num_dim, requires_grad=True)
+    scale = ones(num_dim, requires_grad=True)
+    q = torch.distributions.TransformedDistribution(
+        ParamNormal(loc, scale),
+        [torch_tf.AffineTransform(zeros(num_dim), ones(num_dim))],
+    )
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q=q)
+    posterior.set_default_x(zeros(1, num_dim))
+
+    assert len(list(posterior._q.parameters())) == 2
+    posterior.train(**TRAIN_KWARGS)
+    assert posterior.sample((5,)).shape == (5, num_dim)
+
+
 def test_retrain_fails_after_setting_an_already_built_q():
     """An already-built `q` cannot be rebuilt, so retraining must fail loudly."""
     posterior = _make_posterior("flow")
