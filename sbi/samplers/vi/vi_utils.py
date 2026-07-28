@@ -398,14 +398,14 @@ def check_variational_distribution(q: Distribution, prior: Distribution) -> None
 
 
 class AdaptedVariationalDistribution(Distribution):
-    """Wraps a user-supplied distribution for use with `DivergenceOptimizer`s.
+    """Wraps a user-supplied variational distribution for the `DivergenceOptimizer`s.
 
-    Ensures the support matches the prior's, and exposes `parameters`/`modules` as real
-    methods so that the wrapper pickles by reference.
+    Makes the support match the prior's, and defines `parameters` and `modules` as
+    methods on the class so that the distribution can be pickled.
 
-    Must mirror the surface of `TransformedDistribution` and no more: it is not an
+    Must offer the same methods as a `TransformedDistribution` and no more: it is not an
     `nn.Module` and defines neither `to` nor `sample_and_log_prob`, because
-    `DivergenceOptimizer` branches on all three.
+    `DivergenceOptimizer` checks for all three and behaves differently if they exist.
     """
 
     arg_constraints: Dict = {}

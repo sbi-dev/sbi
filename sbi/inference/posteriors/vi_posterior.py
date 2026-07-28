@@ -59,17 +59,18 @@ QType = Union[VariationalFamily, Distribution, "VIPosterior", Callable]
 
 @dataclass
 class _QSpec:
-    """Serializable recipe for rebuilding the variational distribution.
+    """Stores how to rebuild the variational distribution.
 
-    Must hold data only, so that it pickles by value; the builder that consumes it,
-    `VIPosterior._build_q_from_spec`, is a method and so pickles by reference.
+    Must contain only data, never a function defined inside a method: those cannot be
+    pickled, which is why the construction itself lives in
+    `VIPosterior._build_q_from_spec`.
 
     Attributes:
-        kind: Which family `q` came from.
+        kind: Which variational family `q` was built from.
         flow_type: Zuko flow name, for `kind="flow"`.
         full_covariance: Whether the Gaussian is full-rank, for `kind="gaussian"`.
-        builder: The user's own builder, for `kind="callable"`.
-        init_snapshot: Pre-training copy of a user distribution, for
+        builder: The user's own builder function, for `kind="callable"`.
+        init_snapshot: Copy of the user's distribution before training, for
             `kind="distribution"`.
     """
 
@@ -368,8 +369,8 @@ class VIPosterior(NeuralPosterior):
             An untrained `q` of the family originally requested.
 
         Raises:
-            ValueError: If `q` was supplied as a pre-built flow instance, which carries
-                no recipe to rebuild from.
+            ValueError: If `q` was supplied as an already-built distribution, which does
+                not say how to build a new one.
         """
         spec = self._q_spec
         if spec.kind == "flow":
@@ -391,9 +392,9 @@ class VIPosterior(NeuralPosterior):
             assert spec.init_snapshot is not None
             return detach_and_deepcopy(spec.init_snapshot)
         raise ValueError(
-            "Cannot rebuild `q`: it was passed as a pre-built distribution instance, "
-            "which carries no construction recipe. Pass `q` as a family name, a "
-            "`Callable` builder, or a `Distribution` to use `retrain_from_scratch`."
+            "Cannot rebuild `q`: it was passed as an already-built distribution, which "
+            "does not say how to build a new one. To use `retrain_from_scratch`, pass "
+            "`q` as a variational family name, a `Callable`, or a `Distribution`."
         )
 
     def _build_conditional_flow(
@@ -506,7 +507,7 @@ class VIPosterior(NeuralPosterior):
             modules = []
         _flow_types = (ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian)
         if isinstance(q, _flow_types):
-            # A pre-built instance carries no recipe; `train` restores its own spec.
+            # A ready-made distribution says nothing about how to build a new one.
             self._q_spec = _QSpec(kind="instance")
             self._trained_on = None
         elif isinstance(q, Distribution):
@@ -797,8 +798,8 @@ class VIPosterior(NeuralPosterior):
                 For a family name or a `Callable` builder this re-initialises with fresh
                 random weights. For a user-supplied `Distribution` it restores the copy
                 taken when `q` was set, since sbi cannot re-randomize an opaque object.
-                Raises `ValueError` if `q` was given as a pre-built flow instance, which
-                carries no construction recipe.
+                Raises `ValueError` if `q` was given as an already-built distribution,
+                which does not say how to build a new one.
             reset_optimizer: Reset the divergence optimizer
             show_progress_bar: If any progress report should be displayed.
             quality_control: If False quality control is skipped.
@@ -844,7 +845,7 @@ class VIPosterior(NeuralPosterior):
 
         # Init q and the optimizer if necessary
         if retrain_from_scratch:
-            # The `q` setter reclassifies by type, so restore our recipe afterwards.
+            # Setting `q` forgets how to rebuild it, so keep our own copy.
             spec = self._q_spec
             self.q = self._build_q_from_spec()
             self._q_spec = spec
@@ -1368,20 +1369,21 @@ class VIPosterior(NeuralPosterior):
         )
 
     def __getstate__(self) -> Dict:
-        """Return the state to pickle, also used by `copy.deepcopy`.
+        """Returns the state of the object that is supposed to be pickled.
 
-        Must null in the copy rather than on `self`, so that serializing cannot mutate
-        the live posterior. `train()` rebuilds the dropped `_optimizer` on demand.
+        Also used by `copy.deepcopy`. Must clear entries on the copy and not on `self`,
+        so that saving a posterior leaves it unchanged. The optimizer is left out
+        because `train()` builds a new one when it is missing.
 
         Returns:
-            The attributes to pickle.
+            The attributes to be pickled.
         """
         state = self.__dict__.copy()
         state["_optimizer"] = None
         return state
 
     def __setstate__(self, state_dict: Dict) -> None:
-        """Restore from pickled state.
+        """Sets the state when being loaded from pickle.
 
         Args:
             state_dict: State produced by `__getstate__`.

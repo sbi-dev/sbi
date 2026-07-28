@@ -470,7 +470,7 @@ def test_amortized_posterior_survives_roundtrip():
 
 
 def test_retrain_from_scratch_with_bounded_prior():
-    """Retraining must not re-apply `link_transform` to an already-adapted `q`.
+    """Retraining an already-wrapped `q` must not apply the link transform twice.
 
     Needs a bounded prior: with an unbounded one the link transform is the identity
     and applying it twice is unobservable.
@@ -495,8 +495,8 @@ def test_retrain_from_scratch_with_bounded_prior():
     assert torch.isfinite(posterior.log_prob(samples)).all()
 
 
-def test_set_q_with_instance_clears_the_rebuild_recipe():
-    """A hand-built `q` has no rebuild recipe, so retraining must fail loudly."""
+def test_retrain_fails_after_setting_an_already_built_q():
+    """An already-built `q` cannot be rebuilt, so retraining must fail loudly."""
     posterior = _make_posterior("flow")
     replacement = LearnableGaussian(
         dim=2, full_covariance=False, link_transform=posterior.link_transform
@@ -505,7 +505,7 @@ def test_set_q_with_instance_clears_the_rebuild_recipe():
     posterior.set_q(replacement)
 
     assert posterior.q is replacement
-    with pytest.raises(ValueError, match="no construction recipe"):
+    with pytest.raises(ValueError, match="Cannot rebuild"):
         posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
 
 
