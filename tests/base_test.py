@@ -4,8 +4,10 @@
 import pytest
 import torch
 
+import sbi.inference
 from sbi import utils
 from sbi.inference import NPE, infer
+from sbi.inference.trainers import nle, npe, nre
 
 
 def test_infer():
@@ -44,3 +46,42 @@ def test_get_dataloaders(training_batch_size):
     )
 
     assert len(val_loader) * val_loader.batch_size == int(validation_fraction * N)
+
+
+@pytest.mark.parametrize(
+    "legacy_name",
+    (
+        "SNPE_A",
+        "SNPE_B",
+        "SNPE_C",
+        "SNPE",
+        "NPE",
+        "SNLE_A",
+        "SNLE",
+        "SNL",
+        "NLE",
+        "SNRE_A",
+        "SNRE_B",
+        "SNRE_C",
+        "SNRE",
+        "SRE",
+        "NRE",
+    ),
+)
+def test_legacy_aliases_agree_across_import_paths(legacy_name):
+    """Deprecated aliases must resolve to the same class from either import path.
+
+    `sbi.inference.trainers.npe.SNPE_B` pointed at `NPE_C` while `sbi.inference.SNPE_B`
+    pointed at `NPE_B`. That was harmless while `NPE_B` was unimplemented, but became a
+    silent mis-dispatch once it was. Testing the invariant rather than the single alias
+    covers the whole class of typo, and the test can be deleted wholesale along with the
+    aliases.
+    """
+    expected = getattr(sbi.inference, legacy_name)
+
+    for module in (npe, nle, nre):
+        if hasattr(module, legacy_name):
+            assert getattr(module, legacy_name) is expected, (
+                f"{module.__name__}.{legacy_name} disagrees with "
+                f"sbi.inference.{legacy_name}"
+            )
