@@ -145,10 +145,13 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 Pass `None` if the parameters were sampled from the prior. If not
                 `None`, it will trigger a different loss-function.
             exclude_invalid_x: Whether invalid simulations are discarded during
-                training. For single-round SNPE, it is fine to discard invalid
-                simulations, but for multi-round SNPE (atomic), discarding invalid
-                simulations gives systematically wrong results. If `None`, it will
-                be `True` in the first round and `False` in later rounds.
+                training. For single-round NPE, it is fine to discard invalid
+                simulations, but for multi-round NPE (atomic), discarding invalid
+                simulations gives systematically wrong results, so this raises
+                instead. If `None`, it will be `True` in the first round and `False`
+                in later rounds. Whether the atomic loss applies is only known once
+                `train()` runs, so the first multi-round round is treated as atomic
+                even for a MoG setup that will not use it.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
