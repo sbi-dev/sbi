@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
+
 from sbi.inference.abc import MCABC, SMCABC
 from sbi.inference.trainers.base import (
     NeuralInference,  # noqa: F401
@@ -13,24 +15,49 @@ from sbi.inference.trainers.npe import MNPE, NPE_A, NPE_B, NPE_C, NPE_PFN  # noq
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C  # noqa: F401
 from sbi.inference.trainers.vfpe import FMPE, NPSE
 
-SNL = SNLE = SNLE_A = NLE = NLE_A
+NLE = NLE_A
 _nle_family = ["NLE_A", "MNLE"]
 
-
-SNPE_A = NPE_A
-SNPE_B = NPE_B
-SNPE = APT = SNPE_C = NPE = NPE_C
+NPE = NPE_C
 _npe_family = ["NPE_A", "NPE_B", "NPE_C", "NPE_PFN", "MNPE"]
 
-
-SRE = SNRE = SNRE_B = NRE = NRE_B
-AALR = SNRE_A = NRE_A
-CNRE = SNRE_C = NRE_C
+NRE = NRE_B
 _nre_family = ["NRE_A", "NRE_B", "NRE_C", "BNRE"]
 
-ABC = MCABC
-SMC = SMCABC
 _abc_family = ["MCABC", "SMCABC"]
+
+_DEPRECATED_ALIASES = {
+    "SNL": "NLE_A",
+    "SNLE": "NLE_A",
+    "SNLE_A": "NLE_A",
+    "SNPE_A": "NPE_A",
+    "SNPE_B": "NPE_B",
+    "SNPE": "NPE_C",
+    "SNPE_C": "NPE_C",
+    "APT": "NPE_C",
+    "SRE": "NRE_B",
+    "SNRE": "NRE_B",
+    "SNRE_B": "NRE_B",
+    "AALR": "NRE_A",
+    "SNRE_A": "NRE_A",
+    "CNRE": "NRE_C",
+    "SNRE_C": "NRE_C",
+    "ABC": "MCABC",
+    "SMC": "SMCABC",
+}
+
+
+def __getattr__(name: str):
+    if name in _DEPRECATED_ALIASES:
+        canonical = _DEPRECATED_ALIASES[name]
+        warnings.warn(
+            f"`sbi.inference.{name}` is deprecated since sbi v0.27.0 and will be "
+            f"removed in v0.28.0. Use `sbi.inference.{canonical}` instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        return globals()[canonical]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 from sbi.inference.posteriors import (
