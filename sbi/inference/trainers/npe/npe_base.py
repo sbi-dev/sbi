@@ -194,8 +194,9 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
         # Check for problematic z-scoring
         warn_if_invalid_for_zscoring(x)
+        # The exact name check excludes `MNPE`, which subclasses `NPE_C`.
         if (
-            type(self).__name__ == "SNPE_C"
+            type(self).__name__ == "NPE_C"
             and current_round > 0
             and not self.use_non_atomic_loss
         ):
@@ -203,7 +204,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 num_nans,
                 num_infs,
                 exclude_invalid_x,
-                "Multiround SNPE-C (atomic)",
+                "Multiround NPE-C (atomic)",
             )
         else:
             npe_msg_on_invalid_x(

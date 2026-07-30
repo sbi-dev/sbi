@@ -553,7 +553,7 @@ def npe_msg_on_invalid_x(
         else:
             logging.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "They are not excluded from training due to `exclude_invalid_x=False`. "
                 "Training will likely fail, we strongly recommend "
                 f"`exclude_invalid_x=True` for {algorithm}."
             )
@@ -562,18 +562,18 @@ def npe_msg_on_invalid_x(
 def nle_nre_apt_msg_on_invalid_x(
     num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
 ) -> None:
-    """Warn or raise if there are NaNs or Infs, appropriate to SNLE, SNRE, or APT.
+    """Warn or raise on NaNs or Infs, for NLE, NRE, or atomic NPE-C.
 
     This will raise an error in the default case of `exclude_invalid_x=False` since
-    SNLE/SNRE/APT do not allow to discard invalid simulations (Glöckler et al. 2021).
-    If `exclude_invalid_x` has explicitly been set to `True` by the user, this
+    NLE/NRE/atomic NPE-C do not allow to discard invalid simulations (Glöckler et al.
+    2021). If `exclude_invalid_x` has explicitly been set to `True` by the user, this
     function will give a warning about the systematic error.
     """
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
             logging.warning(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"These will be discarded from training due to "
                 f"`exclude_invalid_x=True`. Please be aware that this gives "
                 f"systematically wrong results for {algorithm} and is only recommended "
@@ -581,8 +581,8 @@ def nle_nre_apt_msg_on_invalid_x(
             )
         else:
             raise ValueError(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
-                f"{algorithm} does not allow invalid simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                f"{algorithm} does not allow invalid simulations. "
                 f"Replace the invalid values with an unreasonably low or high value."
             )
 

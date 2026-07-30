@@ -1,6 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import logging
+import warnings
+
 import pytest
 import torch
 from torch import eye, ones, zeros
@@ -9,6 +12,7 @@ from torch.distributions import MultivariateNormal
 from sbi import utils as utils
 from sbi.diagnostics import run_sbc
 from sbi.inference import (
+    MNPE,
     NPE_A,
     NPE_C,
     SNL,
@@ -62,6 +66,69 @@ def test_z_scoring_warning(snpe_method: type):
         snpe_method(utils.BoxUniform(zeros(num_dim), ones(num_dim))).append_simulations(
             theta, x
         ).train(max_num_epochs=1)
+
+
+def _round_one_data_with_nan(trainer_class: type = NPE_C, num_dim: int = 2):
+    """Build a trainer plus round-one data containing a single NaN row.
+
+    Passing a proposal that is not the prior makes `append_simulations()` treat the very
+    first batch as round one, which is where the strict atomic check applies. Nothing is
+    trained, so these tests are fast.
+    """
+    prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+    theta = prior.sample((20,))
+    x = theta + 0.1 * torch.randn(20, num_dim)
+    x[0, 0] = float("nan")
+    proposal = utils.BoxUniform(-1.0 * ones(num_dim), 1.0 * ones(num_dim))
+
+    return trainer_class(prior=prior, show_progress_bars=False), theta, x, proposal
+
+
+def test_multiround_npe_c_raises_on_invalid_x():
+    """Multi-round atomic NPE-C must reject invalid simulations by default.
+
+    `exclude_invalid_x` defaults to False for rounds > 0, and discarding invalid
+    simulations biases the atomic NPE-C loss, so the default must raise rather than
+    train on NaNs. This check was dead between v0.23.0 and v0.27.0 because it compared
+    the class name against the pre-rename `SNPE_C`.
+    """
+    inference, theta, x, proposal = _round_one_data_with_nan()
+
+    with pytest.raises(ValueError, match="does not allow invalid simulations"):
+        inference.append_simulations(theta, x, proposal=proposal)
+
+
+def test_multiround_npe_c_warns_when_excluding_invalid_x(caplog):
+    """With an explicit `exclude_invalid_x=True`, NPE-C warns instead of raising."""
+    inference, theta, x, proposal = _round_one_data_with_nan()
+
+    with caplog.at_level(logging.WARNING), warnings.catch_warnings():
+        # The proposal is not a NeuralPosterior, which warns separately.
+        warnings.simplefilter("ignore", UserWarning)
+        inference.append_simulations(
+            theta, x, proposal=proposal, exclude_invalid_x=True
+        )
+
+    assert "Multiround NPE-C (atomic)" in caplog.text
+    assert "systematically wrong results" in caplog.text
+    # The single invalid row was discarded.
+    assert inference.get_simulations()[0].shape[0] == theta.shape[0] - 1
+
+
+def test_multiround_mnpe_does_not_raise_on_invalid_x(caplog):
+    """MNPE subclasses NPE_C but is deliberately excluded from the strict check.
+
+    MNPE shipped in v0.25.0, long after the check went dead in v0.23.0, so it has never
+    been subject to it. Re-enabling the check must not change MNPE's behavior.
+    """
+    inference, theta, x, proposal = _round_one_data_with_nan(trainer_class=MNPE)
+
+    with caplog.at_level(logging.WARNING), warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        inference.append_simulations(theta, x, proposal=proposal)  # must not raise
+
+    assert "Multiround NPE-C (atomic)" not in caplog.text
+    assert "Found 1 NaN simulations" in caplog.text
 
 
 @pytest.mark.slow
