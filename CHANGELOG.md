@@ -8,6 +8,7 @@
 
 * Add NPE-PFN by @jsvetter in https://github.com/sbi-dev/sbi/pull/1778
 * feat(mdn): implement transform_to_unconstrained z-scoring for MDN by @BHARATH0153 in https://github.com/sbi-dev/sbi/pull/1888
+* feat(vfpe): opt-in composed standardization for scale-equivariant FMPE/NPSE by @test1card in https://github.com/sbi-dev/sbi/pull/1884
 
 #### 🔧 Code Quality & Refactoring
 
@@ -22,6 +23,10 @@
 * add parametrized sample_with coverage across all inference methods and remove redundant NPE rejection prior guard by @Dev-Sudarshan in https://github.com/sbi-dev/sbi/pull/1839
 * fix: constrain pymc to avoid arviz-1.x import break, test CI on py3.13 by @janfb in https://github.com/sbi-dev/sbi/pull/1909
 * fix: improve plot summary arguments by @janfb in https://github.com/sbi-dev/sbi/pull/1861
+* fix: correct biased pymc HMC sampling (target_accept) by @janfb in https://github.com/sbi-dev/sbi/pull/1908
+* fix: make unconstraining transforms module-owned by @janfb in https://github.com/sbi-dev/sbi/pull/1939
+* fix: unify device handling and run the GPU test suite on MPS by @janfb in https://github.com/sbi-dev/sbi/pull/1958
+* fix: make VIPosterior serialization state-based by @janfb in https://github.com/sbi-dev/sbi/pull/1953
 
 ### 🛠️ Maintenance & Improvements
 
@@ -30,6 +35,7 @@
 * docs(tutorials): Add note on posterior modes in "Getting Started" by @nicholasjng in https://github.com/sbi-dev/sbi/pull/1847
 * docs: add guidance for coding agents by @janfb in https://github.com/sbi-dev/sbi/pull/1868
 * docs: add list of maintainers to docs by @dgedon in https://github.com/sbi-dev/sbi/pull/1934
+* docs: better VI posterior and sampling methods how-to-guides by @janfb in https://github.com/sbi-dev/sbi/pull/1942
 * Point README documentation links at `/stable/` instead of `/latest/`, so they always match the installed release rather than the current `main` branch, by @janfb
 
 #### 🧪 Testing & CI/CD
@@ -45,6 +51,7 @@
 * @nicholasjng made their first contribution in https://github.com/sbi-dev/sbi/pull/1847
 * @PC-DOS made their first contribution in https://github.com/sbi-dev/sbi/pull/1879
 * @BHARATH0153 made their first contribution in https://github.com/sbi-dev/sbi/pull/1888
+* @test1card made their first contribution in https://github.com/sbi-dev/sbi/pull/1884
 
 **Full Changelog**: https://github.com/sbi-dev/sbi/compare/v0.26.1...v0.27.0
 
