@@ -706,3 +706,19 @@ def test_amortized_vi_with_fake_potential():
     log_probs = posterior.log_prob(samples, x=x_test)
     assert log_probs.shape == (100,)
     assert torch.isfinite(log_probs).all()
+
+
+def test_vi_posterior_stores_resolved_device():
+    """Test that potential and posterior resolve devices, whatever the spelling."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    potential_fn = FakePotential(prior=prior, device="cpu:0")
+    assert potential_fn.device == "cpu"
+
+    potential_fn.to("cpu:0")
+    assert potential_fn.device == "cpu"
+
+    posterior = VIPosterior(potential_fn, prior, device="cpu:0")
+    assert posterior._device == "cpu"
+
+    posterior.to("cpu:0")
+    assert posterior._device == "cpu"

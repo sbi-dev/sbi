@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import asdict
 from typing import Tuple, Union
 
@@ -52,6 +53,7 @@ from sbi.utils import BoxUniform
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
 from sbi.utils.user_input_checks import validate_theta_and_x
+from tests.test_utils import mps_fallback_disabled
 
 pytestmark = pytest.mark.skipif(
     not gpu_available(), reason="No CUDA or MPS device available."
@@ -526,7 +528,9 @@ def test_boxuniform_device_handling(arg_device, device):
     Also tests torch.device as argument of process_device."""
 
     arg_device = process_device(arg_device)
-    device = process_device(device)
+    # `device=None` asks BoxUniform to infer the device from low and high, so it must
+    # stay None rather than being resolved to the CPU.
+    device = None if device is None else process_device(device)
 
     prior = BoxUniform(
         low=zeros(1).to(arg_device), high=ones(1).to(arg_device), device=device
@@ -779,7 +783,7 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
 
     for transform in posterior.theta_transform._inv.base_transform.parts:
         assert (
-            str(transform(torch.tensor([0.0], device=device)).device).strip(":0")
+            transform(torch.tensor([0.0], device=device)).device.type
             == device.split(":")[0]
         ), "Prior transform is on the correct device."
 
@@ -823,10 +827,18 @@ def test_vector_field_methods_degvice_handling(
     device_inference = process_device(device_inference)
     num_dims = 2
 
-    if vf_trainer == NPSE:
-        iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
-    else:
-        iid_methods = ["fnpe"]
+    iid_methods = ["fnpe"]
+    if vf_trainer == NPSE and num_trials > 1:
+        if mps_fallback_disabled(device_inference):
+            warnings.warn(
+                "Testing only fnpe: the Gaussian iid methods need "
+                "aten::_linalg_eigh.eigenvalues, which MPS does not implement. "
+                "Re-run with PYTORCH_ENABLE_MPS_FALLBACK=1 to cover them.",
+                UserWarning,
+                stacklevel=1,
+            )
+        else:
+            iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
 
     posterior = inference.build_posterior(
         sample_with="sde" if num_trials > 1 else "ode"
@@ -871,12 +883,12 @@ def test_vector_field_methods_degvice_handling(
 @pytest.mark.gpu
 @pytest.mark.parametrize("prior_device", ["cpu", "gpu"])
 def test_npe_pfn_on_device(prior_device):
-    pytest.importorskip("tabpfn")
     """NPE_PFN should work correctly when prior/data come from different devices.
 
     TabPFN always runs on CPU, so the estimator context must remain on CPU
     regardless of where the prior or observations live.
     """
+    pytest.importorskip("tabpfn")
     prior_device = process_device(prior_device)
     num_dim = 2
     num_simulations = 30
@@ -890,18 +902,26 @@ def test_npe_pfn_on_device(prior_device):
     x = theta + torch.randn_like(theta)
     x_o = torch.zeros(1, num_dim)
 
-    inferer = NPE_PFN(prior=prior, device="cpu")
+    inferer = NPE_PFN(prior=prior, device=prior_device)
     inferer.append_simulations(theta, x)
     posterior = inferer.build_posterior(sample_with="filtered_direct")
     posterior.set_default_x(x_o)
 
+    expected_device = prior_device.split(":")[0]
+
     samples = posterior.sample((5,))
     assert samples.shape == (5, num_dim)
+    assert samples.device.type == expected_device, (
+        f"Samples are on {samples.device}, expected {prior_device}."
+    )
 
     log_probs = posterior.log_prob(samples)
     assert log_probs.shape == (5,)
+    assert log_probs.device.type == expected_device, (
+        f"log_prob is on {log_probs.device}, expected {prior_device}."
+    )
 
-    assert posterior.estimator._context_input.device.type == "cpu", (
+    assert posterior.posterior_estimator._context_input.device.type == "cpu", (
         "TabPFN context must always remain on CPU."
     )
 

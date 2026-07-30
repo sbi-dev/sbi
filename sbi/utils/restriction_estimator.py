@@ -24,7 +24,7 @@ from sbi.utils.sbiutils import (
     standardizing_net,
     z_score_parser,
 )
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import validate_theta_and_x
 
 
@@ -645,7 +645,7 @@ class RestrictedPrior(Distribution):
         self._accept_reject_fn = accept_reject_fn
         self._posterior = posterior  # Only used for SIR.
         self._sample_with = sample_with
-        self._device = device
+        self._device = process_device(device)
         self.acceptance_rate = None  # Only defined for rejection sampling.
 
     def sample(

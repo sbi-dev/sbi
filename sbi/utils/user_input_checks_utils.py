@@ -233,6 +233,7 @@ class PytorchReturnTypeWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
@@ -430,6 +431,7 @@ class MultipleIndependent(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         for i in range(len(self.dists)):
             self.dists[i] = move_distribution_to_device(self.dists[i], device)
         self.device = device
@@ -543,6 +545,7 @@ class OneDimPriorWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
