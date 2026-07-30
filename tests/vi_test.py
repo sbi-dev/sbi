@@ -560,23 +560,37 @@ def test_parameters_outside_q_and_its_base_must_be_passed(nested: bool):
         )
 
 
-def test_adapted_q_moves_across_devices():
+# The three wrapper shapes: parameters passed explicitly, auto-detected from the
+# base, and exposed by a module.
+@pytest.mark.parametrize("kind", ["distribution", "transformed", "module"])
+def test_adapted_q_moves_across_devices(kind: str):
     """`VIPosterior.to` only moves a `q` that offers `to`, so the wrapper must.
 
-    The meta device makes the move observable without a GPU.
+    A module moves to the meta device, observable without a GPU. Plain tensors move
+    by `.data` reassignment, which meta refuses, so those kinds need real hardware.
     """
     num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    posterior = VIPosterior(
-        FakePotential(prior=prior),
-        prior,
-        q=_ModuleNormal(num_dim),
-        theta_transform=torch_tf.identity_transform,
-    )
+    if kind == "module":
+        device = "meta"
+        prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+        posterior = VIPosterior(
+            FakePotential(prior=prior),
+            prior,
+            q=_ModuleNormal(num_dim),
+            theta_transform=torch_tf.identity_transform,
+        )
+    else:
+        if torch.backends.mps.is_available():
+            device = "mps"
+        elif torch.cuda.is_available():
+            device = "cuda"
+        else:
+            pytest.skip("Moving plain tensors needs a real second device.")
+        posterior = _make_posterior(kind, num_dim)
 
-    posterior.to("meta")
+    posterior.to(device)
 
-    assert all(p.device.type == "meta" for p in posterior.q.parameters())
+    assert all(p.device.type == device for p in posterior.q.parameters())
 
 
 def test_retrain_fails_after_setting_an_already_built_q():

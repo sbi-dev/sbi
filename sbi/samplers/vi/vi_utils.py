@@ -457,14 +457,16 @@ class AdaptedVariationalDistribution(Distribution):
         In place, so that every object holding a reference to them, such as the
         optimizer, keeps seeing the same tensors.
         """
-        for parameter in self._user_parameters:
+        if hasattr(self._source, "to"):
+            self._source.to(device)
+        for module in self._user_modules:
+            module.to(device)
+        # Covers tensors passed as `parameters` or found on a plain-distribution
+        # source, which offer no `to` of their own.
+        for parameter in self.parameters():
             parameter.data = parameter.data.to(device)
             if parameter.grad is not None:
                 parameter.grad.data = parameter.grad.data.to(device)
-        for module in self._user_modules:
-            module.to(device)
-        if hasattr(self._source, "to"):
-            self._source.to(device)
 
     @property
     def support(self):  # type: ignore[override]
