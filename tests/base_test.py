@@ -100,6 +100,31 @@ def test_legacy_aliases_agree_across_import_paths(legacy_name):
         )
 
 
+def test_infer_warns_on_legacy_method_string():
+    """The legacy method strings warn once, attributed to the caller.
+
+    `infer()` resolves the canonical name itself: going through the module
+    `__getattr__` pointed the warning at `base.py` instead of the user's script.
+    """
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+
+    def simulator(theta):
+        return theta + 0.1 * torch.randn_like(theta)
+
+    with pytest.warns(FutureWarning, match="npe_c") as record:
+        infer(
+            simulator,
+            prior,
+            method="snpe",
+            num_simulations=10,
+            train_kwargs={"max_num_epochs": 1},
+        )
+
+    future_warnings = [w for w in record if w.category is FutureWarning]
+    assert len(future_warnings) == 1
+    assert __file__ == future_warnings[0].filename
+
+
 def test_deprecated_aliases_warn():
     """Every legacy alias must emit a FutureWarning that names its replacement.
 

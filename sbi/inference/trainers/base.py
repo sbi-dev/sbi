@@ -127,11 +127,24 @@ def infer(
     Returns: Posterior over parameters conditional on observations (amortized).
     """
 
-    try:
-        # Moved here to avoid circular imports at initialization.
-        import sbi.inference  # noqa: R0401
+    # Moved here to avoid circular imports at initialization.
+    import sbi.inference  # noqa: R0401
 
-        method_fun: Callable = getattr(sbi.inference, method.upper())
+    # Resolve legacy method strings here: going through the module `__getattr__`
+    # would attribute the warning to this file instead of the caller.
+    name = method.upper()
+    canonical = sbi.inference._DEPRECATED_ALIASES.get(name)
+    if canonical is not None:
+        warn(
+            f"method='{method}' is deprecated since sbi v0.27.0 and will be "
+            f"removed in v0.28.0. Use method='{canonical.lower()}' instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        name = canonical
+
+    try:
+        method_fun: Callable = getattr(sbi.inference, name)
     except AttributeError as err:
         raise NameError(
             "Method not available. `method` must be one of 'npe', 'nle', 'nre'."
