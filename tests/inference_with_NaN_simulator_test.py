@@ -118,19 +118,20 @@ def test_multiround_npe_c_warns_when_excluding_invalid_x(caplog):
     assert inference.get_simulations()[0].shape[0] == theta.shape[0] - 1
 
 
-@pytest.mark.parametrize("trainer_class", (NPE_B, NPE_C, MNPE))
-def test_single_round_tolerates_invalid_x(trainer_class, caplog):
+def test_single_round_tolerates_invalid_x(caplog):
     """Round 0 uses the plain log-prob loss, so discarding invalid rows is safe.
 
     Guards the `current_round > 0` gate: without a proposal the strict check must not
-    apply, or ordinary single-round training would start raising.
+    apply, or ordinary single-round training would start raising. One trainer covers
+    the gate, since no NPE subclass overrides `append_simulations` and round 0
+    short-circuits the per-row check.
     """
     prior = utils.BoxUniform(-2.0 * ones(2), 2.0 * ones(2))
     theta = prior.sample((20,))
     x = theta + 0.1 * torch.randn(20, 2)
     x[0, 0] = float("nan")
 
-    inference = trainer_class(prior=prior, show_progress_bars=False)
+    inference = NPE_C(prior=prior, show_progress_bars=False)
     with caplog.at_level(logging.WARNING):
         inference.append_simulations(theta, x)  # must not raise
 
