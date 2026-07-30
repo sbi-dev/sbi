@@ -6,8 +6,6 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from numpy import ndarray
-from scipy.stats._distn_infrastructure import rv_frozen
-from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
@@ -31,12 +29,12 @@ def check_prior(prior: Any) -> None:
         assert isinstance(
             prior, Distribution
         ), """Prior must be a PyTorch Distribution. See FAQ 7 for more details or use
-        `sbi.utils.user_input_checks.process_prior` for wrapping scipy and lists of
-        independent priors."""
+        `sbi.utils.user_input_checks.process_prior` for wrapping custom priors and
+        lists of independent priors."""
 
 
 def process_prior(
-    prior: Union[Sequence[Distribution], Distribution, rv_frozen, multi_rv_frozen],
+    prior: Union[Sequence[Distribution], Distribution, Any],
     custom_prior_wrapper_kwargs: Optional[Dict] = None,
 ) -> Tuple[Distribution, int, bool]:
     """
@@ -100,13 +98,6 @@ def process_prior(
 
     if isinstance(prior, Distribution):
         return process_pytorch_prior(prior)
-
-    # If prior is given as `scipy.stats` object, wrap as PyTorch.
-    elif isinstance(prior, (rv_frozen, multi_rv_frozen)):
-        raise NotImplementedError(
-            "Passing a prior as scipy.stats object is deprecated. "
-            "Please pass it as a PyTorch Distribution."
-        )
 
     # Otherwise it is a custom prior - check for `.sample()` and `.log_prob()`.
     else:
