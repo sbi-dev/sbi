@@ -353,7 +353,12 @@ class LC2ST:
             TypeError: If classifier is not a BaseEstimator subclass.
         """
         # Compare device types, since device strings may carry an index, e.g. "mps:0".
-        device_type = torch.device(self.device).type
+        try:
+            device_type = torch.device(self.device).type
+        except RuntimeError:
+            # Not a torch device, e.g. sbi's "gpu" alias. Classifiers fall back to
+            # the CPU for unrecognized devices, so do not raise here.
+            device_type = str(self.device).lower()
         if isinstance(classifier, str):
             if classifier.lower() == "mlp":
                 use_gpu = (device_type == "cuda" and torch.cuda.is_available()) or (
