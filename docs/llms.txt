@@ -27,7 +27,8 @@ expected coverage, TARP, L-C2ST).
 - [Density Estimators](https://sbi.readthedocs.io/en/latest/how_to_guide/03_density_estimators.html): Choosing and configuring neural networks
 - [Embedding Networks](https://sbi.readthedocs.io/en/latest/how_to_guide/04_embedding_networks.html): FCEmbedding, CNNEmbedding, custom nn.Module
 - [Choosing Inference Method](https://sbi.readthedocs.io/en/latest/how_to_guide/06_choosing_inference_method.html): NPE vs NLE vs NRE decision guide
-- [Sampler Interface](https://sbi.readthedocs.io/en/latest/how_to_guide/09_sampler_interface.html): MCMC, VI, rejection for NLE/NRE posteriors
+- [Sampler Interface](https://sbi.readthedocs.io/en/latest/how_to_guide/09_sampler_interface.html): Choosing MCMC, rejection, VI or importance sampling for NLE/NRE posteriors
+- [Variational Inference](https://sbi.readthedocs.io/en/latest/how_to_guide/26_variational_inference.html): Fixed-observation and amortized VI, quality checks, SIR refinement
 - [i.i.d. Observations](https://sbi.readthedocs.io/en/latest/how_to_guide/11_iid_sampling_with_nle_or_nre.html): Multiple observations with NLE/NRE
 - [Hyperparameter Tuning](https://sbi.readthedocs.io/en/latest/how_to_guide/21_hyperparameter_tuning.html): Optuna integration for architecture search
 - [Abstraction Levels](https://sbi.readthedocs.io/en/latest/how_to_guide/24_abstraction_levels.html): Four levels of control over the density estimator (Trainer classes to custom `nn.Module`), plus sampling-control levels for NLE

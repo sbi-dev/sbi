@@ -8,6 +8,7 @@ Sampling
    :maxdepth: 1
 
    09_sampler_interface.ipynb
+   26_variational_inference.ipynb
    10_refine_posterior_with_importance_sampling.ipynb
    11_iid_sampling_with_nle_or_nre.ipynb
    12_mcmc_diagnostics_with_arviz.ipynb
