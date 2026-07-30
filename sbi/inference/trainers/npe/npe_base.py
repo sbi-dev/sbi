@@ -607,11 +607,9 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(context.discard_prior_samples and self._round > 0)
 
-        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
-        # SNPE-A can, by construction of the algorithm, only use samples from the last
-        # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
-        # so this is how we check for whether or not we are using SNPE-A.
-        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
+        # A per-row loss cannot reuse samples from previous rounds: for the non-atomic
+        # loss this is a current limitation, for NPE-A it is how the algorithm works.
+        if self.use_non_atomic_loss or getattr(self, "_per_row_multiround_loss", False):
             start_idx = self._round
 
         return start_idx
