@@ -370,9 +370,10 @@ class AdaptedVariationalDistribution(Distribution):
     Makes the support match the prior's, and defines `parameters` and `modules` as
     methods on the class so that the distribution can be pickled.
 
-    Must offer the same methods as a `TransformedDistribution` and no more: it is not an
-    `nn.Module` and defines neither `to` nor `sample_and_log_prob`, because
-    `DivergenceOptimizer` checks for all three and behaves differently if they exist.
+    Must offer the same methods as a `TransformedDistribution`: it is not an
+    `nn.Module` and does not define `sample_and_log_prob`, because
+    `DivergenceOptimizer` checks for both and behaves differently if they exist. It
+    does define `to`, so that moving the posterior across devices reaches `q`.
     """
 
     arg_constraints: Dict = {}
@@ -449,6 +450,21 @@ class AdaptedVariationalDistribution(Distribution):
         if hasattr(self._source, "modules"):
             return self._source.modules()  # type: ignore[attr-defined]
         return iter(())
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Move the trainable tensors to `device`, in place.
+
+        In place, so that every object holding a reference to them, such as the
+        optimizer, keeps seeing the same tensors.
+        """
+        for parameter in self._user_parameters:
+            parameter.data = parameter.data.to(device)
+            if parameter.grad is not None:
+                parameter.grad.data = parameter.grad.data.to(device)
+        for module in self._user_modules:
+            module.to(device)
+        if hasattr(self._source, "to"):
+            self._source.to(device)
 
     @property
     def support(self):  # type: ignore[override]

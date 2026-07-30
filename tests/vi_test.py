@@ -372,6 +372,33 @@ class _ParamNormal(torch.distributions.Independent):
         return iter(self._params)
 
 
+class _ModuleNormal(torch.nn.Module, torch.distributions.Distribution):
+    """A trainable distribution built as a module, a natural way to write one."""
+
+    support = torch.distributions.constraints.real_vector
+    has_rsample = True
+    arg_constraints: dict = {}
+
+    def __init__(self, num_dim: int):
+        torch.nn.Module.__init__(self)
+        self.loc = torch.nn.Parameter(zeros(num_dim))
+        self.log_scale = torch.nn.Parameter(zeros(num_dim))
+        torch.distributions.Distribution.__init__(
+            self, torch.Size([]), torch.Size([num_dim]), validate_args=False
+        )
+
+    def _dist(self):
+        return torch.distributions.Independent(
+            torch.distributions.Normal(self.loc, self.log_scale.exp()), 1
+        )
+
+    def rsample(self, sample_shape=torch.Size()):
+        return self._dist().rsample(sample_shape)
+
+    def log_prob(self, value):
+        return self._dist().log_prob(value)
+
+
 def _make_posterior(kind: str, num_dim: int = 2, prior=None):
     """Build an untrained VIPosterior for each way of specifying `q`.
 
@@ -531,6 +558,25 @@ def test_parameters_outside_q_and_its_base_must_be_passed(nested: bool):
             MultivariateNormal(zeros(num_dim), eye(num_dim)),
             torch_tf.identity_transform,
         )
+
+
+def test_adapted_q_moves_across_devices():
+    """`VIPosterior.to` only moves a `q` that offers `to`, so the wrapper must.
+
+    The meta device makes the move observable without a GPU.
+    """
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    posterior = VIPosterior(
+        FakePotential(prior=prior),
+        prior,
+        q=_ModuleNormal(num_dim),
+        theta_transform=torch_tf.identity_transform,
+    )
+
+    posterior.to("meta")
+
+    assert all(p.device.type == "meta" for p in posterior.q.parameters())
 
 
 def test_retrain_fails_after_setting_an_already_built_q():
