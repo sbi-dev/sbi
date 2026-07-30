@@ -977,3 +977,50 @@ def test_zuko_device_transform():
     cond = torch.randn(1, 3).to(device)
     assert est.log_prob(theta.unsqueeze(1), cond).device.type == device.split(":")[0]
     assert est.sample((10,), cond).device.type == device.split(":")[0]
+
+
+@pytest.mark.gpu
+def test_pickle_map_location_reconciles_device():
+    """_device is reconciled after loading with map_location=..."""
+    import tempfile
+
+    device = process_device("gpu")
+    prior = MultivariateNormal(zeros(2).to(device), eye(2).to(device))
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    trainer = NPE(prior=prior, device=device, show_progress_bars=False)
+    trainer.append_simulations(theta.cpu(), x.cpu())
+    estimator = trainer.train(max_num_epochs=1)
+    posterior = trainer.build_posterior(estimator).set_default_x(zeros(1, 2).to(device))
+
+    with tempfile.NamedTemporaryFile(suffix=".pt") as f:
+        torch.save(posterior, f.name)
+        loaded = torch.load(f.name, weights_only=False, map_location="cpu")
+
+    tensor_devices = {str(p.device) for p in loaded.posterior_estimator.parameters()}
+    assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
+    assert tensor_devices == {"cpu"}, f"tensors on {tensor_devices}, expected cpu"
+
+
+@pytest.mark.gpu
+def test_pickle_map_location_vi_posterior():
+    """VIPosterior _device is reconciled after loading with map_location=..."""
+    import tempfile
+
+    device = process_device("gpu")
+    prior = MultivariateNormal(zeros(2).to(device), eye(2).to(device))
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    trainer = NPE(prior=prior, device=device, show_progress_bars=False)
+    trainer.append_simulations(theta.cpu(), x.cpu())
+    estimator = trainer.train(max_num_epochs=1)
+    posterior = trainer.build_posterior(estimator).set_default_x(zeros(1, 2).to(device))
+    vi_posterior = VIPosterior(posterior)
+
+    with tempfile.NamedTemporaryFile(suffix=".pt") as f:
+        torch.save(vi_posterior, f.name)
+        loaded = torch.load(f.name, weights_only=False, map_location="cpu")
+
+    assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"

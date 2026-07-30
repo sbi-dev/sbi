@@ -16,7 +16,11 @@ from sbi.inference.potentials.base_potential import (
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import (
+    canonical_device,
+    ensure_theta_batched,
+    process_device,
+)
 from sbi.utils.user_input_checks import process_x
 
 
@@ -330,7 +334,21 @@ class NeuralPosterior:
         For developers: for any new attribute added to `NeuralPosterior`, we have to
         add an entry here using `check_warn_and_setstate()`.
 
+        After restoring state, we reconcile `_device` with the actual location of the
+        model parameters. This handles `torch.load(..., map_location=...)`, which moves
+        tensor storages during unpickling but leaves the `_device` string unchanged.
+
         Args:
             state_dict: State to be restored.
         """
         self.__dict__ = state_dict
+        estimator = getattr(self, "posterior_estimator", None)
+        if estimator is None:
+            estimator = getattr(self, "potential_fn", None)
+        params = getattr(estimator, "parameters", None)
+        if params is not None:
+            param = next(params(), None)
+            if param is not None and canonical_device(
+                str(param.device)
+            ) != canonical_device(self._device):
+                self._device = str(param.device)
