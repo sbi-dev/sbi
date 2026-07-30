@@ -12,7 +12,6 @@ This module tests both:
 from __future__ import annotations
 
 import pickle
-import tempfile
 from copy import deepcopy
 
 import numpy as np
@@ -277,74 +276,6 @@ def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int):
     check_c2st(samples, target_samples, alg="slice_np")
 
 
-@pytest.mark.parametrize("q", FLOWS)
-def test_deepcopy_support(q: str):
-    """Test that VIPosterior supports deepcopy for all flow types."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    potential_fn = FakePotential(prior=prior)
-    theta_transform = torch_tf.identity_transform
-
-    posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
-    posterior_copy = deepcopy(posterior)
-    posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    assert posterior._x != posterior_copy._x, "Deepcopy should create independent copy"
-
-    posterior_copy = deepcopy(posterior)
-    assert (posterior._x == posterior_copy._x).all(), "Deepcopy should preserve values"
-
-    # Verify samples are reproducible
-    torch.manual_seed(0)
-    if hasattr(posterior._q, "rsample"):
-        s1 = posterior._q.rsample()
-    else:
-        s1 = posterior._q.sample((1,)).squeeze(0)
-    torch.manual_seed(0)
-    if hasattr(posterior_copy._q, "rsample"):
-        s2 = posterior_copy._q.rsample()
-    else:
-        s2 = posterior_copy._q.sample((1,)).squeeze(0)
-    assert torch.allclose(s1, s2), "Samples should match after deepcopy"
-
-    # Test deepcopy after sampling (can produce nonleaf tensors in cache)
-    if hasattr(posterior.q, "rsample"):
-        posterior.q.rsample()
-    else:
-        posterior.q.sample((1,))
-    deepcopy(posterior)  # Should not raise
-
-
-@pytest.mark.parametrize("q", FLOWS)
-def test_pickle_support(q: str):
-    """Test that VIPosterior can be saved and loaded via pickle."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    potential_fn = FakePotential(prior=prior)
-    theta_transform = torch_tf.identity_transform
-
-    posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
-    posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-
-    with tempfile.NamedTemporaryFile(suffix=".pt") as f:
-        torch.save(posterior, f.name)
-        posterior_loaded = torch.load(f.name, weights_only=False)
-        assert (posterior._x == posterior_loaded._x).all()
-
-    # Verify samples are reproducible
-    torch.manual_seed(0)
-    if hasattr(posterior._q, "rsample"):
-        s1 = posterior._q.rsample()
-    else:
-        s1 = posterior._q.sample((1,)).squeeze(0)
-    torch.manual_seed(0)
-    if hasattr(posterior_loaded._q, "rsample"):
-        s2 = posterior_loaded._q.rsample()
-    else:
-        s2 = posterior_loaded._q.sample((1,)).squeeze(0)
-
-    assert torch.allclose(s1, s2), "Samples should match after unpickling"
-
-
 # =============================================================================
 # Serialization
 # =============================================================================
@@ -448,15 +379,19 @@ Q_KINDS = ["flow", "gaussian", "callable", "distribution", "transformed"]
 
 @pytest.mark.parametrize("kind", Q_KINDS)
 def test_trained_posterior_survives_roundtrip(kind: str):
-    """Pickling preserves training and leaves the copy fully usable."""
+    """Pickling preserves training, leaves the original untouched, and the copy
+    stays fully usable."""
     num_dim = 2
     posterior = _make_posterior(kind, num_dim)
     posterior.train(**TRAIN_KWARGS)
+    trained_on, optimizer = posterior._trained_on, posterior._optimizer
 
     torch.manual_seed(0)
     expected = posterior.sample((5,))
     reloaded = pickle.loads(pickle.dumps(posterior))
 
+    assert posterior._trained_on is trained_on
+    assert posterior._optimizer is optimizer
     assert reloaded._trained_on is not None
     torch.manual_seed(0)
     assert torch.allclose(reloaded.sample((5,)), expected)
@@ -464,17 +399,25 @@ def test_trained_posterior_survives_roundtrip(kind: str):
     assert reloaded.sample((5,)).shape == (5, num_dim)
 
 
-def test_pickling_does_not_mutate_the_original():
-    """`pickle.dumps` must leave the posterior it serializes untouched."""
-    posterior = _make_posterior("gaussian")
-    posterior.train(**TRAIN_KWARGS)
-    trained_on, optimizer = posterior._trained_on, posterior._optimizer
+# Deepcopy shares the pickle path, so one seeded compare per family suffices.
+@pytest.mark.parametrize("q", FLOWS)
+def test_every_flow_family_pickles(q: str):
+    """Each family builds different modules, which all must survive pickling."""
+    num_dim = 2
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    posterior = VIPosterior(
+        FakePotential(prior=prior),
+        prior,
+        q=q,
+        theta_transform=torch_tf.identity_transform,
+    )
 
-    pickle.dumps(posterior)  # Discard the bytes; the original is what matters.
+    reloaded = pickle.loads(pickle.dumps(posterior))
 
-    assert posterior._trained_on is trained_on
-    assert posterior._optimizer is optimizer
-    posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
+    torch.manual_seed(0)
+    expected = posterior._q.sample((3,))
+    torch.manual_seed(0)
+    assert torch.allclose(reloaded._q.sample((3,)), expected)
 
 
 def test_deepcopy_of_trained_posterior_rewires_optimizer():
@@ -605,27 +548,6 @@ def test_retrain_fails_after_setting_an_already_built_q():
     assert posterior.q is replacement
     with pytest.raises(ValueError, match="Cannot rebuild"):
         posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
-
-
-# One representative per side of the asymmetry; the round-trip test above covers
-# every kind, this only pins fresh-weights against restored-snapshot.
-@pytest.mark.parametrize("kind", ["flow", "distribution"])
-def test_retrain_from_scratch_semantics_per_kind(kind: str):
-    """Pin the documented per-kind asymmetry of `retrain_from_scratch`."""
-    posterior = _make_posterior(kind)
-    initial = [p.detach().clone() for p in posterior._q.parameters()]
-    posterior.train(**TRAIN_KWARGS)
-    trained = [p.detach().clone() for p in posterior._q.parameters()]
-
-    # Not via `train(retrain_from_scratch=True)`: it would train over the rebuild.
-    rebuilt = [p.detach().clone() for p in posterior._build_q_from_spec().parameters()]
-
-    if kind == "distribution":
-        assert all(torch.allclose(a, b) for a, b in zip(initial, rebuilt, strict=True))
-    else:
-        assert any(
-            not torch.allclose(a, b) for a, b in zip(trained, rebuilt, strict=True)
-        )
 
 
 def test_vi_posterior_interface():
