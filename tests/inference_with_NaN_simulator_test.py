@@ -115,20 +115,38 @@ def test_multiround_npe_c_warns_when_excluding_invalid_x(caplog):
     assert inference.get_simulations()[0].shape[0] == theta.shape[0] - 1
 
 
-def test_multiround_mnpe_does_not_raise_on_invalid_x(caplog):
-    """MNPE subclasses NPE_C but is deliberately excluded from the strict check.
+def test_multiround_mnpe_raises_on_invalid_x():
+    """MNPE inherits the strict check, because it is always atomic.
 
-    MNPE shipped in v0.25.0, long after the check went dead in v0.23.0, so it has never
-    been subject to it. Re-enabling the check must not change MNPE's behavior.
+    MNPE subclasses NPE_C, and its `MixedDensityEstimator` is never a
+    `MixtureDensityEstimator`, so `use_non_atomic_loss` can never become True. Every
+    multi-round MNPE run therefore uses the atomic loss and has the same exposure to
+    invalid simulations as NPE-C.
     """
     inference, theta, x, proposal = _round_one_data_with_nan(trainer_class=MNPE)
 
-    with caplog.at_level(logging.WARNING), warnings.catch_warnings():
-        warnings.simplefilter("ignore", UserWarning)
-        inference.append_simulations(theta, x, proposal=proposal)  # must not raise
+    with pytest.raises(ValueError, match="does not allow invalid simulations"):
+        inference.append_simulations(theta, x, proposal=proposal)
 
-    assert "Multiround NPE-C (atomic)" not in caplog.text
+
+@pytest.mark.parametrize("trainer_class", (NPE_C, MNPE))
+def test_single_round_tolerates_invalid_x(trainer_class, caplog):
+    """Round 0 uses the plain log-prob loss, so discarding invalid rows is safe.
+
+    Filtering the joint on the validity of x leaves p(theta|x) unchanged for valid x, so
+    the strict check must not apply without a proposal.
+    """
+    prior = utils.BoxUniform(-2.0 * ones(2), 2.0 * ones(2))
+    theta = prior.sample((20,))
+    x = theta + 0.1 * torch.randn(20, 2)
+    x[0, 0] = float("nan")
+
+    inference = trainer_class(prior=prior, show_progress_bars=False)
+    with caplog.at_level(logging.WARNING):
+        inference.append_simulations(theta, x)  # must not raise
+
     assert "Found 1 NaN simulations" in caplog.text
+    assert "does not allow invalid simulations" not in caplog.text
 
 
 @pytest.mark.slow
