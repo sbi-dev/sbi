@@ -38,8 +38,7 @@ from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
     FlowEstimatorConfig,
     ScoreEstimatorConfig,
-    build_flow_matching_estimator,
-    build_score_matching_estimator,
+    build_vector_field_estimator,
 )
 from sbi.utils.nn_utils import check_net_device
 from sbi.utils.vector_field_utils import VectorFieldNet
@@ -425,9 +424,10 @@ def posterior_score_nn(
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
-        return build_score_matching_estimator(
+        return build_vector_field_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
+            estimator_type="score",
             sde_type=sde_type,
             **builder_kwargs,
         )
@@ -515,9 +515,10 @@ def posterior_flow_nn(
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
-        return build_flow_matching_estimator(
+        return build_vector_field_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
+            estimator_type="flow",
             **builder_kwargs,
         )
 
