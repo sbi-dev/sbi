@@ -110,7 +110,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         x: Tensor,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
-        algorithm: str = "SNRE",
+        algorithm: str = "NRE",
         data_device: Optional[str] = None,
     ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
