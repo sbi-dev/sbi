@@ -13,11 +13,11 @@ from sbi import utils as utils
 from sbi.diagnostics import run_sbc
 from sbi.inference import (
     MNPE,
+    NLE_A,
     NPE_A,
     NPE_B,
     NPE_C,
-    SNL,
-    SRE,
+    NRE_B,
     DirectPosterior,
     simulate_for_sbi,
 )
@@ -188,8 +188,8 @@ def test_multiround_npe_a_tolerates_invalid_x(caplog):
     ("method", "percent_nans"),
     (
         (NPE_C, 0.05),
-        pytest.param(SNL, 0.05, marks=pytest.mark.xfail),
-        pytest.param(SRE, 0.05, marks=pytest.mark.xfail),
+        pytest.param(NLE_A, 0.05, marks=pytest.mark.xfail),
+        pytest.param(NRE_B, 0.05, marks=pytest.mark.xfail),
     ),
 )
 def test_inference_with_nan_simulator(method: type, percent_nans: float):

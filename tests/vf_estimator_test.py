@@ -9,10 +9,16 @@ import pytest
 import torch
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
-from sbi.neural_nets.net_builders import (
-    build_flow_matching_estimator,
-    build_score_matching_estimator,
-)
+from sbi.neural_nets.net_builders import build_vector_field_estimator
+
+
+# Local stand-ins for the deprecated wrapper builders, which warn since v0.27.0.
+def build_flow_matching_estimator(*args, **kwargs):
+    return build_vector_field_estimator(*args, estimator_type="flow", **kwargs)
+
+
+def build_score_matching_estimator(*args, **kwargs):
+    return build_vector_field_estimator(*args, estimator_type="score", **kwargs)
 
 
 @pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
