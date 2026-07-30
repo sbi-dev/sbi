@@ -3,7 +3,7 @@
 
 import warnings
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
@@ -138,7 +138,9 @@ class VIPosterior(NeuralPosterior):
                 TorchTransform, device: str) -> Distribution` for custom flow
                 configurations. The
                 callable should return a distribution with `sample()` and `log_prob()`
-                methods. If q is already a `VIPosterior`, then the arguments will be
+                methods, and should be a module-level function: the posterior keeps it
+                in order to rebuild `q`, and a local function or lambda cannot be
+                pickled. If q is already a `VIPosterior`, then the arguments will be
                 copied from it (relevant for multi-round training).
             theta_transform: Maps form prior support to unconstrained space. The
                 inverse is used here to ensure that the posterior support is equal to
@@ -487,7 +489,9 @@ class VIPosterior(NeuralPosterior):
                 parameters (you can pass them within the parameters/modules attribute).
                 Additionally, we allow a `Callable` with signature
                 `(event_shape: torch.Size, link_transform: TorchTransform, device: str)
-                -> Distribution`, which builds a custom distribution. If q is already
+                -> Distribution`, which builds a custom distribution. It should be a
+                module-level function: the posterior keeps it in order to rebuild `q`,
+                and a local function or lambda cannot be pickled. If q is already
                 a `VIPosterior`, then the arguments will be copied from it (relevant
                 for multi-round training).
 
@@ -543,7 +547,8 @@ class VIPosterior(NeuralPosterior):
                 q = self._build_q_from_spec()
             self._trained_on = None
         elif isinstance(q, VIPosterior):
-            self._q_spec = q._q_spec
+            # A copy, so that later `set_q` calls on one posterior stay local to it.
+            self._q_spec = replace(q._q_spec)
             self._trained_on = q._trained_on
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
             self.vi_method = q.vi_method  # type: ignore
