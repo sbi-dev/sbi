@@ -637,49 +637,6 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     return x
 
 
-def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
-    """Prepare simulator and prior for usage in sbi.
-
-    NOTE: This method is deprecated as of sbi version v0.23.0. and will be removed in a
-    future release. Please use `process_prior` and `process_simulator` in the future.
-    This is a wrapper around `process_prior` and `process_simulator` which can be
-    used in isolation as well.
-
-    Attempts to meet the following requirements by reshaping and type-casting:
-
-    - the simulator function receives as input and returns a Tensor.<br/>
-    - the simulator can simulate batches of parameters and return batches of data.<br/>
-    - the prior does not produce batches and samples and evaluates to Tensor.<br/>
-    - the output shape is a `torch.Size((1,N))` (i.e, has a leading batch dimension 1).
-
-    If this is not possible, a suitable exception will be raised.
-
-    Args:
-        simulator: Simulator as provided by the user.
-        prior: Prior as provided by the user.
-
-    Returns:
-        Tuple (simulator, prior) checked and matching the requirements of sbi.
-    """
-
-    warnings.warn(
-        "This method is deprecated as of sbi version v0.23.0. and will be removed in a \
-        future release."
-        "Please use `process_prior` and `process_simulator` in the future.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    # Check prior, return PyTorch prior.
-    prior, _, prior_returns_numpy = process_prior(prior)
-
-    # Check simulator, returns PyTorch simulator able to simulate batches.
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-
-    # Consistency check after making ready for sbi.
-    check_sbi_inputs(simulator, prior)
-
-    return simulator, prior
 
 
 def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
