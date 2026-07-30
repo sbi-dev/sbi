@@ -58,12 +58,10 @@ def test_get_dataloaders(training_batch_size):
         "NPE",
         "SNLE_A",
         "SNLE",
-        "SNL",
         "NLE",
         "SNRE_A",
         "SNRE_B",
         "SNRE_C",
-        "SNRE",
         "SRE",
         "NRE",
     ),
@@ -76,12 +74,20 @@ def test_legacy_aliases_agree_across_import_paths(legacy_name):
     silent mis-dispatch once it was. Testing the invariant rather than the single alias
     covers the whole class of typo, and the test can be deleted wholesale along with the
     aliases.
+
+    Only aliases that both import paths define are parametrized here. `SNL` and `SNRE`
+    exist on `sbi.inference` alone, so there is nothing to cross-check for them.
     """
     expected = getattr(sbi.inference, legacy_name)
+    defining_modules = [m for m in (npe, nle, nre) if hasattr(m, legacy_name)]
 
-    for module in (npe, nle, nre):
-        if hasattr(module, legacy_name):
-            assert getattr(module, legacy_name) is expected, (
-                f"{module.__name__}.{legacy_name} disagrees with "
-                f"sbi.inference.{legacy_name}"
-            )
+    assert defining_modules, (
+        f"No trainer sub-package defines {legacy_name}. Either the alias moved or it "
+        f"should not be parametrized here, which would make this test vacuous."
+    )
+
+    for module in defining_modules:
+        assert getattr(module, legacy_name) is expected, (
+            f"{module.__name__}.{legacy_name} disagrees with "
+            f"sbi.inference.{legacy_name}"
+        )

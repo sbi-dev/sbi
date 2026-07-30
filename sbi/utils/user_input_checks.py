@@ -9,7 +9,7 @@ from numpy import ndarray
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
-from sbi.sbi_types import Array
+from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
 from sbi.utils.user_input_checks_utils import (
@@ -34,7 +34,7 @@ def check_prior(prior: Any) -> None:
 
 
 def process_prior(
-    prior: Union[Sequence[Distribution], Distribution, Any],
+    prior: Union[Sequence[Distribution], Distribution, CustomPrior],
     custom_prior_wrapper_kwargs: Optional[Dict] = None,
 ) -> Tuple[Distribution, int, bool]:
     """
