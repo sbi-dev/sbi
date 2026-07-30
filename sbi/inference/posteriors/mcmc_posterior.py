@@ -60,7 +60,6 @@ class MCMCPosterior(NeuralPosterior):
         num_chains: int = 20,
         init_strategy: Literal["proposal", "sir", "resample"] = "resample",
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
-        init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
         mp_context: Literal["fork", "spawn"] = "spawn",
         device: Optional[Union[str, torch.device]] = None,
@@ -89,7 +88,7 @@ class MCMCPosterior(NeuralPosterior):
             init_strategy: The initialisation strategy for chains; `proposal` will draw
                 init locations from `proposal`, whereas `sir` will use Sequential-
                 Importance-Resampling (SIR). SIR initially samples
-                `init_strategy_num_candidates` from the `proposal`, evaluates all of
+                `num_candidate_samples` from the `proposal`, evaluates all of
                 them under the `potential_fn` and `proposal`, and then resamples the
                 initial locations with weights proportional to `exp(potential_fn -
                 proposal.log_prob`. `resample` is the same as `sir` but
@@ -98,9 +97,6 @@ class MCMCPosterior(NeuralPosterior):
                 init strategy, e.g., for `init_strategy=sir` this could be
                 `num_candidate_samples`, i.e., the number of candidates to find init
                 locations (internal default is `1000`), or `device`.
-            init_strategy_num_candidates: Number of candidates to find init
-                 locations in `init_strategy=sir` (deprecated, use
-                 init_strategy_parameters instead).
             num_workers: number of cpu cores used to parallelize mcmc
             mp_context: Multiprocessing start method, either `"fork"` or `"spawn"`
                 (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
@@ -115,16 +111,6 @@ class MCMCPosterior(NeuralPosterior):
                 samplers. If `None`, `hmc_pymc` uses `0.9` and `nuts_pymc` keeps
                 PyMC's backend default. See `MCMCPosteriorParameters` for details.
         """
-        if method == "slice":
-            warn(
-                "The Pyro-based slice sampler is deprecated, and the method `slice` "
-                "has been changed to `slice_np`, i.e., the custom "
-                "numpy-based slice sampler.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            method = "slice_np"
-
         thin = _process_thin_default(thin)
 
         super().__init__(
@@ -150,17 +136,6 @@ class MCMCPosterior(NeuralPosterior):
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
         self.x_shape = x_shape
-
-        if init_strategy_num_candidates is not None:
-            warn(
-                "Passing `init_strategy_num_candidates` is deprecated as of sbi "
-                "v0.19.0. Instead, use e.g., `init_strategy_parameters "
-                f"={'num_candidate_samples': 1000}`",
-                stacklevel=2,
-            )
-            self.init_strategy_parameters["num_candidate_samples"] = (
-                init_strategy_num_candidates
-            )
 
         self.potential_ = self._prepare_potential(method)
 
@@ -555,22 +530,9 @@ class MCMCPosterior(NeuralPosterior):
 
         Returns: Initialization function.
         """
-        if init_strategy == "proposal" or init_strategy == "prior":
-            if init_strategy == "prior":
-                warn(
-                    "You set `init_strategy=prior`. As of sbi v0.18.0, this is "
-                    "deprecated and it will be removed in a future release. Use "
-                    "`init_strategy=proposal` instead.",
-                    stacklevel=2,
-                )
+        if init_strategy == "proposal":
             return lambda: proposal_init(proposal, transform=transform, **kwargs)
         elif init_strategy == "sir":
-            warn(
-                "As of sbi v0.19.0, the behavior of the SIR initialization for MCMC "
-                "has changed. If you wish to restore the behavior of sbi v0.18.0, set "
-                "`init_strategy='resample'.`",
-                stacklevel=2,
-            )
             return lambda: sir_init(
                 proposal, potential_fn, transform=transform, **kwargs
             )
@@ -582,7 +544,9 @@ class MCMCPosterior(NeuralPosterior):
             latest_sample = IterateParameters(self._mcmc_init_params, **kwargs)
             return latest_sample
         else:
-            raise NotImplementedError
+            raise NotImplementedError(
+                f"Init strategy {init_strategy} is not implemented."
+            )
 
     def _get_initial_params(
         self,
@@ -961,13 +925,6 @@ class MCMCPosterior(NeuralPosterior):
             track_gradients = False
             pyro = False
         else:
-            if "hmc" in method or "nuts" in method:
-                warn(
-                    "The kwargs 'hmc' and 'nuts' are deprecated. Use 'hmc_pyro', "
-                    "'nuts_pyro', 'hmc_pymc', or 'nuts_pymc' instead.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
             raise NotImplementedError(f"MCMC method {method} is not implemented.")
 
         prepared_potential = partial(
