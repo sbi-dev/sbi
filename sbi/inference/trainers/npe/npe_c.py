@@ -218,7 +218,7 @@ class NPE_C(PosteriorEstimatorTrainer):
             )
 
             algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
-            print(f"Using SNPE-C with {algorithm} loss")
+            print(f"Using {type(self).__name__} with {algorithm} loss")
 
             if self.use_non_atomic_loss:
                 # Take care of z-scoring, pre-compute and store prior terms.

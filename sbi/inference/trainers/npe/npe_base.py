@@ -197,21 +197,20 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
         # Check for problematic z-scoring
         warn_if_invalid_for_zscoring(x)
+        algorithm = (
+            f"{'Multiround' if current_round > 0 else 'Single-round'} "
+            f"{type(self).__name__}"
+        )
         if (
             current_round > 0
             and not getattr(self, "_per_row_multiround_loss", False)
             and not self.use_non_atomic_loss
         ):
             nle_nre_apt_msg_on_invalid_x(
-                num_nans,
-                num_infs,
-                exclude_invalid_x,
-                f"Multiround {type(self).__name__}",
+                num_nans, num_infs, exclude_invalid_x, algorithm
             )
         else:
-            npe_msg_on_invalid_x(
-                num_nans, num_infs, exclude_invalid_x, "Single-round NPE"
-            )
+            npe_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, algorithm)
 
         self._check_proposal(proposal)
 
