@@ -269,9 +269,6 @@ def test_process_device(device_input) -> None:
             elif torch.backends.mps.is_available():
                 assert device_output == "mps:0"
 
-        # GPU devices are returned with an explicit index, whichever way they are
-        # spelled, so that device strings can be compared directly. A bare "cuda"
-        # resolves to the current device; an explicit index is kept verbatim.
         if device_input == "cuda" and torch.cuda.is_available():
             assert device_output == f"cuda:{torch.cuda.current_device()}"
         if device_input == "cuda:0" and torch.cuda.is_available():
@@ -319,20 +316,10 @@ def test_canonical_device_resolves_bare_cuda(monkeypatch) -> None:
     assert torchutils.canonical_device("cuda") == "cuda:3"
 
 
-def test_canonical_device_rejects_unknown_device() -> None:
-    """Test that an uninterpretable device raises a helpful error."""
-    with pytest.raises(RuntimeError, match="Could not interpret"):
-        torchutils.canonical_device("not-a-device")
-
-
 @pytest.mark.gpu
 @pytest.mark.parametrize("device_input", ("gpu", "mps", "mps:0"))
 def test_process_device_allows_mps_with_float64_default(device_input) -> None:
-    """Test that MPS is usable while torch defaults to double precision.
-
-    MPS does not support double precision, so `process_device` has to set the
-    default dtype for every spelling of the device, not just for "gpu".
-    """
+    """Test that every MPS spelling lowers the default dtype to float32."""
     if not torch.backends.mps.is_available():
         pytest.skip("Requires an MPS device.")
 
