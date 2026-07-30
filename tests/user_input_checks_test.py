@@ -137,6 +137,16 @@ def test_prior_wrappers(wrapper, prior, kwargs):
     assert len(prior.log_prob(prior.sample((10,))).shape) == 1
 
 
+def test_one_dim_wrapper_constructs_with_validation_on():
+    """With validation on (as here, or via torch's global default, which
+    `MultipleIndependent(validate_args=True)` flips), torch reads `arg_constraints`
+    during `__init__`, which used to dereference `self.prior` before it was set.
+    """
+    prior = OneDimPriorWrapper(Exponential(torch.tensor([3.0])), validate_args=True)
+
+    assert prior.log_prob(prior.sample((3,))).shape == (3,)
+
+
 def test_reinterpreted_batch_dim_prior():
     """Test whether the right warning and error are raised for reinterpreted priors."""
 
