@@ -14,6 +14,7 @@ from sbi.diagnostics import run_sbc
 from sbi.inference import (
     MNPE,
     NPE_A,
+    NPE_B,
     NPE_C,
     SNL,
     SRE,
@@ -109,7 +110,7 @@ def test_multiround_npe_c_warns_when_excluding_invalid_x(caplog):
             theta, x, proposal=proposal, exclude_invalid_x=True
         )
 
-    assert "Multiround NPE-C (atomic)" in caplog.text
+    assert "Multiround NPE_C" in caplog.text
     assert "systematically wrong results" in caplog.text
     # The single invalid row was discarded.
     assert inference.get_simulations()[0].shape[0] == theta.shape[0] - 1
@@ -127,6 +128,31 @@ def test_multiround_mnpe_raises_on_invalid_x():
 
     with pytest.raises(ValueError, match="does not allow invalid simulations"):
         inference.append_simulations(theta, x, proposal=proposal)
+
+
+def test_multiround_npe_b_raises_on_invalid_x():
+    """NPE-B normalizes its importance weights across the batch.
+
+    Discarding rows changes the normalizer, so the weights no longer reflect the
+    proposal. This is a different mechanism from NPE-C's atomic loss with the same
+    consequence.
+    """
+    inference, theta, x, proposal = _round_one_data_with_nan(trainer_class=NPE_B)
+
+    with pytest.raises(ValueError, match="does not allow invalid simulations"):
+        inference.append_simulations(theta, x, proposal=proposal)
+
+
+def test_multiround_npe_a_tolerates_invalid_x(caplog):
+    """NPE-A trains on the plain log-prob, so discarding rows cannot bias it."""
+    inference, theta, x, proposal = _round_one_data_with_nan(trainer_class=NPE_A)
+
+    with caplog.at_level(logging.WARNING), warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        inference.append_simulations(theta, x, proposal=proposal)  # must not raise
+
+    assert "Found 1 NaN simulations" in caplog.text
+    assert "does not allow invalid simulations" not in caplog.text
 
 
 @pytest.mark.parametrize("trainer_class", (NPE_C, MNPE))

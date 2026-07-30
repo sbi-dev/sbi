@@ -4,7 +4,17 @@
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import asdict
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 from torch import Tensor, ones
 from torch.distributions import Distribution
@@ -58,6 +68,10 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
+    # Whether the multi-round loss normalizes across the training batch, which makes it
+    # unsafe to discard invalid simulations. Subclasses with a per-row loss opt out.
+    _multiround_loss_couples_batch: ClassVar[bool] = True
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -198,15 +212,15 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         # Check for problematic z-scoring
         warn_if_invalid_for_zscoring(x)
         if (
-            hasattr(self, "_log_prob_proposal_posterior_atomic")
-            and current_round > 0
+            current_round > 0
+            and self._multiround_loss_couples_batch
             and not self.use_non_atomic_loss
         ):
             nle_nre_apt_msg_on_invalid_x(
                 num_nans,
                 num_infs,
                 exclude_invalid_x,
-                "Multiround NPE-C (atomic)",
+                f"Multiround {type(self).__name__}",
             )
         else:
             npe_msg_on_invalid_x(

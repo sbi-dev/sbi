@@ -85,6 +85,10 @@ class NPE_A(PosteriorEstimatorTrainer):
         samples = posterior.sample((1000,), x=x_o)
     """
 
+    # NPE-A trains on the plain log-prob and corrects analytically after the final
+    # round, so its loss is per-row.
+    _multiround_loss_couples_batch = False
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
