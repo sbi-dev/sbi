@@ -11,6 +11,20 @@ from torch import Tensor, nn
 from torch._higher_order_ops.associative_scan import associative_scan  # type: ignore
 
 
+def _aggregate_last_step(x: Tensor) -> Tensor:
+    """Aggregate a sequence of hidden states by keeping the last one."""
+    return x[:, -1, :]
+
+
+def _aggregate_mean(x: Tensor) -> Tensor:
+    """Aggregate a sequence of hidden states by averaging over time."""
+    return x.mean(dim=1)
+
+
+# Module-level, so that an embedding net holding one of these can be pickled.
+_AGGREGATIONS = {"last_step": _aggregate_last_step, "mean": _aggregate_mean}
+
+
 class LRUEmbedding(nn.Module):
     """Embedding network backed by a stack of Linear Recurrent Unit (LRU) blocks.
     This type of embedding is intended to be used with sequential data, e.g.
@@ -95,12 +109,13 @@ class LRUEmbedding(nn.Module):
         ]
         self.lru_blocks = nn.Sequential(*lru_blocks)
 
-        if aggregate_fcn == "last_step":
-            self.aggregation = lambda x: x[:, -1, :]
-        elif aggregate_fcn == "mean":
-            self.aggregation = lambda x: x.mean(dim=1)
-        elif isinstance(aggregate_fcn, str):
-            raise ValueError(f"aggretate_func {aggregate_fcn} not implemented")
+        if isinstance(aggregate_fcn, str):
+            if aggregate_fcn not in _AGGREGATIONS:
+                raise ValueError(
+                    f"aggregate_fcn {aggregate_fcn} not implemented, use one of "
+                    f"{sorted(_AGGREGATIONS)} or pass a function."
+                )
+            self.aggregation = _AGGREGATIONS[aggregate_fcn]
         else:
             self.aggregation = aggregate_fcn
 
