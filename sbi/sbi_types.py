@@ -94,6 +94,7 @@ class Tracker(Protocol):
 __all__ = [
     "AcceptRejectFn",
     "Array",
+    "CustomPrior",
     "Shape",
     "OneOrMore",
     "SampleProposal",
