@@ -13,6 +13,7 @@ from pytest_harvest import get_session_results_df, get_xdist_worker_id, is_main_
 
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.utils.sbiutils import seed_all_backends
+from sbi.utils.torchutils import gpu_available
 
 # Seed for `set_seed` fixture. Change to random state of all seeded tests.
 seed = 1
@@ -35,10 +36,9 @@ def set_default_tensor_type():
 
 # Pytest hook to skip GPU tests if no devices are available.
 def pytest_collection_modifyitems(config, items):
-    """Skip GPU tests if no CUDA devices are available."""
-    gpu_device_available = torch.cuda.is_available()
-    if not gpu_device_available:
-        skip_gpu = pytest.mark.skip(reason="No CUDA device available")
+    """Skip GPU tests if no CUDA or MPS device is available."""
+    if not gpu_available():
+        skip_gpu = pytest.mark.skip(reason="No GPU (CUDA or MPS) device available")
 
         for item in items:
             if "gpu" in item.keywords:

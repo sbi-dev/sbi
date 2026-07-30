@@ -1306,7 +1306,9 @@ def _prepare_x_transforms(
                 "`x_dist` requires a `.support` attribute for"
                 "an unconstrained transformation."
             )
-        transform_to_unconstrained = biject_transform_zuko(mcmc_transform(x_dist))
+        transform_to_unconstrained = biject_transform_zuko(
+            mcmc_transform(x_dist, device=batch_x.device)
+        )
         transforms = (transform_to_unconstrained,)
     elif z_score_x_bool:
         z_score_transform = standardizing_transform_zuko(batch_x, structured_x)

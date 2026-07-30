@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
+import pytest
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
@@ -15,7 +16,33 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, within_support
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, mps_fallback_enabled
+
+
+def mps_fallback_disabled(device: str) -> bool:
+    """Whether `device` is MPS without PyTorch's CPU fallback for missing operators.
+
+    Args:
+        device: processed device string, e.g., the return of `process_device("gpu")`.
+
+    Returns:
+        Whether operators missing on MPS raise instead of falling back to CPU.
+    """
+    return str(device).startswith("mps") and not mps_fallback_enabled()
+
+
+def skip_if_mps_op_unsupported(device: str, op_name: str) -> None:
+    """Skip the calling test if it needs an operator that MPS does not implement.
+
+    Args:
+        device: processed device string, e.g., the return of `process_device("gpu")`.
+        op_name: the ATen operator the test relies on, e.g., `"aten::binomial"`.
+    """
+    if mps_fallback_disabled(device):
+        pytest.skip(
+            f"PyTorch does not implement {op_name} for the MPS backend. Re-run with "
+            "PYTORCH_ENABLE_MPS_FALLBACK=1 in the environment to use the CPU fallback."
+        )
 
 
 def kl_d_via_monte_carlo(

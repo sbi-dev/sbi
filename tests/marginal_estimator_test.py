@@ -33,7 +33,7 @@ from sbi.utils.torchutils import process_device
         ),
     ],
 )
-@pytest.mark.parametrize("device", ["cpu", pytest.param("cuda", marks=pytest.mark.gpu)])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 @pytest.mark.parametrize("model", ["nsf", marginal_nn(model=ZukoFlowType.NSF)])
 def test_marginal_estimator(
     dist: torch.distributions.Distribution, device: str, model: Union[str, Callable]

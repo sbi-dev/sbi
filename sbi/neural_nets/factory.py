@@ -358,6 +358,7 @@ def posterior_score_nn(
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
+    compose_standardization: bool = False,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a ScoreEstimator object for score-based
@@ -391,6 +392,8 @@ def posterior_score_nn(
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
+        compose_standardization: Opt-in per-dim affine standardization theta<->z
+            for scale-equivariant calibration. Defaults to False.
         **kwargs: Additional estimator / network arguments.  Valid keys are
             defined by ``ScoreEstimatorConfig``; unknown keys raise
             ``TypeError``.
@@ -398,6 +401,11 @@ def posterior_score_nn(
     Returns:
         Constructor function for NPSE.
     """
+    if compose_standardization and z_score_theta != "independent":
+        raise ValueError(
+            "compose_standardization=True requires z_score_theta='independent'."
+        )
+
     # Map user-facing parameter names to internal names.
     mapped = dict(
         z_score_x=z_score_x,
@@ -408,6 +416,7 @@ def posterior_score_nn(
         time_embedding_dim=t_embedding_dim,
         time_emb_type=time_emb_type,
         net=model,
+        compose_standardization=compose_standardization,
     )
 
     # Validate against known fields — warns on unknown kwargs (typos)
@@ -443,6 +452,7 @@ def posterior_flow_nn(
     time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
     gaussian_baseline: bool = False,
+    compose_standardization: bool = False,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a FlowMatchingEstimator object for flow-based
@@ -471,6 +481,8 @@ def posterior_flow_nn(
         gaussian_baseline: If True, use analytical Gaussian baseline velocity
             derived from Bayes' rule. The network then only learns the residual.
             Defaults to False.
+        compose_standardization: Opt-in per-dim affine standardization theta<->z
+            for scale-equivariant calibration. Defaults to False.
         **kwargs: Additional estimator / network arguments.  Valid keys are
             defined by ``FlowEstimatorConfig``; unknown keys raise
             ``TypeError``.
@@ -478,6 +490,11 @@ def posterior_flow_nn(
     Returns:
         Constructor function for FMPE.
     """
+    if compose_standardization and z_score_theta != "independent":
+        raise ValueError(
+            "compose_standardization=True requires z_score_theta='independent'."
+        )
+
     # Map user-facing parameter names to internal names.
     mapped = dict(
         z_score_x=z_score_theta,
@@ -489,6 +506,7 @@ def posterior_flow_nn(
         time_emb_type=time_emb_type,
         net=model,
         gaussian_baseline=gaussian_baseline,
+        compose_standardization=compose_standardization,
     )
 
     # Validate against known fields — warns on unknown kwargs (typos)

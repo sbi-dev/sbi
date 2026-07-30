@@ -725,3 +725,19 @@ def test_lc2st_classifier_kwargs_override(cal_data):
         device="cpu",
     )
     assert lc2st_clean.clf_kwargs["max_iter"] == 1000
+
+
+def test_lc2st_accepts_gpu_device_alias(cal_data):
+    """Test that sbi's "gpu" alias does not crash LC2ST.
+
+    LC2ST falls back to CPU classifiers for devices it does not recognize
+    instead of raising.
+    """
+    lc2st = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.posterior_samples,
+        classifier="mlp",
+        device="gpu",
+    )
+    assert lc2st.clf_class is MLPClassifier

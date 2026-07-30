@@ -60,6 +60,7 @@
 
 ### 🐛 Bug Fixes
 
+* **Improve PyMC HMC sampling** ([#1908](https://github.com/sbi-dev/sbi/pull/1908)): Use a target acceptance probability of `0.9` by default for `hmc_pymc`, avoiding poor finite-chain mixing observed with PyMC's `0.65` default. The value can be customized with `MCMCPosteriorParameters.target_accept` or `MCMCPosterior.sample(target_accept=...)`.
 * **Fix TARP z-scoring bug** ([#1832](https://github.com/sbi-dev/sbi/issues/1832)): Reference points are now z-scored alongside `thetas` and `posterior_samples` when `z_score_theta=True`, fixing incorrect distance calculations that masked bias detection.
 * **Fix broken `biased_toy_gaussian` test helper**: Rewrote to create actual location bias (posterior mean shifted from truth) instead of the previous NaN-producing formula.
 * **Raise on unsupported `transform_to_unconstrained` z-scoring**: `z_score_x="transform_to_unconstrained"` was silently ignored by the nflows builders (`maf`, `nsf`, `maf_rqs`, `made`), the MDN builder, the unconditional Zuko builder, the ratio-based classifier builders (`linear`, `mlp`, `resnet`), and the vector field builders (FMPE / NPSE), producing a model with no reparametrization. These builders now raise a clear `ValueError`. The mixed builders (MNLE / MNPE) raise transitively when their continuous flow is a non-Zuko model. The option remains supported by the conditional `zuko_*` models.

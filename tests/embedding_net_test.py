@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+import pickle
 from typing import Callable
 
 import pytest
@@ -756,6 +757,19 @@ def test_lru_embedding_net_isolated(
     assert isinstance(x_embed, Tensor)
     assert torch.is_floating_point(x_embed), "Output tensor is not a real tensor"
     assert x_embed.shape == (batch_size, output_dim)
+
+
+@pytest.mark.parametrize("aggregate_fcn", ["last_step", "mean"])
+def test_lru_embedding_net_is_picklable(aggregate_fcn: str):
+    """Every aggregation preset must survive pickling, since posteriors get pickled."""
+    embedding_net = LRUEmbedding(
+        input_dim=3, output_dim=4, num_blocks=1, aggregate_fcn=aggregate_fcn
+    )
+    x = torch.randn(2, 5, 3)
+
+    reloaded = pickle.loads(pickle.dumps(embedding_net))
+
+    assert torch.allclose(reloaded(x), embedding_net(x))
 
 
 def test_lru_pipeline(embedding_feat_dim: int = 17):

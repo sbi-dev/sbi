@@ -20,7 +20,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import check_prior
 
 
@@ -102,6 +102,7 @@ class DirectPosterior(NeuralPosterior):
         Args:
             device: device where to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         if hasattr(self.prior, "to"):
             self.prior.to(device)  # type: ignore

@@ -57,11 +57,13 @@ Sampling
 --------
 
 - :doc:`how_to_guide/09_sampler_interface`
+- :doc:`how_to_guide/26_variational_inference`
 - :doc:`how_to_guide/10_refine_posterior_with_importance_sampling`
 - :doc:`how_to_guide/11_iid_sampling_with_nle_or_nre`
 - :doc:`how_to_guide/12_mcmc_diagnostics_with_arviz`
 - :doc:`how_to_guide/23_using_pyro_with_sbi`
 - :doc:`how_to_guide/19_posterior_parameters`
+- :doc:`how_to_guide/25_choosing_vector_field_options`
 
 
 Diagnostics

@@ -12,7 +12,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import process_x
 
 
@@ -104,6 +104,7 @@ class EnsemblePosterior(NeuralPosterior):
         Args:
             device: The device to move the ensemble posterior to.
         """
+        device = process_device(device)
         self.device = device
         self._device = device
         for i in range(len(self.posteriors)):
@@ -462,6 +463,7 @@ class EnsemblePotential(BasePotential):
         Args:
             device: The device to move the ensemble potential to.
         """
+        device = process_device(device)
         self.device = device
         for i in range(len(self.potential_fns)):
             self.potential_fns[i].to(device)

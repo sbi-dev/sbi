@@ -109,6 +109,15 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         self.register_buffer("mean_0", mean_0_tensor)
         self.register_buffer("std_0", std_0_tensor)
 
+    def _check_compose_baseline_compatible(self) -> None:
+        """Reject incompatible analytical and composed standardization baselines."""
+        if self.gaussian_baseline and self.compose_enabled:
+            raise ValueError(
+                "gaussian_baseline and composed standardization cannot be used "
+                "together. Set gaussian_baseline=False to use composed "
+                "standardization."
+            )
+
     def _get_time_dependent_stats(self, time: Tensor) -> Tuple[Tensor, Tensor]:
         """Compute time-dependent mean and std for z-scoring.
 
@@ -283,6 +292,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Loss value.
         """
+        if self.compose_enabled:
+            input = self.to_z(input)
+
         # Randomly sample time steps
         if times is None:
             times = torch.rand(input.shape[:-1], device=input.device, dtype=input.dtype)
