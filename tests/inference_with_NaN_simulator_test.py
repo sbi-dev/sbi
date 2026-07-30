@@ -85,15 +85,17 @@ def _round_one_data_with_nan(trainer_class: type = NPE_C, num_dim: int = 2):
     return trainer_class(prior=prior, show_progress_bars=False), theta, x, proposal
 
 
-def test_multiround_npe_c_raises_on_invalid_x():
-    """Multi-round atomic NPE-C must reject invalid simulations by default.
+@pytest.mark.parametrize("trainer_class", (NPE_B, NPE_C, MNPE))
+def test_multiround_raises_on_invalid_x(trainer_class):
+    """Multi-round NPE must reject invalid simulations unless its loss is per-row.
 
-    `exclude_invalid_x` defaults to False for rounds > 0, and discarding invalid
-    simulations biases the atomic NPE-C loss, so the default must raise rather than
-    train on NaNs. This check was dead between v0.23.0 and v0.27.0 because it compared
-    the class name against the pre-rename `SNPE_C`.
+    `exclude_invalid_x` defaults to False for rounds > 0. NPE-C normalizes over atoms
+    drawn from the batch, MNPE always does since it is never a MoG, and NPE-B normalizes
+    its importance weights across the batch, so discarding rows biases all three. The
+    check was dead between v0.23.0 and v0.27.0 because it compared the class name
+    against the pre-rename `SNPE_C`.
     """
-    inference, theta, x, proposal = _round_one_data_with_nan()
+    inference, theta, x, proposal = _round_one_data_with_nan(trainer_class)
 
     with pytest.raises(ValueError, match="does not allow invalid simulations"):
         inference.append_simulations(theta, x, proposal=proposal)
@@ -116,60 +118,13 @@ def test_multiround_npe_c_warns_when_excluding_invalid_x(caplog):
     assert inference.get_simulations()[0].shape[0] == theta.shape[0] - 1
 
 
-def test_multiround_mnpe_raises_on_invalid_x():
-    """MNPE inherits the strict check, because it is always atomic.
-
-    MNPE subclasses NPE_C, and its `MixedDensityEstimator` is never a
-    `MixtureDensityEstimator`, so `use_non_atomic_loss` can never become True. Every
-    multi-round MNPE run therefore uses the atomic loss and has the same exposure to
-    invalid simulations as NPE-C.
-    """
-    inference, theta, x, proposal = _round_one_data_with_nan(trainer_class=MNPE)
-
-    with pytest.raises(ValueError, match="does not allow invalid simulations"):
-        inference.append_simulations(theta, x, proposal=proposal)
-
-
-def test_multiround_npe_b_raises_on_invalid_x():
-    """NPE-B normalizes its importance weights across the batch.
-
-    Discarding rows changes the normalizer, so the weights no longer reflect the
-    proposal. This is a different mechanism from NPE-C's atomic loss with the same
-    consequence.
-    """
-    inference, theta, x, proposal = _round_one_data_with_nan(trainer_class=NPE_B)
-
-    with pytest.raises(ValueError, match="does not allow invalid simulations"):
-        inference.append_simulations(theta, x, proposal=proposal)
-
-
 def test_multiround_npe_a_tolerates_invalid_x(caplog):
     """NPE-A trains on the plain log-prob, so discarding rows cannot bias it."""
-    inference, theta, x, proposal = _round_one_data_with_nan(trainer_class=NPE_A)
+    inference, theta, x, proposal = _round_one_data_with_nan(NPE_A)
 
     with caplog.at_level(logging.WARNING), warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         inference.append_simulations(theta, x, proposal=proposal)  # must not raise
-
-    assert "Found 1 NaN simulations" in caplog.text
-    assert "does not allow invalid simulations" not in caplog.text
-
-
-@pytest.mark.parametrize("trainer_class", (NPE_C, MNPE))
-def test_single_round_tolerates_invalid_x(trainer_class, caplog):
-    """Round 0 uses the plain log-prob loss, so discarding invalid rows is safe.
-
-    Filtering the joint on the validity of x leaves p(theta|x) unchanged for valid x, so
-    the strict check must not apply without a proposal.
-    """
-    prior = utils.BoxUniform(-2.0 * ones(2), 2.0 * ones(2))
-    theta = prior.sample((20,))
-    x = theta + 0.1 * torch.randn(20, 2)
-    x[0, 0] = float("nan")
-
-    inference = trainer_class(prior=prior, show_progress_bars=False)
-    with caplog.at_level(logging.WARNING):
-        inference.append_simulations(theta, x)  # must not raise
 
     assert "Found 1 NaN simulations" in caplog.text
     assert "does not allow invalid simulations" not in caplog.text
