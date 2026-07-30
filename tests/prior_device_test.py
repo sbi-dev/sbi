@@ -5,6 +5,7 @@ import pytest
 import torch
 from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal, Normal
 
+from sbi.utils import RestrictedPrior
 from sbi.utils.torchutils import BoxUniform, process_device
 from sbi.utils.user_input_checks_utils import (
     MultipleIndependent,
@@ -108,3 +109,31 @@ def test_MultipleIndependent(device: str):
     assert log_probs.device.type == device.split(":")[0], (
         f"log_prob was not correctly moved to {device}."
     )
+
+
+@pytest.mark.parametrize(
+    "prior",
+    [
+        BoxUniform(torch.zeros(2), torch.ones(2)),
+        PytorchReturnTypeWrapper(MultivariateNormal(torch.zeros(2), torch.eye(2))),
+        MultipleIndependent([
+            Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
+            Beta(torch.tensor([2.0]), torch.tensor([2.0])),
+        ]),
+    ],
+)
+def test_prior_to_stores_resolved_device(prior):
+    """Test that `.to()` stores the resolved device, whatever the spelling."""
+    prior.to("cpu:0")
+    assert prior.device == "cpu"
+
+
+def test_restricted_prior_stores_resolved_device():
+    """Test that RestrictedPrior resolves the device it is constructed with."""
+    prior = BoxUniform(torch.zeros(2), torch.ones(2))
+
+    def accept_all(theta):
+        return torch.ones(theta.shape[0], dtype=torch.bool)
+
+    restricted = RestrictedPrior(prior, accept_all, device="cpu:0")
+    assert restricted._device == "cpu"
