@@ -42,7 +42,11 @@ from sbi.sbi_types import (
     TorchTransform,
 )
 from sbi.utils.sbiutils import mcmc_transform
-from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
+from sbi.utils.torchutils import (
+    atleast_2d_float32_tensor,
+    ensure_theta_batched,
+    process_device,
+)
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 # Supported Zuko flow types for VI (lowercase names)
@@ -152,7 +156,7 @@ class VIPosterior(NeuralPosterior):
         super().__init__(potential_fn, theta_transform, device, x_shape=x_shape)
 
         # Especially the prior may be on another device -> move it...
-        self._device = device
+        device = self._device
         self.theta_transform = theta_transform
         self.x_shape = x_shape
         self.potential_fn.device = device
@@ -221,6 +225,7 @@ class VIPosterior(NeuralPosterior):
         Returns:
             self for method chaining.
         """
+        device = process_device(device)
         self._device = device
 
         # Move potential (which moves prior, x_o, and estimator).
