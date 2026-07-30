@@ -33,7 +33,6 @@ def run_sbc(
     num_workers: int = 1,
     show_progress_bar: bool = True,
     use_batched_sampling: bool = True,
-    **kwargs,
 ) -> Tuple[Tensor, Tensor]:
     """Run simulation-based calibration (SBC) or expected coverage.
 
@@ -69,15 +68,6 @@ def run_sbc(
 
     # Validate input parameters.
     _validate_sbc_inputs(thetas, xs, num_sbc_samples, num_posterior_samples)
-
-    # Handle deprecated parameter.
-    if "sbc_batch_size" in kwargs:
-        warnings.warn(
-            "`sbc_batch_size` is deprecated and will be removed in future versions."
-            " Use `num_workers` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     # Get posterior samples, batched or parallelized.
     posterior_samples = get_posterior_samples_on_batch(
