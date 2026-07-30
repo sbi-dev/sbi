@@ -113,7 +113,9 @@ def infer(
             parameters, e.g. which ranges are meaningful for them. Any
             object with `.log_prob()`and `.sample()` (for example, a PyTorch
             distribution) can be used.
-        method: What inference method to use. Either of SNPE, SNLE or SNRE.
+        method: What inference method to use. Either of 'npe', 'nle' or 'nre'. The
+            legacy names 'snpe', 'snle' and 'snre' still work but emit a
+            `FutureWarning`.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
@@ -132,7 +134,7 @@ def infer(
         method_fun: Callable = getattr(sbi.inference, method.upper())
     except AttributeError as err:
         raise NameError(
-            "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
+            "Method not available. `method` must be one of 'npe', 'nle', 'nre'."
         ) from err
 
     if (
