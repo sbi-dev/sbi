@@ -167,17 +167,7 @@ def z_score_parser(
     Returns:
         Flag for whether or not to z-score, and whether data is structured
     """
-    if isinstance(z_score_flag, bool):
-        # Raise warning if boolean was passed.
-        warnings.warn(
-            "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
-            "removed in a future release. Use 'none', 'independent', or 'structured' "
-            "to indicate z-scoring option.",
-            stacklevel=2,
-        )
-        z_score_bool, structured_data = z_score_flag, False
-
-    elif (z_score_flag is None) or (z_score_flag == "none"):
+    if (z_score_flag is None) or (z_score_flag == "none"):
         # Return Falses if "none" or None was passed.
         z_score_bool, structured_data = False, False
 
