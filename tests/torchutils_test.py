@@ -270,9 +270,12 @@ def test_process_device(device_input) -> None:
                 assert device_output == "mps:0"
 
         # GPU devices are returned with an explicit index, whichever way they are
-        # spelled, so that device strings can be compared directly.
-        if str(device_input).startswith("cuda") and torch.cuda.is_available():
+        # spelled, so that device strings can be compared directly. A bare "cuda"
+        # resolves to the current device; an explicit index is kept verbatim.
+        if device_input == "cuda" and torch.cuda.is_available():
             assert device_output == f"cuda:{torch.cuda.current_device()}"
+        if device_input == "cuda:0" and torch.cuda.is_available():
+            assert device_output == "cuda:0"
         if str(device_input).startswith("mps") and torch.backends.mps.is_available():
             assert device_output == "mps:0"
 

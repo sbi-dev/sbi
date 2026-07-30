@@ -783,7 +783,7 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
 
     for transform in posterior.theta_transform._inv.base_transform.parts:
         assert (
-            str(transform(torch.tensor([0.0], device=device)).device).strip(":0")
+            transform(torch.tensor([0.0], device=device)).device.type
             == device.split(":")[0]
         ), "Prior transform is on the correct device."
 
