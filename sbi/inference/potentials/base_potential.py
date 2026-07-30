@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks import process_x
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
@@ -28,7 +29,7 @@ class BasePotential(metaclass=ABCMeta):
             x_o: Observed data.
             device: Device on which to evaluate the potential function.
         """
-        self.device = device
+        self.device = process_device(device)
         self.prior = prior
         self.set_x(x_o)
 
@@ -94,6 +95,7 @@ class BasePotential(metaclass=ABCMeta):
             Self for method chaining.
         """
 
+        device = process_device(device)
         self.device = device
         if self.prior is not None:
             self.prior = move_distribution_to_device(self.prior, device)
