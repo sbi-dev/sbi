@@ -1,9 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import copy
 import warnings
 from copy import deepcopy
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
@@ -29,11 +29,11 @@ from sbi.neural_nets.net_builders.flow import (
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
 from sbi.samplers.vi.vi_quality_control import get_quality_metric
 from sbi.samplers.vi.vi_utils import (
+    AdaptedVariationalDistribution,
     LearnableGaussian,
     TransformedZukoFlow,
-    adapt_variational_distribution,
     check_variational_distribution,
-    make_object_deepcopy_compatible,
+    detach_and_deepcopy,
 )
 from sbi.sbi_types import (
     Shape,
@@ -59,6 +59,26 @@ VariationalFamily = Literal[
 
 # Type for the q parameter in VIPosterior
 QType = Union[VariationalFamily, Distribution, "VIPosterior", Callable]
+
+
+@dataclass
+class _QSpec:
+    """Stores how to rebuild the variational distribution.
+
+    Attributes:
+        kind: Which variational family `q` was built from.
+        flow_type: Zuko flow name, for `kind="flow"`.
+        full_covariance: Whether the Gaussian is full-rank, for `kind="gaussian"`.
+        builder: The user's own builder function, for `kind="callable"`.
+        init_snapshot: Copy of the user's distribution before training, for
+            `kind="distribution"`.
+    """
+
+    kind: Literal["flow", "gaussian", "callable", "distribution", "instance"]
+    flow_type: Optional[str] = None
+    full_covariance: Optional[bool] = None
+    builder: Optional[Callable] = None
+    init_snapshot: Optional[Distribution] = None
 
 
 class VIPosterior(NeuralPosterior):
@@ -122,7 +142,9 @@ class VIPosterior(NeuralPosterior):
                 TorchTransform, device: str) -> Distribution` for custom flow
                 configurations. The
                 callable should return a distribution with `sample()` and `log_prob()`
-                methods. If q is already a `VIPosterior`, then the arguments will be
+                methods, and should be a module-level function: the posterior keeps it
+                in order to rebuild `q`, and a local function or lambda cannot be
+                pickled. If q is already a `VIPosterior`, then the arguments will be
                 copied from it (relevant for multi-round training).
             theta_transform: Maps form prior support to unconstrained space. The
                 inverse is used here to ensure that the posterior support is equal to
@@ -343,6 +365,41 @@ class VIPosterior(NeuralPosterior):
 
         return transformed_flow.to(self._device)
 
+    def _build_q_from_spec(self) -> Distribution:
+        """Build a fresh variational distribution from `self._q_spec`.
+
+        Returns:
+            An untrained `q` of the family originally requested.
+
+        Raises:
+            ValueError: If `q` was supplied as an already-built distribution, which does
+                not say how to build a new one.
+        """
+        spec = self._q_spec
+        if spec.kind == "flow":
+            assert spec.flow_type is not None
+            return self._build_unconditional_flow(spec.flow_type)
+        if spec.kind == "gaussian":
+            return LearnableGaussian(
+                dim=self._prior.event_shape[0],
+                full_covariance=bool(spec.full_covariance),
+                link_transform=self.link_transform,
+                device=self._device,
+            )
+        if spec.kind == "callable":
+            assert spec.builder is not None
+            return spec.builder(
+                self._prior.event_shape, self.link_transform, device=self._device
+            )
+        if spec.kind == "distribution":
+            assert spec.init_snapshot is not None
+            return detach_and_deepcopy(spec.init_snapshot)
+        raise ValueError(
+            "Cannot rebuild `q`: it was passed as an already-built distribution, which "
+            "does not say how to build a new one. To use `retrain_from_scratch`, pass "
+            "`q` as a variational family name, a `Callable`, or a `Distribution`."
+        )
+
     def _build_conditional_flow(
         self,
         theta: Tensor,
@@ -437,7 +494,9 @@ class VIPosterior(NeuralPosterior):
                 parameters (you can pass them within the parameters/modules attribute).
                 Additionally, we allow a `Callable` with signature
                 `(event_shape: torch.Size, link_transform: TorchTransform, device: str)
-                -> Distribution`, which builds a custom distribution. If q is already
+                -> Distribution`, which builds a custom distribution. It should be a
+                module-level function: the posterior keeps it in order to rebuild `q`,
+                and a local function or lambda cannot be pickled. If q is already
                 a `VIPosterior`, then the arguments will be copied from it (relevant
                 for multi-round training).
 
@@ -451,53 +510,36 @@ class VIPosterior(NeuralPosterior):
             parameters = []
         if modules is None:
             modules = []
-        self._q_arg = (q, parameters, modules)
         _flow_types = (ZukoUnconditionalFlow, TransformedZukoFlow, LearnableGaussian)
         if isinstance(q, _flow_types):
-            # Flow/Gaussian passed directly (e.g., from _q_build_fn during retrain)
-            make_object_deepcopy_compatible(q)
+            # Nothing records how to build another one, so retraining will refuse.
+            self._q_spec = _QSpec(kind="instance")
             self._trained_on = None
         elif isinstance(q, Distribution):
-            q = adapt_variational_distribution(
-                q,
-                self._prior,
-                self.link_transform,
-                parameters=parameters,
-                modules=modules,
+            # Wrapping an already-wrapped `q`, as `retrain_from_scratch` hands back,
+            # would apply the link transform twice and break sampling.
+            if not isinstance(q, AdaptedVariationalDistribution):
+                q = AdaptedVariationalDistribution(
+                    q,
+                    self._prior,
+                    self.link_transform,
+                    parameters=parameters,
+                    modules=modules,
+                )
+            self._q_spec = _QSpec(
+                kind="distribution", init_snapshot=detach_and_deepcopy(q)
             )
-            make_object_deepcopy_compatible(q)
-            self_custom_q_init_cache = deepcopy(q)
-            self._q_build_fn = lambda *args, **kwargs: self_custom_q_init_cache
             self._trained_on = None
-            self._zuko_flow_type = None
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
                 if q in _ZUKO_FLOW_TYPES:
-                    q_flow = self._build_unconditional_flow(q)
-                    self._zuko_flow_type = q
-                    self._q_build_fn = lambda *args, ft=q, **kwargs: (
-                        self._build_unconditional_flow(ft)
-                    )
-                    q = q_flow
+                    self._q_spec = _QSpec(kind="flow", flow_type=q)
+                    q = self._build_unconditional_flow(q)
                 elif q in ("gaussian", "gaussian_diag"):
-                    self._zuko_flow_type = None
-                    full_cov = q == "gaussian"
-                    dim = self._prior.event_shape[0]
-                    q_dist = LearnableGaussian(
-                        dim=dim,
-                        full_covariance=full_cov,
-                        link_transform=self.link_transform,
-                        device=self._device,
+                    self._q_spec = _QSpec(
+                        kind="gaussian", full_covariance=q == "gaussian"
                     )
-                    self._q_build_fn = lambda *args, fc=full_cov, d=dim, **kwargs: (
-                        LearnableGaussian(
-                            dim=d,
-                            full_covariance=fc,
-                            link_transform=self.link_transform,
-                            device=self._device,
-                        )
-                    )
-                    q = q_dist
+                    q = self._build_q_from_spec()
                 else:
                     supported = sorted(_ZUKO_FLOW_TYPES) + ["gaussian", "gaussian_diag"]
                     raise ValueError(
@@ -506,26 +548,18 @@ class VIPosterior(NeuralPosterior):
                     )
             else:
                 # Callable provided - use as-is
-                self._zuko_flow_type = None
-                self._q_build_fn = q
-                q = self._q_build_fn(
-                    self._prior.event_shape,
-                    self.link_transform,
-                    device=self._device,
-                )
-            make_object_deepcopy_compatible(q)
+                self._q_spec = _QSpec(kind="callable", builder=q)
+                q = self._build_q_from_spec()
             self._trained_on = None
         elif isinstance(q, VIPosterior):
-            self._q_build_fn = q._q_build_fn
+            # A copy, so that later `set_q` calls on one posterior stay local to it.
+            self._q_spec = replace(q._q_spec)
             self._trained_on = q._trained_on
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
-            self._zuko_flow_type = getattr(q, "_zuko_flow_type", None)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
-            self._q_arg = q._q_arg
-            make_object_deepcopy_compatible(q.q)
-            q = deepcopy(q.q)
+            q = detach_and_deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
             if hasattr(q, "to"):
                 q.to(self._device)  # type: ignore[union-attr]
@@ -767,7 +801,12 @@ class VIPosterior(NeuralPosterior):
             clip_value: Gradient clipping value, decreasing may help if you see invalid
                 values.
             warm_up_rounds: Initialize the posterior as the prior.
-            retrain_from_scratch: Retrain the variational distributions from scratch.
+            retrain_from_scratch: Rebuild the variational distribution before training.
+                For a family name or a `Callable` builder this re-initialises with fresh
+                random weights. For a user-supplied `Distribution` it restores the copy
+                taken when `q` was set, since sbi cannot re-randomize an opaque object.
+                Raises `ValueError` if `q` was given as an already-built distribution,
+                which does not say how to build a new one.
             reset_optimizer: Reset the divergence optimizer
             show_progress_bar: If any progress report should be displayed.
             quality_control: If False quality control is skipped.
@@ -813,7 +852,10 @@ class VIPosterior(NeuralPosterior):
 
         # Init q and the optimizer if necessary
         if retrain_from_scratch:
-            self.q = self._q_build_fn()  # type: ignore
+            # Setting `q` forgets how to rebuild it, so keep our own copy.
+            spec = self._q_spec
+            self.q = self._build_q_from_spec()
+            self._q_spec = spec
             self._optimizer = self._optimizer_builder(
                 self.potential_fn,
                 self.q,
@@ -1333,65 +1375,24 @@ class VIPosterior(NeuralPosterior):
             force_update=force_update,
         )
 
-    def __deepcopy__(self, memo: Optional[Dict] = None) -> "VIPosterior":
-        """This method is called when using `copy.deepcopy` on the object.
-
-        It defines how the object is copied. We need to overwrite this method, since the
-        default implementation does use __getstate__ and __setstate__ which we overwrite
-        to enable pickling (and in particular the necessary modifications are
-        incompatible deep copying).
-
-        Args:
-            memo (Optional[Dict], optional): Deep copy internal memo. Defaults to None.
-
-        Returns:
-            VIPosterior: Deep copy of the VIPosterior.
-        """
-        if memo is None:
-            memo = {}
-
-        # Create a new instance of the class
-        cls = self.__class__
-        result = cls.__new__(cls)
-        # Add to memo
-        memo[id(self)] = result
-        # Copy attributes
-        for k, v in self.__dict__.items():
-            setattr(result, k, copy.deepcopy(v, memo))
-        return result
-
     def __getstate__(self) -> Dict:
-        """This method is called when pickling the object.
+        """Returns the state of the object that is supposed to be pickled.
 
-        It defines what is pickled. We need to overwrite this method, since some parts
-        do not support pickle protocols (e.g. due to local functions).
+        Also used by `copy.deepcopy`. Must clear entries on the copy and not on `self`,
+        so that saving a posterior leaves it unchanged. The optimizer is left out
+        because `train()` builds a new one when it is missing.
 
         Returns:
-            Dict: All attributes of the VIPosterior.
+            The attributes to be pickled.
         """
-        self._optimizer = None
-        self.__deepcopy__ = None  # type: ignore
-        self._q_build_fn = None
-        self._q.__deepcopy__ = None  # type: ignore
         state = self.__dict__.copy()
+        state["_optimizer"] = None
         return state
 
-    def __setstate__(self, state_dict: Dict):
-        """This method is called when unpickling the object.
-
-        Especially, we need to restore the removed attributes and ensure that the object
-        e.g. remains deep copy compatible.
+    def __setstate__(self, state_dict: Dict) -> None:
+        """Sets the state when being loaded from pickle.
 
         Args:
-            state_dict: Given state dictionary, we will restore the object from it.
+            state_dict: State produced by `__getstate__`.
         """
         self.__dict__ = state_dict
-        q = deepcopy(self._q)
-        # Restore removed attributes
-        self.set_q(*self._q_arg)
-        self._q = q
-        make_object_deepcopy_compatible(self)
-        make_object_deepcopy_compatible(self.q)
-        # Handle amortized mode
-        if self._mode == "amortized" and self._amortized_q is not None:
-            make_object_deepcopy_compatible(self._amortized_q)

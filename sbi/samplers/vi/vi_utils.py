@@ -7,6 +7,7 @@ from typing import (
     Dict,
     Iterable,
     Optional,
+    TypeVar,
     Union,
 )
 
@@ -19,12 +20,13 @@ from torch.distributions import (
     Normal,
     TransformedDistribution,
 )
-from torch.distributions.transforms import ComposeTransform, IndependentTransform
 from torch.nn import Module
 
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
 from sbi.utils.torchutils import _base_recursor
+
+_CopyableT = TypeVar("_CopyableT")
 
 
 class TransformedZukoFlow(nn.Module):
@@ -256,48 +258,6 @@ def filter_kwargs_for_func(f: Callable, kwargs: Dict) -> Dict:
     return new_kwargs
 
 
-def get_parameters(t: Union[TorchTransform, Module]) -> Iterable:
-    """Recursive helper function which can be used to extract parameters from
-    TransformedDistributions.
-
-    Args:
-        t: A TorchTransform object, which is scanned for the "parameters" attribute.
-
-    Yields:
-        Iterator[Iterable]: Generator of parameters.
-    """
-    if hasattr(t, "parameters"):
-        yield from t.parameters()  # type: ignore
-    elif isinstance(t, ComposeTransform):
-        for part in t.parts:
-            yield from get_parameters(part)
-    elif isinstance(t, IndependentTransform):
-        yield from get_parameters(t.base_transform)
-    else:
-        pass
-
-
-def get_modules(t: Union[TorchTransform, Module]) -> Iterable:
-    """Recursive helper function which can be used to extract modules from
-    TransformedDistributions.
-
-    Args:
-        t: A TorchTransform object, which is scanned for the "modules" attribute.
-
-    Yields:
-        Iterator[Iterable]: Generator of Modules
-    """
-    if isinstance(t, Module):
-        yield t
-    elif isinstance(t, ComposeTransform):
-        for part in t.parts:
-            yield from get_modules(part)
-    elif isinstance(t, IndependentTransform):
-        yield from get_modules(t.base_transform)
-    else:
-        pass
-
-
 def check_parameters_modules_attribute(q: VariationalDistribution) -> None:
     """Checks a parameterized distribution object for valid `parameters` and `modules`.
 
@@ -394,101 +354,139 @@ def check_variational_distribution(q: Distribution, prior: Distribution) -> None
     check_sample_shape_and_support(q, prior)
 
 
-def add_parameters_module_attributes(
-    q: Distribution, parameters: Callable, modules: Callable
-):
-    """Sets the attribute `parameters` and `modules` on q
-
-    Args:
-        q: Variational distribution which is checked
-        parameters: A function which returns an iterable of leaf tensors.
-        modules: A function which returns an iterable of nn.Module
-
-
-    """
-    q.parameters = parameters  # type: ignore
-    q.modules = modules  # type: ignore
+def _owns_parameters(transform: TorchTransform) -> bool:
+    """Whether a transform, or one it is built from, holds trainable tensors."""
+    if hasattr(transform, "parameters"):
+        return True
+    parts = getattr(transform, "parts", None) or [
+        t for t in [getattr(transform, "base_transform", None)] if t is not None
+    ]
+    return any(_owns_parameters(part) for part in parts)
 
 
-def add_parameter_attributes_to_transformed_distribution(
-    q: TransformedDistribution,
-) -> None:
-    """A function that will add `parameters` and `modules` to q automatically, if q is a
-    TransformedDistribution.
+class AdaptedVariationalDistribution(Distribution):
+    """Wraps a user-supplied variational distribution for the `DivergenceOptimizer`s.
 
-    Args:
-        q: Variational distribution instances TransformedDistribution.
+    Makes the support match the prior's, and defines `parameters` and `modules` as
+    methods on the class so that the distribution can be pickled.
 
-
+    Must offer the same methods as a `TransformedDistribution`: it is not an
+    `nn.Module` and does not define `sample_and_log_prob`, because
+    `DivergenceOptimizer` checks for both and behaves differently if they exist. It
+    does define `to`, so that moving the posterior across devices reaches `q`.
     """
 
-    def parameters():
-        """Returns the parameters of the distribution."""
-        if hasattr(q.base_dist, "parameters"):
-            yield from q.base_dist.parameters()  # type: ignore[attr-defined]
-        for t in q.transforms:
-            yield from get_parameters(t)
+    arg_constraints: Dict = {}
 
-    def modules():
-        """Returns the modules of the distribution."""
-        if hasattr(q.base_dist, "modules"):
-            yield from q.base_dist.modules()  # type: ignore[attr-defined]
-        for t in q.transforms:
-            yield from get_modules(t)
+    def __init__(
+        self,
+        q: Distribution,
+        prior: Distribution,
+        link_transform: Callable,
+        parameters: Optional[Iterable] = None,
+        modules: Optional[Iterable] = None,
+    ) -> None:
+        """
+        Args:
+            q: The user's variational distribution.
+            prior: Prior, used only to compare supports.
+            link_transform: Applied when `q`'s support differs from the prior's.
+            parameters: Trainable tensors, for a `q` that does not expose them itself.
+                Required if the tensors live anywhere other than `q` or, for a
+                `TransformedDistribution`, its base distribution.
+            modules: Modules, for a `q` that does not expose them itself.
 
-    add_parameters_module_attributes(q, parameters, modules)
+        Raises:
+            ValueError: If no trainable tensors can be found, or if some sit somewhere
+                sbi does not look and were not passed as `parameters`.
+        """
+        self._user_parameters = list(parameters) if parameters is not None else []
+        self._user_modules = list(modules) if modules is not None else []
 
+        self._source = q
+        if not self._user_parameters and not hasattr(q, "parameters"):
+            # A `TransformedDistribution` holds its trainable tensors on the base.
+            base = getattr(q, "base_dist", None)
+            if base is None or not hasattr(base, "parameters"):
+                raise ValueError(
+                    "The variational distribution has no parameters to optimize. Pass "
+                    "the trainable tensors as `parameters` (and any modules as "
+                    "`modules`)."
+                )
+            if any(_owns_parameters(t) for t in getattr(q, "transforms", [])):
+                raise ValueError(
+                    "The variational distribution keeps trainable tensors in its "
+                    "transforms, which sbi does not collect on its own. Pass all of "
+                    "them as `parameters` (and any modules as `modules`), so that none "
+                    "are silently left out of training."
+                )
+            self._source = base
 
-def adapt_variational_distribution(
-    q: VariationalDistribution,
-    prior: Distribution,
-    link_transform: Callable,
-    parameters: Optional[Iterable] = None,
-    modules: Optional[Iterable] = None,
-) -> Distribution:
-    """This will adapt a distribution to be compatible with DivergenceOptimizers.
-    Especially it will make sure that the distribution has parameters and that it
-    satisfies obvious contraints which a posterior must satisfy i.e. the support must be
-    equal to that of the prior.
-
-    Args:
-        q: Variational distribution.
-        prior: Prior distribution
-        theta_transform: Theta transformation.
-        parameters: List of parameters.
-        modules: List of modules.
-
-    Returns:
-        TransformedDistribution: Compatible variational distribution.
-
-    """
-    if parameters is None:
-        parameters = []
-    if modules is None:
-        modules = []
-
-    # Extract user define parameters
-    def parameters_fn():
-        """Returns the parameters of the distribution."""
-        return parameters
-
-    def modules_fn():
-        """Returns the modules of the distribution."""
-        return modules
-
-    if isinstance(q, TransformedDistribution):
-        if parameters == [] or modules_fn == []:
-            add_parameter_attributes_to_transformed_distribution(q)
-        else:
-            add_parameters_module_attributes(q, parameters_fn, modules_fn)
         if hasattr(prior, "support") and q.support != prior.support:
-            q = TransformedDistribution(q.base_dist, q.transforms + [link_transform])
-    else:
-        if hasattr(prior, "support") and q.support != prior.support:
-            q = TransformedDistribution(q, [link_transform])
-        add_parameters_module_attributes(q, parameters_fn, modules_fn)
+            if isinstance(q, TransformedDistribution):
+                q = TransformedDistribution(
+                    q.base_dist, list(q.transforms) + [link_transform]
+                )
+            else:
+                q = TransformedDistribution(q, [link_transform])
+        self._q = q
 
-    return q
+        super().__init__(
+            batch_shape=q.batch_shape,
+            event_shape=q.event_shape,
+            validate_args=False,
+        )
+
+    def parameters(self) -> Iterable:
+        """Yield the trainable tensors, as given or as `q` exposes them."""
+        if self._user_parameters:
+            return iter(self._user_parameters)
+        return self._source.parameters()  # type: ignore[attr-defined]
+
+    def modules(self) -> Iterable:
+        """Yield the modules, as given or as `q` exposes them."""
+        if self._user_modules:
+            return iter(self._user_modules)
+        if hasattr(self._source, "modules"):
+            return self._source.modules()  # type: ignore[attr-defined]
+        return iter(())
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Move the trainable tensors to `device`, in place.
+
+        In place, so that every object holding a reference to them, such as the
+        optimizer, keeps seeing the same tensors.
+        """
+        if hasattr(self._source, "to"):
+            self._source.to(device)
+        for module in self._user_modules:
+            module.to(device)
+        # Covers tensors passed as `parameters` or found on a plain-distribution
+        # source, which offer no `to` of their own.
+        for parameter in self.parameters():
+            parameter.data = parameter.data.to(device)
+            if parameter.grad is not None:
+                parameter.grad.data = parameter.grad.data.to(device)
+
+    @property
+    def support(self):  # type: ignore[override]
+        return self._q.support
+
+    @property
+    def has_rsample(self) -> bool:  # type: ignore[override]
+        return self._q.has_rsample
+
+    def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
+        return self._q.sample(sample_shape)
+
+    def rsample(self, sample_shape: Shape = torch.Size()) -> Tensor:
+        return self._q.rsample(sample_shape)
+
+    def log_prob(self, value: Tensor) -> Tensor:
+        return self._q.log_prob(value)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self._q})"
 
 
 def detach_all_non_leaf_tensors(obj: object) -> None:
@@ -511,23 +509,18 @@ def detach_all_non_leaf_tensors(obj: object) -> None:
         _base_recursor(obj, check=check, action=action)
 
 
-def make_object_deepcopy_compatible(obj: object):
-    """This function overwrites the `__deepcopy__` attribute. This is required if e.g.
-    the object contains non leaf PyTorch tensors.
+def detach_and_deepcopy(obj: _CopyableT) -> _CopyableT:
+    """Deep-copy `obj`, detaching any non-leaf tensors it caches first.
+
+    Only needed for `torch.distributions` objects, whose constructors call `.expand()`
+    and cache non-leaf tensors that `deepcopy` refuses. `nn.Module`-based families hold
+    only leaf parameters and copy fine.
 
     Args:
-        obj: An object where a corresponding `__deepcopy__` attributed is added.
+        obj: Object to copy.
 
+    Returns:
+        An independent copy of `obj`.
     """
-
-    def __deepcopy__(memo):
-        detach_all_non_leaf_tensors(obj)
-        cls = obj.__class__
-        result = cls.__new__(cls)
-        memo[id(obj)] = result
-        for k, v in obj.__dict__.items():
-            setattr(result, k, deepcopy(v, memo))
-        return result
-
-    obj.__deepcopy__ = __deepcopy__  # type: ignore
-    return obj
+    detach_all_non_leaf_tensors(obj)
+    return deepcopy(obj)

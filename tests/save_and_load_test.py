@@ -8,14 +8,39 @@ import torch
 
 from sbi import utils as utils
 from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
     VIPosteriorParameters,
     VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
+
+
+def _assert_survives_pickling(posterior, num_dim: int) -> None:
+    """Saving must leave the posterior unchanged and reload an equivalent one.
+
+    Compares seeded samples rather than their shape: a posterior that lost a weight, or
+    a `VIPosterior` that silently retrained, still returns correctly shaped samples.
+    """
+    torch.manual_seed(0)
+    expected = posterior.sample((3,))
+
+    attributes = {name: id(value) for name, value in vars(posterior).items()}
+    reloaded = pickle.loads(pickle.dumps(posterior))
+    assert {name: id(value) for name, value in vars(posterior).items()} == attributes, (
+        "pickling replaced attributes on the posterior it serialized"
+    )
+
+    torch.manual_seed(0)
+    samples = reloaded.sample((3,))
+    assert samples.shape == (3, num_dim)
+    if not isinstance(posterior, MCMCPosterior):
+        # MCMC drops its sampler on purpose (#1291) and so redraws a fresh chain.
+        assert torch.allclose(samples, expected)
 
 
 @pytest.mark.parametrize(
@@ -28,6 +53,7 @@ from sbi.inference.posteriors.vi_posterior import VIPosterior
         pytest.param(NRE, MCMCPosteriorParameters, marks=pytest.mark.mcmc),
         pytest.param(NRE, VIPosteriorParameters, marks=pytest.mark.mcmc),
         (NRE, RejectionPosteriorParameters),
+        (NRE, ImportanceSamplingPosteriorParameters),
     ),
 )
 def test_picklability(
@@ -65,9 +91,8 @@ def test_picklability(
         loaded_posterior = pickle.load(handle)
 
     # A corrupted `theta_transform` unpickles fine and only fails on use (#1952).
-    # VIPosterior is skipped: `__setstate__` resets `_trained_on`, a separate gap.
-    if not isinstance(posterior, VIPosterior):
-        assert loaded_posterior.sample((1,)).shape == (1, num_dim)
+    assert loaded_posterior.sample((1,)).shape == (1, num_dim)
+    _assert_survives_pickling(posterior, num_dim)
 
     with open(f"{tmp_path}/saved_inference.pickle", "wb") as handle:
         pickle.dump(inference, handle)
