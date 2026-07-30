@@ -122,6 +122,20 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         proposal: Optional[Any],
     ) -> Tensor: ...
 
+    def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
+        """Return whether the multi-round loss for `proposal` treats rows independently.
+
+        A per-row loss can discard invalid simulations without bias, and can only be
+        fitted to the latest round.
+
+        Args:
+            proposal: The distribution the parameters of a round were sampled from.
+
+        Returns:
+            False, unless a subclass says otherwise for this proposal.
+        """
+        return False
+
     def append_simulations(
         self,
         theta: Tensor,
@@ -146,12 +160,10 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 `None`, it will trigger a different loss-function.
             exclude_invalid_x: Whether invalid simulations are discarded during
                 training. For single-round NPE, it is fine to discard invalid
-                simulations, but for multi-round NPE (atomic), discarding invalid
-                simulations gives systematically wrong results, so this raises
-                instead. If `None`, it will be `True` in the first round and `False`
-                in later rounds. Whether the atomic loss applies is only known once
-                `train()` runs, so the first multi-round round is treated as atomic
-                even for a MoG setup that will not use it.
+                simulations, but for multi-round NPE with a loss that normalizes across
+                the batch, discarding them gives systematically wrong results, so this
+                raises instead. If `None`, it will be `True` in the first round and
+                `False` in later rounds.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
@@ -201,11 +213,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             f"{'Multiround' if current_round > 0 else 'Single-round'} "
             f"{type(self).__name__}"
         )
-        if (
-            current_round > 0
-            and not getattr(self, "_per_row_multiround_loss", False)
-            and not self.use_non_atomic_loss
-        ):
+        if current_round > 0 and not self._multiround_loss_is_per_row(proposal):
             nle_nre_apt_msg_on_invalid_x(
                 num_nans, num_infs, exclude_invalid_x, algorithm
             )
@@ -606,9 +614,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(context.discard_prior_samples and self._round > 0)
 
-        # A per-row loss cannot reuse samples from previous rounds: for the non-atomic
-        # loss this is a current limitation, for NPE-A it is how the algorithm works.
-        if self.use_non_atomic_loss or getattr(self, "_per_row_multiround_loss", False):
+        # A per-row loss cannot reuse earlier rounds: a current limitation for the
+        # non-atomic loss, and how the algorithm works for NPE-A.
+        latest_proposal = (
+            self._proposal_roundwise[-1] if self._proposal_roundwise else None
+        )
+        if self._multiround_loss_is_per_row(latest_proposal):
             start_idx = self._round
 
         return start_idx

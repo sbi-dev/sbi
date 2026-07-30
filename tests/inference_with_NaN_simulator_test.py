@@ -118,6 +118,58 @@ def test_multiround_npe_c_warns_when_excluding_invalid_x(caplog):
     assert inference.get_simulations()[0].shape[0] == theta.shape[0] - 1
 
 
+@pytest.mark.parametrize("trainer_class", (NPE_B, NPE_C, MNPE))
+def test_single_round_tolerates_invalid_x(trainer_class, caplog):
+    """Round 0 uses the plain log-prob loss, so discarding invalid rows is safe.
+
+    Guards the `current_round > 0` gate: without a proposal the strict check must not
+    apply, or ordinary single-round training would start raising.
+    """
+    prior = utils.BoxUniform(-2.0 * ones(2), 2.0 * ones(2))
+    theta = prior.sample((20,))
+    x = theta + 0.1 * torch.randn(20, 2)
+    x[0, 0] = float("nan")
+
+    inference = trainer_class(prior=prior, show_progress_bars=False)
+    with caplog.at_level(logging.WARNING):
+        inference.append_simulations(theta, x)  # must not raise
+
+    assert "Found 1 NaN simulations" in caplog.text
+    assert "does not allow invalid simulations" not in caplog.text
+
+
+def test_npe_c_checks_the_current_proposal_not_the_previous_round():
+    """The guard must judge the proposal being appended, not the last trained round.
+
+    A MoG round sets `use_non_atomic_loss=True`. If the guard read that flag, the next
+    round with a non-MoG proposal would take the lenient branch, keep the invalid rows,
+    and then train atomically on them.
+    """
+    prior = utils.BoxUniform(-2.0 * ones(2), 2.0 * ones(2))
+    inference = NPE_C(prior=prior, density_estimator="mdn", show_progress_bars=False)
+
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn(100, 2)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+    mog_proposal = inference.build_posterior().set_default_x(x[0])
+
+    # A MoG proposal selects the non-atomic loss and records it on the trainer.
+    theta = mog_proposal.sample((100,), show_progress_bars=False)
+    x = theta + 0.1 * torch.randn(100, 2)
+    inference.append_simulations(theta, x, proposal=mog_proposal)
+    inference.train(max_num_epochs=1)
+    assert inference.use_non_atomic_loss, "expected the MoG path in this round"
+
+    # The next round uses a non-MoG proposal, so the atomic loss applies again.
+    non_mog_proposal = utils.BoxUniform(-1.0 * ones(2), ones(2))
+    theta = non_mog_proposal.sample((100,))
+    x = theta + 0.1 * torch.randn(100, 2)
+    x[0, 0] = float("nan")
+
+    with pytest.raises(ValueError, match="does not allow invalid simulations"):
+        inference.append_simulations(theta, x, proposal=non_mog_proposal)
+
+
 def test_multiround_npe_a_tolerates_invalid_x(caplog):
     """NPE-A trains on the plain log-prob, so discarding rows cannot bias it."""
     inference, theta, x, proposal = _round_one_data_with_nan(NPE_A)

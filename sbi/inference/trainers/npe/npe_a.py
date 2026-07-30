@@ -85,10 +85,6 @@ class NPE_A(PosteriorEstimatorTrainer):
         samples = posterior.sample((1000,), x=x_o)
     """
 
-    # Unlike NPE-B and NPE-C, NPE-A trains on the plain log-prob, so discarding invalid
-    # simulations cannot bias it.
-    _per_row_multiround_loss = True
-
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -471,6 +467,19 @@ class NPE_A(PosteriorEstimatorTrainer):
         )
 
         return self._posterior
+
+    def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
+        """Return True: NPE-A trains on the plain log-prob for any proposal.
+
+        The proposal correction is applied analytically after training, not in the loss.
+
+        Args:
+            proposal: Unused, the answer does not depend on it.
+
+        Returns:
+            True.
+        """
+        return True
 
     def _log_prob_proposal_posterior(
         self,
