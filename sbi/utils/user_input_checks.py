@@ -28,7 +28,7 @@ def check_prior(prior: Any) -> None:
     else:
         assert isinstance(
             prior, Distribution
-        ), """Prior must be a PyTorch Distribution. See FAQ 7 for more details or use
+        ), """Prior must be a PyTorch Distribution. Use
         `sbi.utils.user_input_checks.process_prior` for wrapping custom priors and
         lists of independent priors."""
 

@@ -39,9 +39,9 @@ This approach will make sampling slower, but samples will not "leak".
 
 - if your prior is either Gaussian (torch.distributions.MultivariateNormal) or Uniform
 (sbi.utils.BoxUniform), you can avoid leakage by using a mixture density network as
-density estimator. I.e., set `density_estimator='mdn'` when creating the `SNPE`
+density estimator. I.e., set `density_estimator='mdn'` when creating the `NPE_C`
 inference object. When running inference, there should be a print statement "Using
-SNPE-C with non-atomic loss".
+NPE_C with non-atomic loss".
 
 - use a different algorithm, e.g., Sequential NRE and Sequential NLE. Note, however,
 that these algorithms can have different issues and potential pitfalls.
