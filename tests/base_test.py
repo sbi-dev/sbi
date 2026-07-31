@@ -55,6 +55,33 @@ def test_get_dataloaders(training_batch_size):
     assert len(val_loader) * val_loader.batch_size == int(validation_fraction * N)
 
 
+# Ground truth for the alias mapping, deliberately spelled out rather than read from
+# `_DEPRECATED_ALIASES`: a test that iterates the dict under test can only prove the
+# implementation agrees with itself, so a wrong entry would pass.
+LEGACY_ALIASES = {
+    "SNL": "NLE_A",
+    "SNLE": "NLE_A",
+    "SNLE_A": "NLE_A",
+    "SNPE_A": "NPE_A",
+    "SNPE_B": "NPE_B",
+    "SNPE": "NPE_C",
+    "SNPE_C": "NPE_C",
+    "APT": "NPE_C",
+    "SRE": "NRE_B",
+    "SNRE": "NRE_B",
+    "SNRE_B": "NRE_B",
+    "AALR": "NRE_A",
+    "SNRE_A": "NRE_A",
+    "CNRE": "NRE_C",
+    "SNRE_C": "NRE_C",
+    "ABC": "MCABC",
+    "SMC": "SMCABC",
+}
+
+
+# The aliases warn by design; this test is about cross-path agreement, which
+# `test_deprecated_aliases_warn` does not cover.
+@pytest.mark.filterwarnings("ignore::FutureWarning")
 @pytest.mark.parametrize(
     "legacy_name",
     (
@@ -125,19 +152,47 @@ def test_infer_warns_on_legacy_method_string():
     assert __file__ == future_warnings[0].filename
 
 
-def test_deprecated_aliases_warn():
+@pytest.mark.parametrize(("alias", "canonical"), LEGACY_ALIASES.items())
+def test_deprecated_aliases_warn(alias, canonical):
     """Every legacy alias must emit a FutureWarning that names its replacement.
 
     The aliases were silent since v0.23.0. They warn in v0.27.0 and go in v0.28.0,
     together with this test.
+
+    Matching the replacement clause rather than the bare name matters: 14 of the pairs
+    have the canonical name as a substring of the alias (`"NPE_A"` in `"SNPE_A"`), so a
+    bare match would succeed against the first half of the message either way.
     """
-    for module in (sbi.inference, npe, nle, nre):
-        for alias, canonical in module._DEPRECATED_ALIASES.items():
-            with pytest.warns(FutureWarning, match=canonical):
-                resolved = getattr(module, alias)
-            assert resolved is getattr(module, canonical), (
-                f"{module.__name__}.{alias} does not resolve to {canonical}"
-            )
+    with pytest.warns(
+        FutureWarning, match=rf"Use `sbi\.inference\.{canonical}` instead"
+    ):
+        resolved = getattr(sbi.inference, alias)
+
+    assert resolved is getattr(sbi.inference, canonical), (
+        f"sbi.inference.{alias} does not resolve to {canonical}"
+    )
+
+
+def test_deprecated_alias_set_is_complete():
+    """An alias missing from the warn-list would break hard in v0.28.0, with no warning.
+
+    Compares against the literal above rather than the implementation's own dict, so
+    both a missing and an unexpected entry fail.
+    """
+    assert sbi.inference._DEPRECATED_ALIASES == LEGACY_ALIASES
+
+
+@pytest.mark.parametrize("module", (npe, nle, nre))
+def test_submodule_aliases_warn_and_agree(module):
+    """The trainer sub-packages warn too, and resolve to the same classes."""
+    for alias, canonical in module._DEPRECATED_ALIASES.items():
+        assert LEGACY_ALIASES[alias] == canonical, (
+            f"{module.__name__}.{alias} maps to {canonical}, expected "
+            f"{LEGACY_ALIASES[alias]}"
+        )
+        with pytest.warns(FutureWarning, match=rf"\.{canonical}` instead"):
+            resolved = getattr(module, alias)
+        assert resolved is getattr(module, canonical)
 
 
 def test_canonical_shorthands_do_not_warn():
