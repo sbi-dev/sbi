@@ -26,6 +26,7 @@ from sbi.utils.metrics import check_c2st
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import atleast_2d, process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
+from tests.test_utils import skip_if_mps_op_unsupported
 
 
 # toy simulator for mixed data
@@ -91,6 +92,7 @@ def mnle_trained_accurate(request, mnle_prior):
 def test_mnle_on_device(mnle_prior, mcmc_params_fast: MCMCPosteriorParameters):
     """Test MNLE API on device."""
     device = process_device("gpu")
+    skip_if_mps_op_unsupported(device, "aten::binomial")
     mnle_prior.to(device)
     theta = mnle_prior.sample((100,))
     x = mixed_simulator(theta)

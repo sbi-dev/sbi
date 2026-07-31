@@ -30,7 +30,11 @@ from sbi.samplers.mcmc import (
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
-from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
+from sbi.utils.torchutils import (
+    ensure_theta_batched,
+    process_device,
+    tensor2numpy,
+)
 from sbi.utils.typechecks import validate_target_accept
 
 
@@ -152,6 +156,7 @@ class MCMCPosterior(NeuralPosterior):
         Args:
             device: Device to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
