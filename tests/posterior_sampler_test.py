@@ -10,7 +10,7 @@ from torch import Tensor, eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import (
-    SNL,
+    NLE_A,
     MCMCPosterior,
     likelihood_estimator_based_potential,
 )
@@ -43,7 +43,7 @@ def test_api_posterior_sampler_set(
     num_trials: int = 2,
     num_simulations: int = 10,
 ):
-    """Runs SNL and checks that posterior_sampler is correctly set."""
+    """Runs NLE and checks that posterior_sampler is correctly set."""
     x_o = zeros((num_trials, num_dim))
     mcmc_params_fast = mcmc_params_fast.with_param(
         num_chains=num_chains, method=sampling_method
@@ -52,7 +52,7 @@ def test_api_posterior_sampler_set(
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
 
-    inference = SNL(prior, show_progress_bars=False)
+    inference = NLE_A(prior, show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
