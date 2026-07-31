@@ -85,7 +85,7 @@ dev = [
 ]
 
 [project.urls]
-documentation = "https://sbi-dev.github.io/sbi/"
+documentation = "https://sbi.readthedocs.io/"
 source = "https://github.com/sbi-dev/sbi"
 tracker = "https://github.com/sbi-dev/sbi/issues"
 
@@ -150,7 +150,7 @@ xfail_strict = true
 # Pyright configuration
 [tool.pyright]
 include = ["sbi"]
-exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "mkdocs", "tests"]
+exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "tests"]
 pythonVersion = "3.10"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
