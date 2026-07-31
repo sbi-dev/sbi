@@ -55,9 +55,7 @@ def test_get_dataloaders(training_batch_size):
     assert len(val_loader) * val_loader.batch_size == int(validation_fraction * N)
 
 
-# Ground truth for the alias mapping, deliberately spelled out rather than read from
-# `_DEPRECATED_ALIASES`: a test that iterates the dict under test can only prove the
-# implementation agrees with itself, so a wrong entry would pass.
+# Spelled out rather than read from `_DEPRECATED_ALIASES`, so a wrong entry there fails.
 LEGACY_ALIASES = {
     "SNL": "NLE_A",
     "SNLE": "NLE_A",
@@ -122,11 +120,7 @@ def test_legacy_aliases_agree_across_import_paths(legacy_name):
 
 
 def test_infer_warns_on_legacy_method_string():
-    """The legacy method strings warn once, attributed to the caller.
-
-    `infer()` resolves the canonical name itself: going through the module
-    `__getattr__` pointed the warning at `base.py` instead of the user's script.
-    """
+    """The legacy method strings warn once, attributed to the caller."""
     prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
 
     def simulator(theta):
@@ -150,12 +144,8 @@ def test_infer_warns_on_legacy_method_string():
 def test_deprecated_aliases_warn(alias, canonical):
     """Every legacy alias must emit a FutureWarning that names its replacement.
 
-    The aliases were silent since v0.23.0. They warn in v0.27.0 and go in v0.28.0,
-    together with this test.
-
-    Matching the replacement clause rather than the bare name matters: 14 of the pairs
-    have the canonical name as a substring of the alias (`"NPE_A"` in `"SNPE_A"`), so a
-    bare match would succeed against the first half of the message either way.
+    Matches the replacement clause, not the bare name: many aliases contain their
+    canonical name as a substring (`"NPE_A"` in `"SNPE_A"`).
     """
     with pytest.warns(
         FutureWarning, match=rf"Use `sbi\.inference\.{canonical}` instead"
@@ -168,11 +158,7 @@ def test_deprecated_aliases_warn(alias, canonical):
 
 
 def test_deprecated_alias_set_is_complete():
-    """An alias missing from the warn-list would break hard in v0.28.0, with no warning.
-
-    Compares against the literal above rather than the implementation's own dict, so
-    both a missing and an unexpected entry fail.
-    """
+    """An alias missing from the warn-list would break in v0.28.0 with no warning."""
     assert sbi.inference._DEPRECATED_ALIASES == LEGACY_ALIASES
 
 
