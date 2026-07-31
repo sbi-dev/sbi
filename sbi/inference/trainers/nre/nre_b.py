@@ -3,8 +3,6 @@
 
 from typing import Dict, Optional, Union
 
-import torch
-from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
@@ -12,11 +10,11 @@ from sbi.inference.trainers._contracts import LossArgsNRE
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
+from sbi.inference.trainers.nre.nre_loss import NRELossStrategy, SRELoss
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
-from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_B(RatioEstimatorTrainer):
@@ -111,6 +109,7 @@ class NRE_B(RatioEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        loss_strategy: Optional[NRELossStrategy] = None,
     ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
@@ -146,31 +145,8 @@ class NRE_B(RatioEstimatorTrainer):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         kwargs["loss_kwargs"] = LossArgsNRE(num_atoms=kwargs.pop("num_atoms"))
 
+        if loss_strategy is None:
+            kwargs["loss_strategy"] = SRELoss()
+
         return super().train(**kwargs)
 
-    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        r"""Return cross-entropy (via softmax activation) loss for 1-out-of-`num_atoms`
-        classification.
-
-        The classifier takes as input `num_atoms` $(\theta,x)$ pairs. Out of these
-        pairs, one pair was sampled from the joint $p(\theta,x)$ and all others from the
-        marginals $p(\theta)p(x)$. The classifier is trained to predict which of the
-        pairs was sampled from the joint $p(\theta,x)$.
-        """
-
-        assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
-        batch_size = theta.shape[0]
-        logits = self._classifier_logits(theta, x, num_atoms)
-
-        # For 1-out-of-`num_atoms` classification each datapoint consists
-        # of `num_atoms` points, with one of them being the correct one.
-        # We have a batch of `batch_size` such datapoints.
-        logits = logits.reshape(batch_size, num_atoms)
-
-        # Index 0 is the theta-x-pair sampled from the joint p(theta,x) and hence the
-        # "correct" one for the 1-out-of-N classification.
-        log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)
-
-        loss = -torch.mean(log_prob)
-        assert_all_finite(loss, "NRE-B loss")
-        return loss

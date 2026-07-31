@@ -3,18 +3,17 @@
 
 from typing import Dict, Optional, Sequence, Union
 
-import torch
-from torch import Tensor, nn, ones
+from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers._contracts import LossArgs, LossArgsBNRE
 from sbi.inference.trainers.nre.nre_a import NRE_A
+from sbi.inference.trainers.nre.nre_loss import BNRELoss, NRELossStrategy
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
-from sbi.utils.torchutils import assert_all_finite
 
 
 class BNRE(NRE_A):
@@ -113,6 +112,7 @@ class BNRE(NRE_A):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        loss_strategy: Optional[NRELossStrategy] = None,
     ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         Args:
@@ -156,44 +156,11 @@ class BNRE(NRE_A):
             regularization_strength=kwargs.pop("regularization_strength"),
         )
 
+        if loss_strategy is None:
+            kwargs["loss_strategy"] = BNRELoss()
+
         return super().train(**kwargs)
 
-    def _loss(
-        self, theta: Tensor, x: Tensor, num_atoms: int, regularization_strength: float
-    ) -> Tensor:
-        """Returns the binary cross-entropy loss for the trained classifier.
-
-        The classifier takes as input a $(\theta,x)$ pair. It is trained to predict 1
-        if the pair was sampled from the joint $p(\theta,x)$, and to predict 0 if the
-        pair was sampled from the marginals $p(\theta)p(x)$.
-        """
-
-        assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
-        batch_size = theta.shape[0]
-
-        logits = self._classifier_logits(theta, x, num_atoms)
-        likelihood = torch.sigmoid(logits).squeeze()
-
-        # Alternating pairs where there is one sampled from the joint and one
-        # sampled from the marginals. The first element is sampled from the
-        # joint p(theta, x) and is labelled 1. The second element is sampled
-        # from the marginals p(theta)p(x) and is labelled 0. And so on.
-        labels = ones(2 * batch_size, device=self._device)  # two atoms
-        labels[1::2] = 0.0
-
-        # Binary cross entropy to learn the likelihood (AALR-specific)
-        bce = nn.BCELoss()(likelihood, labels)
-
-        # Balancing regularizer
-        regularizer = (
-            (torch.sigmoid(logits[0::2]) + torch.sigmoid(logits[1::2]) - 1)
-            .mean()
-            .square()
-        )
-
-        loss = bce + regularization_strength * regularizer
-        assert_all_finite(loss, "BNRE loss")
-        return loss
 
     def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         """Overrides the parent class method to check the type of loss_args."""

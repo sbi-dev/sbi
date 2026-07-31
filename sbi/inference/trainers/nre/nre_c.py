@@ -1,9 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Dict, Optional, Sequence, Union
 
-import torch
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -12,11 +11,11 @@ from sbi.inference.trainers._contracts import LossArgs, LossArgsNRE_C
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
+from sbi.inference.trainers.nre.nre_loss import CNRELoss, NRELossStrategy
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
-from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_C(RatioEstimatorTrainer):
@@ -109,6 +108,7 @@ class NRE_C(RatioEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        loss_strategy: Optional[NRELossStrategy] = None,
     ) -> RatioEstimator:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
@@ -157,89 +157,8 @@ class NRE_C(RatioEstimatorTrainer):
             num_atoms=kwargs.pop("num_classes") + 1, gamma=kwargs.pop("gamma")
         )
 
-        return super().train(**kwargs)
-
-    def _loss(
-        self, theta: Tensor, x: Tensor, num_atoms: int, gamma: float
-    ) -> torch.Tensor:
-        r"""Return cross-entropy loss (via ''multi-class sigmoid'' activation) for
-        1-out-of-`K + 1` classification.
-
-        At optimum, this loss function returns the exact likelihood-to-evidence ratio
-        in the first round.
-        Details of loss computation are described in Contrastive Neural Ratio
-        Estimation[1]. The paper does not discuss the sequential case.
-
-        [1] _Contrastive Neural Ratio Estimation_, Benajmin Kurt Miller, et. al.,
-            NeurIPS 2022, https://arxiv.org/abs/2210.06170
-        """
-
-        # Reminder: K = num_classes
-        # The algorithm is written with K, so we convert back to K format rather than
-        # reasoning in num_atoms.
-        num_classes = num_atoms - 1
-        assert num_classes >= 1, f"num_classes = {num_classes} must be greater than 1."
-
-        assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
-        batch_size = theta.shape[0]
-
-        # We append a contrastive theta to the marginal case because we will remove
-        # the jointly drawn
-        # sample in the logits_marginal[:, 0] position. That makes the remaining sample
-        # marginally drawn.
-        # We have a batch of `batch_size` datapoints.
-        logits_marginal = self._classifier_logits(theta, x, num_classes + 1).reshape(
-            batch_size, num_classes + 1
-        )
-        logits_joint = self._classifier_logits(theta, x, num_classes).reshape(
-            batch_size, num_classes
-        )
-
-        dtype = logits_marginal.dtype
-        device = logits_marginal.device
-
-        # Index 0 is the theta-x-pair sampled from the joint p(theta,x) and hence
-        # we remove the jointly drawn sample from the logits_marginal
-        logits_marginal = logits_marginal[:, 1:]
-        # ... and retain it in the logits_joint. Now we have two arrays with K choices.
-
-        # To use logsumexp, we extend the denominator logits with loggamma
-        loggamma = torch.tensor(gamma, dtype=dtype, device=device).log()
-        logK = torch.tensor(num_classes, dtype=dtype, device=device).log()
-        denominator_marginal = torch.concat(
-            [loggamma + logits_marginal, logK.expand((batch_size, 1))],
-            dim=-1,
-        )
-        denominator_joint = torch.concat(
-            [loggamma + logits_joint, logK.expand((batch_size, 1))],
-            dim=-1,
-        )
-
-        # Compute the contributions to the loss from each term in the classification.
-        log_prob_marginal = logK - torch.logsumexp(denominator_marginal, dim=-1)
-        log_prob_joint = (
-            loggamma + logits_joint[:, 0] - torch.logsumexp(denominator_joint, dim=-1)
-        )
-
-        # relative weights. p_marginal := p_0, and p_joint := p_K * K from the notation.
-        p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(gamma)
-
-        loss = -torch.mean(p_marginal * log_prob_marginal + p_joint * log_prob_joint)
-        assert_all_finite(loss, "NRE-C loss")
-        return loss
-
-    @staticmethod
-    def _get_prior_probs_marginal_and_joint(gamma: float) -> Tuple[float, float]:
-        r"""Return a tuple (p_marginal, p_joint) where `p_marginal := `$p_0$,
-        `p_joint := `$p_K \cdot K$.
-
-        We let the joint (dependently drawn) class to be equally likely across K
-        options. The marginal class is therefore restricted to get the remaining
-        probability.
-        """
-        p_joint = gamma / (1 + gamma)
-        p_marginal = 1 / (1 + gamma)
-        return p_marginal, p_joint
+        if loss_strategy is None:
+            kwargs["loss_strategy"] = CNRELoss()
 
     def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         """Overrides the parent class method to check the type of loss_args."""
