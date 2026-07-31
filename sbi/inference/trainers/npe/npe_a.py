@@ -77,7 +77,9 @@ class NPE_A(PosteriorEstimatorTrainer):
         for round_idx in range(5):
             theta = proposal.sample((100,))
             x = simulator(theta)
-            density_estimator = inference.append_simulations(theta, x).train()
+            density_estimator = inference.append_simulations(
+                theta, x, proposal=proposal
+            ).train()
             posterior = inference.build_posterior(density_estimator)
             proposal = posterior.set_default_x(x_o)
 
@@ -467,6 +469,19 @@ class NPE_A(PosteriorEstimatorTrainer):
         )
 
         return self._posterior
+
+    def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
+        """Return True: NPE-A trains on the plain log-prob for any proposal.
+
+        The proposal correction is applied analytically after training, not in the loss.
+
+        Args:
+            proposal: Unused, the answer does not depend on it.
+
+        Returns:
+            True.
+        """
+        return True
 
     def _log_prob_proposal_posterior(
         self,

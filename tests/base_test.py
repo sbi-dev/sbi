@@ -4,8 +4,10 @@
 import pytest
 import torch
 
+import sbi.inference
 from sbi import utils
 from sbi.inference import NPE, infer
+from sbi.inference.trainers import nle, npe, nre
 
 
 def test_infer():
@@ -44,3 +46,42 @@ def test_get_dataloaders(training_batch_size):
     )
 
     assert len(val_loader) * val_loader.batch_size == int(validation_fraction * N)
+
+
+@pytest.mark.parametrize(
+    "legacy_name",
+    (
+        "SNPE_A",
+        "SNPE_B",
+        "SNPE_C",
+        "SNPE",
+        "NPE",
+        "SNLE_A",
+        "SNLE",
+        "NLE",
+        "SNRE_A",
+        "SNRE_B",
+        "SNRE_C",
+        "SRE",
+        "NRE",
+    ),
+)
+def test_legacy_aliases_agree_across_import_paths(legacy_name):
+    """Deprecated aliases must resolve to the same class from either import path.
+
+    Only aliases that both import paths define are parametrized here. `SNL` and `SNRE`
+    exist on `sbi.inference` alone, so there is nothing to cross-check for them.
+    """
+    expected = getattr(sbi.inference, legacy_name)
+    defining_modules = [m for m in (npe, nle, nre) if hasattr(m, legacy_name)]
+
+    assert defining_modules, (
+        f"No trainer sub-package defines {legacy_name}. Either the alias moved or it "
+        f"should not be parametrized here, which would make this test vacuous."
+    )
+
+    for module in defining_modules:
+        assert getattr(module, legacy_name) is expected, (
+            f"{module.__name__}.{legacy_name} disagrees with "
+            f"sbi.inference.{legacy_name}"
+        )

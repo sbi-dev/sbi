@@ -6,12 +6,10 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from numpy import ndarray
-from scipy.stats._distn_infrastructure import rv_frozen
-from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
-from sbi.sbi_types import Array
+from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import (
     BoxUniform,
@@ -35,13 +33,13 @@ def check_prior(prior: Any) -> None:
     else:
         assert isinstance(
             prior, Distribution
-        ), """Prior must be a PyTorch Distribution. See FAQ 7 for more details or use
-        `sbi.utils.user_input_checks.process_prior` for wrapping scipy and lists of
-        independent priors."""
+        ), """Prior must be a PyTorch Distribution. Use
+        `sbi.utils.user_input_checks.process_prior` for wrapping custom priors and
+        lists of independent priors."""
 
 
 def process_prior(
-    prior: Union[Sequence[Distribution], Distribution, rv_frozen, multi_rv_frozen],
+    prior: Union[Sequence[Distribution], Distribution, CustomPrior],
     custom_prior_wrapper_kwargs: Optional[Dict] = None,
 ) -> Tuple[Distribution, int, bool]:
     """
@@ -105,13 +103,6 @@ def process_prior(
 
     if isinstance(prior, Distribution):
         return process_pytorch_prior(prior)
-
-    # If prior is given as `scipy.stats` object, wrap as PyTorch.
-    elif isinstance(prior, (rv_frozen, multi_rv_frozen)):
-        raise NotImplementedError(
-            "Passing a prior as scipy.stats object is deprecated. "
-            "Please pass it as a PyTorch Distribution."
-        )
 
     # Otherwise it is a custom prior - check for `.sample()` and `.log_prob()`.
     else:
@@ -640,51 +631,6 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
             f"the shape of simulated data x ({x_event_shape})."
         )
     return x
-
-
-def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
-    """Prepare simulator and prior for usage in sbi.
-
-    NOTE: This method is deprecated as of sbi version v0.23.0. and will be removed in a
-    future release. Please use `process_prior` and `process_simulator` in the future.
-    This is a wrapper around `process_prior` and `process_simulator` which can be
-    used in isolation as well.
-
-    Attempts to meet the following requirements by reshaping and type-casting:
-
-    - the simulator function receives as input and returns a Tensor.<br/>
-    - the simulator can simulate batches of parameters and return batches of data.<br/>
-    - the prior does not produce batches and samples and evaluates to Tensor.<br/>
-    - the output shape is a `torch.Size((1,N))` (i.e, has a leading batch dimension 1).
-
-    If this is not possible, a suitable exception will be raised.
-
-    Args:
-        simulator: Simulator as provided by the user.
-        prior: Prior as provided by the user.
-
-    Returns:
-        Tuple (simulator, prior) checked and matching the requirements of sbi.
-    """
-
-    warnings.warn(
-        "This method is deprecated as of sbi version v0.23.0. and will be removed in a \
-        future release."
-        "Please use `process_prior` and `process_simulator` in the future.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    # Check prior, return PyTorch prior.
-    prior, _, prior_returns_numpy = process_prior(prior)
-
-    # Check simulator, returns PyTorch simulator able to simulate batches.
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-
-    # Consistency check after making ready for sbi.
-    check_sbi_inputs(simulator, prior)
-
-    return simulator, prior
 
 
 def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:

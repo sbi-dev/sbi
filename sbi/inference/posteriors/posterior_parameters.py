@@ -231,7 +231,7 @@ class MCMCPosteriorParameters(PosteriorParameters):
         init_strategy: The initialisation strategy for chains; `proposal` will draw
             init locations from `proposal`, whereas `sir` will use Sequential-
             Importance-Resampling (SIR). SIR initially samples
-            `init_strategy_num_candidates` from the `proposal`, evaluates all of
+            `num_candidate_samples` from the `proposal`, evaluates all of
             them under the `potential_fn` and `proposal`, and then resamples the
             initial locations with weights proportional to `exp(potential_fn -
             proposal.log_prob`. `resample` is the same as `sir` but

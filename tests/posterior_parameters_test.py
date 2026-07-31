@@ -62,7 +62,6 @@ def get_inference():
                 "potential_fn",
                 "proposal",
                 "device",
-                "init_strategy_num_candidates",
                 "theta_transform",
             },
         ),

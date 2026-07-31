@@ -167,17 +167,7 @@ def z_score_parser(
     Returns:
         Flag for whether or not to z-score, and whether data is structured
     """
-    if isinstance(z_score_flag, bool):
-        # Raise warning if boolean was passed.
-        warnings.warn(
-            "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
-            "removed in a future release. Use 'none', 'independent', or 'structured' "
-            "to indicate z-scoring option.",
-            stacklevel=2,
-        )
-        z_score_bool, structured_data = z_score_flag, False
-
-    elif (z_score_flag is None) or (z_score_flag == "none"):
+    if (z_score_flag is None) or (z_score_flag == "none"):
         # Return Falses if "none" or None was passed.
         z_score_bool, structured_data = False, False
 
@@ -553,7 +543,7 @@ def npe_msg_on_invalid_x(
         else:
             logging.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "They are not excluded from training due to `exclude_invalid_x=False`. "
                 "Training will likely fail, we strongly recommend "
                 f"`exclude_invalid_x=True` for {algorithm}."
             )
@@ -562,18 +552,18 @@ def npe_msg_on_invalid_x(
 def nle_nre_apt_msg_on_invalid_x(
     num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
 ) -> None:
-    """Warn or raise if there are NaNs or Infs, appropriate to SNLE, SNRE, or APT.
+    """Warn or raise on NaNs or Infs, for NLE, NRE, or atomic NPE-C.
 
     This will raise an error in the default case of `exclude_invalid_x=False` since
-    SNLE/SNRE/APT do not allow to discard invalid simulations (Glöckler et al. 2021).
-    If `exclude_invalid_x` has explicitly been set to `True` by the user, this
+    NLE/NRE/atomic NPE-C do not allow to discard invalid simulations (Glöckler et al.
+    2021). If `exclude_invalid_x` has explicitly been set to `True` by the user, this
     function will give a warning about the systematic error.
     """
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
             logging.warning(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"These will be discarded from training due to "
                 f"`exclude_invalid_x=True`. Please be aware that this gives "
                 f"systematically wrong results for {algorithm} and is only recommended "
@@ -581,46 +571,10 @@ def nle_nre_apt_msg_on_invalid_x(
             )
         else:
             raise ValueError(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
-                f"{algorithm} does not allow invalid simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                f"{algorithm} does not allow invalid simulations. "
                 f"Replace the invalid values with an unreasonably low or high value."
             )
-
-
-def check_warn_and_setstate(
-    state_dict: Dict,
-    key_name: str,
-    replacement_value: Any,
-    warning_msg: str = "",
-) -> Tuple[Dict, str]:
-    """
-    Check if `key_name` is in `state_dict` and add it if not.
-
-    If the key already existed in the `state_dict`, the dictionary remains
-    unaltered. This function also appends to a warning string.
-
-    For developers: The reason that this method only appends to a warning string
-    instead of warning directly is that the user might get multiple very similar
-    warnings if multiple attributes had to be replaced. Thus, we start off with an
-    emtpy string and keep appending all missing attributes. Then, in the end,
-    all attributes are displayed along with a full description of the warning.
-
-    Args:
-        attribute_name: The name of the attribute to check.
-        state_dict: The dictionary to search (and write to if the key does not yet
-            exist).
-        replacement_value: The value to be written to the `state_dict`.
-        warning_msg: String to which the warning message should be appended to.
-
-    Returns:
-        A dictionary which contains the key `attribute_name` and a string with an
-        appended warning message.
-    """
-
-    if key_name not in state_dict:
-        state_dict[key_name] = replacement_value
-        warning_msg += " `self." + key_name + f" = {str(replacement_value)}`"
-    return state_dict, warning_msg
 
 
 def get_simulations_since_round(
@@ -739,7 +693,7 @@ def check_dist_class(
     """Returns whether the `dist` is instance of `class_to_check`.
 
     The dist can be hidden in an Independent distribution, a Boxuniform or in a wrapper.
-    E.g., when the user called `prepare_for_sbi`, the distribution will in fact be a
+    E.g., when the user called `process_prior`, the distribution will in fact be a
     `PytorchReturnTypeWrapper`. Thus, we need additional checks.
 
     Args:
@@ -780,9 +734,9 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
     checking whether the log-probabilty is not `-inf` will not work because, as of
     torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
-    sample is out of the support (see #451). In `prepare_for_sbi()`, we set
+    sample is out of the support (see #451). In `process_prior()`, we set
     `validate_args=False`. This would take care of this, but requires running
-    `prepare_for_sbi()` and otherwise throws a cryptic error.
+    `process_prior()` and otherwise throws a cryptic error.
 
     Args:
         distribution: Distribution under which to evaluate the `samples`, e.g., a

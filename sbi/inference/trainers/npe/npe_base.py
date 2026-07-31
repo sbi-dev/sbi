@@ -122,6 +122,20 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         proposal: Optional[Any],
     ) -> Tensor: ...
 
+    def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
+        """Return whether the multi-round loss for `proposal` treats rows independently.
+
+        A per-row loss can discard invalid simulations without bias, and can only be
+        fitted to the latest round.
+
+        Args:
+            proposal: The distribution the parameters of a round were sampled from.
+
+        Returns:
+            False, unless a subclass says otherwise for this proposal.
+        """
+        return False
+
     def append_simulations(
         self,
         theta: Tensor,
@@ -145,10 +159,11 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 Pass `None` if the parameters were sampled from the prior. If not
                 `None`, it will trigger a different loss-function.
             exclude_invalid_x: Whether invalid simulations are discarded during
-                training. For single-round SNPE, it is fine to discard invalid
-                simulations, but for multi-round SNPE (atomic), discarding invalid
-                simulations gives systematically wrong results. If `None`, it will
-                be `True` in the first round and `False` in later rounds.
+                training. For single-round NPE, it is fine to discard invalid
+                simulations, but for multi-round NPE with a loss that normalizes across
+                the batch, discarding them gives systematically wrong results, so this
+                raises instead. If `None`, it will be `True` in the first round and
+                `False` in later rounds.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
@@ -194,21 +209,16 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
 
         # Check for problematic z-scoring
         warn_if_invalid_for_zscoring(x)
-        if (
-            type(self).__name__ == "SNPE_C"
-            and current_round > 0
-            and not self.use_non_atomic_loss
-        ):
+        algorithm = (
+            f"{'Multiround' if current_round > 0 else 'Single-round'} "
+            f"{type(self).__name__}"
+        )
+        if current_round > 0 and not self._multiround_loss_is_per_row(proposal):
             nle_nre_apt_msg_on_invalid_x(
-                num_nans,
-                num_infs,
-                exclude_invalid_x,
-                "Multiround SNPE-C (atomic)",
+                num_nans, num_infs, exclude_invalid_x, algorithm
             )
         else:
-            npe_msg_on_invalid_x(
-                num_nans, num_infs, exclude_invalid_x, "Single-round NPE"
-            )
+            npe_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, algorithm)
 
         self._check_proposal(proposal)
 
@@ -604,11 +614,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(context.discard_prior_samples and self._round > 0)
 
-        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
-        # SNPE-A can, by construction of the algorithm, only use samples from the last
-        # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
-        # so this is how we check for whether or not we are using SNPE-A.
-        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
+        # A per-row loss cannot reuse earlier rounds: a current limitation for the
+        # non-atomic loss, and how the algorithm works for NPE-A.
+        latest_proposal = (
+            self._proposal_roundwise[-1] if self._proposal_roundwise else None
+        )
+        if self._multiround_loss_is_per_row(latest_proposal):
             start_idx = self._round
 
         return start_idx

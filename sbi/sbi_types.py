@@ -55,6 +55,19 @@ class AcceptRejectFn(Protocol):
     def __call__(self, theta: Tensor) -> Tensor: ...
 
 
+class CustomPrior(Protocol):
+    """Protocol for user-provided priors that are not PyTorch distributions.
+
+    `process_prior` wraps any object with `.sample()` and `.log_prob()` into a
+    PyTorch `Distribution`. Both methods may return either a Tensor or a numpy
+    array; `process_prior` detects which and wraps accordingly.
+    """
+
+    def sample(self, sample_shape=...) -> Any: ...
+
+    def log_prob(self, value) -> Any: ...
+
+
 class Tracker(Protocol):
     """Protocol for experiment tracking integrations."""
 
@@ -81,6 +94,7 @@ class Tracker(Protocol):
 __all__ = [
     "AcceptRejectFn",
     "Array",
+    "CustomPrior",
     "Shape",
     "OneOrMore",
     "SampleProposal",
