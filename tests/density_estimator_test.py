@@ -27,6 +27,7 @@ from sbi.neural_nets.net_builders import (
     build_mnpe,
     build_nsf,
     build_tabpfn_flow,
+    build_vector_field_estimator,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -38,19 +39,8 @@ from sbi.neural_nets.net_builders import (
     build_zuko_unaf,
 )
 from sbi.neural_nets.net_builders.flow import build_zuko_flow
-from sbi.neural_nets.net_builders.vector_field_nets import build_vector_field_estimator
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.torchutils import BoxUniform
-
-
-# Local stand-ins for the deprecated wrapper builders, which warn since v0.27.0.
-def build_flow_matching_estimator(*args, **kwargs):
-    return build_vector_field_estimator(*args, estimator_type="flow", **kwargs)
-
-
-def build_score_matching_estimator(*args, **kwargs):
-    return build_vector_field_estimator(*args, estimator_type="score", **kwargs)
-
 
 # List of all density estimator builders for testing.
 model_builders = [
@@ -68,12 +58,6 @@ model_builders = [
     build_zuko_nsf,
     build_zuko_sospf,
     build_zuko_unaf,
-]
-
-
-vector_field_builders = [
-    build_flow_matching_estimator,
-    build_score_matching_estimator,
 ]
 
 
@@ -450,8 +434,6 @@ def _build_density_estimator_and_tensors(
         build_mnle,
         build_mnpe,
         build_categoricalmassestimator,
-        build_flow_matching_estimator,
-        build_score_matching_estimator,
     ]:
         density_estimator = density_estimator_build_fn(
             batch_x=batch_input,
@@ -624,11 +606,11 @@ def build_estimator(theta, x):
 
 
 def build_vf_estimator_npse(theta, x):
-    return build_score_matching_estimator(theta, x)
+    return build_vector_field_estimator(theta, x, "score")
 
 
 def build_vf_estimator_fmpe(theta, x):
-    return build_flow_matching_estimator(theta, x)
+    return build_vector_field_estimator(theta, x, "flow")
 
 
 def build_estimator_missing_args():

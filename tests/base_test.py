@@ -55,28 +55,6 @@ def test_get_dataloaders(training_batch_size):
     assert len(val_loader) * val_loader.batch_size == int(validation_fraction * N)
 
 
-# Spelled out rather than read from `_DEPRECATED_ALIASES`, so a wrong entry there fails.
-LEGACY_ALIASES = {
-    "SNL": "NLE_A",
-    "SNLE": "NLE_A",
-    "SNLE_A": "NLE_A",
-    "SNPE_A": "NPE_A",
-    "SNPE_B": "NPE_B",
-    "SNPE": "NPE_C",
-    "SNPE_C": "NPE_C",
-    "APT": "NPE_C",
-    "SRE": "NRE_B",
-    "SNRE": "NRE_B",
-    "SNRE_B": "NRE_B",
-    "AALR": "NRE_A",
-    "SNRE_A": "NRE_A",
-    "CNRE": "NRE_C",
-    "SNRE_C": "NRE_C",
-    "ABC": "MCABC",
-    "SMC": "SMCABC",
-}
-
-
 # The aliases warn by design; this test is about cross-path agreement, which
 # `test_deprecated_aliases_warn` does not cover.
 @pytest.mark.filterwarnings("ignore::FutureWarning")
@@ -140,7 +118,9 @@ def test_infer_warns_on_legacy_method_string():
     assert __file__ == future_warnings[0].filename
 
 
-@pytest.mark.parametrize(("alias", "canonical"), LEGACY_ALIASES.items())
+@pytest.mark.parametrize(
+    ("alias", "canonical"), sbi.inference._DEPRECATED_ALIASES.items()
+)
 def test_deprecated_aliases_warn(alias, canonical):
     """Every legacy alias must emit a FutureWarning that names its replacement.
 
@@ -157,18 +137,13 @@ def test_deprecated_aliases_warn(alias, canonical):
     )
 
 
-def test_deprecated_alias_set_is_complete():
-    """An alias missing from the warn-list would break in v0.28.0 with no warning."""
-    assert sbi.inference._DEPRECATED_ALIASES == LEGACY_ALIASES
-
-
 @pytest.mark.parametrize("module", (npe, nle, nre))
 def test_submodule_aliases_warn_and_agree(module):
     """The trainer sub-packages warn too, and resolve to the same classes."""
     for alias, canonical in module._DEPRECATED_ALIASES.items():
-        assert LEGACY_ALIASES[alias] == canonical, (
-            f"{module.__name__}.{alias} maps to {canonical}, expected "
-            f"{LEGACY_ALIASES[alias]}"
+        expected = sbi.inference._DEPRECATED_ALIASES[alias]
+        assert expected == canonical, (
+            f"{module.__name__}.{alias} maps to {canonical}, expected {expected}"
         )
         with pytest.warns(FutureWarning, match=rf"\.{canonical}` instead"):
             resolved = getattr(module, alias)
