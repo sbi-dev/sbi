@@ -41,6 +41,8 @@ through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM (FKZ 01IS21055A) a
 Tübingen AI Center (FKZ 01IS18039A). Since 2024, `sbi` has been supported by the
 appliedAI Institute for Europe gGmbH.
 
+![German Federal Ministry of Education and Research Logo](_static/logo_bmbf.svg)
+
 ## Important dependencies and prior art
 
 - `sbi` is the successor to [`delfi`](https://github.com/mackelab/delfi), a Theano-based
