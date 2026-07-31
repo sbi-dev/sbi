@@ -10,16 +10,6 @@ from sbi.neural_nets.factory import (
     posterior_score_nn,
 )
 
-
-def __getattr__(name):
-    if name == "flowmatching_nn":
-        raise ImportError(
-            "`flowmatching_nn` has been removed. "
-            "Please use `posterior_flow_nn` instead."
-        )
-    raise AttributeError(f"Module '{__name__}' has no attribute '{name}'")
-
-
 __all__ = [
     "classifier_nn",
     "likelihood_nn",
