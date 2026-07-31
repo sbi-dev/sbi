@@ -1646,9 +1646,10 @@ def sbc_rank_plot(
             list of Tensors when comparing several sets of ranks, e.g., set of ranks
             obtained from different methods.
         num_bins: number of bins used for binning the ranks, default is
-            num_sbc_runs / 10 for CDF plots, num_sbc_runs / 20 for histograms.
+            num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
+            histograms.
         plot_type: type of SBC plot: "hist" for histograms, "cdf" for empirical CDFs,
-            or "ecdf_diff" for eCDF differences from uniformity.
+            or "cdf-diff" for eCDF differences from uniformity.
         parameter_labels: list of labels for each parameter dimension.
         ranks_labels: list of labels for each set of ranks.
         colors: list of colors for each parameter dimension, or each set of ranks.
@@ -1702,9 +1703,10 @@ def _sbc_rank_plot(
             list of Tensors when comparing several sets of ranks, e.g., set of ranks
             obtained from different methods.
         num_bins: number of bins used for binning the ranks, default is
-            num_sbc_runs / 10 for CDF plots, num_sbc_runs / 20 for histograms.
+            num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
+            histograms.
         plot_type: type of SBC plot: "hist" for histograms, "cdf" for empirical CDFs,
-            or "ecdf_diff" for eCDF differences from uniformity.
+            or "cdf-diff" for eCDF differences from uniformity.
         parameter_labels: list of labels for each parameter dimension.
         ranks_labels: list of labels for each set of ranks.
         colors: list of colors for each parameter dimension, or each set of ranks.
@@ -1740,10 +1742,11 @@ def _sbc_rank_plot(
         if isinstance(rank, Tensor):
             ranks_list[idx]: np.ndarray = rank.numpy()  # type: ignore
 
-    plot_types = ["hist", "cdf", "ecdf_diff"]
-    assert plot_type in plot_types, (
-        f"plot type {plot_type} not implemented, use one in {plot_types}."
-    )
+    plot_types = ["hist", "cdf", "cdf-diff"]
+    if plot_type not in plot_types:
+        raise ValueError(
+            f"plot type {plot_type} not implemented, use one in {plot_types}."
+        )
 
     if legend_kwargs is None:
         legend_kwargs = dict(loc="best", handlelength=0.8)
@@ -1751,8 +1754,7 @@ def _sbc_rank_plot(
     num_sbc_runs, num_parameters = ranks_list[0].shape
     num_ranks = len(ranks_list)
 
-    # For multiple methods, and for hist/ecdf_diff, plot each param separately
-    if num_ranks > 1 or plot_type in ("hist", "ecdf_diff"):
+    if num_ranks > 1 or plot_type in ("hist", "cdf-diff"):
         params_in_subplots = True
 
     for ranki in ranks_list:
@@ -1769,7 +1771,11 @@ def _sbc_rank_plot(
     if ranks_labels is None:
         ranks_labels = [f"rank set {i + 1}" for i in range(num_ranks)]
     if num_bins is None:
-        num_bins = num_sbc_runs // 10 if plot_type == "cdf" else num_sbc_runs // 20
+        num_bins = (
+            num_sbc_runs // 10
+            if plot_type in ("cdf", "cdf-diff")
+            else num_sbc_runs // 20
+        )
     num_bins = max(num_bins, 1)
     assert isinstance(num_bins, int)
 
@@ -1840,8 +1846,8 @@ def _sbc_rank_plot(
                     if jj == 0 and ranks_labels[ii] is not None:
                         plt.legend(**legend_kwargs)
 
-                elif plot_type == "ecdf_diff":
-                    _plot_ranks_as_ecdf_diff(
+                elif plot_type == "cdf-diff":
+                    _plot_ranks_as_cdf_diff(
                         ranki[:, jj],  # type: ignore
                         num_bins,
                         num_repeats,
@@ -1852,20 +1858,11 @@ def _sbc_rank_plot(
                         alpha=line_alpha,
                     )
                     if ii == 0 and show_uniform_region:
-                        x_fill = np.linspace(0, num_bins, num_repeats * num_bins)
-                        lower_bound = -1.96 * np.sqrt(
-                            np.linspace(0, 1, num_repeats * num_bins)
-                            * (1 - np.linspace(0, 1, num_repeats * num_bins))
-                            / num_sbc_runs
-                        )
-                        upper_bound = -lower_bound
-                        plt.fill_between(
-                            x_fill,
-                            lower_bound,
-                            upper_bound,
-                            color="gray",
+                        _plot_cdf_diff_region_expected_under_uniformity(
+                            num_sbc_runs,
+                            num_bins,
+                            num_repeats,
                             alpha=uniform_region_alpha,
-                            label="95% under uniformity",
                         )
 
                 else:
@@ -2012,6 +2009,60 @@ def _plot_ranks_as_cdf(
     plt.xlabel("posterior rank" if xlabel is None else xlabel)
 
 
+def _plot_ranks_as_cdf_diff(
+    ranks: np.ndarray,
+    num_bins: int,
+    num_repeats: int,
+    ranks_label: Optional[str] = None,
+    xlabel: Optional[str] = None,
+    color: Optional[str] = None,
+    alpha: float = 0.8,
+    show_ylabel: bool = True,
+    num_ticks: int = 3,
+) -> None:
+    """Plot the difference between the empirical CDF and the uniform CDF.
+
+    Positive values mean more ranks accumulated than expected, negative fewer.
+
+    Args:
+        ranks: SBC ranks in shape (num_sbc_runs, )
+        num_bins: number of bins for the histogram.
+        num_repeats: number of repeats of each CDF step, i.e., resolution of the eCDF.
+        ranks_label: label for the ranks, e.g., when comparing ranks of different
+            methods.
+        xlabel: label for the current parameter.
+        color: line color for the cdf.
+        alpha: line transparency.
+        show_ylabel: whether to show y-label.
+        num_ticks: number of ticks on the x-axis.
+    """
+    hist, *_ = np.histogram(ranks, bins=num_bins, density=False)
+    histcs = hist.cumsum()
+    ecdf = histcs / histcs.max()
+    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
+    diff = ecdf - uniform_cdf
+
+    plt.plot(
+        np.linspace(0, num_bins, num_repeats * num_bins),
+        np.repeat(diff, num_repeats),
+        label=ranks_label,
+        color=color,
+        alpha=alpha,
+    )
+
+    if show_ylabel:
+        plt.yticks(np.linspace(-0.5, 0.5, 3))
+        plt.ylabel("empirical CDF - uniform CDF")
+    else:
+        plt.yticks(np.linspace(-0.5, 0.5, 3), [])
+
+    plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
+    plt.ylim(-0.5, 0.5)
+    plt.xlim(0, num_bins)
+    plt.xticks(np.linspace(0, num_bins, num_ticks))
+    plt.xlabel("posterior rank" if xlabel is None else xlabel)
+
+
 def _plot_cdf_region_expected_under_uniformity(
     num_sbc_runs: int,
     num_bins: int,
@@ -2042,6 +2093,33 @@ def _plot_cdf_region_expected_under_uniformity(
     )
 
 
+def _plot_cdf_diff_region_expected_under_uniformity(
+    num_sbc_runs: int,
+    num_bins: int,
+    num_repeats: int,
+    alpha: float = 0.2,
+    color: str = "gray",
+) -> None:
+    """Plot region of empirical CDF differences expected under uniformity."""
+
+    uni_bins = binom(num_sbc_runs, p=1 / num_bins).ppf(0.5) * np.ones(num_bins)
+    uni_bins_cdf = uni_bins.cumsum() / uni_bins.sum()
+    uni_bins_cdf[-1] -= 1e-9
+
+    lower = [binom(num_sbc_runs, p=p).ppf(0.005) for p in uni_bins_cdf]
+    upper = [binom(num_sbc_runs, p=p).ppf(0.995) for p in uni_bins_cdf]
+
+    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
+    plt.fill_between(
+        x=np.linspace(0, num_bins, num_repeats * num_bins),
+        y1=np.repeat(np.array(lower) / np.max(lower) - uniform_cdf, num_repeats),
+        y2=np.repeat(np.array(upper) / np.max(upper) - uniform_cdf, num_repeats),
+        color=color,
+        alpha=alpha,
+        label="expected under uniformity",
+    )
+
+
 def _plot_hist_region_expected_under_uniformity(
     num_sbc_runs: int,
     num_bins: int,
@@ -2063,58 +2141,6 @@ def _plot_hist_region_expected_under_uniformity(
         alpha=alpha,
         label="expected under uniformity",
     )
-
-
-def _plot_ranks_as_ecdf_diff(
-    ranks: np.ndarray,
-    num_bins: int,
-    num_repeats: int,
-    ranks_label: Optional[str] = None,
-    xlabel: Optional[str] = None,
-    color: Optional[str] = None,
-    alpha: float = 0.8,
-    show_ylabel: bool = True,
-    num_ticks: int = 3,
-) -> None:
-    """Plot eCDF differences showing deviation from uniformity.
-
-    Args:
-        ranks: SBC ranks in shape (num_sbc_runs, )
-        num_bins: number of bins for the histogram.
-        num_repeats: number of repeats of each CDF step (resolution of the eCDF).
-        ranks_label: label for the ranks.
-        xlabel: label for the current parameter.
-        color: line color.
-        alpha: line transparency.
-        show_ylabel: whether to show y-label.
-        num_ticks: number of ticks on the x-axis.
-    """
-    hist, *_ = np.histogram(ranks, bins=num_bins, density=False)
-    histcs = hist.cumsum()
-    ecdf = histcs / histcs.max()
-    uniform_cdf = np.linspace(0, 1, num_bins)
-    diff = ecdf - uniform_cdf
-
-    x = np.linspace(0, num_bins, num_repeats * num_bins)
-    plt.plot(
-        x,
-        np.repeat(diff, num_repeats),
-        label=ranks_label,
-        color=color,
-        alpha=alpha,
-    )
-
-    if show_ylabel:
-        plt.yticks(np.linspace(-0.5, 0.5, 3))
-        plt.ylabel("eCDF - uniform CDF")
-    else:
-        plt.yticks(np.linspace(-0.5, 0.5, 3), [])
-
-    plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
-    plt.ylim(-0.5, 0.5)
-    plt.xlim(0, num_bins)
-    plt.xticks(np.linspace(0, num_bins, num_ticks))
-    plt.xlabel("posterior rank" if xlabel is None else xlabel)
 
 
 # Diagnostics for hypothesis tests

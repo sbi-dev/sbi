@@ -249,7 +249,7 @@ def test_plot_summary_axes_length_validation(mock_inference, overlay, n_axes_pas
 @pytest.mark.parametrize("num_parameters", (2, 4, 10))
 @pytest.mark.parametrize("num_cols", (2, 3, 4))
 @pytest.mark.parametrize("custom_figure", (False, True))
-@pytest.mark.parametrize("plot_type", ("hist", "cdf", "ecdf_diff"))
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
 def test_sbc_rank_plot(num_parameters, num_cols, custom_figure, plot_type):
     """Test sbc plots with different num_parameters, subplot shapes and plot types."""
 
