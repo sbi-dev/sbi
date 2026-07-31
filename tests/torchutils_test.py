@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -250,13 +251,16 @@ def test_dkl_gauss():
         )
 
 
-@pytest.mark.parametrize("device_input", ("cpu", "gpu", "cuda", "cuda:0", "mps"))
-def test_process_device(device_input: str) -> None:
-    """Test whether the device is processed correctly."""
+@pytest.mark.parametrize(
+    "device_input",
+    ("cpu", None, torch.device("cpu"), "gpu", "cuda", "cuda:0", "mps", "mps:0"),
+)
+def test_process_device(device_input) -> None:
+    """Test whether the device is processed into a canonical device string."""
 
     try:
         device_output = torchutils.process_device(device_input)
-        if device_input == "cpu":
+        if device_input in ("cpu", None, torch.device("cpu")):
             assert device_output == "cpu"
         elif device_input == "gpu":
             if torch.cuda.is_available():
@@ -265,10 +269,12 @@ def test_process_device(device_input: str) -> None:
             elif torch.backends.mps.is_available():
                 assert device_output == "mps:0"
 
-        if device_input.startswith("cuda") and torch.cuda.is_available():
-            assert device_output == device_input
-        if device_input == "mps" and torch.backends.mps.is_available():
-            assert device_output == "mps"
+        if device_input == "cuda" and torch.cuda.is_available():
+            assert device_output == f"cuda:{torch.cuda.current_device()}"
+        if device_input == "cuda:0" and torch.cuda.is_available():
+            assert device_output == "cuda:0"
+        if str(device_input).startswith("mps") and torch.backends.mps.is_available():
+            assert device_output == "mps:0"
 
     except RuntimeError:
         # this should not happen for cpu
@@ -277,3 +283,70 @@ def test_process_device(device_input: str) -> None:
         # should only happen if no gpu is available
         if device_input == "gpu":
             assert not torchutils.gpu_available()
+
+
+def test_process_device_rejects_unknown_device() -> None:
+    """Test that an uninterpretable device raises a helpful error."""
+    with pytest.raises(RuntimeError, match="Could not interpret"):
+        torchutils.process_device("not-a-device")
+
+
+@pytest.mark.parametrize(
+    "device_input, expected",
+    (
+        ("cpu", "cpu"),
+        ("cpu:0", "cpu"),
+        (torch.device("cpu"), "cpu"),
+        ("mps", "mps:0"),
+        ("mps:0", "mps:0"),
+        (torch.device("mps"), "mps:0"),
+        ("cuda:2", "cuda:2"),
+        (torch.device("cuda", 2), "cuda:2"),
+    ),
+)
+def test_canonical_device(device_input, expected: str) -> None:
+    """Test canonicalization, which must not require the device to be available."""
+    assert torchutils.canonical_device(device_input) == expected
+
+
+def test_canonical_device_resolves_bare_cuda(monkeypatch) -> None:
+    """Test that a bare "cuda" picks up the current CUDA device index."""
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "current_device", lambda: 3)
+    assert torchutils.canonical_device("cuda") == "cuda:3"
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device_input", ("gpu", "mps", "mps:0"))
+def test_process_device_allows_mps_with_float64_default(device_input) -> None:
+    """Test that every MPS spelling lowers the default dtype to float32."""
+    if not torch.backends.mps.is_available():
+        pytest.skip("Requires an MPS device.")
+
+    torch.set_default_dtype(torch.float64)
+    try:
+        assert torchutils.process_device(device_input) == "mps:0"
+        assert torch.get_default_dtype() == torch.float32
+    finally:
+        torch.set_default_dtype(torch.float32)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device_input", ("gpu", "mps"))
+def test_process_device_warns_on_mps_without_fallback(device_input, monkeypatch):
+    """Test that MPS users are told once how to enable PyTorch's CPU fallback."""
+    if not torch.backends.mps.is_available() or torch.cuda.is_available():
+        pytest.skip("Requires a machine whose only GPU backend is MPS.")
+
+    monkeypatch.delenv("PYTORCH_ENABLE_MPS_FALLBACK", raising=False)
+    monkeypatch.setattr(torchutils, "_HAS_WARNED_MPS_FALLBACK", False)
+    with pytest.warns(UserWarning, match="PYTORCH_ENABLE_MPS_FALLBACK") as record:
+        torchutils.process_device(device_input)
+        torchutils.process_device(device_input)
+    assert len(record) == 1, "The fallback advice should be given only once."
+
+    monkeypatch.setenv("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+    monkeypatch.setattr(torchutils, "_HAS_WARNED_MPS_FALLBACK", False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        torchutils.process_device(device_input)

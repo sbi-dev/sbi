@@ -10,6 +10,7 @@ import torch
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders import build_vector_field_estimator
+from sbi.utils.torchutils import process_device
 
 
 # Local stand-ins for the deprecated wrapper builders, which warn since v0.27.0.
@@ -59,8 +60,7 @@ def test_vector_field_estimator_loss_shapes(
     assert losses.shape == (batch_dim,)
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "cuda"])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 @pytest.mark.parametrize(
     "estimator_type,sde_type",
     [
@@ -72,6 +72,7 @@ def test_vector_field_estimator_loss_shapes(
 )
 def test_vector_field_estimator_on_device(device, estimator_type, sde_type):
     """Test whether vector field estimators can be moved to the device."""
+    device = process_device(device)
     if estimator_type == "flow":
         estimator = build_flow_matching_estimator(
             torch.randn(100, 1), torch.randn(100, 1)
@@ -88,11 +89,11 @@ def test_vector_field_estimator_on_device(device, estimator_type, sde_type):
     time = torch.randn(1, device=device)
     out = estimator(inputs, condition, time)
 
-    assert str(out.device).split(":")[0] == device, "Output device mismatch."
+    assert out.device.type == device.split(":")[0], "Output device mismatch."
 
     # Test loss
     loss = estimator.loss(inputs, condition)
-    assert str(loss.device).split(":")[0] == device, "Loss device mismatch."
+    assert loss.device.type == device.split(":")[0], "Loss device mismatch."
 
 
 @pytest.mark.parametrize("input_sample_dim", (1, 2, 3))

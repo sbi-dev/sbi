@@ -406,9 +406,10 @@ def posterior_score_nn(
         )
 
     # Map user-facing parameter names to internal names.
+    # Builder takes batch_x=batch_theta, so its z_score_x is the theta setting.
     mapped = dict(
-        z_score_x=z_score_x,
-        z_score_y=z_score_theta,
+        z_score_x=z_score_theta,
+        z_score_y=z_score_x,
         hidden_features=hidden_features,
         num_layers=num_layers,
         embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),

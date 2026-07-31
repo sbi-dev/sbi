@@ -152,21 +152,22 @@ def test_run_tarp_correct(distance, z_score_theta, accurate_samples):
 
 
 @pytest.mark.gpu
-def test_run_tarp_correct_on_cuda_device(accurate_samples):
+def test_run_tarp_correct_on_gpu_device(accurate_samples):
     z_score_theta = True
     distance = l2
     dev = device(process_device("gpu"))
     theta, samples = accurate_samples
     theta, samples = theta.to(dev), samples.to(dev)
 
-    with pytest.raises(NotImplementedError):
-        # let's make sure the execution problem is still there
-        # if torch fixes https://github.com/pytorch/pytorch/issues/69519
-        # this context manager should ensure, the case fails
-        # then we can fix the tarp code
-        from torch import histogram
+    if dev.type == "cuda":
+        with pytest.raises(NotImplementedError):
+            # let's make sure the execution problem is still there
+            # if torch fixes https://github.com/pytorch/pytorch/issues/69519
+            # this context manager should ensure, the case fails
+            # then we can fix the tarp code
+            from torch import histogram
 
-        histogram(zeros((3,)).to(dev), bins=4)
+            histogram(zeros((3,)).to(dev), bins=4)
 
     references = get_tarp_references(theta).to(dev)
 

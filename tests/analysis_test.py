@@ -8,11 +8,11 @@ from sbi.analysis import ActiveSubspace, conditional_corrcoeff, conditional_pair
 from sbi.inference import NPE
 from sbi.utils import BoxUniform, get_1d_marginal_peaks_from_kde
 from sbi.utils.torchutils import process_device
+from tests.test_utils import skip_if_mps_op_unsupported
 
 
 @pytest.mark.slow
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 def test_analysis_modules(device: str) -> None:
     """Tests sensitivity analysis and conditional posterior utils on GPU and CPU.
 
@@ -24,6 +24,7 @@ def test_analysis_modules(device: str) -> None:
 
     num_dim = 3
     device = process_device(device)
+    skip_if_mps_op_unsupported(device, "aten::_linalg_eigh.eigenvalues")
     prior = BoxUniform(
         low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim), device=device
     )

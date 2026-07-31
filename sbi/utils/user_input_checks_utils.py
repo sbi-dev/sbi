@@ -233,6 +233,7 @@ class PytorchReturnTypeWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
@@ -430,6 +431,7 @@ class MultipleIndependent(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         for i in range(len(self.dists)):
             self.dists[i] = move_distribution_to_device(self.dists[i], device)
         self.device = device
@@ -523,14 +525,14 @@ class OneDimPriorWrapper(Distribution):
     """
 
     def __init__(self, prior: Distribution, validate_args=None) -> None:
+        self.prior = prior
+        # The wrapped prior validates its own arguments; validating here would
+        # make torch look for them on the wrapper, which only delegates.
         super().__init__(
             batch_shape=prior.batch_shape,
             event_shape=prior.event_shape,
-            validate_args=(
-                prior._validate_args if validate_args is None else validate_args
-            ),
+            validate_args=False,
         )
-        self.prior = prior
         self.device = None
 
     def to(self, device: Union[str, torch.device]) -> None:
@@ -543,6 +545,7 @@ class OneDimPriorWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 

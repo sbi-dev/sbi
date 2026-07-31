@@ -30,7 +30,7 @@ from sbi.utils.sbiutils import (
     warn_if_outside_prior_support,
     within_support,
 )
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 
 
 class VectorFieldPosterior(NeuralPosterior):
@@ -115,6 +115,7 @@ class VectorFieldPosterior(NeuralPosterior):
         Args:
             device: device where to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         if hasattr(self.prior, "to"):
             self.prior.to(device)  # type: ignore
