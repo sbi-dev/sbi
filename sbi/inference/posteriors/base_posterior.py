@@ -330,7 +330,6 @@ class NeuralPosterior:
 
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
-
         For developers: for any new attribute added to `NeuralPosterior`, we have to
         add an entry here using `check_warn_and_setstate()`.
 

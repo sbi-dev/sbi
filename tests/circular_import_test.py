@@ -63,7 +63,6 @@ def find_submodules(package_name: str):
         ):
             submodules.append(name)
             if is_pkg:
-                # There are some wanted import errors for deprecated modules
                 with contextlib.suppress(ImportError):
                     walk_submodules(importlib.import_module(name))
 
