@@ -73,14 +73,17 @@ def test_get_dataloaders(training_batch_size):
         "SNRE_B",
         "SNRE_C",
         "SRE",
+        "AALR",
+        "CNRE",
         "NRE",
     ),
 )
 def test_legacy_aliases_agree_across_import_paths(legacy_name):
     """Deprecated aliases must resolve to the same class from either import path.
 
-    Only aliases that both import paths define are parametrized here. `SNL` and `SNRE`
-    exist on `sbi.inference` alone, so there is nothing to cross-check for them.
+    Only aliases that a trainer sub-package also defines are parametrized here.
+    `ABC`, `APT`, `SMC`, `SNL` and `SNRE` exist on `sbi.inference` alone, so there is
+    nothing to cross-check for them.
     """
     expected = getattr(sbi.inference, legacy_name)
     defining_modules = [m for m in (npe, nle, nre) if hasattr(m, legacy_name)]
@@ -116,6 +119,34 @@ def test_infer_warns_on_legacy_method_string():
     future_warnings = [w for w in record if w.category is FutureWarning]
     assert len(future_warnings) == 1
     assert __file__ == future_warnings[0].filename
+
+
+def test_deprecated_alias_set_is_complete():
+    """Pin the alias set literally.
+
+    The tests below parametrize over `_DEPRECATED_ALIASES`, so dropping an entry
+    would shrink their collection rather than fail them, and the alias would stop
+    resolving for users with a green suite. This is the only test that would notice.
+    """
+    assert set(sbi.inference._DEPRECATED_ALIASES) == {
+        "SNL",
+        "SNLE",
+        "SNLE_A",
+        "SNPE_A",
+        "SNPE_B",
+        "SNPE",
+        "SNPE_C",
+        "APT",
+        "SRE",
+        "SNRE",
+        "SNRE_B",
+        "AALR",
+        "SNRE_A",
+        "CNRE",
+        "SNRE_C",
+        "ABC",
+        "SMC",
+    }
 
 
 @pytest.mark.parametrize(
@@ -160,7 +191,12 @@ def test_canonical_shorthands_do_not_warn():
 
 
 def test_deprecated_vector_field_builders_warn():
-    """The flow and score wrapper builders warn and still delegate correctly."""
+    """The flow and score wrapper builders warn and still delegate correctly.
+
+    `sde_type` is passed on purpose: with positional arguments only, a shim that
+    dropped `**kwargs` would still return the right estimator class and pass, while
+    silently building a VE rather than a VP score estimator.
+    """
     theta, x = torch.randn(20, 2), torch.randn(20, 2)
 
     with pytest.warns(FutureWarning, match="build_vector_field_estimator"):
@@ -168,8 +204,13 @@ def test_deprecated_vector_field_builders_warn():
     assert type(flow) is type(build_vector_field_estimator(theta, x, "flow"))
 
     with pytest.warns(FutureWarning, match="build_vector_field_estimator"):
-        score = build_score_matching_estimator(theta, x)
-    assert type(score) is type(build_vector_field_estimator(theta, x, "score"))
+        score = build_score_matching_estimator(theta, x, sde_type="vp")
+    assert type(score) is type(
+        build_vector_field_estimator(theta, x, "score", sde_type="vp")
+    )
+    assert type(score) is not type(
+        build_vector_field_estimator(theta, x, "score", sde_type="ve")
+    ), "`sde_type` did not reach the canonical builder"
 
 
 def test_vector_field_posterior_sample_with_warns():

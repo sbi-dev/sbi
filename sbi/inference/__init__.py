@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
+from typing import TYPE_CHECKING
 
 from sbi.inference.abc import MCABC, SMCABC
 from sbi.inference.trainers.base import (
@@ -45,6 +46,19 @@ _DEPRECATED_ALIASES = {
     "ABC": "MCABC",
     "SMC": "SMCABC",
 }
+
+if TYPE_CHECKING:
+    # A module `__getattr__` is invisible to type checkers, so the aliases would
+    # otherwise resolve to `Any`. Never executed, so the warnings still fire.
+    SNL = SNLE = SNLE_A = NLE_A
+    SNPE_A = NPE_A
+    SNPE_B = NPE_B
+    SNPE = SNPE_C = APT = NPE_C
+    SRE = SNRE = SNRE_B = NRE_B
+    AALR = SNRE_A = NRE_A
+    CNRE = SNRE_C = NRE_C
+    ABC = MCABC
+    SMC = SMCABC
 
 
 def __getattr__(name: str):

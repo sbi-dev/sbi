@@ -1,7 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
+# Underscored: no `__all__` here, so a bare name would leak into `import *`.
+import warnings as _warnings
+from typing import TYPE_CHECKING as _TYPE_CHECKING
 
 from sbi.inference.trainers.nre.bnre import BNRE
 from sbi.inference.trainers.nre.nre_a import NRE_A
@@ -20,10 +22,16 @@ _DEPRECATED_ALIASES = {
 }
 
 
+if _TYPE_CHECKING:
+    AALR = SNRE_A = NRE_A
+    SRE = SNRE_B = NRE_B
+    CNRE = SNRE_C = NRE_C
+
+
 def __getattr__(name: str):
     if name in _DEPRECATED_ALIASES:
         canonical = _DEPRECATED_ALIASES[name]
-        warnings.warn(
+        _warnings.warn(
             f"`{__name__}.{name}` is deprecated since sbi v0.27.0 and will be "
             f"removed in v0.28.0. Use `{__name__}.{canonical}` instead.",
             FutureWarning,
