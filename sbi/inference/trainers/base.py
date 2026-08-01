@@ -82,6 +82,26 @@ from sbi.utils.user_input_checks import (
     process_simulator,
 )
 
+# The two classes take different required arguments, so one template cannot serve both.
+_ABC_USAGE = {
+    "MCABC": (
+        "    from sbi.inference import MCABC\n"
+        "    inference = MCABC(simulator, prior)\n"
+        "    samples = inference(x_o, num_simulations=1000, quantile=0.1)"
+    ),
+    "SMCABC": (
+        "    from sbi.inference import SMCABC\n"
+        "    inference = SMCABC(simulator, prior)\n"
+        "    samples = inference(\n"
+        "        x_o,\n"
+        "        num_particles=100,\n"
+        "        num_initial_pop=1000,\n"
+        "        num_simulations=5000,\n"
+        "        epsilon_decay=0.5,\n"
+        "    )"
+    ),
+}
+
 
 def infer(
     simulator: Callable,
@@ -113,10 +133,12 @@ def infer(
             parameters, e.g. which ranges are meaningful for them. Any
             object with `.log_prob()`and `.sample()` (for example, a PyTorch
             distribution) can be used.
-        method: What inference method to use, case-insensitively: any trainer
-            `sbi.inference` exports, for example 'npe', 'nle', 'nre', 'npe_a',
-            'fmpe' or 'npse'. The legacy names 'snpe', 'snle' and 'snre' still work
-            but emit a `FutureWarning`.
+        method: What inference method to use, case-insensitively: any neural
+            trainer `sbi.inference` exports, for example 'npe', 'nle', 'nre',
+            'npe_a', 'fmpe' or 'npse'. The legacy names 'snpe', 'snle' and 'snre'
+            still work but emit a `FutureWarning`. The ABC methods are not
+            supported, because they take the simulator at construction; call
+            `MCABC`/`SMCABC` directly.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
@@ -135,6 +157,18 @@ def infer(
     # would attribute the warning to this file instead of the caller.
     name = method.upper()
     canonical = sbi.inference._DEPRECATED_ALIASES.get(name)
+    resolved = canonical if canonical is not None else name
+
+    # Before the deprecation warning: advising a spelling `infer` cannot run either
+    # would only send the user around the loop again.
+    if resolved in sbi.inference._abc_family:
+        raise ValueError(
+            f"`infer` does not support '{method}'. It trains a neural network on "
+            "simulations it draws itself, while the ABC methods take the simulator "
+            f"at construction and have no training step. Use {resolved} directly:"
+            f"\n\n{_ABC_USAGE[resolved]}"
+        )
+
     if canonical is not None:
         warn(
             f"method='{method}' is deprecated since sbi v0.27.0 and will be "
@@ -142,15 +176,14 @@ def infer(
             FutureWarning,
             stacklevel=2,
         )
-        name = canonical
 
     try:
-        method_fun: Callable = getattr(sbi.inference, name)
+        method_fun: Callable = getattr(sbi.inference, resolved)
     except AttributeError as err:
         raise NameError(
-            f"Method '{method}' not available. `method` must name a trainer exported "
-            "by `sbi.inference`, for example 'npe', 'nle', 'nre', 'npe_a', 'fmpe' "
-            "or 'npse'."
+            f"Method '{method}' not available. `method` must name a neural trainer "
+            "exported by `sbi.inference`, for example 'npe', 'nle', 'nre', 'npe_a', "
+            "'fmpe' or 'npse'."
         ) from err
 
     if (

@@ -181,6 +181,36 @@ def test_submodule_aliases_warn_and_agree(module):
         assert resolved is getattr(module, canonical)
 
 
+@pytest.mark.parametrize("method", ("abc", "smcabc"))
+def test_infer_rejects_abc_methods(method):
+    """`infer` has never been able to run ABC, so it must say so.
+
+    The ABC classes take the simulator at construction and have no
+    `append_simulations`/`train`, so every spelling used to end in the same opaque
+    `TypeError` about a missing positional argument. One legacy and one canonical
+    spelling, since they take different paths to the check.
+    """
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+
+    with warnings.catch_warnings():
+        # Must not advise a spelling `infer` cannot run either.
+        warnings.simplefilter("error", FutureWarning)
+        with pytest.raises(ValueError, match="does not support") as err:
+            infer(
+                lambda theta: theta,
+                prior,
+                method=method,
+                num_simulations=10,
+            )
+
+    # The message prints a usage example. `__call__` takes different required
+    # arguments per class, so a shared template would send the user into the same
+    # "missing required positional arguments" it is meant to replace.
+    required = {"MCABC": ("quantile",), "SMCABC": ("num_particles", "epsilon_decay")}
+    target = "SMCABC" if "smc" in method else "MCABC"
+    assert all(kwarg in str(err.value) for kwarg in required[target])
+
+
 def test_canonical_shorthands_do_not_warn():
     """`NPE`, `NLE` and `NRE` stay silent: their fate is a separate naming decision."""
     with warnings.catch_warnings():
