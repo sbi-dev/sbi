@@ -82,26 +82,6 @@ from sbi.utils.user_input_checks import (
     process_simulator,
 )
 
-# The two classes take different required arguments, so one template cannot serve both.
-_ABC_USAGE = {
-    "MCABC": (
-        "    from sbi.inference import MCABC\n"
-        "    inference = MCABC(simulator, prior)\n"
-        "    samples = inference(x_o, num_simulations=1000, quantile=0.1)"
-    ),
-    "SMCABC": (
-        "    from sbi.inference import SMCABC\n"
-        "    inference = SMCABC(simulator, prior)\n"
-        "    samples = inference(\n"
-        "        x_o,\n"
-        "        num_particles=100,\n"
-        "        num_initial_pop=1000,\n"
-        "        num_simulations=5000,\n"
-        "        epsilon_decay=0.5,\n"
-        "    )"
-    ),
-}
-
 
 def infer(
     simulator: Callable,
@@ -165,8 +145,8 @@ def infer(
         raise ValueError(
             f"`infer` does not support '{method}'. It trains a neural network on "
             "simulations it draws itself, while the ABC methods take the simulator "
-            f"at construction and have no training step. Use {resolved} directly:"
-            f"\n\n{_ABC_USAGE[resolved]}"
+            f"at construction and have no training step. Use {resolved} directly. "
+            f"Its `__call__` docstring shows an example."
         )
 
     if canonical is not None:

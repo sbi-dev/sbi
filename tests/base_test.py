@@ -191,24 +191,19 @@ def test_infer_rejects_abc_methods(method):
     spelling, since they take different paths to the check.
     """
     prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+    target = "SMCABC" if "smc" in method else "MCABC"
 
     with warnings.catch_warnings():
         # Must not advise a spelling `infer` cannot run either.
         warnings.simplefilter("error", FutureWarning)
-        with pytest.raises(ValueError, match="does not support") as err:
+        # Word boundary: `MCABC` is a substring of `SMCABC`.
+        with pytest.raises(ValueError, match=rf"does not support.*\b{target}\b"):
             infer(
                 lambda theta: theta,
                 prior,
                 method=method,
                 num_simulations=10,
             )
-
-    # The message prints a usage example. `__call__` takes different required
-    # arguments per class, so a shared template would send the user into the same
-    # "missing required positional arguments" it is meant to replace.
-    required = {"MCABC": ("quantile",), "SMCABC": ("num_particles", "epsilon_decay")}
-    target = "SMCABC" if "smc" in method else "MCABC"
-    assert all(kwarg in str(err.value) for kwarg in required[target])
 
 
 def test_canonical_shorthands_do_not_warn():

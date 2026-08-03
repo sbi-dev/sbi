@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-# Underscored: no `__all__` here, so a bare name would leak into `import *`.
 import warnings as _warnings
 
 from sbi.inference.trainers.nre.bnre import BNRE
