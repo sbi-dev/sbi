@@ -3,7 +3,6 @@
 
 # Underscored: no `__all__` here, so a bare name would leak into `import *`.
 import warnings as _warnings
-from typing import TYPE_CHECKING as _TYPE_CHECKING
 
 from sbi.inference.trainers.npe.mnpe import MNPE  # noqa: F401
 from sbi.inference.trainers.npe.npe_a import NPE_A  # noqa: F401
@@ -20,12 +19,6 @@ _DEPRECATED_ALIASES = {
     "SNPE_C": "NPE_C",
     "SNPE": "NPE_C",
 }
-
-
-if _TYPE_CHECKING:
-    SNPE_A = NPE_A
-    SNPE_B = NPE_B
-    SNPE = SNPE_C = NPE_C
 
 
 def __getattr__(name: str):
