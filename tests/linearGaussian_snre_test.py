@@ -11,7 +11,6 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils
 from sbi.inference import (
-    AALR,
     BNRE,
     NRE_A,
     NRE_B,
@@ -220,7 +219,7 @@ def test_c2st_nre_variants_on_linearGaussian_with_multiple_trials(
     map_ = posterior.map(num_init_samples=1_000, init_method="proposal")
 
     # Checks for log_prob()
-    if prior_str == "gaussian" and isinstance(nre_method, (AALR, BNRE)):
+    if prior_str == "gaussian" and nre_method in (NRE_A, BNRE):
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior. We can do this only if the classifier_loss was as described in
         # Hermans et al. 2020 ('aalr') since Durkan et al. 2020 version only allows
