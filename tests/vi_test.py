@@ -929,3 +929,17 @@ def test_vi_posterior_stores_resolved_device():
 
     posterior.to("cpu:0")
     assert posterior._device == "cpu"
+
+
+def test_learnable_gaussian_ignores_the_upper_triangle_of_scale_tril():
+    """`scale_tril` is optimized unconstrained, so it drifts off the identity.
+
+    `rsample` then used the full matrix while `log_prob` ignored the upper triangle,
+    which biased the ELBO by the difference.
+    """
+    q = LearnableGaussian(dim=3, full_covariance=True)
+    with torch.no_grad():
+        q.scale_tril.add_(0.5)
+
+    scale_tril = q._base_dist().scale_tril
+    assert torch.equal(scale_tril, scale_tril.tril())
