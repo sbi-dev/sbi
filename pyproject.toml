@@ -166,3 +166,7 @@ reportIndexIssue = false
 reportReturnType = false
 reportPrivateImportUsage = false
 typeCheckingMode = "basic"
+
+[tool.uv]
+# No pre-releases in uv.lock; uv's fallback strategy picked a broken numba beta (#1969).
+prerelease = "disallow"
