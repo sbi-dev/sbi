@@ -350,4 +350,3 @@ def test_process_device_warns_on_mps_without_fallback(device_input, monkeypatch)
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         torchutils.process_device(device_input)
-
