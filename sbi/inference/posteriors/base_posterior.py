@@ -7,7 +7,8 @@ from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
-from torch import Tensor
+from torch import Tensor, nn
+from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,
@@ -16,8 +17,14 @@ from sbi.inference.potentials.base_potential import (
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import (
+    canonical_device,
+    ensure_theta_batched,
+    infer_tensor_device,
+    process_device,
+)
 from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class NeuralPosterior:
@@ -331,3 +338,32 @@ class NeuralPosterior:
             state_dict: State to be restored.
         """
         self.__dict__ = state_dict
+
+        actual_device = infer_tensor_device(self)
+        if actual_device is None or canonical_device(actual_device) == canonical_device(
+            self._device
+        ):
+            return
+
+        self._device = actual_device
+        if getattr(self, "device", None) is not None:
+            self.device = actual_device
+
+        if hasattr(self, "potential_fn"):
+            self.potential_fn.to(actual_device)  # type: ignore[union-attr]
+        for attr in ("prior", "proposal"):
+            value = getattr(self, attr, None)
+            if isinstance(value, Distribution):
+                setattr(self, attr, move_distribution_to_device(value, actual_device))
+        for attr in (
+            "posterior_estimator",
+            "vector_field_estimator",
+            "_q",
+            "_amortized_q",
+        ):
+            value = getattr(self, attr, None)
+            if isinstance(value, nn.Module):
+                value.to(actual_device)
+        x = getattr(self, "_x", None)
+        if x is not None:
+            self._x = x.to(actual_device)
