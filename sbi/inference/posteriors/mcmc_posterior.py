@@ -136,6 +136,7 @@ class MCMCPosterior(NeuralPosterior):
         validate_target_accept(target_accept)
         self.target_accept = target_accept
         self._posterior_sampler = None
+        self._mcmc_init_params: Optional[Tensor] = None
 
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
@@ -546,11 +547,44 @@ class MCMCPosterior(NeuralPosterior):
                 proposal, potential_fn, transform=transform, **kwargs
             )
         elif init_strategy == "latest_sample":
-            latest_sample = IterateParameters(self._mcmc_init_params, **kwargs)
-            return latest_sample
+            # `getattr`: posteriors unpickled from older sbi versions lack the
+            # attribute entirely.
+            stored_params = getattr(self, "_mcmc_init_params", None)
+            if stored_params is None:
+                raise ValueError(
+                    "`init_strategy='latest_sample'` continues the chains of an "
+                    "earlier `sample()` call, but this posterior holds no chain "
+                    "states. Only `method='slice_np'` and "
+                    "`method='slice_np_vectorized'` record them, and only after a "
+                    "`sample()` or `sample_batched()` call. Use another init "
+                    "strategy, for example 'proposal' or 'sir'."
+                )
+            return IterateParameters(stored_params, **kwargs)
         else:
             raise NotImplementedError(
                 f"Init strategy {init_strategy} is not implemented."
+            )
+
+    def _check_latest_sample_supply(self, init_strategy: str, num_needed: int) -> None:
+        """Fail before sampling if `latest_sample` cannot supply enough chain states.
+
+        Args:
+            init_strategy: The requested init strategy.
+            num_needed: Number of initial parameters this call draws.
+
+        Raises:
+            ValueError: If the last run stored fewer states than this call needs.
+        """
+        stored_params = getattr(self, "_mcmc_init_params", None)
+        if init_strategy != "latest_sample" or stored_params is None:
+            return
+
+        stored = len(stored_params)
+        if num_needed > stored:
+            raise ValueError(
+                f"`init_strategy='latest_sample'` has {stored} chain state(s) from "
+                f"the last run, but this call needs {num_needed}. Run at most "
+                f"{stored} chain(s), or use another init strategy."
             )
 
     def _get_initial_params(
@@ -576,6 +610,8 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Tensor: initial parameters, one for each chain
         """
+        self._check_latest_sample_supply(init_strategy, num_chains)
+
         # Build init function
         init_fn = self._build_mcmc_init_fn(
             self.proposal,
@@ -649,6 +685,9 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Tensor: initial parameters, one for each chain
         """
+
+        # One init per chain per observation, all drawn from the same iterator.
+        self._check_latest_sample_supply(init_strategy, len(x) * num_chains_per_x)
 
         potential_ = deepcopy(self.potential_fn)
         initial_params = []
