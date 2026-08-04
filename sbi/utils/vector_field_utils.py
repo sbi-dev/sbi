@@ -325,7 +325,9 @@ def denoise_independent(
     if len(batch_shape) < p.reinterpreted_batch_ndims:
         return denoised_base_dist
     else:
-        return Independent(denoised_base_dist, p.reinterpreted_batch_ndims)
+        return Independent(
+            denoised_base_dist, p.reinterpreted_batch_ndims, validate_args=False
+        )
 
 
 def denoise_gaussian(p: Normal, m: Tensor, s: Tensor, x_t: Tensor) -> Normal:
@@ -348,7 +350,7 @@ def denoise_gaussian(p: Normal, m: Tensor, s: Tensor, x_t: Tensor) -> Normal:
     posterior_mean = posterior_variance * (mean_0 / std_0**2 + m * x_t / s**2)
     posterior_std = torch.sqrt(posterior_variance)
 
-    return Normal(posterior_mean, posterior_std)
+    return Normal(posterior_mean, posterior_std, validate_args=False)
 
 
 def denoise_multivariate_gaussian(
@@ -381,7 +383,9 @@ def denoise_multivariate_gaussian(
     term1 = torch.matmul(precision_prior, mean0.unsqueeze(-1))
     term2 = (m / s**2)[..., None] * x_t.unsqueeze(-1)
     posterior_mean = torch.matmul(posterior_cov, term1 + term2).squeeze(-1)
-    return MultivariateNormal(posterior_mean, covariance_matrix=posterior_cov)
+    return MultivariateNormal(
+        posterior_mean, covariance_matrix=posterior_cov, validate_args=False
+    )
 
 
 def denoise_mixture(
@@ -408,7 +412,11 @@ def denoise_mixture(
     denoised_logits = mixture_logits[None, ...] + component_loglikelihood
     # Normalize the logits
     denoised_logits = denoised_logits - denoised_logits.logsumexp(dim=-1, keepdims=True)
-    return MixtureSameFamily(Categorical(logits=denoised_logits), denoised_components)
+    return MixtureSameFamily(
+        Categorical(logits=denoised_logits, validate_args=False),
+        denoised_components,
+        validate_args=False,
+    )
 
 
 def denoise_uniform(
@@ -508,7 +516,9 @@ def marginalize_independent(
     if len(batch_shape) < p.reinterpreted_batch_ndims:
         return marg_base_dist
     else:
-        return Independent(marg_base_dist, p.reinterpreted_batch_ndims)
+        return Independent(
+            marg_base_dist, p.reinterpreted_batch_ndims, validate_args=False
+        )
 
 
 def marginalize_mixture(
@@ -525,7 +535,9 @@ def marginalize_mixture(
         The marginal MixtureSameFamily distribution.
     """
     return MixtureSameFamily(
-        p.mixture_distribution, marginalize(p.component_distribution, m, s)
+        p.mixture_distribution,
+        marginalize(p.component_distribution, m, s),
+        validate_args=False,
     )
 
 
@@ -548,7 +560,7 @@ def marginalize_gaussian(p: Normal, m: Tensor, s: Tensor) -> Normal:
     marginal_variance = (m * std_0) ** 2 + s**2
     marginal_std = torch.sqrt(marginal_variance)
 
-    return Normal(marginal_mean, marginal_std)
+    return Normal(marginal_mean, marginal_std, validate_args=False)
 
 
 def marginalize_multivariate_gaussian(
@@ -577,7 +589,9 @@ def marginalize_multivariate_gaussian(
         device=cov_0.device,  # type: ignore
     )
 
-    return MultivariateNormal(marginal_mean, covariance_matrix=marginal_cov)
+    return MultivariateNormal(
+        marginal_mean, covariance_matrix=marginal_cov, validate_args=False
+    )
 
 
 def marginalize_uniform(p: Uniform, m: Tensor, s: Tensor) -> 'UniformNormalConvolution':
@@ -623,7 +637,8 @@ class UniformNormalPosterior(Distribution):
         m: Scaling factor.
         s: Standard deviation of the noise.
         x_t: Observed data.
-        validate_args: Whether to validate arguments. Defaults to None.
+        validate_args: Whether to validate arguments. Defaults to False: the
+            clamps below absorb degenerate intermediates that validation rejects.
     """
 
     arg_constraints = {
@@ -642,7 +657,7 @@ class UniformNormalPosterior(Distribution):
         m: Tensor | float,
         s: Tensor | float,
         x_t: Tensor | float,
-        validate_args: Optional[bool] = None,
+        validate_args: Optional[bool] = False,
     ) -> None:
         self.low = torch.as_tensor(low)
         self.high = torch.as_tensor(high)
@@ -655,7 +670,9 @@ class UniformNormalPosterior(Distribution):
         self.sigma = self.s / torch.abs(self.m)
 
         # Standard Normal Distribution
-        self.standard_normal = Normal(torch.tensor(0.0, device=self.sigma.device), 1.0)
+        self.standard_normal = Normal(
+            torch.tensor(0.0, device=self.sigma.device), 1.0, validate_args=False
+        )
 
         # Standardized truncation limits
         self.alpha = (self.low - self.mu) / self.sigma
@@ -701,7 +718,8 @@ class UniformNormalPosterior(Distribution):
         return torch.clamp(sample, min=self.low, max=self.high)
 
     def log_prob(self, x: Tensor) -> Tensor:
-        lp = Normal(self.mu, self.sigma).log_prob(x) - torch.log(self.Z)
+        normal = Normal(self.mu, self.sigma, validate_args=False)
+        lp = normal.log_prob(x) - torch.log(self.Z)
         return torch.where((x >= self.low) & (x <= self.high), lp, -torch.inf)
 
 
@@ -713,7 +731,8 @@ class UniformNormalConvolution(Distribution):
         high: Upper bound of the uniform distribution.
         scale: Scaling factor.
         noise: Standard deviation of the noise.
-        validate_args: Whether to validate arguments. Defaults to None.
+        validate_args: Whether to validate arguments. Defaults to False (see
+            UniformNormalPosterior).
     """
 
     arg_constraints = {
@@ -731,7 +750,7 @@ class UniformNormalConvolution(Distribution):
         high: Tensor | float,
         scale: Tensor | float,
         noise: Tensor | float,
-        validate_args=None,
+        validate_args=False,
     ) -> None:
         self.low = torch.as_tensor(low)
         self.high = torch.as_tensor(high)
@@ -757,7 +776,7 @@ class UniformNormalConvolution(Distribution):
         # Compute p(value) using the convolution formula:
         # p(value) = 1/(b-a) * [Phi((value - scale*a)/noise)
         # - Phi((value - scale*b)/noise)]
-        dist0 = Normal(torch.tensor(0.0, device=value.device), 1.0)
+        dist0 = Normal(torch.tensor(0.0, device=value.device), 1.0, validate_args=False)
         numerator = dist0.cdf((value - self.scale * self.low) / self.noise) - dist0.cdf(
             (value - self.scale * self.high) / self.noise
         )
@@ -814,12 +833,18 @@ def fit_gmm(
         means = means.squeeze(-1)
         covariances = covariances.squeeze(-1).squeeze(-1)
         std = torch.sqrt(covariances)
-        components = Normal(means, std)
+        components = Normal(means, std, validate_args=False)
     else:
-        components = MultivariateNormal(means, covariance_matrix=covariances)
+        components = MultivariateNormal(
+            means, covariance_matrix=covariances, validate_args=False
+        )
 
     # Construct and return the MixtureSameFamily distribution
-    return MixtureSameFamily(Categorical(probs=weights), components)
+    return MixtureSameFamily(
+        Categorical(probs=weights, validate_args=False),
+        components,
+        validate_args=False,
+    )
 
 
 def mv_diag_or_dense(A_diag_or_dense: Tensor, b: Tensor, batch_dims: int = 0) -> Tensor:
