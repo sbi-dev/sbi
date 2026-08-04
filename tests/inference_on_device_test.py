@@ -545,7 +545,11 @@ def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C]):
     num_rounds = 2
     num_simulations = 1000
     device = process_device("gpu")
-    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim), device=device)
+    # NPE-A's correction needs the Gaussian prior's precision to stay positive
+    # definite.
+    prior = MultivariateNormal(
+        torch.zeros(num_dim, device=device), torch.eye(num_dim, device=device)
+    )
     simulator = diagonal_linear_gaussian
 
     estimator = "mdn_snpe_a" if method == NPE_A else "mdn"

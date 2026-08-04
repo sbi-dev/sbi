@@ -921,3 +921,28 @@ def test_scan(
     assert torch.allclose(y_scan, y_loop, atol=1e-5)
 
     torch.compiler.reset()
+
+
+LRU_DEFAULTS = dict(
+    input_dim=4,
+    state_dim=8,
+    r_min=0.0,
+    r_max=1.0,
+    phase_max=torch.pi,
+    bidirectional=False,
+    mode="scan",
+)
+
+
+def test_lru_rejects_invalid_state_dim():
+    """The check read `input_dim`, so an invalid `state_dim` passed silently."""
+    with pytest.raises(ValueError, match="state_dim"):
+        LRU(**{**LRU_DEFAULTS, "state_dim": -5})
+
+
+def test_lru_forward_rejects_invalid_mode():
+    """`forward()`'s `match mode` must stay in sync with the constructor."""
+    layer = LRU(**LRU_DEFAULTS)
+
+    with pytest.raises(ValueError, match="mode"):
+        layer.forward(torch.randn(2, 6, LRU_DEFAULTS["input_dim"]), mode="invalid")

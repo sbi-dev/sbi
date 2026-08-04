@@ -29,6 +29,24 @@ def set_seed():
     seed_all_backends(seed)
 
 
+@pytest.fixture(autouse=True)
+def guard_torch_validation_default():
+    """Fail the test that mutates torch's global validation default.
+
+    `set_default_validate_args` is a torch staticmethod: called on any instance, it
+    changes validation for every distribution constructed afterwards, which makes
+    test failures order-dependent. sbi sets validation per instance only.
+    """
+    default = torch.distributions.Distribution._validate_args
+    yield
+    polluted = torch.distributions.Distribution._validate_args is not default
+    torch.distributions.Distribution._validate_args = default
+    assert not polluted, (
+        "This test changed torch's global validation default. Use "
+        "`sbi.utils.torchutils.set_validate_args` to configure single instances."
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def set_default_tensor_type():
     torch.set_default_dtype(torch.float32)

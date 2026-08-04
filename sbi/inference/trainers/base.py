@@ -1,12 +1,14 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import os
 import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime
+from inspect import currentframe
 from pathlib import Path
 from typing import (
     Any,
@@ -81,6 +83,33 @@ from sbi.utils.user_input_checks import (
     process_prior,
     process_simulator,
 )
+
+_SBI_ROOT = str(Path(__file__).parents[2]) + os.sep
+
+
+def _stacklevel_to_caller(default: int = 2) -> int:
+    """Return the `warnings.warn` stacklevel of the first frame outside sbi.
+
+    Trainers reach the training loop through a different number of internal frames
+    each, so no constant is right for all of them. A constant also makes Python's
+    "once per location" filter collapse every training run in a process into one
+    warning. (`warn(skip_file_prefixes=...)` would do this, but needs Python 3.12.)
+
+    Args:
+        default: Stacklevel to fall back to if every frame is inside sbi.
+
+    Returns:
+        Stacklevel that attributes the warning to the caller's own code.
+    """
+    frame = currentframe()
+    frame = frame.f_back if frame is not None else None
+    level = 1
+    while frame is not None:
+        if not frame.f_code.co_filename.startswith(_SBI_ROOT):
+            return level
+        frame = frame.f_back
+        level += 1
+    return default
 
 
 def infer(
@@ -256,6 +285,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._round = 0
         self._val_loss = float("Inf")
         self._best_val_loss = float("Inf")
+        self._best_model_state_dict = None
         self._epochs_since_last_improvement = 0
 
         if summary_writer is not None:
@@ -749,8 +779,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
         else:
             raise NotImplementedError(
-                "Posterior parameter construction not implemented for",
-                f"'{sample_with}'",
+                f"Posterior parameter construction not implemented for '{sample_with}'"
             )
 
         return posterior_parameters
@@ -950,8 +979,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 )
             if sample_with not in ("ode", "sde"):
                 raise ValueError(
-                    "`sample_with` must be either",
-                    f" 'ode' or 'sde', got '{sample_with}'",
+                    f"`sample_with` must be either 'ode' or 'sde', got '{sample_with}'"
                 )
             posterior = VectorFieldPosterior(
                 vector_field_estimator=vector_field_estimator,
@@ -1000,8 +1028,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 )
             else:
                 raise NotImplementedError(
-                    "Sampling method not implemented for",
-                    f"'{posterior_parameters}'",
+                    f"Sampling method not implemented for '{posterior_parameters}'"
                 )
         return posterior
 
@@ -1039,7 +1066,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 list(self._neural_net.parameters()),
                 lr=train_config.learning_rate,
             )
-            self.epoch, self.val_loss = 0, float("Inf")
+            self.epoch, self._val_loss = 0, float("Inf")
 
         while self.epoch <= train_config.max_num_epochs and not self._converged(
             self.epoch, train_config.stop_after_epochs
@@ -1063,9 +1090,16 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             self.epoch += 1
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        self._report_convergence_at_end(
-            self.epoch, train_config.stop_after_epochs, train_config.max_num_epochs
-        )
+        if self.epoch > train_config.max_num_epochs:
+            # The `and` above short-circuits on the last check, so `_converged` never
+            # saw the final epoch. Score it here before choosing the weights to keep.
+            if self._val_loss < self._best_val_loss:
+                self._best_val_loss = self._val_loss
+                self._best_model_state_dict = deepcopy(self._neural_net.state_dict())
+            elif self._best_model_state_dict is not None:
+                self._neural_net.load_state_dict(self._best_model_state_dict)
+
+        self._report_convergence_at_end(self.epoch, train_config.max_num_epochs)
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
@@ -1229,20 +1263,26 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         )
         return TensorBoardTracker(SummaryWriter(logdir))
 
-    def _report_convergence_at_end(
-        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
-    ) -> None:
-        if self._converged(epoch, stop_after_epochs):
+    def _report_convergence_at_end(self, epoch: int, max_num_epochs: int) -> None:
+        """Report why the training loop stopped.
+
+        Args:
+            epoch: Epoch counter as the training loop left it.
+            max_num_epochs: The epoch budget the loop was given.
+        """
+        # Not `_converged()`: it advances the counter it reads, so a second call can
+        # flip its own verdict.
+        if epoch <= max_num_epochs:
             print(
                 "\r",
                 f"Neural network successfully converged after {epoch} epochs.",
                 end="",
             )
-        elif max_num_epochs == epoch:
+        else:
             warn(
-                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
+                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached, "
                 "but network has not yet fully converged. Consider increasing it.",
-                stacklevel=2,
+                stacklevel=_stacklevel_to_caller(),
             )
 
     def _summarize(

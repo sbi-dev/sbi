@@ -16,6 +16,7 @@ from sbi.utils.torchutils import (
     assert_all_finite,
     atleast_2d,
     canonical_device,
+    set_validate_args,
 )
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
@@ -206,7 +207,7 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
 
     # Turn off validation of input arguments to allow `log_prob()` on samples outside
     # of the support.
-    prior.set_default_validate_args(False)
+    set_validate_args(prior, False)
 
     # Reject unwrapped scalar priors.
     # This will reject Uniform priors with dimension larger than 1.

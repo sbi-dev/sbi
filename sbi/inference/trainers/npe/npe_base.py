@@ -234,8 +234,8 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         if self._prior is None or isinstance(self._prior, ImproperEmpirical):
             if proposal is not None:
                 raise ValueError(
-                    "You did not passed a prior at initialization, but now you "
-                    "passed a proposal. If you want to run multi-round SNPE, you have "
+                    "You did not pass a prior at initialization, but now you "
+                    "passed a proposal. If you want to run multi-round NPE, you have "
                     "to specify a prior (set the `.prior` argument or re-initialize "
                     "the object with a prior distribution). If the samples you passed "
                     "to `append_simulations()` were sampled from the prior, you can "
@@ -555,7 +555,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                         "proposal distribution it uses is not the prior (it can be "
                         "accessed via `RestrictedPrior._prior`). We do not "
                         "recommend to mix the `RestrictedPrior` with multi-round "
-                        "SNPE.",
+                        "NPE.",
                         stacklevel=2,
                     )
             elif (
@@ -571,12 +571,10 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 )
         elif self._round > 0:
             raise ValueError(
-                "A proposal was passed but no prior was passed at initialisation. When "
-                "running multi-round inference, a prior needs to be specified upon "
-                "initialisation. Potential fix: setting the `._prior` attribute or "
-                "re-initialisation. If the samples passed to `append_simulations()` "
-                "were sampled from the prior, single-round inference can be performed "
-                "with `append_simulations(..., proprosal=None)`."
+                "This trainer has already run multi-round inference, but no "
+                "`proposal` was passed for the new simulations. Pass the "
+                "distribution the simulations were sampled from. If they were "
+                "sampled from the prior, pass the prior object as `proposal`."
             )
 
     def _get_start_index(self, context: StartIndexContext) -> int:
