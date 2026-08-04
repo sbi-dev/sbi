@@ -1090,9 +1090,7 @@ def test_pickle_map_location_vi_posterior():
 
     samples = loaded.sample((10,))
     log_probs = loaded.log_prob(samples)
-    assert str(samples.device) == "cpu", (
-        f"samples on {samples.device}, expected cpu"
-    )
+    assert str(samples.device) == "cpu", f"samples on {samples.device}, expected cpu"
     assert str(log_probs.device) == "cpu", (
         f"log probabilities on {log_probs.device}, expected cpu"
     )
@@ -1130,6 +1128,4 @@ def test_pickle_map_location_vector_field_posterior():
     )
 
     samples = loaded.sample((10,))
-    assert str(samples.device) == "cpu", (
-        f"samples on {samples.device}, expected cpu"
-    )
+    assert str(samples.device) == "cpu", f"samples on {samples.device}, expected cpu"
