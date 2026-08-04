@@ -212,9 +212,11 @@ class VectorFieldPosterior(NeuralPosterior):
                 the specific `ScoreAdaptation` child class for details, specifically
                 `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
             max_sampling_batch_size: Maximum batch size for sampling.
-            sample_with: Sampling method to use - 'ode' or 'sde'. Note that in order to
-                use the 'sde' sampling method, the vector field estimator must support
-                it and have the SCORE_DEFINED class attribute set to True.
+            sample_with: Deprecated, set it at construction instead; will be removed
+                in v0.28.0. Sampling method to use - 'ode' or 'sde'. Note that in
+                order to use the 'sde' sampling method, the vector field estimator
+                must support it and have the SCORE_DEFINED class attribute set to
+                True.
             show_progress_bars: Whether to show a progress bar during sampling.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
@@ -232,6 +234,15 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if sample_with is None:
             sample_with = self.sample_with
+        else:
+            warnings.warn(
+                "Passing `sample_with` to `VectorFieldPosterior.sample()` is "
+                "deprecated since sbi v0.27.0 and will be removed in v0.28.0. Set "
+                "it at construction, e.g. "
+                "`build_posterior(..., sample_with=...)`, instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)

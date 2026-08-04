@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Dict, Literal, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Union
 
 import torch
 from torch import Tensor, eye, ones
@@ -77,7 +77,9 @@ class NPE_C(PosteriorEstimatorTrainer):
         for round_idx in range(5):
             theta = proposal.sample((100,))
             x = simulator(theta)
-            density_estimator = inference.append_simulations(theta, x).train()
+            density_estimator = inference.append_simulations(
+                theta, x, proposal=proposal
+            ).train()
             posterior = inference.build_posterior(density_estimator)
             proposal = posterior.set_default_x(x_o)
 
@@ -208,17 +210,10 @@ class NPE_C(PosteriorEstimatorTrainer):
             # SNPE, we only use the latest data that was passed, i.e. the one from the
             # last proposal.
             proposal = self._proposal_roundwise[-1]
-            self.use_non_atomic_loss = (
-                isinstance(proposal, DirectPosterior)
-                and isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
-                and isinstance(self._neural_net, MixtureDensityEstimator)
-                and check_dist_class(
-                    self._prior, class_to_check=(Uniform, MultivariateNormal)
-                )[0]
-            )
+            self.use_non_atomic_loss = self._multiround_loss_is_per_row(proposal)
 
             algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
-            print(f"Using SNPE-C with {algorithm} loss")
+            print(f"Using {type(self).__name__} with {algorithm} loss")
 
             if self.use_non_atomic_loss:
                 # Take care of z-scoring, pre-compute and store prior terms.
@@ -306,6 +301,28 @@ class NPE_C(PosteriorEstimatorTrainer):
                 )
         else:
             self._maybe_z_scored_prior = self._prior
+
+    def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
+        """Return whether the MoG closed-form correction applies to `proposal`.
+
+        The correction is a product of Gaussians, so it needs a MoG proposal, a MoG
+        density estimator and a Gaussian or uniform prior. Unlike the atomic loss it
+        has no cross-row dependence.
+
+        Args:
+            proposal: The distribution the parameters of a round were sampled from.
+
+        Returns:
+            Whether the non-atomic loss applies.
+        """
+        return (
+            isinstance(proposal, DirectPosterior)
+            and isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
+            and isinstance(self._neural_net, MixtureDensityEstimator)
+            and check_dist_class(
+                self._prior, class_to_check=(Uniform, MultivariateNormal)
+            )[0]
+        )
 
     def _log_prob_proposal_posterior(
         self,

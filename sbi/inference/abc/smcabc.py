@@ -191,6 +191,17 @@ class SMCABC(ABCBASE):
             summary (if return_summary True): dictionary containing the accepted
                 paramters (if kde True), distances and simulated data x of all
                 populations.
+
+        Examples:
+            >>> from sbi.inference import SMCABC
+            >>> inference = SMCABC(simulator, prior)
+            >>> samples = inference(
+            ...     x_o,
+            ...     num_particles=100,
+            ...     num_initial_pop=1000,
+            ...     num_simulations=5000,
+            ...     epsilon_decay=0.5,
+            ... )
         """
 
         pop_idx = 0

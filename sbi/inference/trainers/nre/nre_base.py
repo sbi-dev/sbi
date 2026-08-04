@@ -110,7 +110,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         x: Tensor,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
-        algorithm: str = "SNRE",
+        algorithm: str = "NRE",
         data_device: Optional[str] = None,
     ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
@@ -230,14 +230,9 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
                 stacklevel=2,
             )
 
+        # Defensive only: every subclass supplies `loss_kwargs` before delegating here.
         if loss_kwargs is None:
             loss_kwargs = LossArgsNRE()
-            warnings.warn(
-                "No value provided for loss_kwargs. NRE loss arguments like "
-                "num_atoms should be set via `LossArgsNRE. A default of  "
-                "num_atoms={loss_kwargs.num_atoms} will be used.",
-                stacklevel=2,
-            )
 
         if not issubclass(type(loss_kwargs), LossArgsNRE):
             raise TypeError(

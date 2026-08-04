@@ -128,6 +128,11 @@ class MCABC(ABCBASE):
                 can .sample() and .log_prob().
             summary (if summary True): dictionary containing the accepted paramters (if
                 kde True), distances and simulated data x.
+
+        Examples:
+            >>> from sbi.inference import MCABC
+            >>> inference = MCABC(simulator, prior)
+            >>> samples = inference(x_o, num_simulations=1000, quantile=0.1)
         """
 
         # Exactly one of eps or quantile need to be passed.

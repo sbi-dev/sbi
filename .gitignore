@@ -1,7 +1,6 @@
 # Project specific
 .sbi_env/
 *sbi-logs/
-/docs/site/*
 /docs/*/_autosummary/*
 
 # Development files and python cache

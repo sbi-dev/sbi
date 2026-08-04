@@ -369,8 +369,6 @@ def test_kde(bandwidth, transform, sample_weights):
 @pytest.mark.parametrize(
     "z_x",
     [
-        True,
-        False,
         None,
         "none",
         "independent",
@@ -388,8 +386,6 @@ def test_kde(bandwidth, transform, sample_weights):
 @pytest.mark.parametrize(
     "z_theta",
     [
-        True,
-        False,
         None,
         "none",
         "independent",
@@ -406,19 +402,18 @@ def test_kde(bandwidth, transform, sample_weights):
 )
 def test_z_score_parser(z_x, z_theta):
     """Test the z_score_parser function."""
-    if z_x is bool or z_theta is bool:
-        with pytest.warns(
-            UserWarning,
-            match="Boolean values for z-scoring are deprecated and will",
-        ):
-            z_score_parser(z_x)
-            z_score_parser(z_theta)
-
     result_x = z_score_parser(z_x)
     result_theta = z_score_parser(z_theta)
 
     assert result_x is not None, f"z_score_parser({z_x}) returned None"
     assert result_theta is not None, f"z_score_parser({z_theta}) returned None"
+
+
+@pytest.mark.parametrize("z_score_flag", (True, False))
+def test_z_score_parser_rejects_bool(z_score_flag):
+    """Booleans were deprecated in v0.18.0 and are no longer accepted."""
+    with pytest.raises(ValueError, match="Invalid z-scoring option"):
+        z_score_parser(z_score_flag)
 
 
 @pytest.mark.parametrize(

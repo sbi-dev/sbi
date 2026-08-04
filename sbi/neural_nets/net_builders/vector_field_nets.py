@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
+import warnings
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, Sequence, Union
 
@@ -334,10 +335,24 @@ def build_vector_field_estimator(
 
 # For backward compatibility
 def build_flow_matching_estimator(*args, **kwargs):
+    warnings.warn(
+        "`build_flow_matching_estimator` is deprecated since sbi v0.27.0 and will "
+        "be removed in v0.28.0. Use "
+        "`build_vector_field_estimator(..., estimator_type='flow')` instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
     return build_vector_field_estimator(*args, estimator_type="flow", **kwargs)
 
 
 def build_score_matching_estimator(*args, **kwargs):
+    warnings.warn(
+        "`build_score_matching_estimator` is deprecated since sbi v0.27.0 and will "
+        "be removed in v0.28.0. Use "
+        "`build_vector_field_estimator(..., estimator_type='score')` instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
     return build_vector_field_estimator(*args, estimator_type="score", **kwargs)
 
 

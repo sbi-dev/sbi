@@ -102,7 +102,7 @@ def infer(
     The scope of this function is limited to the most essential features of sbi. For
     more flexibility (e.g. multi-round inference, different density estimators) please
     use the flexible interface described here:
-    https://sbi-dev.github.io/sbi/latest/tutorials/02_multiround_inference/
+    https://sbi.readthedocs.io/en/latest/advanced_tutorials/02_multiround_inference.html
 
     Args:
         simulator: A function that takes parameters $\theta$ and maps them to
@@ -113,7 +113,12 @@ def infer(
             parameters, e.g. which ranges are meaningful for them. Any
             object with `.log_prob()`and `.sample()` (for example, a PyTorch
             distribution) can be used.
-        method: What inference method to use. Either of SNPE, SNLE or SNRE.
+        method: What inference method to use, case-insensitively: any neural
+            trainer `sbi.inference` exports, for example 'npe', 'nle', 'nre',
+            'npe_a', 'fmpe' or 'npse'. The legacy names 'snpe', 'snle' and 'snre'
+            still work but emit a `FutureWarning`. The ABC methods are not
+            supported, because they take the simulator at construction; call
+            `MCABC`/`SMCABC` directly.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
@@ -125,14 +130,40 @@ def infer(
     Returns: Posterior over parameters conditional on observations (amortized).
     """
 
-    try:
-        # Moved here to avoid circular imports at initialization.
-        import sbi.inference  # noqa: R0401
+    # Moved here to avoid circular imports at initialization.
+    import sbi.inference  # noqa: R0401
 
-        method_fun: Callable = getattr(sbi.inference, method.upper())
+    # Resolve legacy method strings here: going through the module `__getattr__`
+    # would attribute the warning to this file instead of the caller.
+    name = method.upper()
+    canonical = sbi.inference._DEPRECATED_ALIASES.get(name)
+    resolved = canonical if canonical is not None else name
+
+    # Before the deprecation warning: advising a spelling `infer` cannot run either
+    # would only send the user around the loop again.
+    if resolved in sbi.inference._abc_family:
+        raise ValueError(
+            f"`infer` does not support '{method}'. It trains a neural network on "
+            "simulations it draws itself, while the ABC methods take the simulator "
+            f"at construction and have no training step. Use {resolved} directly. "
+            f"Its `__call__` docstring shows an example."
+        )
+
+    if canonical is not None:
+        warn(
+            f"method='{method}' is deprecated since sbi v0.27.0 and will be "
+            f"removed in v0.28.0. Use method='{canonical.lower()}' instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+
+    try:
+        method_fun: Callable = getattr(sbi.inference, resolved)
     except AttributeError as err:
         raise NameError(
-            "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
+            f"Method '{method}' not available. `method` must name a neural trainer "
+            "exported by `sbi.inference`, for example 'npe', 'nle', 'nre', 'npe_a', "
+            "'fmpe' or 'npse'."
         ) from err
 
     if (
@@ -143,7 +174,7 @@ def infer(
         warn(
             "We discourage the use the simple interface in more complicated settings. "
             "Have a look into the flexible interface, e.g. in our tutorial "
-            "(https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started).",
+            "(https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html).",
             stacklevel=2,
         )
     # Set variables to empty dicts to be able to pass them
