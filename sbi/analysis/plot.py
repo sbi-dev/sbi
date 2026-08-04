@@ -1747,10 +1747,6 @@ def _sbc_rank_plot(
         raise ValueError(
             f"plot type {plot_type} not implemented, use one in {plot_types}."
         )
-    plot_types = ["hist", "cdf"]
-    assert plot_type in plot_types, (
-        f"plot type {plot_type} not implemented, use one in {plot_types}."
-    )
 
     if legend_kwargs is None:
         legend_kwargs = dict(loc="best", handlelength=0.8)
