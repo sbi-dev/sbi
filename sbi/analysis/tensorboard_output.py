@@ -158,7 +158,10 @@ def plot_summary(
     elif isinstance(trainer, Path):
         log_dir = trainer
     else:
-        raise ValueError(f"trainer {trainer}")
+        raise ValueError(
+            f"Expected a NeuralInference object or a Path to a log directory, "
+            f"got {type(trainer).__name__}."
+        )
 
     all_event_data = _get_event_data_from_log_dir(log_dir, size_guidance)
     scalars = all_event_data["scalars"]

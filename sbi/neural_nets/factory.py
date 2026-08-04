@@ -331,9 +331,9 @@ def posterior_nn(
     if model == "mdn_snpe_a":
         if num_components != 10:
             raise ValueError(
-                "You set `num_components`. For SNPE-A, this has to be done at "
+                "You set `num_components`. For NPE-A, this has to be done at "
                 "instantiation of the inference object, i.e. "
-                "`inference = SNPE_A(..., num_components=20)`"
+                "`inference = NPE_A(..., num_components=20)`"
             )
         builder_kwargs.pop("num_components")
 

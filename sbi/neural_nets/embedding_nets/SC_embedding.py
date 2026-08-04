@@ -318,9 +318,9 @@ class SpectralConvEmbedding(nn.Module):
 
         else:
             raise ValueError(
-                'Input tensor should be 3D (batch_size, channels, n_points) '
-                'or 4D (batch_size, 2, channels, n_points). ',
-                f'The tensor that was passed has shape {x.shape}.',
+                "Input tensor should be 3D (batch_size, channels, n_points) "
+                "or 4D (batch_size, 2, channels, n_points). "
+                f"The tensor that was passed has shape {x.shape}."
             )
 
         n_points = x.shape[1]

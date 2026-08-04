@@ -928,13 +928,13 @@ def _validate_plotting_style(
         for i, val in enumerate(plotting_style):
             if val is not None and val not in allowed_styles:
                 raise ValueError(
-                    f"Expected {argument_name} at index {i} to be None or one",
-                    f" of {allowed_styles} but got {val}.",
+                    f"Expected {argument_name} at index {i} to be None or one"
+                    f" of {allowed_styles} but got {val}."
                 )
     elif plotting_style is not None and plotting_style not in allowed_styles:
         raise ValueError(
-            f"Expected {argument_name} to be None, a list or one",
-            f" of {allowed_styles} but got {plotting_style}.",
+            f"Expected {argument_name} to be None, a list or one"
+            f" of {allowed_styles} but got {plotting_style}."
         )
 
 
@@ -1740,7 +1740,7 @@ def _sbc_rank_plot(
 
     plot_types = ["hist", "cdf"]
     assert plot_type in plot_types, (
-        "plot type {plot_type} not implemented, use one in {plot_types}."
+        f"plot type {plot_type} not implemented, use one in {plot_types}."
     )
 
     if legend_kwargs is None:

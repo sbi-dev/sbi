@@ -226,3 +226,11 @@ def test_marginal_log_prob_x_space(D: int, N: int):
     assert p_val_mis < 0.05, (
         f"Expected small p_val for misspecified data, obtained {p_val_mis}"
     )
+
+
+def test_mmd_embedding_mode_requires_trained_inference():
+    """An untrained trainer must raise a `ValueError`, not crash."""
+    x = torch.randn(10, 2)
+
+    with pytest.raises(ValueError, match="No neural net found"):
+        calc_misspecification_mmd(x_obs=x[:1], x=x, inference=NPE(), mode="embedding")
