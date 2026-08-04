@@ -55,6 +55,7 @@
 
 * fix: make CI reproducible via committed uv.lock and clarify pymc/pyro import errors by @janfb in https://github.com/sbi-dev/sbi/pull/1894
 * build(deps): bump the github-actions group with 6 updates by @dependabot in https://github.com/sbi-dev/sbi/pull/1965
+* chore: disallow pre-releases in the uv resolution, refresh the lock by @janfb in https://github.com/sbi-dev/sbi/pull/1969
 
 ### 🎉 New Contributors
 
