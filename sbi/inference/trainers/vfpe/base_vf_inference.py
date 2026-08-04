@@ -361,9 +361,9 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         assert self._neural_net is not None
         neural_net = self._neural_net
 
-        # Initialize tracking variables if not exists
-        if not hasattr(self, '_best_val_loss'):
-            self._best_val_loss = float('inf')
+        # A stale best-val-loss would stop this run early on the earlier run's weights.
+        if epoch == 0:
+            self._best_val_loss = float("inf")
             self._epochs_since_last_improvement = 0
             self._best_model_state_dict = None
 

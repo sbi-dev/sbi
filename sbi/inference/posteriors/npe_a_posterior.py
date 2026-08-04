@@ -181,7 +181,6 @@ class NPE_A_Posterior(DirectPosterior):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         max_sampling_batch_size: int = 10_000,
-        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -192,7 +191,6 @@ class NPE_A_Posterior(DirectPosterior):
             sample_shape: Shape of samples to draw.
             x: Conditioning observation. Uses default_x if not provided.
             max_sampling_batch_size: Batch size for rejection sampling.
-            sample_with: Deprecated, raises error if set.
             show_progress_bars: Whether to show progress during sampling.
             reject_outside_prior: If True, reject samples outside prior support.
             max_sampling_time: Maximum time for sampling in seconds.
@@ -217,12 +215,6 @@ class NPE_A_Posterior(DirectPosterior):
             if max_sampling_batch_size is None
             else max_sampling_batch_size
         )
-
-        if sample_with is not None:
-            raise ValueError(
-                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                f"`sample_with` is no longer supported."
-            )
 
         if reject_outside_prior:
             samples = rejection.accept_reject_sample(

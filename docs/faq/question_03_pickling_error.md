@@ -44,7 +44,7 @@ multiprocessing framework you prefer. You can then simulate your data outside of
 
 ```python
 # Given pre-simulated theta and x
-trainer = SNPE(prior)
+trainer = NPE(prior)
 trainer.append_simulations(theta, x).train()
 ```
 

@@ -16,7 +16,11 @@ from torch.distributions import (
     constraints,
 )
 
-from sbi.utils.torchutils import move_all_tensor_to_device, process_device
+from sbi.utils.torchutils import (
+    move_all_tensor_to_device,
+    process_device,
+    set_validate_args,
+)
 
 
 def get_distribution_parameters(
@@ -63,10 +67,13 @@ def move_distribution_to_device(
     else:
         try:
             params = get_distribution_parameters(dist, device)
-            return type(dist)(**params)
+            rebuilt = type(dist)(**params)
         except Exception:
             move_all_tensor_to_device(dist, device)
             return dist
+        # Not a constructor argument: a user subclass need not accept `validate_args`.
+        set_validate_args(rebuilt, dist._validate_args)
+        return rebuilt
 
 
 class CustomPriorWrapper(Distribution):
@@ -181,6 +188,10 @@ class PytorchReturnTypeWrapper(Distribution):
         event_shape=torch.Size(),
         validate_args=None,
     ):
+        self.prior = prior
+        if validate_args is not None:
+            set_validate_args(prior, validate_args)
+
         super().__init__(
             batch_shape=batch_shape,
             event_shape=event_shape,
@@ -189,7 +200,6 @@ class PytorchReturnTypeWrapper(Distribution):
             ),
         )
 
-        self.prior = prior
         self.device = None
         self.return_type = return_type
 
@@ -220,6 +230,11 @@ class PytorchReturnTypeWrapper(Distribution):
         )
 
     @property
+    def arg_constraints(self) -> Dict[str, constraints.Constraint]:
+        # Torch looks up a same-named attribute per constraint; this wrapper has none.
+        return {}
+
+    @property
     def support(self):
         return self.prior.support
 
@@ -233,6 +248,7 @@ class PytorchReturnTypeWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
@@ -270,14 +286,15 @@ class MultipleIndependent(Distribution):
             from sbi.utils.user_input_checks_utils import MultipleIndependent
 
             prior = MultipleIndependent([
-                Gamma(torch.zeros(1), torch.ones(1)),
-                Beta(torch.zeros(1), torch.ones(1)),
+                Gamma(torch.ones(1), torch.ones(1)),
+                Beta(2 * torch.ones(1), 2 * torch.ones(1)),
                 MultivariateNormal(torch.ones(2), torch.tensor([[1, .1], [.1, 1.]]))
             ])
         """
         self._check_distributions(dists)
         if validate_args is not None:
-            [d.set_default_validate_args(validate_args) for d in dists]
+            for d in dists:
+                set_validate_args(d, validate_args)
 
         self.dists = dists
         self.device = process_device(device or "cpu")
@@ -430,6 +447,7 @@ class MultipleIndependent(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         for i in range(len(self.dists)):
             self.dists[i] = move_distribution_to_device(self.dists[i], device)
         self.device = device
@@ -523,6 +541,9 @@ class OneDimPriorWrapper(Distribution):
     """
 
     def __init__(self, prior: Distribution, validate_args=None) -> None:
+        self.prior = prior
+        if validate_args is not None:
+            set_validate_args(prior, validate_args)
         super().__init__(
             batch_shape=prior.batch_shape,
             event_shape=prior.event_shape,
@@ -530,7 +551,6 @@ class OneDimPriorWrapper(Distribution):
                 prior._validate_args if validate_args is None else validate_args
             ),
         )
-        self.prior = prior
         self.device = None
 
     def to(self, device: Union[str, torch.device]) -> None:
@@ -543,6 +563,7 @@ class OneDimPriorWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
@@ -555,7 +576,8 @@ class OneDimPriorWrapper(Distribution):
 
     @property
     def arg_constraints(self) -> Dict[str, constraints.Constraint]:
-        return self.prior.arg_constraints
+        # Torch looks up a same-named attribute per constraint; this wrapper has none.
+        return {}
 
     @property
     def support(self):

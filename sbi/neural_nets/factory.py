@@ -38,8 +38,7 @@ from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
     FlowEstimatorConfig,
     ScoreEstimatorConfig,
-    build_flow_matching_estimator,
-    build_score_matching_estimator,
+    build_vector_field_estimator,
 )
 from sbi.utils.nn_utils import check_net_device
 from sbi.utils.vector_field_utils import VectorFieldNet
@@ -332,9 +331,9 @@ def posterior_nn(
     if model == "mdn_snpe_a":
         if num_components != 10:
             raise ValueError(
-                "You set `num_components`. For SNPE-A, this has to be done at "
+                "You set `num_components`. For NPE-A, this has to be done at "
                 "instantiation of the inference object, i.e. "
-                "`inference = SNPE_A(..., num_components=20)`"
+                "`inference = NPE_A(..., num_components=20)`"
             )
         builder_kwargs.pop("num_components")
 
@@ -358,6 +357,7 @@ def posterior_score_nn(
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
+    compose_standardization: bool = False,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a ScoreEstimator object for score-based
@@ -391,6 +391,8 @@ def posterior_score_nn(
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
+        compose_standardization: Opt-in per-dim affine standardization theta<->z
+            for scale-equivariant calibration. Defaults to False.
         **kwargs: Additional estimator / network arguments.  Valid keys are
             defined by ``ScoreEstimatorConfig``; unknown keys raise
             ``TypeError``.
@@ -398,16 +400,23 @@ def posterior_score_nn(
     Returns:
         Constructor function for NPSE.
     """
+    if compose_standardization and z_score_theta != "independent":
+        raise ValueError(
+            "compose_standardization=True requires z_score_theta='independent'."
+        )
+
     # Map user-facing parameter names to internal names.
+    # Builder takes batch_x=batch_theta, so its z_score_x is the theta setting.
     mapped = dict(
-        z_score_x=z_score_x,
-        z_score_y=z_score_theta,
+        z_score_x=z_score_theta,
+        z_score_y=z_score_x,
         hidden_features=hidden_features,
         num_layers=num_layers,
         embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
         time_embedding_dim=t_embedding_dim,
         time_emb_type=time_emb_type,
         net=model,
+        compose_standardization=compose_standardization,
     )
 
     # Validate against known fields — warns on unknown kwargs (typos)
@@ -416,9 +425,10 @@ def posterior_score_nn(
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
-        return build_score_matching_estimator(
+        return build_vector_field_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
+            estimator_type="score",
             sde_type=sde_type,
             **builder_kwargs,
         )
@@ -443,6 +453,7 @@ def posterior_flow_nn(
     time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
     gaussian_baseline: bool = False,
+    compose_standardization: bool = False,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a FlowMatchingEstimator object for flow-based
@@ -471,6 +482,8 @@ def posterior_flow_nn(
         gaussian_baseline: If True, use analytical Gaussian baseline velocity
             derived from Bayes' rule. The network then only learns the residual.
             Defaults to False.
+        compose_standardization: Opt-in per-dim affine standardization theta<->z
+            for scale-equivariant calibration. Defaults to False.
         **kwargs: Additional estimator / network arguments.  Valid keys are
             defined by ``FlowEstimatorConfig``; unknown keys raise
             ``TypeError``.
@@ -478,6 +491,11 @@ def posterior_flow_nn(
     Returns:
         Constructor function for FMPE.
     """
+    if compose_standardization and z_score_theta != "independent":
+        raise ValueError(
+            "compose_standardization=True requires z_score_theta='independent'."
+        )
+
     # Map user-facing parameter names to internal names.
     mapped = dict(
         z_score_x=z_score_theta,
@@ -489,6 +507,7 @@ def posterior_flow_nn(
         time_emb_type=time_emb_type,
         net=model,
         gaussian_baseline=gaussian_baseline,
+        compose_standardization=compose_standardization,
     )
 
     # Validate against known fields — warns on unknown kwargs (typos)
@@ -497,9 +516,10 @@ def posterior_flow_nn(
     builder_kwargs = config.to_dict()
 
     def build_fn(batch_theta, batch_x):
-        return build_flow_matching_estimator(
+        return build_vector_field_estimator(
             batch_x=batch_theta,
             batch_y=batch_x,
+            estimator_type="flow",
             **builder_kwargs,
         )
 

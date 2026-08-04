@@ -281,7 +281,7 @@ class SpectralConvEmbedding(nn.Module):
         embedding_net = SpectralConvEmbedding(modes=15, in_channels=3,
             out_channels=1, conv_channels=5, num_layers=4)
         neural_posterior = posterior_nn(model="nsf", embedding_net=embedding_net)
-        inference = SNPE(prior=sbi_prior, density_estimator=neural_posterior)
+        inference = NPE_C(prior=sbi_prior, density_estimator=neural_posterior)
         _ = inference.append_simulations(theta, data_equispaced)
 
         # Example for non-equispaced data with batch size of 256, 3 channels and
@@ -299,7 +299,7 @@ class SpectralConvEmbedding(nn.Module):
         embedding_net = SpectralConvEmbedding(modes=15, in_channels=3, out_channels=1,
             conv_channels=5, num_layers=4)
         neural_posterior = posterior_nn(model="nsf", embedding_net=embedding_net)
-        inference = SNPE(prior=sbi_prior, density_estimator=neural_posterior)
+        inference = NPE_C(prior=sbi_prior, density_estimator=neural_posterior)
         _ = inference.append_simulations(theta, data_nonequispaced)
 
         Returns:
@@ -318,9 +318,9 @@ class SpectralConvEmbedding(nn.Module):
 
         else:
             raise ValueError(
-                'Input tensor should be 3D (batch_size, channels, n_points) '
-                'or 4D (batch_size, 2, channels, n_points). ',
-                f'The tensor that was passed has shape {x.shape}.',
+                "Input tensor should be 3D (batch_size, channels, n_points) "
+                "or 4D (batch_size, 2, channels, n_points). "
+                f"The tensor that was passed has shape {x.shape}."
             )
 
         n_points = x.shape[1]

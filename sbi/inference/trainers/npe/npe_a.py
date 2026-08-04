@@ -77,7 +77,9 @@ class NPE_A(PosteriorEstimatorTrainer):
         for round_idx in range(5):
             theta = proposal.sample((100,))
             x = simulator(theta)
-            density_estimator = inference.append_simulations(theta, x).train()
+            density_estimator = inference.append_simulations(
+                theta, x, proposal=proposal
+            ).train()
             posterior = inference.build_posterior(density_estimator)
             proposal = posterior.set_default_x(x_o)
 
@@ -132,7 +134,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         # Catch invalid inputs.
         if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
             raise TypeError(
-                "The `density_estimator` passed to SNPE_A needs to be a "
+                "The `density_estimator` passed to NPE_A needs to be a "
                 "callable or the string 'mdn_snpe_a'!"
             )
 
@@ -201,7 +203,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         """
 
         assert not retrain_from_scratch, """Retraining from scratch is not supported in
-            SNPE-A yet. The reason for this is that, if we reininitialized the density
+            NPE-A yet. The reason for this is that, if we reininitialized the density
             estimator, the z-scoring would change, which would break the posthoc
             correction. This is a pure implementation issue."""
 
@@ -260,14 +262,14 @@ class NPE_A(PosteriorEstimatorTrainer):
             default_x = proposal.default_x
             if default_x is None:
                 raise ValueError(
-                    "Proposal posterior must have a default_x set for SNPE-A "
+                    "Proposal posterior must have a default_x set for NPE-A "
                     "correction. Call posterior.set_default_x(x_o) before using "
                     "as proposal."
                 )
             if default_x.shape[0] != 1:
                 raise ValueError(
-                    f"SNPE-A requires default_x batch size of 1, got "
-                    f"{default_x.shape[0]}. SNPE-A only supports single "
+                    f"NPE-A requires default_x batch size of 1, got "
+                    f"{default_x.shape[0]}. NPE-A only supports single "
                     "observations for correction."
                 )
             return proposal.get_mog_params(default_x)
@@ -293,7 +295,7 @@ class NPE_A(PosteriorEstimatorTrainer):
                 )
             if default_x.shape[0] != 1:
                 raise ValueError(
-                    f"SNPE-A requires default_x batch size of 1, got "
+                    f"NPE-A requires default_x batch size of 1, got "
                     f"{default_x.shape[0]}."
                 )
             mog = proposal.get_mog_params(default_x)
@@ -306,7 +308,7 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         # Unsupported type
         raise TypeError(
-            f"For multi-round SNPE-A, proposal must be one of: NPE_A_Posterior, "
+            f"For multi-round NPE-A, proposal must be one of: NPE_A_Posterior, "
             f"MultivariateNormal, MoG, or an object with get_mog_params() method. "
             f"Got {type(proposal).__name__}. For custom proposals, construct "
             f"NPE_A_Posterior directly with your proposal_mog parameter."
@@ -468,6 +470,19 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         return self._posterior
 
+    def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
+        """Return True: NPE-A trains on the plain log-prob for any proposal.
+
+        The proposal correction is applied analytically after training, not in the loss.
+
+        Args:
+            proposal: Unused, the answer does not depend on it.
+
+        Returns:
+            True.
+        """
+        return True
+
     def _log_prob_proposal_posterior(
         self,
         theta: Tensor,
@@ -562,7 +577,7 @@ def _correct_for_proposal(
     except torch.linalg.LinAlgError as e:
         raise ValueError(
             "Posterior precision matrix is not positive definite. "
-            "This is a known issue with SNPE-A when the proposal and density "
+            "This is a known issue with NPE-A when the proposal and density "
             "estimator don't align well. Try different hyperparameters. "
             f"Original error: {e}"
         ) from e

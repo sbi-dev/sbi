@@ -386,6 +386,43 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
             embedding_net if embedding_net is not None else nn.Identity()
         )
 
+        # Boundary affine for estimators trained and sampled in standardized space.
+        self.register_buffer(
+            "_theta_shift", torch.zeros(1, *self.input_shape, dtype=torch.float32)
+        )
+        self.register_buffer(
+            "_theta_scale", torch.ones(1, *self.input_shape, dtype=torch.float32)
+        )
+        self.register_buffer(
+            "_compose_standardization", torch.tensor(False), persistent=True
+        )
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        r"""Load legacy checkpoints as compose-off and reject partial affines."""
+        compose_names = ("_theta_shift", "_theta_scale", "_compose_standardization")
+        present = [n for n in compose_names if prefix + n in state_dict]
+        if present and len(present) != len(compose_names):
+            missing = [n for n in compose_names if prefix + n not in state_dict]
+            raise RuntimeError(
+                "Partial composed-standardization checkpoint: present "
+                f"{[prefix + n for n in present]} but missing "
+                f"{[prefix + n for n in missing]}. Refusing to inject identity "
+                "defaults for the missing buffers (that would silently produce a "
+                "wrong affine). Load a checkpoint with either all three compose "
+                "buffers or none of them."
+            )
+        if not present:
+            state_dict[prefix + "_theta_shift"] = torch.zeros_like(self._theta_shift)
+            state_dict[prefix + "_theta_scale"] = torch.ones_like(self._theta_scale)
+            state_dict[prefix + "_compose_standardization"] = torch.tensor(
+                False, device=self._compose_standardization.device
+            )
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+        self._check_compose_internal_stats_unit()
+        baseline_check = getattr(self, "_check_compose_baseline_compatible", None)
+        if baseline_check is not None:
+            baseline_check()
+
     @property
     def embedding_net(self) -> nn.Module:
         r"""Return the embedding network if it exists."""
@@ -419,6 +456,33 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         r"""Standard deviation of the base distribution
         (the initial noise at time t=T)."""
         return self._std_base
+
+    @property
+    def compose_enabled(self) -> bool:
+        r"""Whether composed standardization is active."""
+        return bool(getattr(self, "_compose_standardization", False))
+
+    def to_z(self, theta: Tensor) -> Tensor:
+        r"""Map original-space parameters to standardized space."""
+        return (theta - self._theta_shift) / self._theta_scale
+
+    def from_z(self, z: Tensor) -> Tensor:
+        r"""Map standardized parameters back to original space."""
+        return self._theta_shift + self._theta_scale * z
+
+    def log_abs_det(self) -> Tensor:
+        r"""Return the log absolute determinant of the z-to-theta affine."""
+        return torch.log(self._theta_scale).sum()
+
+    def _check_compose_internal_stats_unit(self) -> None:
+        r"""Require unit internal statistics when the boundary affine is active."""
+        if not self.compose_enabled:
+            return
+        if not ((self.mean_0 == 0).all() and (self.std_0 == 1).all()):
+            raise ValueError(
+                "compose_standardization is enabled but the internal input-norm "
+                "stats mean_0/std_0 are not unit (0/1)."
+            )
 
     # -------------------------- ODE METHODS --------------------------
 

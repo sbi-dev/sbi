@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+import pickle
 from typing import Callable
 
 import pytest
@@ -758,6 +759,19 @@ def test_lru_embedding_net_isolated(
     assert x_embed.shape == (batch_size, output_dim)
 
 
+@pytest.mark.parametrize("aggregate_fcn", ["last_step", "mean"])
+def test_lru_embedding_net_is_picklable(aggregate_fcn: str):
+    """Every aggregation preset must survive pickling, since posteriors get pickled."""
+    embedding_net = LRUEmbedding(
+        input_dim=3, output_dim=4, num_blocks=1, aggregate_fcn=aggregate_fcn
+    )
+    x = torch.randn(2, 5, 3)
+
+    reloaded = pickle.loads(pickle.dumps(embedding_net))
+
+    assert torch.allclose(reloaded(x), embedding_net(x))
+
+
 def test_lru_pipeline(embedding_feat_dim: int = 17):
     """Smoke-test an entire pipeline run using the LRU embedding."""
 
@@ -907,3 +921,28 @@ def test_scan(
     assert torch.allclose(y_scan, y_loop, atol=1e-5)
 
     torch.compiler.reset()
+
+
+LRU_DEFAULTS = dict(
+    input_dim=4,
+    state_dim=8,
+    r_min=0.0,
+    r_max=1.0,
+    phase_max=torch.pi,
+    bidirectional=False,
+    mode="scan",
+)
+
+
+def test_lru_rejects_invalid_state_dim():
+    """The check read `input_dim`, so an invalid `state_dim` passed silently."""
+    with pytest.raises(ValueError, match="state_dim"):
+        LRU(**{**LRU_DEFAULTS, "state_dim": -5})
+
+
+def test_lru_forward_rejects_invalid_mode():
+    """`forward()`'s `match mode` must stay in sync with the constructor."""
+    layer = LRU(**LRU_DEFAULTS)
+
+    with pytest.raises(ValueError, match="mode"):
+        layer.forward(torch.randn(2, 6, LRU_DEFAULTS["input_dim"]), mode="invalid")

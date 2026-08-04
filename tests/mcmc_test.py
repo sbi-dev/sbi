@@ -158,6 +158,7 @@ def test_c2st_pymc_sampler_on_Gaussian(
         draws=(int(num_samples / num_chains)),  # PyMC does not use thinning
         tune=warmup,
         chains=num_chains,
+        seed=0,  # reproducible sampling; PyMC is not covered by the global seed
     )
     samples = sampler.run()
     assert samples.shape == (
@@ -171,6 +172,92 @@ def test_c2st_pymc_sampler_on_Gaussian(
     alg = f"pymc_{step}"
 
     check_c2st(samples, target_samples, alg=alg)
+
+
+@pytest.mark.mcmc
+@pytest.mark.parametrize(
+    ("step", "target_accept", "expected"),
+    [
+        # 0.9 is spelled out rather than imported from `_DEFAULT_HMC_TARGET_ACCEPT` so
+        # that changing the documented default has to be a deliberate test update.
+        ("hmc", None, 0.9),
+        ("hmc", 0.99, 0.99),
+        ("nuts", None, None),
+    ],
+)
+def test_pymc_target_accept_default_and_override(step, target_accept, expected):
+    """PyMC HMC uses sbi's default and explicit user values take precedence."""
+    from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
+
+    theta_dim = 2
+
+    def potential_fn(theta):
+        return -0.5 * (theta**2).sum(axis=-1)
+
+    sampler = PyMCSampler(
+        potential_fn=potential_fn,
+        initvals=np.zeros((1, theta_dim)),
+        step=step,
+        target_accept=target_accept,
+        draws=1,
+        tune=1,
+        chains=1,
+    )
+    assert sampler._target_accept == expected
+
+
+@pytest.mark.mcmc
+def test_mcmc_posterior_rejects_invalid_target_accept():
+    """Per-call overrides validate target_accept at the public API boundary."""
+    theta_dim = 2
+    prior = BoxUniform(low=-2 * ones(theta_dim), high=2 * ones(theta_dim))
+
+    def potential_fn(theta):
+        return -0.5 * (theta**2).sum(axis=-1)
+
+    with pytest.warns(UserWarning, match="unconditional potential"):
+        posterior = build_from_potential(potential_fn, prior)
+    with pytest.raises(ValueError, match="target_accept"):
+        posterior.sample((1,), method="hmc_pymc", target_accept=0.0)
+
+
+def _gaussian_potential_posterior():
+    prior = BoxUniform(low=-2 * ones(2), high=2 * ones(2))
+
+    def potential_fn(theta):
+        return -0.5 * (theta**2).sum(axis=-1)
+
+    with pytest.warns(UserWarning, match="unconditional potential"):
+        return build_from_potential(potential_fn, prior)
+
+
+@pytest.mark.mcmc
+def test_latest_sample_raises_before_any_sampling_run():
+    """`latest_sample` continues stored chains; without a run there are none."""
+    posterior = _gaussian_potential_posterior()
+
+    with pytest.raises(ValueError, match="no chain states"):
+        posterior.sample((1,), init_strategy="latest_sample", show_progress_bars=False)
+
+
+@pytest.mark.mcmc
+def test_latest_sample_raises_when_more_chains_than_stored():
+    """The last run stored one state per chain; a bigger run must not start."""
+    posterior = _gaussian_potential_posterior()
+    posterior.sample((10,), num_chains=2, show_progress_bars=False)
+
+    with pytest.raises(ValueError, match="chain state"):
+        posterior.sample(
+            (10,),
+            num_chains=5,
+            init_strategy="latest_sample",
+            show_progress_bars=False,
+        )
+
+    # The happy path: the same chain count continues the stored chains.
+    posterior.sample(
+        (10,), num_chains=2, init_strategy="latest_sample", show_progress_bars=False
+    )
 
 
 @pytest.mark.mcmc

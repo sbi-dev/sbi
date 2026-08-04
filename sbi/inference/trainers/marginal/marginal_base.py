@@ -16,6 +16,7 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 
+from sbi.inference.trainers.base import _stacklevel_to_caller
 from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -305,6 +306,20 @@ class MarginalTrainer:
             self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
+
+        if self.epoch > max_num_epochs:
+            # The `and` above short-circuits on the last check, so `_converged` never
+            # saw the final epoch. Score it here before choosing the weights to keep.
+            if self._val_loss < self._best_val_loss:
+                self._best_val_loss = self._val_loss
+                self._best_model_state_dict = deepcopy(self._neural_net.state_dict())
+            elif self._best_model_state_dict is not None:
+                self._neural_net.load_state_dict(self._best_model_state_dict)
+            warn(
+                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached, "
+                "but network has not yet fully converged. Consider increasing it.",
+                stacklevel=_stacklevel_to_caller(),
+            )
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)

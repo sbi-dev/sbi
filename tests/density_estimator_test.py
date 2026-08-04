@@ -19,7 +19,6 @@ from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_ev
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
-    build_flow_matching_estimator,
     build_made,
     build_maf,
     build_maf_rqs,
@@ -27,8 +26,8 @@ from sbi.neural_nets.net_builders import (
     build_mnle,
     build_mnpe,
     build_nsf,
-    build_score_matching_estimator,
     build_tabpfn_flow,
+    build_vector_field_estimator,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -59,12 +58,6 @@ model_builders = [
     build_zuko_nsf,
     build_zuko_sospf,
     build_zuko_unaf,
-]
-
-
-vector_field_builders = [
-    build_flow_matching_estimator,
-    build_score_matching_estimator,
 ]
 
 
@@ -441,8 +434,6 @@ def _build_density_estimator_and_tensors(
         build_mnle,
         build_mnpe,
         build_categoricalmassestimator,
-        build_flow_matching_estimator,
-        build_score_matching_estimator,
     ]:
         density_estimator = density_estimator_build_fn(
             batch_x=batch_input,
@@ -615,11 +606,11 @@ def build_estimator(theta, x):
 
 
 def build_vf_estimator_npse(theta, x):
-    return build_score_matching_estimator(theta, x)
+    return build_vector_field_estimator(theta, x, "score")
 
 
 def build_vf_estimator_fmpe(theta, x):
-    return build_flow_matching_estimator(theta, x)
+    return build_vector_field_estimator(theta, x, "flow")
 
 
 def build_estimator_missing_args():

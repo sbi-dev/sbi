@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
+import warnings
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, Sequence, Union
 
@@ -41,6 +42,9 @@ class _VectorFieldBaseConfig(_EstimatorConfigBase):
     activation: Optional[Any] = None
     sinusoidal_max_freq: Optional[float] = None
     fourier_scale: Optional[float] = None
+
+    # Apply a per-dimension boundary affine around the vector-field estimator.
+    compose_standardization: Optional[bool] = None
 
     # MLP-specific
     layer_norm: Optional[bool] = None
@@ -109,6 +113,25 @@ class FlowEstimatorConfig(_VectorFieldBaseConfig):
     gaussian_baseline: Optional[bool] = None
 
 
+def _compute_theta_standardization(
+    batch_x: Tensor,
+    z_score_x: Optional[str],
+    compose_standardization: bool,
+):
+    """Return internal normalization and optional boundary-affine statistics."""
+    if compose_standardization:
+        shift, scale = z_standardization(batch_x, structured_dims=False)
+        scale = scale.clamp_min(1e-20)
+        return torch.zeros_like(shift), torch.ones_like(scale), shift, scale
+
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
+        mean_0, std_0 = z_standardization(batch_x, structured_x)
+    else:
+        mean_0, std_0 = 0, 1
+    return mean_0, std_0, None, None
+
+
 def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
@@ -127,6 +150,7 @@ def build_vector_field_estimator(
         VectorFieldNet,
     ] = "mlp",
     gaussian_baseline: bool = False,
+    compose_standardization: bool = False,
     **kwargs,
 ) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
     """Builds a vector field estimator (flow matching or score matching) with the given
@@ -152,6 +176,8 @@ def build_vector_field_estimator(
         gaussian_baseline: If True, use analytical Gaussian baseline velocity
             derived from Bayes' rule. The network then only learns the residual.
             Only used when estimator_type="flow". Defaults to False.
+        compose_standardization: Whether to train and sample in per-dimension
+            standardized theta coordinates. Defaults to False.
         **kwargs: Additional arguments forwarded to the estimator and network
             constructors.  Valid keys are defined by ``ScoreEstimatorConfig``
             and ``FlowEstimatorConfig``; validation happens in the upstream
@@ -225,12 +251,9 @@ def build_vector_field_estimator(
         else:
             raise ValueError(f"Unknown architecture: {net}")
 
-    # Z-score setup
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
-        mean_0, std_0 = z_standardization(batch_x, structured_x)
-    else:
-        mean_0, std_0 = 0, 1
+    mean_0, std_0, compose_shift, compose_scale = _compute_theta_standardization(
+        batch_x, z_score_x, compose_standardization
+    )
 
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
     embedding_net_y = (
@@ -239,15 +262,31 @@ def build_vector_field_estimator(
         else embedding_net
     )
 
+    def _wire_compose(estimator):
+        """Attach and validate the boundary affine."""
+        if compose_shift is not None and compose_scale is not None:
+            shift = compose_shift.reshape(1, *estimator.input_shape).float()
+            scale = compose_scale.reshape(1, *estimator.input_shape).float()
+            estimator._theta_shift.copy_(shift)
+            estimator._theta_scale.copy_(scale)
+            estimator._compose_standardization.fill_(True)
+        estimator._check_compose_internal_stats_unit()
+        baseline_check = getattr(estimator, "_check_compose_baseline_compatible", None)
+        if baseline_check is not None:
+            baseline_check()
+        return estimator
+
     if estimator_type == "flow":
-        return FlowMatchingEstimator(
-            net=vectorfield_net,
-            input_shape=batch_x[0].shape,
-            condition_shape=batch_y[0].shape,
-            embedding_net=embedding_net_y,
-            mean_0=mean_0,
-            std_0=std_0,
-            gaussian_baseline=gaussian_baseline,
+        return _wire_compose(
+            FlowMatchingEstimator(
+                net=vectorfield_net,
+                input_shape=batch_x[0].shape,
+                condition_shape=batch_y[0].shape,
+                embedding_net=embedding_net_y,
+                mean_0=mean_0,
+                std_0=std_0,
+                gaussian_baseline=gaussian_baseline,
+            )
         )
     elif estimator_type == "score":
         # Choose the appropriate score estimator based on SDE type
@@ -279,14 +318,16 @@ def build_vector_field_estimator(
             vp_keys = ["beta_min", "beta_max"]
             estimator_kwargs = {k: kwargs[k] for k in vp_keys if k in kwargs}
 
-        return estimator_cls(
-            net=vectorfield_net,
-            input_shape=batch_x[0].shape,
-            condition_shape=batch_y[0].shape,
-            embedding_net=embedding_net_y,
-            mean_0=mean_0,
-            std_0=std_0,
-            **estimator_kwargs,
+        return _wire_compose(
+            estimator_cls(
+                net=vectorfield_net,
+                input_shape=batch_x[0].shape,
+                condition_shape=batch_y[0].shape,
+                embedding_net=embedding_net_y,
+                mean_0=mean_0,
+                std_0=std_0,
+                **estimator_kwargs,
+            )
         )
     else:
         raise ValueError(f"Unknown estimator type: {estimator_type}")
@@ -294,10 +335,24 @@ def build_vector_field_estimator(
 
 # For backward compatibility
 def build_flow_matching_estimator(*args, **kwargs):
+    warnings.warn(
+        "`build_flow_matching_estimator` is deprecated since sbi v0.27.0 and will "
+        "be removed in v0.28.0. Use "
+        "`build_vector_field_estimator(..., estimator_type='flow')` instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
     return build_vector_field_estimator(*args, estimator_type="flow", **kwargs)
 
 
 def build_score_matching_estimator(*args, **kwargs):
+    warnings.warn(
+        "`build_score_matching_estimator` is deprecated since sbi v0.27.0 and will "
+        "be removed in v0.28.0. Use "
+        "`build_vector_field_estimator(..., estimator_type='score')` instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
     return build_vector_field_estimator(*args, estimator_type="score", **kwargs)
 
 

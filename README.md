@@ -92,7 +92,7 @@ print(posterior)
 ## Tutorials
 
 If you're new to `sbi`, we recommend starting with our [Getting
-Started](https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started/) tutorial.
+Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html) tutorial.
 
 You can also access and run these tutorials directly in your browser by opening
 [Codespace](https://docs.github.com/en/codespaces/overview). To do so, click the green
@@ -105,22 +105,22 @@ You might also find this tutorial paper useful: [Deistler, M., Boelts, J., Stein
 
 The following inference algorithms are currently available. You can find instructions on
 how to run each of these methods
-[here](https://sbi-dev.github.io/sbi/latest/tutorials/16_implemented_methods/).
+[here](https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html).
 
 ### Neural Posterior Estimation: amortized (NPE) and sequential (SNPE)
 
-- [`(S)NPE_A`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npe.npe_a.NPE_A)
+- [`(S)NPE_A`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.NPE_A.html)
   (including amortized single-round `NPE`) from Papamakarios G and Murray I [_Fast
   ε-free Inference of Simulation Models with Bayesian Conditional Density
   Estimation_](https://proceedings.neurips.cc/paper/2016/hash/6aca97005c68f1206823815f66102863-Abstract.html)
   (NeurIPS 2016).
 
-- [`(S)NPE_B`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npe.npe_b.NPE_B)
+- [`(S)NPE_B`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.NPE_B.html)
   from Lueckmann JM, Goncalves P, Bassetto G, Öcal K, Nonnenmacher M, and Macke J [_Flexible
   statistical inference for mechanistic models of neural dynamics_](https://arxiv.org/abs/1711.01861)
   (NeurIPS 2017).
 
-- [`(S)NPE_C`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.npe.npe_c.NPE_C)
+- [`(S)NPE_C`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.NPE_C.html)
   or `APT` from Greenberg D, Nonnenmacher M, and Macke J [_Automatic Posterior
   Transformation for likelihood-free inference_](https://arxiv.org/abs/1905.07488) (ICML
   2019).
@@ -129,52 +129,52 @@ how to run each of these methods
   and hassle-free simulation-based inference_](https://arxiv.org/abs/2210.04815)
   (NeurIPS 2022).
 
-- [`FMPE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.vfpe.fmpe.FMPE)
+- [`FMPE`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.FMPE.html)
   from Wildberger, J., Dax, M., Buchholz, S., Green, S., Macke, J. H., & Schölkopf, B.
   [_Flow matching for scalable simulation-based
   inference_](https://proceedings.neurips.cc/paper_files/paper/2023/hash/3663ae53ec078860bb0b9c6606e092a0-Abstract-Conference.html).
   (NeurIPS 2023).
 
-- [`NPSE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.vfpe.npse.NPSE) from
+- [`NPSE`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.NPSE.html) from
   Geffner, T., Papamakarios, G., & Mnih, A. [_Compositional score modeling for
   simulation-based inference_](https://proceedings.mlr.press/v202/geffner23a.html).
   (ICML 2023)
 
 ### Neural Likelihood Estimation: amortized (NLE) and sequential (SNLE)
 
-- [`(S)NLE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.nle.nle_a.NLE_A)
+- [`(S)NLE`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.NLE_A.html)
   or just `SNL` from Papamakarios G, Sterrat DC and Murray I [_Sequential Neural
   Likelihood_](https://arxiv.org/abs/1805.07226) (AISTATS 2019).
 
 ### Neural Ratio Estimation: amortized (NRE) and sequential (SNRE)
 
-- [`(S)NRE_A`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.nre.nre_a.NRE_A)
+- [`(S)NRE_A`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.NRE_A.html)
   or `AALR` from Hermans J, Begy V, and Louppe G. [_Likelihood-free Inference with
   Amortized Approximate Likelihood Ratios_](https://arxiv.org/abs/1903.04057) (ICML
   2020).
 
-- [`(S)NRE_B`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.nre.nre_b.NRE_B)
+- [`(S)NRE_B`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.NRE_B.html)
   or `SRE` from Durkan C, Murray I, and Papamakarios G. [_On Contrastive Learning for
   Likelihood-free Inference_](https://arxiv.org/abs/2002.03712) (ICML 2020).
 
-- [`(S)NRE_C`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.nre.nre_c.NRE_C)
+- [`(S)NRE_C`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.NRE_C.html)
   or `NRE-C` from Miller BK, Weniger C, Forré P. [_Contrastive Neural Ratio
   Estimation_](https://arxiv.org/abs/2210.06170) (NeurIPS 2022).
 
-- [`BNRE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.nre.bnre.BNRE) from
+- [`BNRE`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.BNRE.html) from
   Delaunoy A, Hermans J, Rozet F, Wehenkel A, and Louppe G. [_Towards Reliable
   Simulation-Based Inference with Balanced Neural Ratio
   Estimation_](https://arxiv.org/abs/2208.13624) (NeurIPS 2022).
 
 ### Neural Variational Inference, amortized (NVI) and sequential (SNVI)
 
-- [`SNVI`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.posteriors.vi_posterior)
+- [`SNVI`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.VIPosterior.html)
   from Glöckler M, Deistler M, Macke J, [_Variational methods for simulation-based
   inference_](https://openreview.net/forum?id=kZ0UYdhqkNY) (ICLR 2022).
 
 ### Mixed Neural Likelihood Estimation (MNLE)
 
-- [`MNLE`](https://sbi-dev.github.io/sbi/latest/reference/#sbi.inference.trainers.nle.mnle.MNLE) from
+- [`MNLE`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.MNLE.html) from
   Boelts J, Lueckmann JM, Gao R, Macke J, [_Flexible and efficient simulation-based
   inference for models of decision-making_](https://elifesciences.org/articles/77220)
   (eLife 2022).
@@ -184,7 +184,7 @@ how to run each of these methods
 We welcome any feedback on how `sbi` is working for your inference problems (see
 [Discussions](https://github.com/sbi-dev/sbi/discussions)) and are happy to receive bug
 reports, pull requests, and other feedback (see
-[contribute](https://sbi-dev.github.io/sbi/latest/contribute/)). We wish to maintain a
+[contribute](https://sbi.readthedocs.io/en/latest/contributing.html)). We wish to maintain a
 positive and respectful community; please read our [Code of
 Conduct](CODE_OF_CONDUCT.md). To report a security vulnerability, please see our
 [Security Policy](SECURITY.md).

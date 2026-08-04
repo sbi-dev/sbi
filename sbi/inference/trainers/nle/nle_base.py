@@ -91,7 +91,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         x: Tensor,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
-        algorithm: str = "SNLE",
+        algorithm: str = "NLE",
         data_device: Optional[str] = None,
     ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
@@ -389,7 +389,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             )
 
             assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
-                "SNLE cannot handle multi-dimensional simulator output."
+                "NLE cannot handle multi-dimensional simulator output."
             )
             del theta, x
 
