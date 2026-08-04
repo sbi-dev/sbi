@@ -1008,7 +1008,6 @@ def test_pickle_map_location_reconciles_device():
     tensor_devices = {str(p.device) for p in loaded.posterior_estimator.parameters()}
     assert tensor_devices == {"cpu"}, f"tensors on {tensor_devices}, expected cpu"
 
-    # `potential()` must not fail with a cross-device error after the load.
     samples = loaded.sample((10,))
     potential_values = loaded.potential(samples)
     assert str(potential_values.device) == "cpu", (
