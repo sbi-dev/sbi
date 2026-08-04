@@ -176,9 +176,24 @@ class LearnableGaussian(nn.Module):
 
     def _base_dist(self) -> Distribution:
         """Get the base Gaussian distribution with current parameters."""
+        # `validate_args=False`: the parameters are unconstrained, so an optimizer step
+        # can leave the support. NaN log-probs beat a mid-training exception.
         if self._full_cov:
-            return MultivariateNormal(self.loc, scale_tril=self.scale_tril)
-        return Independent(Normal(self.loc, self.log_scale.exp()), 1)
+            return MultivariateNormal(
+                self.loc, scale_tril=self._cholesky(), validate_args=False
+            )
+        return Independent(
+            Normal(self.loc, self.log_scale.exp(), validate_args=False),
+            1,
+        )
+
+    def _cholesky(self) -> Tensor:
+        """Read the unconstrained `scale_tril` parameter as a lower-Cholesky factor.
+
+        The optimizer moves the upper triangle away from zero. `log_prob` ignores it,
+        `rsample` does not, which biases the ELBO. Dropping it makes the two agree.
+        """
+        return self.scale_tril.tril()
 
     def sample(self, sample_shape: Shape) -> Tensor:
         """Sample from the distribution.
