@@ -369,5 +369,6 @@ class NeuralPosterior:
             value = getattr(self, attr, None)
             if isinstance(value, nn.Module):
                 value.to(actual_device)
-        if getattr(self, "_x", None) is not None:
-            self._x = self._x.to(actual_device)
+        x = getattr(self, "_x", None)
+        if x is not None:
+            self._x = x.to(actual_device)
