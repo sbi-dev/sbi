@@ -291,6 +291,31 @@ def test_process_device_rejects_unknown_device() -> None:
         torchutils.process_device("not-a-device")
 
 
+def test_box_uniform_never_inherits_the_global_validation_default() -> None:
+    """MCMC evaluates out-of-support thetas and needs `-inf` rather than a raise.
+
+    `BoxUniform` must therefore not pick up torch's global default, neither at
+    construction nor when `to()` rebuilds it.
+    """
+    default = distributions.Distribution._validate_args
+    try:
+        distributions.Distribution._validate_args = True
+        prior = torchutils.BoxUniform(-ones(2), ones(2))
+        outside = torch.tensor([5.0, 5.0])
+
+        assert prior.log_prob(outside).isinf()
+        prior.to("cpu")
+        assert prior.log_prob(outside).isinf()
+
+        # `to()` rebuilds both layers and must carry the per-instance setting.
+        torchutils.set_validate_args(prior, True)
+        prior.to("cpu")
+        assert prior._validate_args, "to() dropped the setting on the wrapper"
+        assert prior.base_dist._validate_args, "to() dropped the setting on the member"
+    finally:
+        distributions.Distribution._validate_args = default
+
+
 @pytest.mark.parametrize(
     "device_input, expected",
     (
