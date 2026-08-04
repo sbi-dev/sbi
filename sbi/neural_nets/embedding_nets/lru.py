@@ -239,16 +239,16 @@ class LRU(nn.Module):
         # Check and store the inputs.
         if not isinstance(input_dim, int) or input_dim <= 0:
             raise ValueError("input_dim must be a positive integer.")
-        if not isinstance(state_dim, int) or input_dim <= 0:
+        if not isinstance(state_dim, int) or state_dim <= 0:
             raise ValueError("state_dim must be a positive integer.")
         if not (0 <= r_min < r_max <= 1):
             raise ValueError(
-                f"Invalid {r_min=} and/or {r_max: float = }. They must suffice "
+                f"Invalid {r_min=} and/or {r_max=}. They must satisfy "
                 "0 <= r_min < r_max <= 1."
             )
         if not (0 <= phase_max <= 2 * torch.pi):
             raise ValueError(
-                f"Invalid {phase_max: float = }. I must suffice 0 <= phase_max <= 2 pi."
+                f"Invalid {phase_max=}. It must satisfy 0 <= phase_max <= 2 pi."
             )
         if mode not in ("loop", "scan"):
             raise ValueError(f"Invalid {mode=}. Must be 'loop' or 'scan'.")
@@ -339,7 +339,7 @@ class LRU(nn.Module):
             state = state.to(device=input.device)
             assert state.shape == expected_state_shape, (
                 f"Invalid state shape {state.shape}, "  # fmt: skip
-                "expected {expected_state_shape}"  # fmt: skip
+                f"expected {expected_state_shape}"  # fmt: skip
             )
 
         # Detemine which mode to run the forward method with.
@@ -349,6 +349,8 @@ class LRU(nn.Module):
                 output = self._forward_scan(input, state)
             case "loop":
                 output = self._forward_loop(input, state)
+            case _:
+                raise ValueError(f"Invalid {mode=}. Must be 'loop' or 'scan'.")
         return output
 
     def _forward_loop(self, input: Tensor, state: Tensor) -> Tensor:
