@@ -22,8 +22,6 @@ from torch.distributions import (
     constraints,
 )
 
-from sbi.utils.torchutils import BoxUniform
-
 
 class VectorFieldNet(nn.Module, ABC):
     """Abstract base class for vector field estimation networks.
@@ -302,7 +300,7 @@ def denoise(p: Distribution, m: Tensor, s: Tensor, x_t: Tensor) -> Distribution:
         return denoise_gaussian(p, m, s, x_t)
     elif isinstance(p, MultivariateNormal):
         return denoise_multivariate_gaussian(p, m, s, x_t)
-    elif isinstance(p, (Uniform, BoxUniform)):
+    elif isinstance(p, Uniform):
         return denoise_uniform(p, m, s, x_t)
     else:
         return denoise_general(p, m, s, x_t)
@@ -414,7 +412,7 @@ def denoise_mixture(
 
 
 def denoise_uniform(
-    p: Uniform | BoxUniform, m: Tensor, s: Tensor, x_t: Tensor
+    p: Uniform, m: Tensor, s: Tensor, x_t: Tensor
 ) -> 'UniformNormalPosterior':
     """Denoise a uniform distribution.
 
@@ -484,7 +482,7 @@ def marginalize(p: Distribution, m: Tensor, s: Tensor) -> Distribution:
         return marginalize_gaussian(p, m, s)
     elif isinstance(p, MultivariateNormal):
         return marginalize_multivariate_gaussian(p, m, s)
-    elif isinstance(p, (Uniform, BoxUniform)):
+    elif isinstance(p, Uniform):
         return marginalize_uniform(p, m, s)
     elif isinstance(p, MixtureSameFamily):
         return marginalize_mixture(p, m, s)
@@ -582,9 +580,7 @@ def marginalize_multivariate_gaussian(
     return MultivariateNormal(marginal_mean, covariance_matrix=marginal_cov)
 
 
-def marginalize_uniform(
-    p: Uniform | BoxUniform, m: Tensor, s: Tensor
-) -> 'UniformNormalConvolution':
+def marginalize_uniform(p: Uniform, m: Tensor, s: Tensor) -> 'UniformNormalConvolution':
     """Marginalize a uniform distribution.
 
     Args:
