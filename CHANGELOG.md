@@ -1,5 +1,72 @@
 # Changelog
 
+## v0.27.0
+
+### ✨ Highlights
+
+#### 🚀 New Inference Methods & Features
+
+* Add NPE-PFN by @jsvetter in https://github.com/sbi-dev/sbi/pull/1778
+* feat(mdn): implement transform_to_unconstrained z-scoring for MDN by @BHARATH0153 in https://github.com/sbi-dev/sbi/pull/1888
+* feat(vfpe): opt-in composed standardization for scale-equivariant FMPE/NPSE by @test1card in https://github.com/sbi-dev/sbi/pull/1884
+
+#### 🔧 Code Quality & Refactoring
+
+* LC2ST Module Refactoring by @janfb in https://github.com/sbi-dev/sbi/pull/1727
+
+### ⚠️ Deprecations
+
+* deprecation: warn on the legacy aliases, remove in 0.28 by @janfb in https://github.com/sbi-dev/sbi/pull/1962
+
+### 🐛 Bug Fixes
+
+* fix: raise on unsupported unconstrained space transform by @janfb in https://github.com/sbi-dev/sbi/pull/1886
+* fix: transform_to_unconstrained device mdn device handling (#1893) by @BHARATH0153 in https://github.com/sbi-dev/sbi/pull/1896
+* fix: extend batched simulator detection to fix #1878 by @PC-DOS in https://github.com/sbi-dev/sbi/pull/1879
+* fix: guard recursive object traversal against cycles by @janfb in https://github.com/sbi-dev/sbi/pull/1938
+* add parametrized sample_with coverage across all inference methods and remove redundant NPE rejection prior guard by @Dev-Sudarshan in https://github.com/sbi-dev/sbi/pull/1839
+* fix: constrain pymc to avoid arviz-1.x import break, test CI on py3.13 by @janfb in https://github.com/sbi-dev/sbi/pull/1909
+* fix: improve plot summary arguments by @janfb in https://github.com/sbi-dev/sbi/pull/1861
+* fix: correct biased pymc HMC sampling (target_accept) by @janfb in https://github.com/sbi-dev/sbi/pull/1908
+* fix: make unconstraining transforms module-owned by @janfb in https://github.com/sbi-dev/sbi/pull/1939
+* fix: unify device handling and run the GPU test suite on MPS by @janfb in https://github.com/sbi-dev/sbi/pull/1958
+* fix: make VIPosterior serialization state-based by @janfb in https://github.com/sbi-dev/sbi/pull/1953
+* fix(npse): map z-scoring arguments to the intended variable by @test1card in https://github.com/sbi-dev/sbi/pull/1956
+* fix: four latent NPE and NRE bugs, and remove long-stale deprecations by @janfb in https://github.com/sbi-dev/sbi/pull/1960
+* fix: dead guards and broken messages found by the 0.27 audit sweep by @janfb in https://github.com/sbi-dev/sbi/pull/1963
+* fix: pin validate_args=False on the vector-field internal distributions by @janfb in https://github.com/sbi-dev/sbi/pull/1971
+
+### 🛠️ Maintenance & Improvements
+
+#### 📖 Documentation & Website
+
+* docs(tutorials): Add note on posterior modes in "Getting Started" by @nicholasjng in https://github.com/sbi-dev/sbi/pull/1847
+* docs: add guidance for coding agents by @janfb in https://github.com/sbi-dev/sbi/pull/1868
+* docs: add list of maintainers to docs by @dgedon in https://github.com/sbi-dev/sbi/pull/1934
+* docs: better VI posterior and sampling methods how-to-guides by @janfb in https://github.com/sbi-dev/sbi/pull/1942
+* docs: retire the legacy mkdocs site and point all links at readthedocs by @janfb in https://github.com/sbi-dev/sbi/pull/1961
+* Point README documentation links at `/stable/` instead of `/latest/`, so they always match the installed release rather than the current `main` branch, by @janfb
+
+#### 🧪 Testing & CI/CD
+
+* fix: make VF tests deterministic and order-independent by @janfb in https://github.com/sbi-dev/sbi/pull/1913
+* chore: refresh .test_durations by @github-actions in https://github.com/sbi-dev/sbi/pull/1967
+
+#### 🏗️ Infrastructure & Dependencies
+
+* fix: make CI reproducible via committed uv.lock and clarify pymc/pyro import errors by @janfb in https://github.com/sbi-dev/sbi/pull/1894
+* build(deps): bump the github-actions group with 6 updates by @dependabot in https://github.com/sbi-dev/sbi/pull/1965
+* chore: disallow pre-releases in the uv resolution, refresh the lock by @janfb in https://github.com/sbi-dev/sbi/pull/1969
+
+### 🎉 New Contributors
+
+* @nicholasjng made their first contribution in https://github.com/sbi-dev/sbi/pull/1847
+* @PC-DOS made their first contribution in https://github.com/sbi-dev/sbi/pull/1879
+* @BHARATH0153 made their first contribution in https://github.com/sbi-dev/sbi/pull/1888
+* @test1card made their first contribution in https://github.com/sbi-dev/sbi/pull/1884
+
+**Full Changelog**: https://github.com/sbi-dev/sbi/compare/v0.26.1...v0.27.0
+
 ## v0.26.1
 
 ### ⚠️ Breaking Changes
