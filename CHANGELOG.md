@@ -14,6 +14,10 @@
 
 * LC2ST Module Refactoring by @janfb in https://github.com/sbi-dev/sbi/pull/1727
 
+### ⚠️ Deprecations
+
+* deprecation: warn on the legacy aliases, remove in 0.28 by @janfb in https://github.com/sbi-dev/sbi/pull/1962
+
 ### 🐛 Bug Fixes
 
 * fix: raise on unsupported unconstrained space transform by @janfb in https://github.com/sbi-dev/sbi/pull/1886
@@ -27,6 +31,9 @@
 * fix: make unconstraining transforms module-owned by @janfb in https://github.com/sbi-dev/sbi/pull/1939
 * fix: unify device handling and run the GPU test suite on MPS by @janfb in https://github.com/sbi-dev/sbi/pull/1958
 * fix: make VIPosterior serialization state-based by @janfb in https://github.com/sbi-dev/sbi/pull/1953
+* fix(npse): map z-scoring arguments to the intended variable by @test1card in https://github.com/sbi-dev/sbi/pull/1956
+* fix: four latent NPE and NRE bugs, and remove long-stale deprecations by @janfb in https://github.com/sbi-dev/sbi/pull/1960
+* fix: dead guards and broken messages found by the 0.27 audit sweep by @janfb in https://github.com/sbi-dev/sbi/pull/1963
 
 ### 🛠️ Maintenance & Improvements
 
@@ -36,15 +43,18 @@
 * docs: add guidance for coding agents by @janfb in https://github.com/sbi-dev/sbi/pull/1868
 * docs: add list of maintainers to docs by @dgedon in https://github.com/sbi-dev/sbi/pull/1934
 * docs: better VI posterior and sampling methods how-to-guides by @janfb in https://github.com/sbi-dev/sbi/pull/1942
+* docs: retire the legacy mkdocs site and point all links at readthedocs by @janfb in https://github.com/sbi-dev/sbi/pull/1961
 * Point README documentation links at `/stable/` instead of `/latest/`, so they always match the installed release rather than the current `main` branch, by @janfb
 
 #### 🧪 Testing & CI/CD
 
 * fix: make VF tests deterministic and order-independent by @janfb in https://github.com/sbi-dev/sbi/pull/1913
+* chore: refresh .test_durations by @github-actions in https://github.com/sbi-dev/sbi/pull/1967
 
 #### 🏗️ Infrastructure & Dependencies
 
 * fix: make CI reproducible via committed uv.lock and clarify pymc/pyro import errors by @janfb in https://github.com/sbi-dev/sbi/pull/1894
+* build(deps): bump the github-actions group with 6 updates by @dependabot in https://github.com/sbi-dev/sbi/pull/1965
 
 ### 🎉 New Contributors
 
