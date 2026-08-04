@@ -43,7 +43,10 @@ from sbi.sbi_types import (
 )
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
-from sbi.utils.user_input_checks_utils import move_distribution_to_device
+from sbi.utils.user_input_checks_utils import (
+    move_distribution_to_device,
+    potential_on_device,
+)
 
 # Supported Zuko flow types for VI (lowercase names)
 _ZUKO_FLOW_TYPES = {"maf", "nsf", "naf", "unaf", "nice", "sospf", "gf"}
@@ -155,8 +158,6 @@ class VIPosterior(NeuralPosterior):
         self._device = device
         self.theta_transform = theta_transform
         self.x_shape = x_shape
-        self.potential_fn.device = device
-        self.potential_fn.to(device)
 
         # Get prior and previous builds
         if prior is not None:
@@ -223,11 +224,10 @@ class VIPosterior(NeuralPosterior):
         """
         self._device = device
 
-        # Move potential (which moves prior, x_o, and estimator).
-        self.potential_fn.to(device)  # type: ignore
         self._prior = move_distribution_to_device(self._prior, device)
 
-        # Rebuild link_transform on new device (same logic as __init__).
+        self.potential_fn = potential_on_device(self.potential_fn, device)
+
         if self.theta_transform is None:
             self.link_transform = mcmc_transform(self._prior, device=device).inv
         else:

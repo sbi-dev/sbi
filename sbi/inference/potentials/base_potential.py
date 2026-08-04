@@ -9,7 +9,6 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.utils.user_input_checks import process_x
-from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class BasePotential(metaclass=ABCMeta):
@@ -104,22 +103,27 @@ class BasePotential(metaclass=ABCMeta):
         return self._x_o
 
     def to(self, device: Union[str, torch.device]) -> "BasePotential":
-        """Move prior and x_o to the given device.
+        """Deprecated: Do not call .to() on potentials.
 
-        It also sets the device attribute to the given device.
+        Potentials are immutable after creation. To move to a different device:
+        - Option 1: Move estimator, prior, and x first, then build potential
+        - Option 2: Use posterior.to(device) which handles this internally
 
         Args:
-            device: Device to move the prior and x_o to.
+            device: Device (unused, kept for API compatibility).
 
         Returns:
             Self for method chaining.
         """
+        import warnings
 
-        self.device = device
-        if self.prior is not None:
-            self.prior = move_distribution_to_device(self.prior, device)
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
+        warnings.warn(
+            "Calling .to() on a potential is deprecated and will be removed. "
+            "Move estimator, prior, and x to the device first, then build the "
+            "potential, or use posterior.to(device) which handles this internally.",
+            FutureWarning,
+            stacklevel=2,
+        )
         return self
 
 
@@ -155,18 +159,6 @@ class CustomPotentialWrapper(BasePotential):
         super().__init__(prior, x_o, device)
 
         self.potential_fn = potential_fn
-
-    def to(self, device: Union[str, torch.device]) -> "CustomPotentialWrapper":
-        """Move prior and x_o to the given device.
-
-        Args:
-            device: Device to move the prior and x_o to.
-
-        Returns:
-            Self for method chaining.
-        """
-        super().to(device)
-        return self
 
     def __call__(self, theta, track_gradients: bool = True):
         """Calls the custom potential function on given theta.

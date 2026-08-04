@@ -88,19 +88,6 @@ class PosteriorBasedPotential(BasePotential):
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
 
-    def to(self, device: Union[str, torch.device]) -> "PosteriorBasedPotential":
-        """Move posterior estimator, prior and x_o to the given device.
-
-        Args:
-            device: Device to move the posterior_estimator, prior and x_o to.
-
-        Returns:
-            Self for method chaining.
-        """
-        super().to(device)
-        self.posterior_estimator.to(device)
-        return self
-
     def bind(self, x_o: Tensor, x_is_iid: bool = False) -> "PosteriorBasedPotential":
         """Create new potential with x bound, without mutable state."""
         bound = PosteriorBasedPotential(

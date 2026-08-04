@@ -30,6 +30,10 @@ from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
+from sbi.utils.user_input_checks_utils import (
+    move_distribution_to_device,
+    potential_on_device,
+)
 
 
 class MCMCPosterior(NeuralPosterior):
@@ -168,13 +172,14 @@ class MCMCPosterior(NeuralPosterior):
             device: Device to move the posterior to.
         """
         self.device = device
-        self.potential_fn.to(device)  # type: ignore
-        self.proposal.to(device)
+        self.proposal = move_distribution_to_device(self.proposal, device)
         x_o = None
         if hasattr(self, "_x") and (self._x is not None):
             x_o = self._x.to(device)
 
         self.theta_transform = mcmc_transform(self.proposal, device=device)
+
+        self.potential_fn = potential_on_device(self.potential_fn, device)
 
         super().__init__(
             self.potential_fn,

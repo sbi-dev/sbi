@@ -69,6 +69,86 @@ def move_distribution_to_device(
             return dist
 
 
+def potential_on_device(potential, device: Union[str, torch.device]):
+    """Create a new potential on the specified device.
+
+    This utility creates a new potential with the neural estimator moved to a new
+    device. It does NOT mutate the original potential.
+
+    The function:
+    1. Finds the estimator attribute (likelihood_estimator, ratio_estimator,
+       posterior_estimator, or vector_field_estimator)
+    2. Moves it to the device
+    3. Creates a NEW potential with the moved estimator
+
+    Args:
+        potential: The potential to create a new copy of on the target device.
+        device: The target device.
+
+    Returns:
+        A new potential instance with the estimator on the target device.
+    """
+    from sbi.inference.potentials.likelihood_based_potential import (
+        LikelihoodBasedPotential,
+    )
+    from sbi.inference.potentials.posterior_based_potential import (
+        PosteriorBasedPotential,
+    )
+    from sbi.inference.potentials.ratio_based_potential import (
+        RatioBasedPotential,
+    )
+    from sbi.inference.potentials.vector_field_potential import (
+        VectorFieldBasedPotential,
+    )
+
+    for attr_name in (
+        "likelihood_estimator",
+        "ratio_estimator",
+        "posterior_estimator",
+        "vector_field_estimator",
+    ):
+        if hasattr(potential, attr_name):
+            estimator = getattr(potential, attr_name)
+            if hasattr(estimator, "to"):
+                moved_estimator = estimator.to(device)
+                break
+    else:
+        warnings.warn(
+            "Could not find an estimator in the potential to move. "
+            "The potential may not work correctly on the new device. "
+            "Consider moving the estimator before building the potential.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return potential
+
+    prior = (
+        move_distribution_to_device(potential.prior, device)
+        if hasattr(potential, "prior") and potential.prior
+        else None
+    )
+    x_o = potential._x_o
+
+    if isinstance(potential, LikelihoodBasedPotential):
+        return LikelihoodBasedPotential(moved_estimator, prior, x_o, device=device)
+    elif isinstance(potential, PosteriorBasedPotential):
+        return PosteriorBasedPotential(moved_estimator, prior, x_o, device=device)
+    elif isinstance(potential, RatioBasedPotential):
+        return RatioBasedPotential(moved_estimator, prior, x_o, device=device)
+    elif isinstance(potential, VectorFieldBasedPotential):
+        return VectorFieldBasedPotential(
+            moved_estimator,
+            prior,
+            x_o,
+            device=device,
+            iid_method=potential.iid_method,
+            iid_params=potential.iid_params,
+            neural_ode_backend=potential.neural_ode_backend,
+        )
+    else:
+        return potential
+
+
 class CustomPriorWrapper(Distribution):
     def __init__(
         self,

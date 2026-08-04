@@ -82,23 +82,6 @@ class VectorFieldBasedPotential(BasePotential):
 
         super().__init__(prior, x_o, device=device)
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Moves score_estimator, prior and x_o to the given device.
-
-        It also sets the device attribute to the given device.
-
-        Args:
-            device: Device to move the score_estimator, prior and x_o to.
-        """
-
-        self.device = device
-        self.vector_field_estimator.to(device)
-        if self.prior:
-            self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
-
     def set_x(
         self,
         x_o: Optional[Tensor],
