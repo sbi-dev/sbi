@@ -34,6 +34,7 @@
 * fix(npse): map z-scoring arguments to the intended variable by @test1card in https://github.com/sbi-dev/sbi/pull/1956
 * fix: four latent NPE and NRE bugs, and remove long-stale deprecations by @janfb in https://github.com/sbi-dev/sbi/pull/1960
 * fix: dead guards and broken messages found by the 0.27 audit sweep by @janfb in https://github.com/sbi-dev/sbi/pull/1963
+* fix: pin validate_args=False on the vector-field internal distributions by @janfb in https://github.com/sbi-dev/sbi/pull/1971
 
 ### 🛠️ Maintenance & Improvements
 
