@@ -35,6 +35,7 @@ from sbi.samplers.vi.vi_utils import (
     filter_kwargs_for_func,
 )
 from sbi.sbi_types import Array
+from sbi.utils.torchutils import set_validate_args
 from sbi.utils.user_input_checks import check_prior
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
@@ -120,7 +121,7 @@ class DivergenceOptimizer(ABC):
         self._kwargs = kwargs
 
         if prior is not None:
-            self.prior.set_default_validate_args(False)  # type: ignore
+            set_validate_args(self.prior, False)  # type: ignore
 
         # Manage modules - only add q if it's an nn.Module (not for external dists)
         from torch.nn import Module as TorchModule
@@ -534,8 +535,6 @@ class IWElboOptimizer(ElboOptimizer):
         self.loss_name = "iwelbo"
         self.eps = 1e-7
         self.dreg = dreg
-        if not hasattr(self, 'HYPER_PARAMETERS'):
-            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["K", "dreg"]
         if dreg:
             self.stick_the_landing = True
@@ -696,8 +695,6 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         self.alpha = alpha
         self.unbiased = unbiased
         super().__init__(*args, **kwargs)
-        if not hasattr(self, 'HYPER_PARAMETERS'):
-            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["alpha", "unbiased", "dreg"]
         self.eps = 1e-5
         self.dreg = dreg

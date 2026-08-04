@@ -29,6 +29,28 @@ from sbi.utils.typechecks import is_nonnegative_int, is_positive_int
 _HAS_WARNED_MPS_FALLBACK: bool = False
 
 
+def set_validate_args(
+    dist: torch.distributions.Distribution, validate_args: bool
+) -> None:
+    """Set argument and sample validation on this distribution instance only.
+
+    Torch only offers `set_default_validate_args`, which mutates the default for every
+    distribution constructed afterwards, globally. Validation runs at every layer of a
+    composed distribution, so this recurses into any nested distribution, including
+    private ones such as `Beta._dirichlet`.
+
+    Args:
+        dist: The distribution instance to configure.
+        validate_args: Whether the instance validates arguments and samples.
+    """
+    dist._validate_args = validate_args
+    for value in vars(dist).values():
+        members = value if isinstance(value, (list, tuple)) else [value]
+        for member in members:
+            if isinstance(member, torch.distributions.Distribution):
+                set_validate_args(member, validate_args)
+
+
 def process_device(device: Optional[Union[str, torch.device]]) -> str:
     """Resolve `device` to a canonical device string and set torch up to use it.
 
@@ -586,6 +608,7 @@ class BoxUniform(Independent):
                 validate_args=False,
             ),
             reinterpreted_batch_ndims,
+            validate_args=False,
         )
 
     def to(self, device: Union[str, torch.device]) -> None:
@@ -612,13 +635,17 @@ class BoxUniform(Independent):
         self.low = self.low.to(device=device)
         self.high = self.high.to(device=device)
 
+        # Rebuilding below would otherwise reset this to torch's class default.
+        validate_args = self._validate_args
+
         super().__init__(
             Uniform(
                 low=self.low,
                 high=self.high,
-                validate_args=False,
+                validate_args=validate_args,
             ),
             self.reinterpreted_batch_ndims,
+            validate_args=validate_args,
         )
 
 

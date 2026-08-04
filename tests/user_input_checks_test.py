@@ -108,6 +108,11 @@ torch.set_default_dtype(torch.float32)
             Exponential(torch.tensor([3.0])),
             dict(),
         ),
+        (
+            OneDimPriorWrapper,
+            Exponential(torch.tensor([3.0])),
+            dict(validate_args=True),
+        ),
     ),
 )
 def test_prior_wrappers(wrapper, prior, kwargs):
@@ -137,13 +142,57 @@ def test_prior_wrappers(wrapper, prior, kwargs):
     assert len(prior.log_prob(prior.sample((10,))).shape) == 1
 
 
+def test_multiple_independent_sets_validation_per_instance():
+    """`validate_args` must configure the members, not torch's global default."""
+    default = torch.distributions.Distribution._validate_args
+    prior = MultipleIndependent(
+        [Gamma(ones(1), ones(1)), BoxUniform(zeros(1), ones(1))],
+        validate_args=True,
+    )
+
+    assert torch.distributions.Distribution._validate_args is default
+    assert prior._validate_args
+    assert all(d._validate_args for d in prior.dists)
+    assert prior.dists[1].base_dist._validate_args
+
+
+@pytest.mark.parametrize(
+    "build",
+    (
+        lambda: MultipleIndependent(
+            [Gamma(ones(1), ones(1)), Beta(2 * ones(1), 2 * ones(1))],
+            validate_args=False,
+        ),
+        lambda: OneDimPriorWrapper(Exponential(3 * ones(1)), validate_args=False),
+    ),
+    ids=("MultipleIndependent", "OneDimPriorWrapper"),
+)
+def test_validate_args_false_survives_a_polluted_global(build):
+    """MCMC evaluates out-of-support and NaN values and needs `log_prob` not to raise.
+
+    These wrappers delegate `log_prob`, so the members must carry the setting too.
+    """
+    default = torch.distributions.Distribution._validate_args
+    try:
+        torch.distributions.Distribution._validate_args = True
+        prior = build()
+        bad = torch.full((1, prior.sample().numel()), float("nan"))
+
+        assert prior.log_prob(bad).isnan().all()
+        # Turning the global off would silence the raise too, so pin it untouched.
+        assert torch.distributions.Distribution._validate_args
+    finally:
+        torch.distributions.Distribution._validate_args = default
+
+
 def test_one_dim_wrapper_constructs_with_validation_on():
-    """With validation on (as here, or via torch's global default, which
-    `MultipleIndependent(validate_args=True)` flips), torch reads `arg_constraints`
-    during `__init__`, which used to dereference `self.prior` before it was set.
+    """The wrapper must construct and honour `validate_args=True`.
+
+    Torch reads `arg_constraints` during `__init__`, which dereferences `self.prior`.
     """
     prior = OneDimPriorWrapper(Exponential(torch.tensor([3.0])), validate_args=True)
 
+    assert prior._validate_args
     assert prior.log_prob(prior.sample((3,))).shape == (3,)
 
 
