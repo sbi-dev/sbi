@@ -353,8 +353,6 @@ class NeuralPosterior:
             return
 
         self._device = actual_device
-        # Some posteriors (e.g. VectorFieldPosterior) also store a plain `device`
-        # attribute that sampling reads directly.
         if getattr(self, "device", None) is not None:
             self.device = actual_device
 
