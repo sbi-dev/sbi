@@ -216,6 +216,61 @@ def infer_module_device(module: torch.nn.Module, fallback: str) -> str:
             return fallback
 
 
+def infer_tensor_device(obj: Any) -> Optional[str]:
+    """Return the device of the first tensor or module parameter reachable from `obj`.
+
+    Walks the object graph depth-first. Module parameters and buffers take priority
+    over plain tensors, since they are the strongest signal for where a model lives.
+    Used after `torch.load(..., map_location=...)` to find where the tensors of a
+    pickled object actually are, because `map_location` moves tensor storages but
+    leaves device string attributes unchanged.
+
+    Args:
+        obj: Root object of the graph to inspect.
+
+    Returns:
+        Device string, e.g. `"cpu"`, `"cuda:0"` or `"mps:0"`, or `None` if the graph
+        contains no tensor or module with parameters or buffers.
+    """
+
+    def _infer(current: Any, seen: set) -> Optional[str]:
+        if id(current) in seen:
+            return None
+        seen.add(id(current))
+
+        if isinstance(current, Module):
+            try:
+                return str(next(current.parameters()).device)
+            except StopIteration:
+                try:
+                    return str(next(current.buffers()).device)
+                except StopIteration:
+                    pass
+
+        if isinstance(current, Tensor):
+            return str(current.device)
+
+        if isinstance(current, dict):
+            for value in current.values():
+                device = _infer(value, seen)
+                if device is not None:
+                    return device
+        elif isinstance(current, (list, tuple)):
+            for value in current:
+                device = _infer(value, seen)
+                if device is not None:
+                    return device
+        elif hasattr(current, "__dict__"):
+            for value in vars(current).values():
+                device = _infer(value, seen)
+                if device is not None:
+                    return device
+
+        return None
+
+    return _infer(obj, set())
+
+
 def tile(x: Tensor, n: int) -> Tensor:
     """Tiles a tensor `x` by repeating it `n` times along a new leading dimension.
 

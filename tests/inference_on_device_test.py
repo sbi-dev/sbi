@@ -54,6 +54,7 @@ from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
 from sbi.utils.user_input_checks import validate_theta_and_x
 from tests.test_utils import mps_fallback_disabled
+from tests.vi_test import FakePotential as VIFakePotential
 
 pytestmark = pytest.mark.skipif(
     not gpu_available(), reason="No CUDA or MPS device available."
@@ -981,46 +982,136 @@ def test_zuko_device_transform():
 
 @pytest.mark.gpu
 def test_pickle_map_location_reconciles_device():
-    """_device is reconciled after loading with map_location=..."""
+    """DirectPosterior device state is reconciled after loading with map_location=..."""
     import tempfile
 
     device = process_device("gpu")
-    prior = MultivariateNormal(zeros(2).to(device), eye(2).to(device))
+    prior = BoxUniform(-torch.ones(2, device=device), torch.ones(2, device=device))
     theta = prior.sample((200,))
     x = theta + 0.1 * torch.randn_like(theta)
 
     trainer = NPE(prior=prior, device=device, show_progress_bars=False)
-    trainer.append_simulations(theta.cpu(), x.cpu())
-    estimator = trainer.train(max_num_epochs=1)
-    posterior = trainer.build_posterior(estimator).set_default_x(zeros(1, 2).to(device))
+    trainer.append_simulations(theta, x)
+    trainer.train(max_num_epochs=1)
+    posterior = trainer.build_posterior(
+        prior=prior, posterior_parameters=DirectPosteriorParameters()
+    ).set_default_x(zeros(1, 2, device=device))
 
     with tempfile.NamedTemporaryFile(suffix=".pt") as f:
         torch.save(posterior, f.name)
         loaded = torch.load(f.name, weights_only=False, map_location="cpu")
 
-    tensor_devices = {str(p.device) for p in loaded.posterior_estimator.parameters()}
     assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
+    assert loaded.potential_fn.device == "cpu", (
+        f"potential_fn.device is {loaded.potential_fn.device!r}, expected cpu"
+    )
+    tensor_devices = {str(p.device) for p in loaded.posterior_estimator.parameters()}
     assert tensor_devices == {"cpu"}, f"tensors on {tensor_devices}, expected cpu"
+
+    # `potential()` must not fail with a cross-device error after the load.
+    samples = loaded.sample((10,))
+    potential_values = loaded.potential(samples)
+    assert str(potential_values.device) == "cpu", (
+        f"potential evaluated on {potential_values.device}, expected cpu"
+    )
 
 
 @pytest.mark.gpu
-def test_pickle_map_location_vi_posterior():
-    """VIPosterior _device is reconciled after loading with map_location=..."""
+@pytest.mark.parametrize(
+    "posterior_params",
+    [
+        pytest.param(RejectionPosteriorParameters(), id="rejection"),
+        pytest.param(ImportanceSamplingPosteriorParameters(), id="importance"),
+        pytest.param(
+            MCMCPosteriorParameters(num_chains=1, warmup_steps=1, thin=1),
+            id="mcmc",
+        ),
+    ],
+)
+def test_pickle_map_location_potential_based_posteriors(posterior_params):
+    """Potential-based posteriors are reconciled after loading with map_location=..."""
     import tempfile
 
     device = process_device("gpu")
-    prior = MultivariateNormal(zeros(2).to(device), eye(2).to(device))
+    prior = BoxUniform(-torch.ones(2, device=device), torch.ones(2, device=device))
     theta = prior.sample((200,))
     x = theta + 0.1 * torch.randn_like(theta)
 
     trainer = NPE(prior=prior, device=device, show_progress_bars=False)
-    trainer.append_simulations(theta.cpu(), x.cpu())
-    estimator = trainer.train(max_num_epochs=1)
-    posterior = trainer.build_posterior(estimator).set_default_x(zeros(1, 2).to(device))
-    vi_posterior = VIPosterior(posterior)
+    trainer.append_simulations(theta, x)
+    trainer.train(max_num_epochs=1)
+    posterior = trainer.build_posterior(
+        prior=prior, posterior_parameters=posterior_params
+    ).set_default_x(zeros(1, 2, device=device))
+
+    with tempfile.NamedTemporaryFile(suffix=".pt") as f:
+        torch.save(posterior, f.name)
+        loaded = torch.load(f.name, weights_only=False, map_location="cpu")
+
+    assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
+    assert loaded.potential_fn.device == "cpu", (
+        f"potential_fn.device is {loaded.potential_fn.device!r}, expected cpu"
+    )
+
+    samples = loaded.sample((10,))
+    potential_values = loaded.potential(samples)
+    assert str(potential_values.device) == "cpu", (
+        f"potential evaluated on {potential_values.device}, expected cpu"
+    )
+
+
+@pytest.mark.gpu
+def test_pickle_map_location_vi_posterior():
+    """VIPosterior device state is reconciled after loading with map_location=..."""
+    import tempfile
+
+    device = process_device("gpu")
+    prior = MultivariateNormal(zeros(2, device=device), eye(2, device=device))
+
+    potential_fn = VIFakePotential(prior=prior, device=device)
+    vi_posterior = VIPosterior(
+        potential_fn=potential_fn, prior=prior, q="gaussian", device=device
+    ).set_default_x(zeros(2, dtype=torch.float32, device=device))
 
     with tempfile.NamedTemporaryFile(suffix=".pt") as f:
         torch.save(vi_posterior, f.name)
         loaded = torch.load(f.name, weights_only=False, map_location="cpu")
 
     assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
+    assert loaded.potential_fn.device == "cpu", (
+        f"potential_fn.device is {loaded.potential_fn.device!r}, expected cpu"
+    )
+    assert str(next(loaded._q.parameters()).device) == "cpu", (
+        "variational distribution tensors are not on cpu"
+    )
+
+
+@pytest.mark.gpu
+def test_pickle_map_location_vector_field_posterior():
+    """VectorFieldPosterior device state is reconciled after loading."""
+    import tempfile
+
+    device = process_device("gpu")
+    num_dims = 2
+    prior = BoxUniform(
+        -torch.ones(num_dims, device=device), torch.ones(num_dims, device=device)
+    )
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference = FMPE(prior=prior, device=device)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = inference.build_posterior()
+    posterior.set_default_x(zeros(1, num_dims, device=device))
+
+    with tempfile.NamedTemporaryFile(suffix=".pt") as f:
+        torch.save(posterior, f.name)
+        loaded = torch.load(f.name, weights_only=False, map_location="cpu")
+
+    assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
+    assert loaded.potential_fn.device == "cpu", (
+        f"potential_fn.device is {loaded.potential_fn.device!r}, expected cpu"
+    )
+    assert str(next(loaded.vector_field_estimator.parameters()).device) == "cpu", (
+        "vector field estimator tensors are not on cpu"
+    )

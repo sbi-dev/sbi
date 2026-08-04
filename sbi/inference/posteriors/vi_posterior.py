@@ -1392,7 +1392,11 @@ class VIPosterior(NeuralPosterior):
     def __setstate__(self, state_dict: Dict) -> None:
         """Sets the state when being loaded from pickle.
 
+        Delegates to `NeuralPosterior.__setstate__`, which reconciles the device
+        attributes with the actual location of the tensors after
+        `torch.load(..., map_location=...)`.
+
         Args:
             state_dict: State produced by `__getstate__`.
         """
-        self.__dict__ = state_dict
+        super().__setstate__(state_dict)

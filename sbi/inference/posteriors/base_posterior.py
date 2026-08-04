@@ -7,7 +7,8 @@ from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
-from torch import Tensor
+from torch import Tensor, nn
+from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,
@@ -19,9 +20,11 @@ from sbi.utils.sbiutils import gradient_ascent
 from sbi.utils.torchutils import (
     canonical_device,
     ensure_theta_batched,
+    infer_tensor_device,
     process_device,
 )
 from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class NeuralPosterior:
@@ -330,24 +333,41 @@ class NeuralPosterior:
 
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
-        For developers: for any new attribute added to `NeuralPosterior`, we have to
-        add an entry here using `check_warn_and_setstate()`.
 
-        After restoring state, we reconcile `_device` with the actual location of the
-        model parameters. This handles `torch.load(..., map_location=...)`, which moves
-        tensor storages during unpickling but leaves the `_device` string unchanged.
+        After restoring the state, the device attributes are reconciled with the
+        actual location of the model tensors. `torch.load(..., map_location=...)`
+        moves tensor storages during unpickling but leaves device string attributes
+        unchanged, so a posterior would otherwise report a stale device. We update
+        `_device`, `potential_fn.device`, the prior, `x_o`, and the estimator to
+        agree with where the tensors actually are.
 
         Args:
             state_dict: State to be restored.
         """
         self.__dict__ = state_dict
-        estimator = getattr(self, "posterior_estimator", None)
-        if estimator is None:
-            estimator = getattr(self, "potential_fn", None)
-        params = getattr(estimator, "parameters", None)
-        if params is not None:
-            param = next(params(), None)
-            if param is not None and canonical_device(
-                str(param.device)
-            ) != canonical_device(self._device):
-                self._device = str(param.device)
+
+        actual_device = infer_tensor_device(self)
+        if actual_device is None or canonical_device(actual_device) == canonical_device(
+            self._device
+        ):
+            return
+
+        self._device = actual_device
+
+        if hasattr(self, "potential_fn"):
+            self.potential_fn.to(actual_device)  # type: ignore[union-attr]
+        for attr in ("prior", "proposal"):
+            value = getattr(self, attr, None)
+            if isinstance(value, Distribution):
+                setattr(self, attr, move_distribution_to_device(value, actual_device))
+        for attr in (
+            "posterior_estimator",
+            "vector_field_estimator",
+            "_q",
+            "_amortized_q",
+        ):
+            value = getattr(self, attr, None)
+            if isinstance(value, nn.Module):
+                value.to(actual_device)
+        if getattr(self, "_x", None) is not None:
+            self._x = self._x.to(actual_device)
