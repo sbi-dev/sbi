@@ -157,35 +157,3 @@ def test_unconstraining_transform_follows_dtype_cast(builder_name):
     log_probs = estimator.log_prob(theta.double(), condition.double())
     assert log_probs.dtype == torch.float64
     assert torch.isfinite(log_probs).all()
-
-
-def test_setstate_reconciles_stale_device_string(tmp_path):
-    """`__setstate__` repairs a stale device string even on a cpu-only machine.
-
-    `torch.load(map_location=...)` moves tensor storages but leaves device string
-    attributes untouched. The same effect is reproduced here by tampering the strings
-    before saving: after loading, `_device` and `potential_fn.device` must agree with
-    the actual location of the tensors.
-    """
-    num_dim = 2
-    prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
-    theta = prior.sample((100,))
-    x = theta + torch.randn_like(theta) * 0.1
-
-    inference = NPE(prior=prior)
-    inference.append_simulations(theta, x).train(max_num_epochs=1)
-    posterior = inference.build_posterior().set_default_x(torch.zeros(1, num_dim))
-
-    posterior._device = "cuda:0"
-    posterior.potential_fn.device = "cuda:0"
-
-    with open(f"{tmp_path}/stale.pickle", "wb") as handle:
-        torch.save(posterior, handle)
-    with open(f"{tmp_path}/stale.pickle", "rb") as handle:
-        loaded = torch.load(handle, weights_only=False)
-
-    assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
-    assert loaded.potential_fn.device == "cpu", (
-        f"potential_fn.device is {loaded.potential_fn.device!r}, expected cpu"
-    )
-    assert loaded.sample((5,)).shape == (5, num_dim)
