@@ -8,7 +8,7 @@ import torch
 
 import sbi.inference
 from sbi import utils
-from sbi.inference import NPE, VectorFieldPosterior, infer
+from sbi.inference import FMPE, NPE, VectorFieldPosterior, infer
 from sbi.inference.trainers import nle, npe, nre
 from sbi.neural_nets.net_builders import (
     build_flow_matching_estimator,
@@ -256,3 +256,58 @@ def test_vector_field_posterior_sample_with_warns():
             reject_outside_prior=False,
             show_progress_bars=False,
         )
+
+
+@pytest.mark.parametrize(
+    "losses",
+    (
+        [10.0, 9.0, 8.0, 7.0, 6.0, 5.0],
+        [10.0, 9.0, 8.0, 7.0, 6.0, 6.0],
+    ),
+    ids=("best-is-the-last-epoch", "best-is-an-earlier-epoch"),
+)
+def test_exhausted_epoch_budget_returns_the_best_weights(losses):
+    """A run that hits `max_num_epochs` must end on the weights of its best epoch.
+
+    Both shapes matter. The loop condition short-circuits, so `_converged` never
+    scores the final epoch: a run still improving at the budget must not roll back
+    to an earlier, worse checkpoint, and a run that got worse must roll back.
+    """
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference = NPE(prior=prior, show_progress_bars=False)
+    inference.append_simulations(theta, x)
+
+    scripted = iter(losses)
+    inference._validate_epoch = lambda *_a, **_kw: next(scripted, losses[-1])
+    # `stop_after_epochs` is large so the run cannot converge early.
+    inference.train(max_num_epochs=5, stop_after_epochs=50, training_batch_size=50)
+
+    assert inference.epoch > 5, "the budget must have run out for this to test anything"
+    assert inference._best_val_loss == min(losses)
+    final = inference._neural_net.state_dict()
+    assert all(
+        torch.equal(final[k], v) for k, v in inference._best_model_state_dict.items()
+    )
+
+
+def test_vector_field_converged_resets_between_runs():
+    """A stale best-val-loss from run one must not leak into run two.
+
+    Otherwise run two can converge immediately and restore run one's weights.
+    """
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference = FMPE(prior=prior, show_progress_bars=False)
+    inference.append_simulations(theta, x)
+    inference.train(max_num_epochs=1)
+
+    stale_best = inference._best_val_loss
+    inference._val_loss = stale_best + 10.0
+    inference._converged(epoch=0, stop_after_epochs=20)
+
+    assert inference._best_val_loss == pytest.approx(stale_best + 10.0)
