@@ -1108,9 +1108,15 @@ def test_pickle_map_location_vector_field_posterior():
         loaded = torch.load(f.name, weights_only=False, map_location="cpu")
 
     assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
+    assert loaded.device == "cpu", f"device is {loaded.device!r}, expected cpu"
     assert loaded.potential_fn.device == "cpu", (
         f"potential_fn.device is {loaded.potential_fn.device!r}, expected cpu"
     )
     assert str(next(loaded.vector_field_estimator.parameters()).device) == "cpu", (
         "vector field estimator tensors are not on cpu"
+    )
+
+    samples = loaded.sample((10,))
+    assert str(samples.device) == "cpu", (
+        f"samples on {samples.device}, expected cpu"
     )

@@ -338,8 +338,8 @@ class NeuralPosterior:
         actual location of the model tensors. `torch.load(..., map_location=...)`
         moves tensor storages during unpickling but leaves device string attributes
         unchanged, so a posterior would otherwise report a stale device. We update
-        `_device`, `potential_fn.device`, the prior, `x_o`, and the estimator to
-        agree with where the tensors actually are.
+        `_device`, `device`, `potential_fn.device`, the prior, `x_o`, and the
+        estimator to agree with where the tensors actually are.
 
         Args:
             state_dict: State to be restored.
@@ -353,6 +353,10 @@ class NeuralPosterior:
             return
 
         self._device = actual_device
+        # Some posteriors (e.g. VectorFieldPosterior) also store a plain `device`
+        # attribute that sampling reads directly.
+        if getattr(self, "device", None) is not None:
+            self.device = actual_device
 
         if hasattr(self, "potential_fn"):
             self.potential_fn.to(actual_device)  # type: ignore[union-attr]
