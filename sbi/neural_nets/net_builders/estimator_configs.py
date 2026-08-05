@@ -72,7 +72,9 @@ class _EstimatorBuilderBase:
     """Shared base providing ``from_kwargs()``, ``to_dict()``, and the abstract
     ``build()`` contract for all estimator builders."""
 
-    extra_kwargs: dict = field(default_factory=dict)
+    # kw_only so this base field does not become the first positional
+    # parameter of every subclass (it would capture, e.g., a model name).
+    extra_kwargs: dict = field(default_factory=dict, kw_only=True)
 
     def __post_init__(self):
         for f in fields(self):
@@ -636,11 +638,17 @@ class RatioEstimatorBuilder(_EstimatorBuilderBase):
     model: CLASSIFIER_MODELS = "resnet"  # type: ignore[valid-type]
 
     # --- Shared across classifiers ---
+    # For NRE, the builder's "input" is theta and the "condition" is x:
+    # z_score_input z-scores the parameters, z_score_condition the data.
     z_score_input: Optional[Literal["none", "independent", "structured"]] = None
     z_score_condition: Optional[Literal["none", "independent", "structured"]] = None
     hidden_features: Optional[int] = None
+    # User-facing semantics follow `classifier_nn`: embedding_net_theta embeds
+    # the parameters, embedding_net_x embeds the data. (The underlying
+    # build_*_classifier functions use positional x/y naming where their
+    # `embedding_net_x` applies to theta — translated in `_build_kwargs`.)
+    embedding_net_theta: Optional[nn.Module] = None
     embedding_net_x: Optional[nn.Module] = None
-    embedding_net_y: Optional[nn.Module] = None
 
     # --- ResNet-specific ---
     num_blocks: Optional[int] = None
@@ -660,7 +668,20 @@ class RatioEstimatorBuilder(_EstimatorBuilderBase):
         self._reject_inapplicable_fields(
             _classifier_build_fns()[self.model],
             discriminator="model",
+            # Translated to the build functions' positional x/y names in
+            # `_build_kwargs`; applicable to all classifier models.
+            always_ok=frozenset({"embedding_net_theta", "embedding_net_x"}),
         )
+
+    def _build_kwargs(self) -> dict:
+        """Translate user-facing embedding names to the build functions'
+        positional naming: theta -> embedding_net_x, x -> embedding_net_y."""
+        kwargs = super()._build_kwargs()
+        if "embedding_net_x" in kwargs:
+            kwargs["embedding_net_y"] = kwargs.pop("embedding_net_x")
+        if "embedding_net_theta" in kwargs:
+            kwargs["embedding_net_x"] = kwargs.pop("embedding_net_theta")
+        return kwargs
 
     def build(self, batch_input: Tensor, batch_condition: Tensor) -> RatioEstimator:
         """Build the classifier by dispatching to the appropriate

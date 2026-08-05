@@ -10,12 +10,34 @@ from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
     _VALID_DENSITY_MODELS,
     DensityEstimatorBuilder,
+    MixedDensityEstimatorBuilder,
+    RatioEstimatorBuilder,
 )
 
 
 def test_density_estimator_builder_invalid_model_raises():
     with pytest.raises(ValueError, match="Unknown model"):
         DensityEstimatorBuilder(model="invalid_model")
+
+
+@pytest.mark.parametrize(
+    "builder_cls,discriminator,model",
+    [
+        (DensityEstimatorBuilder, "model", "nsf"),
+        (MixedDensityEstimatorBuilder, "continuous_model", "mdn"),
+        (RatioEstimatorBuilder, "model", "mlp"),
+    ],
+)
+def test_first_positional_argument_is_the_model(builder_cls, discriminator, model):
+    """The first positional argument must bind to the model discriminator.
+
+    `extra_kwargs` is declared on the shared base class, so without
+    ``kw_only`` it would capture the model name and leave the discriminator
+    at its default. That builds the wrong network without raising.
+    """
+    builder = builder_cls(model)
+    assert getattr(builder, discriminator) == model
+    assert builder.extra_kwargs == {}
 
 
 def test_density_estimator_builder_to_dict_only_set_fields():
@@ -77,8 +99,8 @@ def test_density_estimator_builder_build_with_embedding_net(model):
     x = torch.randn(100, 3)
     estimator = builder.build(batch_input=theta, batch_condition=x)
     assert isinstance(estimator, ConditionalDensityEstimator)
-    # The embedding net must not be a plain Identity.
-    assert not isinstance(estimator.embedding_net, nn.Identity)
+    # The supplied module itself must be installed in the estimator.
+    assert any(module is emb for module in estimator.modules())
 
 
 @pytest.mark.parametrize("model", ["maf", "zuko_maf"])
