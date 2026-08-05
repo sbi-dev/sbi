@@ -380,7 +380,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             self._best_model_state_dict = None
 
         # Check if we have a new best loss
-        if self._val_loss < self._best_val_loss:
+        if epoch == 0 or self._val_loss < self._best_val_loss:
             self._best_val_loss = self._val_loss
             self._epochs_since_last_improvement = 0
             self._best_model_state_dict = deepcopy(neural_net.state_dict())
