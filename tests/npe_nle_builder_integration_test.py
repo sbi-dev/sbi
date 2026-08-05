@@ -8,12 +8,13 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import MNLE, MNPE, NLE_A, NPE_C
+from sbi.inference import MNLE, MNPE, NLE_A, NPE_A, NPE_C
 from sbi.neural_nets import likelihood_nn, posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
     DensityEstimatorBuilder,
     MixedDensityEstimatorBuilder,
+    RatioEstimatorBuilder,
 )
 from sbi.utils import BoxUniform
 from sbi.utils.user_input_checks import check_estimator_arg
@@ -279,3 +280,32 @@ def test_density_z_score_alias():
     assert "z_score_y" in kwargs
     assert "z_score_input" not in kwargs
     assert "z_score_condition" not in kwargs
+
+
+@pytest.mark.parametrize(
+    "trainer_cls", [t for t, _, _ in _TRAINERS], ids=["npe", "nle"]
+)
+@pytest.mark.parametrize(
+    "builder", [RatioEstimatorBuilder(), MixedDensityEstimatorBuilder()]
+)
+def test_wrong_builder_family_raises(trainer_cls, builder):
+    """Builders of the wrong family should raise TypeError early."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.raises(TypeError, match="DensityEstimatorBuilder"):
+        trainer_cls(prior, density_estimator=builder)
+
+
+@pytest.mark.parametrize("trainer_cls", [MNPE, MNLE], ids=["mnpe", "mnle"])
+def test_mixed_trainer_rejects_plain_builder(trainer_cls):
+    """MNPE/MNLE require the mixed builder, not the plain density builder."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.raises(TypeError, match="MixedDensityEstimatorBuilder"):
+        trainer_cls(prior, density_estimator=DensityEstimatorBuilder())
+
+
+def test_npe_a_default_does_not_warn():
+    """NPE_A's preconfigured string default must not trigger the deprecation."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        NPE_A(prior)

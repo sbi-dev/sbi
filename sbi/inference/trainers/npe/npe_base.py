@@ -4,7 +4,17 @@
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import asdict
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 from torch import Tensor, ones
 from torch.distributions import Distribution
@@ -62,6 +72,8 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
+    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (DensityEstimatorBuilder,)
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -125,6 +137,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             )
             self._build_neural_net = posterior_nn(model=density_estimator)
         elif isinstance(density_estimator, _EstimatorBuilderBase):
+            if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
+                allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
+                raise TypeError(
+                    f"{type(self).__name__} requires a {allowed}; got "
+                    f"{type(density_estimator).__name__}."
+                )
             self._build_neural_net = self._wrap_builder(density_estimator)
         else:
             self._build_neural_net = density_estimator

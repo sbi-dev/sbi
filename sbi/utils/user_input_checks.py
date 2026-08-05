@@ -2,7 +2,17 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import torch
 from numpy import ndarray
@@ -20,6 +30,9 @@ from sbi.utils.user_input_checks_utils import (
     OneDimPriorWrapper,
     PytorchReturnTypeWrapper,
 )
+
+if TYPE_CHECKING:
+    from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 
 
 def check_prior(prior: Any) -> None:
@@ -710,8 +723,14 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
         num_samples={num_prior_samples}."""
 
 
-def check_estimator_arg(estimator: Union[str, Callable]) -> None:
-    """Check (density or ratio) estimator argument passed by the user."""
+def check_estimator_arg(
+    estimator: Union[str, Callable, "_EstimatorBuilderBase"],
+) -> None:
+    """Check (density or ratio) estimator argument passed by the user.
+
+    Accepts a string identifier, an estimator builder (subclass of
+    ``_EstimatorBuilderBase``), or a build function returning an ``nn.Module``.
+    """
     from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 
     if not (
@@ -720,8 +739,8 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     ):
         raise TypeError(
             "The passed density estimator / classifier must be a string, "
-            "an _EstimatorBuilderBase, or a function "
-            f"returning a nn.Module, but is {type(estimator)}"
+            "an estimator builder (e.g. DensityEstimatorBuilder), or a "
+            f"function returning a nn.Module, but is {type(estimator)}"
         )
 
 
