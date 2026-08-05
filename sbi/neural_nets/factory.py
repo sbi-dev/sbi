@@ -375,7 +375,7 @@ def posterior_score_nn(
             - 'ada_mlp': Fully connected feed-forward with adaptive
                layer normalization for conditioning.
             - 'transformer': Transformer network.
-            - 'transformer_cross_attention': Transformer with cross-attention.
+            - 'transformer_cross_attn': Transformer with cross-attention.
             -  nn.Module: Custom network
             Defaults to 'mlp'.
         z_score_theta: Whether to z-score thetas passing into the network, can be one
@@ -466,7 +466,7 @@ def posterior_flow_nn(
             - 'ada_mlp': Fully connected feed-forward with adaptive
                 layer normalization for conditioning.
             - 'transformer': Transformer network.
-            - 'transformer_cross_attention': Transformer with cross-attention.
+            - 'transformer_cross_attn': Transformer with cross-attention.
             -  nn.Module: Custom network
             Defaults to 'mlp'.
         z_score_theta: Whether to z-score theta for time-dependent normalization.
