@@ -170,7 +170,7 @@ def test_train_with_builder(trainer_cls, gaussian_sims):
 
 
 @pytest.mark.parametrize("trainer_cls", [FMPE, NPSE])
-def test_builder_role_shapes(trainer_cls, gaussian_sims):
+def test_builder_role_shapes(trainer_cls):
     """Asymmetric dims catch silent role swaps (Decision 10/13)."""
     prior = MultivariateNormal(zeros(2), torch.eye(2))
     theta = prior.sample((200,))
@@ -261,18 +261,13 @@ def test_default_builder_applies_z_scoring(est_type):
     x = theta + 0.1 * torch.randn_like(theta)
     builder = VectorFieldEstimatorBuilder(model="mlp", estimator_type=est_type)
     estimator = builder.build(batch_input=theta, batch_condition=x)
-    if est_type == "flow":
-        mean_attr, std_attr = "mean_0", "std_0"
-    else:
-        mean_attr, std_attr = "_mean_base", "_std_base"
-
-    mean = getattr(estimator, mean_attr)
-    std = getattr(estimator, std_attr)
+    mean = estimator.mean_0
+    std = estimator.std_0
     assert not torch.equal(mean, torch.zeros_like(mean)), (
-        f"{mean_attr} is all zeros: z-scoring was not applied to the input"
+        "mean_0 is all zeros: z-scoring was not applied to the input"
     )
     assert not torch.equal(std, torch.ones_like(std)), (
-        f"{std_attr} is all ones: z-scoring was not applied to the input"
+        "std_0 is all ones: z-scoring was not applied to the input"
     )
 
     from sbi.utils.sbiutils import Standardize
