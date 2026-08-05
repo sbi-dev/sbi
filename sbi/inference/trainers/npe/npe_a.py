@@ -22,6 +22,7 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
 from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.factory import posterior_nn
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import BoxUniform
@@ -139,6 +140,10 @@ class NPE_A(PosteriorEstimatorTrainer):
             )
 
         self._num_components = num_components
+
+        # No builder equivalent of "mdn_snpe_a"; resolve before the base class.
+        if density_estimator == "mdn_snpe_a":
+            density_estimator = posterior_nn(model="mdn_snpe_a")
 
         # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
         # requiring the signature to have `num_components`, save it for use below, and

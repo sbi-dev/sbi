@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Tuple, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -66,6 +66,8 @@ class MNLE(LikelihoodEstimatorTrainer):
         x_o = torch.cat([torch.randn(1, 5), torch.tensor([[1., 0., 2.]])], dim=1)
         samples = posterior.sample((1000,), x=x_o)
     """
+
+    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (MixedDensityEstimatorBuilder,)
 
     def __init__(
         self,
