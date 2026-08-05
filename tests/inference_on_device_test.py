@@ -1075,6 +1075,12 @@ def test_pickle_map_location_vi_posterior():
     vi_posterior = VIPosterior(
         potential_fn=potential_fn, prior=prior, q="gaussian", device=device
     ).set_default_x(zeros(2, dtype=torch.float32, device=device))
+    vi_posterior.train(
+        max_num_iters=10,
+        check_for_convergence=False,
+        quality_control=False,
+        show_progress_bar=False,
+    )
 
     with tempfile.NamedTemporaryFile(suffix=".pt") as f:
         torch.save(vi_posterior, f.name)
