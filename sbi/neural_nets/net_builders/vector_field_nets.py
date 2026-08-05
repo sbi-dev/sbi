@@ -169,7 +169,7 @@ def build_vector_field_estimator(
         num_heads: Number of attention heads per block (for transformer).
         mlp_ratio: Ratio for MLP hidden dimension (for transformer).
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
-            "transformer_cross_attention" or a custom network following the
+            "transformer_cross_attn" or a custom network following the
             VectorFieldNet protocol.
         gaussian_baseline: If True, use analytical Gaussian baseline velocity
             derived from Bayes' rule. The network then only learns the residual.
@@ -232,6 +232,8 @@ def build_vector_field_estimator(
         hidden_features_int = (
             hidden_features if isinstance(hidden_features, int) else hidden_features[0]
         )
+        # Pop is_x_emb_seq from kwargs to avoid duplicate forwarding.
+        kwargs.pop("is_x_emb_seq", None)
         vectorfield_net = build_transformer_network(
             batch_x=batch_x,
             batch_y=batch_y,
