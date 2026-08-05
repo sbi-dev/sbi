@@ -745,9 +745,9 @@ class VectorFieldEstimatorBuilder(_EstimatorBuilderBase):
 
     Covers MLP, AdaMLP, Transformer, and cross-attention Transformer
     architectures used by ``FMPE`` (flow matching) and ``NPSE`` (score
-    matching).  The ``estimator_type`` field selects between the two:
-    ``"flow"`` dispatches to ``build_flow_matching_estimator`` and
-    ``"score"`` dispatches to ``build_score_matching_estimator``.
+    matching).  ``build()`` forwards to ``build_vector_field_estimator``,
+    which constructs a ``FlowMatchingEstimator`` for ``"flow"`` and a
+    ``ConditionalScoreEstimator`` subclass for ``"score"``.
     """
 
     _DISCRIMINATORS: ClassVar[frozenset] = frozenset({
