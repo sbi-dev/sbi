@@ -323,7 +323,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         return self._summary
 
     @classmethod
-    def _wrap_builder(cls, builder: "_EstimatorBuilderBase") -> Callable:
+    def _wrap_builder(
+        cls, builder: "_EstimatorBuilderBase"
+    ) -> Callable[[Tensor, Tensor], ConditionalEstimatorType]:
         """Wrap an estimator builder as a ``(batch_theta, batch_x)`` callable."""
         input_is_theta = cls._INPUT_IS_THETA
 
