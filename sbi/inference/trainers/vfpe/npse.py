@@ -107,8 +107,11 @@ class NPSE(VectorFieldTrainer):
             score_estimator: Deprecated, use `vf_estimator` instead.
             density_estimator: Deprecated, use `vf_estimator` instead.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
-                Only used when `vf_estimator` is a string (i.e. when using the
-                default builder). Ignored when a custom callable is passed.
+                When ``vf_estimator`` is ``None``, forwarded to the default
+                builder. When a ``VectorFieldEstimatorBuilder`` is passed,
+                ``sde_type`` must match the builder's value or be left at the
+                default (set it on the builder instead). When a string
+                (deprecated), forwarded to ``posterior_score_nn``.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
