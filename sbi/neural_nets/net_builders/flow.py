@@ -583,7 +583,7 @@ def build_zuko_nsf(
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    num_bins: int = 8,
+    num_bins: int = 10,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -616,7 +616,7 @@ def build_zuko_nsf(
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
-        num_bins: The number of bins in the spline transformations. Defaults to 8.
+        num_bins: The number of bins in the spline transformations. Defaults to 10.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NSF"
@@ -648,7 +648,7 @@ def build_zuko_ncsf(
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    num_bins: int = 8,
+    num_bins: int = 10,
     **kwargs,
 ) -> ZukoFlow:
     r"""
@@ -676,7 +676,7 @@ def build_zuko_ncsf(
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
-        num_bins: The number of bins in the spline transformations. Defaults to 8.
+        num_bins: The number of bins in the spline transformations. Defaults to 10.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NCSF"
@@ -962,7 +962,7 @@ def build_zuko_gf(
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
-    num_transforms: int = 3,
+    num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     components: int = 8,
     **kwargs,
@@ -1023,7 +1023,7 @@ def build_zuko_bpf(
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
-    num_transforms: int = 3,
+    num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     degree: int = 16,
     **kwargs,
