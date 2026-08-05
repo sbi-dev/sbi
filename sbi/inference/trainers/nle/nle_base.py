@@ -47,7 +47,7 @@ from sbi.utils.torchutils import assert_all_finite
 
 class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
     _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (DensityEstimatorBuilder,)
-    _INPUT_IS_THETA = False  # NLE models p(x|θ): input=x, condition=θ
+    _INPUT_IS_THETA: ClassVar[bool] = False  # NLE models p(x|θ): input=x, condition=θ
 
     def __init__(
         self,
