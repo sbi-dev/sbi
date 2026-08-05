@@ -376,6 +376,8 @@ def posterior_score_nn(
                layer normalization for conditioning.
             - 'transformer': Transformer network.
             - 'transformer_cross_attn': Transformer with cross-attention.
+                Requires sequence-shaped conditioning (3-D ``batch_y`` or an
+                ``embedding_net`` returning ``(batch, seq_len, emb_dim)``).
             -  nn.Module: Custom network
             Defaults to 'mlp'.
         z_score_theta: Whether to z-score thetas passing into the network, can be one
@@ -467,6 +469,8 @@ def posterior_flow_nn(
                 layer normalization for conditioning.
             - 'transformer': Transformer network.
             - 'transformer_cross_attn': Transformer with cross-attention.
+                Requires sequence-shaped conditioning (3-D ``batch_y`` or an
+                ``embedding_net`` returning ``(batch, seq_len, emb_dim)``).
             -  nn.Module: Custom network
             Defaults to 'mlp'.
         z_score_theta: Whether to z-score theta for time-dependent normalization.
