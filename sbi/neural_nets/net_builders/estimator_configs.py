@@ -37,6 +37,7 @@ from typing import (
 
 import torch.nn as nn
 from torch import Tensor
+from torch.distributions import Distribution
 
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
@@ -429,14 +430,19 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
     z_score_input: Optional[
         Literal["none", "independent", "structured", "transform_to_unconstrained"]
     ] = None
-    z_score_condition: Optional[
-        Literal["none", "independent", "structured", "transform_to_unconstrained"]
-    ] = None
+    # The condition side never applies the unconstrained transform (the
+    # build functions validate it for the input side only), so it is not
+    # offered here.
+    z_score_condition: Optional[Literal["none", "independent", "structured"]] = None
     hidden_features: Optional[Union[int, Sequence[int]]] = None
     num_transforms: Optional[int] = None
     num_bins: Optional[int] = None
     embedding_net: Optional[nn.Module] = None
     num_components: Optional[int] = None
+    # Distribution over the modeled variable; required by (and only used
+    # with) z_score_input="transform_to_unconstrained" on the zuko models
+    # to derive the support bounds.
+    x_dist: Optional[Distribution] = None
 
     # --- NFlows-specific (MAF, NSF, MAF-RQS) ---
     num_blocks: Optional[int] = None
@@ -467,9 +473,20 @@ class DensityEstimatorBuilder(_EstimatorBuilderBase):
                 f"Must be one of {sorted(_VALID_DENSITY_MODELS)}."
             )
         super().__post_init__()
+        # x_dist is consumed only on the input side of the flow builders;
+        # the condition side never applies the unconstrained transform.
+        if self.x_dist is not None and self.z_score_input != (
+            "transform_to_unconstrained"
+        ):
+            raise ValueError(
+                "`x_dist` is only used with z_score_input='transform_to_unconstrained'."
+            )
         self._reject_inapplicable_fields(
             _density_build_fns()[self.model],
             discriminator="model",
+            # x_dist is consumed by the shared zuko flow constructor, which
+            # the per-model build functions forward to via **kwargs.
+            always_ok=frozenset({"x_dist"}),
         )
 
     def build(
@@ -505,6 +522,7 @@ _MIXED_ALWAYS_OK: frozenset = frozenset({
     "dropout_probability",
     "z_score_input",
     "z_score_condition",
+    "x_dist",
 })
 
 
@@ -540,8 +558,15 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
     dropout_probability: Optional[float] = None
 
     # --- Z-scoring ---
-    z_score_input: Optional[Literal["none", "independent", "structured"]] = None
+    # "transform_to_unconstrained" is supported on the input side when the
+    # continuous model is a zuko flow (non-zuko continuous models raise
+    # transitively) and requires `x_dist`. The condition side of the mixed
+    # estimator never applies it, so it is not offered there.
+    z_score_input: Optional[
+        Literal["none", "independent", "structured", "transform_to_unconstrained"]
+    ] = None
     z_score_condition: Optional[Literal["none", "independent", "structured"]] = None
+    x_dist: Optional[Distribution] = None
 
     def __post_init__(self):
         if self.continuous_model not in _VALID_DENSITY_MODELS:
@@ -550,6 +575,14 @@ class MixedDensityEstimatorBuilder(_EstimatorBuilderBase):
                 f"Must be one of {sorted(_VALID_DENSITY_MODELS)}."
             )
         super().__post_init__()
+        # x_dist is consumed only on the input side of the continuous flow;
+        # the condition side never applies the unconstrained transform.
+        if self.x_dist is not None and self.z_score_input != (
+            "transform_to_unconstrained"
+        ):
+            raise ValueError(
+                "`x_dist` is only used with z_score_input='transform_to_unconstrained'."
+            )
         from sbi.neural_nets.net_builders.mixed_nets import model_builders
 
         self._reject_inapplicable_fields(

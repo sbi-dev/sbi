@@ -309,3 +309,48 @@ def test_npe_a_default_does_not_warn():
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
         NPE_A(prior)
+
+
+def test_transform_to_unconstrained_reachable_via_builders():
+    """Both density builders can express transform_to_unconstrained + x_dist."""
+    theta = torch.randn(100, 2)
+    x = torch.rand(100, 3) + 0.1
+    est = DensityEstimatorBuilder(
+        model="zuko_nsf",
+        z_score_input="transform_to_unconstrained",
+        x_dist=BoxUniform(zeros(3), 2 * torch.ones(3)),
+    ).build(x, theta)
+    assert est is not None
+
+    x_disc = torch.randint(0, 3, (100, 1)).float()
+    x_mixed = torch.cat([torch.rand(100, 2) + 0.1, x_disc], dim=1)
+    est_mixed = MixedDensityEstimatorBuilder(
+        continuous_model="zuko_nsf",
+        z_score_input="transform_to_unconstrained",
+        x_dist=BoxUniform(zeros(2), 2 * torch.ones(2)),
+    ).build(x_mixed, theta)
+    assert isinstance(est_mixed, MixedDensityEstimator)
+
+
+def test_x_dist_requires_transform_to_unconstrained():
+    """x_dist without transform_to_unconstrained z-scoring is rejected."""
+    with pytest.raises(ValueError, match="x_dist"):
+        DensityEstimatorBuilder(model="maf", x_dist=BoxUniform(zeros(2), torch.ones(2)))
+    with pytest.raises(ValueError, match="x_dist"):
+        MixedDensityEstimatorBuilder(x_dist=BoxUniform(zeros(2), torch.ones(2)))
+
+
+def test_condition_side_transform_to_unconstrained_rejected():
+    """Condition-side transform_to_unconstrained is rejected on both builders:
+    the unconstrained transform is never applied on the condition side, so
+    accepting it would be a silent no-op."""
+    with pytest.raises(ValueError, match="z_score_condition"):
+        DensityEstimatorBuilder(
+            model="zuko_nsf",
+            z_score_condition="transform_to_unconstrained",
+        )
+    with pytest.raises(ValueError, match="z_score_condition"):
+        MixedDensityEstimatorBuilder(
+            continuous_model="zuko_nsf",
+            z_score_condition="transform_to_unconstrained",
+        )
