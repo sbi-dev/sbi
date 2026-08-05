@@ -235,3 +235,28 @@ def test_warning_includes_import_path():
     prior = MultivariateNormal(zeros(2), eye(2))
     with pytest.warns(FutureWarning, match="from sbi.neural_nets import"):
         NRE_A(prior, classifier="resnet", show_progress_bars=False)
+
+
+def test_embedding_net_semantics():
+    """embedding_net_theta embeds theta; embedding_net_x embeds the data x.
+
+    The underlying build_*_classifier functions use positional x/y naming in
+    which their `embedding_net_x` applies to theta; the builder translates so
+    that the user-facing names match `classifier_nn` (and the attributes of
+    the built RatioEstimator itself).
+    """
+    theta = torch.randn(100, 2)
+    x = torch.randn(100, 5)
+    emb_theta = torch.nn.Linear(2, 3)
+    emb_x = torch.nn.Linear(5, 4)
+    builder = RatioEstimatorBuilder(
+        embedding_net_theta=emb_theta, embedding_net_x=emb_x
+    )
+    estimator = builder.build(batch_input=theta, batch_condition=x)
+
+    theta_slots = [n for n, m in estimator.named_modules() if m is emb_theta]
+    x_slots = [n for n, m in estimator.named_modules() if m is emb_x]
+    assert all("embedding_net_theta" in n for n in theta_slots) and theta_slots
+    assert all("embedding_net_x" in n for n in x_slots) and x_slots
+    # Asymmetric dims: swapped routing would crash the forward pass.
+    estimator(theta[:5], x[:5])
