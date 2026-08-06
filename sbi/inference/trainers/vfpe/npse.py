@@ -84,7 +84,7 @@ class NPSE(VectorFieldTrainer):
         density_estimator: Optional[
             ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]
         ] = None,
-        sde_type: Literal["vp", "ve", "subvp"] = "ve",
+        sde_type: Optional[Literal["vp", "ve", "subvp"]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -107,11 +107,13 @@ class NPSE(VectorFieldTrainer):
             score_estimator: Deprecated, use `vf_estimator` instead.
             density_estimator: Deprecated, use `vf_estimator` instead.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
-                When ``vf_estimator`` is ``None``, forwarded to the default
+                Defaults to ``None`` (resolved to ``"ve"``). When
+                ``vf_estimator`` is ``None``, forwarded to the default
                 builder. When a ``VectorFieldEstimatorBuilder`` is passed,
-                ``sde_type`` must match the builder's value or be left at the
-                default (set it on the builder instead). When a string
-                (deprecated), forwarded to ``posterior_score_nn``.
+                a non-``None`` ``sde_type`` that differs from the builder's
+                value raises ``ValueError`` (set it on the builder instead).
+                When a string (deprecated), forwarded to
+                ``posterior_score_nn``.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -155,19 +157,28 @@ class NPSE(VectorFieldTrainer):
             )
             vf_estimator = density_estimator
 
-        # Builder owns sde_type; reject conflicting trainer-level value.
-        if isinstance(vf_estimator, VectorFieldEstimatorBuilder) and sde_type != "ve":
+        # Builder owns sde_type; reject only when both are explicitly supplied
+        # and they disagree.
+        if (
+            isinstance(vf_estimator, VectorFieldEstimatorBuilder)
+            and sde_type is not None
+            and vf_estimator.sde_type is not None
+            and sde_type != vf_estimator.sde_type
+        ):
             raise ValueError(
-                f"Cannot pass `sde_type={sde_type!r}` when a "
-                "VectorFieldEstimatorBuilder is provided. Set `sde_type` on "
-                "the builder instead: "
+                f"Conflicting `sde_type`: trainer received {sde_type!r} but "
+                f"the builder has {vf_estimator.sde_type!r}. Set `sde_type` "
+                "on the builder only: "
                 f"VectorFieldEstimatorBuilder(sde_type={sde_type!r})."
             )
+
+        # Resolve sde_type sentinel for non-builder paths.
+        resolved_sde_type = sde_type if sde_type is not None else "ve"
 
         if vf_estimator is None:
             vf_estimator = VectorFieldEstimatorBuilder(
                 estimator_type="score",
-                sde_type=sde_type,
+                sde_type=resolved_sde_type,
             )
         elif isinstance(vf_estimator, VectorFieldEstimatorBuilder):
             if vf_estimator.estimator_type is None:
@@ -199,7 +210,7 @@ class NPSE(VectorFieldTrainer):
         # When vf_estimator is a string (deprecated path), build the default.
         if isinstance(vf_estimator, str):
             self._build_neural_net = self._build_default_nn_fn(
-                model=vf_estimator, sde_type=sde_type
+                model=vf_estimator, sde_type=resolved_sde_type
             )
 
     def build_posterior(
