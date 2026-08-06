@@ -18,6 +18,12 @@ Note: because ``None`` serves as the "unset" sentinel, callers cannot
 intentionally forward ``None`` to override a non-None builder default (e.g.
 ``tails=None`` in ``build_maf_rqs``).  This is an acceptable trade-off for
 preserving typed field annotations.
+
+The marginal configs at the bottom of this module follow a different pattern:
+one small class per model, carrying only the fields its flow accepts, with real
+defaults instead of ``None`` sentinels.  A setting the flow does not accept is
+not a field there, so it raises ``TypeError`` at construction instead of being
+silently dropped on the way to the flow library.
 """
 
 import inspect
