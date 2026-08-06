@@ -367,4 +367,3 @@ def test_all_architectures_build(net, batch_y_3d, is_x_emb_seq_kwarg):
     )
     assert estimator is not None
     assert estimator.input_shape == torch.Size([3])
-
