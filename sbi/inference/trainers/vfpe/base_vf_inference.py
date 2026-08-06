@@ -692,6 +692,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             theta, x, _ = self.get_simulations(starting_round=start_idx)
             # Use only training data for building the neural net (z-scoring transforms)
 
+            assert self._build_neural_net is not None
             self._neural_net = self._build_neural_net(
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
