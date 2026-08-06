@@ -240,41 +240,131 @@ def test_legacy_and_vf_estimator_conflict(trainer_cls, kwarg, gaussian_sims):
         )
 
 
-def test_npse_sde_type_conflict_with_builder(gaussian_sims):
-    """Builder's sde_type is authoritative; trainer-level conflicts raise."""
+@pytest.mark.parametrize(
+    "builder_sde,trainer_sde,should_raise",
+    [
+        # values agree then no error
+        ("ve", "ve", False),
+        # values conflict then must raise
+        ("ve", "vp", True),
+        # builder only (trainer omits) then no error
+        ("vp", None, False),
+        # trainer only (no builder) then no error, forwarded to default builder
+        (None, "vp", False),
+    ],
+    ids=["agree", "conflict", "builder-only", "trainer-only"],
+)
+def test_npse_sde_type_interactions(
+    builder_sde, trainer_sde, should_raise, gaussian_sims
+):
+    """sde_type must raise only when both are supplied and they disagree."""
     prior, _, _ = gaussian_sims
-    with pytest.raises(ValueError, match="sde_type"):
+
+    builder_kwargs = {"estimator_type": "score"}
+    if builder_sde is not None:
+        builder_kwargs["sde_type"] = builder_sde
+
+    trainer_kwargs = {"prior": prior}
+    if trainer_sde is not None:
+        trainer_kwargs["sde_type"] = trainer_sde
+
+    if should_raise:
+        with pytest.raises(ValueError, match="sde_type"):
+            NPSE(
+                vf_estimator=VectorFieldEstimatorBuilder(**builder_kwargs),
+                **trainer_kwargs,
+            )
+    else:
+        # Should not raise.
         NPSE(
-            prior=prior,
-            vf_estimator=VectorFieldEstimatorBuilder(
-                estimator_type="score",
-                sde_type="ve",
-            ),
-            sde_type="vp",
+            vf_estimator=VectorFieldEstimatorBuilder(**builder_kwargs),
+            **trainer_kwargs,
         )
 
 
 @pytest.mark.parametrize("est_type", ["flow", "score"])
-def test_default_builder_applies_z_scoring(est_type):
-    """Default builder must z-score inputs, matching posterior_flow_nn defaults."""
+def test_default_builder_matches_factory_z_scoring(est_type):
+    """Builder and factory must produce identical z-scoring buffers."""
     theta = torch.randn(200, 2) + 5.0
     x = theta + 0.1 * torch.randn_like(theta)
+
+    # Build via builder.
     builder = VectorFieldEstimatorBuilder(model="mlp", estimator_type=est_type)
-    estimator = builder.build(batch_input=theta, batch_condition=x)
-    mean = estimator.mean_0
-    std = estimator.std_0
-    assert not torch.equal(mean, torch.zeros_like(mean)), (
-        "mean_0 is all zeros: z-scoring was not applied to the input"
+    est_builder = builder.build(batch_input=theta, batch_condition=x)
+
+    # Build via factory.
+    if est_type == "flow":
+        from sbi.neural_nets.factory import posterior_flow_nn
+
+        factory_fn = posterior_flow_nn(model="mlp")
+    else:
+        from sbi.neural_nets.factory import posterior_score_nn
+
+        factory_fn = posterior_score_nn(model="mlp")
+    est_factory = factory_fn(theta, x)
+
+    # Compare z-scoring buffers on the input (theta) side.
+    assert torch.allclose(est_builder.mean_0, est_factory.mean_0), (
+        "mean_0 mismatch between builder and factory"
     )
-    assert not torch.equal(std, torch.ones_like(std)), (
-        "std_0 is all ones: z-scoring was not applied to the input"
+    assert torch.allclose(est_builder.std_0, est_factory.std_0), (
+        "std_0 mismatch between builder and factory"
     )
 
+    # Compare z-scoring on the condition (x) side.
     from sbi.utils.sbiutils import Standardize
 
-    has_standardize = any(
-        isinstance(m, Standardize) for m in estimator.embedding_net.modules()
+    def _get_standardize(module):
+        for m in module.modules():
+            if isinstance(m, Standardize):
+                return m
+        return None
+
+    std_builder = _get_standardize(est_builder.embedding_net)
+    std_factory = _get_standardize(est_factory.embedding_net)
+    assert std_builder is not None, "Builder embedding_net missing Standardize"
+    assert std_factory is not None, "Factory embedding_net missing Standardize"
+    assert torch.allclose(std_builder.mean, std_factory.mean), (
+        "embedding_net Standardize mean mismatch"
     )
-    assert has_standardize, (
-        "embedding_net has no Standardize layer: z-scoring was not applied to y"
+    assert torch.allclose(std_builder.std, std_factory.std), (
+        "embedding_net Standardize std mismatch"
     )
+
+
+@pytest.mark.parametrize(
+    "net,batch_y_3d,is_x_emb_seq_kwarg",
+    [
+        ("mlp", False, None),
+        ("ada_mlp", False, None),
+        ("transformer", False, None),
+        ("transformer_cross_attn", True, None),
+        # net="transformer" plus explicit is_x_emb_seq=True via kwargs
+        ("transformer", True, True),
+    ],
+    ids=["mlp", "ada_mlp", "transformer", "cross_attn", "transformer+is_x_emb_seq"],
+)
+def test_all_architectures_build(net, batch_y_3d, is_x_emb_seq_kwarg):
+    """All four architectures must build without error."""
+    from sbi.neural_nets.net_builders.vector_field_nets import (
+        build_vector_field_estimator,
+    )
+
+    batch_x = torch.randn(10, 3)
+    # Cross-attention needs sequence-shaped conditioning.
+    batch_y = torch.randn(10, 4, 8) if batch_y_3d else torch.randn(10, 5)
+
+    extra = {}
+    if is_x_emb_seq_kwarg is not None:
+        extra["is_x_emb_seq"] = is_x_emb_seq_kwarg
+
+    estimator = build_vector_field_estimator(
+        batch_x=batch_x,
+        batch_y=batch_y,
+        net=net,
+        estimator_type="flow",
+        **extra,
+    )
+    assert estimator is not None
+    assert estimator.input_shape == torch.Size([3])
+
