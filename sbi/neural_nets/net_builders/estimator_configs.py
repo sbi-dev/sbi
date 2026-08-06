@@ -774,6 +774,9 @@ class VectorFieldEstimatorBuilder(_EstimatorBuilderBase):
     # --- Flow-matching-specific ---
     gaussian_baseline: Optional[bool] = None
 
+    # --- Shared estimator option ---
+    compose_standardization: Optional[bool] = None
+
     # --- Score-matching-specific (VE schedule) ---
     train_schedule: Optional[Literal["uniform", "lognormal"]] = None
     solve_schedule: Optional[Literal["uniform", "power_law"]] = None
