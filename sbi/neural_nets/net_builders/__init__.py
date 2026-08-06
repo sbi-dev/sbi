@@ -9,6 +9,16 @@ from sbi.neural_nets.net_builders.classifier import (
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
     DensityEstimatorBuilder,
+    MarginalBPFConfig,
+    MarginalConfigBase,
+    MarginalGFConfig,
+    MarginalMAFConfig,
+    MarginalNAFConfig,
+    MarginalNCSFConfig,
+    MarginalNICEConfig,
+    MarginalNSFConfig,
+    MarginalSOSPFConfig,
+    MarginalUNAFConfig,
     MixedDensityEstimatorBuilder,
     RatioEstimatorBuilder,
     VectorFieldEstimatorBuilder,
