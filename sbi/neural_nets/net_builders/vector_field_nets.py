@@ -170,7 +170,9 @@ def build_vector_field_estimator(
         mlp_ratio: Ratio for MLP hidden dimension (for transformer).
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
             "transformer_cross_attn" or a custom network following the
-            VectorFieldNet protocol.
+            VectorFieldNet protocol. ``"transformer_cross_attn"`` requires
+            sequence-shaped conditioning (3-D ``batch_y`` or an ``embedding_net``
+            that returns ``(batch, seq_len, emb_dim)``).
         gaussian_baseline: If True, use analytical Gaussian baseline velocity
             derived from Bayes' rule. The network then only learns the residual.
             Only used when estimator_type="flow". Defaults to False.
@@ -232,8 +234,8 @@ def build_vector_field_estimator(
         hidden_features_int = (
             hidden_features if isinstance(hidden_features, int) else hidden_features[0]
         )
-        # Pop is_x_emb_seq from kwargs to avoid duplicate forwarding.
-        kwargs.pop("is_x_emb_seq", None)
+        # Let an explicit kwarg win; fall back to deriving from net name.
+        is_x_emb_seq = kwargs.pop("is_x_emb_seq", net == "transformer_cross_attn")
         vectorfield_net = build_transformer_network(
             batch_x=batch_x,
             batch_y=batch_y,
@@ -243,7 +245,7 @@ def build_vector_field_estimator(
             mlp_ratio=mlp_ratio,
             time_embedding_dim=time_embedding_dim,
             embedding_net=embedding_net,
-            is_x_emb_seq=(net == "transformer_cross_attn"),
+            is_x_emb_seq=is_x_emb_seq,
             **kwargs,
         )
     else:
