@@ -240,9 +240,8 @@ def infer(
 class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     """Abstract base class for neural inference methods."""
 
+    # Overridden by subclasses when needed (e.g., LikelihoodEstimatorTrainer).
     _INPUT_IS_THETA: ClassVar[bool] = True
-    """If True, batch_theta maps to batch_input. LikelihoodEstimatorTrainer
-    overrides to False because NLE models p(x|θ)."""
 
     def __init__(
         self,
