@@ -21,13 +21,25 @@ from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
+from sbi.neural_nets.factory import ZukoFlowType
+from sbi.neural_nets.net_builders.estimator_configs import (
+    MARGINAL_MODELS,
+    MarginalConfigBase,
+    MarginalNSFConfig,
+    _EstimatorBuilderBase,
+    _marginal_config_from_model,
+)
 from sbi.sbi_types import Tracker
 from sbi.utils import check_estimator_arg, get_log_root
 from sbi.utils.torchutils import assert_all_finite, process_device
 from sbi.utils.tracking import TensorBoardTracker
 
-DensityEstimatorType = Union[ZukoFlowType, str, Callable[[Tensor], Any]]
+DensityEstimatorType = Union[
+    MarginalConfigBase,
+    ZukoFlowType,
+    MARGINAL_MODELS,
+    Callable[[Tensor], Any],
+]
 
 
 class MarginalTrainer:
@@ -45,13 +57,14 @@ class MarginalTrainer:
 
         import torch
         from sbi.inference import MarginalTrainer
+        from sbi.neural_nets import MarginalNSFConfig
 
         # 1. Simulate data
         theta = torch.randn(100, 3)
         x = theta + torch.randn_like(theta) * 0.1
 
         # 2. Train marginal density estimator
-        marginal_trainer = MarginalTrainer(density_estimator="nsf")
+        marginal_trainer = MarginalTrainer(density_estimator=MarginalNSFConfig())
         marginal_estimator = marginal_trainer.append_samples(x).train()
 
         # 3. Evaluate log probability of new observations
@@ -61,7 +74,7 @@ class MarginalTrainer:
 
     def __init__(
         self,
-        density_estimator: DensityEstimatorType = ZukoFlowType.NSF,
+        density_estimator: Optional[DensityEstimatorType] = None,
         device: str = "cpu",
         summary_writer: Optional[SummaryWriter] = None,
         tracker: Optional[Tracker] = None,
@@ -70,17 +83,13 @@ class MarginalTrainer:
         """Initialize the marginal trainer.
 
         Args:
-            density_estimator: Density estimator to use. Can be a string or a callable.
-                If a string, it must be one of the following:
-                - "bpf": Bijector Polynomial Flow
-                - "maf": Masked Autoregressive Flow
-                - "naf": Neural Autoregressive Flow
-                - "ncsf": Neural Conditional Spline Flow
-                - "nsf": Neural Spline Flow
-                - "sospf": Sum-of-Squares Polynomial Flow
-                - "unaf": Unconditional Neural Autoregressive Flow
-                If a callable, it must be a function that returns a neural network
-                that inherits from `UnconditionalDensityEstimator`.
+            density_estimator: The marginal density estimator to train. If `None`
+                (default), uses `MarginalNSFConfig` with default settings. A
+                per-model config (e.g. `MarginalMAFConfig(num_transforms=10)`)
+                can be passed to configure the estimator. If it is a string or a
+                `ZukoFlowType` (both deprecated), use the default settings of
+                that model. Alternatively, a function that takes a batch of $x$
+                and returns an `UnconditionalDensityEstimator` can be provided.
             device: Device to use for training. Can be "cpu" or "cuda".
             summary_writer: Deprecated alias for the TensorBoard summary writer.
                 Use ``tracker`` instead.
@@ -116,21 +125,48 @@ class MarginalTrainer:
             epoch_durations_sec=[],
         )
 
-        if isinstance(density_estimator, ZukoFlowType):
-            check_estimator_arg(density_estimator.value)
-            self._build_neural_net = marginal_nn(model=density_estimator)
-        elif isinstance(density_estimator, str):
-            check_estimator_arg(density_estimator)
-            self._build_neural_net = marginal_nn(
-                model=ZukoFlowType(density_estimator.lower())
+        if density_estimator is None:
+            self._build_neural_net = MarginalNSFConfig().build
+        elif isinstance(density_estimator, MarginalConfigBase):
+            self._build_neural_net = density_estimator.build
+        elif isinstance(density_estimator, _EstimatorBuilderBase):
+            # The conditional builders are not callable, so without this branch
+            # they would fall through to the unhelpful ValueError below.
+            raise TypeError(
+                "MarginalTrainer requires a marginal config; got "
+                f"{type(density_estimator).__name__}. Use a per-model config, "
+                "e.g. MarginalNSFConfig()."
             )
+        elif isinstance(density_estimator, ZukoFlowType):
+            warn(
+                "Passing a ZukoFlowType is deprecated. Use a marginal config "
+                "instead, e.g. `from sbi.neural_nets import MarginalNSFConfig`.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            check_estimator_arg(density_estimator.value)
+            self._build_neural_net = _marginal_config_from_model(
+                density_estimator.value
+            ).build
+        elif isinstance(density_estimator, str):
+            warn(
+                "Passing a string for `density_estimator` is deprecated. Use a "
+                "marginal config instead, e.g. "
+                "`from sbi.neural_nets import MarginalNSFConfig`.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            check_estimator_arg(density_estimator)
+            self._build_neural_net = _marginal_config_from_model(
+                density_estimator
+            ).build
         elif callable(density_estimator):
             check_estimator_arg(density_estimator)
             self._build_neural_net = density_estimator
         else:
             raise ValueError(
-                "density_estimator must be either a DensityEstimator, str, or a "
-                "Callable[[Tensor], Any]."
+                "density_estimator must be either a marginal config, a str, or "
+                "a Callable[[Tensor], Any]."
             )
 
     def get_dataloaders(
