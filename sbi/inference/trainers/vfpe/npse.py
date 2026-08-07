@@ -188,6 +188,9 @@ class NPSE(VectorFieldTrainer):
                     "NPSE builds score estimators; got a builder with "
                     f"estimator_type={vf_estimator.estimator_type!r}."
                 )
+            # Forward trainer's sde_type when the builder's is unset.
+            if vf_estimator.sde_type is None and sde_type is not None:
+                vf_estimator = replace(vf_estimator, sde_type=sde_type)
         elif isinstance(vf_estimator, str):
             warnings.warn(
                 "Passing a string for `vf_estimator` is deprecated. "
