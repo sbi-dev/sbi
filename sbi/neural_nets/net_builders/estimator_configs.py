@@ -820,7 +820,7 @@ class VectorFieldEstimatorBuilder(_EstimatorBuilderBase):
 
         # Reject fields inapplicable to the chosen model architecture.
         always_ok = (
-            frozenset({"z_score_input", "z_score_condition"})
+            frozenset({"z_score_input", "z_score_condition", "compose_standardization"})
             | _SCORE_ONLY_FIELDS
             | _FLOW_ONLY_FIELDS
         )
