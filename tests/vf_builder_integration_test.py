@@ -241,24 +241,24 @@ def test_legacy_and_vf_estimator_conflict(trainer_cls, kwarg, gaussian_sims):
 
 
 @pytest.mark.parametrize(
-    "builder_sde,trainer_sde,should_raise",
+    "builder_sde,trainer_sde,should_raise,expected_cls",
     [
-        # values agree then no error
-        ("ve", "ve", False),
+        # values agree then no error, uses the agreed value
+        ("ve", "ve", False, "VEScoreEstimator"),
         # values conflict then must raise
-        ("ve", "vp", True),
-        # builder only (trainer omits) then no error
-        ("vp", None, False),
-        # trainer only (no builder) then no error, forwarded to default builder
-        (None, "vp", False),
+        ("ve", "vp", True, None),
+        # builder only (trainer omits) then no error, builder's value wins
+        ("vp", None, False, "VPScoreEstimator"),
+        # builder sde_type unset, trainer explicit then trainer's value forwarded
+        (None, "vp", False, "VPScoreEstimator"),
     ],
     ids=["agree", "conflict", "builder-only", "trainer-only"],
 )
 def test_npse_sde_type_interactions(
-    builder_sde, trainer_sde, should_raise, gaussian_sims
+    builder_sde, trainer_sde, should_raise, expected_cls, gaussian_sims
 ):
     """sde_type must raise only when both are supplied and they disagree."""
-    prior, _, _ = gaussian_sims
+    prior, theta, x = gaussian_sims
 
     builder_kwargs = {"estimator_type": "score"}
     if builder_sde is not None:
@@ -275,10 +275,14 @@ def test_npse_sde_type_interactions(
                 **trainer_kwargs,
             )
     else:
-        # Should not raise.
-        NPSE(
+        trainer = NPSE(
             vf_estimator=VectorFieldEstimatorBuilder(**builder_kwargs),
             **trainer_kwargs,
+        )
+        trainer.append_simulations(theta, x)
+        estimator = trainer.train(max_num_epochs=1, training_batch_size=100)
+        assert type(estimator).__name__ == expected_cls, (
+            f"Expected {expected_cls}, got {type(estimator).__name__}"
         )
 
 
