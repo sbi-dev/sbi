@@ -11,8 +11,10 @@ from datetime import datetime
 from inspect import currentframe
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
+    ClassVar,
     Dict,
     Generic,
     List,
@@ -34,6 +36,9 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -235,6 +240,9 @@ def infer(
 class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     """Abstract base class for neural inference methods."""
 
+    # Overridden by subclasses when needed (e.g., LikelihoodEstimatorTrainer).
+    _INPUT_IS_THETA: ClassVar[bool] = True
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -312,6 +320,20 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     @property
     def summary(self):
         return self._summary
+
+    @classmethod
+    def _wrap_builder(
+        cls, builder: "_EstimatorBuilderBase"
+    ) -> Callable[[Tensor, Tensor], ConditionalEstimatorType]:
+        """Wrap an estimator builder as a ``(batch_theta, batch_x)`` callable."""
+        input_is_theta = cls._INPUT_IS_THETA
+
+        def build_fn(batch_theta, batch_x):
+            if input_is_theta:
+                return builder.build(batch_input=batch_theta, batch_condition=batch_x)
+            return builder.build(batch_input=batch_x, batch_condition=batch_theta)
+
+        return build_fn
 
     @abstractmethod
     def append_simulations(

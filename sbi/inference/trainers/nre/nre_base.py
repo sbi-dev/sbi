@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import asdict, replace
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, eye, ones
@@ -484,22 +484,6 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             )
 
             del x, theta
-
-    @staticmethod
-    def _wrap_builder(
-        builder: _EstimatorBuilderBase,
-    ) -> Callable:
-        """Wrap a builder object as a legacy-compatible build function.
-
-        This allows the existing ``_initialize_neural_network`` flow to work
-        unchanged: the returned callable has the same ``(batch_theta, batch_x)``
-        signature as the functions produced by ``classifier_nn``.
-        """
-
-        def build_fn(batch_theta, batch_x):
-            return builder.build(batch_input=batch_theta, batch_condition=batch_x)
-
-        return build_fn
 
     def _get_losses(self, batch: Sequence[Tensor], loss_args: LossArgs) -> Tensor:
         """
