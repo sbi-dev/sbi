@@ -90,6 +90,13 @@ def batch_x() -> Tensor:
     return torch.randn(100, 3)
 
 
+def _samples_in_domain_of(model: str) -> Tensor:
+    """Return samples from the domain the model is defined on."""
+    if model == "ncsf":
+        return torch.pi * (2 * torch.rand(100, 3) - 1)
+    return torch.randn(100, 3)
+
+
 @pytest.mark.parametrize(
     "config_cls,kwargs",
     [
@@ -216,13 +223,15 @@ def test_marginal_nsf_defaults_to_ten_bins(batch_x):
 
 
 @pytest.mark.parametrize("model", MODELS)
-def test_build_returns_a_usable_estimator(model, batch_x):
+def test_build_returns_a_usable_estimator(model):
     """Every model must build an estimator that models the given samples."""
+    batch_x = _samples_in_domain_of(model)
     estimator = _MARGINAL_CONFIGS[model]().build(batch_x)
-
+    log_prob = estimator.log_prob(batch_x)
     assert isinstance(estimator, UnconditionalDensityEstimator)
     assert estimator.input_shape == batch_x[0].shape
-    assert estimator.log_prob(batch_x).shape == (batch_x.shape[0],)
+    assert log_prob.shape == (batch_x.shape[0],)
+    assert torch.isfinite(log_prob).all()
     assert estimator.sample(torch.Size((5,))).shape == (5, *batch_x[0].shape)
 
 
