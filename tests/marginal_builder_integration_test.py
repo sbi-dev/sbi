@@ -237,10 +237,12 @@ def test_invalid_z_score_value_raises(value):
         MarginalNSFConfig(z_score_x=value)
 
 
-def test_configs_are_immutable():
-    config = MarginalNSFConfig()
+@pytest.mark.parametrize("model", MODELS)
+def test_configs_are_immutable(model):
+    """Every config must be frozen, not just the one that gets edited most."""
+    config = _MARGINAL_CONFIGS[model]()
     with pytest.raises(FrozenInstanceError):
-        config.bins = 20
+        config.num_transforms = 20
 
 
 def test_base_config_is_not_usable_on_its_own():
@@ -309,11 +311,16 @@ def test_deprecated_model_arguments_warn(density_estimator):
         MarginalTrainer(density_estimator=density_estimator)
 
 
+@pytest.mark.parametrize("case", [str.lower, str.upper], ids=["lower", "upper"])
 @pytest.mark.parametrize("model", MODELS)
-def test_deprecated_string_builds_the_default_config(model, batch_x):
-    """The deprecated path must resolve to the config for the same model."""
+def test_deprecated_string_builds_the_default_config(model, case, batch_x):
+    """The deprecated path must resolve to the config for the same model.
+
+    The name stays case-insensitive, as it was before: the misspecification
+    how-to guide passes `"NSF"`.
+    """
     with pytest.warns(FutureWarning):
-        trainer = MarginalTrainer(density_estimator=model)
+        trainer = MarginalTrainer(density_estimator=case(model))
 
     torch.manual_seed(0)
     from_string = trainer._build_neural_net(batch_x)
@@ -338,6 +345,16 @@ def test_conditional_builder_raises():
 def test_non_callable_density_estimator_raises():
     with pytest.raises(ValueError, match="marginal config"):
         MarginalTrainer(density_estimator=42)
+
+
+def test_built_module_is_rejected():
+    """A module is callable, so only `check_estimator_arg` catches it.
+
+    The trainer needs a function that builds the estimator from a batch, not
+    the estimator itself.
+    """
+    with pytest.raises(TypeError, match="function returning a nn.Module"):
+        MarginalTrainer(density_estimator=torch.nn.Linear(3, 3))
 
 
 def test_default_estimator_is_the_marginal_nsf(batch_x):
