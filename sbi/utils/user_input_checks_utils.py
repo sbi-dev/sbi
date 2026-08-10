@@ -72,13 +72,16 @@ def move_distribution_to_device(
 def potential_on_device(potential, device: Union[str, torch.device]):
     """Create a new potential on the specified device.
 
-    This utility creates a new potential with the neural estimator moved to a new
-    device. It does NOT mutate the original potential.
+    This utility creates a new potential configured for the target device.
+
+    Note: moving the underlying estimator/prior may mutate those objects in-place
+    if they are shared with other potentials/posteriors. After calling this function,
+    the original estimator and prior should not be used with a different device.
 
     The function:
     1. Finds the estimator attribute (likelihood_estimator, ratio_estimator,
        posterior_estimator, or vector_field_estimator)
-    2. Moves it to the device
+    2. Moves it to the device (mutates in-place)
     3. Creates a NEW potential with the moved estimator
 
     Args:
@@ -88,6 +91,9 @@ def potential_on_device(potential, device: Union[str, torch.device]):
     Returns:
         A new potential instance with the estimator on the target device.
     """
+    from sbi.inference.potentials.base_potential import (
+        CustomPotentialWrapper,
+    )
     from sbi.inference.potentials.likelihood_based_potential import (
         LikelihoodBasedPotential,
     )
@@ -101,6 +107,26 @@ def potential_on_device(potential, device: Union[str, torch.device]):
         VectorFieldBasedPotential,
     )
 
+    # Handle CustomPotentialWrapper separately - it has no estimator
+    if isinstance(potential, CustomPotentialWrapper):
+        prior = (
+            move_distribution_to_device(potential.prior, device)
+            if hasattr(potential, "prior") and potential.prior
+            else None
+        )
+        x_o = potential._x_o.to(device) if potential._x_o is not None else None
+        x_is_iid = getattr(potential, "_x_is_iid", True)
+
+        new_potential = CustomPotentialWrapper(
+            potential_fn=potential.potential_fn,
+            prior=prior,
+            x_o=x_o,
+            device=device,
+        )
+        if x_o is not None:
+            new_potential.bind(x_o, x_is_iid=x_is_iid)
+        return new_potential
+
     for attr_name in (
         "likelihood_estimator",
         "ratio_estimator",
@@ -113,14 +139,11 @@ def potential_on_device(potential, device: Union[str, torch.device]):
                 moved_estimator = estimator.to(device)
                 break
     else:
-        warnings.warn(
+        raise ValueError(
             "Could not find an estimator in the potential to move. "
             "The potential may not work correctly on the new device. "
-            "Consider moving the estimator before building the potential.",
-            UserWarning,
-            stacklevel=2,
+            "Consider moving the estimator before building the potential."
         )
-        return potential
 
     prior = (
         move_distribution_to_device(potential.prior, device)
@@ -128,15 +151,20 @@ def potential_on_device(potential, device: Union[str, torch.device]):
         else None
     )
     x_o = potential._x_o
+    x_is_iid = getattr(potential, "_x_is_iid", True)
 
     if isinstance(potential, LikelihoodBasedPotential):
-        return LikelihoodBasedPotential(moved_estimator, prior, x_o, device=device)
+        new_potential = LikelihoodBasedPotential(
+            moved_estimator, prior, x_o, device=device
+        )
     elif isinstance(potential, PosteriorBasedPotential):
-        return PosteriorBasedPotential(moved_estimator, prior, x_o, device=device)
+        new_potential = PosteriorBasedPotential(
+            moved_estimator, prior, x_o, device=device
+        )
     elif isinstance(potential, RatioBasedPotential):
-        return RatioBasedPotential(moved_estimator, prior, x_o, device=device)
+        new_potential = RatioBasedPotential(moved_estimator, prior, x_o, device=device)
     elif isinstance(potential, VectorFieldBasedPotential):
-        return VectorFieldBasedPotential(
+        new_potential = VectorFieldBasedPotential(
             moved_estimator,
             prior,
             x_o,
@@ -147,6 +175,11 @@ def potential_on_device(potential, device: Union[str, torch.device]):
         )
     else:
         return potential
+
+    if x_o is not None:
+        new_potential.bind(x_o, x_is_iid=x_is_iid)
+
+    return new_potential
 
 
 class CustomPriorWrapper(Distribution):
