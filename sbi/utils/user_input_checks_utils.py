@@ -92,6 +92,7 @@ def potential_on_device(potential, device: Union[str, torch.device]):
         A new potential instance with the estimator on the target device.
     """
     from sbi.inference.potentials.base_potential import (
+        BasePotential,
         CustomPotentialWrapper,
     )
     from sbi.inference.potentials.likelihood_based_potential import (
@@ -127,6 +128,16 @@ def potential_on_device(potential, device: Union[str, torch.device]):
             new_potential.bind(x_o, x_is_iid=x_is_iid)
         return new_potential
 
+    # Check if it's a known estimator-based potential type
+    estimator_based_types = (
+        LikelihoodBasedPotential,
+        PosteriorBasedPotential,
+        RatioBasedPotential,
+        VectorFieldBasedPotential,
+    )
+    is_estimator_based = isinstance(potential, estimator_based_types)
+
+    # Look for estimator in potential
     for attr_name in (
         "likelihood_estimator",
         "ratio_estimator",
@@ -139,11 +150,36 @@ def potential_on_device(potential, device: Union[str, torch.device]):
                 moved_estimator = estimator.to(device)
                 break
     else:
-        raise ValueError(
-            "Could not find an estimator in the potential to move. "
-            "The potential may not work correctly on the new device. "
-            "Consider moving the estimator before building the potential."
-        )
+        # No estimator found
+        if is_estimator_based:
+            raise ValueError(
+                "Could not find an estimator in the potential to move. "
+                "The potential may not work correctly on the new device. "
+                "Consider moving the estimator before building the potential."
+            )
+        # For other BasePotential subclasses (e.g., custom potentials like
+        # FakePotential), just move prior and x_o
+        if isinstance(potential, BasePotential):
+            prior = (
+                move_distribution_to_device(potential.prior, device)
+                if hasattr(potential, "prior") and potential.prior
+                else None
+            )
+            x_o = potential._x_o.to(device) if potential._x_o is not None else None
+            x_is_iid = getattr(potential, "_x_is_iid", True)
+
+            # Create new instance of the same type
+            new_potential = type(potential)(
+                prior=prior,
+                x_o=x_o,
+                device=device,
+            )
+            if x_o is not None:
+                new_potential.bind(x_o, x_is_iid=x_is_iid)
+            return new_potential
+
+        # Not a known potential type, return as-is
+        return potential
 
     prior = (
         move_distribution_to_device(potential.prior, device)
