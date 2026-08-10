@@ -31,7 +31,7 @@ def get_posterior_samples_on_batch(
         posterior: sbi posterior.
         sample_shape: Shape of samples to draw from the posterior for each x.
         num_workers: number of workers to use for parallelization.
-        show_progress_bars: whether to show progress bars.
+        show_progress_bar: whether to show progress bar.
         use_batched_sampling: whether to use batched sampling if possible.
 
     Returns:
