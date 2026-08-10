@@ -1113,7 +1113,7 @@ class VIPosterior(NeuralPosterior):
             )
 
         # Ensure potential_fn is on the correct device for amortized training
-        self.potential_fn.to(self._device)
+        self.potential_fn = potential_on_device(self.potential_fn, self._device)
 
         # Setup optimizer
         optimizer = Adam(self._amortized_q.parameters(), lr=learning_rate)
