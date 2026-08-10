@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Protocol, Union
 
@@ -59,8 +60,6 @@ class BasePotential(metaclass=ABCMeta):
 
         DEPRECATED: Use bind() instead. This method delegates to bind() internally.
         """
-        import warnings
-
         warnings.warn(
             "set_x() is deprecated, use bind() instead",
             FutureWarning,
@@ -115,8 +114,6 @@ class BasePotential(metaclass=ABCMeta):
         Returns:
             Self for method chaining.
         """
-        import warnings
-
         warnings.warn(
             "Calling .to() on a potential is deprecated and will be removed. "
             "Move estimator, prior, and x to the device first, then build the "
