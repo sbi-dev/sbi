@@ -35,7 +35,7 @@ def get_posterior_samples_on_batch(
         use_batched_sampling: whether to use batched sampling if possible.
 
     Returns:
-        posterior_samples: of shape (num_samples, batch_size, dim_parameters).
+        posterior_samples: of shape sample_shape + (batch_size, dim_parameters).
     """
     num_xs = len(xs)
 
