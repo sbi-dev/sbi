@@ -950,6 +950,16 @@ class MarginalConfigBase:
                 f"{type(self).__name__}. Pass them as arguments instead."
             )
 
+        from sbi.neural_nets.net_builders.flow import nflow_specific_kwargs
+
+        dropped = set(self.extra_kwargs) & set(nflow_specific_kwargs)
+        if dropped:
+            raise ValueError(
+                f"`extra_kwargs` key(s) {sorted(dropped)} never reach the flow: "
+                "they are filtered out before it is built. Pass the name Zuko "
+                "uses instead, e.g. `bins` rather than `num_bins`."
+            )
+
     def __repr__(self) -> str:
         parts = []
         for f in fields(self):

@@ -291,6 +291,13 @@ def test_extra_kwargs_cannot_shadow_a_field():
         MarginalNSFConfig(extra_kwargs={"bins": 20})
 
 
+@pytest.mark.parametrize("key", sorted(nflow_specific_kwargs))
+def test_extra_kwargs_rejects_the_names_the_flow_never_sees(key):
+    """build_zuko_unconditional_flow drops these before building the flow."""
+    with pytest.raises(ValueError, match="never reach the flow"):
+        MarginalNSFConfig(extra_kwargs={key: 20})
+
+
 def test_every_model_has_a_config():
     """The registry must cover the models the deprecated string path accepts."""
     assert set(_MARGINAL_CONFIGS) == {flow.value for flow in ZukoFlowType}
