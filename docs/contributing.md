@@ -302,10 +302,9 @@ caution and responsibility*.
 
 `sbi` is a community project. It is fine to use an AI assistant to read the code, to
 understand a problem, and to check your plan. It is a good way to learn a codebase
-quickly. But we can run AI assistants ourselves and could, in principle, use AI agents
-to fix issues and write new features. However, what we cannot do without you is grow the
-group of people who understand `sbi`. This is why we ask that you can explain every part
-of what you submit, in your own words.
+quickly. But a contribution is more than the patch: we want to grow the group of people
+who understand `sbi`. This is why we ask that you can explain every part of what you
+submit, in your own words.
 
 - **Understand the Code:** Do *not* blindly accept suggestions from AI assistants. You
     are responsible for ensuring that any code you submit (whether written by you or

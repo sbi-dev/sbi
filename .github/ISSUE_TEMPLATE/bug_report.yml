@@ -35,7 +35,6 @@ body:
     attributes:
       label: sbi version
       description: The output of `python -c "import sbi; print(sbi.__version__)"`.
-      placeholder: "0.27.0"
     validations:
       required: true
 
@@ -43,7 +42,7 @@ body:
     id: python-version
     attributes:
       label: Python version
-      placeholder: "3.12"
+      description: The output of `python --version`.
     validations:
       required: true
 
@@ -64,7 +63,9 @@ body:
     id: method
     attributes:
       label: Inference method
-      description: Select all that apply.
+      description: >-
+        Select all that apply. If your method is not in the list, name it under
+        Additional context.
       multiple: true
       options:
         - NPE
@@ -73,8 +74,23 @@ body:
         - NPSE
         - FMPE
         - MNLE / MNPE
+        - NPE-PFN
+        - ABC (MCABC / SMCABC)
         - Not method-specific
         - Other
+    validations:
+      required: false
+
+  - type: dropdown
+    id: rounds
+    attributes:
+      label: Single-round or multi-round
+      description: >-
+        Multi-round means sequential inference, for example SNPE, SNLE or SNRE.
+      options:
+        - Single-round (amortized)
+        - Multi-round (sequential)
+        - Not applicable
     validations:
       required: false
 
