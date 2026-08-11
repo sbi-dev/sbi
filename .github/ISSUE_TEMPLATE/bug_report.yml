@@ -64,8 +64,8 @@ body:
     attributes:
       label: Inference method
       description: >-
-        Select all that apply. If your method is not in the list, name it under
-        Additional context.
+        Select all that apply. If your method is not listed, select Other and name
+        it under Additional context.
       multiple: true
       options:
         - NPE

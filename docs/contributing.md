@@ -39,8 +39,9 @@ For all other issues, comment on the issue first. Tell us what causes the proble
 you want to solve it, and how you want to test it. This proposal is your claim on the
 issue. It shows us that you understand the problem, and it lets us tell you early if we
 want a different solution. Please write this comment yourself, see
-[Using AI Coding Assistants](#using-ai-coding-assistants). We do not assign issues, and a
-comment that only asks for permission is not a claim. We usually do not answer these.
+[Using AI Coding Assistants](#using-ai-coding-assistants). We do not assign issues.
+Comments that only ask for permission are not claims, and we usually do not answer them.
+Please send the proposal instead.
 
 If you plan a larger change that nobody proposed yet, for example a new feature or a new
 example, open an issue first and describe what you intend to do. This prevents wasted

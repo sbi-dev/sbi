@@ -40,6 +40,9 @@ body:
     id: contribution
     attributes:
       label: Contribution
+      description: >-
+        If you want to implement this, please also tell us how you would test it.
+        Our contributing guide explains how a proposal claims an issue.
       options:
         - label: I would like to work on this myself.
           required: false
