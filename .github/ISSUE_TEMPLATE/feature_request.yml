@@ -1,6 +1,6 @@
 name: Feature request
 description: Suggest an improvement or a new feature for sbi
-labels: ["enhancement"]
+labels: ["feature request"]
 body:
   - type: textarea
     id: problem
