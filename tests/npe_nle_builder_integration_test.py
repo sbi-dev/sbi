@@ -12,9 +12,13 @@ from sbi.inference import MNLE, MNPE, NLE_A, NPE_A, NPE_C
 from sbi.neural_nets import likelihood_nn, posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
-    DensityEstimatorBuilder,
-    MixedDensityEstimatorBuilder,
-    RatioEstimatorBuilder,
+    _MIXED_CONTINUOUS_CONFIGS,
+    MAFConfig,
+    MDNConfig,
+    MixedConfig,
+    NSFConfig,
+    ResNetClassifierConfig,
+    ZukoNSFConfig,
 )
 from sbi.utils import BoxUniform
 from sbi.utils.user_input_checks import check_estimator_arg
@@ -28,17 +32,13 @@ _TRAINERS = [(NPE_C, posterior_nn, "theta"), (NLE_A, likelihood_nn, "x")]
     ids=["npe", "nle"],
 )
 def test_no_warning_for_valid_inputs(trainer_cls, factory_fn):
-    """None default, builder, and callable should not emit FutureWarning."""
+    """None default, config, and callable should not emit FutureWarning."""
     prior = MultivariateNormal(zeros(2), eye(2))
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
         trainer_cls(prior, show_progress_bars=False)
-        trainer_cls(
-            prior,
-            density_estimator=DensityEstimatorBuilder(model="maf"),
-            show_progress_bars=False,
-        )
+        trainer_cls(prior, density_estimator=MAFConfig(), show_progress_bars=False)
         trainer_cls(
             prior,
             density_estimator=factory_fn(model="maf"),
@@ -54,7 +54,7 @@ def test_no_warning_for_valid_inputs(trainer_cls, factory_fn):
 def test_string_emits_deprecation_warning(trainer_cls):
     """Passing a string to density_estimator should emit FutureWarning."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    with pytest.warns(FutureWarning, match="deprecated"):
+    with pytest.warns(FutureWarning, match="from sbi.neural_nets import"):
         trainer_cls(prior, density_estimator="maf", show_progress_bars=False)
 
 
@@ -63,13 +63,19 @@ def test_string_emits_deprecation_warning(trainer_cls):
     _TRAINERS,
     ids=["npe", "nle"],
 )
-@pytest.mark.parametrize("model", ("maf", "nsf"))
-def test_train_with_builder(trainer_cls, factory_fn, input_var, model):
-    """Train with a DensityEstimatorBuilder, verify loss and posterior sampling."""
+@pytest.mark.parametrize(
+    "config",
+    [
+        MAFConfig(hidden_features=16, num_transforms=2),
+        ZukoNSFConfig(hidden_features=16),
+    ],
+    ids=["maf", "zuko_nsf"],
+)
+def test_train_with_config(trainer_cls, factory_fn, input_var, config):
+    """Train with a per-model config, verify loss and posterior sampling."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    builder = DensityEstimatorBuilder(model=model, hidden_features=16, num_transforms=2)
-    inference = trainer_cls(prior, density_estimator=builder, show_progress_bars=False)
+    inference = trainer_cls(prior, density_estimator=config, show_progress_bars=False)
 
     theta = prior.sample((200,))
     x = theta + 0.1 * torch.randn_like(theta)
@@ -101,13 +107,13 @@ def test_train_with_builder(trainer_cls, factory_fn, input_var, model):
     [(t, v) for t, _, v in _TRAINERS],
     ids=["npe", "nle"],
 )
-def test_builder_role_shapes(trainer_cls, input_var):
+def test_config_role_shapes(trainer_cls, input_var):
     """Verify input_shape matches the modeled variable, not the condition."""
     num_dim_theta = 2
     num_dim_x = 5
     prior = MultivariateNormal(zeros(num_dim_theta), eye(num_dim_theta))
-    builder = DensityEstimatorBuilder(model="maf", hidden_features=16, num_transforms=2)
-    inference = trainer_cls(prior, density_estimator=builder, show_progress_bars=False)
+    config = MAFConfig(hidden_features=16, num_transforms=2)
+    inference = trainer_cls(prior, density_estimator=config, show_progress_bars=False)
 
     theta = prior.sample((200,))
     x = torch.randn(200, num_dim_x)
@@ -127,14 +133,13 @@ def test_builder_role_shapes(trainer_cls, input_var):
 
 @pytest.mark.parametrize("trainer_cls", [MNLE, MNPE], ids=["mnle", "mnpe"])
 def test_mixed_no_warning_for_valid_inputs(trainer_cls):
-    """None default and builder should not emit FutureWarning."""
+    """None default and config should not emit FutureWarning."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    builder = MixedDensityEstimatorBuilder(continuous_model="nsf")
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
         trainer_cls(prior, show_progress_bars=False)
-        trainer_cls(prior, density_estimator=builder, show_progress_bars=False)
+        trainer_cls(prior, density_estimator=MixedConfig(), show_progress_bars=False)
 
 
 @pytest.mark.parametrize(
@@ -161,10 +166,58 @@ def test_mixed_wrong_string_raises(trainer_cls, wrong_string):
         trainer_cls(prior, density_estimator=wrong_string, show_progress_bars=False)
 
 
-def test_mixed_builder_invalid_continuous_model():
-    """Invalid continuous_model should raise ValueError."""
-    with pytest.raises(ValueError, match="continuous_model"):
-        MixedDensityEstimatorBuilder(continuous_model="invalid")
+@pytest.mark.parametrize(
+    "continuous",
+    [ResNetClassifierConfig(), MixedConfig()],
+    ids=["classifier", "mixed"],
+)
+def test_mixed_rejects_a_continuous_model_it_cannot_build(continuous):
+    """The nested config replaces the old `continuous_model` Literal.
+
+    That Literal quietly restricted which models MNLE and MNPE accept, so the
+    restriction has to be re-stated as a type check on the nested config.
+    """
+    with pytest.raises(TypeError, match="continuous component"):
+        MixedConfig(continuous=continuous)
+
+
+def test_mixed_continuous_configs_match_the_build_functions():
+    """Guard against drift between the allowed set and `mixed_nets`."""
+    from sbi.neural_nets.net_builders.estimator_configs import _DENSITY_CONFIGS
+    from sbi.neural_nets.net_builders.mixed_nets import model_builders
+
+    assert (
+        frozenset(_DENSITY_CONFIGS[name] for name in model_builders)
+        == _MIXED_CONTINUOUS_CONFIGS
+    )
+
+
+def test_mixed_requires_a_single_continuous_width():
+    """The discrete net and the combined embedding are sized from that width."""
+    with pytest.raises(ValueError, match="hidden_features"):
+        MixedConfig(continuous=ZukoNSFConfig(hidden_features=[16, 16]))
+
+
+def test_mixed_default_keeps_the_previous_continuous_net():
+    """Nesting must not quietly change the network MNLE and MNPE have shipped.
+
+    The mixed build function overrode the spline tail bound with its own value,
+    so the default continuous config has to carry that rather than `NSFConfig`'s.
+    """
+    import inspect
+
+    from sbi.neural_nets.net_builders.mixed_nets import (
+        _build_mixed_density_estimator,
+    )
+
+    params = inspect.signature(_build_mixed_density_estimator).parameters
+    continuous = MixedConfig().continuous
+
+    assert isinstance(continuous, NSFConfig)
+    assert continuous.tail_bound == params["tail_bound"].default
+    assert continuous.hidden_features == params["hidden_features"].default
+    assert continuous.num_transforms == params["num_transforms"].default
+    assert continuous.num_bins == params["num_bins"].default
 
 
 @pytest.mark.parametrize(
@@ -195,12 +248,12 @@ def test_mixed_builder_invalid_continuous_model():
     ],
     ids=["mnle", "mnpe"],
 )
-def test_mixed_train_with_builder(trainer_cls, make_data, input_var):
-    """Train MNLE/MNPE with MixedDensityEstimatorBuilder end-to-end."""
-    builder = MixedDensityEstimatorBuilder(
-        continuous_model="nsf", hidden_features=16, num_transforms=2
+def test_mixed_train_with_config(trainer_cls, make_data, input_var):
+    """Train MNLE/MNPE with a nested continuous config end-to-end."""
+    config = MixedConfig(
+        continuous=NSFConfig(hidden_features=16, num_transforms=2, tail_bound=10.0)
     )
-    trainer = trainer_cls(density_estimator=builder, show_progress_bars=False)
+    trainer = trainer_cls(density_estimator=config, show_progress_bars=False)
 
     theta, x = make_data(200)
     estimator = trainer.append_simulations(theta, x).train(
@@ -218,18 +271,39 @@ def test_mixed_train_with_builder(trainer_cls, make_data, input_var):
     assert torch.isfinite(loss).all()
 
 
+def test_mixed_continuous_settings_reach_the_continuous_net():
+    """A setting on the nested config must configure the continuous sub-net."""
+    theta = torch.cat(
+        [torch.randn(200, 2), torch.randint(0, 3, (200, 1)).float()], dim=-1
+    )
+    x = torch.randn(200, 4)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        narrow = MixedConfig(continuous=NSFConfig(hidden_features=16)).build(
+            batch_input=theta, batch_condition=x
+        )
+        wide = MixedConfig(continuous=NSFConfig(hidden_features=64)).build(
+            batch_input=theta, batch_condition=x
+        )
+
+    assert sum(p.numel() for p in narrow.continuous_net.parameters()) < sum(
+        p.numel() for p in wide.continuous_net.parameters()
+    )
+
+
 @pytest.mark.parametrize(
     "estimator",
     (
-        DensityEstimatorBuilder(model="maf"),
-        MixedDensityEstimatorBuilder(continuous_model="nsf"),
+        MAFConfig(),
+        MixedConfig(),
         "maf",
         posterior_nn(model="maf"),
     ),
-    ids=["density_builder", "mixed_builder", "string", "callable"],
+    ids=["density_config", "mixed_config", "string", "callable"],
 )
 def test_check_estimator_arg_accepts_valid_inputs(estimator):
-    """check_estimator_arg should accept builders, strings, and callables."""
+    """check_estimator_arg should accept configs, strings, and callables."""
     check_estimator_arg(estimator)
 
 
@@ -239,118 +313,71 @@ def test_check_estimator_arg_rejects_module():
         check_estimator_arg(torch.nn.Linear(3, 3))
 
 
-@pytest.mark.parametrize("trainer_cls", [MNLE, MNPE], ids=["mnle", "mnpe"])
-def test_mixed_trainer_rejects_plain_density_builder(trainer_cls):
-    """Passing a DensityEstimatorBuilder to MNLE/MNPE should raise TypeError early."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    wrong_builder = DensityEstimatorBuilder(model="maf")
-    with pytest.raises(TypeError, match="MixedDensityEstimatorBuilder"):
-        trainer_cls(prior, density_estimator=wrong_builder, show_progress_bars=False)
-
-
-def test_valid_continuous_models_match_builders():
-    """Guard against drift between _VALID_DENSITY_MODELS and mixed_nets."""
-    from sbi.neural_nets.net_builders.estimator_configs import (
-        _VALID_DENSITY_MODELS,
-    )
-    from sbi.neural_nets.net_builders.mixed_nets import model_builders
-
-    assert frozenset(model_builders) == _VALID_DENSITY_MODELS
-
-
-def test_valid_density_models_match_builders():
-    """Guard against drift between _VALID_DENSITY_MODELS and _density_build_fns."""
-    from sbi.neural_nets.net_builders.estimator_configs import (
-        _VALID_DENSITY_MODELS,
-        _density_build_fns,
-    )
-
-    assert set(_density_build_fns().keys()) == _VALID_DENSITY_MODELS
-
-
-def test_density_z_score_alias():
-    """z_score_input to z_score_x and z_score_condition to z_score_y."""
-    builder = DensityEstimatorBuilder(
-        model="maf",
-        z_score_input="independent",
-        z_score_condition="structured",
-    )
-    kwargs = builder._build_kwargs()
-    assert "z_score_x" in kwargs
-    assert "z_score_y" in kwargs
-    assert "z_score_input" not in kwargs
-    assert "z_score_condition" not in kwargs
-
-
 @pytest.mark.parametrize(
     "trainer_cls", [t for t, _, _ in _TRAINERS], ids=["npe", "nle"]
 )
 @pytest.mark.parametrize(
-    "builder", [RatioEstimatorBuilder(), MixedDensityEstimatorBuilder()]
+    "config", [ResNetClassifierConfig(), MixedConfig()], ids=["classifier", "mixed"]
 )
-def test_wrong_builder_family_raises(trainer_cls, builder):
-    """Builders of the wrong family should raise TypeError early."""
+def test_wrong_config_family_raises(trainer_cls, config):
+    """Configs of the wrong family should raise TypeError early."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    with pytest.raises(TypeError, match="DensityEstimatorBuilder"):
-        trainer_cls(prior, density_estimator=builder)
+    with pytest.raises(TypeError, match="DensityConfigBase"):
+        trainer_cls(prior, density_estimator=config)
 
 
 @pytest.mark.parametrize("trainer_cls", [MNPE, MNLE], ids=["mnpe", "mnle"])
-def test_mixed_trainer_rejects_plain_builder(trainer_cls):
-    """MNPE/MNLE require the mixed builder, not the plain density builder."""
+def test_mixed_trainer_rejects_plain_density_config(trainer_cls):
+    """MNPE/MNLE require the mixed config, not a plain density config."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    with pytest.raises(TypeError, match="MixedDensityEstimatorBuilder"):
-        trainer_cls(prior, density_estimator=DensityEstimatorBuilder())
+    with pytest.raises(TypeError, match="MixedConfig"):
+        trainer_cls(prior, density_estimator=MAFConfig())
 
 
 def test_npe_a_default_does_not_warn():
-    """NPE_A's preconfigured string default must not trigger the deprecation."""
+    """NPE_A's default must not trigger the string deprecation."""
     prior = MultivariateNormal(zeros(2), eye(2))
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
         NPE_A(prior)
 
 
-def test_transform_to_unconstrained_reachable_via_builders():
-    """Both density builders can express transform_to_unconstrained + x_dist."""
-    theta = torch.randn(100, 2)
-    x = torch.rand(100, 3) + 0.1
-    est = DensityEstimatorBuilder(
-        model="zuko_nsf",
-        z_score_input="transform_to_unconstrained",
-        x_dist=BoxUniform(zeros(3), 2 * torch.ones(3)),
-    ).build(x, theta)
-    assert est is not None
-
-    x_disc = torch.randint(0, 3, (100, 1)).float()
-    x_mixed = torch.cat([torch.rand(100, 2) + 0.1, x_disc], dim=1)
-    est_mixed = MixedDensityEstimatorBuilder(
-        continuous_model="zuko_nsf",
-        z_score_input="transform_to_unconstrained",
-        x_dist=BoxUniform(zeros(2), 2 * torch.ones(2)),
-    ).build(x_mixed, theta)
-    assert isinstance(est_mixed, MixedDensityEstimator)
+def test_npe_a_string_warns():
+    """The one NPE_A string stays available, deprecated."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.warns(FutureWarning, match="MDNConfig"):
+        NPE_A(prior, density_estimator="mdn_snpe_a")
 
 
-def test_x_dist_requires_transform_to_unconstrained():
-    """x_dist without transform_to_unconstrained z-scoring is rejected."""
-    with pytest.raises(ValueError, match="x_dist"):
-        DensityEstimatorBuilder(model="maf", x_dist=BoxUniform(zeros(2), torch.ones(2)))
-    with pytest.raises(ValueError, match="x_dist"):
-        MixedDensityEstimatorBuilder(x_dist=BoxUniform(zeros(2), torch.ones(2)))
+@pytest.mark.parametrize("num_components", [3, 7], ids=["three", "seven"])
+def test_npe_a_num_components_wins_over_the_config(num_components):
+    """NPE-A rebuilds the MDN per round, so the trainer owns `num_components`."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    trainer = NPE_A(
+        prior,
+        density_estimator=MDNConfig(hidden_features=16),
+        num_components=num_components,
+        show_progress_bars=False,
+    )
+    estimator = trainer.append_simulations(theta, x).train(
+        max_num_epochs=1, training_batch_size=100
+    )
+
+    assert estimator.net._num_components == num_components
 
 
-def test_condition_side_transform_to_unconstrained_rejected():
-    """Condition-side transform_to_unconstrained is rejected on both builders:
-    the unconstrained transform is never applied on the condition side, so
-    accepting it would be a silent no-op."""
-    with pytest.raises(ValueError, match="z_score_condition"):
-        DensityEstimatorBuilder(
-            model="zuko_nsf",
-            z_score_condition="transform_to_unconstrained",
-        )
-    with pytest.raises(ValueError, match="z_score_condition"):
-        MixedDensityEstimatorBuilder(
-            continuous_model="zuko_nsf",
-            z_score_condition="transform_to_unconstrained",
-        )
+def test_npe_a_rejects_a_conflicting_num_components():
+    """Setting it on both sides is ambiguous, so it must not be guessed."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.raises(ValueError, match="num_components"):
+        NPE_A(prior, density_estimator=MDNConfig(num_components=5), num_components=20)
+
+
+def test_npe_a_rejects_a_non_mdn_config():
+    """NPE-A's analytical correction needs a mixture of Gaussians."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.raises(TypeError, match="MDNConfig"):
+        NPE_A(prior, density_estimator=NSFConfig())
