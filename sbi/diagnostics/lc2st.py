@@ -1005,14 +1005,18 @@ class LC2ST_NF(LC2ST):
 
     def get_scores(
         self,
-        x_o: Tensor,
-        trained_clfs: List[BaseEstimator],
+        theta_o: Optional[Tensor] = None,
+        x_o: Optional[Tensor] = None,
+        trained_clfs: Optional[List[BaseEstimator]] = None,
         return_probs: bool = False,
         **kwargs: Any,
     ) -> Union[LC2STScores, Tuple[np.ndarray, np.ndarray]]:
         """Computes the L-C2ST scores given the trained classifiers.
 
         Args:
+            theta_o: Ignored. Samples are drawn from the base distribution at
+                initialization and stored in ``self.theta_o``. This parameter exists
+                to match the ``LC2ST`` interface.
             x_o: The observation, of shape (,dim_x).
             trained_clfs: Trained classifiers.
             return_probs: Whether to return the predicted probabilities of being in P,
@@ -1023,6 +1027,8 @@ class LC2ST_NF(LC2ST):
             LC2STScores object, or for backward compatibility with return_probs=True,
             a tuple (probs, scores).
         """
+        if x_o is None or trained_clfs is None:
+            raise ValueError("get_scores requires `x_o` and `trained_clfs`; got None.")
         return super().get_scores(
             theta_o=self.theta_o,
             x_o=x_o,
@@ -1032,24 +1038,31 @@ class LC2ST_NF(LC2ST):
 
     def get_statistic_on_observed_data(
         self,
-        x_o: Tensor,
+        theta_o: Optional[Tensor] = None,
+        x_o: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> float:
         """Computes the L-C2ST statistics for the observed data:
         Mean over all cv-scores.
 
         Args:
+            theta_o: Ignored. Samples are drawn from the base distribution at
+                initialization and stored in ``self.theta_o``. This parameter exists
+                to match the ``LC2ST`` interface.
             x_o: The observation, of shape (, dim_x).
             kwargs: Additional arguments used in the parent class.
 
         Returns:
             L-C2ST statistic at `x_o`.
         """
+        if x_o is None:
+            raise ValueError("get_statistic_on_observed_data requires `x_o`; got None.")
         return super().get_statistic_on_observed_data(theta_o=self.theta_o, x_o=x_o)
 
     def p_value(
         self,
-        x_o: Tensor,
+        theta_o: Optional[Tensor] = None,
+        x_o: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> float:
         r"""Computes the p-value for L-C2ST.
@@ -1060,23 +1073,32 @@ class LC2ST_NF(LC2ST):
         several trials under the null hypothesis: $1/H \sum_{h=1}^{H} I(T_h < T_o)$.
 
         Args:
+            theta_o: Ignored. Samples are drawn from the base distribution at
+                initialization and stored in ``self.theta_o``. This parameter exists
+                to match the ``LC2ST`` interface.
             x_o: The observation, of shape (, dim_x).
             kwargs: Additional arguments used in the parent class.
 
         Returns:
             p-value for L-C2ST at `x_o`.
         """
+        if x_o is None:
+            raise ValueError("p_value requires `x_o`; got None.")
         return super().p_value(theta_o=self.theta_o, x_o=x_o)
 
     def reject_test(
         self,
-        x_o: Tensor,
+        theta_o: Optional[Tensor] = None,
+        x_o: Optional[Tensor] = None,
         alpha: float = 0.05,
         **kwargs: Any,
     ) -> bool:
         """Computes the test result for L-C2ST at a given significance level.
 
         Args:
+            theta_o: Ignored. Samples are drawn from the base distribution at
+                initialization and stored in ``self.theta_o``. This parameter exists
+                to match the ``LC2ST`` interface.
             x_o: The observation, of shape (, dim_x).
             alpha: Significance level, defaults to 0.05.
             kwargs: Additional arguments used in the parent class.
@@ -1084,6 +1106,8 @@ class LC2ST_NF(LC2ST):
         Returns:
             L-C2ST result: True if rejected, False otherwise.
         """
+        if x_o is None:
+            raise ValueError("reject_test requires `x_o`; got None.")
         return super().reject_test(theta_o=self.theta_o, x_o=x_o, alpha=alpha)
 
     def train_under_null_hypothesis(
@@ -1112,7 +1136,8 @@ class LC2ST_NF(LC2ST):
 
     def get_statistics_under_null_hypothesis(
         self,
-        x_o: Tensor,
+        theta_o: Optional[Tensor] = None,
+        x_o: Optional[Tensor] = None,
         return_probs: bool = False,
         verbosity: int = 0,
         **kwargs: Any,
@@ -1120,6 +1145,9 @@ class LC2ST_NF(LC2ST):
         """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
+            theta_o: Ignored. Samples are drawn from the base distribution at
+                initialization and stored in ``self.theta_o``. This parameter exists
+                to match the ``LC2ST`` interface.
             x_o: The observation.
                 Shape (, dim_x)
             return_probs: Whether to return the predicted probabilities of being in P.
@@ -1127,6 +1155,10 @@ class LC2ST_NF(LC2ST):
             verbosity: Verbosity level, defaults to 0.
             kwargs: Additional arguments used in the parent class.
         """
+        if x_o is None:
+            raise ValueError(
+                "get_statistics_under_null_hypothesis requires `x_o`; got None."
+            )
         return super().get_statistics_under_null_hypothesis(
             theta_o=self.theta_o,
             x_o=x_o,
