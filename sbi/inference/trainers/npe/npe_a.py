@@ -1,7 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from copy import deepcopy
+from dataclasses import replace
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
@@ -23,9 +25,12 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
 )
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.factory import posterior_nn
+from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import BoxUniform
+
+_MDN_DEFAULT_COMPONENTS = MDNConfig().num_components
 
 # Constant for numerical stability in matrix operations.
 _CORRECTION_EPSILON: float = 1e-6
@@ -93,8 +98,10 @@ class NPE_A(PosteriorEstimatorTrainer):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["mdn_snpe_a"],
+            MDNConfig,
             ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
-        ] = "mdn_snpe_a",
+            None,
+        ] = None,
         num_components: int = 10,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -109,9 +116,12 @@ class NPE_A(PosteriorEstimatorTrainer):
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            density_estimator: If it is a string (only "mdn_snpe_a" is valid), use a
-                pre-configured mixture of densities network. Alternatively, a function
-                that builds a custom neural network, which adheres to
+            density_estimator: If `None` (default), uses `MDNConfig()`. NPE-A
+                needs a mixture of Gaussians, so `MDNConfig` is the only config it
+                accepts; its `num_components` is set by this class's
+                `num_components` argument. If it is a string (deprecated), only
+                "mdn_snpe_a" is valid. Alternatively, a function that builds a
+                custom neural network, which adheres to
                 `ConditionalEstimatorBuildFn` protocol can be provided. The function
                 will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
@@ -132,18 +142,46 @@ class NPE_A(PosteriorEstimatorTrainer):
             show_progress_bars: Whether to show a progressbar during training.
         """
 
-        # Catch invalid inputs.
-        if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
-            raise TypeError(
-                "The `density_estimator` passed to NPE_A needs to be a "
-                "callable or the string 'mdn_snpe_a'!"
-            )
-
         self._num_components = num_components
 
-        # No builder equivalent of "mdn_snpe_a"; resolve before the base class.
-        if density_estimator == "mdn_snpe_a":
+        if density_estimator is None:
+            density_estimator = MDNConfig()
+        elif isinstance(density_estimator, MDNConfig):
+            if (
+                density_estimator.num_components != _MDN_DEFAULT_COMPONENTS
+                and density_estimator.num_components != num_components
+            ):
+                raise ValueError(
+                    "`num_components` was set both on the config "
+                    f"({density_estimator.num_components}) and on NPE_A "
+                    f"({num_components}). For NPE-A it belongs on the trainer, "
+                    "which overrides it per round."
+                )
+        elif isinstance(density_estimator, str):
+            if density_estimator != "mdn_snpe_a":
+                raise TypeError(
+                    "The `density_estimator` passed to NPE_A needs to be a "
+                    "MDNConfig, a callable, or the string 'mdn_snpe_a'!"
+                )
+            warnings.warn(
+                "Passing a string for `density_estimator` is deprecated. "
+                "Use MDNConfig() instead, e.g. "
+                "`from sbi.neural_nets import MDNConfig`.",
+                FutureWarning,
+                stacklevel=2,
+            )
             density_estimator = posterior_nn(model="mdn_snpe_a")
+        elif not callable(density_estimator):
+            raise TypeError(
+                "The `density_estimator` passed to NPE_A needs to be a "
+                "MDNConfig, a callable, or the string 'mdn_snpe_a'!"
+            )
+
+        # The number of components changes per round, so the config is kept and
+        # rebuilt in `train()` rather than turned into a build function here.
+        self._mdn_config = (
+            density_estimator if isinstance(density_estimator, MDNConfig) else None
+        )
 
         # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
         # requiring the signature to have `num_components`, save it for use below, and
@@ -232,10 +270,15 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         self._round = max(self._data_round_index)
 
-        # Always use the specified number of components
-        self._build_neural_net = partial(
-            self._build_neural_net, num_components=self._num_components
-        )
+        # Always use the specified number of components.
+        if self._mdn_config is not None:
+            self._build_neural_net = self._wrap_builder(
+                replace(self._mdn_config, num_components=self._num_components)
+            )
+        else:
+            self._build_neural_net = partial(
+                self._build_neural_net, num_components=self._num_components
+            )
 
         density_estimator = super().train(**kwargs)
 

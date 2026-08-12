@@ -24,12 +24,15 @@ from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.trainers._contracts import LossArgs, StartIndexContext
 from sbi.inference.trainers.base import NeuralInference
-from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuildFn,
 )
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
+from sbi.neural_nets.net_builders.estimator_configs import (
+    TabPFNConfig,
+    _PerModelConfigBase,
+)
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     handle_invalid_x,
@@ -53,7 +56,9 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Optional[ConditionalEstimatorBuildFn[TabPFNFlow]] = None,
+        density_estimator: Optional[
+            Union[TabPFNConfig, ConditionalEstimatorBuildFn[TabPFNFlow]]
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -65,9 +70,10 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         Args:
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them.
-            density_estimator: Optional custom builder for the density estimator.
-                When `None`, a `TabPFNFlow` estimator is constructed via `posterior_nn`.
-                Otherwise, a function that builds such a estimator needs to be provided.
+            density_estimator: If `None` (default), uses `TabPFNConfig()`. A
+                `TabPFNConfig` can be passed to configure the estimator.
+                Alternatively, a function that builds such an estimator needs to
+                be provided.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -88,10 +94,14 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         )
 
         if density_estimator is None:
-            self._build_neural_net = posterior_nn(
-                model="tabpfn",
-                z_score_theta="none",
-                z_score_x="none",
+            # TabPFN preprocesses both sides itself, so neither is z-scored.
+            density_estimator = TabPFNConfig(z_score_condition="none")
+        if isinstance(density_estimator, TabPFNConfig):
+            self._build_neural_net = self._wrap_builder(density_estimator)
+        elif isinstance(density_estimator, _PerModelConfigBase):
+            raise TypeError(
+                "NPE_PFN requires a TabPFNConfig; got "
+                f"{type(density_estimator).__name__}."
             )
         else:
             self._build_neural_net = density_estimator
