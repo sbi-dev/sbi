@@ -18,6 +18,12 @@ Note: because ``None`` serves as the "unset" sentinel, callers cannot
 intentionally forward ``None`` to override a non-None builder default (e.g.
 ``tails=None`` in ``build_maf_rqs``).  This is an acceptable trade-off for
 preserving typed field annotations.
+
+The marginal configs at the bottom of this module follow a different pattern:
+one small class per model, carrying only the fields its flow accepts, with real
+defaults instead of ``None`` sentinels.  A setting the flow does not accept is
+not a field there, so it raises ``TypeError`` at construction instead of being
+silently dropped on the way to the flow library.
 """
 
 import inspect
@@ -45,6 +51,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalEstimator,
 )
 from sbi.neural_nets.estimators.mixed_density_estimator import MixedDensityEstimator
+from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 
 _BUILD_KWARG_ALIASES: dict = {
@@ -68,6 +75,31 @@ def _literal_values(tp) -> frozenset:
     return out
 
 
+def _check_literal_values(config, allow_none: bool) -> None:
+    """Raise if a ``Literal`` field holds a value outside its annotation.
+
+    Python does not check ``Literal`` values at runtime, so a typo like
+    ``z_score_input="indepedent"`` would otherwise construct and then be read
+    as "do not z-score" downstream.
+
+    Args:
+        config: The config instance to check.
+        allow_none: Whether ``None`` is a valid value for every field, as it is
+            on the configs that use it as the "not set" sentinel.
+    """
+    for f in fields(config):
+        allowed = _literal_values(f.type)
+        val = getattr(config, f.name)
+        if not allowed or (allow_none and val is None):
+            continue
+        if val not in allowed:
+            raise ValueError(
+                f"Invalid value {val!r} for `{f.name}`. "
+                f"Must be one of {sorted(map(str, allowed))}"
+                f"{' or None' if allow_none else ''}."
+            )
+
+
 @dataclass(frozen=True, eq=False, repr=False)
 class _EstimatorBuilderBase:
     """Shared base providing ``from_kwargs()``, ``to_dict()``, and the abstract
@@ -78,14 +110,7 @@ class _EstimatorBuilderBase:
     extra_kwargs: dict = field(default_factory=dict, kw_only=True)
 
     def __post_init__(self):
-        for f in fields(self):
-            allowed = _literal_values(f.type)
-            val = getattr(self, f.name)
-            if allowed and val is not None and val not in allowed:
-                raise ValueError(
-                    f"Invalid value {val!r} for `{f.name}`. "
-                    f"Must be one of {sorted(map(str, allowed))} or None."
-                )
+        _check_literal_values(self, allow_none=True)
 
     _DISCRIMINATORS: ClassVar[frozenset] = frozenset({
         "model",
@@ -882,3 +907,290 @@ class VectorFieldEstimatorBuilder(_EstimatorBuilderBase):
         d["net"] = self.model
         d.update(self.extra_kwargs)
         return d
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalConfigBase:
+    """Base configuration for marginal (unconditional) density estimators.
+
+    Marginal estimators model $p(x)$ without a condition, so ``build()`` takes
+    only ``batch_x`` and returns a ``ZukoUnconditionalFlow``.  Every
+    model is a Zuko flow, selected by the subclass through ``_WHICH_NF``.
+
+    Subclasses add the settings their flow accepts, under Zuko's own parameter
+    names.  A setting a flow does not accept is not a field on its config, so
+    it raises ``TypeError`` at construction rather than being ignored.  Fields
+    carry real defaults, which makes the class the reference for the values a
+    build actually uses.
+
+    Args:
+        hidden_features: Number of hidden features per transform, or one value
+            per transform.
+        num_transforms: Number of transforms in the flow.
+        z_score_input: Whether to z-score the samples $x$, one of `none`,
+            `independent`, or `structured`.  Unconditional flows do not
+            implement `transform_to_unconstrained`, so it is not offered.
+        extra_kwargs: Additional keyword arguments forwarded to the Zuko flow
+            constructor, for settings that have no field of their own.
+    """
+
+    hidden_features: Union[int, Sequence[int]] = 50
+    num_transforms: int = 5
+    z_score_input: Literal["none", "independent", "structured"] = "independent"
+
+    # kw_only so it stays out of the positional argument list, which the
+    # per-model settings occupy.
+    extra_kwargs: dict = field(default_factory=dict, kw_only=True)
+
+    _WHICH_NF: ClassVar[str]
+    """Name of the Zuko flow class this config builds, set by each subclass."""
+
+    def __post_init__(self):
+        if type(self) is MarginalConfigBase:
+            raise TypeError(
+                "MarginalConfigBase only holds the settings shared by all "
+                "marginal models. Use a per-model config, e.g. "
+                "MarginalNSFConfig()."
+            )
+        _check_literal_values(self, allow_none=False)
+        shadowed = set(self.extra_kwargs) & {f.name for f in fields(self)}
+        if shadowed:
+            raise ValueError(
+                f"`extra_kwargs` key(s) {sorted(shadowed)} are fields of "
+                f"{type(self).__name__}. Pass them as arguments instead."
+            )
+
+        from sbi.neural_nets.net_builders.flow import nflow_specific_kwargs
+
+        dropped = set(self.extra_kwargs) & set(nflow_specific_kwargs)
+        if dropped:
+            raise ValueError(
+                f"`extra_kwargs` key(s) {sorted(dropped)} never reach the flow: "
+                "they are filtered out before it is built. Pass the name Zuko "
+                "uses instead, e.g. `bins` rather than `num_bins`."
+            )
+
+    def __repr__(self) -> str:
+        parts = []
+        for f in fields(self):
+            val = getattr(self, f.name)
+            default = (
+                f.default_factory() if f.default_factory is not MISSING else f.default
+            )
+            if val == default:
+                continue
+            parts.append(f"{f.name}={val!r}")
+        return f"{type(self).__name__}({', '.join(parts)})"
+
+    def _build_kwargs(self) -> dict:
+        """All fields as builder kwargs, with ``extra_kwargs`` merged in.
+
+        Field names are translated via ``_BUILD_KWARG_ALIASES``, so that the
+        user-facing ``z_score_input`` reaches the build function as its
+        ``z_score_x``, the same way the other builders do it.
+        """
+        d = {
+            _BUILD_KWARG_ALIASES.get(f.name, f.name): getattr(self, f.name)
+            for f in fields(self)
+            if f.name != "extra_kwargs"
+        }
+        d.update(self.extra_kwargs)
+        return d
+
+    def build(self, batch_x: Tensor) -> ZukoUnconditionalFlow:
+        """Build the marginal density estimator.
+
+        Args:
+            batch_x: Batch of samples $x$, used to infer dimensionality and
+                (optional) z-scoring.
+
+        Returns:
+            A ``ZukoUnconditionalFlow`` over $x$.
+        """
+        from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
+
+        return build_zuko_unconditional_flow(
+            which_nf=self._WHICH_NF, batch_x=batch_x, **self._build_kwargs()
+        )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalBPFConfig(MarginalConfigBase):
+    """Marginal Bernstein polynomial flow.
+
+    Args:
+        degree: Degree of the Bernstein polynomial.
+    """
+
+    degree: int = 16
+
+    _WHICH_NF: ClassVar[str] = "BPF"
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalGFConfig(MarginalConfigBase):
+    """Marginal Gaussianization flow.
+
+    Zuko forwards the settings it does not name to an element-wise transform,
+    which builds no network when there is no condition.  A marginal flow never
+    has one, so `hidden_features` and `extra_kwargs` would be dropped on the
+    way there and are rejected instead.  Size the flow with `num_transforms`
+    and `components`.
+
+    Args:
+        components: Number of mixture components per Gaussianization step.
+    """
+
+    components: int = 8
+
+    _WHICH_NF: ClassVar[str] = "GF"
+
+    def __post_init__(self):
+        super().__post_init__()
+        default_width = MarginalConfigBase.hidden_features
+        ignored = []
+        if self.hidden_features != default_width:
+            ignored.append("hidden_features")
+        if self.extra_kwargs:
+            ignored.append("extra_kwargs")
+        if ignored:
+            raise ValueError(
+                f"GF does not use {ignored}: Zuko passes them to an "
+                "element-wise transform, which takes no network without a "
+                "condition. Use `num_transforms` or `components` instead."
+            )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalMAFConfig(MarginalConfigBase):
+    """Marginal masked autoregressive flow.
+
+    Args:
+        randperm: Whether features are randomly permuted between transforms.
+    """
+
+    randperm: bool = False
+
+    _WHICH_NF: ClassVar[str] = "MAF"
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalNAFConfig(MarginalConfigBase):
+    """Marginal neural autoregressive flow.
+
+    Args:
+        randperm: Whether features are randomly permuted between transforms.
+        signal: Number of signal features of the monotonic network.
+    """
+
+    randperm: bool = False
+    signal: int = 16
+
+    _WHICH_NF: ClassVar[str] = "NAF"
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalNCSFConfig(MarginalConfigBase):
+    """Marginal neural circular spline flow.
+
+    Args:
+        bins: Number of bins of the spline transforms.
+    """
+
+    bins: int = 10
+
+    _WHICH_NF: ClassVar[str] = "NCSF"
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalNICEConfig(MarginalConfigBase):
+    """Marginal non-linear independent components estimation flow.
+
+    Args:
+        randmask: Whether the coupling masks are randomly drawn.
+    """
+
+    randmask: bool = False
+
+    _WHICH_NF: ClassVar[str] = "NICE"
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalNSFConfig(MarginalConfigBase):
+    """Marginal neural spline flow.
+
+    Args:
+        bins: Number of bins of the spline transforms.
+    """
+
+    bins: int = 10
+
+    _WHICH_NF: ClassVar[str] = "NSF"
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalSOSPFConfig(MarginalConfigBase):
+    """Marginal sum-of-squares polynomial flow.
+
+    Args:
+        degree: Degree of the polynomials.
+        polynomials: Number of polynomials.
+    """
+
+    degree: int = 4
+    polynomials: int = 3
+
+    _WHICH_NF: ClassVar[str] = "SOSPF"
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MarginalUNAFConfig(MarginalConfigBase):
+    """Marginal unconstrained neural autoregressive flow.
+
+    Args:
+        randperm: Whether features are randomly permuted between transforms.
+        signal: Number of signal features of the monotonic network.
+    """
+
+    randperm: bool = False
+    signal: int = 16
+
+    _WHICH_NF: ClassVar[str] = "UNAF"
+
+
+MARGINAL_MODELS = Literal[
+    "bpf", "gf", "maf", "naf", "ncsf", "nice", "nsf", "sospf", "unaf"
+]
+
+# Kept internal: the per-model configs are the public way to pick a model. This
+# dict only backs the deprecated string path and the trainer default.
+_MARGINAL_CONFIGS: dict = {
+    "bpf": MarginalBPFConfig,
+    "gf": MarginalGFConfig,
+    "maf": MarginalMAFConfig,
+    "naf": MarginalNAFConfig,
+    "ncsf": MarginalNCSFConfig,
+    "nice": MarginalNICEConfig,
+    "nsf": MarginalNSFConfig,
+    "sospf": MarginalSOSPFConfig,
+    "unaf": MarginalUNAFConfig,
+}
+
+
+def _marginal_config_from_model(model: str) -> MarginalConfigBase:
+    """Return the default config of a marginal model given its name.
+
+    Args:
+        model: Name of the model, case-insensitive.
+
+    Returns:
+        A default-constructed config for that model.
+    """
+    try:
+        config_cls = _MARGINAL_CONFIGS[model.lower()]
+    except KeyError:
+        raise ValueError(
+            f"Unknown marginal model {model!r}. "
+            f"Must be one of {sorted(_MARGINAL_CONFIGS)}."
+        ) from None
+    return config_cls()
