@@ -1045,6 +1045,21 @@ class MarginalGFConfig(MarginalConfigBase):
 
     _WHICH_NF: ClassVar[str] = "GF"
 
+    def __post_init__(self):
+        super().__post_init__()
+        default_width = MarginalConfigBase.hidden_features
+        ignored = []
+        if self.hidden_features != default_width:
+            ignored.append("hidden_features")
+        if self.extra_kwargs:
+            ignored.append("extra_kwargs")
+        if ignored:
+            raise ValueError(
+                f"GF does not use {ignored}: Zuko passes them to an "
+                "element-wise transform, which takes no network without a "
+                "condition. Use `num_transforms` or `components` instead."
+            )
+
 
 @dataclass(frozen=True, eq=False, repr=False)
 class MarginalMAFConfig(MarginalConfigBase):
@@ -1144,15 +1159,7 @@ class MarginalUNAFConfig(MarginalConfigBase):
 
 
 MARGINAL_MODELS = Literal[
-    "bpf",
-    "gf",
-    "maf",
-    "naf",
-    "ncsf",
-    "nice",
-    "nsf",
-    "sospf",
-    "unaf",
+    "bpf", "gf", "maf", "naf", "ncsf", "nice", "nsf", "sospf", "unaf"
 ]
 
 # Kept internal: the per-model configs are the public way to pick a model. This
