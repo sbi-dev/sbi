@@ -137,6 +137,15 @@ class MarginalTrainer:
                 f"{type(density_estimator).__name__}. Use a per-model config, "
                 "e.g. MarginalNSFConfig()."
             )
+        elif isinstance(density_estimator, type) and issubclass(
+            density_estimator, (MarginalConfigBase, _EstimatorBuilderBase)
+        ):
+            # A config class is callable, so a forgotten `()` would pass the
+            # callable branch below and only fail once training starts.
+            raise TypeError(
+                f"Got the class {density_estimator.__name__}, not an instance. "
+                f"Use {density_estimator.__name__}()."
+            )
         elif isinstance(density_estimator, ZukoFlowType):
             warn(
                 "Passing a ZukoFlowType is deprecated. Use a marginal config "
