@@ -287,9 +287,22 @@ def test_extra_kwargs_reaches_the_flow(batch_x):
     )
 
 
-def test_extra_kwargs_typo_is_not_silent(batch_x):
-    with pytest.raises(TypeError, match="unexpected keyword argument"):
-        MarginalNSFConfig(extra_kwargs={"binz": 20}).build(batch_x)
+@pytest.mark.parametrize("model", MODELS)
+def test_extra_kwargs_typo_is_not_silent(model, batch_x):
+    """A key no flow knows must surface, whichever model is used.
+
+    Eight of them let it through to Zuko, which rejects it. GF drops anything
+    it is not named, so its config refuses `extra_kwargs` outright and the
+    mistake surfaces one step earlier.
+    """
+    config_cls = _MARGINAL_CONFIGS[model]
+
+    if model == "gf":
+        with pytest.raises(ValueError, match="GF does not use"):
+            config_cls(extra_kwargs={"binz": 20})
+    else:
+        with pytest.raises(TypeError, match="unexpected keyword argument"):
+            config_cls(extra_kwargs={"binz": 20}).build(batch_x)
 
 
 @pytest.mark.parametrize(
