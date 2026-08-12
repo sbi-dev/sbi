@@ -27,6 +27,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MarginalConfigBase,
     MarginalNSFConfig,
     _EstimatorBuilderBase,
+    _PerModelConfigBase,
     _marginal_config_from_model,
 )
 from sbi.sbi_types import Tracker
@@ -129,8 +130,8 @@ class MarginalTrainer:
             self._build_neural_net = MarginalNSFConfig().build
         elif isinstance(density_estimator, MarginalConfigBase):
             self._build_neural_net = density_estimator.build
-        elif isinstance(density_estimator, _EstimatorBuilderBase):
-            # The conditional builders are not callable, so without this branch
+        elif isinstance(density_estimator, _PerModelConfigBase):
+            # The conditional configs are not callable, so without this branch
             # they would fall through to the unhelpful ValueError below.
             raise TypeError(
                 "MarginalTrainer requires a marginal config; got "

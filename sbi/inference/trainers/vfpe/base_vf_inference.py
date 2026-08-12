@@ -28,6 +28,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
     VectorFieldEstimatorBuilder,
     _EstimatorBuilderBase,
+    _PerModelConfigBase,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -95,7 +96,10 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
 
         check_estimator_arg(vector_field_estimator_builder)
 
-        if isinstance(vector_field_estimator_builder, _EstimatorBuilderBase):
+        if isinstance(
+            vector_field_estimator_builder,
+            (_EstimatorBuilderBase, _PerModelConfigBase),
+        ):
             if not isinstance(
                 vector_field_estimator_builder, VectorFieldEstimatorBuilder
             ):
