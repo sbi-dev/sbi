@@ -167,7 +167,8 @@ def build_vector_field_estimator(
         time_embedding_dim: Number of dimensions for time embedding.
         num_layers: Number of layers in the network.
         num_heads: Number of attention heads per block (for transformer).
-        mlp_ratio: Ratio for MLP hidden dimension (for transformer).
+        mlp_ratio: Ratio for MLP hidden dimension (for transformer and the
+            global MLP of ada_mlp).
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
             "transformer_cross_attn" or a custom network following the
             VectorFieldNet protocol. ``"transformer_cross_attn"`` requires
@@ -226,6 +227,7 @@ def build_vector_field_estimator(
             hidden_features=hidden_features,
             num_layers=num_layers,
             time_embedding_dim=time_embedding_dim,
+            mlp_ratio=mlp_ratio,
             embedding_net=embedding_net,
             **kwargs,
         )
@@ -515,7 +517,6 @@ class GlobalEmbeddingMLP(nn.Module):
         hidden_features: The dimensionality of the MLP block.
         num_intermediate_layers: Number of intermediate MLP blocks (Linear+GeLU+Linear).
         mlp_ratio: The ratio of the hidden dimension to the intermediate dimension.
-        **kwargs: Key word arguments handed to the AdaMLPBlock.
     """
 
     def __init__(
@@ -531,7 +532,6 @@ class GlobalEmbeddingMLP(nn.Module):
         mlp_ratio: int = 1,
         activation: type[nn.Module] = nn.GELU,
         use_x_emb: bool = True,
-        **kwargs,
     ):
         super().__init__()
         self.num_intermediate_layers = num_intermediate_layers
@@ -772,7 +772,7 @@ class VectorFieldAdaMLP(VectorFieldNet):
             output_dim=condition_emb_dim,
             time_emb_dim=time_emb_dim,
             num_intermediate_layers=num_intermediate_mlp_layers,
-            global_mlp_ratio=global_mlp_ratio,
+            mlp_ratio=global_mlp_ratio,
             time_emb_type=time_emb_type,
             sinusoidal_max_freq=sinusoidal_max_freq,
             fourier_scale=fourier_scale,
@@ -1084,7 +1084,8 @@ class VectorFieldTransformer(VectorFieldNet):
             num_heads: Number of attention heads.
             mlp_ratio: Ratio for mlp hidden dimension.
             time_emb_dim: Dimension of time embedding.
-            time_emb_type: Type of time embedding ('sinusoidal' or 'fourier').
+            time_emb_type: Type of time embedding ('sinusoidal' or
+                'random_fourier').
             sinusoidal_max_freq: Maximum frequency for sinusoidal embedding.
             fourier_scale: Scale for fourier embedding.
             activation: Activation function.
@@ -1105,7 +1106,7 @@ class VectorFieldTransformer(VectorFieldNet):
             output_dim=hidden_features,
             time_emb_dim=time_emb_dim,
             num_intermediate_layers=num_intermediate_mlp_layers,
-            global_mlp_ratio=global_mlp_ratio,
+            mlp_ratio=global_mlp_ratio,
             time_emb_type=time_emb_type,
             sinusoidal_max_freq=sinusoidal_max_freq,
             fourier_scale=fourier_scale,
@@ -1348,7 +1349,7 @@ def build_transformer_network(
     hidden_features: int = 100,
     num_layers: int = 5,
     num_heads: int = 10,
-    mlp_ratio: int = 2,
+    mlp_ratio: int = 4,
     time_embedding_dim: int = 32,
     embedding_net: nn.Module = nn.Identity(),
     time_emb_type: str = "sinusoidal",
@@ -1369,7 +1370,7 @@ def build_transformer_network(
         mlp_ratio: Ratio for MLP hidden dimension.
         time_embedding_dim: Number of dimensions for time embedding.
         embedding_net: Embedding network for batch_y.
-        time_emb_type: Type of time embedding ("sinusoidal" or "fourier").
+        time_emb_type: Type of time embedding ("sinusoidal" or "random_fourier").
         sinusoidal_max_freq: Max frequency for sinusoidal embeddings.
         fourier_scale: Scale for random fourier embeddings.
         activation: Activation function.
