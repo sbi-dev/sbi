@@ -32,8 +32,8 @@ class MNPE(NPE_C):
 
     MNPE (Mixed Neural Posterior Estimation) is similar to NPE: it directly
     estimates a distribution over parameters given data. Unlike NPE, it is designed to
-    be applied to parmaeters with mixed types, i.e., continuous and discrete parameters.
-    This can occur, for example, in models with switching components. The emebedding
+    be applied to parameters with mixed types, i.e., continuous and discrete parameters.
+    This can occur, for example, in models with switching components. The embedding
     net will only operate on the continuous parameters, note this to design the
     dimension of the embedding net.
 
