@@ -837,7 +837,7 @@ class DiTBlock(nn.Module):
         hidden_features: int,
         cond_dim: int,
         num_heads: int,
-        mlp_ratio: int = 2,
+        mlp_ratio: int = 4,
         activation: type[nn.Module] = nn.GELU,
     ):
         """Initialize dit transformer block.
