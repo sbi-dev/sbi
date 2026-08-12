@@ -49,9 +49,9 @@ from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimator,
-    UnconditionalDensityEstimator,
 )
 from sbi.neural_nets.estimators.mixed_density_estimator import MixedDensityEstimator
+from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 
 _BUILD_KWARG_ALIASES: dict = {
@@ -75,6 +75,31 @@ def _literal_values(tp) -> frozenset:
     return out
 
 
+def _check_literal_values(config, allow_none: bool) -> None:
+    """Raise if a ``Literal`` field holds a value outside its annotation.
+
+    Python does not check ``Literal`` values at runtime, so a typo like
+    ``z_score_input="indepedent"`` would otherwise construct and then be read
+    as "do not z-score" downstream.
+
+    Args:
+        config: The config instance to check.
+        allow_none: Whether ``None`` is a valid value for every field, as it is
+            on the configs that use it as the "not set" sentinel.
+    """
+    for f in fields(config):
+        allowed = _literal_values(f.type)
+        val = getattr(config, f.name)
+        if not allowed or (allow_none and val is None):
+            continue
+        if val not in allowed:
+            raise ValueError(
+                f"Invalid value {val!r} for `{f.name}`. "
+                f"Must be one of {sorted(map(str, allowed))}"
+                f"{' or None' if allow_none else ''}."
+            )
+
+
 @dataclass(frozen=True, eq=False, repr=False)
 class _EstimatorBuilderBase:
     """Shared base providing ``from_kwargs()``, ``to_dict()``, and the abstract
@@ -85,14 +110,7 @@ class _EstimatorBuilderBase:
     extra_kwargs: dict = field(default_factory=dict, kw_only=True)
 
     def __post_init__(self):
-        for f in fields(self):
-            allowed = _literal_values(f.type)
-            val = getattr(self, f.name)
-            if allowed and val is not None and val not in allowed:
-                raise ValueError(
-                    f"Invalid value {val!r} for `{f.name}`. "
-                    f"Must be one of {sorted(map(str, allowed))} or None."
-                )
+        _check_literal_values(self, allow_none=True)
 
     _DISCRIMINATORS: ClassVar[frozenset] = frozenset({
         "model",
@@ -896,7 +914,7 @@ class MarginalConfigBase:
     """Base configuration for marginal (unconditional) density estimators.
 
     Marginal estimators model $p(x)$ without a condition, so ``build()`` takes
-    only ``batch_x`` and returns an ``UnconditionalDensityEstimator``.  Every
+    only ``batch_x`` and returns a ``ZukoUnconditionalFlow``.  Every
     model is a Zuko flow, selected by the subclass through ``_WHICH_NF``.
 
     Subclasses add the settings their flow accepts, under Zuko's own parameter
@@ -934,15 +952,7 @@ class MarginalConfigBase:
                 "marginal models. Use a per-model config, e.g. "
                 "MarginalNSFConfig()."
             )
-        # Python does not check `Literal` values at runtime.
-        for f in fields(self):
-            allowed = _literal_values(f.type)
-            val = getattr(self, f.name)
-            if allowed and val not in allowed:
-                raise ValueError(
-                    f"Invalid value {val!r} for `{f.name}`. "
-                    f"Must be one of {sorted(map(str, allowed))}."
-                )
+        _check_literal_values(self, allow_none=False)
         shadowed = set(self.extra_kwargs) & {f.name for f in fields(self)}
         if shadowed:
             raise ValueError(
@@ -973,16 +983,21 @@ class MarginalConfigBase:
         return f"{type(self).__name__}({', '.join(parts)})"
 
     def _build_kwargs(self) -> dict:
-        """All fields as builder kwargs, with ``extra_kwargs`` merged in."""
+        """All fields as builder kwargs, with ``extra_kwargs`` merged in.
+
+        Field names are translated via ``_BUILD_KWARG_ALIASES``, so that the
+        user-facing ``z_score_input`` reaches the build function as its
+        ``z_score_x``, the same way the other builders do it.
+        """
         d = {
-            f.name: getattr(self, f.name)
+            _BUILD_KWARG_ALIASES.get(f.name, f.name): getattr(self, f.name)
             for f in fields(self)
             if f.name != "extra_kwargs"
         }
         d.update(self.extra_kwargs)
         return d
 
-    def build(self, batch_x: Tensor) -> UnconditionalDensityEstimator:
+    def build(self, batch_x: Tensor) -> ZukoUnconditionalFlow:
         """Build the marginal density estimator.
 
         Args:
@@ -1042,6 +1057,12 @@ class MarginalBPFConfig(MarginalConfigBase):
 class MarginalGFConfig(MarginalConfigBase):
     """Marginal Gaussianization flow.
 
+    Zuko forwards the settings it does not name to an element-wise transform,
+    which builds no network when there is no condition.  A marginal flow never
+    has one, so `hidden_features` and `extra_kwargs` would be dropped on the
+    way there and are rejected instead.  Size the flow with `num_transforms`
+    and `components`.
+
     Args:
         components: Number of mixture components per Gaussianization step.
     """
@@ -1052,18 +1073,20 @@ class MarginalGFConfig(MarginalConfigBase):
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class MarginalMAFConfig(_ZukoPermutationField, MarginalConfigBase):
+class MarginalMAFConfig(MarginalConfigBase):
     """Marginal masked autoregressive flow.
 
     Args:
         randperm: Whether features are randomly permuted between transforms.
     """
 
+    randperm: bool = False
+
     _WHICH_NF: ClassVar[str] = "MAF"
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class MarginalNAFConfig(_ZukoMonotonicFields, MarginalConfigBase):
+class MarginalNAFConfig(MarginalConfigBase):
     """Marginal neural autoregressive flow.
 
     Args:
@@ -1071,16 +1094,21 @@ class MarginalNAFConfig(_ZukoMonotonicFields, MarginalConfigBase):
         signal: Number of signal features of the monotonic network.
     """
 
+    randperm: bool = False
+    signal: int = 16
+
     _WHICH_NF: ClassVar[str] = "NAF"
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class MarginalNCSFConfig(_ZukoSplineFields, MarginalConfigBase):
+class MarginalNCSFConfig(MarginalConfigBase):
     """Marginal neural circular spline flow.
 
     Args:
         bins: Number of bins of the spline transforms.
     """
+
+    bins: int = 10
 
     _WHICH_NF: ClassVar[str] = "NCSF"
 
@@ -1099,12 +1127,14 @@ class MarginalNICEConfig(MarginalConfigBase):
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class MarginalNSFConfig(_ZukoSplineFields, MarginalConfigBase):
+class MarginalNSFConfig(MarginalConfigBase):
     """Marginal neural spline flow.
 
     Args:
         bins: Number of bins of the spline transforms.
     """
+
+    bins: int = 10
 
     _WHICH_NF: ClassVar[str] = "NSF"
 
@@ -1125,13 +1155,16 @@ class MarginalSOSPFConfig(MarginalConfigBase):
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class MarginalUNAFConfig(_ZukoMonotonicFields, MarginalConfigBase):
+class MarginalUNAFConfig(MarginalConfigBase):
     """Marginal unconstrained neural autoregressive flow.
 
     Args:
         randperm: Whether features are randomly permuted between transforms.
         signal: Number of signal features of the monotonic network.
     """
+
+    randperm: bool = False
+    signal: int = 16
 
     _WHICH_NF: ClassVar[str] = "UNAF"
 
