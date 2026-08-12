@@ -9,6 +9,19 @@ from torch import Tensor, nn
 from sbi.neural_nets.embedding_nets.fully_connected import FCEmbedding
 
 
+def _validate_cnn_input_shape(x: Tensor, input_shape: Tuple) -> None:
+    """Validate a channel-first CNN input shape."""
+    trailing_shape = tuple(x.shape[1:])
+    valid_shapes = (input_shape,)
+    if input_shape[0] == 1:
+        valid_shapes += (input_shape[1:],)
+    if trailing_shape not in valid_shapes:
+        raise ValueError(
+            "Expected input with channels first and trailing shape "
+            f"in {valid_shapes}, but got {trailing_shape}."
+        )
+
+
 def calculate_filter_output_size(input_size, padding, dilation, kernel, stride) -> int:
     """Returns output size of a filter given filter arguments.
 
@@ -67,7 +80,7 @@ def get_new_cnn_output_size(
 
 
 class CNNEmbedding(nn.Module):
-    """Convolutional embedding network (1D or 2D convolutions)."""
+    """Convolutional embedding network with channel-first 1D or 2D inputs."""
 
     def __init__(
         self,
@@ -90,7 +103,9 @@ class CNNEmbedding(nn.Module):
         Allows usage of multiple (color) channels by passing in_channels > 1.
 
         Args:
-            input_shape: Dimensionality of input, e.g., (28,) for 1D, (28, 28) for 2D.
+            input_shape: Spatial input shape without batch or channel dimensions, e.g.,
+                (28,) for 1D or (28, 28) for 2D. Inputs must use channel-first
+                layout.
             in_channels: Number of image channels, default 1.
             out_channels_per_layer: Number of out convolutional out_channels for each
                 layer. Must match the number of layers passed below.
@@ -165,10 +180,11 @@ class CNNEmbedding(nn.Module):
     # Defining the forward pass
     def forward(self, x: Tensor) -> Tensor:
         batch_size = x.size(0)
+        _validate_cnn_input_shape(x, self.input_shape)
 
         # reshape to account for single channel data.
-        x = self.cnn_subnet(x.view(batch_size, *self.input_shape))
+        x = self.cnn_subnet(x.reshape(batch_size, *self.input_shape))
         # flatten for linear layers.
-        x = x.view(batch_size, -1)
+        x = x.reshape(batch_size, -1)
         x = self.linear_subnet(x)
         return x

@@ -172,6 +172,26 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "maf", "NPE")
 
 
+@pytest.mark.parametrize(
+    ("embedding_cls", "input_shape", "kwargs"),
+    [
+        (CNNEmbedding, (32, 32), {}),
+        (CausalCNNEmbedding, (64,), {"pool_kernel_size": 2}),
+    ],
+)
+def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
+    """CNN embeddings accept strided inputs and reject channel-last inputs."""
+    embedding_net = embedding_cls(input_shape, in_channels=3, **kwargs)
+    channel_last_input = torch.randn(4, *input_shape, 3)
+    non_contiguous_input = channel_last_input.movedim(-1, 1)
+
+    assert not non_contiguous_input.is_contiguous()
+    assert embedding_net(non_contiguous_input).shape == (4, 20)
+
+    with pytest.raises(ValueError, match="Expected input with channels first"):
+        embedding_net(channel_last_input)
+
+
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
 @pytest.mark.parametrize("num_layers", [2, 4])
 @pytest.mark.parametrize("num_hiddens", [32, 64])
