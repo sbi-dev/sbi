@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import pickle
 from typing import Callable, Tuple
 
 import numpy as np
@@ -20,8 +21,12 @@ from torch.distributions import (
 
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+)
+from sbi.inference.potentials.posterior_based_potential import (
+    posterior_estimator_based_potential,
 )
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MultivariateGaussianMDN,
@@ -289,29 +294,63 @@ def test_process_x(x, x_shape):
     process_x(x, x_shape)
 
 
-@pytest.mark.parametrize("check_finite_x", (True, False))
-def test_posterior_check_finite_x(check_finite_x: bool):
-    """`x_o` with NaNs must raise unless the user opts out via `check_finite_x`."""
-
+@pytest.fixture(scope="module")
+def trained_npe():
+    """A minimally trained NPE, shared by the `check_finite_x` tests."""
     prior = BoxUniform(zeros(2), ones(2))
     inference = NPE_C(prior=prior, show_progress_bars=False)
     theta = prior.sample((100,))
-    inference.append_simulations(theta, torch.randn(100, 2)).train(max_num_epochs=1)
+    estimator = inference.append_simulations(theta, torch.randn(100, 2)).train(
+        max_num_epochs=1
+    )
+    return prior, inference, estimator
 
+
+@pytest.mark.parametrize("check_finite_x", (True, False))
+def test_posterior_check_finite_x(check_finite_x: bool, trained_npe):
+    """`x_o` with NaNs must raise unless the user opts out via `check_finite_x`.
+
+    Covers both guarded paths: `set_default_x` and, via `log_prob(x=...)`,
+    `_x_else_default_x`.
+    """
+    prior, inference, _ = trained_npe
     posterior = inference.build_posterior(
         posterior_parameters=DirectPosteriorParameters(check_finite_x=check_finite_x)
     )
     x_with_nan = torch.tensor([0.0, float("nan")])
 
     if check_finite_x:
-        # Both the default-x and the per-call path must be guarded.
         with pytest.raises(ValueError, match="NaN/Inf"):
             posterior.set_default_x(x_with_nan)
         with pytest.raises(ValueError, match="NaN/Inf"):
-            posterior.log_prob(theta[:2], x=x_with_nan)
+            posterior.log_prob(prior.sample((2,)), x=x_with_nan)
     else:
         posterior.set_default_x(x_with_nan)
         assert posterior.default_x.isnan().any()
+
+
+def test_check_finite_x_on_preconditioned_potential(trained_npe):
+    """`x_o` passed to the potential builder (#573) must be checked too."""
+    prior, _, estimator = trained_npe
+    potential_fn, theta_transform = posterior_estimator_based_potential(
+        estimator, prior, x_o=torch.tensor([[0.0, float("nan")]])
+    )
+
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        MCMCPosterior(potential_fn, theta_transform=theta_transform, proposal=prior)
+
+
+def test_posterior_unpickles_without_check_finite_x(trained_npe):
+    """Posteriors pickled before `check_finite_x` existed must still load."""
+    _, inference, _ = trained_npe
+    state = inference.build_posterior().__getstate__().copy()
+    del state["_check_finite_x"]
+
+    restored = DirectPosterior.__new__(DirectPosterior)
+    restored.__setstate__(pickle.loads(pickle.dumps(state)))
+
+    assert restored._check_finite_x
+    restored.set_default_x(torch.zeros(1, 2))
 
 
 @pytest.mark.parametrize(

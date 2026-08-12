@@ -82,7 +82,10 @@ class NeuralPosterior:
         # If the sampler interface (#573) is used, the user might have passed `x_o`
         # already to the potential function builder. If so, this `x_o` will be used
         # as default x.
-        self._x = self.potential_fn.return_x_o()
+        x_o = self.potential_fn.return_x_o()
+        if x_o is not None and self._check_finite_x:
+            assert_all_finite(x_o, "Observed data x_o")
+        self._x = x_o
 
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
@@ -343,4 +346,6 @@ class NeuralPosterior:
         Args:
             state_dict: State to be restored.
         """
+        # Posteriors pickled before `check_finite_x` was introduced carry no such key.
+        state_dict.setdefault("_check_finite_x", True)
         self.__dict__ = state_dict
