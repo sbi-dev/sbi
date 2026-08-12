@@ -13,7 +13,7 @@ from sbi.inference.potentials.base_potential import BasePotential, CustomPotenti
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -81,6 +81,7 @@ class RejectionPosterior(NeuralPosterior):
         Args:
             device: The device to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
@@ -200,6 +201,7 @@ class RejectionPosterior(NeuralPosterior):
             samples, _ = rejection_sample(
                 potential,
                 proposal=self.proposal,
+                theta_transform=self.theta_transform,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 warn_acceptance=0.01,

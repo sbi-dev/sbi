@@ -6,7 +6,7 @@ import torch
 from torch import Tensor, eye, norm, ones, zeros
 from torch.distributions import MultivariateNormal, biject_to
 
-from sbi.inference import MCABC, SMC
+from sbi.inference import MCABC, SMCABC
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -97,7 +97,7 @@ def test_smcabc_performance(prior_type: str, algorithm_variant: str, kernel: str
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SMC(
+    infer = SMCABC(
         simulator,
         prior,
         distance="l2",
@@ -216,7 +216,7 @@ def _fast_smcabc_test(**kwargs):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SMC(
+    infer = SMCABC(
         simulator,
         prior,
         distance=defaults["distance"],

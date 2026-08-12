@@ -2,7 +2,9 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from typing import Literal, Optional, Sequence, Union
+import warnings
+from dataclasses import dataclass
+from typing import Any, Literal, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
@@ -15,8 +17,13 @@ from sbi.neural_nets.estimators.score_estimator import (
     VEScoreEstimator,
     VPScoreEstimator,
 )
+from sbi.neural_nets.net_builders.estimator_configs import (
+    VF_MODELS,
+    _EstimatorBuilderBase,
+)
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
+    assert_transform_to_unconstrained_supported,
     standardizing_net,
     z_score_parser,
     z_standardization,
@@ -25,13 +32,113 @@ from sbi.utils.user_input_checks import check_data_device
 from sbi.utils.vector_field_utils import VectorFieldNet
 
 
-# ==================== Building Flow/Score Matching Estimators =========================
+@dataclass(frozen=True, eq=False, repr=False)
+class _VectorFieldBaseConfig(_EstimatorBuilderBase):
+    """Shared configuration fields for all vector field estimator builders.
+
+    Inherits ``to_dict()`` from ``_EstimatorBuilderBase``.
+    Defaults are ``None`` so that only explicitly-set fields are forwarded — the
+    actual default values live in the estimator / network constructors.
+    """
+
+    # Network architecture extras (shared)
+    activation: Optional[Any] = None
+    sinusoidal_max_freq: Optional[float] = None
+    fourier_scale: Optional[float] = None
+
+    # Apply a per-dimension boundary affine around the vector-field estimator.
+    compose_standardization: Optional[bool] = None
+
+    # MLP-specific
+    layer_norm: Optional[bool] = None
+    skip_connections: Optional[bool] = None
+
+    # AdaMLP-specific
+    condition_emb_dim: Optional[int] = None
+    num_intermediate_mlp_layers: Optional[int] = None
+    adamlp_ratio: Optional[int] = None
+
+    # Transformer-specific
+    is_x_emb_seq: Optional[bool] = None
+
+    # Params that are explicit in build_vector_field_estimator but may be
+    # passed through **kwargs at the factory level
+    net: Optional[Any] = None
+    z_score_x: Optional[Any] = None
+    z_score_y: Optional[Any] = None
+    hidden_features: Optional[Any] = None
+    num_layers: Optional[int] = None
+    time_embedding_dim: Optional[int] = None
+    num_heads: Optional[int] = None
+    mlp_ratio: Optional[int] = None
+    embedding_net: Optional[Any] = None
+    time_emb_type: Optional[str] = None
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class ScoreEstimatorConfig(_VectorFieldBaseConfig):
+    """Configuration for score-matching estimator builders (NPSE).
+
+    Extends the base config with SDE-specific parameters for VE, VP, and SubVP
+    noise schedules.  Unknown parameters raise ``TypeError`` on direct
+    construction but are warned-and-forwarded via ``from_kwargs()``.
+    """
+
+    # VE schedule params (Karras et al. 2022)
+    train_schedule: Optional[Literal["uniform", "lognormal"]] = None
+    solve_schedule: Optional[Literal["uniform", "power_law"]] = None
+    sigma_min: Optional[float] = None
+    sigma_max: Optional[float] = None
+    lognormal_mean: Optional[float] = None
+    lognormal_std: Optional[float] = None
+    power_law_exponent: Optional[float] = None
+
+    # VP / SubVP params
+    beta_min: Optional[float] = None
+    beta_max: Optional[float] = None
+
+    # Note: ``sde_type`` and ``estimator_type`` are intentionally absent.
+    # They are consumed at the factory level (``posterior_score_nn``) before
+    # config construction and are not forwarded through the config.
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class FlowEstimatorConfig(_VectorFieldBaseConfig):
+    """Configuration for flow-matching estimator builders (FMPE).
+
+    Currently identical to the base config.  Unknown parameters raise
+    ``TypeError`` on direct construction but are warned-and-forwarded
+    via ``from_kwargs()``.
+    """
+
+    gaussian_baseline: Optional[bool] = None
+
+
+def _compute_theta_standardization(
+    batch_x: Tensor,
+    z_score_x: Optional[str],
+    compose_standardization: bool,
+):
+    """Return internal normalization and optional boundary-affine statistics."""
+    if compose_standardization:
+        shift, scale = z_standardization(batch_x, structured_dims=False)
+        scale = scale.clamp_min(1e-20)
+        return torch.zeros_like(shift), torch.ones_like(scale), shift, scale
+
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
+        mean_0, std_0 = z_standardization(batch_x, structured_x)
+    else:
+        mean_0, std_0 = 0, 1
+    return mean_0, std_0, None, None
+
+
 def build_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
     estimator_type: Literal["flow", "score"] = "flow",
-    z_score_x: Optional[str] = None,
-    z_score_y: Optional[str] = None,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     embedding_net: nn.Module = nn.Identity(),
     sde_type: str = "ve",  # Only used for score estimator
     hidden_features: Union[Sequence[int], int] = 100,
@@ -39,10 +146,9 @@ def build_vector_field_estimator(
     num_layers: int = 5,
     num_heads: int = 10,
     mlp_ratio: int = 4,
-    net: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-        VectorFieldNet,
-    ] = "mlp",
+    net: Union[VF_MODELS, VectorFieldNet] = "mlp",
+    gaussian_baseline: bool = False,
+    compose_standardization: bool = False,
     **kwargs,
 ) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
     """Builds a vector field estimator (flow matching or score matching) with the given
@@ -63,9 +169,19 @@ def build_vector_field_estimator(
         num_heads: Number of attention heads per block (for transformer).
         mlp_ratio: Ratio for MLP hidden dimension (for transformer).
         net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
-            "transformer_cross_attention" or a custom network following the
-            VectorFieldNet protocol.
-        **kwargs: Additional arguments for the network.
+            "transformer_cross_attn" or a custom network following the
+            VectorFieldNet protocol. ``"transformer_cross_attn"`` requires
+            sequence-shaped conditioning (3-D ``batch_y`` or an ``embedding_net``
+            that returns ``(batch, seq_len, emb_dim)``).
+        gaussian_baseline: If True, use analytical Gaussian baseline velocity
+            derived from Bayes' rule. The network then only learns the residual.
+            Only used when estimator_type="flow". Defaults to False.
+        compose_standardization: Whether to train and sample in per-dimension
+            standardized theta coordinates. Defaults to False.
+        **kwargs: Additional arguments forwarded to the estimator and network
+            constructors.  Valid keys are defined by ``ScoreEstimatorConfig``
+            and ``FlowEstimatorConfig``; validation happens in the upstream
+            factory functions (``posterior_score_nn`` / ``posterior_flow_nn``).
 
     Returns:
         A vector field estimator (either FlowMatchingEstimator or
@@ -73,6 +189,12 @@ def build_vector_field_estimator(
     """
     # Check inputs and device
     check_data_device(batch_x, batch_y)
+    assert_transform_to_unconstrained_supported(
+        z_score_x,
+        "build_vector_field_estimator",
+        "Vector field estimators (flow matching / score matching) do not implement "
+        "it; use one of 'none', 'independent', or 'structured' instead.",
+    )
 
     # Build network if not provided
     if net == "mlp":
@@ -107,11 +229,13 @@ def build_vector_field_estimator(
             embedding_net=embedding_net,
             **kwargs,
         )
-    elif net == "transformer":
+    elif net in ("transformer", "transformer_cross_attn"):
         # For transformer, hidden_features must be an int
         hidden_features_int = (
             hidden_features if isinstance(hidden_features, int) else hidden_features[0]
         )
+        # Let an explicit kwarg win; fall back to deriving from net name.
+        is_x_emb_seq = kwargs.pop("is_x_emb_seq", net == "transformer_cross_attn")
         vectorfield_net = build_transformer_network(
             batch_x=batch_x,
             batch_y=batch_y,
@@ -121,6 +245,7 @@ def build_vector_field_estimator(
             mlp_ratio=mlp_ratio,
             time_embedding_dim=time_embedding_dim,
             embedding_net=embedding_net,
+            is_x_emb_seq=is_x_emb_seq,
             **kwargs,
         )
     else:
@@ -129,12 +254,9 @@ def build_vector_field_estimator(
         else:
             raise ValueError(f"Unknown architecture: {net}")
 
-    # Z-score setup
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
-        mean_0, std_0 = z_standardization(batch_x, structured_x)
-    else:
-        mean_0, std_0 = 0, 1
+    mean_0, std_0, compose_shift, compose_scale = _compute_theta_standardization(
+        batch_x, z_score_x, compose_standardization
+    )
 
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
     embedding_net_y = (
@@ -143,12 +265,31 @@ def build_vector_field_estimator(
         else embedding_net
     )
 
+    def _wire_compose(estimator):
+        """Attach and validate the boundary affine."""
+        if compose_shift is not None and compose_scale is not None:
+            shift = compose_shift.reshape(1, *estimator.input_shape).float()
+            scale = compose_scale.reshape(1, *estimator.input_shape).float()
+            estimator._theta_shift.copy_(shift)
+            estimator._theta_scale.copy_(scale)
+            estimator._compose_standardization.fill_(True)
+        estimator._check_compose_internal_stats_unit()
+        baseline_check = getattr(estimator, "_check_compose_baseline_compatible", None)
+        if baseline_check is not None:
+            baseline_check()
+        return estimator
+
     if estimator_type == "flow":
-        return FlowMatchingEstimator(
-            net=vectorfield_net,
-            input_shape=batch_x[0].shape,
-            condition_shape=batch_y[0].shape,
-            embedding_net=embedding_net_y,
+        return _wire_compose(
+            FlowMatchingEstimator(
+                net=vectorfield_net,
+                input_shape=batch_x[0].shape,
+                condition_shape=batch_y[0].shape,
+                embedding_net=embedding_net_y,
+                mean_0=mean_0,
+                std_0=std_0,
+                gaussian_baseline=gaussian_baseline,
+            )
         )
     elif estimator_type == "score":
         # Choose the appropriate score estimator based on SDE type
@@ -161,13 +302,35 @@ def build_vector_field_estimator(
         else:
             raise ValueError(f"Unknown SDE type: {sde_type}")
 
-        return estimator_cls(
-            net=vectorfield_net,
-            input_shape=batch_x[0].shape,
-            condition_shape=batch_y[0].shape,
-            embedding_net=embedding_net_y,
-            mean_0=mean_0,
-            std_0=std_0,
+        # Extract estimator-specific kwargs based on SDE type
+        estimator_kwargs = {}
+        if sde_type == "ve":
+            # VE-specific parameters: sigma bounds and EDM-style schedules
+            ve_keys = [
+                "sigma_min",
+                "sigma_max",
+                "train_schedule",
+                "solve_schedule",
+                "lognormal_mean",
+                "lognormal_std",
+                "power_law_exponent",
+            ]
+            estimator_kwargs = {k: kwargs[k] for k in ve_keys if k in kwargs}
+        elif sde_type in ("vp", "subvp"):
+            # VP/SubVP-specific beta parameters
+            vp_keys = ["beta_min", "beta_max"]
+            estimator_kwargs = {k: kwargs[k] for k in vp_keys if k in kwargs}
+
+        return _wire_compose(
+            estimator_cls(
+                net=vectorfield_net,
+                input_shape=batch_x[0].shape,
+                condition_shape=batch_y[0].shape,
+                embedding_net=embedding_net_y,
+                mean_0=mean_0,
+                std_0=std_0,
+                **estimator_kwargs,
+            )
         )
     else:
         raise ValueError(f"Unknown estimator type: {estimator_type}")
@@ -175,10 +338,24 @@ def build_vector_field_estimator(
 
 # For backward compatibility
 def build_flow_matching_estimator(*args, **kwargs):
+    warnings.warn(
+        "`build_flow_matching_estimator` is deprecated since sbi v0.27.0 and will "
+        "be removed in v0.28.0. Use "
+        "`build_vector_field_estimator(..., estimator_type='flow')` instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
     return build_vector_field_estimator(*args, estimator_type="flow", **kwargs)
 
 
 def build_score_matching_estimator(*args, **kwargs):
+    warnings.warn(
+        "`build_score_matching_estimator` is deprecated since sbi v0.27.0 and will "
+        "be removed in v0.28.0. Use "
+        "`build_vector_field_estimator(..., estimator_type='score')` instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
     return build_vector_field_estimator(*args, estimator_type="score", **kwargs)
 
 
@@ -1105,7 +1282,7 @@ def build_standard_mlp_network(
     activation: type[nn.Module] = nn.GELU,
     layer_norm: bool = True,
     skip_connections: bool = True,
-    time_emb_type: str = "random_fourier",
+    time_emb_type: str = "sinusoidal",
     sinusoidal_max_freq: float = 1000.0,
     fourier_scale: float = 30.0,
     **kwargs,

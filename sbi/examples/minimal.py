@@ -3,7 +3,7 @@
 
 import torch
 
-from sbi.inference import SNPE, infer, simulate_for_sbi
+from sbi.inference import NPE_C, infer, simulate_for_sbi
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils.user_input_checks import (
     process_prior,
@@ -22,7 +22,7 @@ def simple():
         loc=prior_mean, covariance_matrix=prior_cov
     )
     posterior = infer(
-        diagonal_linear_gaussian, prior, "snpe", num_simulations=500, num_workers=1
+        diagonal_linear_gaussian, prior, "npe_c", num_simulations=500, num_workers=1
     )
     posterior.sample((100,), x=x_o)
 
@@ -43,7 +43,7 @@ def flexible():
     prior, _, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
-    inference = SNPE(prior)
+    inference = NPE_C(prior)
 
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=500)
     density_estimator = inference.append_simulations(theta, x).train()

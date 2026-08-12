@@ -8,7 +8,6 @@ from typing import Callable, Tuple
 import numpy as np
 import pytest
 import torch
-from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import (
     Beta,
@@ -23,6 +22,9 @@ from sbi.inference import NPE, NPE_A, NPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+)
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MultivariateGaussianMDN,
 )
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
@@ -109,6 +111,11 @@ torch.set_default_dtype(torch.float32)
             Exponential(torch.tensor([3.0])),
             dict(),
         ),
+        (
+            OneDimPriorWrapper,
+            Exponential(torch.tensor([3.0])),
+            dict(validate_args=True),
+        ),
     ),
 )
 def test_prior_wrappers(wrapper, prior, kwargs):
@@ -136,6 +143,60 @@ def test_prior_wrappers(wrapper, prior, kwargs):
 
     # For 1D priors, the `log_prob()` should not have a batch dim.
     assert len(prior.log_prob(prior.sample((10,))).shape) == 1
+
+
+def test_multiple_independent_sets_validation_per_instance():
+    """`validate_args` must configure the members, not torch's global default."""
+    default = torch.distributions.Distribution._validate_args
+    prior = MultipleIndependent(
+        [Gamma(ones(1), ones(1)), BoxUniform(zeros(1), ones(1))],
+        validate_args=True,
+    )
+
+    assert torch.distributions.Distribution._validate_args is default
+    assert prior._validate_args
+    assert all(d._validate_args for d in prior.dists)
+    assert prior.dists[1].base_dist._validate_args
+
+
+@pytest.mark.parametrize(
+    "build",
+    (
+        lambda: MultipleIndependent(
+            [Gamma(ones(1), ones(1)), Beta(2 * ones(1), 2 * ones(1))],
+            validate_args=False,
+        ),
+        lambda: OneDimPriorWrapper(Exponential(3 * ones(1)), validate_args=False),
+    ),
+    ids=("MultipleIndependent", "OneDimPriorWrapper"),
+)
+def test_validate_args_false_survives_a_polluted_global(build):
+    """MCMC evaluates out-of-support and NaN values and needs `log_prob` not to raise.
+
+    These wrappers delegate `log_prob`, so the members must carry the setting too.
+    """
+    default = torch.distributions.Distribution._validate_args
+    try:
+        torch.distributions.Distribution._validate_args = True
+        prior = build()
+        bad = torch.full((1, prior.sample().numel()), float("nan"))
+
+        assert prior.log_prob(bad).isnan().all()
+        # Turning the global off would silence the raise too, so pin it untouched.
+        assert torch.distributions.Distribution._validate_args
+    finally:
+        torch.distributions.Distribution._validate_args = default
+
+
+def test_one_dim_wrapper_constructs_with_validation_on():
+    """The wrapper must construct and honour `validate_args=True`.
+
+    Torch reads `arg_constraints` during `__init__`, which dereferences `self.prior`.
+    """
+    prior = OneDimPriorWrapper(Exponential(torch.tensor([3.0])), validate_args=True)
+
+    assert prior._validate_args
+    assert prior.log_prob(prior.sample((3,))).shape == (3,)
 
 
 def test_reinterpreted_batch_dim_prior():
@@ -400,25 +461,8 @@ def test_inference_with_user_sbi_problems(
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
     x_o = torch.zeros(x.shape[1])
-    posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=2)
-
-    # Build posterior.
-    if snpe_method == NPE_A:
-        if not isinstance(prior, (MultivariateNormal, BoxUniform, DirectPosterior)):
-            with pytest.raises(AssertionError):
-                # NPE-A does not support priors yet.
-                posterior_estimator = inference.correct_for_proposal()
-                _ = DirectPosterior(
-                    posterior_estimator=posterior_estimator, prior=prior
-                ).set_default_x(x_o)
-        else:
-            _ = DirectPosterior(
-                posterior_estimator=posterior_estimator, prior=prior
-            ).set_default_x(x_o)
-    else:
-        _ = DirectPosterior(
-            posterior_estimator=posterior_estimator, prior=prior
-        ).set_default_x(x_o)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+    inference.build_posterior().set_default_x(x_o)
 
 
 @pytest.mark.parametrize(
@@ -644,3 +688,21 @@ def test_simulate_for_sbi(
             assert x.shape[0] == num_simulations, "x should have num_simulations rows"
             assert theta.shape[1] == num_dim, "Theta should have num_dim columns"
             assert x.shape[1] == num_dim, "x should have num_dim columns"
+
+
+def test_proposal_sharing_weights_with_trainer_raises():
+    """Test that using proposal without deepcopy raises ValueError."""
+
+    prior = BoxUniform(low=zeros(2), high=ones(2))
+    inference = NPE_C(prior=prior)
+    theta = prior.sample((10,))
+    x = theta + torch.randn_like(theta) * 0.1
+    inference.append_simulations(theta, x)
+
+    net_reference = inference.train(max_num_epochs=1, show_train_summary=False)
+
+    unsafe_proposal = DirectPosterior(posterior_estimator=net_reference, prior=prior)
+    unsafe_proposal.set_default_x(x[0])
+
+    with pytest.raises(ValueError, match="same object"):
+        inference.append_simulations(theta, x, proposal=unsafe_proposal)

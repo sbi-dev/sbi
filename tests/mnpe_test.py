@@ -152,7 +152,13 @@ def test_batched_sampling(num_simulations: int = 100):
 @pytest.mark.parametrize("flow_model", ("mdn", "nsf", "zuko_nsf"))
 @pytest.mark.parametrize("z_score_x", ("independent", "none"))
 @pytest.mark.parametrize("embedding_net", (torch.nn.Identity(), FCEmbedding(1, 1)))
-def test_mnpe_api(flow_model: str, z_score_x: str, embedding_net: nn.Module):
+@pytest.mark.parametrize("dropout_probability", (0.0, 0.5))
+def test_mnpe_api(
+    flow_model: str,
+    z_score_x: str,
+    embedding_net: nn.Module,
+    dropout_probability: float,
+):
     """Test MNPE API."""
 
     # Generate data
@@ -176,6 +182,7 @@ def test_mnpe_api(flow_model: str, z_score_x: str, embedding_net: nn.Module):
         z_score_x=z_score_x,
         embedding_net=embedding_net,
         log_transform_x=False,
+        dropout_probability=dropout_probability,
     )
     trainer = MNPE(density_estimator=density_estimator)
     trainer.append_simulations(theta, x).train(max_num_epochs=1)

@@ -17,12 +17,11 @@ from typing import (
     Union,
 )
 
+import nflows.transforms as nflows_tf
 import numpy as np
-import pyknos.nflows.transforms as nflows_tf
 import torch
 import torch.distributions.transforms as torch_tf
 import zuko
-from pyro.distributions import Empirical
 from torch import Tensor, ones, zeros
 from torch import nn as nn
 from torch.distributions import (
@@ -37,49 +36,91 @@ from torch.optim.adam import Adam
 from sbi.sbi_types import TorchTransform
 
 
-def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
-    """Raise warning if z-scoring would create duplicate data points.
+def warn_if_invalid_for_zscoring(
+    x: Tensor,
+    outlier_iqr_factor: float = 10.0,
+) -> None:
+    """Warn if data has properties that may cause issues during z-scoring.
+
+    This function checks for:
+    1. Constant features (zero standard deviation) which would cause NaN
+    2. Extreme outliers which may cause precision loss during z-scoring
+
+    Extreme outliers are detected using a robust IQR-based method: values more than
+    `outlier_iqr_factor * IQR` away from the quartiles are considered extreme.
+    This is robust because IQR is not affected by the outliers themselves.
 
     Args:
-        x: Simulated data.
-        duplicate_tolerance: Tolerated proportion of duplicates after z-scoring.
+        x: Data tensor of shape (num_samples, *features). For >2D tensors, features
+            are flattened for checking.
+        outlier_iqr_factor: Factor for IQR-based outlier detection. Values beyond
+            Q1 - factor*IQR or Q3 + factor*IQR are considered extreme outliers.
+            Default 10.0 (very conservative; standard is 1.5-3.0).
+
+    Example:
+        >>> x_normal = torch.randn(1000, 2)
+        >>> warn_if_invalid_for_zscoring(x_normal)  # No warning
+        >>> x_outlier = torch.randn(1000, 2)
+        >>> x_outlier[0, 0] = 1000.0  # Add extreme outlier
+        >>> warn_if_invalid_for_zscoring(x_outlier)  # Warns about dimension 0
     """
+    # Flatten to 2D (N, D) for tensors with >2 dimensions (e.g., images)
+    if x.ndim > 2:
+        x = x.flatten(start_dim=1)
 
-    # Count unique xs.
-    num_unique = torch.unique(x, dim=0).numel()
-
-    # Check we do have different data in the batch
-    if num_unique == 1:
+    # Handle edge case of single sample
+    if x.shape[0] <= 1:
         warnings.warn(
-            "Beware that there is only a single unique element in the simulated data. "
-            "If this is intended, make sure to set `z_score_x='none'` as z-scoring "
-            "would result in NaNs",
+            "Only one data sample provided. Z-scoring requires multiple samples "
+            "to compute meaningful statistics. Consider adding more simulations.",
             UserWarning,
             stacklevel=2,
         )
-
-        # Skip computation.
         return
-    else:
-        # z-score.
-        zx = (x - x.mean(0)) / x.std(0)
 
-        # Count again and warn on too many new duplicates.
-        num_unique_z = torch.unique(zx, dim=0).numel()
+    std = x.std(0)
 
-        if num_unique_z < num_unique * (1 - duplicate_tolerance):
-            warnings.warn(
-                f"Z-scoring these simulation outputs resulted in {num_unique_z} unique "
-                f"datapoints. Before z-scoring, it had been {num_unique}. This can "
-                "occur due to numerical inaccuracies when the data covers a large "
-                "range of values. Consider either setting `z_score_x=False` (but "
-                "beware that this can be problematic for training the NN) or exclude "
-                "outliers from your dataset. Note: if you have already set "
-                "`z_score_x=False`, this warning will still be displayed, but you can"
-                " ignore it.",
-                UserWarning,
-                stacklevel=2,
-            )
+    # Check for constant features (zero std)
+    constant_dims = torch.where(std < 1e-14)[0]
+    if len(constant_dims) > 0:
+        warnings.warn(
+            f"Data has constant values in dimension(s) {constant_dims.tolist()}. "
+            "These dimensions carry no information and will be mapped to zero after "
+            "z-scoring. Consider removing constant features from your data.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return  # Skip outlier check if there are constant features
+
+    # Check for extreme outliers using IQR-based detection (robust to outliers)
+    q1, q3 = torch.quantile(
+        x, torch.tensor([0.25, 0.75], device=x.device, dtype=x.dtype), dim=0
+    )
+    iqr = q3 - q1
+
+    # For dimensions with zero IQR (e.g., discrete data), skip outlier check
+    valid_iqr = iqr > 1e-14
+    if not valid_iqr.any():
+        return
+
+    lower_bound = q1 - outlier_iqr_factor * iqr
+    upper_bound = q3 + outlier_iqr_factor * iqr
+
+    # Vectorized outlier detection across all dimensions
+    is_outlier = (x < lower_bound) | (x > upper_bound)  # (N, D)
+    has_outlier_per_dim = is_outlier.any(dim=0)  # (D,)
+    outlier_dims = torch.where(has_outlier_per_dim & valid_iqr)[0].tolist()
+
+    if outlier_dims:
+        warnings.warn(
+            f"Data has extreme outliers in dimension(s) {outlier_dims} "
+            f"(beyond {outlier_iqr_factor}x IQR from quartiles). "
+            "This may cause precision loss during z-scoring, where distinct values "
+            "become indistinguishable. Consider removing outliers from your data "
+            "or setting `z_score_x='none'` (though this may affect training).",
+            UserWarning,
+            stacklevel=2,
+        )
 
 
 def x_shape_from_simulation(batch_x: Tensor) -> torch.Size:
@@ -126,17 +167,7 @@ def z_score_parser(
     Returns:
         Flag for whether or not to z-score, and whether data is structured
     """
-    if isinstance(z_score_flag, bool):
-        # Raise warning if boolean was passed.
-        warnings.warn(
-            "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
-            "removed in a future release. Use 'none', 'independent', or 'structured' "
-            "to indicate z-scoring option.",
-            stacklevel=2,
-        )
-        z_score_bool, structured_data = z_score_flag, False
-
-    elif (z_score_flag is None) or (z_score_flag == "none"):
+    if (z_score_flag is None) or (z_score_flag == "none"):
         # Return Falses if "none" or None was passed.
         z_score_bool, structured_data = False, False
 
@@ -156,6 +187,39 @@ def z_score_parser(
         )
 
     return z_score_bool, structured_data
+
+
+def assert_transform_to_unconstrained_supported(
+    z_score_x: Optional[str],
+    builder_name: str,
+    suggestion: str,
+) -> None:
+    """Raise whenever ``z_score_x == "transform_to_unconstrained"``.
+
+    This is a guard to be called from builders that do *not* implement the
+    ``transform_to_unconstrained`` option; it unconditionally raises when the flag is
+    set, so the caller is responsible for only invoking it from such builders.
+
+    The ``transform_to_unconstrained`` z-scoring option derives a bijection from the
+    prior's support (rather than batch statistics) and is only implemented for the
+    conditional Zuko builders. For the other builders, ``z_score_parser`` returns
+    ``(False, False)`` for this flag, which would otherwise make the option a silent
+    no-op (the model is built with no reparametrization at all). This guard turns that
+    silent no-op into a clear error.
+
+    Args:
+        z_score_x: The z-scoring option passed by the user.
+        builder_name: Name of the calling builder, for the error message.
+        suggestion: Builder-specific hint on what to use instead.
+
+    Raises:
+        ValueError: If ``z_score_x == "transform_to_unconstrained"``.
+    """
+    if z_score_x == "transform_to_unconstrained":
+        raise ValueError(
+            f"`z_score_x='transform_to_unconstrained'` is not supported by "
+            f"`{builder_name}`. {suggestion}"
+        )
 
 
 def standardizing_transform(
@@ -212,14 +276,81 @@ def standardizing_transform_zuko(
     )
 
 
-class CallableTransform:
-    """Wraps a PyTorch Transform to be used in Zuko UnconditionalTransform."""
+def _patch_inverse_transform_pickling() -> None:
+    """Keep ``_inv`` when pickling ``_InverseTransform`` (pytorch/pytorch#191197).
 
-    def __init__(self, transform):
-        self.transform = transform
+    ``Transform.__getstate__`` clears ``_inv`` as a reciprocal cache, but
+    ``_InverseTransform`` stores its wrapped transform there, so pickling it yields
+    ``Inverse(None)``. Applied at import since ``__getstate__`` runs when writing.
+    """
+    if "__getstate__" in torch_tf._InverseTransform.__dict__:
+        return
 
-    def __call__(self):
+    def __getstate__(self) -> Dict[str, Any]:
+        return self.__dict__.copy()  # Keep `_inv`: wrapped transform, not a cache.
+
+    torch_tf._InverseTransform.__getstate__ = __getstate__
+
+
+_patch_inverse_transform_pickling()
+
+
+def _contains_inverse_transform(transform: TorchTransform) -> bool:
+    """Return whether a transform tree contains an inverse wrapper."""
+    seen = set()
+
+    def contains_inverse(current: TorchTransform) -> bool:
+        if id(current) in seen:
+            return False
+        seen.add(id(current))
+        if isinstance(current, torch_tf._InverseTransform):
+            return True
+        for key, value in current.__dict__.items():
+            if key == "_inv":
+                continue
+            if isinstance(value, TorchTransform) and contains_inverse(value):
+                return True
+            if isinstance(value, (list, tuple)) and any(
+                isinstance(item, TorchTransform) and contains_inverse(item)
+                for item in value
+            ):
+                return True
+        return False
+
+    return contains_inverse(transform)
+
+
+class CallableTransform(nn.Module):
+    """Own a PyTorch transform as a movable, picklable module.
+
+    Transform tensors are intentionally absent from ``state_dict``; callers rebuild
+    the transform before loading estimator weights.
+    """
+
+    def __init__(self, transform: TorchTransform):
+        super().__init__()
+        self._is_inverse = _contains_inverse_transform(transform)
+        self._transform = transform.inv if self._is_inverse else transform
+        if not isinstance(
+            self._transform, TorchTransform
+        ) or _contains_inverse_transform(self._transform):
+            raise ValueError(
+                "CallableTransform requires one transform orientation without "
+                "nested inverse wrappers."
+            )
+
+    @property
+    def transform(self) -> TorchTransform:
+        """Return the transform in the orientation supplied at construction."""
+        return self._transform.inv if self._is_inverse else self._transform
+
+    def forward(self) -> TorchTransform:
         return self.transform
+
+    def _apply(self, fn):
+        super()._apply(fn)
+        _apply_to_transform(self._transform, fn)
+        return self
 
 
 def biject_transform_zuko(
@@ -412,7 +543,7 @@ def npe_msg_on_invalid_x(
         else:
             logging.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "They are not excluded from training due to `exclude_invalid_x=False`. "
                 "Training will likely fail, we strongly recommend "
                 f"`exclude_invalid_x=True` for {algorithm}."
             )
@@ -421,18 +552,18 @@ def npe_msg_on_invalid_x(
 def nle_nre_apt_msg_on_invalid_x(
     num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
 ) -> None:
-    """Warn or raise if there are NaNs or Infs, appropriate to SNLE, SNRE, or APT.
+    """Warn or raise on NaNs or Infs, for NLE, NRE, or atomic NPE-C.
 
     This will raise an error in the default case of `exclude_invalid_x=False` since
-    SNLE/SNRE/APT do not allow to discard invalid simulations (Glöckler et al. 2021).
-    If `exclude_invalid_x` has explicitly been set to `True` by the user, this
+    NLE/NRE/atomic NPE-C do not allow to discard invalid simulations (Glöckler et al.
+    2021). If `exclude_invalid_x` has explicitly been set to `True` by the user, this
     function will give a warning about the systematic error.
     """
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
             logging.warning(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"These will be discarded from training due to "
                 f"`exclude_invalid_x=True`. Please be aware that this gives "
                 f"systematically wrong results for {algorithm} and is only recommended "
@@ -440,46 +571,10 @@ def nle_nre_apt_msg_on_invalid_x(
             )
         else:
             raise ValueError(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
-                f"{algorithm} does not allow invalid simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                f"{algorithm} does not allow invalid simulations. "
                 f"Replace the invalid values with an unreasonably low or high value."
             )
-
-
-def check_warn_and_setstate(
-    state_dict: Dict,
-    key_name: str,
-    replacement_value: Any,
-    warning_msg: str = "",
-) -> Tuple[Dict, str]:
-    """
-    Check if `key_name` is in `state_dict` and add it if not.
-
-    If the key already existed in the `state_dict`, the dictionary remains
-    unaltered. This function also appends to a warning string.
-
-    For developers: The reason that this method only appends to a warning string
-    instead of warning directly is that the user might get multiple very similar
-    warnings if multiple attributes had to be replaced. Thus, we start off with an
-    emtpy string and keep appending all missing attributes. Then, in the end,
-    all attributes are displayed along with a full description of the warning.
-
-    Args:
-        attribute_name: The name of the attribute to check.
-        state_dict: The dictionary to search (and write to if the key does not yet
-            exist).
-        replacement_value: The value to be written to the `state_dict`.
-        warning_msg: String to which the warning message should be appended to.
-
-    Returns:
-        A dictionary which contains the key `attribute_name` and a string with an
-        appended warning message.
-    """
-
-    if key_name not in state_dict:
-        state_dict[key_name] = replacement_value
-        warning_msg += " `self." + key_name + f" = {str(replacement_value)}`"
-    return state_dict, warning_msg
 
 
 def get_simulations_since_round(
@@ -598,7 +693,7 @@ def check_dist_class(
     """Returns whether the `dist` is instance of `class_to_check`.
 
     The dist can be hidden in an Independent distribution, a Boxuniform or in a wrapper.
-    E.g., when the user called `prepare_for_sbi`, the distribution will in fact be a
+    E.g., when the user called `process_prior`, the distribution will in fact be a
     `PytorchReturnTypeWrapper`. Thus, we need additional checks.
 
     Args:
@@ -639,9 +734,9 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
     checking whether the log-probabilty is not `-inf` will not work because, as of
     torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
-    sample is out of the support (see #451). In `prepare_for_sbi()`, we set
+    sample is out of the support (see #451). In `process_prior()`, we set
     `validate_args=False`. This would take care of this, but requires running
-    `prepare_for_sbi()` and otherwise throws a cryptic error.
+    `process_prior()` and otherwise throws a cryptic error.
 
     Args:
         distribution: Distribution under which to evaluate the `samples`, e.g., a
@@ -735,6 +830,37 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
     ])
 
     return theta_repeated, x_repeated
+
+
+def _apply_to_transform(
+    transform: TorchTransform, fn: Callable[[Tensor], Tensor]
+) -> None:
+    """Apply fn to all tensors in a transform tree.
+
+    Walks ComposeTransform.parts, IndependentTransform.base_transform,
+    etc., so .to() calls propagate into the transform.
+
+    Args:
+        transform: Root of the transform tree.
+        fn: Callable applied to each tensor (e.g. ``lambda t: t.to(device)``).
+    """
+    seen = set()
+
+    def _walk(t):
+        if id(t) in seen:
+            return
+        seen.add(id(t))
+        for key, val in list(t.__dict__.items()):
+            if isinstance(val, Tensor):
+                object.__setattr__(t, key, fn(val))
+            elif isinstance(val, (list, tuple)):
+                for item in val:
+                    if isinstance(item, TorchTransform):
+                        _walk(item)
+            elif isinstance(val, TorchTransform):
+                _walk(val)
+
+    _walk(transform)
 
 
 def mcmc_transform(
@@ -851,6 +977,9 @@ def mcmc_transform(
 
     check_transform(prior, transform)  # type: ignore
 
+    if enable_transform:
+        _apply_to_transform(transform, lambda t: t.to(device))
+
     return transform.inv  # type: ignore
 
 
@@ -879,7 +1008,7 @@ def check_transform(
     ), "Original and re-transformed parameters must be close to each other."
 
 
-class ImproperEmpirical(Empirical):
+class ImproperEmpirical(Distribution):
     """
     Wrapper around pyro's `Emprirical` distribution that returns constant `log_prob()`.
 
@@ -893,7 +1022,7 @@ class ImproperEmpirical(Empirical):
     """
 
     def __init__(self, values: Tensor, log_weights: Optional[Tensor] = None):
-        super().__init__(values, log_weights=log_weights)
+        super().__init__()
         # Warn if extremely large to inform about memory/serialization cost.
         self._mean = self._compute_mean(values, log_weights)
         self._variance = self._compute_variance(values, log_weights)
@@ -907,7 +1036,7 @@ class ImproperEmpirical(Empirical):
 
     def log_prob(self, value: Tensor) -> Tensor:
         """
-        Return ones as a constant log-prob for each input.
+        Return ones as a constant log-prob(zeros) for each input.
 
         Args:
             value: The parameters at which to evaluate the log-probability.
@@ -915,11 +1044,7 @@ class ImproperEmpirical(Empirical):
         Returns:
             Tensor of as many ones as there were parameter sets.
         """
-        raise NotImplementedError(
-            "Evaluating log_prob from ImproperEmpirical is not supported. If you are "
-            "using likelihood or ratio estimation, or multi-round inference, you need "
-            "to define a prior distribution."
-        )
+        return torch.zeros(value.shape[:-1], device=value.device, dtype=value.dtype)
 
     def _compute_mean(self, values: Tensor, weights: Optional[Tensor] = None) -> Tensor:
         """
@@ -975,7 +1100,7 @@ class ImproperEmpirical(Empirical):
     def stddev(self) -> Tensor:
         return torch.sqrt(self._variance)
 
-    def to(self, device: Union[str, torch.device]) -> None:
+    def to(self, device: Union[str, torch.device]) -> "ImproperEmpirical":
         """
         Move the distribution to a different device.
 
@@ -987,7 +1112,7 @@ class ImproperEmpirical(Empirical):
         """
         self._mean = self._mean.to(device)
         self._variance = self._variance.to(device)
-        super().to(device)
+        return self
 
 
 def mog_log_prob(
@@ -1000,7 +1125,7 @@ def mog_log_prob(
     the batch. This is because these values were computed from a batch of $x$ (and the
     $x$ in the batch are not the same).
 
-    This code is similar to the code of mdn.py in pyknos, but it does not use
+    This code is similar to the MDN implementation in sbi, but it does not use
     log(det(Cov)) = -2*sum(log(diag(L))), L being Cholesky of Precision. Instead, it
     just computes log(det(Cov)). Also, it uses the above-defined helper
     `_batched_vmv()`.

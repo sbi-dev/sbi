@@ -52,7 +52,8 @@ To get started, install the ``sbi`` package with:
 
    python -m pip install sbi
 
-for more advanced install options, see our `Install Guide <https://sbi.readthedocs.io/en/latest/installation.html>`_.
+For Pyro- or PyMC-based MCMC samplers, install ``sbi[pyro]``, ``sbi[pymc]``, or
+``sbi[all]``. For more details, see our `Install Guide <https://sbi.readthedocs.io/en/latest/installation.html>`_.
 
 Then, check out our material:
 
@@ -71,7 +72,7 @@ Then, check out our material:
       Practical recipes for common tasks.
 
    .. grid-item-card:: 📚 API Reference
-      :link: sbi
+      :link: api_reference
       :link-type: doc
 
       Full documentation of modules and functions.
@@ -255,7 +256,7 @@ Diagnostics
    :maxdepth: 2
    :caption: More guides/resources
 
-   sbi
+   api_reference
    faq
    contributor_guide
    changelog

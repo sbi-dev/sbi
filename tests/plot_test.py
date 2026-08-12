@@ -20,6 +20,7 @@ from sbi.analysis.plotting_classes import (
 )
 from sbi.inference import NLE, NPE, NRE
 from sbi.utils import BoxUniform
+from sbi.utils.tracking import TensorBoardTracker
 
 
 @pytest.mark.parametrize("samples", (torch.randn(100, 1),))
@@ -109,11 +110,12 @@ def test_plot_summary(method, tmp_path):
     num_simulations = 6
 
     summary_writer = SummaryWriter(tmp_path)
+    tracker = TensorBoardTracker(summary_writer)
 
     def simulator(theta):
         return theta + 1.0 + torch.randn_like(theta) * 0.1
 
-    inference = method(prior=prior, summary_writer=summary_writer)
+    inference = method(prior=prior, tracker=tracker)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -127,6 +129,121 @@ def test_plot_summary(method, tmp_path):
     fig, axes = plot_summary(inference)
     assert isinstance(fig, Figure) and isinstance(axes[0], Axes)
     close()
+
+
+@pytest.fixture
+def mock_inference(mocker, tmp_path):
+    """Patch event-data loading so unit tests don't need real tensorboard logs."""
+    steps = list(range(10))
+    scalars = {
+        "training_loss": {"step": steps, "value": [1.0 / (i + 1) for i in steps]},
+        "validation_loss": {"step": steps, "value": [1.2 / (i + 1) for i in steps]},
+    }
+    mocker.patch(
+        "sbi.analysis.tensorboard_output._get_event_data_from_log_dir",
+        return_value={"scalars": scalars},
+    )
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "overlay, plot_kwargs, colors, expected_n_axes",
+    (
+        (False, None, None, 2),
+        (True, None, None, 1),
+        (True, {"color": "red"}, None, 1),
+        (True, {"color": "red"}, ["blue", "green"], 1),
+    ),
+)
+def test_plot_summary_overlay_kwargs_precedence(
+    mock_inference, overlay, plot_kwargs, colors, expected_n_axes
+):
+    """Cover overlay shape, plot_kwargs forwarding, and the colors-vs-plot_kwargs
+    collision regression: passing both must not raise TypeError, and `colors`
+    must take precedence."""
+    fig, axes = plot_summary(
+        mock_inference,
+        tags=["training_loss", "validation_loss"],
+        overlay=overlay,
+        colors=colors,
+        plot_kwargs=plot_kwargs,
+        verbose=False,
+    )
+    assert axes.shape == (expected_n_axes,)
+    if colors is not None:
+        # colors wins over plot_kwargs["color"]
+        lines = axes[0].get_lines()
+        assert [line.get_color() for line in lines] == colors
+    close()
+
+
+def test_plot_summary_deprecated_kwargs(mock_inference):
+    """Old kwargs `inference` and `disable_tensorboard_prompt` still work but
+    emit a FutureWarning."""
+    with pytest.warns(FutureWarning, match="`inference` is deprecated"):
+        fig, _ = plot_summary(
+            inference=mock_inference,
+            tags=["training_loss"],
+            verbose=False,
+        )
+    close()
+    with pytest.warns(FutureWarning, match="`disable_tensorboard_prompt`"):
+        fig, _ = plot_summary(
+            mock_inference,
+            tags=["training_loss"],
+            disable_tensorboard_prompt=True,
+        )
+    close()
+
+
+@pytest.mark.parametrize("kwarg", ("colors", "labels", "ylabel"))
+def test_plot_summary_length_validation(mock_inference, kwarg):
+    """colors/labels/ylabel with wrong length must raise ValueError, not IndexError."""
+    with pytest.raises(ValueError, match=f"`{kwarg}` must have length 2"):
+        plot_summary(
+            mock_inference,
+            tags=["training_loss", "validation_loss"],
+            **{kwarg: ["only_one_entry"]},
+            verbose=False,
+        )
+
+
+def test_plot_summary_length_validation_aggregates_errors(mock_inference):
+    """Multiple wrong-length kwargs are reported in one ValueError, not iteratively."""
+    with pytest.raises(ValueError) as exc:
+        plot_summary(
+            mock_inference,
+            tags=["training_loss", "validation_loss"],
+            colors=["red"],
+            labels=["only_one"],
+            ylabel=["a", "b", "c"],
+            verbose=False,
+        )
+    msg = str(exc.value)
+    assert "`colors`" in msg and "`labels`" in msg and "`ylabel`" in msg
+
+
+@pytest.mark.parametrize(
+    "overlay, n_axes_passed",
+    [
+        (False, 1),  # overlay=False, expects len(tags)=2 axes, got 1
+        (False, 3),  # overlay=False, expects len(tags)=2 axes, got 3
+        (True, 2),  # overlay=True, expects 1 axis, got 2
+    ],
+)
+def test_plot_summary_axes_length_validation(mock_inference, overlay, n_axes_passed):
+    """Mismatched user-provided `axes` must raise ValueError, not silently misbehave."""
+    fig, axes = subplots(1, n_axes_passed)
+    with pytest.raises(ValueError, match="`axes` must have length"):
+        plot_summary(
+            mock_inference,
+            tags=["training_loss", "validation_loss"],
+            overlay=overlay,
+            fig=fig,
+            axes=axes,
+            verbose=False,
+        )
+    close(fig)
 
 
 @pytest.mark.parametrize("num_parameters", (2, 4, 10))
@@ -358,4 +475,57 @@ def test_plotting_style_arguments_validation(kwargs):
 
     _ = pairplot(samples=posterior_samples, **kwargs)
 
+    close()
+
+
+# --- Tests for discrete_indices support ---
+
+
+def _make_mixed_samples(n: int = 200, dim: int = 4) -> torch.Tensor:
+    """Helper: first 2 dims continuous, rest discrete."""
+    samples = torch.randn(n, dim)
+    for i in range(2, dim):
+        samples[:, i] = torch.randint(0, 4, (n,)).float()
+    return samples
+
+
+@pytest.mark.parametrize("diag", ("hist", "kde", "scatter", "bar"))
+@pytest.mark.parametrize("upper", ("scatter", "kde", "contour", "hist"))
+def test_pairplot_discrete_indices(diag, upper):
+    """pairplot with discrete_indices should not crash for any diag/upper combo."""
+    samples = _make_mixed_samples()
+    fig, _ = pairplot(samples, discrete_indices=[2, 3], diag=diag, upper=upper)
+    assert isinstance(fig, Figure)
+    close()
+
+
+@pytest.mark.parametrize(
+    "samples_fn, pairplot_kwargs",
+    [
+        pytest.param(
+            lambda: torch.randint(0, 5, (200, 3)).float(),
+            dict(discrete_indices=[0, 1, 2], diag="kde", upper="kde"),
+            id="all_discrete",
+        ),
+        pytest.param(
+            lambda: _make_mixed_samples(n=200, dim=3),
+            dict(discrete_indices=[2], diag="kde", upper="scatter", lower="contour"),
+            id="lower_triangle",
+        ),
+        pytest.param(
+            lambda: [_make_mixed_samples(n=100, dim=3)] * 2,
+            dict(discrete_indices=[2], diag="kde", upper="scatter"),
+            id="multiple_samples",
+        ),
+        pytest.param(
+            lambda: _make_mixed_samples(),
+            dict(discrete_indices=[2, 3], subset=[0, 2], diag="kde", upper="kde"),
+            id="subset",
+        ),
+    ],
+)
+def test_pairplot_discrete_edge_cases(samples_fn, pairplot_kwargs):
+    """Edge cases: all-discrete, lower triangle, multiple samples, subset."""
+    fig, _ = pairplot(samples_fn(), **pairplot_kwargs)
+    assert isinstance(fig, Figure)
     close()

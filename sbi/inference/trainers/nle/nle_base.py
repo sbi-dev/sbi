@@ -3,7 +3,16 @@
 
 import warnings
 from abc import ABC
-from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 from torch import Tensor
 from torch.distributions import Distribution
@@ -23,26 +32,36 @@ from sbi.inference.trainers._contracts import StartIndexContext, TrainConfig
 from sbi.inference.trainers.base import NeuralInference
 from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.sbi_types import TorchTransform
+from sbi.neural_nets.net_builders.estimator_configs import (
+    DensityEstimatorBuilder,
+    _EstimatorBuilderBase,
+)
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 from sbi.utils.torchutils import assert_all_finite
 
 
 class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
+    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (DensityEstimatorBuilder,)
+    _INPUT_IS_THETA: ClassVar[bool] = False  # NLE models p(x|θ): input=x, condition=θ
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
-            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
-        ] = "maf",
+            DensityEstimatorBuilder,
+            ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Base class for `Neural Likelihood Estimation` methods.
@@ -52,14 +71,13 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type (one of nsf, maf, mdn, made). Alternatively, a function
+            density_estimator: If it is a string (deprecated), use a pre-configured
+                network of the provided type (one of nsf, maf, mdn, made). If it is
+                a `DensityEstimatorBuilder`, the builder's `build()` method will be
+                called with the first batch of simulations. Alternatively, a function
                 that builds a custom neural network, which adheres to
-                `ConditionalEstimatorBuilder` protocol can be provided. The function
-                will be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. The
-                density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
+                `ConditionalEstimatorBuildFn` protocol can be provided. If None,
+                it uses a default `DensityEstimatorBuilder` with `"maf"`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -69,17 +87,38 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
+            tracker=tracker,
             show_progress_bars=show_progress_bars,
         )
 
-        # As detailed in the docstring, `density_estimator` is either a string or
-        # a callable. The function creating the neural network is attached to
+        # `density_estimator` is either a string, a builder, or a callable.
+        # The function creating the neural network is attached to
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
-        check_estimator_arg(density_estimator)
-        if isinstance(density_estimator, str):
+        if density_estimator is not None:
+            check_estimator_arg(density_estimator)
+        if density_estimator is None:
+            self._build_neural_net = self._wrap_builder(
+                DensityEstimatorBuilder(model="maf")
+            )
+        elif isinstance(density_estimator, str):
+            warnings.warn(
+                "Passing a string for `density_estimator` is deprecated. "
+                "Use DensityEstimatorBuilder(model=...) instead, e.g. "
+                "`from sbi.neural_nets import DensityEstimatorBuilder`.",
+                FutureWarning,
+                stacklevel=3,
+            )
             self._build_neural_net = likelihood_nn(model=density_estimator)
+        elif isinstance(density_estimator, _EstimatorBuilderBase):
+            if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
+                allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
+                raise TypeError(
+                    f"{type(self).__name__} requires a {allowed}; got "
+                    f"{type(density_estimator).__name__}."
+                )
+            self._build_neural_net = self._wrap_builder(density_estimator)
         else:
             self._build_neural_net = density_estimator
 
@@ -89,7 +128,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         x: Tensor,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
-        algorithm: str = "SNLE",
+        algorithm: str = "NLE",
         data_device: Optional[str] = None,
     ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
@@ -179,6 +218,12 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         Returns:
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
+
+        if len(self._data_round_index) == 0:
+            raise RuntimeError(
+                "No simulations found. You must call .append_simulations() "
+                "before calling .train()."
+            )
 
         start_idx = self._get_start_index(
             context=StartIndexContext(discard_prior_samples=discard_prior_samples)
@@ -381,7 +426,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             )
 
             assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
-                "SNLE cannot handle multi-dimensional simulator output."
+                "NLE cannot handle multi-dimensional simulator output."
             )
             del theta, x
 

@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional, Tuple, Union
 from warnings import warn
 
 import torch
-from pyknos.nflows.nn import nets
+from nflows.nn import nets
 from torch import Tensor, nn, relu
 from torch.nn import MSELoss
 from torch.nn.utils.clip_grad import clip_grad_norm_
@@ -201,10 +201,10 @@ class ActiveSubspace:
         def build_mlp(theta):
             classifier = nn.Sequential(
                 nn.Linear(theta.shape[1], hidden_features),
-                nn.BatchNorm1d(hidden_features),
+                nn.LayerNorm(hidden_features),
                 nn.ReLU(),
                 nn.Linear(hidden_features, hidden_features),
-                nn.BatchNorm1d(hidden_features),
+                nn.LayerNorm(hidden_features),
                 nn.ReLU(),
                 nn.Linear(hidden_features, 1),
             )

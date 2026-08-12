@@ -104,24 +104,21 @@ class ZukoFlow(ConditionalDensityEstimator):
 
         Args:
             input: Inputs to evaluate the log probability on. Of shape
+                `(sample_dim, batch_dim, *event_shape)` or
+                `(batch_dim, *event_shape)`.
+            condition: Conditions of shape `(batch_dim, *event_shape)` or
                 `(sample_dim, batch_dim, *event_shape)`.
-            condition: Conditions of shape `(batch_dim, *event_shape)`.
-
-        Raises:
-            AssertionError: If `input_batch_dim != condition_batch_dim`.
 
         Returns:
-            Sample-wise log probabilities, shape `(input_sample_dim, input_batch_dim)`.
+            Sample-wise log probabilities, shape `(sample_dim, batch_dim)`.
         """
-        input_batch_dim = input.shape[1]
-        condition_batch_dim = condition.shape[0]
-
-        assert condition_batch_dim == input_batch_dim, (
-            f"Batch shape of condition {condition_batch_dim} and input "
-            f"{input_batch_dim} do not match."
+        input, condition, batch_dim = self._broadcast_and_align(input, condition)
+        sample_dim = input.shape[0]
+        condition_flat = condition.reshape(
+            sample_dim * batch_dim, *self.condition_shape
         )
-
-        emb_cond = self._embedding_net(condition)
+        emb_cond = self._embedding_net(condition_flat)
+        emb_cond = emb_cond.reshape(sample_dim, batch_dim, -1)
         dists = self.net(emb_cond)
         log_probs = dists.log_prob(input)
 

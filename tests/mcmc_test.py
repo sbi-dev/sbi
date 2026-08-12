@@ -3,35 +3,21 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 import numpy as np
 import pytest
 import torch
 from torch import eye, ones, zeros
-from torch.distributions import Uniform
 
-from sbi.inference import (
-    NLE,
-    MCMCPosterior,
-    likelihood_estimator_based_potential,
-)
 from sbi.inference.posteriors.mcmc_posterior import build_from_potential
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
-from sbi.neural_nets import likelihood_nn
-from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,
     SliceSamplerVectorized,
 )
-from sbi.simulators.linear_gaussian import (
-    diagonal_linear_gaussian,
-    true_posterior_linear_gaussian_mvn_prior,
-)
+from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
-from sbi.utils.user_input_checks import process_prior
 
 
 @pytest.mark.mcmc
@@ -163,6 +149,8 @@ def test_c2st_pymc_sampler_on_Gaussian(
         with torch.set_grad_enabled(track_gradients):
             return target_distribution.log_prob(x)
 
+    from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
+
     sampler = PyMCSampler(
         potential_fn=lp_f,
         initvals=np.zeros((num_chains, num_dim)).astype(np.float32),
@@ -170,6 +158,7 @@ def test_c2st_pymc_sampler_on_Gaussian(
         draws=(int(num_samples / num_chains)),  # PyMC does not use thinning
         tune=warmup,
         chains=num_chains,
+        seed=0,  # reproducible sampling; PyMC is not covered by the global seed
     )
     samples = sampler.run()
     assert samples.shape == (
@@ -187,71 +176,87 @@ def test_c2st_pymc_sampler_on_Gaussian(
 
 @pytest.mark.mcmc
 @pytest.mark.parametrize(
-    "method",
-    (
-        "nuts_pyro",
-        "hmc_pyro",
-        "nuts_pymc",
-        "hmc_pymc",
-        "slice_pymc",
-        "slice_np",
-        "slice_np_vectorized",
-    ),
+    ("step", "target_accept", "expected"),
+    [
+        # 0.9 is spelled out rather than imported from `_DEFAULT_HMC_TARGET_ACCEPT` so
+        # that changing the documented default has to be a deliberate test update.
+        ("hmc", None, 0.9),
+        ("hmc", 0.99, 0.99),
+        ("nuts", None, None),
+    ],
 )
-def test_getting_inference_diagnostics(
-    method, mcmc_params_fast: MCMCPosteriorParameters
-):
-    num_simulations = 100
-    num_samples = 10
-    num_dim = 2
+def test_pymc_target_accept_default_and_override(step, target_accept, expected):
+    """PyMC HMC uses sbi's default and explicit user values take precedence."""
+    from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 
-    # Use composed prior to test MultipleIndependent case.
-    prior = [
-        Uniform(low=-ones(1), high=ones(1)),
-        Uniform(low=-ones(1), high=ones(1)),
-    ]
+    theta_dim = 2
 
-    simulator = diagonal_linear_gaussian
-    density_estimator = likelihood_nn("maf", num_transforms=3)
-    inference = NLE(density_estimator=density_estimator, show_progress_bars=False)
-    prior, *_ = process_prior(prior)
-    theta = prior.sample((num_simulations,))
-    x = simulator(theta)
-    likelihood_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=num_simulations, max_num_epochs=2
-    )
+    def potential_fn(theta):
+        return -0.5 * (theta**2).sum(axis=-1)
 
-    x_o = zeros((1, num_dim))
-    potential_fn, theta_transform = likelihood_estimator_based_potential(
-        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
-    )
-    posterior = MCMCPosterior(
-        proposal=prior,
+    sampler = PyMCSampler(
         potential_fn=potential_fn,
-        theta_transform=theta_transform,
-        **asdict(mcmc_params_fast),
+        initvals=np.zeros((1, theta_dim)),
+        step=step,
+        target_accept=target_accept,
+        draws=1,
+        tune=1,
+        chains=1,
     )
-    posterior.sample(
-        sample_shape=(num_samples,),
-        method=method,
-    )
-    idata = posterior.get_arviz_inference_data()
+    assert sampler._target_accept == expected
 
-    assert hasattr(idata, "posterior"), (
-        f"`MCMCPosterior.get_arviz_inference_data()` for method {method} "
-        f"returned invalid InferenceData. Must contain key 'posterior', "
-        f"but found only {list(idata.keys())}"
-    )
-    samples = getattr(idata.posterior, posterior.param_name).data
-    samples = samples.reshape(-1, samples.shape[-1])[:: mcmc_params_fast.thin][
-        :num_samples
-    ]
-    assert samples.shape == (
-        num_samples,
-        num_dim,
-    ), (
-        f"MCMC samples for method {method} have incorrect shape (n_samples, n_dims). "
-        f"Expected {(num_samples, num_dim)}, got {samples.shape}"
+
+@pytest.mark.mcmc
+def test_mcmc_posterior_rejects_invalid_target_accept():
+    """Per-call overrides validate target_accept at the public API boundary."""
+    theta_dim = 2
+    prior = BoxUniform(low=-2 * ones(theta_dim), high=2 * ones(theta_dim))
+
+    def potential_fn(theta):
+        return -0.5 * (theta**2).sum(axis=-1)
+
+    with pytest.warns(UserWarning, match="unconditional potential"):
+        posterior = build_from_potential(potential_fn, prior)
+    with pytest.raises(ValueError, match="target_accept"):
+        posterior.sample((1,), method="hmc_pymc", target_accept=0.0)
+
+
+def _gaussian_potential_posterior():
+    prior = BoxUniform(low=-2 * ones(2), high=2 * ones(2))
+
+    def potential_fn(theta):
+        return -0.5 * (theta**2).sum(axis=-1)
+
+    with pytest.warns(UserWarning, match="unconditional potential"):
+        return build_from_potential(potential_fn, prior)
+
+
+@pytest.mark.mcmc
+def test_latest_sample_raises_before_any_sampling_run():
+    """`latest_sample` continues stored chains; without a run there are none."""
+    posterior = _gaussian_potential_posterior()
+
+    with pytest.raises(ValueError, match="no chain states"):
+        posterior.sample((1,), init_strategy="latest_sample", show_progress_bars=False)
+
+
+@pytest.mark.mcmc
+def test_latest_sample_raises_when_more_chains_than_stored():
+    """The last run stored one state per chain; a bigger run must not start."""
+    posterior = _gaussian_potential_posterior()
+    posterior.sample((10,), num_chains=2, show_progress_bars=False)
+
+    with pytest.raises(ValueError, match="chain state"):
+        posterior.sample(
+            (10,),
+            num_chains=5,
+            init_strategy="latest_sample",
+            show_progress_bars=False,
+        )
+
+    # The happy path: the same chain count continues the stored chains.
+    posterior.sample(
+        (10,), num_chains=2, init_strategy="latest_sample", show_progress_bars=False
     )
 
 

@@ -1,0 +1,16 @@
+# Blank issues stay enabled: most issues in this repository are opened by
+# maintainers, who do not need a template.
+blank_issues_enabled: true
+contact_links:
+  - name: Question about using sbi
+    url: https://github.com/sbi-dev/sbi/discussions
+    about: >-
+      Ask how to choose a method, how to set up your simulator or prior, how to
+      read your results, or why sbi behaves the way it does. Questions are
+      answered faster here, and other users can find the answer later.
+  - name: Documentation and tutorials
+    url: https://sbi.readthedocs.io/en/latest/
+    about: How-to guides, tutorials, and the API reference.
+  - name: Contributing guide
+    url: https://sbi.readthedocs.io/en/latest/contributing.html
+    about: How to set up a development environment and open a pull request.

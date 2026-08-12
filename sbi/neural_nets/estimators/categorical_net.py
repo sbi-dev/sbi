@@ -270,24 +270,21 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
 
         Args:
             input: Input datapoints of shape
-                `(sample_dim, batch_dim, *event_shape_input)`.Must be a discrete
+                `(sample_dim, batch_dim, *event_shape_input)` or
+                `(batch_dim, *event_shape_input)`. Must be a discrete
                 indicator of class identity.
-            condition: Conditions of shape `(batch_dim, *event_shape_condition)`.
+            condition: Conditions of shape `(batch_dim, *event_shape_condition)` or
+                `(sample_dim, batch_dim, *event_shape_condition)`.
 
         Returns:
             Log-probabilities of shape `(sample_dim, batch_dim)`.
         """
-        input_batch_dim = input.shape[1]
-        condition_batch_dim = condition.shape[0]
-
-        assert condition_batch_dim == input_batch_dim, (
-            f"Batch shape of condition {condition_batch_dim} and input "
-            f"{input_batch_dim} do not match."
-        )
-
-        # The CatetoricalNet can actually handle torch shape conventions and
-        # just returns log-probabilities of shape `(sample_dim, batch_dim)`.
-        return self.net.log_prob(input, condition, **kwargs)
+        input, condition, batch_dim = self._broadcast_and_align(input, condition)
+        sample_dim = input.shape[0]
+        input = input.reshape(sample_dim * batch_dim, *self.input_shape)
+        condition = condition.reshape(sample_dim * batch_dim, *self.condition_shape)
+        log_probs = self.net.log_prob(input, condition, **kwargs)
+        return log_probs.reshape(sample_dim, batch_dim)
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         """Return samples from the conditional categorical distribution.

@@ -7,7 +7,6 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Iterable,
     Literal,
     Optional,
     Union,
@@ -16,12 +15,15 @@ from typing import (
     get_origin,
 )
 
+from torch.distributions import Distribution
+
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.sbi_types import PyroTransformedDistribution, TorchTransform
+from sbi.sbi_types import TorchTransform
 from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_float,
     is_positive_int,
+    validate_target_accept,
 )
 
 
@@ -132,6 +134,44 @@ class DirectPosteriorParameters(PosteriorParameters):
 
 
 @dataclass(frozen=True)
+class FilteredDirectPosteriorParameters(PosteriorParameters):
+    """Parameters for initializing `FilteredDirectPosterior`.
+
+    Fields:
+        max_sampling_batch_size: Batchsize of samples drawn from
+            the proposal at every iteration.
+        enable_transform: Whether to transform parameters to unconstrained space
+            during MAP optimization. When False, an identity transform will be
+            returned for `theta_transform`.
+        filter_size: Number of context simulations retained after filtering.
+        filter_type: Filtering strategy. Either `"knn"`, `"first"`, or a
+            callable returning context indices.
+    """
+
+    max_sampling_batch_size: int = 10_000
+    enable_transform: bool = True
+    filter_size: int = 2048
+    filter_type: Union[Literal["knn", "first"], Callable] = "knn"
+
+    def validate(self):
+        """Validate `FilteredDirectPosteriorParameters` fields."""
+
+        if not is_positive_int(self.max_sampling_batch_size):
+            raise ValueError("max_sampling_batch_size must be greater than 0.")
+
+        if not is_positive_int(self.filter_size - 1):
+            raise ValueError("filter_size must be greater than 1.")
+
+        if not (
+            (isinstance(self.filter_type, str) and self.filter_type in {"knn", "first"})
+            or callable(self.filter_type)
+        ):
+            raise ValueError(
+                "filter_type must be one of ['knn', 'first'] or a callable."
+            )
+
+
+@dataclass(frozen=True)
 class ImportanceSamplingPosteriorParameters(PosteriorParameters):
     """
     Parameters for initializing ImportanceSamplingPosterior.
@@ -192,7 +232,7 @@ class MCMCPosteriorParameters(PosteriorParameters):
         init_strategy: The initialisation strategy for chains; `proposal` will draw
             init locations from `proposal`, whereas `sir` will use Sequential-
             Importance-Resampling (SIR). SIR initially samples
-            `init_strategy_num_candidates` from the `proposal`, evaluates all of
+            `num_candidate_samples` from the `proposal`, evaluates all of
             them under the `potential_fn` and `proposal`, and then resamples the
             initial locations with weights proportional to `exp(potential_fn -
             proposal.log_prob`. `resample` is the same as `sir` but
@@ -206,6 +246,14 @@ class MCMCPosteriorParameters(PosteriorParameters):
             (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
             faster than `"spawn"` but is only supported on POSIX-based systems
             (e.g. Linux and macOS, not Windows).
+        target_accept: Target acceptance probability used only by the PyMC samplers
+            `hmc_pymc` and `nuts_pymc`, controlling step-size adaptation during
+            warmup. Higher values generally result in smaller steps and fewer
+            rejections, at the cost of speed. If `None`, `hmc_pymc` uses `0.9`
+            because PyMC's `0.65` default mixed poorly in sbi's Gaussian regression
+            test, and `nuts_pymc` keeps PyMC's backend default. Ignored by
+            `slice_pymc`, the Pyro samplers (`hmc_pyro`, `nuts_pyro`) and the numpy
+            slice samplers.
     """
 
     method: Literal[
@@ -224,9 +272,12 @@ class MCMCPosteriorParameters(PosteriorParameters):
     init_strategy_parameters: Optional[Dict[str, Any]] = None
     num_workers: int = 1
     mp_context: Literal["fork", "spawn"] = "spawn"
+    target_accept: Optional[float] = None
 
     def validate(self):
         """Validate MCMCPosteriorParameters fields."""
+
+        validate_target_accept(self.target_accept)
 
         if not (
             self.init_strategy_parameters is None
@@ -251,8 +302,6 @@ class RejectionPosteriorParameters(PosteriorParameters):
     Parameters for initializing RejectionPosterior.
 
     Fields:
-        theta_transform: Transformation that is applied to parameters. Is not used
-            during but only when calling `.map()`.
         max_sampling_batch_size: The batchsize of samples being drawn from
             the proposal at every iteration.
         num_samples_to_find_max: The number of samples that are used to find the
@@ -262,7 +311,6 @@ class RejectionPosteriorParameters(PosteriorParameters):
         m: Multiplier to the `potential_fn / proposal` ratio.
     """
 
-    theta_transform: Optional[TorchTransform] = None
     max_sampling_batch_size: int = 10_000
     num_samples_to_find_max: int = 10_000
     num_iter_to_find_max: int = 100
@@ -270,14 +318,6 @@ class RejectionPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate RejectionPosteriorParameters fields."""
-
-        if not (
-            self.theta_transform is None
-            or isinstance(self.theta_transform, TorchTransform)
-        ):
-            raise TypeError(
-                "theta_transform must be either None or of type TorchTransform"
-            )
 
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")
@@ -335,61 +375,86 @@ class VectorFieldPosteriorParameters(PosteriorParameters):
 @dataclass(frozen=True)
 class VIPosteriorParameters(PosteriorParameters):
     """
-    Parameters for initializing VIPosterior.
+    Parameters for VIPosterior, supporting both single-x and amortized VI.
 
     Fields:
-        q: Variational distribution, either string, `TransformedDistribution`, or a
-            `VIPosterior` object. This specifies a parametric class of distribution
-            over which the best possible posterior approximation is searched. For
-            string input, we currently support [nsf, scf, maf, mcf, gaussian,
-            gaussian_diag]. You can also specify your own variational family by
-            passing a pyro `TransformedDistribution`.
-            Additionally, we allow a `Callable`, which allows you the pass a
-            `builder` function, which if called returns a distribution. This may be
-            useful for setting the hyperparameters e.g. `num_transfroms` within the
-            `get_flow_builder` method specifying the number of transformations
-            within a normalizing flow. If q is already a `VIPosterior`, then the
-            arguments will be copied from it (relevant for multi-round training).
-        vi_method: This specifies the variational methods which are used to fit q to
-            the posterior. We currently support [rKL, fKL, IW, alpha]. Note that
-            some of the divergences are `mode seeking` i.e. they underestimate
-            variance and collapse on multimodal targets (`rKL`, `alpha` for alpha >
-            1) and some are `mass covering` i.e. they overestimate variance but
-            typically cover all modes (`fKL`, `IW`, `alpha` for alpha < 1).
-        parameters: List of parameters of the variational posterior. This is only
-            required for user-defined q i.e. if q does not have a `parameters`
-            attribute.
-        modules: List of modules of the variational posterior. This is only
-            required for user-defined q i.e. if q does not have a `modules`
-            attribute.
+        q: Variational distribution. Either a string specifying the flow type
+            [maf, nsf, naf, unaf, nice, sospf, gf, gaussian, gaussian_diag], a
+            `Distribution`, a `VIPosterior` object, or a `Callable`
+            builder function. For amortized VI, only string flow types are
+            supported. If q is already a `VIPosterior`, arguments are copied
+            from it (relevant for multi-round training). Note: For 1D problems,
+            prefer "gf" (mixture of Gaussians) or "gaussian" as autoregressive
+            flows may be unstable.
+        vi_method: Variational method for fitting q to the posterior. Options:
+            [rKL, fKL, IW, alpha]. Some are "mode seeking" (rKL, alpha > 1) and
+            some are "mass covering" (fKL, IW, alpha < 1). Currently only used
+            for single-x VI; amortized VI uses ELBO (rKL).
+        num_transforms: Number of transforms in the normalizing flow. Used for
+            both single-x VI (via set_q/train) and amortized VI (via
+            train_amortized).
+        hidden_features: Hidden layer size in the flow networks. Used for both
+            single-x VI and amortized VI.
+        z_score_theta: Method for z-scoring θ (the parameters being sampled).
+            One of "none", "independent", "structured". Used for both single-x
+            VI and amortized VI. Use "structured" for parameters with
+            correlations.
+        z_score_x: Method for z-scoring x (the conditioning observation).
+            One of "none", "independent", "structured". Only used for amortized
+            VI (train_amortized). Use "structured" for structured data like
+            images.
+
+    Note:
+        For custom distributions that lack `parameters()` and `modules()` methods,
+        pass these via `VIPosterior.set_q(q, parameters=..., modules=...)` instead.
     """
 
     q: Union[
-        Literal["nsf", "scf", "maf", "mcf", "gaussian", "gaussian_diag"],
-        PyroTransformedDistribution,
+        Literal[
+            "maf",
+            "nsf",
+            "naf",
+            "unaf",
+            "nice",
+            "sospf",
+            "gf",
+            "gaussian",
+            "gaussian_diag",
+        ],
+        Distribution,
         "VIPosterior",
         Callable,
     ] = "maf"
     vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL"
-    parameters: Optional[Iterable] = None
-    modules: Optional[Iterable] = None
+    num_transforms: int = 5
+    hidden_features: int = 50
+    z_score_theta: Literal["none", "independent", "structured"] = "independent"
+    z_score_x: Literal["none", "independent", "structured"] = "independent"
 
     def validate(self):
         """Validate VIPosteriorParameters fields."""
-
-        valid_q = {"nsf", "scf", "maf", "mcf", "gaussian", "gaussian_diag"}
+        valid_q = {
+            "nsf",
+            "maf",
+            "naf",
+            "unaf",
+            "nice",
+            "sospf",
+            "gf",
+            "gaussian",
+            "gaussian_diag",
+        }
 
         if isinstance(self.q, str) and self.q not in valid_q:
             raise ValueError(f"If `q` is a string, it must be one of {valid_q}")
-        elif not isinstance(
-            self.q, (PyroTransformedDistribution, VIPosterior, Callable, str)
-        ):
+        elif not isinstance(self.q, (Distribution, VIPosterior, Callable, str)):
             raise TypeError(
-                "q must be either of typr PyroTransformedDistribution,"
-                " VIPosterioror or Callable"
+                "q must be either of type Distribution, VIPosterior, or Callable"
             )
 
-        if self.parameters is not None and not isinstance(self.parameters, Iterable):
-            raise TypeError("parameters must be iterable or None.")
-        if self.modules is not None and not isinstance(self.modules, Iterable):
-            raise TypeError("modules must be iterable or None.")
+        if self.num_transforms < 1:
+            raise ValueError(f"num_transforms must be >= 1, got {self.num_transforms}")
+        if self.hidden_features < 1:
+            raise ValueError(
+                f"hidden_features must be >= 1, got {self.hidden_features}"
+            )

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict
 
 import numpy as np
@@ -19,12 +20,17 @@ from sbi.inference import (
     NPE_A,
     NPE_B,
     NPE_C,
+    NPE_PFN,
     DirectPosterior,
     MCMCPosterior,
     RejectionPosterior,
     posterior_estimator_based_potential,
 )
-from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
+from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    FilteredDirectPosteriorParameters,
+    MCMCPosteriorParameters,
+)
 from sbi.neural_nets import posterior_nn
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -194,6 +200,115 @@ def test_density_estimators_on_linearGaussian(npe_method: type, density_estimato
     check_c2st(samples, target_samples, alg=f"npe_{density_estimator}")
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "num_dim, prior_str",
+    ((2, "gaussian"), (2, "uniform")),
+)
+def test_c2st_npe_pfn_on_linearGaussian(num_dim: int, prior_str: str):
+    """Test whether NPE-PFN infers well a simple example with available ground truth."""
+
+    pytest.importorskip("tabpfn")
+
+    x_o = zeros(1, num_dim)
+    num_samples = 256
+    num_simulations = 1000
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    if prior_str == "gaussian":
+        prior_mean = zeros(num_dim)
+        prior_cov = eye(num_dim)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        target_samples = gt_posterior.sample((num_samples,))
+    else:
+        prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+            x_o,
+            likelihood_shift,
+            likelihood_cov,
+            prior=prior,
+            num_samples=num_samples,
+        )
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    # Force CPU to avoid MPS fallback issues on macOS.
+    density_estimator = posterior_nn(
+        model="tabpfn",
+        z_score_theta="none",
+        z_score_x="none",
+        regressor_init_kwargs={"device": "cpu"},
+    )
+    inference = NPE_PFN(
+        prior, density_estimator=density_estimator, show_progress_bars=False
+    )
+
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
+    inference.append_simulations(theta, x)
+    posterior = inference.build_posterior(
+        posterior_parameters=FilteredDirectPosteriorParameters(filter_size=256)
+    ).set_default_x(x_o)
+    samples = posterior.sample((num_samples,))
+
+    assert isinstance(posterior, FilteredDirectPosterior)
+
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(samples, target_samples, alg="npe_pfn")
+
+    # Checks for log_prob()
+    if prior_str == "gaussian":
+        # For the Gaussian prior, we compute the KLd between ground truth and posterior.
+        dkl = get_dkl_gaussian_prior(
+            posterior,
+            x_o[0],
+            likelihood_shift,
+            likelihood_cov,
+            prior_mean,
+            prior_cov,
+            num_samples=20,
+        )
+
+        max_dkl = 0.15
+
+        assert dkl < max_dkl, (
+            f"D-KL={dkl} is more than 2 stds above the average performance."
+        )
+
+    elif prior_str == "uniform":
+        # Check whether the returned probability outside of the support is zero.
+        posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
+        assert posterior_prob == 0.0, (
+            "The posterior probability outside of the prior support is not zero"
+        )
+
+        # Check whether normalization (i.e. scaling up the density due
+        # to leakage into regions without prior support) scales up the density by the
+        # correct factor.
+        (
+            posterior_likelihood_unnorm,
+            posterior_likelihood_norm,
+            acceptance_prob,
+        ) = get_normalization_uniform_prior(posterior, prior, x=x_o)
+        # The acceptance probability should be *exactly* the ratio of the unnormalized
+        # and the normalized likelihood. However, we allow for an error margin of 1%,
+        # since the estimation of the acceptance probability is random (based on
+        # rejection sampling).
+        assert (
+            acceptance_prob * 0.99
+            < posterior_likelihood_unnorm / posterior_likelihood_norm
+            < acceptance_prob * 1.01
+        ), "Normalizing the posterior density using the acceptance probability failed."
+
+
 def test_c2st_npe_on_linearGaussian_different_dims(density_estimator="maf"):
     """Test NPE B/C on linear Gaussian with different theta and x dimensionality."""
 
@@ -319,7 +434,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
             theta, x, proposal=prior
         ).train()
         posterior1 = DirectPosterior(
-            prior=prior, posterior_estimator=posterior_estimator
+            prior=prior, posterior_estimator=deepcopy(posterior_estimator)
         ).set_default_x(x_o)
         theta = posterior1.sample((1000,))
         x = simulator(theta)
@@ -335,24 +450,24 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         x = simulator(theta)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
-            prior=prior, posterior_estimator=posterior_estimator
+            prior=prior, posterior_estimator=deepcopy(posterior_estimator)
         ).set_default_x(x_o)
         theta = posterior1.sample((1000,))
         x = simulator(theta)
         _ = inference.append_simulations(theta, x, proposal=posterior1).train()
         posterior = inference.build_posterior().set_default_x(x_o)
     elif method_str == "snpe_a":
-        inference = NPE_A(**creation_args)
+        # Use 3 components with 2 rounds to test multi-component MDN.
+        # Component growth: round 1 = 3, round 2 = 3×3 = 9 components.
+        snpe_a_args = {**creation_args, "num_components": 3}
+        inference = NPE_A(**snpe_a_args)
         proposal = prior
-        final_round = False
-        num_rounds = 3
-        for r in range(num_rounds):
-            if r == 2:
-                final_round = True
-            theta = proposal.sample((500,))
+        num_rounds = 2
+        for _ in range(num_rounds):
+            theta = proposal.sample((1000,))
             x = simulator(theta)
             inference = inference.append_simulations(theta, x, proposal=proposal)
-            _ = inference.train(max_num_epochs=200, final_round=final_round)
+            _ = inference.train()
             posterior = inference.build_posterior().set_default_x(x_o)
             proposal = posterior
     elif method_str.startswith("tsnpe"):
@@ -693,22 +808,14 @@ def test_example_posterior(npe_method: type):
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    extra_kwargs = dict(final_round=True) if npe_method == NPE_A else dict()
-
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = npe_method(prior, show_progress_bars=False)
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
-    posterior_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2, **extra_kwargs
-    )
-    if npe_method == NPE_A:
-        posterior_estimator = inference.correct_for_proposal()
-    posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator
-    ).set_default_x(x_o)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = inference.build_posterior().set_default_x(x_o)
     assert posterior is not None
 
 

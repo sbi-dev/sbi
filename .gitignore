@@ -1,8 +1,7 @@
 # Project specific
 .sbi_env/
 *sbi-logs/
-/docs/site/*
-/docs/reference/_autosummary/*
+/docs/*/_autosummary/*
 
 # Development files and python cache
 /*.pyc
@@ -100,9 +99,10 @@ target/
 *.pyns
 
 # uv
-uv.lock
+# uv.lock is committed so CI installs a reproducible, pinned dependency set
+# (see .github/workflows/latest-deps.yml for the unpinned canary).
 .python-version
 
-# Serena cache
+# tools cache
 .serena/
 .claude/

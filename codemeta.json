@@ -51,12 +51,12 @@
             "@type": "Person",
             "givenName": "Jakob",
             "familyName": "Macke",
-            "https://orcid.org/0000-0001-5154-8912"
+            "@id": "https://orcid.org/0000-0001-5154-8912"
         }
     ],
     "citation": "https://doi.org/10.21105/joss.02505",
     "relatedLink": [
-        "https://sbi-dev.github.io/sbi/"
+        "https://sbi.readthedocs.io/"
     ],
     "codeRepository": [
         "https://github.com/mackelab/sbi/"

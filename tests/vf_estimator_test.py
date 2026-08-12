@@ -9,10 +9,8 @@ import pytest
 import torch
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
-from sbi.neural_nets.net_builders import (
-    build_flow_matching_estimator,
-    build_score_matching_estimator,
-)
+from sbi.neural_nets.net_builders import build_vector_field_estimator
+from sbi.utils.torchutils import process_device
 
 
 @pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
@@ -53,8 +51,7 @@ def test_vector_field_estimator_loss_shapes(
     assert losses.shape == (batch_dim,)
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "cuda"])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 @pytest.mark.parametrize(
     "estimator_type,sde_type",
     [
@@ -66,14 +63,10 @@ def test_vector_field_estimator_loss_shapes(
 )
 def test_vector_field_estimator_on_device(device, estimator_type, sde_type):
     """Test whether vector field estimators can be moved to the device."""
-    if estimator_type == "flow":
-        estimator = build_flow_matching_estimator(
-            torch.randn(100, 1), torch.randn(100, 1)
-        )
-    else:
-        estimator = build_score_matching_estimator(
-            torch.randn(100, 1), torch.randn(100, 1), sde_type=sde_type
-        )
+    device = process_device(device)
+    estimator = build_vector_field_estimator(
+        torch.randn(100, 1), torch.randn(100, 1), estimator_type, sde_type=sde_type
+    )
     estimator.to(device)
 
     # Test forward
@@ -82,11 +75,11 @@ def test_vector_field_estimator_on_device(device, estimator_type, sde_type):
     time = torch.randn(1, device=device)
     out = estimator(inputs, condition, time)
 
-    assert str(out.device).split(":")[0] == device, "Output device mismatch."
+    assert out.device.type == device.split(":")[0], "Output device mismatch."
 
     # Test loss
     loss = estimator.loss(inputs, condition)
-    assert str(loss.device).split(":")[0] == device, "Loss device mismatch."
+    assert loss.device.type == device.split(":")[0], "Loss device mismatch."
 
 
 @pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
@@ -156,22 +149,14 @@ def _build_vector_field_estimator_and_tensors(
     else:
         embedding_net = torch.nn.Identity()
 
-    # Build the appropriate estimator based on type
-    if estimator_type == "flow":
-        estimator = build_flow_matching_estimator(
-            torch.randn_like(building_thetas),
-            torch.randn_like(building_xs),
-            embedding_net=embedding_net,
-            **kwargs,
-        )
-    else:
-        estimator = build_score_matching_estimator(
-            torch.randn_like(building_thetas),
-            torch.randn_like(building_xs),
-            embedding_net=embedding_net,
-            sde_type=sde_type,
-            **kwargs,
-        )
+    estimator = build_vector_field_estimator(
+        torch.randn_like(building_thetas),
+        torch.randn_like(building_xs),
+        estimator_type,
+        embedding_net=embedding_net,
+        sde_type=sde_type,
+        **kwargs,
+    )
 
     inputs = building_thetas[:batch_dim]
     condition = building_xs[:batch_dim]
@@ -185,3 +170,127 @@ def _build_vector_field_estimator_and_tensors(
     )
     condition = condition
     return estimator, inputs, condition
+
+
+@pytest.mark.parametrize(
+    "estimator_type,sde_type",
+    [
+        ("score", "vp"),
+        ("score", "subvp"),
+        ("score", "ve"),
+        ("flow", None),
+    ],
+)
+def test_train_schedule(estimator_type, sde_type):
+    """Test on shapes and bounds for train and solve schedules
+    of vector field estimators (flow or score)
+    """
+    embedding_net = torch.nn.Identity()
+    t_min = torch.tensor([0.0])
+    t_max = torch.tensor([1.0])
+
+    estimator = build_vector_field_estimator(
+        torch.randn(100, 1),
+        torch.randn(100, 1),
+        estimator_type,
+        embedding_net=embedding_net,
+        sde_type=sde_type,
+    )
+
+    if estimator_type == "score":
+        # Schedule with default bounds
+        train_schedule_default = estimator.train_schedule(300)
+        assert train_schedule_default.shape == torch.Size((300,))
+        assert train_schedule_default.max() <= estimator.t_max
+        assert train_schedule_default.min() >= estimator.t_min
+
+        # Schedule with given bounds
+        train_schedule = estimator.train_schedule(300, t_min, t_max)
+        assert train_schedule.shape == torch.Size((300,))
+        assert train_schedule.max() <= t_max.item()
+        assert train_schedule.min() >= t_min.item()
+
+    # Solve schedule with default bounds
+    solve_schedule_default = estimator.solve_schedule(
+        300, t_max=estimator.t_max, t_min=estimator.t_min
+    )
+    assert torch.allclose(solve_schedule_default[0], torch.tensor([estimator.t_max]))
+    assert torch.allclose(solve_schedule_default[-1], torch.tensor([estimator.t_min]))
+    assert solve_schedule_default.shape == torch.Size((300,))
+    assert torch.all(solve_schedule_default[:-1] - solve_schedule_default[1:] >= 0)
+
+    # Solve schedule with given bounds
+    solve_schedule = estimator.solve_schedule(
+        300, t_max=t_max.item(), t_min=t_min.item()
+    )
+    assert torch.allclose(solve_schedule[0], t_max)
+    assert torch.allclose(solve_schedule[-1], t_min)
+    assert solve_schedule_default.shape == torch.Size((300,))
+    assert torch.all(solve_schedule[:-1] - solve_schedule[1:] >= 0)
+
+
+@pytest.mark.parametrize(
+    "train_schedule,solve_schedule",
+    [
+        ("uniform", "uniform"),
+        ("lognormal", "uniform"),
+        ("uniform", "power_law"),
+        ("lognormal", "power_law"),
+    ],
+)
+def test_ve_edm_schedules(train_schedule, solve_schedule):
+    """Test EDM-style schedules for VE estimator (Karras et al. 2022)."""
+    estimator = build_vector_field_estimator(
+        torch.randn(100, 1),
+        torch.randn(100, 1),
+        "score",
+        sde_type="ve",
+        train_schedule=train_schedule,
+        solve_schedule=solve_schedule,
+    )
+
+    # Test train schedule returns valid times without NaN.
+    times_train = estimator.train_schedule(500)
+    assert times_train.shape == (500,)
+    assert torch.all(times_train >= estimator.t_min), "Train times below t_min"
+    assert torch.all(times_train <= estimator.t_max), "Train times above t_max"
+    assert not torch.any(torch.isnan(times_train)), "NaN in train schedule"
+
+    # Test solve schedule returns monotonically decreasing times without NaN.
+    times_solve = estimator.solve_schedule(100)
+    assert times_solve.shape == (100,)
+    assert torch.allclose(times_solve[0], torch.tensor(estimator.t_max)), (
+        "First solve time != t_max"
+    )
+    assert torch.allclose(times_solve[-1], torch.tensor(estimator.t_min)), (
+        "Last solve time != t_min"
+    )
+    assert torch.all(times_solve[:-1] >= times_solve[1:]), (
+        "Solve schedule not monotonically decreasing"
+    )
+    assert not torch.any(torch.isnan(times_solve)), "NaN in solve schedule"
+
+
+def test_ve_lognormal_no_nan_with_extreme_params():
+    """Test that lognormal schedule doesn't produce NaN even with extreme params."""
+    # Use parameters that could cause extreme sigma values.
+    estimator = build_vector_field_estimator(
+        torch.randn(100, 1),
+        torch.randn(100, 1),
+        "score",
+        sde_type="ve",
+        train_schedule="lognormal",
+        lognormal_mean=-3.0,  # Very low mean -> small sigmas
+        lognormal_std=2.0,  # High variance -> some extreme samples
+    )
+
+    # Generate many samples to test edge cases.
+    times = estimator.train_schedule(10000)
+    assert not torch.any(torch.isnan(times)), (
+        "NaN produced with extreme lognormal params"
+    )
+    assert not torch.any(torch.isinf(times)), (
+        "Inf produced with extreme lognormal params"
+    )
+    assert torch.all(times >= estimator.t_min), "Times below t_min"
+    assert torch.all(times <= estimator.t_max), "Times above t_max"

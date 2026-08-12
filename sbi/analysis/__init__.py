@@ -5,7 +5,6 @@ from sbi.analysis.conditional_density import (
     ConditionedMDN,
     conditional_corrcoeff,
     conditional_potential,
-    conditonal_potential,
     eval_conditional_density,
 )
 from sbi.analysis.plot import (
@@ -20,6 +19,7 @@ from sbi.analysis.plot import (
     sbc_rank_plot,
 )
 from sbi.analysis.plotting_classes import (
+    BarDiagOptions,
     ContourOffDiagOptions,
     FigOptions,
     HistDiagOptions,

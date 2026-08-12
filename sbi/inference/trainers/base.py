@@ -1,16 +1,20 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import os
 import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime
+from inspect import currentframe
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
+    ClassVar,
     Dict,
     Generic,
     List,
@@ -33,12 +37,16 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
+if TYPE_CHECKING:
+    from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
+
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+    FilteredDirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     PosteriorParameters,
@@ -57,7 +65,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalEstimatorType,
     ConditionalVectorFieldEstimator,
 )
-from sbi.sbi_types import TorchTransform
+from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_prior,
     get_log_root,
@@ -65,16 +73,48 @@ from sbi.utils import (
     mask_sims_from_prior,
     nle_nre_apt_msg_on_invalid_x,
     validate_theta_and_x,
-    warn_if_zscoring_changes_data,
+    warn_if_invalid_for_zscoring,
 )
-from sbi.utils.sbiutils import get_simulations_since_round
+from sbi.utils.sbiutils import ImproperEmpirical, get_simulations_since_round
 from sbi.utils.simulation_utils import simulate_for_sbi
-from sbi.utils.torchutils import check_if_prior_on_device, process_device
+from sbi.utils.torchutils import (
+    check_if_prior_on_device,
+    infer_module_device,
+    process_device,
+)
+from sbi.utils.tracking import TensorBoardTracker
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
     process_simulator,
 )
+
+_SBI_ROOT = str(Path(__file__).parents[2]) + os.sep
+
+
+def _stacklevel_to_caller(default: int = 2) -> int:
+    """Return the `warnings.warn` stacklevel of the first frame outside sbi.
+
+    Trainers reach the training loop through a different number of internal frames
+    each, so no constant is right for all of them. A constant also makes Python's
+    "once per location" filter collapse every training run in a process into one
+    warning. (`warn(skip_file_prefixes=...)` would do this, but needs Python 3.12.)
+
+    Args:
+        default: Stacklevel to fall back to if every frame is inside sbi.
+
+    Returns:
+        Stacklevel that attributes the warning to the caller's own code.
+    """
+    frame = currentframe()
+    frame = frame.f_back if frame is not None else None
+    level = 1
+    while frame is not None:
+        if not frame.f_code.co_filename.startswith(_SBI_ROOT):
+            return level
+        frame = frame.f_back
+        level += 1
+    return default
 
 
 def infer(
@@ -96,7 +136,7 @@ def infer(
     The scope of this function is limited to the most essential features of sbi. For
     more flexibility (e.g. multi-round inference, different density estimators) please
     use the flexible interface described here:
-    https://sbi-dev.github.io/sbi/latest/tutorials/02_multiround_inference/
+    https://sbi.readthedocs.io/en/latest/advanced_tutorials/02_multiround_inference.html
 
     Args:
         simulator: A function that takes parameters $\theta$ and maps them to
@@ -107,7 +147,12 @@ def infer(
             parameters, e.g. which ranges are meaningful for them. Any
             object with `.log_prob()`and `.sample()` (for example, a PyTorch
             distribution) can be used.
-        method: What inference method to use. Either of SNPE, SNLE or SNRE.
+        method: What inference method to use, case-insensitively: any neural
+            trainer `sbi.inference` exports, for example 'npe', 'nle', 'nre',
+            'npe_a', 'fmpe' or 'npse'. The legacy names 'snpe', 'snle' and 'snre'
+            still work but emit a `FutureWarning`. The ABC methods are not
+            supported, because they take the simulator at construction; call
+            `MCABC`/`SMCABC` directly.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
@@ -119,14 +164,40 @@ def infer(
     Returns: Posterior over parameters conditional on observations (amortized).
     """
 
-    try:
-        # Moved here to avoid circular imports at initialization.
-        import sbi.inference  # noqa: R0401
+    # Moved here to avoid circular imports at initialization.
+    import sbi.inference  # noqa: R0401
 
-        method_fun: Callable = getattr(sbi.inference, method.upper())
+    # Resolve legacy method strings here: going through the module `__getattr__`
+    # would attribute the warning to this file instead of the caller.
+    name = method.upper()
+    canonical = sbi.inference._DEPRECATED_ALIASES.get(name)
+    resolved = canonical if canonical is not None else name
+
+    # Before the deprecation warning: advising a spelling `infer` cannot run either
+    # would only send the user around the loop again.
+    if resolved in sbi.inference._abc_family:
+        raise ValueError(
+            f"`infer` does not support '{method}'. It trains a neural network on "
+            "simulations it draws itself, while the ABC methods take the simulator "
+            f"at construction and have no training step. Use {resolved} directly. "
+            f"Its `__call__` docstring shows an example."
+        )
+
+    if canonical is not None:
+        warn(
+            f"method='{method}' is deprecated since sbi v0.27.0 and will be "
+            f"removed in v0.28.0. Use method='{canonical.lower()}' instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+
+    try:
+        method_fun: Callable = getattr(sbi.inference, resolved)
     except AttributeError as err:
         raise NameError(
-            "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
+            f"Method '{method}' not available. `method` must name a neural trainer "
+            "exported by `sbi.inference`, for example 'npe', 'nle', 'nre', 'npe_a', "
+            "'fmpe' or 'npse'."
         ) from err
 
     if (
@@ -137,7 +208,7 @@ def infer(
         warn(
             "We discourage the use the simple interface in more complicated settings. "
             "Have a look into the flexible interface, e.g. in our tutorial "
-            "(https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started).",
+            "(https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html).",
             stacklevel=2,
         )
     # Set variables to empty dicts to be able to pass them
@@ -169,12 +240,16 @@ def infer(
 class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     """Abstract base class for neural inference methods."""
 
+    # Overridden by subclasses when needed (e.g., LikelihoodEstimatorTrainer).
+    _INPUT_IS_THETA: ClassVar[bool] = True
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Base class for inference methods.
@@ -187,8 +262,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 perform all posterior operations, e.g. gpu or cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
-            summary_writer: A `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """
@@ -209,7 +286,6 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._theta_roundwise = []
         self._x_roundwise = []
         self._prior_masks = []
-        self._model_bank = []
 
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
@@ -217,13 +293,22 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._round = 0
         self._val_loss = float("Inf")
         self._best_val_loss = float("Inf")
+        self._best_model_state_dict = None
         self._epochs_since_last_improvement = 0
 
-        self._summary_writer = (
-            self._default_summary_writer() if summary_writer is None else summary_writer
-        )
+        if summary_writer is not None:
+            warn(
+                "summary_writer is deprecated. Use tracker instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            if tracker is not None:
+                raise ValueError("Pass only one of summary_writer or tracker.")
+            tracker = TensorBoardTracker(summary_writer)
 
-        # Logging during training (by SummaryWriter).
+        self._tracker = self._default_tracker() if tracker is None else tracker
+
+        # Logging during training.
         self._summary = dict(
             epochs_trained=[],
             best_validation_loss=[],
@@ -235,6 +320,20 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     @property
     def summary(self):
         return self._summary
+
+    @classmethod
+    def _wrap_builder(
+        cls, builder: "_EstimatorBuilderBase"
+    ) -> Callable[[Tensor, Tensor], ConditionalEstimatorType]:
+        """Wrap an estimator builder as a ``(batch_theta, batch_x)`` callable."""
+        input_is_theta = cls._INPUT_IS_THETA
+
+        def build_fn(batch_theta, batch_x):
+            if input_is_theta:
+                return builder.build(batch_input=batch_theta, batch_condition=batch_x)
+            return builder.build(batch_input=batch_x, batch_condition=batch_theta)
+
+        return build_fn
 
     @abstractmethod
     def append_simulations(
@@ -282,7 +381,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         theta = theta[is_valid_x]
 
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
+        warn_if_invalid_for_zscoring(x)
         nle_nre_apt_msg_on_invalid_x(
             num_nans, num_infs, exclude_invalid_x, algorithm or type(self).__name__
         )
@@ -465,7 +564,13 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         estimator: Optional[ConditionalEstimator],
         prior: Optional[Distribution],
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
         ],
         posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
@@ -497,8 +602,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             NeuralPosterior object.
         """
 
-        prior = self._resolve_prior(prior)
+        prior = self._resolve_prior(prior, sample_with)
         estimator, device = self._resolve_estimator(estimator)
+        estimator = deepcopy(estimator)
 
         posterior_parameters = self._resolve_posterior_parameters(
             sample_with, posterior_parameters, **kwargs
@@ -512,12 +618,15 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             posterior_parameters,
         )
 
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
+        return self._posterior
 
-        return deepcopy(self._posterior)
-
-    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
+    def _resolve_prior(
+        self,
+        prior: Optional[Distribution],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+    ) -> Distribution:
         """
         Resolves the prior distribution to use.
 
@@ -533,12 +642,16 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         """
 
         if prior is None:
-            if self._prior is None:
+            if self._prior is None or (
+                isinstance(self._prior, ImproperEmpirical)
+                and sample_with not in {'direct', 'sde', 'ode'}
+            ):
                 cls_name = self.__class__.__name__
                 raise ValueError(
                     f"""You did not pass a prior. You have to pass the prior either at
                     initialization `inference = {cls_name}(prior)` or to `
-                    .build_posterior (prior=prior)`."""
+                    .build_posterior (prior=prior)` for
+                    sample_with not in {'direct', 'sde', 'ode'}."""
                 )
             prior = self._prior
         else:
@@ -577,14 +690,21 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                     f" got {type(estimator).__name__}",
                 )
             # Otherwise, infer it from the device of the net parameters.
-            device = str(next(estimator.parameters()).device)
+            device = infer_module_device(estimator, "cpu")
 
         return estimator, device
 
     def _resolve_posterior_parameters(
         self,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "filtered_direct",
         ],
         posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
@@ -631,7 +751,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     def _build_posterior_parameters(
         self,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "filtered_direct",
         ],
         **kwargs,
     ) -> PosteriorParameters:
@@ -650,6 +777,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         if sample_with == "direct":
             params = kwargs.get("direct_sampling_parameters", {}) or {}
             posterior_parameters = DirectPosteriorParameters(**params)
+        elif sample_with == "filtered_direct":
+            params = kwargs.get("filtered_direct_sampling_parameters", {}) or {}
+            posterior_parameters = FilteredDirectPosteriorParameters(**params)
         elif sample_with == "mcmc":
             params = kwargs.get("mcmc_parameters", {}) or {}
             posterior_parameters = MCMCPosteriorParameters(
@@ -671,8 +801,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
         else:
             raise NotImplementedError(
-                "Posterior parameter construction not implemented for",
-                f"'{sample_with}'",
+                f"Posterior parameter construction not implemented for '{sample_with}'"
             )
 
         return posterior_parameters
@@ -692,6 +821,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         deprecated_params = {
             "direct_sampling_parameters",
+            "filtered_direct_sampling_parameters",
             "mcmc_parameters",
             "vectorfield_sampling_parameters",
             "rejection_sampling_parameters",
@@ -808,7 +938,13 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         estimator: ConditionalEstimator,
         prior: Distribution,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
         ],
         device: Union[str, torch.device],
         posterior_parameters: PosteriorParameters,
@@ -865,8 +1001,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 )
             if sample_with not in ("ode", "sde"):
                 raise ValueError(
-                    "`sample_with` must be either",
-                    f" 'ode' or 'sde', got '{sample_with}'",
+                    f"`sample_with` must be either 'ode' or 'sde', got '{sample_with}'"
                 )
             posterior = VectorFieldPosterior(
                 vector_field_estimator=vector_field_estimator,
@@ -891,6 +1026,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             elif isinstance(posterior_parameters, RejectionPosteriorParameters):
                 posterior = RejectionPosterior(
                     potential_fn=potential_fn,
+                    theta_transform=theta_transform,
                     proposal=prior,
                     device=device,
                     **asdict(posterior_parameters),
@@ -914,8 +1050,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 )
             else:
                 raise NotImplementedError(
-                    "Sampling method not implemented for",
-                    f"'{posterior_parameters}'",
+                    f"Sampling method not implemented for '{posterior_parameters}'"
                 )
         return posterior
 
@@ -953,7 +1088,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 list(self._neural_net.parameters()),
                 lr=train_config.learning_rate,
             )
-            self.epoch, self.val_loss = 0, float("Inf")
+            self.epoch, self._val_loss = 0, float("Inf")
 
         while self.epoch <= train_config.max_num_epochs and not self._converged(
             self.epoch, train_config.stop_after_epochs
@@ -977,9 +1112,16 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             self.epoch += 1
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        self._report_convergence_at_end(
-            self.epoch, train_config.stop_after_epochs, train_config.max_num_epochs
-        )
+        if self.epoch > train_config.max_num_epochs:
+            # The `and` above short-circuits on the last check, so `_converged` never
+            # saw the final epoch. Score it here before choosing the weights to keep.
+            if self._val_loss < self._best_val_loss:
+                self._best_val_loss = self._val_loss
+                self._best_model_state_dict = deepcopy(self._neural_net.state_dict())
+            elif self._best_model_state_dict is not None:
+                self._neural_net.load_state_dict(self._best_model_state_dict)
+
+        self._report_convergence_at_end(self.epoch, train_config.max_num_epochs)
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
@@ -996,7 +1138,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         # cause memory leakage when benchmarking.
         self._neural_net.zero_grad(set_to_none=True)
 
-        return deepcopy(self._neural_net)
+        return self._neural_net
 
     def _train_epoch(
         self,
@@ -1134,40 +1276,46 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         return converged
 
-    def _default_summary_writer(self) -> SummaryWriter:
-        """Return summary writer logging to method- and simulator-specific directory."""
+    def _default_tracker(self) -> Tracker:
+        """Return default tracker logging to a TensorBoard directory."""
 
         method = self.__class__.__name__
         logdir = Path(
             get_log_root(), method, datetime.now().isoformat().replace(":", "_")
         )
-        return SummaryWriter(logdir)
+        return TensorBoardTracker(SummaryWriter(logdir))
 
-    def _report_convergence_at_end(
-        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
-    ) -> None:
-        if self._converged(epoch, stop_after_epochs):
+    def _report_convergence_at_end(self, epoch: int, max_num_epochs: int) -> None:
+        """Report why the training loop stopped.
+
+        Args:
+            epoch: Epoch counter as the training loop left it.
+            max_num_epochs: The epoch budget the loop was given.
+        """
+        # Not `_converged()`: it advances the counter it reads, so a second call can
+        # flip its own verdict.
+        if epoch <= max_num_epochs:
             print(
                 "\r",
                 f"Neural network successfully converged after {epoch} epochs.",
                 end="",
             )
-        elif max_num_epochs == epoch:
+        else:
             warn(
-                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
+                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached, "
                 "but network has not yet fully converged. Consider increasing it.",
-                stacklevel=2,
+                stacklevel=_stacklevel_to_caller(),
             )
 
     def _summarize(
         self,
         round_: int,
     ) -> None:
-        """Update the summary_writer with statistics for a given round.
+        """Update the tracker with statistics for a given round.
 
         During training several performance statistics are added to the summary, e.g.,
         using `self._summary['key'].append(value)`. This function writes these values
-        into summary writer object.
+        into the tracker.
 
         Args:
             round: index of round
@@ -1186,17 +1334,17 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
         """
 
-        # Add most recent training stats to summary writer.
-        self._summary_writer.add_scalar(
-            tag="epochs_trained",
-            scalar_value=self._summary["epochs_trained"][-1],
-            global_step=round_ + 1,
+        # Add most recent training stats to tracker.
+        self._tracker.log_metric(
+            name="epochs_trained",
+            value=self._summary["epochs_trained"][-1],
+            step=round_ + 1,
         )
 
-        self._summary_writer.add_scalar(
-            tag="best_validation_loss",
-            scalar_value=self._summary["best_validation_loss"][-1],
-            global_step=round_ + 1,
+        self._tracker.log_metric(
+            name="best_validation_loss",
+            value=self._summary["best_validation_loss"][-1],
+            step=round_ + 1,
         )
 
         # Add validation loss for every epoch.
@@ -1207,27 +1355,27 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             .item()
         )
         for i, vlp in enumerate(self._summary["validation_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="validation_loss",
-                scalar_value=vlp,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="validation_loss",
+                value=vlp,
+                step=int(offset + i),
             )
 
         for i, tlp in enumerate(self._summary["training_loss"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="training_loss",
-                scalar_value=tlp,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="training_loss",
+                value=tlp,
+                step=int(offset + i),
             )
 
         for i, eds in enumerate(self._summary["epoch_durations_sec"][offset:]):
-            self._summary_writer.add_scalar(
-                tag="epoch_durations_sec",
-                scalar_value=eds,
-                global_step=offset + i,
+            self._tracker.log_metric(
+                name="epoch_durations_sec",
+                value=eds,
+                step=int(offset + i),
             )
 
-        self._summary_writer.flush()
+        self._tracker.flush()
 
     @staticmethod
     def _describe_round(round_: int, summary: Dict[str, list]) -> str:
@@ -1266,11 +1414,11 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             "changes in the following two ways: "
             "1) `.train(..., retrain_from_scratch=True)` is not supported. "
             "2) When the loaded object calls the `.train()` method, it generates a new "
-            "tensorboard summary writer (instead of appending to the current one).",
+            "tracker instance (instead of appending to the current one).",
             stacklevel=2,
         )
         dict_to_save = {}
-        unpicklable_attributes = ["_summary_writer", "_build_neural_net"]
+        unpicklable_attributes = ["_tracker", "_build_neural_net"]
         for key in self.__dict__:
             if key in unpicklable_attributes:
                 dict_to_save[key] = None
@@ -1281,13 +1429,13 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
 
-        Also creates a new summary writer (because the previous one was set to `None`
+        Also creates a new tracker (because the previous one was set to `None`
         during serializing, see `__get_state__()`).
 
         Args:
             state_dict: State to be restored.
         """
-        state_dict["_summary_writer"] = self._default_summary_writer()
+        state_dict["_tracker"] = self._default_tracker()
         vars(self).update(state_dict)
 
 

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import asdict
 from typing import Tuple, Union
 
@@ -20,7 +21,10 @@ from sbi.inference.posteriors.ensemble_posterior import (
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -34,7 +38,7 @@ from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
 from sbi.inference.trainers.nle import NLE
-from sbi.inference.trainers.npe import NPE, NPE_A, NPE_C
+from sbi.inference.trainers.npe import NPE, NPE_A, NPE_C, NPE_PFN
 from sbi.inference.trainers.nre import NRE_A, NRE_B, NRE_C
 from sbi.inference.trainers.vfpe import FMPE, NPSE
 from sbi.neural_nets.embedding_nets import FCEmbedding
@@ -46,12 +50,27 @@ from sbi.neural_nets.factory import (
 )
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils import BoxUniform
+from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
 from sbi.utils.user_input_checks import validate_theta_and_x
+from tests.test_utils import mps_fallback_disabled
 
 pytestmark = pytest.mark.skipif(
     not gpu_available(), reason="No CUDA or MPS device available."
 )
+
+
+def _collect_transform_tensors(transform):
+    from sbi.utils.sbiutils import _apply_to_transform
+
+    tensors = []
+
+    def collect(tensor):
+        tensors.append(tensor)
+        return tensor
+
+    _apply_to_transform(transform, collect)
+    return tensors
 
 
 @pytest.mark.slow
@@ -368,22 +387,17 @@ def test_nograd_after_inference_train(inference_method) -> None:
 @pytest.mark.parametrize("num_dim", (1, 3))
 # NOTE: macOS MPS fails for nsf with num_dim > 1
 # might be related to https://github.com/pytorch/pytorch/issues/89127
-@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian"))
 @pytest.mark.parametrize("vi_method", ("rKL", "fKL", "IW", "alpha"))
-@pytest.mark.parametrize("sampling_method", ("naive", "sir"))
-def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
+def test_vi_on_gpu(num_dim: int, q: str, vi_method: str):
     """Test VI on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         vi_method: different vi methods
-        sampling_method: Different sampling methods
     """
 
     device = process_device("gpu")
-
-    if num_dim == 1 and q in ["mcf", "scf"]:
-        return
 
     # Skip the test for nsf on mps:0 as it results in NaNs.
     if device == "mps:0" and num_dim > 1 and q == "nsf":
@@ -412,7 +426,7 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
     posterior.vi_method = vi_method
 
     posterior.train(min_num_iters=9, max_num_iters=10, warm_up_rounds=10)
-    samples = posterior.sample((1,), method=sampling_method)
+    samples = posterior.sample((1,))
     logprobs = posterior.log_prob(samples)
 
     assert str(samples.device) == device, (
@@ -421,6 +435,78 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str, sampling_method: str):
     assert str(logprobs.device) == device, (
         f"The devices after training do not match: {logprobs.device} vs {device}"
     )
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+@pytest.mark.parametrize("num_dim", (2,))
+@pytest.mark.parametrize("flow_type", ("nsf", "maf"))
+def test_amortized_vi_on_gpu(num_dim: int, flow_type: str):
+    """Test amortized VI on GPU.
+
+    Args:
+        num_dim: parameter dimension
+        flow_type: flow architecture for the conditional flow
+    """
+    device = process_device("gpu")
+
+    # Skip nsf on mps as it can cause NaN issues
+    if device == "mps:0" and flow_type == "nsf":
+        return
+
+    prior = MultivariateNormal(
+        zeros(num_dim, device=device), eye(num_dim, device=device)
+    )
+
+    class FakePotential(BasePotential):
+        def __call__(self, theta, **kwargs):
+            return torch.ones(len(theta), dtype=torch.float32, device=device)
+
+        def allow_iid_x(self) -> bool:
+            return True
+
+    potential_fn = FakePotential(prior=prior, device=device)
+
+    # Generate mock simulation data on device
+    theta = prior.sample((500,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    posterior = VIPosterior(
+        potential_fn=potential_fn,
+        prior=prior,
+        device=device,
+    )
+
+    # Train amortized VI
+    posterior.train_amortized(
+        theta=theta,
+        x=x,
+        max_num_iters=50,
+        show_progress_bar=False,
+        flow_type=flow_type,
+        num_transforms=2,
+        hidden_features=16,
+    )
+
+    # Test sampling
+    x_o = zeros(1, num_dim, device=device)
+    samples = posterior.sample((10,), x=x_o)
+    logprobs = posterior.log_prob(samples, x=x_o)
+
+    assert str(samples.device) == device, (
+        f"Sample device mismatch: {samples.device} vs {device}"
+    )
+    assert str(logprobs.device) == device, (
+        f"Log prob device mismatch: {logprobs.device} vs {device}"
+    )
+
+    # Test batched sampling
+    x_batch = torch.randn(3, num_dim, device=device)
+    samples_batched = posterior.sample_batched((5,), x=x_batch)
+    assert str(samples_batched.device) == device, (
+        f"Batched sample device mismatch: {samples_batched.device} vs {device}"
+    )
+    assert samples_batched.shape == (5, 3, num_dim)
 
 
 @pytest.mark.gpu
@@ -442,7 +528,9 @@ def test_boxuniform_device_handling(arg_device, device):
     Also tests torch.device as argument of process_device."""
 
     arg_device = process_device(arg_device)
-    device = process_device(device)
+    # `device=None` asks BoxUniform to infer the device from low and high, so it must
+    # stay None rather than being resolved to the CPU.
+    device = None if device is None else process_device(device)
 
     prior = BoxUniform(
         low=zeros(1).to(arg_device), high=ones(1).to(arg_device), device=device
@@ -452,13 +540,16 @@ def test_boxuniform_device_handling(arg_device, device):
 
 @pytest.mark.gpu
 @pytest.mark.parametrize("method", [NPE_A, NPE_C])
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
-def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: str):
+def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C]):
     num_dim = 2
     num_rounds = 2
-    num_simulations = 100
+    num_simulations = 1000
     device = process_device("gpu")
-    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim), device=device)
+    # NPE-A's correction needs the Gaussian prior's precision to stay positive
+    # definite.
+    prior = MultivariateNormal(
+        torch.zeros(num_dim, device=device), torch.eye(num_dim, device=device)
+    )
     simulator = diagonal_linear_gaussian
 
     estimator = "mdn_snpe_a" if method == NPE_A else "mdn"
@@ -470,7 +561,7 @@ def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C], device: 
 
     proposal = prior
     for _ in range(num_rounds):
-        trainer.append_simulations(theta, x, proposal=proposal).train(max_num_epochs=2)
+        trainer.append_simulations(theta, x, proposal=proposal).train(max_num_epochs=20)
         proposal = trainer.build_posterior().set_default_x(torch.zeros(num_dim))
         theta = proposal.sample((num_simulations,))
         x = simulator(theta)
@@ -641,36 +732,43 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
         )
 
 
-@pytest.mark.slow
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
-@pytest.mark.parametrize(
-    "sampling_method", ["rejection", "importance", "mcmc", "direct"]
-)
-def test_to_method_on_posteriors(device: str, sampling_method: str):
-    """Test .to() method on posteriors.
+@pytest.fixture(scope="module")
+def trained_npe_for_device_test():
+    """Train NPE once, reused across all posterior .to() device tests."""
+    seed_all_backends(1)
+    num_dims = 2
+    num_simulations = 1000
+    prior = BoxUniform(-torch.ones(num_dims), torch.ones(num_dims))
+    trainer = NPE()
+    theta = prior.sample((num_simulations,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    trainer.append_simulations(theta, x).train(max_num_epochs=10)
+    return trainer, prior
 
-    Args:
-        device: device to train and sample the model on.
-        sampling_method: method to sample from the posterior.
-    """
-    device = process_device(device)
-    prior = BoxUniform(torch.zeros(3), torch.ones(3))
-    inference = NPE()
-    x_o = torch.zeros(2).to(device)
-    estimator = inference.append_simulations(
-        torch.randn((100, 3)), torch.randn((100, 2))
-    ).train(max_num_epochs=1)
-    if sampling_method == "rejection":
-        posterior = inference.build_posterior(
-            density_estimator=estimator,
-            prior=prior,
-            sample_with=sampling_method,
-        )
-    else:
-        posterior = inference.build_posterior(
-            density_estimator=estimator, prior=prior, sample_with=sampling_method
-        )
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "posterior_params",
+    [
+        pytest.param(DirectPosteriorParameters(), id="direct"),
+        pytest.param(RejectionPosteriorParameters(), id="rejection"),
+        pytest.param(ImportanceSamplingPosteriorParameters(), id="importance"),
+        pytest.param(
+            MCMCPosteriorParameters(num_chains=1, warmup_steps=1, thin=1),
+            id="mcmc",
+        ),
+    ],
+)
+def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_params):
+    """Test .to() method moves posteriors to GPU correctly and sampling works."""
+    device = process_device("gpu")
+    trainer, prior = trained_npe_for_device_test
+    num_dims = 2
+    x_o = torch.zeros(num_dims).to(device)
+    posterior = trainer.build_posterior(
+        prior=prior,
+        posterior_parameters=posterior_params,
+    )
     posterior.set_default_x(x_o)
     posterior.to(device)
 
@@ -681,55 +779,71 @@ def test_to_method_on_posteriors(device: str, sampling_method: str):
     assert sample_device.device.type == device.split(":")[0], (
         f"sample was not correctly moved to {device}."
     )
-    log_probs = posterior.log_prob(sample_device)
-    assert log_probs.device.type == device.split(":")[0], (
-        f"log_prob was not correctly moved to {device}."
+    posterior.potential_fn.set_x(x_o)
+    potential_values = posterior.potential_fn(sample_device)
+    assert potential_values.device.type == device.split(":")[0], (
+        f"potential was not correctly evaluated on {device}."
     )
 
-    for trasnf in posterior.theta_transform._inv.base_transform.parts:
+    for transform in posterior.theta_transform._inv.base_transform.parts:
         assert (
-            str(trasnf(torch.tensor([0.0], device=device)).device).strip(":0")
+            transform(torch.tensor([0.0], device=device)).device.type
             == device.split(":")[0]
         ), "Prior transform is on the correct device."
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu"])
-@pytest.mark.parametrize("device_inference", ["cpu", "gpu"])
-@pytest.mark.parametrize("num_trials", [1, 2])
-@pytest.mark.parametrize("vf_trainer", [FMPE, NPSE])
-def test_vector_field_methods_device_handling(
-    vf_trainer, device: str, device_inference: str, num_trials: int
-):
-    """Test VectorFieldPosterior on different devices training and inference devices.
-
-    Tests both ode and sde sampling for both FMPE and NPSE.
-
-    Tests iid methods for num_trials = 2.
-
-    Args:
-        vf_trainer: vector field trainer class to use.
-        device: device to train the model on.
-        device_inference: device to run the inference on.
-        iid_method: method to sample from the posterior.
-    """
-
+@pytest.fixture(
+    scope="module",
+    params=[
+        pytest.param((FMPE, "cpu"), id="FMPE-cpu"),
+        pytest.param((FMPE, "gpu"), id="FMPE-gpu"),
+        pytest.param((NPSE, "cpu"), id="NPSE-cpu"),
+        pytest.param((NPSE, "gpu"), id="NPSE-gpu"),
+    ],
+)
+def trained_vf_for_device_test(request):
+    """Train vector field model once per (trainer, device) combination."""
+    seed_all_backends(1)
+    vf_trainer, device_str = request.param
+    device = process_device(device_str)
     num_dims = 2
     num_simulations = 1000
-    if vf_trainer == NPSE:
-        iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
-    else:
-        iid_methods = ["fnpe"]
-
-    device = process_device(device)
-    device_inference = process_device(device_inference)
-
-    prior = BoxUniform(torch.zeros(num_dims), torch.ones(num_dims), device=device)
+    prior = BoxUniform(-torch.ones(num_dims), torch.ones(num_dims), device=device)
     theta = prior.sample((num_simulations,))
     x = theta + 0.1 * torch.randn_like(theta)
-
     inference = vf_trainer(prior=prior, device=device)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=10)
+    inference.append_simulations(theta, x).train(max_num_epochs=10)
+    return vf_trainer, inference, device
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device_inference", ["cpu", "gpu"])
+@pytest.mark.parametrize("num_trials", [1, 2])
+def test_vector_field_methods_degvice_handling(
+    trained_vf_for_device_test, device_inference: str, num_trials: int
+):
+    """Test VectorFieldPosterior on different training and inference devices.
+
+    Tests both ode and sde sampling for both FMPE and NPSE.
+    Tests iid methods for num_trials = 2.
+    """
+    vf_trainer, inference, _ = trained_vf_for_device_test
+    device_inference = process_device(device_inference)
+    num_dims = 2
+
+    iid_methods = ["fnpe"]
+    if vf_trainer == NPSE and num_trials > 1:
+        if mps_fallback_disabled(device_inference):
+            warnings.warn(
+                "Testing only fnpe: the Gaussian iid methods need "
+                "aten::_linalg_eigh.eigenvalues, which MPS does not implement. "
+                "Re-run with PYTORCH_ENABLE_MPS_FALLBACK=1 to cover them.",
+                UserWarning,
+                stacklevel=1,
+            )
+        else:
+            iid_methods = ["fnpe", "gauss", "auto_gauss", "jac_gauss"]
+
     posterior = inference.build_posterior(
         sample_with="sde" if num_trials > 1 else "ode"
     )
@@ -742,10 +856,16 @@ def test_vector_field_methods_device_handling(
         f"VectorFieldPosterior is not in device {device_inference}."
     )
 
-    x_o = torch.ones(num_trials, num_dims).to(device_inference)
+    x_o = torch.zeros(num_trials, num_dims).to(device_inference)
     if num_trials > 1:
         for iid_method in iid_methods:
-            samples = posterior.sample((2,), x=x_o, iid_method=iid_method)
+            samples = posterior.sample(
+                (2,),
+                x=x_o,
+                iid_method=iid_method,
+                steps=10,
+                reject_outside_prior=False,
+            )
             assert samples.device.type == device_inference.split(":")[0], (
                 f"Samples are not on device {device_inference}. "
                 f"{vf_trainer.__name__} with {iid_method}"
@@ -753,12 +873,111 @@ def test_vector_field_methods_device_handling(
     else:
         samples = posterior.sample((2,), x=x_o)
         assert samples.device.type == device_inference.split(":")[0], (
-            f"Samples are not on device {device_inference}. "
-            f"{vf_trainer.__name__} with {iid_method}"
+            f"Samples are not on device {device_inference}. {vf_trainer.__name__}"
         )
 
         log_probs = posterior.log_prob(samples, x=x_o)
         assert log_probs.device.type == device_inference.split(":")[0], (
             f"log_prob was not correctly moved to {device_inference}. "
-            f"{vf_trainer.__name__} with {iid_method}"
+            f"{vf_trainer.__name__}"
         )
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+@pytest.mark.parametrize("prior_device", ["cpu", "gpu"])
+def test_npe_pfn_on_device(prior_device):
+    """NPE_PFN should work correctly when prior/data come from different devices.
+
+    TabPFN always runs on CPU, so the estimator context must remain on CPU
+    regardless of where the prior or observations live.
+    """
+    pytest.importorskip("tabpfn")
+    prior_device = process_device(prior_device)
+    num_dim = 2
+    num_simulations = 30
+
+    prior = BoxUniform(
+        low=-2 * torch.ones(num_dim).to(prior_device),
+        high=2 * torch.ones(num_dim).to(prior_device),
+        device=prior_device,
+    )
+    theta = prior.sample((num_simulations,)).to("cpu")
+    x = theta + torch.randn_like(theta)
+    x_o = torch.zeros(1, num_dim)
+
+    inferer = NPE_PFN(prior=prior, device=prior_device)
+    inferer.append_simulations(theta, x)
+    posterior = inferer.build_posterior(sample_with="filtered_direct")
+    posterior.set_default_x(x_o)
+
+    expected_device = prior_device.split(":")[0]
+
+    samples = posterior.sample((5,))
+    assert samples.shape == (5, num_dim)
+    assert samples.device.type == expected_device, (
+        f"Samples are on {samples.device}, expected {prior_device}."
+    )
+
+    log_probs = posterior.log_prob(samples)
+    assert log_probs.shape == (5,)
+    assert log_probs.device.type == expected_device, (
+        f"log_prob is on {log_probs.device}, expected {prior_device}."
+    )
+
+    assert posterior.posterior_estimator._context_input.device.type == "cpu", (
+        "TabPFN context must always remain on CPU."
+    )
+
+
+@pytest.mark.gpu
+def test_mdn_device_transform():
+    """MDN with transform_to_unconstrained moves transform tensors on .to()."""
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+
+    device = process_device("gpu")
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((512,)), torch.randn(512, 3)
+    est = build_mdn(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+    est.to(device)
+
+    transform_tensors = _collect_transform_tensors(est._prior_transform)
+    assert transform_tensors, "expected the prior transform to hold tensors"
+    for t in transform_tensors:
+        assert t.device.type == device.split(":")[0], (
+            f"transform tensor on {t.device}, expected {device}"
+        )
+
+    theta = prior.sample((5,)).to(device)
+    cond = torch.randn(1, 3).to(device)
+    lp = est.log_prob(theta.unsqueeze(1), cond)
+    assert lp.device.type == device.split(":")[0]
+    s = est.sample((10,), cond)
+    assert s.device.type == device.split(":")[0]
+
+
+@pytest.mark.gpu
+def test_zuko_device_transform():
+    """Zuko's unconstraining transform follows accelerator device moves."""
+    from sbi.neural_nets.net_builders.flow import build_zuko_maf
+    from sbi.utils.sbiutils import CallableTransform
+
+    device = process_device("gpu")
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((512,)), torch.randn(512, 3)
+    est = build_zuko_maf(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+    est.to(device)
+
+    wrappers = [
+        module for module in est.modules() if isinstance(module, CallableTransform)
+    ]
+    assert len(wrappers) == 1
+    assert all(
+        tensor.device.type == device.split(":")[0]
+        for tensor in _collect_transform_tensors(wrappers[0].transform)
+    )
+
+    theta = prior.sample((5,)).to(device)
+    cond = torch.randn(1, 3).to(device)
+    assert est.log_prob(theta.unsqueeze(1), cond).device.type == device.split(":")[0]
+    assert est.sample((10,), cond).device.type == device.split(":")[0]

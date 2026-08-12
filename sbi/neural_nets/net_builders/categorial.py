@@ -25,6 +25,7 @@ def build_categoricalmassestimator(
     num_layers: int = 2,
     num_categories_per_variable: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),
+    dropout_probability: float = 0.0,
 ):
     """Returns a density estimator for a categorical random variable.
 
@@ -37,6 +38,7 @@ def build_categoricalmassestimator(
         num_layers: Number of hidden layers.
         embedding_net: Embedding net for y.
         num_categories: number of categories for each variable.
+        dropout_probability: dropout probability for regularization. default is 0.0.
     """
 
     if z_score_x != "none":
@@ -73,6 +75,7 @@ def build_categoricalmassestimator(
         num_context_features=y_numel,
         num_blocks=num_layers,
         embedding_net=embedding_net,
+        dropout_probability=dropout_probability,
     )
 
     return CategoricalMassEstimator(

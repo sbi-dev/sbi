@@ -6,32 +6,74 @@ from typing import Dict, Optional, Union
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers._contracts import LossArgsNRE
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.net_builders.estimator_configs import RatioEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
-from sbi.sbi_types import TensorBoardSummaryWriter
+from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import assert_all_finite
 
 
 class NRE_B(RatioEstimatorTrainer):
-    """SRE, here known as Neural Ratio Estimation algorithm (NRE-B) [1].
+    r"""Neural Ratio Estimation (NRE-B / SRE) as in Durkan et al. (2020) [1].
+
+    NRE-B is an extension of NRE-A that trains a neural classifier using a contrastive
+    (1-out-of-K) loss to estimate the likelihood-to-evidence ratio. Instead of binary
+    classification, it contrasts one sample from the joint $p(\theta, x)$ against $K-1$
+    samples from the marginals $p(\theta)p(x)$. This multi-class formulation improves
+    training stability compared to NRE-A.
+
+    NRE can be run multi-round without need for correction, but requires running
+    potentially expensive posterior sampling in each round.
 
     [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,
         ICML 2020, https://arxiv.org/pdf/2002.03712
+
+    Example:
+    --------
+
+    ::
+
+        import torch
+        from sbi.inference import NRE_B
+        from sbi.utils import BoxUniform
+
+        # 1. Setup prior and simulate data
+        prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
+        theta = prior.sample((100,))
+        x = theta + torch.randn_like(theta) * 0.1
+
+        # 2. Train ratio estimator with contrastive loss
+        inference = NRE_B(prior=prior)
+        ratio_estimator = inference.append_simulations(theta, x).train(num_atoms=10)
+
+        # 3. Build posterior
+        posterior = inference.build_posterior(ratio_estimator)
+
+        # 4. Sample from posterior
+        x_o = torch.randn(1, 3)
+        samples = posterior.sample((1000,), x=x_o)
     """
 
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
+        classifier: Union[
+            str,
+            RatioEstimatorBuilder,
+            ConditionalEstimatorBuildFn[RatioEstimator],
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[TensorBoardSummaryWriter] = None,
+        summary_writer: Optional[SummaryWriter] = None,
+        tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
         r"""Initialize NRE_B.
@@ -40,18 +82,21 @@ class NRE_B(RatioEstimatorTrainer):
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. If `None`, the
                 prior must be passed to `.build_posterior()`.
-            classifier: Classifier trained to approximate likelihood ratios. If it is
-                a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet), or a callable that implements the
-                `ConditionalEstimatorBuilder` protocol. The callable will
-                be called with the first batch of simulations (theta, x), which can thus
-                be used for shape inference and potentially for z-scoring. It returns a
-                `RatioEstimator`.
+            classifier: The classifier used to approximate the
+                likelihood-to-evidence ratio. If ``None`` (default), uses a
+                ``RatioEstimatorBuilder`` with default settings. A
+                ``RatioEstimatorBuilder`` can be passed to configure
+                the classifier. If it is a string (deprecated), use a
+                pre-configured network of the provided type (one of
+                linear, mlp, resnet). Alternatively, a function that
+                builds a custom neural network can be provided.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """

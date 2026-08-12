@@ -7,7 +7,6 @@ from sbi.samplers.mcmc.init_strategy import (
     resample_given_potential_fn,
     sir_init,
 )
-from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,

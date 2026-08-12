@@ -11,6 +11,7 @@ import torch.distributions.transforms as torch_tf
 from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
+from sbi.sbi_types import AcceptRejectFn, SampleProposal
 from sbi.utils.sbiutils import gradient_ascent
 
 
@@ -228,8 +229,8 @@ def rejection_sample(
 
 @torch.no_grad()
 def accept_reject_sample(
-    proposal: Callable,
-    accept_reject_fn: Callable,
+    proposal: SampleProposal,
+    accept_reject_fn: AcceptRejectFn,
     num_samples: int,
     num_xos: int = 1,
     show_progress_bars: bool = False,
@@ -257,12 +258,12 @@ def accept_reject_sample(
            density during evaluation of the posterior.
 
     Args:
-        proposal: A callable that takes `sample_shape` as arguments (and kwargs as
-            needed). Returns samples from the proposal distribution with shape
-            (*sample_shape, event_dim).
-        accept_reject_fn: Function that evaluates which samples are accepted or
-            rejected. Must take a batch of parameters and return a boolean tensor which
-            indicates which parameters get accepted.
+        proposal: A callable following the `SampleProposal` protocol, i.e., takes
+            `sample_shape` as first argument (and kwargs as needed). Returns samples
+            from the proposal distribution with shape (*sample_shape, event_dim).
+        accept_reject_fn: A callable following the `AcceptRejectFn` protocol that
+            evaluates which samples are accepted or rejected. Takes a batch of
+            parameters and returns a boolean tensor indicating which are accepted.
         num_samples: Desired number of samples.
         num_xos: Number of conditions for batched_sampling (currently only accepting
             one batch dimension for the condition).
@@ -366,7 +367,7 @@ def accept_reject_sample(
 
         # Sample and reject.
         candidates = proposal(
-            (sampling_batch_size,),  # type: ignore
+            torch.Size((sampling_batch_size,)),
             **proposal_sampling_kwargs,
         )
         # SNPE-style rejection-sampling when the proposal is the neural net.
