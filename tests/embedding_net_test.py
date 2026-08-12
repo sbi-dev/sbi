@@ -14,7 +14,10 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils
 from sbi.inference import NLE, NPE, NRE, simulate_for_sbi
-from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters , DirectPosteriorParameters
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    MCMCPosteriorParameters,
+)
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,

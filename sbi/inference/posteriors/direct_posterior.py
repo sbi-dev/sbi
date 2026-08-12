@@ -63,6 +63,9 @@ class DirectPosterior(NeuralPosterior):
             enable_transform: Whether to transform parameters to unconstrained space
                 during MAP optimization. When False, an identity transform will be
                 returned for `theta_transform`.
+            check_finite_x: Whether to raise if the observed data `x_o` contains NaNs
+                or Infs. Set to False when the embedding net expects NaNs, e.g., when
+                `PermutationInvariantEmbedding` pads a varying number of trials.
         """
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for

@@ -75,6 +75,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 returned for `theta_transform`. True is not supported yet.
             sample_with: Whether to sample from the posterior using the ODE-based
                 sampler or the SDE-based sampler.
+            check_finite_x: Whether to raise if the observed data `x_o` contains NaNs
+                or Infs. Set to False when the embedding net expects NaNs, e.g., when
+                `PermutationInvariantEmbedding` pads a varying number of trials.
             **kwargs: Additional keyword arguments passed to
                 `VectorFieldBasedPotential`.
         """

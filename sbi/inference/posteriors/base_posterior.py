@@ -46,6 +46,9 @@ class NeuralPosterior:
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Deprecated, should not be passed.
+            check_finite_x: Whether to raise if the observed data `x_o` contains NaNs
+                or Infs. Set to False when the embedding net expects NaNs, e.g., when
+                `PermutationInvariantEmbedding` pads a varying number of trials.
         """
         if x_shape is not None:
             warn(
@@ -183,26 +186,22 @@ class NeuralPosterior:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
         x = process_x(x, x_event_shape=None)
-
         if self._check_finite_x:
-           assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
+            assert_all_finite(x, "Observed data x_o")
 
         self._x = x.to(self._device)
-
         self._map = None
         return self
-    
+
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
             x = process_x(x, x_event_shape=None)
-
             if self._check_finite_x:
-                assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
+                assert_all_finite(x, "Observed data x_o")
 
             return x
-        
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."

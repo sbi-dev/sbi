@@ -18,7 +18,7 @@ from torch.distributions import (
     Uniform,
 )
 
-from sbi.inference import NPE, NPE_A, NPE_C, simulate_for_sbi
+from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
@@ -277,54 +277,41 @@ def test_process_prior(prior):
         (
             torch.cat([ones(3), torch.tensor([float("nan")]), ones(3)]),  # contains nan
             torch.Size([7]),
-            
         ),
         (
             # contains inf
             torch.cat([ones(3), torch.tensor([float("inf")]), ones(3)]).expand(10, -1),
             torch.Size([7]),
-            
         ),
     ),
 )
 def test_process_x(x, x_shape):
     process_x(x, x_shape)
-    
-def test_set_default_x_check_finite():
+
+
+@pytest.mark.parametrize("check_finite_x", (True, False))
+def test_posterior_check_finite_x(check_finite_x: bool):
+    """`x_o` with NaNs must raise unless the user opts out via `check_finite_x`."""
+
     prior = BoxUniform(zeros(2), ones(2))
-
-    inference = NPE_C(
-        prior=prior,
-        density_estimator="maf",
-        show_progress_bars=False,
-    )
-
+    inference = NPE_C(prior=prior, show_progress_bars=False)
     theta = prior.sample((100,))
-    x = torch.randn(100, 2)
-
-    posterior_estimator = (
-        inference.append_simulations(theta, x)
-        .train(max_num_epochs=1)
-    )
-
-    x_with_nan = torch.tensor([0.0, float("nan")])
-
-    posterior = DirectPosterior(
-        posterior_estimator=posterior_estimator,
-        prior=prior,
-    )
-
-    with pytest.raises(ValueError):
-        posterior.set_default_x(x_with_nan)
+    inference.append_simulations(theta, torch.randn(100, 2)).train(max_num_epochs=1)
 
     posterior = inference.build_posterior(
-    posterior_parameters=DirectPosteriorParameters(
-        check_finite_x=False
-    ),
-)
+        posterior_parameters=DirectPosteriorParameters(check_finite_x=check_finite_x)
+    )
+    x_with_nan = torch.tensor([0.0, float("nan")])
 
-    posterior.set_default_x(x_with_nan)
-
+    if check_finite_x:
+        # Both the default-x and the per-call path must be guarded.
+        with pytest.raises(ValueError, match="NaN/Inf"):
+            posterior.set_default_x(x_with_nan)
+        with pytest.raises(ValueError, match="NaN/Inf"):
+            posterior.log_prob(theta[:2], x=x_with_nan)
+    else:
+        posterior.set_default_x(x_with_nan)
+        assert posterior.default_x.isnan().any()
 
 
 @pytest.mark.parametrize(
@@ -343,7 +330,6 @@ def test_set_default_x_check_finite():
         (lambda _: torch.randn(10, 2), BoxUniform(zeros(2), ones(2)), (10, 2)),
     ),
 )
-
 def test_process_simulator(simulator: Callable, prior: Distribution, x_shape: Tuple):
     prior, theta_dim, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
