@@ -30,7 +30,7 @@ from sbi.utils.torchutils import process_device
         ),
         MixtureSameFamily(
             Categorical(torch.ones(2)),
-            Normal(torch.randn(2), torch.rand(2)),
+            Normal(torch.tensor([-1.5, 1.5]), torch.tensor([0.5, 0.75])),
         ),
     ],
 )
