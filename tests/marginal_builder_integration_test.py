@@ -292,6 +292,31 @@ def test_extra_kwargs_typo_is_not_silent(batch_x):
         MarginalNSFConfig(extra_kwargs={"binz": 20}).build(batch_x)
 
 
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"hidden_features": 200}, {"extra_kwargs": {"activation": torch.nn.ELU}}],
+    ids=["hidden_features", "extra_kwargs"],
+)
+def test_gf_rejects_the_settings_it_would_drop(kwargs):
+    """GF takes no network without a condition, so these never arrive.
+
+    Zuko forwards them to an element-wise transform that builds nothing when
+    `context=0`, which a marginal flow always has. They are not filtered by
+    `nflow_specific_kwargs` and Zuko raises nothing, so only the config can
+    catch them.
+    """
+    with pytest.raises(ValueError, match="GF does not use"):
+        MarginalGFConfig(**kwargs)
+
+
+def test_gf_still_accepts_the_settings_that_work(batch_x):
+    """The guard must not block the two knobs GF does read."""
+    assert _differs(
+        _build_seeded(MarginalGFConfig(), batch_x),
+        _build_seeded(MarginalGFConfig(num_transforms=8, components=16), batch_x),
+    )
+
+
 def test_extra_kwargs_cannot_shadow_a_field():
     """Fields set through `extra_kwargs` would bypass the config's validation."""
     with pytest.raises(ValueError, match="are fields of"):
@@ -306,7 +331,12 @@ def test_extra_kwargs_rejects_the_names_the_flow_never_sees(key):
 
 
 def test_every_model_has_a_config():
-    """The registry must cover the models the deprecated string path accepts."""
+    """The registry, the Literal and the enum must all name the same models.
+
+    `MARGINAL_MODELS` and `_MARGINAL_CONFIGS` are written out separately, so
+    nothing but this stops them drifting apart.
+    """
+    assert set(get_args(MARGINAL_MODELS)) == set(_MARGINAL_CONFIGS)
     assert set(_MARGINAL_CONFIGS) == {flow.value for flow in ZukoFlowType}
 
     for model, config_cls in _MARGINAL_CONFIGS.items():
@@ -358,6 +388,12 @@ def test_conditional_builder_raises():
     """A builder for a conditional estimator cannot build a marginal one."""
     with pytest.raises(TypeError, match="marginal config"):
         MarginalTrainer(density_estimator=DensityEstimatorBuilder(model="maf"))
+
+
+def test_config_class_instead_of_instance_raises():
+    """A forgotten `()` would otherwise pass the callable branch."""
+    with pytest.raises(TypeError, match="not an instance"):
+        MarginalTrainer(density_estimator=MarginalNSFConfig)
 
 
 def test_non_callable_density_estimator_raises():
