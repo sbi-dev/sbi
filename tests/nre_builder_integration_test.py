@@ -11,8 +11,11 @@ from torch.distributions import MultivariateNormal
 from sbi.inference import BNRE, NRE_A, NRE_B, NRE_C
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
-    DensityEstimatorBuilder,
-    RatioEstimatorBuilder,
+    _CLASSIFIER_CONFIGS,
+    LinearClassifierConfig,
+    MAFConfig,
+    MLPClassifierConfig,
+    ResNetClassifierConfig,
 )
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.user_input_checks import check_estimator_arg
@@ -24,14 +27,15 @@ _NRE_TRAINERS = [NRE_A, NRE_B, NRE_C, BNRE]
     "trainer_cls", _NRE_TRAINERS, ids=["nre_a", "nre_b", "nre_c", "bnre"]
 )
 def test_no_warning_for_valid_inputs(trainer_cls):
-    """None default, builder, and callable should not emit FutureWarning."""
+    """None default, config, and callable should not emit FutureWarning."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    builder = RatioEstimatorBuilder(model="resnet")
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
         trainer_cls(prior, show_progress_bars=False)
-        trainer_cls(prior, classifier=builder, show_progress_bars=False)
+        trainer_cls(
+            prior, classifier=ResNetClassifierConfig(), show_progress_bars=False
+        )
         trainer_cls(
             prior,
             classifier=classifier_nn(model="resnet"),
@@ -45,25 +49,18 @@ def test_no_warning_for_valid_inputs(trainer_cls):
 def test_string_emits_deprecation_warning(trainer_cls):
     """Passing a string to classifier should emit FutureWarning."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    with pytest.warns(FutureWarning, match="deprecated"):
+    with pytest.warns(FutureWarning, match="from sbi.neural_nets import"):
         trainer_cls(prior, classifier="resnet", show_progress_bars=False)
 
 
 @pytest.mark.parametrize(
     "trainer_cls", _NRE_TRAINERS, ids=["nre_a", "nre_b", "nre_c", "bnre"]
 )
-def test_wrong_builder_type_raises(trainer_cls):
-    """Passing a DensityEstimatorBuilder should raise TypeError early."""
+def test_wrong_config_family_raises(trainer_cls):
+    """Passing a density config should raise TypeError early."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    wrong_builder = DensityEstimatorBuilder(model="maf")
-    with pytest.raises(TypeError, match="RatioEstimatorBuilder"):
-        trainer_cls(prior, classifier=wrong_builder, show_progress_bars=False)
-
-
-def test_builder_invalid_model():
-    """Invalid model should raise ValueError at construction."""
-    with pytest.raises(ValueError, match="Unknown model"):
-        RatioEstimatorBuilder(model="invalid")
+    with pytest.raises(TypeError, match="ClassifierConfigBase"):
+        trainer_cls(prior, classifier=MAFConfig(), show_progress_bars=False)
 
 
 @pytest.mark.parametrize(
@@ -71,16 +68,14 @@ def test_builder_invalid_model():
     [NRE_A, NRE_B],
     ids=["nre_a", "nre_b"],
 )
-@pytest.mark.parametrize("model", ("resnet", "mlp", "linear"))
-def test_train_with_builder(trainer_cls, model):
-    """Train with a RatioEstimatorBuilder end-to-end."""
+@pytest.mark.parametrize("model", sorted(_CLASSIFIER_CONFIGS))
+def test_train_with_config(trainer_cls, model):
+    """Train with a per-model classifier config end-to-end."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    kwargs = {"model": model}
-    if model != "linear":
-        kwargs["hidden_features"] = 16
-    builder = RatioEstimatorBuilder(**kwargs)
-    inference = trainer_cls(prior, classifier=builder, show_progress_bars=False)
+    kwargs = {} if model == "linear" else {"hidden_features": 16}
+    config = _CLASSIFIER_CONFIGS[model](**kwargs)
+    inference = trainer_cls(prior, classifier=config, show_progress_bars=False)
 
     theta = prior.sample((200,))
     x = theta + 0.1 * torch.randn_like(theta)
@@ -108,13 +103,13 @@ def test_train_with_builder(trainer_cls, model):
     [NRE_A, NRE_B],
     ids=["nre_a", "nre_b"],
 )
-def test_builder_role_shapes(trainer_cls):
+def test_config_role_shapes(trainer_cls):
     """Verify input_shape=theta and condition_shape=x with asymmetric dims."""
     num_dim_theta = 2
     num_dim_x = 5
     prior = MultivariateNormal(zeros(num_dim_theta), eye(num_dim_theta))
-    builder = RatioEstimatorBuilder(model="resnet", hidden_features=16)
-    inference = trainer_cls(prior, classifier=builder, show_progress_bars=False)
+    config = ResNetClassifierConfig(hidden_features=16)
+    inference = trainer_cls(prior, classifier=config, show_progress_bars=False)
 
     theta = prior.sample((200,))
     x = torch.randn(200, num_dim_x)
@@ -129,105 +124,17 @@ def test_builder_role_shapes(trainer_cls):
 @pytest.mark.parametrize(
     "estimator",
     (
-        RatioEstimatorBuilder(model="resnet"),
-        RatioEstimatorBuilder(model="mlp"),
-        RatioEstimatorBuilder(model="linear"),
+        ResNetClassifierConfig(),
+        MLPClassifierConfig(),
+        LinearClassifierConfig(),
         "resnet",
         classifier_nn(model="resnet"),
     ),
-    ids=["resnet_builder", "mlp_builder", "linear_builder", "string", "callable"],
+    ids=["resnet", "mlp", "linear", "string", "callable"],
 )
 def test_check_estimator_arg_accepts_valid_inputs(estimator):
-    """check_estimator_arg accepts ratio builders, strings, and callables."""
+    """check_estimator_arg accepts classifier configs, strings, and callables."""
     check_estimator_arg(estimator)
-
-
-def test_literal_field_validation():
-    """Typos in Literal fields should raise ValueError at construction."""
-    with pytest.raises(ValueError, match="Invalid value.*z_score_input"):
-        RatioEstimatorBuilder(z_score_input="typo")
-    with pytest.raises(ValueError, match="Invalid value.*z_score_condition"):
-        RatioEstimatorBuilder(z_score_condition="typo")
-
-
-def test_inapplicable_fields_rejected():
-    """Fields not accepted by the chosen model's build_fn raise ValueError."""
-    # linear doesn't accept hidden_features
-    with pytest.raises(ValueError, match="silently ignored"):
-        RatioEstimatorBuilder(model="linear", hidden_features=64)
-    # linear doesn't accept num_blocks
-    with pytest.raises(ValueError, match="silently ignored"):
-        RatioEstimatorBuilder(model="linear", num_blocks=5)
-    # mlp doesn't accept num_blocks
-    with pytest.raises(ValueError, match="silently ignored"):
-        RatioEstimatorBuilder(model="mlp", num_blocks=5)
-
-
-def test_applicable_fields_accepted():
-    """Fields that ARE accepted by the chosen model should not raise."""
-    # resnet accepts all of these
-    RatioEstimatorBuilder(
-        model="resnet",
-        hidden_features=64,
-        num_blocks=3,
-        dropout_probability=0.1,
-        use_batch_norm=True,
-    )
-    # mlp accepts hidden_features and norm_layer
-    RatioEstimatorBuilder(model="mlp", hidden_features=64)
-
-
-def test_frozen_immutability():
-    """Builder instances should be frozen (immutable)."""
-    builder = RatioEstimatorBuilder(model="resnet")
-    with pytest.raises(AttributeError):
-        builder.model = "mlp"
-    with pytest.raises(AttributeError):
-        builder.hidden_features = 42
-
-
-def test_repr_shows_discriminator_and_set_fields():
-    """__repr__ should show model + only non-default fields."""
-    builder = RatioEstimatorBuilder(model="resnet", hidden_features=64)
-    r = repr(builder)
-    assert "model='resnet'" in r
-    assert "hidden_features=64" in r
-    assert "z_score_input" not in r
-    assert "extra_kwargs" not in r
-
-
-def test_repr_always_shows_discriminator_even_if_default():
-    """Discriminator field should appear even when it equals the default."""
-    builder = RatioEstimatorBuilder()
-    r = repr(builder)
-    assert "model='resnet'" in r
-
-
-def test_sync_classifier_build_fns():
-    """_VALID_CLASSIFIER_MODELS must match _classifier_build_fns() keys."""
-    from sbi.neural_nets.net_builders.estimator_configs import (
-        _VALID_CLASSIFIER_MODELS,
-        _classifier_build_fns,
-    )
-
-    assert set(_classifier_build_fns().keys()) == _VALID_CLASSIFIER_MODELS
-
-
-def test_z_score_alias_in_build_kwargs():
-    """z_score_input → z_score_x and z_score_condition → z_score_y."""
-    builder = RatioEstimatorBuilder(
-        model="resnet",
-        z_score_input="independent",
-        z_score_condition="structured",
-    )
-    kwargs = builder._build_kwargs()
-    assert "z_score_x" in kwargs
-    assert "z_score_y" in kwargs
-    assert kwargs["z_score_x"] == "independent"
-    assert kwargs["z_score_y"] == "structured"
-    # Original names should NOT appear
-    assert "z_score_input" not in kwargs
-    assert "z_score_condition" not in kwargs
 
 
 def test_warning_includes_import_path():
@@ -235,28 +142,3 @@ def test_warning_includes_import_path():
     prior = MultivariateNormal(zeros(2), eye(2))
     with pytest.warns(FutureWarning, match="from sbi.neural_nets import"):
         NRE_A(prior, classifier="resnet", show_progress_bars=False)
-
-
-def test_embedding_net_semantics():
-    """embedding_net_theta embeds theta; embedding_net_x embeds the data x.
-
-    The underlying build_*_classifier functions use positional x/y naming in
-    which their `embedding_net_x` applies to theta; the builder translates so
-    that the user-facing names match `classifier_nn` (and the attributes of
-    the built RatioEstimator itself).
-    """
-    theta = torch.randn(100, 2)
-    x = torch.randn(100, 5)
-    emb_theta = torch.nn.Linear(2, 3)
-    emb_x = torch.nn.Linear(5, 4)
-    builder = RatioEstimatorBuilder(
-        embedding_net_theta=emb_theta, embedding_net_x=emb_x
-    )
-    estimator = builder.build(batch_input=theta, batch_condition=x)
-
-    theta_slots = [n for n, m in estimator.named_modules() if m is emb_theta]
-    x_slots = [n for n, m in estimator.named_modules() if m is emb_x]
-    assert all("embedding_net_theta" in n for n in theta_slots) and theta_slots
-    assert all("embedding_net_x" in n for n in x_slots) and x_slots
-    # Asymmetric dims: swapped routing would crash the forward pass.
-    estimator(theta[:5], x[:5])
