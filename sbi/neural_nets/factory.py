@@ -1,21 +1,21 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from dataclasses import replace
 from enum import Enum
 from typing import Any, Callable, Literal, Optional, Union
 
 from torch import Tensor, nn
 
-from sbi.neural_nets.net_builders.classifier import (
-    build_linear_classifier,
-    build_mlp_classifier,
-    build_resnet_classifier,
-)
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
-    ClassifierConfig,
+    _BUILD_KWARG_ALIASES,
+    _CLASSIFIER_CONFIGS,
+    _DENSITY_CONFIGS,
     ConditionalFlowConfig,
     MarginalFlowConfig,
+    _config_from_factory_kwargs,
+    _factory_defaults,
 )
 from sbi.neural_nets.net_builders.flow import (
     build_made,
@@ -83,6 +83,90 @@ class ZukoFlowType(Enum):
 embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
                         constructing the net building function."""
 
+# Maps a config field to the name the factory exposes it under, so that the
+# factory's own defaults can be read back from its signature.
+_CLASSIFIER_FACTORY_FIELDS: dict = {
+    "z_score_input": "z_score_theta",
+    "z_score_condition": "z_score_x",
+    "hidden_features": "hidden_features",
+    "embedding_net_theta": "embedding_net_theta",
+    "embedding_net_x": "embedding_net_x",
+}
+
+_POSTERIOR_FACTORY_FIELDS: dict = {
+    "z_score_input": "z_score_theta",
+    "z_score_condition": "z_score_x",
+    "hidden_features": "hidden_features",
+    "num_transforms": "num_transforms",
+    "num_bins": "num_bins",
+    "embedding_net": "embedding_net",
+    "num_components": "num_components",
+}
+
+# NLE models p(x|theta), so the two z-scoring arguments swap roles.
+_LIKELIHOOD_FACTORY_FIELDS: dict = {
+    **_POSTERIOR_FACTORY_FIELDS,
+    "z_score_input": "z_score_x",
+    "z_score_condition": "z_score_theta",
+}
+
+
+_Z_SCORE_FIELDS: frozenset = frozenset({"z_score_input", "z_score_condition"})
+
+
+def _drop_unset_z_scoring(named: dict) -> dict:
+    """Drop the z-scoring arguments left at ``None``.
+
+    The factories accept ``None`` there, and it has always meant "leave it to
+    the builder", not "do not z-score": the old configs treated ``None`` as
+    unset and never forwarded it. Dropping the key keeps that, and lets the
+    config's own default stand.
+    """
+    return {k: v for k, v in named.items() if v is not None or k not in _Z_SCORE_FIELDS}
+
+
+def _density_named_kwargs(embedding_net: nn.Module, **named: Any) -> dict:
+    """Return the density factories' named arguments as config fields."""
+    return _drop_unset_z_scoring(
+        dict(
+            named,
+            embedding_net=check_net_device(
+                embedding_net, "cpu", embedding_net_warn_msg
+            ),
+        )
+    )
+
+
+def _legacy_density_build_fn(
+    model: str,
+    named: dict,
+    extra: dict,
+    input_is_theta: bool,
+) -> Callable:
+    """Return a build function for the models that have no config yet.
+
+    ``mnle`` and ``mnpe`` are reached through the density factories by the
+    deprecated string path of MNLE and MNPE, and are built from flat kwargs by
+    ``build_mnle`` / ``build_mnpe`` rather than from a config.
+    """
+    config = ConditionalFlowConfig.from_kwargs(
+        **{_BUILD_KWARG_ALIASES.get(k, k): v for k, v in named.items()}, **extra
+    )
+    builder_kwargs = config.to_dict()
+
+    def build_fn(batch_theta, batch_x):
+        if model not in model_builders:
+            raise NotImplementedError(f"Model {model} in not implemented")
+
+        modeled, condition = (
+            (batch_theta, batch_x) if input_is_theta else (batch_x, batch_theta)
+        )
+        return model_builders[model](
+            batch_x=modeled, batch_y=condition, **builder_kwargs
+        )
+
+    return build_fn
+
 
 def classifier_nn(
     model: str,
@@ -122,44 +206,36 @@ def classifier_nn(
         embedding_net_x:  Optional embedding network for simulation outputs $x$. This
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
-        **kwargs: Additional classifier arguments.  Valid keys are defined by
-            ``ClassifierConfig``; unknown keys trigger a warning and are forwarded to
-            the builder.
+        **kwargs: Additional classifier arguments.  Valid keys are the fields of
+            the chosen model's config; a key the model does not use raises, and
+            an unknown key triggers a warning and is forwarded to the builder.
     """
 
-    # Map user-facing parameter names to internal names.
-    mapped = dict(
-        z_score_x=z_score_theta,
-        z_score_y=z_score_x,
-        hidden_features=hidden_features,
-        embedding_net_x=check_net_device(
-            embedding_net_theta, "cpu", embedding_net_warn_msg
-        ),
-        embedding_net_y=check_net_device(
-            embedding_net_x, "cpu", embedding_net_warn_msg
-        ),
+    # Map user-facing parameter names to the config's field names.
+    named = _drop_unset_z_scoring(
+        dict(
+            z_score_input=z_score_theta,
+            z_score_condition=z_score_x,
+            hidden_features=hidden_features,
+            embedding_net_theta=check_net_device(
+                embedding_net_theta, "cpu", embedding_net_warn_msg
+            ),
+            embedding_net_x=check_net_device(
+                embedding_net_x, "cpu", embedding_net_warn_msg
+            ),
+        )
+    )
+    config = _config_from_factory_kwargs(
+        model,
+        _CLASSIFIER_CONFIGS,
+        "classifier",
+        named=named,
+        factory_defaults=_factory_defaults(classifier_nn, _CLASSIFIER_FACTORY_FIELDS),
+        extra=kwargs,
     )
 
-    # Validate against known fields — warns on unknown kwargs (typos)
-    # # while still forwarding them to the underlying builder.
-    config = ClassifierConfig.from_kwargs(**mapped, **kwargs)
-    builder_kwargs = config.to_dict()
-
     def build_fn(batch_theta, batch_x):
-        if model == "linear":
-            return build_linear_classifier(
-                batch_x=batch_theta, batch_y=batch_x, **builder_kwargs
-            )
-        if model == "mlp":
-            return build_mlp_classifier(
-                batch_x=batch_theta, batch_y=batch_x, **builder_kwargs
-            )
-        if model == "resnet":
-            return build_resnet_classifier(
-                batch_x=batch_theta, batch_y=batch_x, **builder_kwargs
-            )
-        else:
-            raise NotImplementedError
+        return config.build(batch_input=batch_theta, batch_condition=batch_x)
 
     return build_fn
 
@@ -206,34 +282,35 @@ def likelihood_nn(
         embedding_net: Optional embedding network for parameters $\theta$.
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
-        **kwargs: Additional estimator arguments.  Valid keys are defined by
-            ``ConditionalFlowConfig``; unknown keys trigger a warning
-            and are forwarded to the builder.
+        **kwargs: Additional estimator arguments.  Valid keys are the fields of
+            the chosen model's config; a key the model does not use raises, and
+            an unknown key triggers a warning and is forwarded to the builder.
     """
 
-    # Map user-facing parameter names to internal names.
-    mapped = dict(
-        z_score_x=z_score_x,
-        z_score_y=z_score_theta,
+    named = _density_named_kwargs(
+        z_score_input=z_score_x,
+        z_score_condition=z_score_theta,
         hidden_features=hidden_features,
         num_transforms=num_transforms,
         num_bins=num_bins,
-        embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
+        embedding_net=embedding_net,
         num_components=num_components,
     )
+    if model not in _DENSITY_CONFIGS:
+        return _legacy_density_build_fn(model, named, kwargs, input_is_theta=False)
 
-    # Validate against known fields — warns on unknown kwargs (typos)
-    # while still forwarding them to the underlying builder.
-    config = ConditionalFlowConfig.from_kwargs(**mapped, **kwargs)
-    builder_kwargs = config.to_dict()
+    config = _config_from_factory_kwargs(
+        model,
+        _DENSITY_CONFIGS,
+        "density",
+        named=named,
+        factory_defaults=_factory_defaults(likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS),
+        extra=kwargs,
+    )
 
     def build_fn(batch_theta, batch_x):
-        if model not in model_builders:
-            raise NotImplementedError(f"Model {model} in not implemented")
-
-        return model_builders[model](
-            batch_x=batch_x, batch_y=batch_theta, **builder_kwargs
-        )
+        # NLE models p(x|theta), so the modeled variable is x.
+        return config.build(batch_input=batch_x, batch_condition=batch_theta)
 
     return build_fn
 
@@ -282,52 +359,20 @@ def posterior_nn(
             simulation outputs.
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
-        **kwargs: Additional estimator arguments.  Valid keys are defined by
-            ``ConditionalFlowConfig``; unknown keys trigger a warning
-            and are forwarded to the builder.
+        **kwargs: Additional estimator arguments.  Valid keys are the fields of
+            the chosen model's config; a key the model does not use raises, and
+            an unknown key triggers a warning and is forwarded to the builder.
     """
 
-    # Map user-facing parameter names to internal names.
-    mapped = dict(
-        z_score_x=z_score_theta,
-        z_score_y=z_score_x,
+    named = _density_named_kwargs(
+        z_score_input=z_score_theta,
+        z_score_condition=z_score_x,
         hidden_features=hidden_features,
         num_transforms=num_transforms,
         num_bins=num_bins,
-        embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
+        embedding_net=embedding_net,
         num_components=num_components,
     )
-
-    # Validate against known fields — warns on unknown kwargs (typos)
-    # while still forwarding them to the underlying builder.
-    config = ConditionalFlowConfig.from_kwargs(**mapped, **kwargs)
-    builder_kwargs = config.to_dict()
-
-    def build_fn_snpe_a(batch_theta, batch_x, num_components):
-        """Build function for SNPE-A
-
-        Extract the number of components from the kwargs, such that they are exposed as
-        a kwargs, offering the possibility to later override this kwarg with
-        `functools.partial`. This is necessary in order to make sure that the MDN in
-        SNPE-A only has one component when running the Algorithm 1 part.
-        """
-        return build_mdn(
-            batch_x=batch_theta,
-            batch_y=batch_x,
-            num_components=num_components,
-            **builder_kwargs,
-        )
-
-    def build_fn(batch_theta, batch_x):
-        if model not in model_builders:
-            raise NotImplementedError(f"Model {model} in not implemented")
-
-        # The naming might be a bit confusing.
-        # batch_x are the latent variables, batch_y the conditioned variables.
-        # batch_theta are the parameters and batch_x the observable variables.
-        return model_builders[model](
-            batch_x=batch_theta, batch_y=batch_x, **builder_kwargs
-        )
 
     if model == "mdn_snpe_a":
         if num_components != 10:
@@ -336,9 +381,48 @@ def posterior_nn(
                 "instantiation of the inference object, i.e. "
                 "`inference = NPE_A(..., num_components=20)`"
             )
-        builder_kwargs.pop("num_components")
+        # NPE-A overrides the number of components per round, so it stays a
+        # call-time argument rather than a field of the config.
+        base = _config_from_factory_kwargs(
+            "mdn",
+            _DENSITY_CONFIGS,
+            "density",
+            named={k: v for k, v in named.items() if k != "num_components"},
+            factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
+            extra=kwargs,
+        )
 
-    return build_fn_snpe_a if model == "mdn_snpe_a" else build_fn
+        def build_fn_snpe_a(batch_theta, batch_x, num_components):
+            """Build function for SNPE-A.
+
+            ``num_components`` stays a call-time argument so that it can later be
+            overridden with `functools.partial`. This is necessary in order to
+            make sure that the MDN in SNPE-A only has one component when running
+            the Algorithm 1 part.
+            """
+            return replace(base, num_components=num_components).build(
+                batch_input=batch_theta, batch_condition=batch_x
+            )
+
+        return build_fn_snpe_a
+
+    if model not in _DENSITY_CONFIGS:
+        return _legacy_density_build_fn(model, named, kwargs, input_is_theta=True)
+
+    config = _config_from_factory_kwargs(
+        model,
+        _DENSITY_CONFIGS,
+        "density",
+        named=named,
+        factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
+        extra=kwargs,
+    )
+
+    def build_fn(batch_theta, batch_x):
+        # NPE models p(theta|x), so the modeled variable is theta.
+        return config.build(batch_input=batch_theta, batch_condition=batch_x)
+
+    return build_fn
 
 
 def posterior_score_nn(
