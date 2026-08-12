@@ -927,7 +927,7 @@ class MarginalConfigBase:
         hidden_features: Number of hidden features per transform, or one value
             per transform.
         num_transforms: Number of transforms in the flow.
-        z_score_x: Whether to z-score the samples $x$, one of `none`,
+        z_score_input: Whether to z-score the samples $x$, one of `none`,
             `independent`, or `structured`.  Unconditional flows do not
             implement `transform_to_unconstrained`, so it is not offered.
         extra_kwargs: Additional keyword arguments forwarded to the Zuko flow
@@ -936,7 +936,7 @@ class MarginalConfigBase:
 
     hidden_features: Union[int, Sequence[int]] = 50
     num_transforms: int = 5
-    z_score_x: Literal["none", "independent", "structured"] = "independent"
+    z_score_input: Literal["none", "independent", "structured"] = "independent"
 
     # kw_only so it stays out of the positional argument list, which the
     # per-model settings occupy.
