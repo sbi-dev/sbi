@@ -18,7 +18,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MARGINAL_MODELS,
     _BUILD_KWARG_ALIASES,
     _MARGINAL_CONFIGS,
-    DensityEstimatorBuilder,
+    MAFConfig,
     MarginalBPFConfig,
     MarginalConfigBase,
     MarginalGFConfig,
@@ -400,7 +400,7 @@ def test_unknown_model_string_raises():
 def test_conditional_builder_raises():
     """A builder for a conditional estimator cannot build a marginal one."""
     with pytest.raises(TypeError, match="marginal config"):
-        MarginalTrainer(density_estimator=DensityEstimatorBuilder(model="maf"))
+        MarginalTrainer(density_estimator=MAFConfig())
 
 
 def test_config_class_instead_of_instance_raises():
