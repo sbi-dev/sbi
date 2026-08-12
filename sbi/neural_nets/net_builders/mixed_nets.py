@@ -2,7 +2,8 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Optional
+from dataclasses import replace
+from typing import TYPE_CHECKING, Optional
 
 import torch
 from torch import Tensor, nn
@@ -34,6 +35,10 @@ from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.utils.sbiutils import standardizing_net, z_score_parser
 from sbi.utils.user_input_checks import check_data_device
 
+if TYPE_CHECKING:
+    # Imported for typing only: the config module imports this one at build time.
+    from sbi.neural_nets.net_builders.estimator_configs import DensityConfigBase
+
 model_builders = {
     "mdn": build_mdn,
     "made": build_made,
@@ -58,6 +63,7 @@ def _build_mixed_density_estimator(
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     flow_model: str = "nsf",
+    continuous_config: Optional["DensityConfigBase"] = None,
     num_categories_per_variable: Optional[Tensor] = None,
     embedding_net: nn.Module = nn.Identity(),
     combined_embedding_net: Optional[nn.Module] = None,
@@ -110,7 +116,12 @@ def _build_mixed_density_estimator(
         z_score_y: Whether to z-score ys passing into the network, same options
             as z_score_x.
         flow_model: type of flow model to use for the continuous part of the
-            data.
+            data. Ignored when ``continuous_config`` is given.
+        continuous_config: Config of the model for the continuous part of the
+            data. When given, it replaces ``flow_model`` and the flat
+            continuous settings (``z_score_x``, ``num_transforms``,
+            ``num_components``, ``num_bins``, ``tail_bound``,
+            ``continuous_hidden_features``), which the config carries itself.
         num_categories_per_variable: number of categorical columns of each variable in
             the input data. If None, the function will infer this from the data.
         embedding_net: Optional embedding network for y, required if y is > 1D.
@@ -142,9 +153,14 @@ def _build_mixed_density_estimator(
     """
     check_data_device(batch_x, batch_y)
 
-    # Resolve decoupled parameters, falling back to shared defaults.
+    # Resolve decoupled parameters, falling back to shared defaults. A
+    # continuous config carries the continuous width itself, which then also
+    # sizes the fallback combined embedding net.
     _discrete_hf = discrete_hidden_features or hidden_features
-    _continuous_hf = continuous_hidden_features or hidden_features
+    if continuous_config is not None:
+        _continuous_hf = continuous_config.hidden_features  # type: ignore[attr-defined]
+    else:
+        _continuous_hf = continuous_hidden_features or hidden_features
 
     warnings.warn(
         "The mixed neural density estimator assumes that inferred variable contains "
@@ -196,31 +212,42 @@ def _build_mixed_density_estimator(
             nn.ReLU(),
         )
 
-    # zuko-based flow models do not support dropout_probability; remove it from kwargs
-    # so it is only applied to the categorical net.
-    if flow_model.startswith("zuko"):
-        kwargs.pop("dropout_probability", None)
+    # TODO: add support for optional log-transform in flow builders.
+    continuous_x = (
+        torch.log(cont_x + 1e-10)
+        if log_transform_x  # can apply log transform if data is strictly positive
+        else cont_x
+    )
 
     # Set up a flow for modelling the continuous data, conditioned on the discrete data.
-    continuous_net = model_builders[flow_model](
-        # TODO: add support for optional log-transform in flow builders.
-        batch_x=(
-            torch.log(cont_x + 1e-10)
-            if log_transform_x
-            else cont_x  # can apply log transform if data is strictly positive
-        ),
-        batch_y=combined_condition,
-        z_score_x=z_score_x,
-        z_score_y="none",  # combined condition is already z-scored
-        # combined embedding net for discrete and continuous data.
-        embedding_net=combined_embedding_net,
-        num_bins=num_bins,
-        num_transforms=num_transforms,
-        num_components=num_components,
-        tail_bound=tail_bound,
-        hidden_features=_continuous_hf,
-        **kwargs,
-    )
+    if continuous_config is not None:
+        # The combined condition is already z-scored and is embedded by the
+        # combined embedding net, so those two settings are not the user's here.
+        continuous_net = replace(
+            continuous_config,
+            z_score_condition="none",
+            embedding_net=combined_embedding_net,
+        ).build(batch_input=continuous_x, batch_condition=combined_condition)
+    else:
+        # zuko-based flow models do not support dropout_probability; remove it
+        # from kwargs so it is only applied to the categorical net.
+        if flow_model.startswith("zuko"):
+            kwargs.pop("dropout_probability", None)
+
+        continuous_net = model_builders[flow_model](
+            batch_x=continuous_x,
+            batch_y=combined_condition,
+            z_score_x=z_score_x,
+            z_score_y="none",  # combined condition is already z-scored
+            # combined embedding net for discrete and continuous data.
+            embedding_net=combined_embedding_net,
+            num_bins=num_bins,
+            num_transforms=num_transforms,
+            num_components=num_components,
+            tail_bound=tail_bound,
+            hidden_features=_continuous_hf,
+            **kwargs,
+        )
 
     return MixedDensityEstimator(
         discrete_net=discrete_net,
