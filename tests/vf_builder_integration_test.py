@@ -1,8 +1,10 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import inspect
 import warnings
 from dataclasses import fields as dc_fields
+from typing import get_args
 
 import pytest
 import torch
@@ -10,12 +12,31 @@ from torch import zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import FMPE, NPSE
+from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     _FLOW_ONLY_FIELDS,
     _SCORE_ONLY_FIELDS,
     DensityEstimatorBuilder,
     VectorFieldEstimatorBuilder,
 )
+
+
+@pytest.mark.parametrize(
+    "factory_fn", [posterior_flow_nn, posterior_score_nn], ids=["flow", "score"]
+)
+def test_advertised_time_emb_types_all_build(factory_fn):
+    """Every value the factory's `time_emb_type` Literal advertises must build.
+
+    The annotation advertised `"fourier"` while the networks only accept
+    `"random_fourier"`, so the annotated value crashed at build time and the
+    working value failed type checking.
+    """
+    annotation = inspect.signature(factory_fn).parameters["time_emb_type"].annotation
+    values = get_args(annotation)
+    assert values, "time_emb_type lost its Literal annotation"
+    for value in values:
+        builder = factory_fn(model="mlp", time_emb_type=value)
+        builder(torch.randn(10, 2), torch.randn(10, 3))
 
 
 @pytest.fixture
