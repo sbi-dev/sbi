@@ -1014,32 +1014,6 @@ class MarginalConfigBase:
         )
 
 
-# Field blocks shared by several Zuko flows. A block exists only where the
-# meaning and the default are the same for every flow that uses it; `degree`,
-# for instance, is not shared because BPF defaults to 16 and SOSPF to 4.
-
-
-@dataclass(frozen=True, eq=False, repr=False)
-class _ZukoSplineFields:
-    """Spline settings shared by the NSF and NCSF flows."""
-
-    bins: int = 10
-
-
-@dataclass(frozen=True, eq=False, repr=False)
-class _ZukoPermutationField:
-    """Permutation setting shared by the autoregressive flows."""
-
-    randperm: bool = False
-
-
-@dataclass(frozen=True, eq=False, repr=False)
-class _ZukoMonotonicFields(_ZukoPermutationField):
-    """Monotonic-network settings shared by the NAF and UNAF flows."""
-
-    signal: int = 16
-
-
 @dataclass(frozen=True, eq=False, repr=False)
 class MarginalBPFConfig(MarginalConfigBase):
     """Marginal Bernstein polynomial flow.
