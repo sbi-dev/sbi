@@ -1,17 +1,24 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-"""Tests for config-based kwarg validation in factory functions.
+"""Tests for how the factory functions construct per-model configs.
 
-The primary contract: unknown / misspelled kwargs emit a warning (so typos are
-surfaced) but are still forwarded to the downstream builder, allowing
-library-specific parameters (e.g. Zuko flow kwargs) to pass through.
+The factories span a whole family, so their named arguments cover settings a
+given model may not have. A name the model does not know is dropped while it
+still holds the factory's own default, and rejected once the caller has set it.
+An unrecognised name keeps the old warn-and-forward behaviour, so that
+library-specific parameters (e.g. Zuko flow kwargs) pass through.
 """
+
+import inspect
 
 import pytest
 import torch
 
 from sbi.neural_nets.factory import (
+    _CLASSIFIER_FACTORY_FIELDS,
+    _LIKELIHOOD_FACTORY_FIELDS,
+    _POSTERIOR_FACTORY_FIELDS,
     ZukoFlowType,
     classifier_nn,
     likelihood_nn,
@@ -22,23 +29,22 @@ from sbi.neural_nets.factory import (
 )
 from sbi.neural_nets.net_builders.estimator_configs import ConditionalFlowConfig
 
-
-def test_config_to_dict_filters_none():
-    """to_dict() returns only explicitly-set fields."""
-    cfg = ConditionalFlowConfig(hidden_features=64)
-    d = cfg.to_dict()
-    assert d == {"hidden_features": 64}
-    assert "z_score_x" not in d
+THETA, X = torch.randn(100, 3), torch.randn(100, 5)
 
 
-def test_config_from_kwargs_extra():
-    """from_kwargs() stores unknown keys in extra_kwargs and merges in to_dict()."""
-    with pytest.warns(UserWarning, match="Unknown kwargs"):
-        cfg = ConditionalFlowConfig.from_kwargs(
-            hidden_features=64, some_zuko_param=True
-        )
-    d = cfg.to_dict()
-    assert d == {"hidden_features": 64, "some_zuko_param": True}
+@pytest.mark.parametrize(
+    "factory_fn,fields",
+    [
+        (posterior_nn, _POSTERIOR_FACTORY_FIELDS),
+        (likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS),
+        (classifier_nn, _CLASSIFIER_FACTORY_FIELDS),
+    ],
+    ids=["posterior", "likelihood", "classifier"],
+)
+def test_factory_field_maps_name_real_parameters(factory_fn, fields):
+    """The maps decide which defaults are read, so they must not drift."""
+    params = inspect.signature(factory_fn).parameters
+    assert set(fields.values()) <= set(params)
 
 
 @pytest.mark.parametrize(
@@ -58,6 +64,101 @@ def test_factory_warns_on_unknown_kwargs(factory_fn, factory_args, bad_kwarg):
         factory_fn(*factory_args, **bad_kwarg)
 
 
+@pytest.mark.parametrize(
+    "factory_fn,model,kwarg",
+    [
+        (posterior_nn, "mdn", {"num_bins": 20}),
+        (posterior_nn, "mdn", {"num_transforms": 3}),
+        (likelihood_nn, "made", {"num_components": 5}),
+        (posterior_nn, "maf", {"num_bins": 20}),
+        (classifier_nn, "linear", {"hidden_features": 64}),
+    ],
+    ids=["mdn-bins", "mdn-transforms", "made-components", "maf-bins", "linear-width"],
+)
+def test_factory_rejects_a_setting_the_model_does_not_use(factory_fn, model, kwarg):
+    """A setting the model never reads used to be forwarded and dropped.
+
+    Routing the factories through the per-model configs turns that silent
+    ignore into an error, which is the point of the per-model design.
+    """
+    with pytest.raises(ValueError, match="would be silently ignored"):
+        factory_fn(model, **kwarg)
+
+
+@pytest.mark.parametrize(
+    "factory_fn,model",
+    [
+        (posterior_nn, "mdn"),
+        (posterior_nn, "made"),
+        (posterior_nn, "maf"),
+        (posterior_nn, "zuko_nsf"),
+        (likelihood_nn, "nsf"),
+        (classifier_nn, "linear"),
+        (classifier_nn, "resnet"),
+    ],
+)
+def test_factory_defaults_still_build_every_model(factory_fn, model):
+    """The family-wide defaults must not reject the models that ignore them.
+
+    `posterior_nn("mdn")` passes `num_bins=10` that MDN has no field for; it is
+    the factory's own default, so it is dropped rather than rejected.
+    """
+    assert factory_fn(model)(THETA, X) is not None
+
+
+def test_num_bins_still_reaches_the_zuko_flows():
+    """The Zuko configs name it `bins`, so the factory name has to be mapped."""
+    torch.manual_seed(0)
+    default = posterior_nn("zuko_nsf")(THETA, X)
+    torch.manual_seed(0)
+    coarse = posterior_nn("zuko_nsf", num_bins=3)(THETA, X)
+
+    assert sum(p.numel() for p in default.parameters()) != sum(
+        p.numel() for p in coarse.parameters()
+    )
+
+
+@pytest.mark.parametrize(
+    "factory_fn,input_dim,condition_dim",
+    [(posterior_nn, 3, 5), (likelihood_nn, 5, 3)],
+    ids=["posterior", "likelihood"],
+)
+def test_factories_keep_their_roles(factory_fn, input_dim, condition_dim):
+    """`posterior_nn` models theta given x, `likelihood_nn` the other way."""
+    estimator = factory_fn("maf")(THETA, X)
+
+    assert estimator.input_shape == torch.Size([input_dim])
+    assert estimator.condition_shape == torch.Size([condition_dim])
+
+
 def test_posterior_nn_accepts_valid_extra_kwargs():
-    build_fn = posterior_nn("maf", dtype=torch.float64)
-    assert callable(build_fn)
+    """An unknown name is still forwarded, so library kwargs keep working."""
+    with pytest.warns(UserWarning, match="Unknown kwargs"):
+        build_fn = posterior_nn("zuko_maf", passes=2)
+    assert build_fn(THETA, X) is not None
+
+
+def test_mdn_snpe_a_rejects_num_components():
+    """NPE-A owns the component count, so setting it on the factory is an error."""
+    with pytest.raises(ValueError, match="num_components"):
+        posterior_nn("mdn_snpe_a", num_components=20)
+
+
+def test_mdn_snpe_a_takes_num_components_at_call_time():
+    """NPE-A overrides the count per round, so it stays a call-time argument."""
+    estimator = posterior_nn("mdn_snpe_a")(THETA, X, num_components=3)
+    assert estimator.net._num_components == 3
+
+
+def test_unknown_model_raises():
+    """An unknown name still fails where it always has, at build time."""
+    build_fn = posterior_nn("not_a_model")
+    with pytest.raises(NotImplementedError, match="not implemented"):
+        build_fn(THETA, X)
+
+
+def test_legacy_config_still_validates_the_mixed_string_path():
+    """MNLE and MNPE still reach `build_mnle` / `build_mnpe` with flat kwargs."""
+    cfg = ConditionalFlowConfig(hidden_features=64)
+    assert cfg.to_dict() == {"hidden_features": 64}
+    assert posterior_nn("mnpe") is not None
