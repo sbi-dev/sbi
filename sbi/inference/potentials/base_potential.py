@@ -5,7 +5,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Optional, Protocol, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 
 from sbi.utils.torchutils import process_device
@@ -41,6 +41,16 @@ class BasePotential(metaclass=ABCMeta):
         self, theta: Tensor, time: Optional[Tensor] = None, track_gradients: bool = True
     ) -> Tensor:
         raise NotImplementedError
+
+    @property
+    def x_embedding_net(self) -> Optional[nn.Module]:
+        """Return the network that embeds `x`, if the potential knows it.
+
+        `None` means no net is known to consume `x`, so posteriors derive
+        strict finiteness checks for `x_o`. Only potentials whose estimator
+        is conditioned on `x` override this.
+        """
+        return None
 
     @property
     def x_is_iid(self) -> bool:

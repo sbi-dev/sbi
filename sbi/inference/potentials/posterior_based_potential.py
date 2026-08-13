@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Optional, Tuple, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
@@ -86,6 +86,11 @@ class PosteriorBasedPotential(BasePotential):
         super().__init__(prior, x_o, device)
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
+
+    @property
+    def x_embedding_net(self) -> Optional[nn.Module]:
+        """Return the net embedding `x`: the estimator's condition is `x`."""
+        return self.posterior_estimator.embedding_net
 
     def to(self, device: Union[str, torch.device]) -> "PosteriorBasedPotential":
         """Move posterior estimator, prior and x_o to the given device.

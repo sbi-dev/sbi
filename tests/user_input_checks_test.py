@@ -19,14 +19,18 @@ from torch.distributions import (
     Uniform,
 )
 
+from sbi.analysis import conditional_potential
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
+from sbi.inference.posteriors import EnsemblePosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
-from sbi.inference.posteriors.posterior_parameters import (
-    DirectPosteriorParameters,
-)
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
+)
+from sbi.neural_nets import posterior_nn
+from sbi.neural_nets.embedding_nets import (
+    FCEmbedding,
+    PermutationInvariantEmbedding,
 )
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MultivariateGaussianMDN,
@@ -296,7 +300,7 @@ def test_process_x(x, x_shape):
 
 @pytest.fixture(scope="module")
 def trained_npe():
-    """A minimally trained NPE, shared by the `check_finite_x` tests."""
+    """A minimally trained NPE, shared by the non-finite `x_o` tests."""
     prior = BoxUniform(zeros(2), ones(2))
     inference = NPE_C(prior=prior, show_progress_bars=False)
     theta = prior.sample((100,))
@@ -306,30 +310,23 @@ def trained_npe():
     return prior, inference, estimator
 
 
-@pytest.mark.parametrize("check_finite_x", (True, False))
-def test_posterior_check_finite_x(check_finite_x: bool, trained_npe):
-    """`x_o` with NaNs must raise unless the user opts out via `check_finite_x`.
+def test_posterior_rejects_nonfinite_x(trained_npe):
+    """`x_o` with NaNs must raise when the embedding net is not NaN-tolerant.
 
     Covers both guarded paths: `set_default_x` and, via `log_prob(x=...)`,
     `_x_else_default_x`.
     """
     prior, inference, _ = trained_npe
-    posterior = inference.build_posterior(
-        posterior_parameters=DirectPosteriorParameters(check_finite_x=check_finite_x)
-    )
+    posterior = inference.build_posterior()
     x_with_nan = torch.tensor([0.0, float("nan")])
 
-    if check_finite_x:
-        with pytest.raises(ValueError, match="NaN/Inf"):
-            posterior.set_default_x(x_with_nan)
-        with pytest.raises(ValueError, match="NaN/Inf"):
-            posterior.log_prob(prior.sample((2,)), x=x_with_nan)
-    else:
+    with pytest.raises(ValueError, match="NaN/Inf"):
         posterior.set_default_x(x_with_nan)
-        assert posterior.default_x.isnan().any()
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        posterior.log_prob(prior.sample((2,)), x=x_with_nan)
 
 
-def test_check_finite_x_on_preconditioned_potential(trained_npe):
+def test_nonfinite_x_on_preconditioned_potential(trained_npe):
     """`x_o` passed to the potential builder (#573) must be checked too."""
     prior, _, estimator = trained_npe
     potential_fn, theta_transform = posterior_estimator_based_potential(
@@ -340,17 +337,167 @@ def test_check_finite_x_on_preconditioned_potential(trained_npe):
         MCMCPosterior(potential_fn, theta_transform=theta_transform, proposal=prior)
 
 
-def test_posterior_unpickles_without_check_finite_x(trained_npe):
-    """Posteriors pickled before `check_finite_x` existed must still load."""
+def test_strict_validation_needs_no_pickled_state(trained_npe):
+    """A restored posterior still rejects NaN: validation derives at check time."""
     _, inference, _ = trained_npe
-    state = inference.build_posterior().__getstate__().copy()
-    del state["_check_finite_x"]
+    restored = pickle.loads(pickle.dumps(inference.build_posterior()))
 
-    restored = DirectPosterior.__new__(DirectPosterior)
-    restored.__setstate__(pickle.loads(pickle.dumps(state)))
-
-    assert restored._check_finite_x
     restored.set_default_x(torch.zeros(1, 2))
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        restored.set_default_x(torch.tensor([0.0, float("nan")]))
+
+
+@pytest.fixture(scope="module")
+def trained_nan_tolerant_npe():
+    """A minimally trained NPE with a `PermutationInvariantEmbedding`.
+
+    The embedding declares `accepts_nan_input`, so posteriors built from this
+    trainer must derive NaN-tolerant `x_o` validation without any flag.
+    """
+    num_dim, max_trials, num_sims = 2, 3, 100
+    prior = BoxUniform(zeros(num_dim), ones(num_dim))
+    theta = prior.sample((num_sims,))
+    num_trials = torch.randint(1, max_trials + 1, size=(num_sims,))
+    x = torch.full((num_sims, max_trials, num_dim), float("nan"))
+    for i in range(num_sims):
+        x[i, : num_trials[i]] = theta[i] + 0.1 * torch.randn(num_trials[i], num_dim)
+
+    embedding_net = PermutationInvariantEmbedding(
+        trial_net=FCEmbedding(input_dim=num_dim, output_dim=4),
+        trial_net_output_dim=4,
+        output_dim=4,
+    )
+    density_estimator = posterior_nn(
+        model="mdn", embedding_net=embedding_net, z_score_x="none"
+    )
+    inference = NPE_C(
+        prior=prior, density_estimator=density_estimator, show_progress_bars=False
+    )
+    inference.append_simulations(theta, x, exclude_invalid_x=False).train(
+        max_num_epochs=1, training_batch_size=50
+    )
+
+    x_nan = torch.full((1, max_trials, num_dim), float("nan"))
+    x_nan[0, :1] = 0.5
+    return prior, inference, x_nan
+
+
+@pytest.mark.parametrize("sample_with", ("direct", "mcmc", "rejection"))
+def test_nan_tolerance_derived_from_embedding(sample_with, trained_nan_tolerant_npe):
+    """A NaN-tolerant embedding must derive the tolerance for every sampler.
+
+    Before derivation, only `DirectPosterior` and `VectorFieldPosterior` could
+    opt out of the finiteness check; switching the sampler lost the tolerance.
+    """
+    _, inference, x_nan = trained_nan_tolerant_npe
+    posterior = inference.build_posterior(sample_with=sample_with)
+
+    posterior.set_default_x(x_nan)
+
+    assert posterior.default_x is not None
+    assert posterior.default_x.isnan().any()
+
+
+def test_inf_x_rejected_despite_nan_tolerance(trained_nan_tolerant_npe):
+    """Inf in `x_o` is never padding and must raise even where NaN is accepted."""
+    _, inference, x_nan = trained_nan_tolerant_npe
+    posterior = inference.build_posterior()
+    x_inf = x_nan.clone()
+    x_inf[0, 0, 0] = float("inf")
+
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        posterior.set_default_x(x_inf)
+
+
+def test_ensemble_derives_nan_tolerance_from_components(trained_nan_tolerant_npe):
+    """An ensemble tolerates NaN iff every component does (strict-if-any-strict)."""
+    prior, inference, x_nan = trained_nan_tolerant_npe
+    tolerant = inference.build_posterior()
+    theta = prior.sample((2,))
+
+    ensemble = EnsemblePosterior([tolerant, inference.build_posterior()])
+    ensemble.potential(theta, x=x_nan)
+
+    class FlattenEmbedding(nn.Module):
+        """Same input shapes as the trial embedding, but without the marker."""
+
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(6, 6)
+
+        def forward(self, x: Tensor) -> Tensor:
+            return self.linear(x.flatten(start_dim=1))
+
+    strict_estimator = posterior_nn(
+        model="mdn", embedding_net=FlattenEmbedding(), z_score_x="none"
+    )(prior.sample((20,)), torch.randn(20, 3, 2))
+    strict = DirectPosterior(posterior_estimator=strict_estimator, prior=prior)
+
+    mixed = EnsemblePosterior([tolerant, strict])
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        mixed.potential(theta, x=x_nan)
+
+
+def test_conditioned_potential_preserves_nan_tolerance(trained_nan_tolerant_npe):
+    """`conditional_potential()` over a NaN-tolerant potential must stay tolerant.
+
+    Constructing the posterior runs the `x_o` guard on the NaN-padded
+    observation carried by the conditioned potential.
+    """
+    prior, inference, x_nan = trained_nan_tolerant_npe
+    estimator = inference.build_posterior().posterior_estimator
+    potential_fn, theta_transform = posterior_estimator_based_potential(
+        estimator, prior, x_o=x_nan
+    )
+    conditioned_potential_fn, restricted_tf, restricted_prior = conditional_potential(
+        potential_fn,
+        theta_transform,
+        prior,
+        condition=zeros(1, 2),
+        dims_to_sample=[0],
+    )
+
+    MCMCPosterior(
+        conditioned_potential_fn,
+        theta_transform=restricted_tf,
+        proposal=restricted_prior,
+    )
+
+
+def test_mnpe_derives_nan_tolerance_from_marked_embedding():
+    """The mixed density estimator must expose its condition embedding.
+
+    Any third-party module carrying `accepts_nan_input` counts as NaN-tolerant,
+    and MNPE participates via the standard `embedding_net` property.
+    """
+
+    class NaNTolerantEmbedding(nn.Identity):
+        accepts_nan_input = True
+
+    theta = torch.cat((torch.rand(100, 2), torch.bernoulli(0.5 * ones(100, 1))), dim=1)
+    x = torch.randn(100, 2)
+    estimator = posterior_nn(model="mnpe", embedding_net=NaNTolerantEmbedding())(
+        theta, x
+    )
+    posterior = DirectPosterior(
+        posterior_estimator=estimator, prior=BoxUniform(zeros(3), ones(3))
+    )
+
+    posterior.set_default_x(torch.tensor([[0.0, float("nan")]]))
+
+    assert posterior.default_x is not None
+    assert posterior.default_x.isnan().any()
+
+
+def test_derived_nan_tolerance_survives_pickling(trained_nan_tolerant_npe):
+    """The tolerance derives at check time, so it needs no pickled state."""
+    _, inference, x_nan = trained_nan_tolerant_npe
+    restored = pickle.loads(pickle.dumps(inference.build_posterior()))
+
+    restored.set_default_x(x_nan)
+
+    assert restored.default_x is not None
+    assert restored.default_x.isnan().any()
 
 
 @pytest.mark.parametrize(

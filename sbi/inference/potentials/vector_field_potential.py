@@ -4,7 +4,7 @@
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 from zuko.distributions import NormalizingFlow
 
@@ -76,6 +76,11 @@ class VectorFieldBasedPotential(BasePotential):
         )
 
         super().__init__(prior, x_o, device=device)
+
+    @property
+    def x_embedding_net(self) -> nn.Module:
+        """Return the net embedding `x`: the estimator's condition is `x`."""
+        return self.vector_field_estimator.embedding_net
 
     def to(self, device: Union[str, torch.device]) -> None:
         """

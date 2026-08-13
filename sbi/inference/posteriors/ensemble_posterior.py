@@ -133,6 +133,10 @@ class EnsemblePosterior(NeuralPosterior):
             device=self.device,
         )
 
+    def _x_tolerates_nan(self) -> bool:
+        """NaN `x_o` is valid only if every component tolerates it."""
+        return all(p._x_tolerates_nan() for p in self.posteriors)
+
     def ensure_same_device(self, posteriors: List) -> str:
         """Ensures that all posteriors in the ensemble are on the same device.
 

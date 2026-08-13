@@ -15,7 +15,6 @@ from torch.distributions import MultivariateNormal
 from sbi import utils
 from sbi.inference import NLE, NPE, NRE, simulate_for_sbi
 from sbi.inference.posteriors.posterior_parameters import (
-    DirectPosteriorParameters,
     MCMCPosteriorParameters,
 )
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
@@ -498,9 +497,8 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(
         training_batch_size=100
     )
-    posterior = inference.build_posterior(
-        posterior_parameters=DirectPosteriorParameters(check_finite_x=False)
-    )
+    # No flag needed: the NaN-tolerance is derived from the embedding net.
+    posterior = inference.build_posterior()
 
     num_samples = 1000
     # test different number of trials

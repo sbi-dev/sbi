@@ -736,12 +736,45 @@ def batched_first_of_batch(t: Tensor) -> Tensor:
     return t[:1]
 
 
-def assert_all_finite(quantity: Tensor, description: str = "tensor") -> None:
-    """Raise if tensor quantity contains any NaN or Inf element."""
+def assert_all_finite(
+    quantity: Tensor, description: str = "tensor", allow_nan: bool = False
+) -> None:
+    """Raise if tensor quantity contains any NaN or Inf element.
+
+    Args:
+        quantity: Tensor to check.
+        description: Name of the quantity used in the error message.
+        allow_nan: If True, NaN elements are accepted (e.g., NaN-padded trials
+            for a NaN-tolerant embedding); Inf still raises.
+    """
 
     msg = f"NaN/Inf present in {description}."
-    if not torch.isfinite(quantity).all():
+    invalid = (
+        bool(torch.isinf(quantity).any())
+        if allow_nan
+        else not bool(torch.isfinite(quantity).all())
+    )
+    if invalid:
         raise ValueError(msg)
+
+
+def net_accepts_nan_input(net: Optional[Module]) -> bool:
+    """Return whether any module in `net` declares `accepts_nan_input`.
+
+    NaN-tolerant embeddings such as `PermutationInvariantEmbedding` declare
+    `accepts_nan_input = True` as a class attribute. Builders wrap user
+    embeddings (e.g., inside a standardizing `nn.Sequential`), so the lookup
+    recurses the module tree.
+
+    Args:
+        net: Module to inspect, or None if no net consumes `x`.
+
+    Returns:
+        True if any submodule (including `net` itself) sets `accepts_nan_input`.
+    """
+    if net is None:
+        return False
+    return any(getattr(m, "accepts_nan_input", False) for m in net.modules())
 
 
 def assert_not_nan_or_plus_inf(quantity: Tensor, description: str = "tensor") -> None:
