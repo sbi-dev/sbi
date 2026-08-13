@@ -36,10 +36,12 @@ from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
+from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.neural_nets.net_builders.estimator_configs import (
+    _ESTIMATOR_CONFIG_BASES,
     DensityConfigBase,
     MAFConfig,
-    _PerModelConfigBase,
+    TabPFNConfig,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
@@ -102,6 +104,11 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         if density_estimator is None:
             self._build_neural_net = self._wrap_builder(MAFConfig())
         elif isinstance(density_estimator, str):
+            if density_estimator == "tabpfn":
+                raise TypeError(
+                    f"{type(self).__name__} cannot train TabPFN because "
+                    "TabPFNFlow has no training loss."
+                )
             warnings.warn(
                 "Passing a string for `density_estimator` is deprecated. "
                 "Use a per-model config instead, e.g. "
@@ -110,7 +117,12 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
                 stacklevel=3,
             )
             self._build_neural_net = likelihood_nn(model=density_estimator)
-        elif isinstance(density_estimator, _PerModelConfigBase):
+        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
+            if isinstance(density_estimator, TabPFNConfig):
+                raise TypeError(
+                    f"{type(self).__name__} cannot train TabPFNConfig because "
+                    "TabPFNFlow has no training loss."
+                )
             if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
                 allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
                 raise TypeError(
@@ -423,6 +435,11 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
+            if isinstance(self._neural_net, TabPFNFlow):
+                raise TypeError(
+                    f"{type(self).__name__} cannot train TabPFNFlow because it has "
+                    "no training loss."
+                )
 
             assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
                 "NLE cannot handle multi-dimensional simulator output."
