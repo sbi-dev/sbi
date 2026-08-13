@@ -156,7 +156,7 @@ def _legacy_density_build_fn(
 
     def build_fn(batch_theta, batch_x):
         if model not in model_builders:
-            raise NotImplementedError(f"Model {model} in not implemented")
+            raise NotImplementedError(f"Model {model} is not implemented")
 
         modeled, condition = (
             (batch_theta, batch_x) if input_is_theta else (batch_x, batch_theta)
@@ -171,11 +171,9 @@ def _legacy_density_build_fn(
 def classifier_nn(
     model: str,
     z_score_theta: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        Literal["independent", "structured", "none"]
     ] = "independent",
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 50,
     embedding_net_theta: nn.Module = nn.Identity(),
     embedding_net_x: nn.Module = nn.Identity(),
@@ -200,7 +198,7 @@ def classifier_nn(
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network, same options as z_score_theta.
+            the network, with the same options as `z_score_theta`.
         hidden_features: Number of hidden features.
         embedding_net_theta:  Optional embedding network for parameters $\theta$.
         embedding_net_x:  Optional embedding network for simulation outputs $x$. This
@@ -243,7 +241,7 @@ def classifier_nn(
 def likelihood_nn(
     model: str,
     z_score_theta: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        Literal["independent", "structured", "none"]
     ] = "independent",
     z_score_x: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
@@ -272,16 +270,18 @@ def likelihood_nn(
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network, same options as z_score_theta.
+            the network, with the same options as `z_score_theta`. Supported flow
+            configs additionally accept `transform_to_unconstrained` for this modeled
+            variable.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
-            `nsf`). Ignored if density estimator is a `mdn` or `made`.
-        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
-            estimator not `nsf`.
+            `nsf`). A non-default value raises if the chosen model does not use it.
+        num_bins: Number of bins used for spline models. A non-default value raises
+            if the chosen model does not use it.
         embedding_net: Optional embedding network for parameters $\theta$.
         num_components: Number of mixture components for a mixture of Gaussians.
-            Ignored if density estimator is not an mdn.
+            A non-default value raises if the chosen model is not an MDN.
         **kwargs: Additional estimator arguments.  Valid keys are the fields of
             the chosen model's config; a key the model does not use raises, and
             an unknown key triggers a warning and is forwarded to the builder.
@@ -320,9 +320,7 @@ def posterior_nn(
     z_score_theta: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
     ] = "independent",
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -346,19 +344,21 @@ def posterior_nn(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
+            Supported flow configs additionally accept `transform_to_unconstrained`
+            for this modeled variable.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network, same options as z_score_theta.
+            the network: `none`, `independent`, or `structured`.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
-            `nsf`). Ignored if density estimator is a `mdn` or `made`.
-        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
-            estimator not `nsf`.
+            `nsf`). A non-default value raises if the chosen model does not use it.
+        num_bins: Number of bins used for spline models. A non-default value raises
+            if the chosen model does not use it.
         embedding_net: Optional embedding network for simulation outputs $x$. This
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
         num_components: Number of mixture components for a mixture of Gaussians.
-            Ignored if density estimator is not an mdn.
+            A non-default value raises if the chosen model is not an MDN.
         **kwargs: Additional estimator arguments.  Valid keys are the fields of
             the chosen model's config; a key the model does not use raises, and
             an unknown key triggers a warning and is forwarded to the builder.
