@@ -14,6 +14,7 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     build_adamlp_network,
     build_standard_mlp_network,
     build_transformer_network,
+    build_vector_field_estimator,
 )
 
 
@@ -137,3 +138,21 @@ def test_vector_field_builders_shape_and_build(
         t,
     )
     assert out.shape == inputs.shape
+
+
+def test_mlp_ratio_reaches_the_ada_mlp_global_mlp():
+    """`mlp_ratio` must reach the global MLP on the public ada_mlp path.
+
+    The ratio only shapes the intermediate blocks, so one is requested
+    explicitly; with the default of zero blocks the ratio is inert and the
+    test would pass vacuously.
+    """
+    estimator = build_vector_field_estimator(
+        batch_x=torch.randn(10, 2),
+        batch_y=torch.randn(10, 3),
+        net="ada_mlp",
+        num_intermediate_mlp_layers=1,
+        mlp_ratio=8,
+    )
+    expand = estimator.net.global_mlp.mlp_blocks[0][1]
+    assert expand.out_features == 8 * expand.in_features
