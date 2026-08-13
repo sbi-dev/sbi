@@ -14,14 +14,17 @@ from simulations (more complex).
 To enable this for NPE:
 
 ```python
-density_estimator_build_fun = posterior_nn(
-    model="zuko_nsf",
+from sbi.neural_nets import ZukoNSFConfig
+
+density_estimator = ZukoNSFConfig(
     hidden_features=60,
     num_transforms=3,
-    z_score_theta="transform_to_unconstrained"  # Transforms parameters to unconstrained space
-    x_dist=prior  # For NPE, this specifies bounds for parameters (internally called 'x')
+    # Transforms parameters to unconstrained space.
+    z_score_input="transform_to_unconstrained",
+    # For NPE, this specifies the bounds of the parameters.
+    x_dist=prior,
 )
-inference = NPE(prior, density_estimator=density_estimator_build_fun)
+inference = NPE(prior, density_estimator=density_estimator)
 ```
 
 This ensures that your density estimator operates in a
