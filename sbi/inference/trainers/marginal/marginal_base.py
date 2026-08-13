@@ -24,10 +24,9 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.neural_nets.net_builders.estimator_configs import (
     MARGINAL_MODELS,
+    _ESTIMATOR_CONFIG_BASES,
     MarginalConfigBase,
     MarginalNSFConfig,
-    _EstimatorBuilderBase,
-    _PerModelConfigBase,
     _marginal_config_from_model,
 )
 from sbi.sbi_types import Tracker
@@ -130,7 +129,7 @@ class MarginalTrainer:
             self._build_neural_net = MarginalNSFConfig().build
         elif isinstance(density_estimator, MarginalConfigBase):
             self._build_neural_net = density_estimator.build
-        elif isinstance(density_estimator, _PerModelConfigBase):
+        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
             # The conditional configs are not callable, so without this branch
             # they would fall through to the unhelpful ValueError below.
             raise TypeError(
@@ -139,7 +138,7 @@ class MarginalTrainer:
                 "e.g. MarginalNSFConfig()."
             )
         elif isinstance(density_estimator, type) and issubclass(
-            density_estimator, (MarginalConfigBase, _EstimatorBuilderBase)
+            density_estimator, _ESTIMATOR_CONFIG_BASES
         ):
             # A config class is callable, so a forgotten `()` would pass the
             # callable branch below and only fail once training starts.
