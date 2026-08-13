@@ -38,6 +38,7 @@ from typing import (
     get_origin,
 )
 
+import torch
 import torch.nn as nn
 from nflows.transforms.splines import (
     rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
@@ -586,6 +587,8 @@ class _PerModelConfigBase:
     # per-model settings occupy.
     extra_kwargs: dict = field(default_factory=dict, kw_only=True)
 
+    _SHADOWED_EXTRA_KWARGS: ClassVar[frozenset[str]] = frozenset()
+
     def _reject_if_abstract(self, base: type, example: str) -> None:
         """Raise if *self* is *base* itself, which selects no model."""
         if type(self) is base:
@@ -596,11 +599,16 @@ class _PerModelConfigBase:
 
     def __post_init__(self):
         _check_literal_values(self, allow_none=False)
-        shadowed = set(self.extra_kwargs) & {f.name for f in fields(self)}
+        field_names = {f.name for f in fields(self)}
+        build_names = {_BUILD_KWARG_ALIASES.get(name, name) for name in field_names}
+        shadowed = set(self.extra_kwargs) & (
+            field_names | build_names | self._SHADOWED_EXTRA_KWARGS
+        )
         if shadowed:
             raise ValueError(
                 f"`extra_kwargs` key(s) {sorted(shadowed)} are fields of "
-                f"{type(self).__name__}. Pass them as arguments instead."
+                f"{type(self).__name__} or their downstream aliases. Pass the "
+                "user-facing fields instead."
             )
 
     def __repr__(self) -> str:
@@ -614,6 +622,9 @@ class _PerModelConfigBase:
             # would otherwise always show up as a set field.
             if isinstance(default, nn.Module):
                 if type(val) is type(default):
+                    continue
+            elif isinstance(default, _PerModelConfigBase):
+                if repr(val) == repr(default):
                     continue
             elif val == default:
                 continue
@@ -634,6 +645,27 @@ class _PerModelConfigBase:
         }
         d.update(self.extra_kwargs)
         return d
+
+    def _warn_unknown_extra_kwargs(self, build_fn: Callable) -> None:
+        """Warn when an escape-valve key is not explicit in the build signature."""
+        if not self.extra_kwargs:
+            return
+        accepted = {
+            name
+            for name, param in inspect.signature(build_fn).parameters.items()
+            if param.kind is not inspect.Parameter.VAR_KEYWORD
+        }
+        unknown = set(self.extra_kwargs) - accepted
+        if unknown:
+            warnings.warn(
+                f"Unknown `extra_kwargs` for {type(self).__name__}: "
+                f"{sorted(unknown)}. They will be forwarded to the underlying "
+                "builder; check for typos if this is unintentional.",
+                stacklevel=3,
+            )
+
+
+_ESTIMATOR_CONFIG_BASES = (_EstimatorBuilderBase, _PerModelConfigBase)
 
 
 def _reject_filtered_extra_kwargs(config) -> None:
@@ -705,6 +737,7 @@ class MarginalConfigBase(_PerModelConfigBase):
         """
         from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
 
+        self._warn_unknown_extra_kwargs(build_zuko_unconditional_flow)
         return build_zuko_unconditional_flow(
             which_nf=self._WHICH_NF, batch_x=batch_x, **self._build_kwargs()
         )
@@ -937,6 +970,7 @@ class DensityConfigBase(_PerModelConfigBase):
         Returns:
             A ``ConditionalDensityEstimator``.
         """
+        self._warn_unknown_extra_kwargs(self._BUILD_FN)
         return self._BUILD_FN(
             batch_x=batch_input, batch_y=batch_condition, **self._build_kwargs()
         )
@@ -1054,6 +1088,7 @@ class ZukoNCSFConfig(_ZukoDensityConfigBase):
     num_bins: int = 10
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_ncsf)
+    _SHADOWED_EXTRA_KWARGS: ClassVar[frozenset[str]] = frozenset({"bins"})
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -1080,6 +1115,7 @@ class ZukoNSFConfig(_ZukoDensityConfigBase):
     num_bins: int = 10
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_nsf)
+    _SHADOWED_EXTRA_KWARGS: ClassVar[frozenset[str]] = frozenset({"bins"})
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -1122,6 +1158,7 @@ class _NFlowsFlowConfigBase(DensityConfigBase):
         num_blocks: Number of residual blocks in each transform's net.
         dropout_probability: Dropout probability in each transform's net.
         use_batch_norm: Whether to use batch normalization.
+        dtype: Floating-point dtype of the base distribution.
     """
 
     hidden_features: int = 50
@@ -1129,6 +1166,7 @@ class _NFlowsFlowConfigBase(DensityConfigBase):
     num_blocks: int = 2
     dropout_probability: float = 0.0
     use_batch_norm: bool = False
+    dtype: torch.dtype = torch.float32
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -1278,6 +1316,11 @@ class ClassifierConfigBase(_PerModelConfigBase):
     def __post_init__(self):
         self._reject_if_abstract(ClassifierConfigBase, "ResNetClassifierConfig()")
         super().__post_init__()
+        if "embedding_net_y" in self.extra_kwargs:
+            raise ValueError(
+                "`extra_kwargs` key 'embedding_net_y' duplicates "
+                "`embedding_net_x`. Pass the user-facing field instead."
+            )
 
     def _build_kwargs(self) -> dict:
         """Translate the embedding names to the build functions' x/y naming."""
@@ -1298,6 +1341,7 @@ class ClassifierConfigBase(_PerModelConfigBase):
         Returns:
             A ``RatioEstimator``.
         """
+        self._warn_unknown_extra_kwargs(self._BUILD_FN)
         return self._BUILD_FN(
             batch_x=batch_input, batch_y=batch_condition, **self._build_kwargs()
         )
@@ -1387,8 +1431,10 @@ class MixedConfig(_PerModelConfigBase):
         discrete_hidden_features: Number of hidden features of the categorical
             net.  Falls back to the continuous config's when None.
         discrete_hidden_layers: Number of hidden layers of the categorical net.
-        extra_kwargs: Additional keyword arguments forwarded to the build
-            function, for settings that have no field of their own.
+        dropout_probability: Dropout probability of the categorical net.
+        extra_kwargs: Unsupported for mixed estimators because there is no
+            unambiguous downstream target. Put continuous-model options in
+            ``continuous.extra_kwargs`` instead.
     """
 
     continuous: DensityConfigBase = field(default_factory=_default_mixed_continuous)
@@ -1399,6 +1445,7 @@ class MixedConfig(_PerModelConfigBase):
     log_transform_x: bool = False
     discrete_hidden_features: Optional[int] = None
     discrete_hidden_layers: int = 2
+    dropout_probability: float = 0.0
 
     def __post_init__(self):
         super().__post_init__()
@@ -1416,6 +1463,21 @@ class MixedConfig(_PerModelConfigBase):
                 "The continuous config of a mixed estimator needs a single "
                 "`hidden_features` value, because the discrete net and the "
                 "combined embedding net are sized from it."
+            )
+        if (
+            self.continuous.z_score_condition != "independent"
+            or type(self.continuous.embedding_net) is not nn.Identity
+        ):
+            raise ValueError(
+                "The continuous config's `z_score_condition` and `embedding_net` "
+                "are replaced when its mixed condition is built. Configure them "
+                "with `MixedConfig.z_score_condition`, `embedding_net`, and "
+                "`combined_embedding_net` instead."
+            )
+        if self.extra_kwargs:
+            raise ValueError(
+                "MixedConfig has no downstream pass-through for `extra_kwargs`. "
+                "Put continuous-model options in `continuous.extra_kwargs`."
             )
 
     def build(
@@ -1447,28 +1509,8 @@ class MixedConfig(_PerModelConfigBase):
             log_transform_x=self.log_transform_x,
             discrete_hidden_features=self.discrete_hidden_features,
             discrete_hidden_layers=self.discrete_hidden_layers,
-            **self.extra_kwargs,
+            dropout_probability=self.dropout_probability,
         )
-
-
-def _config_from_model(model: str, configs: dict, role: str) -> _PerModelConfigBase:
-    """Return the default config of a model given its name.
-
-    Args:
-        model: Name of the model.
-        configs: Registry to look the name up in.
-        role: Name of the estimator family, for the error message.
-
-    Returns:
-        A default-constructed config for that model.
-    """
-    try:
-        config_cls = configs[model]
-    except KeyError:
-        raise ValueError(
-            f"Unknown {role} model {model!r}. Must be one of {sorted(configs)}."
-        ) from None
-    return config_cls()
 
 
 def _factory_defaults(factory: Callable, field_to_param: dict) -> dict:
@@ -1519,13 +1561,24 @@ def _config_from_factory_kwargs(
             f"Unknown {role} model {model!r}. Must be one of {sorted(configs)}."
         ) from None
 
-    known = {f.name for f in fields(config_cls)}
+    known = {f.name for f in fields(config_cls)} - {"extra_kwargs"}
+    family_known = {f.name for cls in configs.values() for f in fields(cls)} - {
+        "extra_kwargs"
+    }
     accepted, ignored = {}, []
     for name, value in named.items():
         if name in known:
             accepted[name] = value
         elif value != factory_defaults[name]:
             ignored.append(name)
+    unknown = {}
+    for name, value in extra.items():
+        if name in known:
+            accepted[name] = value
+        elif name in family_known:
+            ignored.append(name)
+        else:
+            unknown[name] = value
     if ignored:
         raise ValueError(
             f"Argument(s) {sorted(ignored)} are not used by model={model!r} "
@@ -1533,16 +1586,10 @@ def _config_from_factory_kwargs(
             f"{config_cls.__name__}, or use `extra_kwargs` to forward "
             f"library-specific options."
         )
-
-    unknown = {}
-    for name, value in extra.items():
-        if name in known:
-            accepted[name] = value
-        else:
-            unknown[name] = value
     if unknown:
         warnings.warn(
-            f"Unknown kwargs passed to {config_cls.__name__}: {set(unknown)}. "
+            f"Unknown kwargs passed to {config_cls.__name__}: "
+            f"{sorted(unknown)}. "
             f"These will be forwarded to the underlying builder. "
             f"If this is unintentional, check for typos.",
             stacklevel=3,
