@@ -686,13 +686,16 @@ def check_estimator_arg(
     Accepts a string identifier, an estimator config, or a build function
     returning an ``nn.Module``.
     """
-    from sbi.neural_nets.net_builders.estimator_configs import (
-        _EstimatorBuilderBase,
-        _PerModelConfigBase,
-    )
+    from sbi.neural_nets.net_builders.estimator_configs import _ESTIMATOR_CONFIG_BASES
+
+    if isinstance(estimator, type) and issubclass(estimator, _ESTIMATOR_CONFIG_BASES):
+        raise TypeError(
+            f"Got the config class {estimator.__name__}, not an instance. "
+            f"Use {estimator.__name__}()."
+        )
 
     if not (
-        isinstance(estimator, (str, _PerModelConfigBase, _EstimatorBuilderBase))
+        isinstance(estimator, (str, *_ESTIMATOR_CONFIG_BASES))
         or (isinstance(estimator, Callable) and not isinstance(estimator, nn.Module))
     ):
         raise TypeError(
