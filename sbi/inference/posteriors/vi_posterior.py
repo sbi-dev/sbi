@@ -1396,4 +1396,3 @@ class VIPosterior(NeuralPosterior):
             state_dict: State produced by `__getstate__`.
         """
         super().__setstate__(state_dict)
-        self.to(self._device)

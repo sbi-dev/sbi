@@ -2,7 +2,17 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import torch
 from numpy import ndarray
@@ -13,7 +23,6 @@ from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import (
     BoxUniform,
-    assert_all_finite,
     atleast_2d,
     canonical_device,
     set_validate_args,
@@ -24,6 +33,9 @@ from sbi.utils.user_input_checks_utils import (
     OneDimPriorWrapper,
     PytorchReturnTypeWrapper,
 )
+
+if TYPE_CHECKING:
+    from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
 
 
 def check_prior(prior: Any) -> None:
@@ -609,8 +621,6 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
-    assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
-
     if x_event_shape is not None and len(x_event_shape) > len(x.shape):
         raise ValueError(
             f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
@@ -662,14 +672,25 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
         num_samples={num_prior_samples}."""
 
 
-def check_estimator_arg(estimator: Union[str, Callable]) -> None:
-    """Check (density or ratio) estimator argument passed by the user."""
-    assert isinstance(estimator, str) or (
-        isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
-    ), (
-        "The passed density estimator / classifier must be a string or a function "
-        f"returning a nn.Module, but is {type(estimator)}"
-    )
+def check_estimator_arg(
+    estimator: Union[str, Callable, "_EstimatorBuilderBase"],
+) -> None:
+    """Check (density or ratio) estimator argument passed by the user.
+
+    Accepts a string identifier, an estimator builder (subclass of
+    ``_EstimatorBuilderBase``), or a build function returning an ``nn.Module``.
+    """
+    from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
+
+    if not (
+        isinstance(estimator, (str, _EstimatorBuilderBase))
+        or (isinstance(estimator, Callable) and not isinstance(estimator, nn.Module))
+    ):
+        raise TypeError(
+            "The passed density estimator / classifier must be a string, "
+            "an estimator builder (e.g. DensityEstimatorBuilder), or a "
+            f"function returning a nn.Module, but is {type(estimator)}"
+        )
 
 
 def validate_theta_and_x(

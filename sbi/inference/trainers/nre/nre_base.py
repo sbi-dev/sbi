@@ -31,7 +31,11 @@ from sbi.inference.trainers.base import (
     NeuralInference,
 )
 from sbi.neural_nets import classifier_nn
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.net_builders.estimator_configs import (
+    RatioEstimatorBuilder,
+    _EstimatorBuilderBase,
+)
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -45,7 +49,12 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
+        classifier: Union[
+            Literal["linear", "mlp", "resnet"],
+            RatioEstimatorBuilder,
+            ConditionalEstimatorBuildFn[RatioEstimator],
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -70,13 +79,14 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
           (normalizing constant) of the data $x$.
 
         Args:
-            classifier: Classifier trained to approximate likelihood ratios. If it is
-                a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet), or a callable that implements the
-                `ConditionalEstimatorBuilder` protocol. The callable will
-                be called with the first batch of simulations (theta, x), which can thus
-                be used for shape inference and potentially for z-scoring. It returns a
-                `RatioEstimator`.
+            classifier: The classifier used to approximate the
+                likelihood-to-evidence ratio. If ``None`` (default), uses a
+                ``RatioEstimatorBuilder`` with default settings. A
+                ``RatioEstimatorBuilder`` can be passed to configure
+                the classifier. If it is a string (deprecated), use a
+                pre-configured network of the provided type (one of
+                linear, mlp, resnet). Alternatively, a function that
+                builds a custom neural network can be provided.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -90,14 +100,29 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             show_progress_bars=show_progress_bars,
         )
 
-        # As detailed in the docstring, `density_estimator` is either a string or
-        # a callable. The function creating the neural network is attached to
-        # `_build_neural_net`. It will be called in the first round and receive
-        # thetas and xs as inputs, so that they can be used for shape inference and
-        # potentially for z-scoring.
-        check_estimator_arg(classifier)
-        if isinstance(classifier, str):
+        if classifier is not None:
+            check_estimator_arg(classifier)
+        if classifier is None:
+            self._build_neural_net = self._wrap_builder(
+                RatioEstimatorBuilder(model="resnet")
+            )
+        elif isinstance(classifier, str):
+            warnings.warn(
+                "Passing a string for `classifier` is deprecated. "
+                "Use RatioEstimatorBuilder(model=...) instead, e.g. "
+                "`from sbi.neural_nets import RatioEstimatorBuilder`.",
+                FutureWarning,
+                stacklevel=3,
+            )
             self._build_neural_net = classifier_nn(model=classifier)
+        elif isinstance(classifier, _EstimatorBuilderBase):
+            if not isinstance(classifier, RatioEstimatorBuilder):
+                raise TypeError(
+                    "NRE requires a RatioEstimatorBuilder; got "
+                    f"{type(classifier).__name__}. Use "
+                    "RatioEstimatorBuilder(model=...)."
+                )
+            self._build_neural_net = self._wrap_builder(classifier)
         else:
             self._build_neural_net = classifier
 

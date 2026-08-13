@@ -12,6 +12,7 @@ from sbi.neural_nets.net_builders.classifier import (
     build_resnet_classifier,
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
+    VF_MODELS,
     ClassifierConfig,
     ConditionalFlowConfig,
     MarginalFlowConfig,
@@ -342,7 +343,7 @@ def posterior_nn(
 
 def posterior_score_nn(
     model: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VF_MODELS,
         VectorFieldNet,
     ] = "mlp",
     sde_type: str = "ve",
@@ -355,7 +356,7 @@ def posterior_score_nn(
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
+    time_emb_type: Literal["sinusoidal", "random_fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
     compose_standardization: bool = False,
     **kwargs: Any,
@@ -374,7 +375,9 @@ def posterior_score_nn(
             - 'ada_mlp': Fully connected feed-forward with adaptive
                layer normalization for conditioning.
             - 'transformer': Transformer network.
-            - 'transformer_cross_attention': Transformer with cross-attention.
+            - 'transformer_cross_attn': Transformer with cross-attention.
+                Requires sequence-shaped conditioning (3-D ``batch_y`` or an
+                ``embedding_net`` returning ``(batch, seq_len, emb_dim)``).
             -  nn.Module: Custom network
             Defaults to 'mlp'.
         z_score_theta: Whether to z-score thetas passing into the network, can be one
@@ -438,7 +441,7 @@ def posterior_score_nn(
 
 def posterior_flow_nn(
     model: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VF_MODELS,
         VectorFieldNet,
     ] = "mlp",
     z_score_theta: Optional[
@@ -450,7 +453,7 @@ def posterior_flow_nn(
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
+    time_emb_type: Literal["sinusoidal", "random_fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
     gaussian_baseline: bool = False,
     compose_standardization: bool = False,
@@ -465,7 +468,9 @@ def posterior_flow_nn(
             - 'ada_mlp': Fully connected feed-forward with adaptive
                 layer normalization for conditioning.
             - 'transformer': Transformer network.
-            - 'transformer_cross_attention': Transformer with cross-attention.
+            - 'transformer_cross_attn': Transformer with cross-attention.
+                Requires sequence-shaped conditioning (3-D ``batch_y`` or an
+                ``embedding_net`` returning ``(batch, seq_len, emb_dim)``).
             -  nn.Module: Custom network
             Defaults to 'mlp'.
         z_score_theta: Whether to z-score theta for time-dependent normalization.

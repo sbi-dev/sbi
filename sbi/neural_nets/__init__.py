@@ -9,6 +9,22 @@ from sbi.neural_nets.factory import (
     posterior_nn,
     posterior_score_nn,
 )
+from sbi.neural_nets.net_builders.estimator_configs import (
+    DensityEstimatorBuilder,
+    MarginalBPFConfig,
+    MarginalConfigBase,
+    MarginalGFConfig,
+    MarginalMAFConfig,
+    MarginalNAFConfig,
+    MarginalNCSFConfig,
+    MarginalNICEConfig,
+    MarginalNSFConfig,
+    MarginalSOSPFConfig,
+    MarginalUNAFConfig,
+    MixedDensityEstimatorBuilder,
+    RatioEstimatorBuilder,
+    VectorFieldEstimatorBuilder,
+)
 
 __all__ = [
     "classifier_nn",
@@ -17,4 +33,18 @@ __all__ = [
     "posterior_nn",
     "posterior_score_nn",
     "posterior_flow_nn",
+    "VectorFieldEstimatorBuilder",
+    "DensityEstimatorBuilder",
+    "MixedDensityEstimatorBuilder",
+    "RatioEstimatorBuilder",
+    "MarginalConfigBase",
+    "MarginalBPFConfig",
+    "MarginalGFConfig",
+    "MarginalMAFConfig",
+    "MarginalNAFConfig",
+    "MarginalNCSFConfig",
+    "MarginalNICEConfig",
+    "MarginalNSFConfig",
+    "MarginalSOSPFConfig",
+    "MarginalUNAFConfig",
 ]

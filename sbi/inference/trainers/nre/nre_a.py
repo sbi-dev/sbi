@@ -12,7 +12,8 @@ from sbi.inference.trainers._contracts import LossArgsNRE_A
 from sbi.inference.trainers.nre.nre_base import (
     RatioEstimatorTrainer,
 )
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.net_builders.estimator_configs import RatioEstimatorBuilder
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
@@ -63,7 +64,12 @@ class NRE_A(RatioEstimatorTrainer):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
+        classifier: Union[
+            str,
+            RatioEstimatorBuilder,
+            ConditionalEstimatorBuildFn[RatioEstimator],
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -76,13 +82,14 @@ class NRE_A(RatioEstimatorTrainer):
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. If `None`, the
                 prior must be passed to `.build_posterior()`.
-            classifier: Classifier trained to approximate likelihood ratios. If it is
-                a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet), or a callable that implements the
-                `ConditionalEstimatorBuilder` protocol. The callable will
-                be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. It
-                returns a `RatioEstimator`.
+            classifier: The classifier used to approximate the
+                likelihood-to-evidence ratio. If ``None`` (default), uses a
+                ``RatioEstimatorBuilder`` with default settings. A
+                ``RatioEstimatorBuilder`` can be passed to configure
+                the classifier. If it is a string (deprecated), use a
+                pre-configured network of the provided type (one of
+                linear, mlp, resnet). Alternatively, a function that
+                builds a custom neural network can be provided.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.

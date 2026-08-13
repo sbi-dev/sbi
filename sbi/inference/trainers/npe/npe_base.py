@@ -4,7 +4,17 @@
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import asdict
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 from torch import Tensor, ones
 from torch.distributions import Distribution
@@ -34,10 +44,14 @@ from sbi.inference.trainers.base import (
 )
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
+)
+from sbi.neural_nets.net_builders.estimator_configs import (
+    DensityEstimatorBuilder,
+    _EstimatorBuilderBase,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -58,13 +72,17 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
+    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (DensityEstimatorBuilder,)
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
-            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
-        ] = "maf",
+            DensityEstimatorBuilder,
+            ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -78,14 +96,13 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         a sequential scheme.
 
         Args:
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type (one of nsf, maf, mdn, made). Alternatively, a function
+            density_estimator: If it is a string (deprecated), use a pre-configured
+                network of the provided type (one of nsf, maf, mdn, made). If it is
+                a ``DensityEstimatorBuilder``, the builder's ``build()`` method will be
+                called with the first batch of simulations. Alternatively, a function
                 that builds a custom neural network, which adheres to
-                `ConditionalEstimatorBuilder` protocol can be provided. The function
-                will be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. The
-                density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
+                ``ConditionalEstimatorBuildFn`` protocol can be provided. If None,
+                it uses a default ``DensityEstimatorBuilder`` with ``"maf"``.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -99,14 +116,34 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             show_progress_bars=show_progress_bars,
         )
 
-        # As detailed in the docstring, `density_estimator` is either a string or
-        # a callable. The function creating the neural network is attached to
+        # `density_estimator` is either a string, a builder, or a callable.
+        # The function creating the neural network is attached to
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
-        check_estimator_arg(density_estimator)
-        if isinstance(density_estimator, str):
+        if density_estimator is not None:
+            check_estimator_arg(density_estimator)
+        if density_estimator is None:
+            self._build_neural_net = self._wrap_builder(
+                DensityEstimatorBuilder(model="maf")
+            )
+        elif isinstance(density_estimator, str):
+            warnings.warn(
+                "Passing a string for `density_estimator` is deprecated. "
+                "Use DensityEstimatorBuilder(model=...) instead, e.g. "
+                "`from sbi.neural_nets import DensityEstimatorBuilder`.",
+                FutureWarning,
+                stacklevel=3,
+            )
             self._build_neural_net = posterior_nn(model=density_estimator)
+        elif isinstance(density_estimator, _EstimatorBuilderBase):
+            if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
+                allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
+                raise TypeError(
+                    f"{type(self).__name__} requires a {allowed}; got "
+                    f"{type(density_estimator).__name__}."
+                )
+            self._build_neural_net = self._wrap_builder(density_estimator)
         else:
             self._build_neural_net = density_estimator
 

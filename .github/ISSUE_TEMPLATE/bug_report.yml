@@ -1,0 +1,105 @@
+name: Bug report
+description: Report a problem to help us improve sbi
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: What happens, and how does it differ from what you expected?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal code example
+      description: >-
+        The shortest code that triggers the problem. This is the single most
+        useful thing you can give us.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Error message or traceback
+      description: Paste the full traceback, if there is one.
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: sbi-version
+    attributes:
+      label: sbi version
+      description: The output of `python -c "import sbi; print(sbi.__version__)"`.
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      description: The output of `python --version`.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      description: Which device did you run on?
+      options:
+        - CPU
+        - CUDA
+        - MPS (Apple Silicon)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: method
+    attributes:
+      label: Inference method
+      description: >-
+        Select all that apply. If your method is not listed, select Other and name
+        it under Additional context.
+      multiple: true
+      options:
+        - NPE
+        - NLE
+        - NRE
+        - NPSE
+        - FMPE
+        - MNLE / MNPE
+        - NPE-PFN
+        - ABC (MCABC / SMCABC)
+        - Not method-specific
+        - Other
+    validations:
+      required: false
+
+  - type: dropdown
+    id: rounds
+    attributes:
+      label: Single-round or multi-round
+      description: >-
+        Multi-round means sequential inference, for example SNPE, SNLE or SNRE.
+      options:
+        - Single-round (amortized)
+        - Multi-round (sequential)
+        - Not applicable
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: >-
+        Anything else that helps us: your operating system, related issues, or
+        how you installed sbi.
+    validations:
+      required: false
