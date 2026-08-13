@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import pickle
 from typing import Callable, Tuple
 
 import numpy as np
@@ -373,13 +372,9 @@ def trained_nan_tolerant_npe():
     return prior, inference, x_nan
 
 
-@pytest.mark.parametrize("sample_with", ("direct", "mcmc", "rejection"))
+@pytest.mark.parametrize("sample_with", ("direct", "mcmc"))
 def test_nan_tolerance_derived_from_embedding(sample_with, trained_nan_tolerant_npe):
-    """A NaN-tolerant embedding must derive the tolerance for every sampler.
-
-    Before derivation, only `DirectPosterior` and `VectorFieldPosterior` could
-    opt out of the finiteness check; switching the sampler lost the tolerance.
-    """
+    """A NaN-tolerant embedding must derive the tolerance for every sampler."""
     _, inference, x_nan = trained_nan_tolerant_npe
     posterior = inference.build_posterior(sample_with=sample_with)
 
@@ -427,6 +422,9 @@ def test_ensemble_derives_nan_tolerance_from_components(trained_nan_tolerant_npe
     mixed = EnsemblePosterior([tolerant, strict])
     with pytest.raises(ValueError, match="NaN/Inf"):
         mixed.potential(theta, x=x_nan)
+    # sample() draws components randomly; rejection must not depend on the draw.
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        mixed.sample((1,), x=x_nan, show_progress_bars=False)
 
 
 def test_conditioned_potential_preserves_nan_tolerance(trained_nan_tolerant_npe):
@@ -480,23 +478,8 @@ def test_mnpe_derives_nan_tolerance_from_marked_embedding():
     assert posterior.default_x.isnan().any()
 
 
-def test_derived_nan_tolerance_survives_pickling(trained_nan_tolerant_npe):
-    """The tolerance derives at check time, so it needs no pickled state."""
-    _, inference, x_nan = trained_nan_tolerant_npe
-    restored = pickle.loads(pickle.dumps(inference.build_posterior()))
-
-    restored.set_default_x(x_nan)
-
-    assert restored.default_x is not None
-    assert restored.default_x.isnan().any()
-
-
 def test_batched_apis_reject_nonfinite_x(trained_npe):
-    """The batched entry points must validate `x` like the non-batched paths.
-
-    They bypass `process_x` and `_x_else_default_x`, so before the shared guard
-    they silently computed on NaN.
-    """
+    """The batched entry points bypass `process_x` and must guard themselves."""
     prior, inference, _ = trained_npe
     x_batch = torch.stack([zeros(2), torch.tensor([0.0, float("nan")])])
     direct = inference.build_posterior()

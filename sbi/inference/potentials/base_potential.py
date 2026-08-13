@@ -44,12 +44,8 @@ class BasePotential(metaclass=ABCMeta):
 
     @property
     def x_embedding_net(self) -> Optional[nn.Module]:
-        """Return the network that embeds `x`, if the potential knows it.
-
-        `None` means no net is known to consume `x`, so posteriors derive
-        strict finiteness checks for `x_o`. Only potentials whose estimator
-        is conditioned on `x` override this.
-        """
+        """Return the net that embeds `x`; `None` (default) means no net is
+        known to consume `x`, so posteriors validate `x_o` strictly."""
         return None
 
     @property

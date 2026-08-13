@@ -497,7 +497,6 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(
         training_batch_size=100
     )
-    # No flag needed: the NaN-tolerance is derived from the embedding net.
     posterior = inference.build_posterior()
 
     num_samples = 1000

@@ -739,14 +739,8 @@ def batched_first_of_batch(t: Tensor) -> Tensor:
 def assert_all_finite(
     quantity: Tensor, description: str = "tensor", allow_nan: bool = False
 ) -> None:
-    """Raise if tensor quantity contains any NaN or Inf element.
-
-    Args:
-        quantity: Tensor to check.
-        description: Name of the quantity used in the error message.
-        allow_nan: If True, NaN elements are accepted (e.g., NaN-padded trials
-            for a NaN-tolerant embedding); Inf still raises.
-    """
+    """Raise if tensor quantity contains NaN or Inf; `allow_nan` accepts NaN
+    (e.g., NaN-padded trials), Inf still raises."""
 
     msg = f"NaN/Inf present in {description}."
     invalid = (
@@ -761,16 +755,8 @@ def assert_all_finite(
 def net_accepts_nan_input(net: Optional[Module]) -> bool:
     """Return whether any module in `net` declares `accepts_nan_input`.
 
-    NaN-tolerant embeddings such as `PermutationInvariantEmbedding` declare
-    `accepts_nan_input = True` as a class attribute. Builders wrap user
-    embeddings (e.g., inside a standardizing `nn.Sequential`), so the lookup
-    recurses the module tree.
-
-    Args:
-        net: Module to inspect, or None if no net consumes `x`.
-
-    Returns:
-        True if any submodule (including `net` itself) sets `accepts_nan_input`.
+    Recurses the module tree because builders wrap user embeddings, e.g.,
+    inside a standardizing `nn.Sequential`. `None` means no net consumes `x`.
     """
     if net is None:
         return False

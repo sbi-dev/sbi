@@ -15,10 +15,8 @@ class PermutationInvariantEmbedding(nn.Module):
     Takes as input a tensor with (batch, permutation_dim, input_dim)
     and outputs (batch, output_dim).
 
-    A varying number of trials is padded with NaN, which the forward pass
-    masks. The class attribute ``accepts_nan_input = True`` declares this;
-    sbi uses it to derive NaN-tolerant validation of the observation `x_o`
-    (Inf is always rejected).
+    The class attribute ``accepts_nan_input = True`` marks NaN input as padding
+    by design; sbi derives NaN-tolerant `x_o` validation from it.
 
     References:
     Chan et al. (2018): "A likelihood-free inference framework for population genetic

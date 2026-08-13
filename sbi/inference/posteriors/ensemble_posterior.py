@@ -203,6 +203,10 @@ class EnsemblePosterior(NeuralPosterior):
         Returns:
             Samples drawn from the ensemble distribution.
         """
+        # Components are drawn randomly; guard here so validation of `x` does
+        # not depend on the draw.
+        if x is not None:
+            self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indizes = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -223,8 +227,7 @@ class EnsemblePosterior(NeuralPosterior):
         x: Tensor,
         **kwargs,
     ) -> Tensor:
-        # Guard here: sampling draws a random subset of components, so relying
-        # on component-level checks would validate nondeterministically.
+        # Guard here so validation of `x` does not depend on the component draw.
         self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indices = torch.multinomial(
