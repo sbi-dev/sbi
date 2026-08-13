@@ -23,7 +23,6 @@ from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import (
     BoxUniform,
-    assert_all_finite,
     atleast_2d,
     canonical_device,
     set_validate_args,
@@ -622,8 +621,6 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
-    assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
-
     if x_event_shape is not None and len(x_event_shape) > len(x.shape):
         raise ValueError(
             f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
