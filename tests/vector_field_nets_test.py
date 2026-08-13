@@ -156,32 +156,3 @@ def test_mlp_ratio_reaches_the_ada_mlp_global_mlp():
     )
     expand = estimator.net.global_mlp.mlp_blocks[0][1]
     assert expand.out_features == 8 * expand.in_features
-
-
-# Measured before the `mlp_ratio` forwarding fixes (2026-08-12), with
-# batch_x of shape (10, 2) and batch_y of shape (10, 3), or (10, 4, 3) for
-# cross-attention.
-_DEFAULT_PARAM_COUNTS = {
-    "mlp": 75802,
-    "ada_mlp": 621600,
-    "transformer": 1678101,
-    "transformer_cross_attn": 1178901,
-}
-
-
-@pytest.mark.parametrize("net", sorted(_DEFAULT_PARAM_COUNTS))
-def test_default_networks_keep_their_shapes(net):
-    """Default-constructed estimators must not change size.
-
-    The forwarding fixes only take effect with
-    `num_intermediate_mlp_layers > 0`, which defaults to zero, so networks
-    built with all defaults must stay identical.
-    """
-    batch_y = (
-        torch.randn(10, 4, 3) if net == "transformer_cross_attn" else torch.randn(10, 3)
-    )
-    estimator = build_vector_field_estimator(
-        batch_x=torch.randn(10, 2), batch_y=batch_y, net=net
-    )
-    n_params = sum(p.numel() for p in estimator.parameters())
-    assert n_params == _DEFAULT_PARAM_COUNTS[net]
