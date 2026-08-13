@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from math import prod
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -10,14 +11,22 @@ from sbi.neural_nets.embedding_nets.fully_connected import FCEmbedding
 
 
 def _validate_cnn_input_shape(x: Tensor, input_shape: Tuple) -> None:
-    """Validate a channel-first CNN input shape."""
+    """Validate a flat or channel-first CNN input shape.
+
+    Args:
+        x: Input tensor with a batch dimension.
+        input_shape: Expected shape after the batch dimension.
+
+    Raises:
+        ValueError: If the trailing input shape is not supported.
+    """
     trailing_shape = tuple(x.shape[1:])
-    valid_shapes = (input_shape,)
+    valid_shapes = (input_shape, (prod(input_shape),))
     if input_shape[0] == 1:
         valid_shapes += (input_shape[1:],)
     if trailing_shape not in valid_shapes:
         raise ValueError(
-            "Expected input with channels first and trailing shape "
+            "Expected flat or channel-first input with trailing shape "
             f"in {valid_shapes}, but got {trailing_shape}."
         )
 
@@ -104,8 +113,8 @@ class CNNEmbedding(nn.Module):
 
         Args:
             input_shape: Spatial input shape without batch or channel dimensions, e.g.,
-                (28,) for 1D or (28, 28) for 2D. Inputs must use channel-first
-                layout.
+                (28,) for 1D or (28, 28) for 2D. Inputs may be flat or use
+                channel-first layout.
             in_channels: Number of image channels, default 1.
             out_channels_per_layer: Number of out convolutional out_channels for each
                 layer. Must match the number of layers passed below.

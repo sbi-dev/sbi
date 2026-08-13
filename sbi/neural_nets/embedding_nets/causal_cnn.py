@@ -167,8 +167,8 @@ class CausalCNNEmbedding(nn.Module):
 
         Args:
             input_shape: Spatial input shape without batch or channel dimensions,
-                e.g. (num_timepoints,). Inputs must use channel-first layout and
-                currently only 1D is supported.
+                e.g. (num_timepoints,). Inputs may be flat or use channel-first
+                layout, and currently only 1D is supported.
             in_channels: Number of input channels, default = 1.
             out_channels_per_layer: number of out_channels for each layer, number
                 of entries should correspond with num_conv_layers passed below.

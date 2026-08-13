@@ -186,9 +186,14 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
     non_contiguous_input = channel_last_input.movedim(-1, 1)
 
     assert not non_contiguous_input.is_contiguous()
-    assert embedding_net(non_contiguous_input).shape == (4, 20)
+    channel_first_embedding = embedding_net(non_contiguous_input)
+    assert channel_first_embedding.shape == (4, 20)
+    torch.testing.assert_close(
+        embedding_net(non_contiguous_input.flatten(start_dim=1)),
+        channel_first_embedding,
+    )
 
-    with pytest.raises(ValueError, match="Expected input with channels first"):
+    with pytest.raises(ValueError, match="Expected flat or channel-first input"):
         embedding_net(channel_last_input)
 
 
