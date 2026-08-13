@@ -18,12 +18,12 @@ from sbi.inference.potentials.base_potential import (
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent
 from sbi.utils.torchutils import (
+    assert_all_finite,
     canonical_device,
     ensure_theta_batched,
     infer_tensor_device,
     process_device,
 )
-from sbi.utils.torchutils import assert_all_finite, ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import process_x
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
