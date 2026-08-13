@@ -75,6 +75,7 @@ def _build_mixed_density_estimator(
     log_transform_x: bool = False,
     discrete_hidden_features: Optional[int] = None,
     discrete_hidden_layers: int = 2,
+    dropout_probability: float = 0.0,
     continuous_hidden_features: Optional[int] = None,
     **kwargs,
 ) -> MixedDensityEstimator:
@@ -142,6 +143,8 @@ def _build_mixed_density_estimator(
             (categorical) net. Defaults to ``hidden_features`` if not set.
         discrete_hidden_layers: number of hidden layers for the discrete
             (categorical) net.
+        dropout_probability: Dropout probability of the categorical net. On
+            the legacy flat path it is also passed to compatible continuous nets.
         continuous_hidden_features: number of hidden features for the continuous
             (flow) net and the fallback combined embedding MLP. Defaults to
             ``hidden_features`` if not set.
@@ -156,11 +159,17 @@ def _build_mixed_density_estimator(
     # Resolve decoupled parameters, falling back to shared defaults. A
     # continuous config carries the continuous width itself, which then also
     # sizes the fallback combined embedding net.
-    _discrete_hf = discrete_hidden_features or hidden_features
     if continuous_config is not None:
         _continuous_hf = continuous_config.hidden_features  # type: ignore[attr-defined]
     else:
         _continuous_hf = continuous_hidden_features or hidden_features
+    _discrete_hf = (
+        discrete_hidden_features
+        if discrete_hidden_features is not None
+        else _continuous_hf
+        if continuous_config is not None
+        else hidden_features
+    )
 
     warnings.warn(
         "The mixed neural density estimator assumes that inferred variable contains "
@@ -199,7 +208,7 @@ def _build_mixed_density_estimator(
         num_layers=discrete_hidden_layers,
         embedding_net=embedding_net,
         num_categories_per_variable=num_categories_per_variable,
-        dropout_probability=kwargs.get("dropout_probability", 0.0),
+        dropout_probability=dropout_probability,
     )
 
     if combined_embedding_net is None:
@@ -229,10 +238,9 @@ def _build_mixed_density_estimator(
             embedding_net=combined_embedding_net,
         ).build(batch_input=continuous_x, batch_condition=combined_condition)
     else:
-        # zuko-based flow models do not support dropout_probability; remove it
-        # from kwargs so it is only applied to the categorical net.
-        if flow_model.startswith("zuko"):
-            kwargs.pop("dropout_probability", None)
+        # On the legacy path, nflows uses the same dropout for both sub-nets.
+        if not flow_model.startswith("zuko"):
+            kwargs["dropout_probability"] = dropout_probability
 
         continuous_net = model_builders[flow_model](
             batch_x=continuous_x,
