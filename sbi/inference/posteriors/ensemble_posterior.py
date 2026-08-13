@@ -223,6 +223,9 @@ class EnsemblePosterior(NeuralPosterior):
         x: Tensor,
         **kwargs,
     ) -> Tensor:
+        # Guard here: sampling draws a random subset of components, so relying
+        # on component-level checks would validate nondeterministically.
+        self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -303,7 +306,9 @@ class EnsemblePosterior(NeuralPosterior):
             `EnsemblePosterior` that will use a default `x` when not explicitly
             passed.
         """
-        self._x = process_x(x, x_event_shape=None).to(self._device)
+        x = process_x(x, x_event_shape=None)
+        self._assert_finite_x(x)
+        self._x = x.to(self._device)
 
         for posterior in self.posteriors:
             posterior.set_default_x(x)

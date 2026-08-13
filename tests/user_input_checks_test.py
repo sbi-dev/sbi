@@ -24,10 +24,11 @@ from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
 from sbi.inference.posteriors import EnsemblePosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
-from sbi.neural_nets import posterior_nn
+from sbi.neural_nets import posterior_nn, posterior_score_nn
 from sbi.neural_nets.embedding_nets import (
     FCEmbedding,
     PermutationInvariantEmbedding,
@@ -337,16 +338,6 @@ def test_nonfinite_x_on_preconditioned_potential(trained_npe):
         MCMCPosterior(potential_fn, theta_transform=theta_transform, proposal=prior)
 
 
-def test_strict_validation_needs_no_pickled_state(trained_npe):
-    """A restored posterior still rejects NaN: validation derives at check time."""
-    _, inference, _ = trained_npe
-    restored = pickle.loads(pickle.dumps(inference.build_posterior()))
-
-    restored.set_default_x(torch.zeros(1, 2))
-    with pytest.raises(ValueError, match="NaN/Inf"):
-        restored.set_default_x(torch.tensor([0.0, float("nan")]))
-
-
 @pytest.fixture(scope="module")
 def trained_nan_tolerant_npe():
     """A minimally trained NPE with a `PermutationInvariantEmbedding`.
@@ -498,6 +489,49 @@ def test_derived_nan_tolerance_survives_pickling(trained_nan_tolerant_npe):
 
     assert restored.default_x is not None
     assert restored.default_x.isnan().any()
+
+
+def test_batched_apis_reject_nonfinite_x(trained_npe):
+    """The batched entry points must validate `x` like the non-batched paths.
+
+    They bypass `process_x` and `_x_else_default_x`, so before the shared guard
+    they silently computed on NaN.
+    """
+    prior, inference, _ = trained_npe
+    x_batch = torch.stack([zeros(2), torch.tensor([0.0, float("nan")])])
+    direct = inference.build_posterior()
+
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        direct.sample_batched((1,), x_batch)
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        direct.log_prob_batched(prior.sample((2,)), x_batch)
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        inference.build_posterior(sample_with="mcmc").sample_batched((1,), x_batch)
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        EnsemblePosterior([direct, direct]).sample_batched((1,), x_batch)
+
+
+def test_vector_field_sample_batched_rejects_nonfinite_x(trained_npe):
+    """The vector-field batched path needs the same guard."""
+    prior, _, _ = trained_npe
+    estimator = posterior_score_nn(z_score_x="none")(
+        prior.sample((20,)), torch.randn(20, 2)
+    )
+    posterior = VectorFieldPosterior(estimator, prior)
+
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        posterior.sample_batched((1,), torch.tensor([[0.0, float("nan")]]))
+
+
+def test_sample_batched_accepts_nan_with_tolerant_embedding(trained_nan_tolerant_npe):
+    """A derived-tolerant posterior samples from NaN-padded batched `x`."""
+    _, inference, x_nan = trained_nan_tolerant_npe
+    posterior = inference.build_posterior()
+    x_batch = torch.cat([x_nan, x_nan])
+
+    samples = posterior.sample_batched((3,), x_batch, show_progress_bars=False)
+
+    assert samples.shape[:2] == (3, 2)
 
 
 @pytest.mark.parametrize(

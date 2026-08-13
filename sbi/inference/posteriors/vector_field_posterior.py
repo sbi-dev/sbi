@@ -549,6 +549,7 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
+        self._assert_finite_x(x)
         if self.vector_field_estimator.compose_enabled:
             raise NotImplementedError(
                 "compose_standardization does not yet support sample_batched "

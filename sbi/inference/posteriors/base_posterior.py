@@ -99,6 +99,16 @@ class NeuralPosterior:
         """
         return net_accepts_nan_input(self.potential_fn.x_embedding_net)
 
+    def _assert_finite_x(self, x: Tensor) -> None:
+        """Raise if `x` contains NaN (unless tolerated, see above) or Inf.
+
+        The batched entry points bypass `process_x` and `_x_else_default_x`, so
+        they call this guard directly.
+        """
+        assert_all_finite(
+            torch.as_tensor(x), "Observed data x_o", allow_nan=self._x_tolerates_nan()
+        )
+
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:

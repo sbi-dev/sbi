@@ -245,6 +245,7 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
+        self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
         condition_shape = self.posterior_estimator.condition_shape
         x = reshape_to_batch_event(x, event_shape=condition_shape)
@@ -418,6 +419,7 @@ class DirectPosterior(NeuralPosterior):
             in the support of the prior, -∞ (corresponding to 0 probability) outside.
         """
 
+        self._assert_finite_x(x)
         theta = ensure_theta_batched(torch.as_tensor(theta))
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
