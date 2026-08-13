@@ -157,3 +157,70 @@ def test_unconstraining_transform_follows_dtype_cast(builder_name):
     log_probs = estimator.log_prob(theta.double(), condition.double())
     assert log_probs.dtype == torch.float64
     assert torch.isfinite(log_probs).all()
+
+
+def _build_direct_posterior(num_dim: int = 2):
+    """A small trained DirectPosterior on CPU for pickling round-trips."""
+    prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    trainer = NPE(prior=prior, show_progress_bars=False)
+    trainer.append_simulations(theta, x)
+    trainer.train(max_num_epochs=1)
+    posterior = trainer.build_posterior(prior=prior).set_default_x(
+        torch.zeros(1, num_dim)
+    )
+    assert posterior._device == "cpu"
+    return posterior
+
+
+def test_torch_load_map_location_reconciles_claimed_device():
+    """A GPU-pickled posterior reloaded with `map_location="cpu"` is reconciled.
+
+    `torch.load(..., map_location=...)` remaps the tensor storages but leaves
+    `_device` untouched. Claiming a non-CPU device while the tensors live on CPU
+    simulates a posterior pickled on a GPU machine and loaded on a CPU machine.
+    """
+    import tempfile
+
+    posterior = _build_direct_posterior()
+    posterior._device = "cuda:0"
+    posterior.device = "cuda:0"
+
+    with tempfile.NamedTemporaryFile(suffix=".pt") as f:
+        torch.save(posterior, f.name)
+        loaded = torch.load(f.name, weights_only=False, map_location="cpu")
+
+    assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
+    assert loaded.device == "cpu", f"device is {loaded.device!r}, expected cpu"
+    assert loaded.potential_fn.device == "cpu", (
+        f"potential_fn.device is {loaded.potential_fn.device!r}, expected cpu"
+    )
+    tensor_devices = {str(p.device) for p in loaded.posterior_estimator.parameters()}
+    assert tensor_devices == {"cpu"}, f"tensors on {tensor_devices}, expected cpu"
+
+    samples = loaded.sample((10,))
+    assert str(samples.device) == "cpu", f"samples on {samples.device}, expected cpu"
+    potential_values = loaded.potential(samples)
+    assert str(potential_values.device) == "cpu", (
+        f"potential on {potential_values.device}, expected cpu"
+    )
+
+
+def test_torch_load_map_location_same_device_is_passthrough():
+    """Loading a CPU-pickled posterior with `map_location="cpu"` leaves it unchanged."""
+    import tempfile
+
+    posterior = _build_direct_posterior()
+
+    with tempfile.NamedTemporaryFile(suffix=".pt") as f:
+        torch.save(posterior, f.name)
+        loaded = torch.load(f.name, weights_only=False, map_location="cpu")
+
+    assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
+    assert loaded.device == "cpu", f"device is {loaded.device!r}, expected cpu"
+
+    samples = loaded.sample((10,))
+    assert samples.shape == (10, 2)
+    assert str(samples.device) == "cpu", f"samples on {samples.device}, expected cpu"
