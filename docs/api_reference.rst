@@ -49,6 +49,18 @@ Neural nets
    sbi.neural_nets.posterior_score_nn
 
 
+Estimators
+----------
+
+.. autosummary::
+   :nosignatures:
+
+   sbi.neural_nets.estimators.ConditionalDensityEstimator
+   sbi.neural_nets.estimators.UnconditionalDensityEstimator
+   sbi.neural_nets.estimators.ConditionalScoreEstimator
+   sbi.neural_nets.ratio_estimators.RatioEstimator
+
+
 Embedding nets
 --------------
 

@@ -15,7 +15,7 @@ Once you have familiarised yourself with the methods and identified how to apply
 for brief answers to specific questions, our
 `advanced tutorials <https://sbi.readthedocs.io/en/latest/advanced_tutorials.html>`_
 for longer explanations of particular features, and our
-`API reference <https://sbi.readthedocs.io/en/latest/sbi.html>`_
+`API reference <https://sbi.readthedocs.io/en/latest/api_reference.html>`_
 for documentation of all features.
 
 

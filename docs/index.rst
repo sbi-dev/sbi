@@ -147,7 +147,7 @@ the inference on one particular observation to be more simulation-efficient
 (e.g., SNPE).
 
 Below, we list all implemented methods and their corresponding publications.
-For usage in ``sbi``, see the `Inference API reference <https://sbi.readthedocs.io/en/latest/sbi.html>`_
+For usage in ``sbi``, see the `Inference API reference <https://sbi.readthedocs.io/en/latest/api_reference.html>`_
 and the `tutorial on implemented methods <https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html>`_.
 
 
