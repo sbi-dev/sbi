@@ -18,13 +18,16 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MAFConfig,
     MDNConfig,
     MLPClassifierConfig,
+    MixedConfig,
     NSFConfig,
     ResNetClassifierConfig,
+    ZukoNCSFConfig,
     ZukoNSFConfig,
+    _NFlowsFlowConfigBase,
     _UnconstrainedCapableConfigBase,
     _ZukoDensityConfigBase,
 )
-from sbi.neural_nets.net_builders.flow import build_zuko_flow
+from sbi.neural_nets.net_builders.flow import build_zuko_flow, get_base_dist
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils import BoxUniform
 
@@ -53,34 +56,28 @@ def _defaults_agree(value, default) -> bool:
 
 @pytest.mark.parametrize("model", BUILDABLE_DENSITY_MODELS)
 def test_density_config_builds(model, batches):
-    """Every density model must build an estimator over the modeled variable."""
+    """Every density config must build a working estimator with the right roles."""
     theta, x = batches
     estimator = _DENSITY_CONFIGS[model]().build(batch_input=theta, batch_condition=x)
 
     assert isinstance(estimator, ConditionalDensityEstimator)
     assert estimator.input_shape == theta[0].shape
     assert estimator.condition_shape == x[0].shape
+    loss = estimator.loss(torch.randn(10, 3), condition=torch.randn(10, 5))
+    assert loss.shape == (10,)
+    assert torch.isfinite(loss).all()
 
 
 @pytest.mark.parametrize("model", CLASSIFIER_MODELS)
 def test_classifier_config_builds(model, batches):
-    """Every classifier model must build a ratio estimator."""
+    """Every classifier config must build a working ratio estimator."""
     theta, x = batches
-    assert isinstance(
-        _CLASSIFIER_CONFIGS[model]().build(batch_input=theta, batch_condition=x),
-        RatioEstimator,
-    )
+    estimator = _CLASSIFIER_CONFIGS[model]().build(batch_input=theta, batch_condition=x)
 
-
-@pytest.mark.parametrize("model", BUILDABLE_DENSITY_MODELS)
-def test_density_loss_is_finite(model, batches):
-    """A built estimator must evaluate on fresh data with a finite loss."""
-    theta, x = batches
-    estimator = _DENSITY_CONFIGS[model]().build(batch_input=theta, batch_condition=x)
-
-    loss = estimator.loss(torch.randn(10, 3), condition=torch.randn(10, 5))
-    assert loss.shape == (10,)
-    assert torch.isfinite(loss).all()
+    assert isinstance(estimator, RatioEstimator)
+    log_ratios = estimator.unnormalized_log_ratio(theta[:10], x[:10])
+    assert log_ratios.shape == (10,)
+    assert torch.isfinite(log_ratios).all()
 
 
 @pytest.mark.parametrize(
@@ -129,6 +126,8 @@ def test_no_density_field_is_dropped_before_the_network(model):
     accepted = set(_params(config_cls._BUILD_FN))
     if issubclass(config_cls, _ZukoDensityConfigBase):
         accepted |= set(_params(build_zuko_flow))
+    if issubclass(config_cls, _NFlowsFlowConfigBase):
+        accepted |= set(_params(get_base_dist))
 
     for name in config_cls()._build_kwargs():
         assert name in accepted, f"`{name}` is not accepted by {model}"
@@ -147,6 +146,8 @@ def test_density_defaults_match_the_build_functions(model):
         # The per-model wrapper wins where both name a setting: it is the one
         # the config calls.
         params = {**_params(build_zuko_flow), **params}
+    if issubclass(config_cls, _NFlowsFlowConfigBase):
+        params = {**_params(get_base_dist), **params}
 
     for name, value in config_cls()._build_kwargs().items():
         assert _defaults_agree(value, params[name].default), f"{model}.{name} drifted"
@@ -163,12 +164,11 @@ def test_classifier_defaults_match_the_build_functions(model):
         assert _defaults_agree(value, params[name].default), f"{model}.{name} drifted"
 
 
-def test_every_density_model_has_a_config():
-    """The registry must cover the models the deprecated string path accepts."""
+def test_legacy_public_builder_registry_remains_complete():
+    """Keep compatibility for callers that import ``factory.model_builders``."""
     from sbi.neural_nets.factory import model_builders
 
-    # `mnle` and `mnpe` are reached through `MixedConfig`, not a density config.
-    assert set(_DENSITY_CONFIGS) == set(model_builders) - {"mnle", "mnpe"}
+    assert set(model_builders) == set(_DENSITY_CONFIGS) | {"mnle", "mnpe"}
 
 
 def test_every_classifier_model_has_a_config():
@@ -315,6 +315,7 @@ def test_repr_shows_only_the_settings_that_differ_from_the_defaults():
     # repr has to recognise it by type.
     assert "embedding_net" not in repr(NSFConfig())
     assert "embedding_net" in repr(NSFConfig(embedding_net=nn.Linear(3, 3)))
+    assert repr(MixedConfig()) == "MixedConfig()"
 
 
 def test_extra_kwargs_reaches_the_build_function(batches):
@@ -324,9 +325,10 @@ def test_extra_kwargs_reaches_the_build_function(batches):
     torch.manual_seed(0)
     default = ZukoNSFConfig().build(batch_input=theta, batch_condition=x)
     torch.manual_seed(0)
-    tweaked = ZukoNSFConfig(extra_kwargs={"passes": 2}).build(
-        batch_input=theta, batch_condition=x
-    )
+    with pytest.warns(UserWarning, match="Unknown `extra_kwargs`"):
+        tweaked = ZukoNSFConfig(extra_kwargs={"passes": 2}).build(
+            batch_input=theta, batch_condition=x
+        )
 
     left, right = default.state_dict(), tweaked.state_dict()
     assert any(not torch.equal(left[k], right[k]) for k in left)
@@ -334,13 +336,62 @@ def test_extra_kwargs_reaches_the_build_function(batches):
 
 def test_extra_kwargs_typo_is_not_silent(batches):
     theta, x = batches
-    with pytest.raises(TypeError, match="unexpected keyword argument"):
+    with (
+        pytest.warns(UserWarning, match="Unknown `extra_kwargs`"),
+        pytest.raises(TypeError, match="unexpected keyword argument"),
+    ):
         ZukoNSFConfig(extra_kwargs={"binz": 20}).build(
             batch_input=theta, batch_condition=x
         )
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        MDNConfig(extra_kwargs={"num_component": 1}),
+        MDNConfig(extra_kwargs={"kwargs": 1}),
+        LinearClassifierConfig(extra_kwargs={"hidden_feature": 2}),
+    ],
+    ids=["density", "var-keyword-name", "classifier"],
+)
+def test_swallowed_extra_kwargs_warn_at_build_time(config, batches):
+    """Builders with permissive **kwargs must still expose likely typos."""
+    theta, x = batches
+    with pytest.warns(UserWarning, match="Unknown `extra_kwargs`"):
+        config.build(batch_input=theta, batch_condition=x)
 
 
 def test_extra_kwargs_cannot_shadow_a_field():
     """Fields set through `extra_kwargs` would bypass the config's validation."""
     with pytest.raises(ValueError, match="are fields of"):
         ZukoNSFConfig(extra_kwargs={"num_bins": 20})
+
+
+@pytest.mark.parametrize(
+    "config_cls,extra_kwargs",
+    [
+        (MAFConfig, {"z_score_x": "none"}),
+        (ResNetClassifierConfig, {"embedding_net_y": nn.Identity()}),
+        (ZukoNCSFConfig, {"bins": 3}),
+        (ZukoNSFConfig, {"bins": 3}),
+    ],
+    ids=[
+        "z-score-alias",
+        "classifier-embedding-alias",
+        "zuko-ncsf-alias",
+        "zuko-nsf-alias",
+    ],
+)
+def test_extra_kwargs_cannot_shadow_a_downstream_alias(config_cls, extra_kwargs):
+    """Aliases must not bypass validation of their user-facing fields."""
+    with pytest.raises(ValueError, match="fields|duplicates"):
+        config_cls(extra_kwargs=extra_kwargs)
+
+
+def test_nflows_dtype_reaches_the_base_distribution(batches):
+    theta, x = batches
+    estimator = MAFConfig(dtype=torch.float64).build(
+        batch_input=theta, batch_condition=x
+    )
+
+    assert estimator.net._distribution._log_z.dtype == torch.float64
