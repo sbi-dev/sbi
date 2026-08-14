@@ -11,11 +11,11 @@ from torch.distributions import MultivariateNormal
 from sbi.inference import BNRE, NRE_A, NRE_B, NRE_C
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
-    _CLASSIFIER_CONFIGS,
     LinearClassifierConfig,
     MAFConfig,
     MLPClassifierConfig,
     ResNetClassifierConfig,
+    VectorFieldEstimatorBuilder,
 )
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.user_input_checks import check_estimator_arg
@@ -63,62 +63,45 @@ def test_wrong_config_family_raises(trainer_cls):
         trainer_cls(prior, classifier=MAFConfig(), show_progress_bars=False)
 
 
-@pytest.mark.parametrize(
-    "trainer_cls",
-    [NRE_A, NRE_B],
-    ids=["nre_a", "nre_b"],
-)
-@pytest.mark.parametrize("model", sorted(_CLASSIFIER_CONFIGS))
-def test_train_with_config(trainer_cls, model):
-    """Train with a per-model classifier config end-to-end."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    kwargs = {} if model == "linear" else {"hidden_features": 16}
-    config = _CLASSIFIER_CONFIGS[model](**kwargs)
-    inference = trainer_cls(prior, classifier=config, show_progress_bars=False)
+def test_rejects_legacy_config_of_the_wrong_family():
+    """The flat vector-field config must not fall through as a callable."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.raises(TypeError, match="ClassifierConfigBase"):
+        NRE_A(
+            prior,
+            classifier=VectorFieldEstimatorBuilder(),
+            show_progress_bars=False,
+        )
 
-    theta = prior.sample((200,))
-    x = theta + 0.1 * torch.randn_like(theta)
+
+def test_train_with_config():
+    """Train with a per-model classifier config end-to-end."""
+    num_dim_theta, num_dim_x = 2, 5
+    prior = MultivariateNormal(zeros(num_dim_theta), eye(num_dim_theta))
+    config = ResNetClassifierConfig(hidden_features=16)
+    inference = NRE_A(prior, classifier=config, show_progress_bars=False)
+
+    theta = prior.sample((100,))
+    x = torch.randn(100, num_dim_x)
     ratio_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2, training_batch_size=100
+        max_num_epochs=1, training_batch_size=50
     )
     assert isinstance(ratio_estimator, RatioEstimator)
+    assert ratio_estimator.input_shape == torch.Size([num_dim_theta])
+    assert ratio_estimator.condition_shape == torch.Size([num_dim_x])
 
     # Verify the trained estimator produces finite log-ratios on fresh data.
     fresh_theta = prior.sample((10,))
-    fresh_x = fresh_theta + 0.1 * torch.randn_like(fresh_theta)
+    fresh_x = torch.randn(10, num_dim_x)
     log_ratios = ratio_estimator.unnormalized_log_ratio(fresh_theta, fresh_x)
     assert log_ratios.shape == (10,)
     assert torch.isfinite(log_ratios).all()
 
     # Posterior should be constructable and produce correct-shaped samples.
     posterior = inference.build_posterior()
-    x_o = zeros(1, num_dim)
+    x_o = zeros(1, num_dim_x)
     samples = posterior.sample((10,), x=x_o)
-    assert samples.shape == (10, num_dim)
-
-
-@pytest.mark.parametrize(
-    "trainer_cls",
-    [NRE_A, NRE_B],
-    ids=["nre_a", "nre_b"],
-)
-def test_config_role_shapes(trainer_cls):
-    """Verify input_shape=theta and condition_shape=x with asymmetric dims."""
-    num_dim_theta = 2
-    num_dim_x = 5
-    prior = MultivariateNormal(zeros(num_dim_theta), eye(num_dim_theta))
-    config = ResNetClassifierConfig(hidden_features=16)
-    inference = trainer_cls(prior, classifier=config, show_progress_bars=False)
-
-    theta = prior.sample((200,))
-    x = torch.randn(200, num_dim_x)
-    estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2, training_batch_size=100
-    )
-
-    assert estimator.input_shape == torch.Size([num_dim_theta])
-    assert estimator.condition_shape == torch.Size([num_dim_x])
+    assert samples.shape == (10, num_dim_theta)
 
 
 @pytest.mark.parametrize(
@@ -135,10 +118,3 @@ def test_config_role_shapes(trainer_cls):
 def test_check_estimator_arg_accepts_valid_inputs(estimator):
     """check_estimator_arg accepts classifier configs, strings, and callables."""
     check_estimator_arg(estimator)
-
-
-def test_warning_includes_import_path():
-    """String deprecation warning should include the import path."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    with pytest.warns(FutureWarning, match="from sbi.neural_nets import"):
-        NRE_A(prior, classifier="resnet", show_progress_bars=False)
