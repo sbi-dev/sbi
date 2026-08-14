@@ -33,9 +33,9 @@ from sbi.inference.trainers.base import (
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.net_builders.estimator_configs import (
+    _ESTIMATOR_CONFIG_BASES,
     ClassifierConfigBase,
     ResNetClassifierConfig,
-    _PerModelConfigBase,
 )
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform, Tracker
@@ -116,7 +116,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
                 stacklevel=3,
             )
             self._build_neural_net = classifier_nn(model=classifier)
-        elif isinstance(classifier, _PerModelConfigBase):
+        elif isinstance(classifier, _ESTIMATOR_CONFIG_BASES):
             if not isinstance(classifier, self._ALLOWED_BUILDER_TYPES):
                 allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
                 raise TypeError(
