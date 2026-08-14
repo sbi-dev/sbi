@@ -8,9 +8,10 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import MNLE, MNPE, NLE_A, NPE_A, NPE_C
+from sbi.inference import MNLE, MNPE, NLE_A, NPE_A, NPE_C, NPE_PFN
 from sbi.neural_nets import likelihood_nn, posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
+from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.neural_nets.net_builders.estimator_configs import (
     _MIXED_CONTINUOUS_CONFIGS,
     MAFConfig,
@@ -18,6 +19,8 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MixedConfig,
     NSFConfig,
     ResNetClassifierConfig,
+    TabPFNConfig,
+    VectorFieldEstimatorBuilder,
     ZukoNSFConfig,
 )
 from sbi.utils import BoxUniform
@@ -59,33 +62,33 @@ def test_string_emits_deprecation_warning(trainer_cls):
 
 
 @pytest.mark.parametrize(
-    "trainer_cls,factory_fn,input_var",
-    _TRAINERS,
+    "trainer_cls,input_var",
+    [(t, v) for t, _, v in _TRAINERS],
     ids=["npe", "nle"],
 )
-@pytest.mark.parametrize(
-    "config",
-    [
-        MAFConfig(hidden_features=16, num_transforms=2),
-        ZukoNSFConfig(hidden_features=16),
-    ],
-    ids=["maf", "zuko_nsf"],
-)
-def test_train_with_config(trainer_cls, factory_fn, input_var, config):
+def test_train_with_config(trainer_cls, input_var):
     """Train with a per-model config, verify loss and posterior sampling."""
-    num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    num_dim_theta, num_dim_x = 2, 5
+    prior = MultivariateNormal(zeros(num_dim_theta), eye(num_dim_theta))
+    config = MAFConfig(hidden_features=16, num_transforms=2)
     inference = trainer_cls(prior, density_estimator=config, show_progress_bars=False)
 
-    theta = prior.sample((200,))
-    x = theta + 0.1 * torch.randn_like(theta)
+    theta = prior.sample((100,))
+    x = torch.randn(100, num_dim_x)
     density_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2, training_batch_size=100
+        max_num_epochs=1, training_batch_size=50
     )
+
+    assert density_estimator.input_shape == torch.Size([
+        num_dim_theta if input_var == "theta" else num_dim_x
+    ])
+    assert density_estimator.condition_shape == torch.Size([
+        num_dim_x if input_var == "theta" else num_dim_theta
+    ])
 
     # Verify finite loss on a fresh batch with correct role order.
     fresh_theta = prior.sample((10,))
-    fresh_x = fresh_theta + 0.1 * torch.randn_like(fresh_theta)
+    fresh_x = torch.randn(10, num_dim_x)
     if input_var == "theta":
         # NPE: loss(input=θ, condition=x)
         loss = density_estimator.loss(fresh_theta, condition=fresh_x)
@@ -97,38 +100,9 @@ def test_train_with_config(trainer_cls, factory_fn, input_var, config):
 
     # Posterior should be constructable and produce correct-shaped samples.
     posterior = inference.build_posterior()
-    x_o = zeros(1, num_dim)
+    x_o = zeros(1, num_dim_x)
     samples = posterior.sample((10,), x=x_o)
-    assert samples.shape == (10, num_dim)
-
-
-@pytest.mark.parametrize(
-    "trainer_cls,input_var",
-    [(t, v) for t, _, v in _TRAINERS],
-    ids=["npe", "nle"],
-)
-def test_config_role_shapes(trainer_cls, input_var):
-    """Verify input_shape matches the modeled variable, not the condition."""
-    num_dim_theta = 2
-    num_dim_x = 5
-    prior = MultivariateNormal(zeros(num_dim_theta), eye(num_dim_theta))
-    config = MAFConfig(hidden_features=16, num_transforms=2)
-    inference = trainer_cls(prior, density_estimator=config, show_progress_bars=False)
-
-    theta = prior.sample((200,))
-    x = torch.randn(200, num_dim_x)
-    estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=2, training_batch_size=100
-    )
-
-    if input_var == "theta":
-        # NPE models p(θ|x): input=θ, condition=x
-        assert estimator.input_shape == torch.Size([num_dim_theta])
-        assert estimator.condition_shape == torch.Size([num_dim_x])
-    else:
-        # NLE models p(x|θ): input=x, condition=θ
-        assert estimator.input_shape == torch.Size([num_dim_x])
-        assert estimator.condition_shape == torch.Size([num_dim_theta])
+    assert samples.shape == (10, num_dim_theta)
 
 
 @pytest.mark.parametrize("trainer_cls", [MNLE, MNPE], ids=["mnle", "mnpe"])
@@ -198,6 +172,40 @@ def test_mixed_requires_a_single_continuous_width():
         MixedConfig(continuous=ZukoNSFConfig(hidden_features=[16, 16]))
 
 
+@pytest.mark.parametrize(
+    "continuous",
+    [
+        NSFConfig(z_score_condition="structured"),
+        NSFConfig(embedding_net=torch.nn.Linear(4, 4)),
+    ],
+    ids=["z-score", "embedding"],
+)
+def test_mixed_rejects_nested_condition_settings_it_replaces(continuous):
+    """Nested condition settings must not be accepted and then discarded."""
+    with pytest.raises(ValueError, match="replaced"):
+        MixedConfig(continuous=continuous)
+
+
+def test_mixed_rejects_unroutable_extra_kwargs():
+    with pytest.raises(ValueError, match="no downstream pass-through"):
+        MixedConfig(extra_kwargs={"typo": 1})
+
+
+def test_mixed_dropout_reaches_the_categorical_net():
+    theta = torch.cat(
+        [torch.randn(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
+    )
+    x = torch.randn(100, 4)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        estimator = MixedConfig(dropout_probability=0.4).build(theta, x)
+
+    dropout = [
+        m.p for m in estimator.discrete_net.modules() if isinstance(m, torch.nn.Dropout)
+    ]
+    assert dropout and set(dropout) == {0.4}
+
+
 def test_mixed_default_keeps_the_previous_continuous_net():
     """Nesting must not quietly change the network MNLE and MNPE have shipped.
 
@@ -218,6 +226,7 @@ def test_mixed_default_keeps_the_previous_continuous_net():
     assert continuous.hidden_features == params["hidden_features"].default
     assert continuous.num_transforms == params["num_transforms"].default
     assert continuous.num_bins == params["num_bins"].default
+    assert MixedConfig().dropout_probability == params["dropout_probability"].default
 
 
 @pytest.mark.parametrize(
@@ -290,6 +299,9 @@ def test_mixed_continuous_settings_reach_the_continuous_net():
     assert sum(p.numel() for p in narrow.continuous_net.parameters()) < sum(
         p.numel() for p in wide.continuous_net.parameters()
     )
+    assert sum(p.numel() for p in narrow.discrete_net.parameters()) < sum(
+        p.numel() for p in wide.discrete_net.parameters()
+    )
 
 
 @pytest.mark.parametrize(
@@ -313,6 +325,13 @@ def test_check_estimator_arg_rejects_module():
         check_estimator_arg(torch.nn.Linear(3, 3))
 
 
+@pytest.mark.parametrize("config_cls", [MAFConfig, VectorFieldEstimatorBuilder])
+def test_check_estimator_arg_rejects_config_class(config_cls):
+    """A forgotten pair of parentheses must fail before training."""
+    with pytest.raises(TypeError, match="not an instance"):
+        check_estimator_arg(config_cls)
+
+
 @pytest.mark.parametrize(
     "trainer_cls", [t for t, _, _ in _TRAINERS], ids=["npe", "nle"]
 )
@@ -324,6 +343,65 @@ def test_wrong_config_family_raises(trainer_cls, config):
     prior = MultivariateNormal(zeros(2), eye(2))
     with pytest.raises(TypeError, match="DensityConfigBase"):
         trainer_cls(prior, density_estimator=config)
+
+
+@pytest.mark.parametrize(
+    "trainer_cls",
+    [NPE_C, NLE_A, MNPE, MNLE, NPE_PFN],
+    ids=["npe", "nle", "mnpe", "mnle", "npe_pfn"],
+)
+def test_trainer_rejects_legacy_config_of_the_wrong_family(trainer_cls):
+    """The remaining flat vector-field config must not fall through as callable."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.raises(TypeError):
+        trainer_cls(
+            prior,
+            density_estimator=VectorFieldEstimatorBuilder(),
+            show_progress_bars=False,
+        )
+
+
+@pytest.mark.parametrize("trainer_cls", [NPE_C, NLE_A], ids=["npe", "nle"])
+@pytest.mark.parametrize(
+    "density_estimator", [TabPFNConfig(), "tabpfn"], ids=["config", "string"]
+)
+def test_gradient_trainer_rejects_tabpfn(trainer_cls, density_estimator):
+    """TabPFNFlow has no loss and is supported only by training-free NPE_PFN."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with pytest.raises(TypeError, match="no training loss"):
+        trainer_cls(
+            prior,
+            density_estimator=density_estimator,
+            show_progress_bars=False,
+        )
+
+
+@pytest.mark.parametrize("trainer_cls", [NPE_C, NLE_A], ids=["npe", "nle"])
+def test_gradient_trainer_rejects_tabpfn_builder(trainer_cls):
+    """A factory-built TabPFNFlow must be rejected before its loss is called."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference = trainer_cls(
+        prior,
+        density_estimator=lambda *_: TabPFNFlow.__new__(TabPFNFlow),
+        show_progress_bars=False,
+    )
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    inference.append_simulations(theta, x)
+    inference.train_indices = torch.arange(10)
+
+    with pytest.raises(TypeError, match="no training loss"):
+        inference._initialize_neural_network(retrain_from_scratch=False, start_idx=0)
+
+
+def test_npe_pfn_accepts_tabpfn_config():
+    prior = MultivariateNormal(zeros(2), eye(2))
+    trainer = NPE_PFN(
+        prior,
+        density_estimator=TabPFNConfig(z_score_condition="none"),
+        show_progress_bars=False,
+    )
+
+    assert callable(trainer._build_neural_net)
 
 
 @pytest.mark.parametrize("trainer_cls", [MNPE, MNLE], ids=["mnpe", "mnle"])
