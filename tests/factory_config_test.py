@@ -11,6 +11,7 @@ library-specific parameters (e.g. Zuko flow kwargs) pass through.
 """
 
 import inspect
+import warnings
 
 import pytest
 import torch
@@ -72,8 +73,18 @@ def test_factory_warns_on_unknown_kwargs(factory_fn, factory_args, bad_kwarg):
         (likelihood_nn, "made", {"num_components": 5}),
         (posterior_nn, "maf", {"num_bins": 20}),
         (classifier_nn, "linear", {"hidden_features": 64}),
+        (posterior_nn, "mdn", {"num_blocks": 7}),
+        (classifier_nn, "linear", {"num_blocks": 7}),
     ],
-    ids=["mdn-bins", "mdn-transforms", "made-components", "maf-bins", "linear-width"],
+    ids=[
+        "mdn-bins",
+        "mdn-transforms",
+        "made-components",
+        "maf-bins",
+        "linear-width",
+        "mdn-other-model-field",
+        "linear-other-model-field",
+    ],
 )
 def test_factory_rejects_a_setting_the_model_does_not_use(factory_fn, model, kwarg):
     """A setting the model never reads used to be forwarded and dropped.
@@ -135,7 +146,17 @@ def test_posterior_nn_accepts_valid_extra_kwargs():
     """An unknown name is still forwarded, so library kwargs keep working."""
     with pytest.warns(UserWarning, match="Unknown kwargs"):
         build_fn = posterior_nn("zuko_maf", passes=2)
-    assert build_fn(THETA, X) is not None
+    with pytest.warns(UserWarning, match="Unknown `extra_kwargs`"):
+        assert build_fn(THETA, X) is not None
+
+
+def test_posterior_nn_accepts_nflows_dtype_without_warning():
+    """The nflows base-distribution dtype is a supported transitive setting."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        estimator = posterior_nn("maf", dtype=torch.float64)(THETA, X)
+
+    assert estimator.net._distribution._log_z.dtype == torch.float64
 
 
 def test_mdn_snpe_a_rejects_num_components():
