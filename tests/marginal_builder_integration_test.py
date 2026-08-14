@@ -28,6 +28,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MarginalNICEConfig,
     MarginalNSFConfig,
     MarginalSOSPFConfig,
+    VectorFieldEstimatorBuilder,
 )
 from sbi.neural_nets.net_builders.flow import (
     build_zuko_bpf,
@@ -281,10 +282,10 @@ def test_repr_shows_only_the_settings_that_differ_from_the_defaults():
 
 def test_extra_kwargs_reaches_the_flow(batch_x):
     """`extra_kwargs` must forward settings that have no field of their own."""
-    assert _differs(
-        _build_seeded(MarginalMAFConfig(), batch_x),
-        _build_seeded(MarginalMAFConfig(extra_kwargs={"passes": 2}), batch_x),
-    )
+    default = _build_seeded(MarginalMAFConfig(), batch_x)
+    with pytest.warns(UserWarning, match="Unknown `extra_kwargs`"):
+        tweaked = _build_seeded(MarginalMAFConfig(extra_kwargs={"passes": 2}), batch_x)
+    assert _differs(default, tweaked)
 
 
 @pytest.mark.parametrize("model", MODELS)
@@ -301,7 +302,10 @@ def test_extra_kwargs_typo_is_not_silent(model, batch_x):
         with pytest.raises(ValueError, match="GF does not use"):
             config_cls(extra_kwargs={"binz": 20})
     else:
-        with pytest.raises(TypeError, match="unexpected keyword argument"):
+        with (
+            pytest.warns(UserWarning, match="Unknown `extra_kwargs`"),
+            pytest.raises(TypeError, match="unexpected keyword argument"),
+        ):
             config_cls(extra_kwargs={"binz": 20}).build(batch_x)
 
 
@@ -397,10 +401,13 @@ def test_unknown_model_string_raises():
         MarginalTrainer(density_estimator="not_a_flow")
 
 
-def test_conditional_builder_raises():
+@pytest.mark.parametrize(
+    "config", [MAFConfig(), VectorFieldEstimatorBuilder()], ids=["density", "vector"]
+)
+def test_conditional_builder_raises(config):
     """A builder for a conditional estimator cannot build a marginal one."""
     with pytest.raises(TypeError, match="marginal config"):
-        MarginalTrainer(density_estimator=MAFConfig())
+        MarginalTrainer(density_estimator=config)
 
 
 def test_config_class_instead_of_instance_raises():
