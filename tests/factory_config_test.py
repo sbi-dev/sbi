@@ -16,6 +16,7 @@ import warnings
 import pytest
 import torch
 
+from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.factory import (
     _CLASSIFIER_FACTORY_FIELDS,
     _LIKELIHOOD_FACTORY_FIELDS,
@@ -182,4 +183,10 @@ def test_legacy_config_still_validates_the_mixed_string_path():
     """MNLE and MNPE still reach `build_mnle` / `build_mnpe` with flat kwargs."""
     cfg = ConditionalFlowConfig(hidden_features=64)
     assert cfg.to_dict() == {"hidden_features": 64}
-    assert posterior_nn("mnpe") is not None
+
+    # The modeled variable carries the discrete column: theta for MNPE, x for MNLE.
+    mixed = torch.cat(
+        [torch.randn(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
+    )
+    assert isinstance(posterior_nn("mnpe")(mixed, X), MixedDensityEstimator)
+    assert isinstance(likelihood_nn("mnle")(THETA, mixed), MixedDensityEstimator)
