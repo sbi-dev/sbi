@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import copy
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Protocol, Union
 
@@ -82,8 +83,15 @@ class BasePotential(metaclass=ABCMeta):
                 "No observed data is available. Use `potential_fn.bind(x_o)`."
             )
 
-    def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "BasePotential":
+    def bind(self, x_o: Optional[Tensor], x_is_iid: bool = True) -> "BasePotential":
         """Create new potential with x bound, without mutable state.
+
+        `bind()` does not modify the original potential. A reference to the
+        original keeps the old state; always use the returned potential.
+
+        The default returns a shallow copy, so the bound potential shares the
+        estimator, prior, and every other attribute with the original.
+        Subclasses override this only to rebuild state derived from `x_o`.
 
         Args:
             x_o: Observed data to bind.
@@ -91,10 +99,13 @@ class BasePotential(metaclass=ABCMeta):
 
         Returns:
             New potential instance with x bound.
-
-        Subclasses must implement this method.
         """
-        raise NotImplementedError(f"{self.__class__.__name__} must implement bind()")
+        bound = copy.copy(self)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        return bound
 
     def return_x_o(self) -> Optional[Tensor]:
         """Return the observed data at which the potential is evaluated.
@@ -178,11 +189,15 @@ class CustomPotentialWrapper(BasePotential):
         with torch.set_grad_enabled(track_gradients):
             return self.potential_fn(theta, self.x_o)
 
-    def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "CustomPotentialWrapper":
+    def bind(
+        self, x_o: Optional[Tensor], x_is_iid: bool = True
+    ) -> "CustomPotentialWrapper":
         """Create new potential with x bound, without mutable state."""
-        return CustomPotentialWrapper(
+        bound = CustomPotentialWrapper(
             potential_fn=self.potential_fn,
             prior=self.prior,
             x_o=x_o,
             device=self.device,
         )
+        bound._x_is_iid = x_is_iid
+        return bound

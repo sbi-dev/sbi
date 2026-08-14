@@ -454,6 +454,8 @@ class EnsemblePotential(BasePotential):
         self._weights = weights
         self.potential_fns = potential_fns
         super().__init__(prior, x_o, device)
+        if self._x_o is not None:
+            self.potential_fns = [p.bind(self._x_o) for p in self.potential_fns]
 
     def to(self, device: Union[str, torch.device]) -> None:
         """
@@ -500,25 +502,38 @@ class EnsemblePotential(BasePotential):
 
     def bind(
         self,
-        x_o: Tensor,
-        x_is_iid: bool = True,
+        x_o: Optional[Tensor],
+        x_is_iid: Optional[bool] = None,
         **kwargs,
     ) -> "EnsemblePotential":
-        """Return a new EnsemblePotential with x_o bound to all component potentials."""
+        """Return a new EnsemblePotential with x_o bound to all component potentials.
+
+        Args:
+            x_o: Observed data to bind.
+            x_is_iid: Whether x_o is a batch of iid observations. With None,
+                every component keeps its own iid default.
+            kwargs: Forwarded to each component's bind().
+
+        Returns:
+            A new EnsemblePotential with bound components.
+        """
         if x_o is not None:
             x_o = process_x(x_o).to(self.device)
 
+        iid_kwargs = {} if x_is_iid is None else {"x_is_iid": x_is_iid}
         bound_potentials = [
-            p.bind(x_o, x_is_iid=x_is_iid, **kwargs) for p in self.potential_fns
+            p.bind(x_o, **iid_kwargs, **kwargs) for p in self.potential_fns
         ]
 
-        return EnsemblePotential(
+        bound = EnsemblePotential(
             potential_fns=bound_potentials,
             weights=self._weights,
             prior=self.prior,
-            x_o=x_o,
+            x_o=None,
             device=self.device,
         )
+        bound._x_o = x_o
+        return bound
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.

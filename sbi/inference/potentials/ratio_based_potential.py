@@ -83,7 +83,9 @@ class RatioBasedPotential(BasePotential):
         self.ratio_estimator.to(device)
         return self
 
-    def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "RatioBasedPotential":
+    def bind(
+        self, x_o: Optional[Tensor], x_is_iid: bool = True
+    ) -> "RatioBasedPotential":
         """Create new potential with x bound, without mutable state."""
         bound = RatioBasedPotential(
             ratio_estimator=self.ratio_estimator,
@@ -91,7 +93,8 @@ class RatioBasedPotential(BasePotential):
             x_o=None,
             device=self.device,
         )
-        x_o = process_x(x_o).to(self.device)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
         bound._x_is_iid = x_is_iid
         return bound

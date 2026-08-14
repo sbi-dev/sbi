@@ -81,6 +81,9 @@ class VectorFieldBasedPotential(BasePotential):
         )
 
         super().__init__(prior, x_o, device=device)
+        self._x_is_iid = False
+        if self._x_o is not None:
+            self.flow = self.rebuild_flow()
 
     def to(self, device: Union[str, torch.device]) -> None:
         """
@@ -155,7 +158,7 @@ class VectorFieldBasedPotential(BasePotential):
 
     def bind(
         self,
-        x_o: Tensor,
+        x_o: Optional[Tensor],
         x_is_iid: bool = False,
         iid_method: Optional[str] = None,
         iid_params: Optional[Dict[str, Any]] = None,
@@ -164,25 +167,35 @@ class VectorFieldBasedPotential(BasePotential):
         **ode_kwargs,
     ) -> "VectorFieldBasedPotential":
         """Create new potential with x bound, without mutable state."""
+        # IID and guidance require transforming the prior to standardized space.
+        if self.vector_field_estimator.compose_enabled:
+            if x_is_iid:
+                raise NotImplementedError(
+                    "compose_standardization does not yet support iid (x with "
+                    "batch>1). Use a single observation, or disable "
+                    "compose_standardization."
+                )
+            if guidance_method is not None:
+                raise NotImplementedError(
+                    "compose_standardization does not yet support guided sampling. "
+                    "Disable guidance, or disable compose_standardization."
+                )
         bound = VectorFieldBasedPotential(
             vector_field_estimator=self.vector_field_estimator,
             prior=self.prior,
             x_o=None,
             device=self.device,
             iid_method=iid_method if iid_method is not None else self.iid_method,
-            iid_params=iid_params if iid_params is not None else self.iid_params,
+            iid_params=iid_params,
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)
-        x_o = process_x(x_o).to(self.device)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
         bound._x_is_iid = x_is_iid
-        bound.guidance_method = (
-            guidance_method if guidance_method is not None else self.guidance_method
-        )
-        bound.guidance_params = (
-            guidance_params if guidance_params is not None else self.guidance_params
-        )
+        bound.guidance_method = guidance_method
+        bound.guidance_params = guidance_params
         if not x_is_iid and (bound._x_o is not None):
             bound.flow = bound.rebuild_flow(**ode_kwargs)
         elif bound._x_o is not None:
