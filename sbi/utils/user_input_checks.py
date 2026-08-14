@@ -685,6 +685,9 @@ def check_estimator_arg(
 
     Accepts a string identifier, an estimator config, or a build function
     returning an ``nn.Module``.
+
+    Args:
+        estimator: The estimator argument to check.
     """
     from sbi.neural_nets.net_builders.estimator_configs import _ESTIMATOR_CONFIG_BASES
 
