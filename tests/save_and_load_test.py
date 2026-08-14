@@ -189,8 +189,10 @@ def test_torch_load_map_location_reconciles_claimed_device():
     posterior.device = "cuda:0"
 
     with tempfile.NamedTemporaryFile(suffix=".pt") as f:
-        torch.save(posterior, f.name)
-        loaded = torch.load(f.name, weights_only=False, map_location="cpu")
+        torch.save(posterior, f)
+        f.flush()
+        f.seek(0)
+        loaded = torch.load(f, weights_only=False, map_location="cpu")
 
     assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
     assert loaded.device == "cpu", f"device is {loaded.device!r}, expected cpu"
@@ -215,8 +217,10 @@ def test_torch_load_map_location_same_device_is_passthrough():
     posterior = _build_direct_posterior()
 
     with tempfile.NamedTemporaryFile(suffix=".pt") as f:
-        torch.save(posterior, f.name)
-        loaded = torch.load(f.name, weights_only=False, map_location="cpu")
+        torch.save(posterior, f)
+        f.flush()
+        f.seek(0)
+        loaded = torch.load(f, weights_only=False, map_location="cpu")
 
     assert loaded._device == "cpu", f"_device is {loaded._device!r}, expected cpu"
     assert loaded.device == "cpu", f"device is {loaded.device!r}, expected cpu"
