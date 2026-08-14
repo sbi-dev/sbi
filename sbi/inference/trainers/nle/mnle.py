@@ -19,8 +19,8 @@ from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.net_builders.estimator_configs import (
+    _ESTIMATOR_CONFIG_BASES,
     MixedConfig,
-    _PerModelConfigBase,
 )
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
@@ -125,7 +125,7 @@ class MNLE(LikelihoodEstimatorTrainer):
                 stacklevel=2,
             )
             density_estimator = likelihood_nn(model="mnle")
-        elif isinstance(density_estimator, _PerModelConfigBase) and not isinstance(
+        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES) and not isinstance(
             density_estimator, self._ALLOWED_BUILDER_TYPES
         ):
             allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
