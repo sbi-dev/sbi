@@ -88,7 +88,7 @@ def test_reject_outside_prior_support_behavior():
             return torch.zeros(theta.shape[0])
 
         def bind(self, x_o, x_is_iid=True):
-            pass
+            return self
 
         def to(self, device):
             self.device = device

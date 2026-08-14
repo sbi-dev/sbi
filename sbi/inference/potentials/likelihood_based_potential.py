@@ -95,15 +95,26 @@ class LikelihoodBasedPotential(BasePotential):
         self.likelihood_estimator.to(device)
         return self
 
-    def bind(self, x_o: Tensor, x_is_iid: bool = True) -> "LikelihoodBasedPotential":
-        """Create new potential with x bound, without mutable state."""
+    def bind(
+        self, x_o: Optional[Tensor], x_is_iid: bool = True
+    ) -> "LikelihoodBasedPotential":
+        """Create new potential with x bound, without mutable state.
+
+        Args:
+            x_o: Observed data to bind.
+            x_is_iid: Whether x_o is a batch of iid observations.
+
+        Returns:
+            A new LikelihoodBasedPotential with x_o bound.
+        """
         bound = LikelihoodBasedPotential(
             likelihood_estimator=self.likelihood_estimator,
             prior=self.prior,
             x_o=None,
             device=self.device,
         )
-        x_o = process_x(x_o).to(self.device)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
         bound._x_is_iid = x_is_iid
         return bound

@@ -85,6 +85,7 @@ class PosteriorBasedPotential(BasePotential):
             The potential function.
         """
         super().__init__(prior, x_o, device)
+        self._x_is_iid = False
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
 
@@ -101,7 +102,9 @@ class PosteriorBasedPotential(BasePotential):
         self.posterior_estimator.to(device)
         return self
 
-    def bind(self, x_o: Tensor, x_is_iid: bool = False) -> "PosteriorBasedPotential":
+    def bind(
+        self, x_o: Optional[Tensor], x_is_iid: bool = False
+    ) -> "PosteriorBasedPotential":
         """Create new potential with x bound, without mutable state."""
         bound = PosteriorBasedPotential(
             posterior_estimator=self.posterior_estimator,
@@ -109,7 +112,8 @@ class PosteriorBasedPotential(BasePotential):
             x_o=None,
             device=self.device,
         )
-        x_o = process_x(x_o).to(self.device)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
         bound._x_is_iid = x_is_iid
         return bound
