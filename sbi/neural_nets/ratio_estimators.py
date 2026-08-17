@@ -106,8 +106,8 @@ class RatioEstimator(ConditionalEstimator):
     def combine_theta_and_x(self, theta: Tensor, x: Tensor) -> Tensor:
         """After embedding them, concatenate embedded_theta and embedded_x
 
-        `theta` and `x` must agree on their shape prefix. This method does not
-        broadcast; expand `x` yourself if it lacks a sample dimension.
+        This method does not broadcast; expand `x` yourself if it lacks a sample
+        dimension.
 
         Args:
             theta: parameters of shape `(*batch_shape, *theta_shape)`, for example
@@ -132,8 +132,8 @@ class RatioEstimator(ConditionalEstimator):
         r"""Return the unnormalized log ratios of the thetas given an x, or multiple
         (batched) xs.
 
-        `theta` and `x` must agree on their shape prefix. This method does not
-        broadcast; expand `x` yourself if it lacks a sample dimension.
+        This method does not broadcast; expand `x` yourself if it lacks a sample
+        dimension.
 
         Args:
             theta: parameters of shape `(*batch_shape, *theta_shape)`, for example
@@ -142,7 +142,7 @@ class RatioEstimator(ConditionalEstimator):
                 `batch_shape` as `theta`.
 
         Returns:
-            Sample-wise unnormalized log ratios with shape `(*batch_shape)`.
+            Sample-wise unnormalized log ratios with shape `batch_shape`.
             Just like log_prob, the last dimension should be squeezed.
         """
 
@@ -154,4 +154,15 @@ class RatioEstimator(ConditionalEstimator):
         return self.unnormalized_log_ratio(*args, **kwargs)
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        raise NotImplementedError()
+        """Not implemented for ratio estimators.
+
+        The NRE variants build their loss from `unnormalized_log_ratio` over
+        contrastive pairs, so each trainer defines its own `_loss`.
+
+        Raises:
+            NotImplementedError: Always.
+        """
+        raise NotImplementedError(
+            "Ratio estimators do not implement `loss`; the NRE trainers compute it "
+            "from `unnormalized_log_ratio`."
+        )

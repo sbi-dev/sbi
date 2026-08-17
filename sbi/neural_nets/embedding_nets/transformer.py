@@ -870,6 +870,23 @@ class TransformerEmbedding(nn.Module):
         attention_mask: Optional[torch.Tensor] = None,
         **kwargs,
     ):
+        """Build an additive causal attention mask.
+
+        Args:
+            sequence_length: Length of the attention window.
+            batch_size: Number of sequences to expand the mask to.
+            dtype: Dtype of the returned mask.
+            device: Device of the returned mask.
+            min_dtype: Value that marks a masked position, usually the smallest
+                finite value of `dtype`.
+            attention_mask: Optional padding mask of shape
+                `(batch_dim, mask_length)`, where 0 marks a padding token.
+            kwargs: Ignored.
+
+        Returns:
+            Mask of shape `(batch_dim, 1, sequence_length, sequence_length)`, holding
+            `min_dtype` where attention is suppressed and 0 elsewhere.
+        """
         causal_mask = torch.full(
             (sequence_length, sequence_length),
             fill_value=min_dtype,
