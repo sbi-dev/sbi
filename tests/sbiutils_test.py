@@ -466,12 +466,8 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     elif build_fn == classifier_nn:
         models = ["linear", "mlp", "resnet"]
 
-    # `transform_to_unconstrained` is only implemented for the conditional Zuko
-    # builders; nflows/mdn/mnle and the ratio-based classifiers now raise a
-    # ValueError instead of silently no-op-ing. The factory maps the *modeled*
-    # variable's z-scoring to the builder's z_score_x: theta for posterior_nn and
-    # classifier_nn (`z_score_x=z_score_theta`), x for likelihood_nn.
-    # posterior_nn and classifier_nn both map z_score_x <- z_score_theta.
+    # The factory maps the *modeled* variable's z-scoring to the builder's `z_score_x`:
+    # theta for posterior_nn and classifier_nn, x for likelihood_nn.
     modeled_z = z_x if build_fn == likelihood_nn else z_theta
 
     for model in models:
@@ -490,8 +486,6 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
         if build_fn in [likelihood_nn, posterior_nn]:
             kwargs.update({"x_dist": dist, "num_transforms": 1})
 
-        # Unsupported combination: the modeled variable requests the unconstrained
-        # transform on a non-Zuko-conditional builder -> expect a clear ValueError.
         if (
             modeled_z == "transform_to_unconstrained"
             and not model.startswith("zuko")
@@ -556,7 +550,7 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
 def test_transform_to_unconstrained_raises_for_unsupported_builders(builder_name):
     """nflows and ratio-classifier builders raise a clear error for
     `transform_to_unconstrained` instead of silently building a model without the
-    reparametrization. MDN now supports it and is excluded."""
+    reparametrization. MDN supports it and is excluded."""
     from sbi.neural_nets.net_builders import flow as flow_builders
     from sbi.neural_nets.net_builders.classifier import (
         build_linear_classifier,

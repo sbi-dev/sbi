@@ -203,10 +203,9 @@ def assert_transform_to_unconstrained_supported(
     The ``transform_to_unconstrained`` z-scoring option derives a bijection from the
     prior's support (rather than batch statistics). It is implemented for the
     conditional Zuko builders and for ``build_mdn``. For the other builders,
-    ``z_score_parser`` returns
-    ``(False, False)`` for this flag, which would otherwise make the option a silent
-    no-op (the model is built with no reparametrization at all). This guard turns that
-    silent no-op into a clear error.
+    ``z_score_parser`` returns ``(False, False)`` for this flag, which would otherwise
+    make the option a silent no-op (the model is built with no reparametrization at
+    all). This guard turns that silent no-op into a clear error.
 
     Args:
         z_score_x: The z-scoring option passed by the user.
