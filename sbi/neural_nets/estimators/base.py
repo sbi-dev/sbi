@@ -527,13 +527,13 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Linear coefficient mean_t of the perturbation kernel expectation
-        :math:`\mu_t(t) = E[\theta_t | \theta_0] = \text{mean_t}(t) \cdot \theta_0`
+        :math:`\mu_t(t) = E[\theta_t | \theta_0] = \text{mean}_t(t) \cdot \theta_0`
         specifying the "mean factor" at a given time, which is always multiplied by
         :math:`\theta_0` to get the mean of the noise distribution, i.e.,
 
         .. math::
             p(\theta_t | \theta_0) =
-            N(\theta_t; \text{mean_t}(t) \cdot \theta_0, \text{std_t}(t)).
+            N(\theta_t; \text{mean}_t(t) \cdot \theta_0, \text{std}_t(t)).
 
         Args:
             times: SDE time variable in [0,1].
@@ -548,8 +548,8 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
             time,
 
         .. math::
-            p(\theta_t | \theta_0) = N(\theta_t; \text{mean_t}(t) \cdot
-            \theta_0, \text{std_t}(t)^2).
+            p(\theta_t | \theta_0) = N(\theta_t; \text{mean}_t(t) \cdot
+            \theta_0, \text{std}_t(t)^2).
 
         Args:
             times: SDE time variable in [0,1].

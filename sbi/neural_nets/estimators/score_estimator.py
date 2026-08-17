@@ -31,7 +31,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     a Wiener process. This will lead to marginal distribution of the form:
 
     .. math::
-        p(x_t | x_0) = N(x_t; \text{mean_t}(t) \cdot x_0, \text{std_t}(t)),
+        p(x_t | x_0) = N(x_t; \text{mean}_t(t) \cdot x_0, \text{std}_t(t)),
 
     where mean_t(t) and std_t(t) are the conditional mean and standard deviation at a
     given time t, respectively.
