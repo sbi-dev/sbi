@@ -207,9 +207,10 @@ class ConditionalDensityEstimator(ConditionalEstimator):
 
     Note:
         We assume that the input to the density estimator is a tensor of shape
-        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
-        of the input. The condition is a tensor of shape (batch_size, *condition_shape),
-        where condition_shape is the shape of the condition tensor.
+        `(sample_dim, batch_dim, *input_shape)`, where `input_shape` is the
+        dimensionality of the input. The condition is a tensor of shape
+        `(batch_size, *condition_shape)`, where `condition_shape` is the shape of
+        the condition tensor.
 
     """
 
@@ -277,7 +278,7 @@ class ConditionalDensityEstimator(ConditionalEstimator):
             condition: Conditions of shape `(batch_dim, *event_shape_condition)`.
 
         Returns:
-            Samples of shape (*sample_shape, batch_dim, *event_shape_input).
+            Samples of shape `(*sample_shape, batch_dim, *event_shape_input)`.
         """
 
         pass
@@ -315,9 +316,10 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
 
     Note:
         We assume that the input to the density estimator is a tensor of shape
-        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
-        of the input. The condition is a tensor of shape (batch_dim, *condition_shape),
-        where condition_shape is the shape of the condition tensor.
+        `(sample_dim, batch_dim, *input_shape)`, where `input_shape` is the
+        dimensionality of the input. The condition is a tensor of shape
+        `(batch_dim, *condition_shape)`, where `condition_shape` is the shape of
+        the condition tensor.
     """
 
     # When implementing custom estimators,
@@ -528,8 +530,10 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         :math:`\mu_t(t) = E[\theta_t | \theta_0] = \text{mean_t}(t) \cdot \theta_0`
         specifying the "mean factor" at a given time, which is always multiplied by
         :math:`\theta_0` to get the mean of the noise distribution, i.e.,
-        :math:`p(\theta_t | \theta_0) = N(\theta_t;
-                \text{mean_t}(t)*\theta_0, \text{std_t}(t)).`
+
+        .. math::
+            p(\theta_t | \theta_0) =
+            N(\theta_t; \text{mean_t}(t) \cdot \theta_0, \text{std_t}(t)).
 
         Args:
             times: SDE time variable in [0,1].
@@ -701,8 +705,8 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
 
     Note:
         We assume that the input to the density estimator is a tensor of shape
-        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
-        of the input.
+        `(sample_dim, batch_dim, *input_shape)`, where `input_shape` is the
+        dimensionality of the input.
 
     """
 
@@ -739,7 +743,7 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
             sample_shape: Shape of the samples to return.
 
         Returns:
-            Samples of shape (*sample_shape, batch_dim, *event_shape_input).
+            Samples of shape `(*sample_shape, batch_dim, *event_shape_input)`.
         """
 
         return self._neural_net.sample(sample_shape)

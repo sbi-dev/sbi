@@ -57,7 +57,7 @@ class RatioEstimator(ConditionalEstimator):
         r"""This method checks whether x has the correct shape.
 
         Args:
-            x: Tensor of shape (*batch_shape, *x_shape).
+            x: Tensor of shape `(*batch_shape, *x_shape)`.
 
         Raises:
             ValueError: If the x has a dimensionality that does not match
@@ -71,7 +71,7 @@ class RatioEstimator(ConditionalEstimator):
         r"""This method checks whether theta has the correct shape.
 
         Args:
-            theta: Tensor of shape (*batch_shape, *theta_shape).
+            theta: Tensor of shape `(*batch_shape, *theta_shape)`.
 
         Raises:
             ValueError: If the theta has a dimensionality that does not match
@@ -87,8 +87,8 @@ class RatioEstimator(ConditionalEstimator):
         r"""This method checks whether theta and x agree on the prefix of their shape.
 
         Args:
-            theta: Tensor of shape (*batch_shape, *theta_shape).
-            x: Tensor of shape (*batch_shape, *x_shape).
+            theta: Tensor of shape `(*batch_shape, *theta_shape)`.
+            x: Tensor of shape `(*batch_shape, *x_shape)`.
 
         Raises:
             ValueError: If the `batch_shape`s do not agree.
@@ -107,8 +107,8 @@ class RatioEstimator(ConditionalEstimator):
         """After embedding them, concatenate embedded_theta and embedded_x
 
         Args:
-            theta: parameters of shape (sample_dim, batch_dim, *theta_shape).
-            x: data of shape (batch_dim, *x_shape).
+            theta: parameters of shape `(sample_dim, batch_dim, *theta_shape)`.
+            x: data of shape `(batch_dim, *x_shape)`.
 
         Returns:
             combined: shape (sample_dim, batch_dim, combined_event_dim)
@@ -128,8 +128,8 @@ class RatioEstimator(ConditionalEstimator):
         (batched) xs.
 
         Args:
-            theta: parameters of shape (sample_dim, batch_dim, *theta_shape).
-            x: data of shape (batch_dim, *x_shape).
+            theta: parameters of shape `(sample_dim, batch_dim, *theta_shape)`.
+            x: data of shape `(batch_dim, *x_shape)`.
 
         Returns:
             Sample-wise unnormalized log ratios with shape (sample_dim, batch_dim).
