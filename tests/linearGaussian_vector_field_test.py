@@ -828,7 +828,13 @@ def test_npse_affine_classifier_free(vector_field_type, prior_type, guidance_par
 @pytest.mark.parametrize(
     "z_score_theta, gaussian_baseline",
     [
-        pytest.param(None, False, marks=pytest.mark.xfail(reason="No z-scoring fails")),
+        # "none", not None: the config layer drops None fields, so None z-scores.
+        pytest.param(
+            "none",
+            False,
+            id="no_zscore",
+            marks=pytest.mark.xfail(reason="No z-scoring fails"),
+        ),
         pytest.param("independent", False, id="zscore"),
         pytest.param("independent", True, id="zscore_baseline"),
     ],
