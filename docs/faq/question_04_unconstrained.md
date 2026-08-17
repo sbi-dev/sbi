@@ -1,7 +1,9 @@
-# Using the logit transformation
-If you've ruled out simulator issues, you can try
-training your density or ratio estimator in an unbounded space
-using a logit transformation:
+# Can I train my density estimator in an unconstrained space?
+
+Yes. If posterior samples leak outside the prior bounds (see
+[posterior samples outside the prior support](question_01_leakage.md)) and you have
+ruled out simulator issues, you can train your density or ratio estimator in an
+unbounded space using a logit transformation:
 
 - **For NPE**: The transformation maps bounded parameters θ
 to unbounded space before training, then applies the inverse (sigmoid)
@@ -14,12 +16,15 @@ from simulations (more complex).
 To enable this for NPE:
 
 ```python
+from sbi.inference import NPE
+from sbi.neural_nets import posterior_nn
+
 density_estimator_build_fun = posterior_nn(
     model="zuko_nsf",
     hidden_features=60,
     num_transforms=3,
-    z_score_theta="transform_to_unconstrained"  # Transforms parameters to unconstrained space
-    x_dist=prior  # For NPE, this specifies bounds for parameters (internally called 'x')
+    z_score_theta="transform_to_unconstrained",  # Transform parameters to unconstrained space
+    x_dist=prior,  # For NPE, this specifies bounds for parameters (internally called 'x')
 )
 inference = NPE(prior, density_estimator=density_estimator_build_fun)
 ```
@@ -35,7 +40,8 @@ This is why we pass the prior as `x_dist`.
 
 Important:
 
-- This transformation is currently only supported for zuko density estimators.
+- This transformation is currently supported by the zuko density estimators
+(`zuko_*`) and by `mdn`. The nflows-based estimators reject it.
 - For **NLE/NRE**, setting up this transformation is more
 complex as it requires estimating bounds for the simulated data
 rather than using prior bounds.

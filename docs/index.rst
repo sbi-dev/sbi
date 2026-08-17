@@ -53,7 +53,7 @@ To get started, install the ``sbi`` package with:
    python -m pip install sbi
 
 For Pyro- or PyMC-based MCMC samplers, install ``sbi[pyro]``, ``sbi[pymc]``, or
-``sbi[all]``. For more details, see our `Install Guide <https://sbi.readthedocs.io/en/latest/installation.html>`_.
+``sbi[all]``. For more details, see our :doc:`Install Guide <installation>`.
 
 Then, check out our material:
 
@@ -147,8 +147,8 @@ the inference on one particular observation to be more simulation-efficient
 (e.g., SNPE).
 
 Below, we list all implemented methods and their corresponding publications.
-For usage in ``sbi``, see the `Inference API reference <https://sbi.readthedocs.io/en/latest/api_reference.html>`_
-and the `tutorial on implemented methods <https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html>`_.
+For usage in ``sbi``, see the :doc:`Inference API reference <api_reference>`
+and the :doc:`tutorial on implemented methods <tutorials/16_implemented_methods>`.
 
 
 Posterior estimation (``(S)NPE``)

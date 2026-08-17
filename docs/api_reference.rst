@@ -10,6 +10,7 @@ API reference
 
    api_reference/prior_and_simulator
    api_reference/neural_nets
+   api_reference/estimators
    api_reference/embedding_nets
    api_reference/training
    api_reference/potentials
@@ -56,9 +57,12 @@ Estimators
    :nosignatures:
 
    sbi.neural_nets.estimators.ConditionalDensityEstimator
-   sbi.neural_nets.estimators.UnconditionalDensityEstimator
    sbi.neural_nets.estimators.ConditionalScoreEstimator
+   sbi.neural_nets.estimators.ConditionalVectorFieldEstimator
+   sbi.neural_nets.estimators.FlowMatchingEstimator
+   sbi.neural_nets.estimators.MixedDensityEstimator
    sbi.neural_nets.ratio_estimators.RatioEstimator
+   sbi.neural_nets.estimators.UnconditionalDensityEstimator
 
 
 Embedding nets

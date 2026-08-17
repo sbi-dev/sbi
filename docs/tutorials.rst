@@ -4,18 +4,18 @@ Tutorials
 =========
 
 Before running the notebooks, follow our instructions to
-`install sbi <https://sbi.readthedocs.io/en/latest/installation.html>`_.
+:doc:`install sbi <installation>`.
 Alternatively, you can also open a `codespace on
 GitHub <https://codespaces.new/sbi-dev/sbi>`_ and work through the tutorials in
 the browser.
 
 Once you have familiarised yourself with the methods and identified how to apply
 ``sbi`` to your use case, you can check out our
-`how-to guide <https://sbi.readthedocs.io/en/latest/how_to_guide.html>`_
+:doc:`how-to guide <how_to_guide>`
 for brief answers to specific questions, our
-`advanced tutorials <https://sbi.readthedocs.io/en/latest/advanced_tutorials.html>`_
+:doc:`advanced tutorials <advanced_tutorials>`
 for longer explanations of particular features, and our
-`API reference <https://sbi.readthedocs.io/en/latest/api_reference.html>`_
+:doc:`API reference <api_reference>`
 for documentation of all features.
 
 
