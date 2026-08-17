@@ -191,9 +191,9 @@ class CNNEmbedding(nn.Module):
         """Embed a batch of inputs.
 
         Args:
-            x: Inputs of shape `(batch_dim, *input_shape)`. A flat
-                `(batch_dim, prod(input_shape))` is also accepted, as is
-                `(batch_dim, *input_shape[1:])` for single-channel inputs.
+            x: Inputs of shape `(batch_dim, in_channels, *input_shape)`. A flat
+                `(batch_dim, in_channels * prod(input_shape))` is also accepted, as
+                is `(batch_dim, *input_shape)` when `in_channels` is 1.
 
         Returns:
             Embeddings of shape `(batch_dim, output_dim)`.

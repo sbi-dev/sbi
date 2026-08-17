@@ -885,7 +885,9 @@ class TransformerEmbedding(nn.Module):
 
         Returns:
             Mask of shape `(batch_dim, 1, sequence_length, sequence_length)`, holding
-            `min_dtype` where attention is suppressed and 0 elsewhere.
+            `min_dtype` where attention is suppressed and 0 elsewhere. For
+            `sequence_length` 1 every entry is `min_dtype`. That leaves attention
+            unchanged, because a softmax over a single position returns one.
         """
         causal_mask = torch.full(
             (sequence_length, sequence_length),
