@@ -17,7 +17,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     Rectified flow matching estimator class that estimates the conditional vector field,
     :math:`v(\theta_t, t; x_o) = \mathbb{E}[\theta_1 - \theta_0 | \theta_t, x_o = x_o]`
 
-    This estimator implements the flow matching approach where the vector field is
+    This estimator implements the flow matching approach [2]_ where the vector field is
     learned by matching the flow between the base and target distributions. The vector
     field represents the instantaneous change in the distribution at time t.
 
@@ -378,11 +378,13 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         .. math::
             \nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / t
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / t
 
         Taking into account the noise scale :math:`\sigma_{min}`, the score function is
-        :math:`\nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / (t + \sigma_{min})`.
+
+        .. math::
+            \nabla_{\theta_t} \log p(\theta_t | x_o) =
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / (t + \sigma_{min}).
 
         Args:
             input: variable whose distribution is estimated.

@@ -19,13 +19,23 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     to generate samples from the target distribution by solving the SDE starting from
     the base (Gaussian) distribution.
 
+    See [2]_ for the denoising diffusion formulation and [3]_ for the
+    noise-conditional score network formulation.
+
     We assume the following SDE:
-                        dx = A(t)xdt + B(t)dW,
+
+    .. math::
+        dx = A(t) x \, dt + B(t) \, dW,
+
     where A(t) and B(t) are the drift and diffusion functions, respectively, and dW is
     a Wiener process. This will lead to marginal distribution of the form:
-                        p(xt|x0) = N(xt; mean_t(t)*x0, std_t(t)),
+
+    .. math::
+        p(x_t | x_0) = N(x_t; \text{mean}_t(t) \cdot x_0, \text{std}_t(t)^2),
+
     where mean_t(t) and std_t(t) are the conditional mean and standard deviation at a
-    given time t, respectively.
+    given time t, respectively. The second argument of N is the variance, which
+    matches `std_fn`.
 
     References
     ----------
