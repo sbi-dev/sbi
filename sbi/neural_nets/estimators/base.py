@@ -533,7 +533,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
 
         .. math::
             p(\theta_t | \theta_0) =
-            N(\theta_t; \text{mean}_t(t) \cdot \theta_0, \text{std}_t(t)).
+            N(\theta_t; \text{mean}_t(t) \cdot \theta_0, \text{std}_t(t)^2).
 
         Args:
             times: SDE time variable in [0,1].

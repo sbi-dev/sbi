@@ -378,13 +378,13 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         .. math::
             \nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / t
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / t
 
         Taking into account the noise scale :math:`\sigma_{min}`, the score function is
 
         .. math::
             \nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / (t + \sigma_{min}).
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / (t + \sigma_{min}).
 
         Args:
             input: variable whose distribution is estimated.

@@ -16,8 +16,13 @@ from simulations (more complex).
 To enable this for NPE:
 
 ```python
+import torch
+
 from sbi.inference import NPE
 from sbi.neural_nets import posterior_nn
+from sbi.utils import BoxUniform
+
+prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
 
 density_estimator_build_fun = posterior_nn(
     model="zuko_nsf",
@@ -40,8 +45,9 @@ This is why we pass the prior as `x_dist`.
 
 Important:
 
-- This transformation is currently supported by the zuko density estimators
-(`zuko_*`) and by `mdn`. The nflows-based estimators reject it.
+- This transformation is currently supported by the conditional zuko density
+estimators (for example `zuko_maf` and `zuko_nsf`) and by `mdn`. The nflows-based
+estimators reject it, and so do the unconditional (marginal) flows.
 - For **NLE/NRE**, setting up this transformation is more
 complex as it requires estimating bounds for the simulated data
 rather than using prior bounds.
