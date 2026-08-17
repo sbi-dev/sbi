@@ -267,6 +267,20 @@ class CausalCNNEmbedding(nn.Module):
         self.aggregation = aggregator
 
     def forward(self, x: Tensor) -> Tensor:
+        """Embed a batch of time series.
+
+        Args:
+            x: Inputs of shape `(batch_dim, in_channels, *input_shape)`. A flat
+                `(batch_dim, in_channels * prod(input_shape))` is also accepted, as
+                is `(batch_dim, *input_shape)` when `in_channels` is 1.
+
+        Returns:
+            Embeddings of shape `(batch_dim, output_dim)` for the default
+            aggregator, otherwise the flattened output of the given `aggregator`.
+
+        Raises:
+            ValueError: If the trailing shape of `x` is none of the above.
+        """
         batch_size = x.size(0)
         _validate_cnn_input_shape(x, self.input_shape)
         x = x.reshape(batch_size, *self.input_shape)

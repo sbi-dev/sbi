@@ -34,8 +34,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         p(x_t | x_0) = N(x_t; \text{mean}_t(t) \cdot x_0, \text{std}_t(t)^2),
 
     where mean_t(t) and std_t(t) are the conditional mean and standard deviation at a
-    given time t, respectively. The second argument of N is the variance, which
-    matches `std_fn`.
+    given time t, respectively. `std_fn` returns the standard deviation, so the second
+    argument of N is its square.
 
     References
     ----------
