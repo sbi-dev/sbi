@@ -28,7 +28,6 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MarginalNICEConfig,
     MarginalNSFConfig,
     MarginalSOSPFConfig,
-    VectorFieldEstimatorBuilder,
 )
 from sbi.neural_nets.net_builders.flow import (
     build_zuko_bpf,
@@ -44,6 +43,7 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unconditional_flow,
     nflow_specific_kwargs,
 )
+from sbi.neural_nets.net_builders.vector_field_nets import FlowMatchingConfig
 
 # The conditional build functions carry the defaults sbi has chosen for each
 # Zuko flow. The marginal configs must reproduce them, under Zuko's own
@@ -402,7 +402,7 @@ def test_unknown_model_string_raises():
 
 
 @pytest.mark.parametrize(
-    "config", [MAFConfig(), VectorFieldEstimatorBuilder()], ids=["density", "vector"]
+    "config", [MAFConfig(), FlowMatchingConfig()], ids=["density", "vector"]
 )
 def test_conditional_builder_raises(config):
     """A builder for a conditional estimator cannot build a marginal one."""

@@ -15,8 +15,8 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MAFConfig,
     MLPClassifierConfig,
     ResNetClassifierConfig,
-    VectorFieldEstimatorBuilder,
 )
+from sbi.neural_nets.net_builders.vector_field_nets import FlowMatchingConfig
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.user_input_checks import check_estimator_arg
 
@@ -69,7 +69,7 @@ def test_rejects_legacy_config_of_the_wrong_family():
     with pytest.raises(TypeError, match="ClassifierConfigBase"):
         NRE_A(
             prior,
-            classifier=VectorFieldEstimatorBuilder(),
+            classifier=FlowMatchingConfig(),
             show_progress_bars=False,
         )
 
