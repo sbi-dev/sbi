@@ -30,7 +30,6 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     NSFConfig,
     ResNetClassifierConfig,
     TabPFNConfig,
-    VectorFieldEstimatorBuilder,
     ZukoBPFConfig,
     ZukoGFConfig,
     ZukoMAFConfig,
@@ -60,6 +59,15 @@ from sbi.neural_nets.net_builders.flow import (
 from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
+    AdaMLPConfig,
+    FlowMatchingConfig,
+    MLPConfig,
+    ScoreConfigBase,
+    SubVPScoreConfig,
+    TransformerConfig,
+    VEScoreConfig,
+    VPScoreConfig,
+    VectorFieldConfigBase,
     build_flow_matching_estimator,
     build_score_matching_estimator,
     build_vector_field_estimator,
