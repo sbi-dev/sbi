@@ -4,7 +4,7 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict, replace
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, ClassVar, Dict, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, ones
@@ -27,8 +27,8 @@ from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
     _ESTIMATOR_CONFIG_BASES,
-    VectorFieldEstimatorBuilder,
 )
+from sbi.neural_nets.net_builders.vector_field_nets import VectorFieldConfigBase
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_estimator_arg,
@@ -48,7 +48,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         prior: Optional[Distribution] = None,
         vector_field_estimator_builder: Union[
             VF_MODELS,
-            VectorFieldEstimatorBuilder,
+            VectorFieldConfigBase,
             ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
             None,
         ] = None,
@@ -69,9 +69,9 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             prior: Prior distribution.
             vector_field_estimator_builder: The vector-field estimator
                 used for flow-matching or score-matching inference.
-                Subclasses resolve a default ``VectorFieldEstimatorBuilder``
-                before calling the base. A ``VectorFieldEstimatorBuilder``
-                can be passed to configure the estimator. If it is a string
+                Subclasses resolve a default config before calling the base. A
+                vector-field config of the subclass' own family can be passed
+                to configure the estimator. If it is a string
                 (deprecated), use a pre-configured network of the provided
                 type (one of mlp, ada_mlp, transformer,
                 transformer_cross_attn). Alternatively, a function that
@@ -97,18 +97,21 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
 
         if isinstance(vector_field_estimator_builder, _ESTIMATOR_CONFIG_BASES):
             if not isinstance(
-                vector_field_estimator_builder, VectorFieldEstimatorBuilder
+                vector_field_estimator_builder, self._ALLOWED_CONFIG_TYPE
             ):
                 raise TypeError(
-                    "VF trainers require a VectorFieldEstimatorBuilder; got "
-                    f"{type(vector_field_estimator_builder).__name__}. Use "
-                    "VectorFieldEstimatorBuilder(model=...)."
+                    f"{type(self).__name__} requires a "
+                    f"{self._ALLOWED_CONFIG_TYPE.__name__}; got "
+                    f"{type(vector_field_estimator_builder).__name__}."
                 )
             self._build_neural_net = self._wrap_builder(vector_field_estimator_builder)
         elif not isinstance(vector_field_estimator_builder, str):
             self._build_neural_net = vector_field_estimator_builder
 
         self._proposal_roundwise = []
+
+    _ALLOWED_CONFIG_TYPE: ClassVar[type] = VectorFieldConfigBase
+    """Config family this trainer accepts, narrowed by each subclass."""
 
     @abstractmethod
     def _build_default_nn_fn(
