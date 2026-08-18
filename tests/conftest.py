@@ -10,8 +10,10 @@ import pandas as pd
 import pytest
 import torch
 from pytest_harvest import get_session_results_df, get_xdist_worker_id, is_main_process
+from torch.distributions import MultivariateNormal
 
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
+from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available
 
@@ -283,3 +285,27 @@ def pytest_sessionfinish(session):
             session_results_df.to_csv(results_file)
     else:
         session_results_df.to_csv('./.bm_results/results_%s.csv' % suffix)
+
+
+@pytest.fixture
+def gaussian_setup():
+    """Common linear-Gaussian setup shared by diagnostics tests."""
+    num_dim = 2
+    likelihood_shift = -1.0 * torch.ones(num_dim)
+    likelihood_cov = 0.3 * torch.eye(num_dim)
+    prior_mean = torch.zeros(num_dim)
+    prior_cov = torch.eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    return {
+        "num_dim": num_dim,
+        "prior": prior,
+        "simulator": simulator,
+        "likelihood_shift": likelihood_shift,
+        "likelihood_cov": likelihood_cov,
+        "prior_mean": prior_mean,
+        "prior_cov": prior_cov,
+    }
