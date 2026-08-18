@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import math
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -47,7 +48,7 @@ def _log_prob_normalized(
                 if isinstance(dist, Distribution)
                 else dist.log_prob(theta, x=x_o)
             )
-        except UserWarning as unnormalized:
+        except Warning as unnormalized:
             raise NotImplementedError(
                 f"`{name}` is a `{type(dist).__name__}`, whose `log_prob()` is "
                 "only defined up to a normalizing constant. The constants do not "
@@ -112,15 +113,13 @@ def kl_divergence_mc(
     if num_nonfinite > 0:
         raise ValueError(
             f"{num_nonfinite}/{len(log_ratio)} samples from `p` have non-finite "
-            "log-ratios, i.e. they fall outside the support of `q`. The KL "
-            "divergence is infinite. This typically happens when `q` is "
-            "truncated or has bounded support that `p` exceeds."
+            "log-ratios, so they most likely fall outside the support of `q` "
+            "and the KL divergence is infinite. This typically happens when `q` "
+            "is truncated or has bounded support that `p` exceeds."
         )
 
     estimate = log_ratio.mean()
-    standard_error = log_ratio.std() / torch.sqrt(
-        torch.tensor(float(log_ratio.numel()))
-    )
+    standard_error = log_ratio.std() / math.sqrt(log_ratio.numel())
     return estimate, standard_error
 
 
