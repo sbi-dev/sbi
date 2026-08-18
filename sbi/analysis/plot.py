@@ -1649,7 +1649,7 @@ def sbc_rank_plot(
             num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
             histograms.
         plot_type: type of SBC plot: "hist" for histograms, "cdf" for empirical CDFs,
-            or "cdf-diff" for eCDF differences from uniformity.
+            or "cdf-diff" for empirical CDF differences from uniformity.
         parameter_labels: list of labels for each parameter dimension.
         ranks_labels: list of labels for each set of ranks.
         colors: list of colors for each parameter dimension, or each set of ranks.
@@ -1706,7 +1706,7 @@ def _sbc_rank_plot(
             num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
             histograms.
         plot_type: type of SBC plot: "hist" for histograms, "cdf" for empirical CDFs,
-            or "cdf-diff" for eCDF differences from uniformity.
+            or "cdf-diff" for empirical CDF differences from uniformity.
         parameter_labels: list of labels for each parameter dimension.
         ranks_labels: list of labels for each set of ranks.
         colors: list of colors for each parameter dimension, or each set of ranks.
@@ -1754,7 +1754,7 @@ def _sbc_rank_plot(
     num_sbc_runs, num_parameters = ranks_list[0].shape
     num_ranks = len(ranks_list)
 
-    if num_ranks > 1 or plot_type in ("hist", "cdf-diff"):
+    if num_ranks > 1 or plot_type in ("hist", "cdf", "cdf-diff"):
         params_in_subplots = True
 
     for ranki in ranks_list:
@@ -1922,19 +1922,18 @@ def _plot_ranks_as_hist(
     """Plot ranks as histograms on the current axis.
 
     Args:
-        ranks: SBC ranks in shape (num_sbc_runs, )
-        num_bins: number of bins for the histogram, recommendation is num_sbc_runs / 20.
-        num_posteriors_samples: number of posterior samples used for ranking.
+        ranks: SBC ranks in shape (num_sbc_runs, ).
+        num_bins: number of bins for the histogram, recommendation is
+            num_sbc_runs / 20.
+        num_posterior_samples: number of posterior samples used for ranking.
         ranks_label: label for the ranks, e.g., when comparing ranks of different
             methods.
         xlabel: label for the current parameter.
         color: histogram color, default from Talts et al.
         alpha: histogram transparency.
         show_ylabel: whether to show y-label "counts".
-        show_legend: whether to show the legend, e.g., when comparing multiple ranks.
         num_ticks: number of ticks on the x-axis.
         xlim_offset_factor: factor for empty space left and right of the histogram.
-        legend_kwargs: kwargs for the legend.
     """
     xlim_offset = int(num_posterior_samples * xlim_offset_factor)
     plt.hist(
@@ -1969,18 +1968,18 @@ def _plot_ranks_as_cdf(
     """Plot ranks as empirical CDFs on the current axis.
 
     Args:
-        ranks: SBC ranks in shape (num_sbc_runs, )
-        num_bins: number of bins for the histogram, recommendation is num_sbc_runs / 20.
-        num_repeats: number of repeats of each CDF step, i.e., resolution of the eCDF.
+        ranks: SBC ranks in shape (num_sbc_runs, ).
+        num_bins: number of bins for the histogram, recommendation is
+            num_sbc_runs / 10.
+        num_repeats: number of repeats of each CDF step, i.e., resolution of the
+            empirical CDF.
         ranks_label: label for the ranks, e.g., when comparing ranks of different
             methods.
-        xlabel: label for the current parameter
+        xlabel: label for the current parameter.
         color: line color for the cdf.
         alpha: line transparency.
-        show_ylabel: whether to show y-label "counts".
-        show_legend: whether to show the legend, e.g., when comparing multiple ranks.
+        show_ylabel: whether to show y-label "empirical CDF".
         num_ticks: number of ticks on the x-axis.
-        legend_kwargs: kwargs for the legend.
 
     """
     # Generate histogram of ranks.
@@ -2027,7 +2026,8 @@ def _plot_ranks_as_cdf_diff(
     Args:
         ranks: SBC ranks in shape (num_sbc_runs, )
         num_bins: number of bins for the histogram.
-        num_repeats: number of repeats of each CDF step, i.e., resolution of the eCDF.
+        num_repeats: number of repeats of each CDF step, i.e., resolution of the
+            empirical CDF.
         ranks_label: label for the ranks, e.g., when comparing ranks of different
             methods.
         xlabel: label for the current parameter.
