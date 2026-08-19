@@ -350,6 +350,8 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         embedding_net: Optional[nn.Module] = None,
         mean_base: Union[float, Tensor] = 0.0,
         std_base: Union[float, Tensor] = 1.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
         r"""Base class for vector field estimators.
 
@@ -364,6 +366,11 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
                 condition.
             mean_base: Mean of the base distribution.
             std_base: Standard deviation of the base distribution.
+            compose_shift: Shift of the boundary affine, i.e. the mean of the
+                standardized coordinates the estimator is trained in. Given
+                together with `compose_scale`.
+            compose_scale: Scale of the boundary affine, given together with
+                `compose_shift`.
         """
         super().__init__(input_shape, condition_shape)
         self.net = net
@@ -396,6 +403,14 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         self.register_buffer(
             "_compose_standardization", torch.tensor(False), persistent=True
         )
+        if (compose_shift is None) != (compose_scale is None):
+            raise ValueError(
+                "`compose_shift` and `compose_scale` have to be given together."
+            )
+        if compose_shift is not None and compose_scale is not None:
+            self._theta_shift.copy_(compose_shift.reshape(1, *self.input_shape).float())
+            self._theta_scale.copy_(compose_scale.reshape(1, *self.input_shape).float())
+            self._compose_standardization.fill_(True)
 
     def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
         r"""Load legacy checkpoints as compose-off and reject partial affines."""

@@ -36,9 +36,12 @@ from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
+from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.neural_nets.net_builders.estimator_configs import (
-    DensityEstimatorBuilder,
-    _EstimatorBuilderBase,
+    _ESTIMATOR_CONFIG_BASES,
+    DensityConfigBase,
+    MAFConfig,
+    TabPFNConfig,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
@@ -46,7 +49,7 @@ from sbi.utils.torchutils import assert_all_finite
 
 
 class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
-    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (DensityEstimatorBuilder,)
+    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (DensityConfigBase,)
     _INPUT_IS_THETA: ClassVar[bool] = False  # NLE models p(x|θ): input=x, condition=θ
 
     def __init__(
@@ -54,7 +57,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
-            DensityEstimatorBuilder,
+            DensityConfigBase,
             ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
             None,
         ] = None,
@@ -73,11 +76,11 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
                 distribution) can be used.
             density_estimator: If it is a string (deprecated), use a pre-configured
                 network of the provided type (one of nsf, maf, mdn, made). If it is
-                a `DensityEstimatorBuilder`, the builder's `build()` method will be
-                called with the first batch of simulations. Alternatively, a function
-                that builds a custom neural network, which adheres to
+                a per-model config, its `build()` method will be called with the
+                first batch of simulations. Alternatively, a function that builds a
+                custom neural network, which adheres to
                 `ConditionalEstimatorBuildFn` protocol can be provided. If None,
-                it uses a default `DensityEstimatorBuilder` with `"maf"`.
+                it uses `MAFConfig()`.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -91,7 +94,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             show_progress_bars=show_progress_bars,
         )
 
-        # `density_estimator` is either a string, a builder, or a callable.
+        # `density_estimator` is either a string, a config, or a callable.
         # The function creating the neural network is attached to
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
@@ -99,19 +102,27 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         if density_estimator is not None:
             check_estimator_arg(density_estimator)
         if density_estimator is None:
-            self._build_neural_net = self._wrap_builder(
-                DensityEstimatorBuilder(model="maf")
-            )
+            self._build_neural_net = self._wrap_builder(MAFConfig())
         elif isinstance(density_estimator, str):
+            if density_estimator == "tabpfn":
+                raise TypeError(
+                    f"{type(self).__name__} cannot train TabPFN because "
+                    "TabPFNFlow has no training loss."
+                )
             warnings.warn(
                 "Passing a string for `density_estimator` is deprecated. "
-                "Use DensityEstimatorBuilder(model=...) instead, e.g. "
-                "`from sbi.neural_nets import DensityEstimatorBuilder`.",
+                "Use a per-model config instead, e.g. "
+                "`from sbi.neural_nets import MAFConfig`.",
                 FutureWarning,
                 stacklevel=3,
             )
             self._build_neural_net = likelihood_nn(model=density_estimator)
-        elif isinstance(density_estimator, _EstimatorBuilderBase):
+        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
+            if isinstance(density_estimator, TabPFNConfig):
+                raise TypeError(
+                    f"{type(self).__name__} cannot train TabPFNConfig because "
+                    "TabPFNFlow has no training loss."
+                )
             if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
                 allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
                 raise TypeError(
@@ -424,6 +435,11 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
+            if isinstance(self._neural_net, TabPFNFlow):
+                raise TypeError(
+                    f"{type(self).__name__} cannot train TabPFNFlow because it has "
+                    "no training loss."
+                )
 
             assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
                 "NLE cannot handle multi-dimensional simulator output."
