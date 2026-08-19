@@ -71,9 +71,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         Args:
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them.
-            density_estimator: If `None` (default), uses
-                `TabPFNConfig(z_score_condition="none")`. A `TabPFNConfig`
-                can be passed to configure the estimator.
+            density_estimator: If `None` (default), uses `TabPFNConfig()`.
+                A `TabPFNConfig` can be passed to configure the estimator.
                 Alternatively, a function that builds such an estimator needs to
                 be provided.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
@@ -98,8 +97,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         if density_estimator is not None:
             check_estimator_arg(density_estimator)
         if density_estimator is None:
-            # TabPFN preprocesses both sides itself, so neither is z-scored.
-            density_estimator = TabPFNConfig(z_score_condition="none")
+            density_estimator = TabPFNConfig()
         if isinstance(density_estimator, TabPFNConfig):
             self._build_neural_net = self._wrap_builder(density_estimator)
         elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
