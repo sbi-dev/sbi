@@ -24,7 +24,6 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
 from sbi.neural_nets.estimators.mog import MoG
-from sbi.neural_nets.factory import posterior_nn
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
@@ -142,10 +141,8 @@ class NPE_A(PosteriorEstimatorTrainer):
             show_progress_bars: Whether to show a progressbar during training.
         """
 
-        self._num_components = num_components
-
         if density_estimator is None:
-            density_estimator = MDNConfig()
+            density_estimator = MDNConfig(num_components=num_components)
         elif isinstance(density_estimator, MDNConfig):
             if (
                 density_estimator.num_components != _MDN_DEFAULT_COMPONENTS
@@ -154,9 +151,11 @@ class NPE_A(PosteriorEstimatorTrainer):
                 raise ValueError(
                     "`num_components` was set both on the config "
                     f"({density_estimator.num_components}) and on NPE_A "
-                    f"({num_components}). For NPE-A it belongs on the trainer, "
-                    "which overrides it per round."
+                    f"({num_components}). For NPE-A it belongs on the trainer."
                 )
+            density_estimator = replace(
+                density_estimator, num_components=num_components
+            )
         elif isinstance(density_estimator, str):
             if density_estimator != "mdn_snpe_a":
                 raise TypeError(
@@ -170,18 +169,12 @@ class NPE_A(PosteriorEstimatorTrainer):
                 FutureWarning,
                 stacklevel=2,
             )
-            density_estimator = posterior_nn(model="mdn_snpe_a")
+            density_estimator = MDNConfig(num_components=num_components)
         elif not callable(density_estimator):
             raise TypeError(
                 "The `density_estimator` passed to NPE_A needs to be a "
                 "MDNConfig, a callable, or the string 'mdn_snpe_a'!"
             )
-
-        # The number of components changes per round, so the config is kept and
-        # rebuilt in `train()` rather than turned into a build function here.
-        self._mdn_config = (
-            density_estimator if isinstance(density_estimator, MDNConfig) else None
-        )
 
         # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
         # requiring the signature to have `num_components`, save it for use below, and
@@ -192,6 +185,11 @@ class NPE_A(PosteriorEstimatorTrainer):
             entries=("self", "__class__", "num_components"),
         )
         super().__init__(**kwargs)
+
+        if not isinstance(density_estimator, MDNConfig):
+            self._build_neural_net = partial(
+                self._build_neural_net, num_components=num_components
+            )
 
     def train(
         self,
@@ -269,16 +267,6 @@ class NPE_A(PosteriorEstimatorTrainer):
             )
 
         self._round = max(self._data_round_index)
-
-        # Always use the specified number of components.
-        if self._mdn_config is not None:
-            self._build_neural_net = self._wrap_builder(
-                replace(self._mdn_config, num_components=self._num_components)
-            )
-        else:
-            self._build_neural_net = partial(
-                self._build_neural_net, num_components=self._num_components
-            )
 
         density_estimator = super().train(**kwargs)
 
