@@ -75,6 +75,7 @@ def _build_mixed_density_estimator(
     log_transform_x: bool = False,
     discrete_hidden_features: Optional[int] = None,
     discrete_hidden_layers: int = 2,
+    combined_embedding_features: Optional[int] = None,
     dropout_probability: float = 0.0,
     continuous_hidden_features: Optional[int] = None,
     **kwargs,
@@ -143,6 +144,8 @@ def _build_mixed_density_estimator(
             (categorical) net. Defaults to ``hidden_features`` if not set.
         discrete_hidden_layers: number of hidden layers for the discrete
             (categorical) net.
+        combined_embedding_features: number of hidden features for the combined
+            embedding net. Defaults to the continuous net's width.
         dropout_probability: Dropout probability of the categorical net. On
             the legacy flat path it is also passed to compatible continuous nets.
         continuous_hidden_features: number of hidden features for the continuous
@@ -214,10 +217,15 @@ def _build_mixed_density_estimator(
     if combined_embedding_net is None:
         # set up linear embedding net for combining discrete and continuous
         # data.
+        _combined_hf = (
+            combined_embedding_features
+            if combined_embedding_features is not None
+            else _continuous_hf
+        )
         combined_embedding_net = nn.Sequential(
-            nn.Linear(combined_condition.shape[-1], _continuous_hf),
+            nn.Linear(combined_condition.shape[-1], _combined_hf),
             nn.ReLU(),
-            nn.Linear(_continuous_hf, _continuous_hf),
+            nn.Linear(_combined_hf, _combined_hf),
             nn.ReLU(),
         )
 
