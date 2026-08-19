@@ -11,6 +11,12 @@ dropped on the way to the network.  ``_PerModelConfigBase`` holds what every
 role needs; the role bases (``DensityConfigBase``, ``ClassifierConfigBase``,
 ``MarginalConfigBase``, and ``MixedConfig``) add their fields and ``build()``.
 
+Each per-model class adds the settings its own model accepts and points at the
+``build_*`` function that consumes them.  A setting a model does not accept is
+therefore not a field on its config, and raises ``TypeError`` at construction
+rather than being ignored.  Fields carry real defaults, which makes the class
+the reference for the values a build actually uses.
+
 The legacy ``*Config`` classes above them are the factory-side validators from
 before that change.  They keep one flat field set per family with ``None`` as
 the "unset" sentinel, and ``from_kwargs()`` warns on unknown names while still
@@ -694,13 +700,8 @@ class MarginalConfigBase(_PerModelConfigBase):
 
     Marginal estimators model $p(x)$ without a condition, so ``build()`` takes
     only ``batch_x`` and returns a ``ZukoUnconditionalFlow``.  Every
-    model is a Zuko flow, selected by the subclass through ``_WHICH_NF``.
-
-    Subclasses add the settings their flow accepts, under Zuko's own parameter
-    names.  A setting a flow does not accept is not a field on its config, so
-    it raises ``TypeError`` at construction rather than being ignored.  Fields
-    carry real defaults, which makes the class the reference for the values a
-    build actually uses.
+    model is a Zuko flow, selected by the subclass through ``_WHICH_NF``, and
+    its settings carry Zuko's own parameter names.
 
     Args:
         hidden_features: Number of hidden features per transform, or one value
@@ -926,13 +927,8 @@ def _marginal_config_from_model(model: str) -> MarginalConfigBase:
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class DensityConfigBase(_PerModelConfigBase):
-    """Base configuration for conditional density estimators (NPE / NLE).
-
-    Subclasses add the settings their model accepts and point ``_BUILD_FN`` at
-    the ``build_*`` function that consumes them.  A setting a model does not
-    accept is not a field on its config, so it raises ``TypeError`` at
-    construction rather than being ignored.
+class _ConditionalDensityConfigBase(_PerModelConfigBase):
+    """Shared fields and ``build()`` of the conditional density configs.
 
     Args:
         z_score_input: Whether to z-score the modeled variable, one of `none`,
@@ -952,10 +948,6 @@ class DensityConfigBase(_PerModelConfigBase):
     _BUILD_FN: ClassVar[Callable]
     """Build function this config feeds, set by each subclass."""
 
-    def __post_init__(self):
-        self._reject_if_abstract(DensityConfigBase, "NSFConfig()")
-        super().__post_init__()
-
     def build(
         self, batch_input: Tensor, batch_condition: Tensor
     ) -> ConditionalDensityEstimator:
@@ -974,6 +966,34 @@ class DensityConfigBase(_PerModelConfigBase):
         return self._BUILD_FN(
             batch_x=batch_input, batch_y=batch_condition, **self._build_kwargs()
         )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class DensityConfigBase(_ConditionalDensityConfigBase):
+    """Base configuration for trainable conditional density estimators.
+
+    Used by ``NPE`` and ``NLE``.
+    """
+
+    def __post_init__(self):
+        self._reject_if_abstract(DensityConfigBase, "NSFConfig()")
+        super().__post_init__()
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class PretrainedConfigBase(_ConditionalDensityConfigBase):
+    """Base configuration for pretrained density estimators.
+
+    A pretrained model comes with its weights and has no training loss, so the
+    trainers that fit a network reject it and it needs its own trainer.
+    """
+
+    _REJECTION_HINT: ClassVar[str] = ""
+    """Hint appended when a trainer that fits a network rejects this config."""
+
+    def __post_init__(self):
+        self._reject_if_abstract(PretrainedConfigBase, "TabPFNConfig()")
+        super().__post_init__()
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -1248,11 +1268,11 @@ class MDNConfig(_UnconstrainedCapableConfigBase):
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class TabPFNConfig(DensityConfigBase):
+class TabPFNConfig(PretrainedConfigBase):
     """TabPFN-based density estimator.
 
-    TabPFN preprocesses the modeled variable itself, so `z_score_input` offers
-    `none` only.
+    TabPFN preprocesses both variables itself, so neither is z-scored and
+    `z_score_input` offers `none` only.
 
     Args:
         regressor_init_kwargs: Keyword arguments passed to `TabPFNRegressor`.
@@ -1260,10 +1280,14 @@ class TabPFNConfig(DensityConfigBase):
     """
 
     z_score_input: Literal["none"] = "none"
+    z_score_condition: Literal["none", "independent", "structured"] = "none"
     regressor_init_kwargs: Optional[dict] = None
     max_context_size: int = 10_000
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_tabpfn_flow)
+    _REJECTION_HINT: ClassVar[str] = (
+        "TabPFNFlow has no training loss. Use NPE_PFN instead."
+    )
 
 
 # Kept internal: the per-model configs are the public way to pick a model. This
@@ -1396,7 +1420,7 @@ _CLASSIFIER_CONFIGS: dict = {
 
 # TabPFN is the one density model the mixed build function cannot use.
 _MIXED_CONTINUOUS_CONFIGS: frozenset = frozenset(
-    cls for name, cls in _DENSITY_CONFIGS.items() if name != "tabpfn"
+    cls for cls in _DENSITY_CONFIGS.values() if issubclass(cls, DensityConfigBase)
 )
 
 
@@ -1429,8 +1453,12 @@ class MixedConfig(_PerModelConfigBase):
             with the discrete variables.  Built automatically when None.
         log_transform_x: Whether to log-transform the continuous variables.
         discrete_hidden_features: Number of hidden features of the categorical
-            net.  Falls back to the continuous config's when None.
+            net.  Falls back to the continuous config's when None, so that a
+            wider continuous net does not leave the discrete one behind.
         discrete_hidden_layers: Number of hidden layers of the categorical net.
+        combined_embedding_features: Number of hidden features of the combined
+            embedding net built when `combined_embedding_net` is None.  Falls
+            back to the continuous config's when None.
         dropout_probability: Dropout probability of the categorical net.
         extra_kwargs: Unsupported for mixed estimators because there is no
             unambiguous downstream target. Put continuous-model options in
@@ -1445,6 +1473,7 @@ class MixedConfig(_PerModelConfigBase):
     log_transform_x: bool = False
     discrete_hidden_features: Optional[int] = None
     discrete_hidden_layers: int = 2
+    combined_embedding_features: Optional[int] = None
     dropout_probability: float = 0.0
 
     def __post_init__(self):
@@ -1456,13 +1485,18 @@ class MixedConfig(_PerModelConfigBase):
                 f"continuous component of a mixed estimator. Use one of "
                 f"{allowed}."
             )
-        # The categorical net and the combined embedding are sized from the
-        # continuous net's width, which has to be a single number.
-        if not isinstance(self.continuous.hidden_features, int):  # type: ignore[attr-defined]
+        # Both nets fall back to the continuous net's width, which can only be
+        # read from a single number.
+        falls_back = self.discrete_hidden_features is None or (
+            self.combined_embedding_net is None
+            and self.combined_embedding_features is None
+        )
+        if falls_back and not isinstance(self.continuous.hidden_features, int):  # type: ignore[attr-defined]
             raise ValueError(
                 "The continuous config of a mixed estimator needs a single "
-                "`hidden_features` value, because the discrete net and the "
-                "combined embedding net are sized from it."
+                "`hidden_features` value, because `discrete_hidden_features` "
+                "and `combined_embedding_features` fall back to it. Set them "
+                "explicitly to use a per-transform width."
             )
         if (
             self.continuous.z_score_condition != "independent"
@@ -1509,6 +1543,7 @@ class MixedConfig(_PerModelConfigBase):
             log_transform_x=self.log_transform_x,
             discrete_hidden_features=self.discrete_hidden_features,
             discrete_hidden_layers=self.discrete_hidden_layers,
+            combined_embedding_features=self.combined_embedding_features,
             dropout_probability=self.dropout_probability,
         )
 
@@ -1531,24 +1566,27 @@ def _config_from_factory_kwargs(
     model: str,
     configs: dict,
     role: str,
-    named: dict,
+    family_args: dict,
     factory_defaults: dict,
     extra: dict,
 ) -> _PerModelConfigBase:
     """Build a per-model config from a factory's arguments.
 
-    A factory's named arguments span the whole family, so a model that does not
-    use one of them gets it dropped while it still holds the factory's own
-    default, and rejected once the caller has set it: that value would
-    otherwise be silently ignored.  Names no model knows keep the factories'
-    warn-and-forward behaviour through ``extra_kwargs``.
+    A factory's arguments span the whole family, so a model that does not use
+    one of them gets it dropped while it still holds the factory's own default,
+    and rejected once the caller has set it: that value would otherwise be
+    silently ignored.  An argument still at the factory's default is not
+    forwarded either, so that a model narrowing a field keeps its own default.
+    Names no model knows keep the factories' warn-and-forward behaviour through
+    ``extra_kwargs``.
 
     Args:
         model: Name of the model to configure.
         configs: Registry to look the name up in.
         role: Name of the estimator family, for the error messages.
-        named: The factory's named arguments, under the config's field names.
-        factory_defaults: Default of each named argument.
+        family_args: The factory's family-wide arguments, under the config's
+            field names.
+        factory_defaults: Default of each family-wide argument.
         extra: The factory's ``**kwargs``.
 
     Returns:
@@ -1566,10 +1604,13 @@ def _config_from_factory_kwargs(
         "extra_kwargs"
     }
     accepted, ignored = {}, []
-    for name, value in named.items():
+    for name, value in family_args.items():
+        if value == factory_defaults[name]:
+            # Untouched by the caller, so the config's own default stands.
+            continue
         if name in known:
             accepted[name] = value
-        elif value != factory_defaults[name]:
+        else:
             ignored.append(name)
     unknown = {}
     for name, value in extra.items():
