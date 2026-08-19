@@ -20,7 +20,6 @@ from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.net_builders.estimator_configs import (
-    _ESTIMATOR_CONFIG_BASES,
     MixedConfig,
 )
 from sbi.sbi_types import Tracker
@@ -70,6 +69,7 @@ class MNPE(NPE_C):
     """
 
     _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (MixedConfig,)
+    _BUILDER_TYPE_HINT: ClassVar[str] = "Use MixedConfig(continuous=...)."
 
     def __init__(
         self,
@@ -127,15 +127,6 @@ class MNPE(NPE_C):
                 stacklevel=2,
             )
             density_estimator = posterior_nn(model="mnpe")
-        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES) and not isinstance(
-            density_estimator, self._ALLOWED_BUILDER_TYPES
-        ):
-            allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
-            raise TypeError(
-                f"{type(self).__name__} requires a {allowed}; got "
-                f"{type(density_estimator).__name__}. Use "
-                "MixedConfig(continuous=...)."
-            )
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
