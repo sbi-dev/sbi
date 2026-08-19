@@ -114,22 +114,24 @@ _LIKELIHOOD_FACTORY_FIELDS: dict = {
 _Z_SCORE_FIELDS: frozenset = frozenset({"z_score_input", "z_score_condition"})
 
 
-def _drop_unset_z_scoring(named: dict) -> dict:
-    """Drop the z-scoring arguments left at ``None``.
+def _normalize_z_scoring(family_args: dict) -> dict:
+    """Map the z-scoring arguments left at ``None`` to ``"none"``.
 
-    The factories accept ``None`` there, and it has always meant "leave it to
-    the builder", not "do not z-score": the old configs treated ``None`` as
-    unset and never forwarded it. Dropping the key keeps that, and lets the
-    config's own default stand.
+    The factories document ``None`` as "do not z-score", and forwarded it to
+    ``z_score_parser``, which reads it that way. The configs do not accept it,
+    so it is translated here rather than reaching them.
     """
-    return {k: v for k, v in named.items() if v is not None or k not in _Z_SCORE_FIELDS}
+    return {
+        k: ("none" if v is None and k in _Z_SCORE_FIELDS else v)
+        for k, v in family_args.items()
+    }
 
 
-def _density_named_kwargs(embedding_net: nn.Module, **named: Any) -> dict:
-    """Return the density factories' named arguments as config fields."""
-    return _drop_unset_z_scoring(
+def _density_family_args(embedding_net: nn.Module, **family_args: Any) -> dict:
+    """Return the density factories' family-wide arguments as config fields."""
+    return _normalize_z_scoring(
         dict(
-            named,
+            family_args,
             embedding_net=check_net_device(
                 embedding_net, "cpu", embedding_net_warn_msg
             ),
@@ -139,7 +141,7 @@ def _density_named_kwargs(embedding_net: nn.Module, **named: Any) -> dict:
 
 def _legacy_density_build_fn(
     model: str,
-    named: dict,
+    family_args: dict,
     extra: dict,
     input_is_theta: bool,
 ) -> Callable:
@@ -150,7 +152,8 @@ def _legacy_density_build_fn(
     ``build_mnle`` / ``build_mnpe`` rather than from a config.
     """
     config = ConditionalFlowConfig.from_kwargs(
-        **{_BUILD_KWARG_ALIASES.get(k, k): v for k, v in named.items()}, **extra
+        **{_BUILD_KWARG_ALIASES.get(k, k): v for k, v in family_args.items()},
+        **extra,
     )
     builder_kwargs = config.to_dict()
 
@@ -210,7 +213,7 @@ def classifier_nn(
     """
 
     # Map user-facing parameter names to the config's field names.
-    named = _drop_unset_z_scoring(
+    family_args = _normalize_z_scoring(
         dict(
             z_score_input=z_score_theta,
             z_score_condition=z_score_x,
@@ -227,7 +230,7 @@ def classifier_nn(
         model,
         _CLASSIFIER_CONFIGS,
         "classifier",
-        named=named,
+        family_args=family_args,
         factory_defaults=_factory_defaults(classifier_nn, _CLASSIFIER_FACTORY_FIELDS),
         extra=kwargs,
     )
@@ -287,7 +290,7 @@ def likelihood_nn(
             an unknown key triggers a warning and is forwarded to the builder.
     """
 
-    named = _density_named_kwargs(
+    family_args = _density_family_args(
         z_score_input=z_score_x,
         z_score_condition=z_score_theta,
         hidden_features=hidden_features,
@@ -297,13 +300,15 @@ def likelihood_nn(
         num_components=num_components,
     )
     if model not in _DENSITY_CONFIGS:
-        return _legacy_density_build_fn(model, named, kwargs, input_is_theta=False)
+        return _legacy_density_build_fn(
+            model, family_args, kwargs, input_is_theta=False
+        )
 
     config = _config_from_factory_kwargs(
         model,
         _DENSITY_CONFIGS,
         "density",
-        named=named,
+        family_args=family_args,
         factory_defaults=_factory_defaults(likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS),
         extra=kwargs,
     )
@@ -364,7 +369,7 @@ def posterior_nn(
             an unknown key triggers a warning and is forwarded to the builder.
     """
 
-    named = _density_named_kwargs(
+    family_args = _density_family_args(
         z_score_input=z_score_theta,
         z_score_condition=z_score_x,
         hidden_features=hidden_features,
@@ -387,7 +392,7 @@ def posterior_nn(
             "mdn",
             _DENSITY_CONFIGS,
             "density",
-            named={k: v for k, v in named.items() if k != "num_components"},
+            family_args={k: v for k, v in family_args.items() if k != "num_components"},
             factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
             extra=kwargs,
         )
@@ -407,13 +412,13 @@ def posterior_nn(
         return build_fn_snpe_a
 
     if model not in _DENSITY_CONFIGS:
-        return _legacy_density_build_fn(model, named, kwargs, input_is_theta=True)
+        return _legacy_density_build_fn(model, family_args, kwargs, input_is_theta=True)
 
     config = _config_from_factory_kwargs(
         model,
         _DENSITY_CONFIGS,
         "density",
-        named=named,
+        family_args=family_args,
         factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
         extra=kwargs,
     )
