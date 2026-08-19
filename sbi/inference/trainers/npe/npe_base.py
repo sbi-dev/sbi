@@ -49,12 +49,12 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
-from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.neural_nets.net_builders.estimator_configs import (
+    _DENSITY_CONFIGS,
     _ESTIMATOR_CONFIG_BASES,
     DensityConfigBase,
     MAFConfig,
-    TabPFNConfig,
+    PretrainedConfigBase,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -76,6 +76,7 @@ from sbi.utils.torchutils import assert_all_finite
 
 class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], ABC):
     _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (DensityConfigBase,)
+    _BUILDER_TYPE_HINT: ClassVar[str] = ""
 
     def __init__(
         self,
@@ -129,10 +130,11 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         if density_estimator is None:
             self._build_neural_net = self._wrap_builder(MAFConfig())
         elif isinstance(density_estimator, str):
-            if density_estimator == "tabpfn":
+            pretrained = _DENSITY_CONFIGS.get(density_estimator)
+            if pretrained is not None and issubclass(pretrained, PretrainedConfigBase):
                 raise TypeError(
-                    f"{type(self).__name__} cannot train TabPFN because "
-                    "TabPFNFlow has no training loss. Use NPE_PFN instead."
+                    f"{type(self).__name__} requires a trainable model; got "
+                    f"{density_estimator!r}. {pretrained._REJECTION_HINT}"
                 )
             warnings.warn(
                 "Passing a string for `density_estimator` is deprecated. "
@@ -143,16 +145,15 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             )
             self._build_neural_net = posterior_nn(model=density_estimator)
         elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
-            if isinstance(density_estimator, TabPFNConfig):
-                raise TypeError(
-                    f"{type(self).__name__} cannot train TabPFNConfig because "
-                    "TabPFNFlow has no training loss. Use NPE_PFN instead."
-                )
             if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
                 allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
+                hint = self._BUILDER_TYPE_HINT or getattr(
+                    density_estimator, "_REJECTION_HINT", ""
+                )
                 raise TypeError(
                     f"{type(self).__name__} requires a {allowed}; got "
                     f"{type(density_estimator).__name__}."
+                    + (f" {hint}" if hint else "")
                 )
             self._build_neural_net = self._wrap_builder(density_estimator)
         else:
@@ -698,12 +699,6 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
-            if isinstance(self._neural_net, TabPFNFlow):
-                raise TypeError(
-                    f"{type(self).__name__} cannot train TabPFNFlow because it has "
-                    "no training loss. Use NPE_PFN instead."
-                )
-
             theta = reshape_to_sample_batch_event(
                 theta.to("cpu"), self._neural_net.input_shape
             )
