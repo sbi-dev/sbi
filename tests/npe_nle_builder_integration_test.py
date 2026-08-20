@@ -11,6 +11,7 @@ from torch.distributions import MultivariateNormal
 from sbi.inference import MNLE, MNPE, NLE_A, NPE_A, NPE_C, NPE_PFN
 from sbi.neural_nets import likelihood_nn, posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
+from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.neural_nets.net_builders.estimator_configs import (
     _MIXED_CONTINUOUS_CONFIGS,
     MAFConfig,
@@ -165,10 +166,29 @@ def test_mixed_continuous_configs_match_the_build_functions():
     )
 
 
-def test_mixed_requires_a_single_continuous_width():
-    """The discrete net and the combined embedding are sized from that width."""
+def test_mixed_requires_explicit_auxiliary_widths_for_per_transform_widths():
+    """Fallback widths require the continuous config to hold one integer."""
     with pytest.raises(ValueError, match="hidden_features"):
         MixedConfig(continuous=ZukoNSFConfig(hidden_features=[16, 16]))
+
+
+def test_mixed_accepts_per_transform_widths_with_explicit_auxiliary_widths():
+    """The categorical and combined nets can be sized independently."""
+    config = MixedConfig(
+        continuous=ZukoNSFConfig(hidden_features=[16, 16]),
+        discrete_hidden_features=12,
+        combined_embedding_features=14,
+    )
+    theta = torch.cat(
+        [torch.randn(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
+    )
+    x = torch.randn(100, 4)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        estimator = config.build(theta, x)
+
+    assert isinstance(estimator, MixedDensityEstimator)
 
 
 @pytest.mark.parametrize(
@@ -221,6 +241,7 @@ def test_mixed_default_keeps_the_previous_continuous_net():
     continuous = MixedConfig().continuous
 
     assert isinstance(continuous, NSFConfig)
+    assert continuous.z_score_input == params["z_score_x"].default
     assert continuous.tail_bound == params["tail_bound"].default
     assert continuous.hidden_features == params["hidden_features"].default
     assert continuous.num_transforms == params["num_transforms"].default
@@ -375,6 +396,23 @@ def test_gradient_trainer_rejects_tabpfn(trainer_cls, density_estimator):
         )
 
 
+@pytest.mark.parametrize("trainer_cls", [NPE_C, NLE_A], ids=["npe", "nle"])
+def test_gradient_trainer_rejects_tabpfn_from_a_custom_builder(trainer_cls):
+    """Callable builders bypass config checks, so validate their built estimator."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference = trainer_cls(
+        prior,
+        density_estimator=lambda *_: TabPFNFlow.__new__(TabPFNFlow),
+        show_progress_bars=False,
+    )
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    inference.append_simulations(theta, x)
+    inference.train_indices = torch.arange(10)
+
+    with pytest.raises(TypeError, match="no training loss"):
+        inference._initialize_neural_network(retrain_from_scratch=False, start_idx=0)
+
+
 def test_npe_pfn_accepts_tabpfn_config():
     prior = MultivariateNormal(zeros(2), eye(2))
     trainer = NPE_PFN(
@@ -410,10 +448,10 @@ def test_npe_a_string_warns():
 
 
 @pytest.mark.parametrize("num_components", [3, 7], ids=["three", "seven"])
-def test_npe_a_num_components_wins_over_the_config(num_components):
-    """NPE-A rebuilds the MDN per round, so the trainer owns `num_components`."""
+def test_npe_a_binds_num_components_at_initialization(num_components):
+    """The trainer's component count is bound once during initialization."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((200,))
+    theta = prior.sample((20,))
     x = theta + 0.1 * torch.randn_like(theta)
 
     trainer = NPE_A(
@@ -422,9 +460,7 @@ def test_npe_a_num_components_wins_over_the_config(num_components):
         num_components=num_components,
         show_progress_bars=False,
     )
-    estimator = trainer.append_simulations(theta, x).train(
-        max_num_epochs=1, training_batch_size=100
-    )
+    estimator = trainer._build_neural_net(theta, x)
 
     assert estimator.net._num_components == num_components
 
