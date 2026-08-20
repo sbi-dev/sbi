@@ -250,6 +250,7 @@ def _mixed_batches():
 
 
 def _assert_same_net(expected, actual):
+    """Whether two built estimators carry the same parameters, name by name."""
     assert expected.state_dict().keys() == actual.state_dict().keys()
     for key, value in expected.state_dict().items():
         assert torch.equal(value, actual.state_dict()[key]), key

@@ -17,6 +17,7 @@ from sbi.neural_nets.net_builders.categorial import (
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
     MixedConfig,
+    _factory_defaults,
     _mixed_config_from_factory_kwargs,
 )
 from sbi.utils.sbiutils import standardizing_net, z_score_parser
@@ -123,22 +124,14 @@ def _build_mixed_density_estimator(
 
 def _config_from_flat_kwargs(log_transform_x: bool, kwargs: dict) -> MixedConfig:
     """Translate the exported mixed builders' legacy flat arguments."""
+    from sbi.neural_nets.factory import _LIKELIHOOD_FACTORY_FIELDS, likelihood_nn
+
     extra = dict(kwargs)
-    family_defaults = {
-        "z_score_input": "independent",
-        "hidden_features": 50,
-        "num_transforms": 5,
-        "num_bins": 10,
-        "num_components": 10,
-    }
+    family_defaults = _factory_defaults(likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS)
+    flat_names = {"z_score_input": "z_score_x", "z_score_condition": "z_score_y"}
     family_args = {
-        "z_score_input": extra.pop("z_score_x", "independent"),
-        "z_score_condition": extra.pop("z_score_y", "independent"),
-        "hidden_features": extra.pop("hidden_features", 50),
-        "num_transforms": extra.pop("num_transforms", 5),
-        "num_bins": extra.pop("num_bins", 10),
-        "embedding_net": extra.pop("embedding_net", nn.Identity()),
-        "num_components": extra.pop("num_components", 10),
+        name: extra.pop(flat_names.get(name, name), default)
+        for name, default in family_defaults.items()
     }
     for name in ("z_score_input", "z_score_condition"):
         if family_args[name] is None:
