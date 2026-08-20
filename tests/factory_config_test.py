@@ -229,6 +229,55 @@ def test_mixed_string_path_builds_the_typed_config(factory_fn, model):
         assert torch.equal(value, actual.state_dict()[name]), name
 
 
+_UNSET_IF_NONE = [
+    "continuous_hidden_features",
+    "discrete_hidden_features",
+    "combined_embedding_features",
+]
+
+
+def _mixed_batches():
+    mixed = torch.cat(
+        [torch.rand(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
+    )
+    return mixed, THETA
+
+
+@pytest.mark.parametrize("name", _UNSET_IF_NONE)
+def test_mixed_treats_an_explicit_none_width_as_unset(name):
+    """The flat API typed these as `Optional[int] = None`, so None means unset."""
+    mixed, theta = _mixed_batches()
+
+    torch.manual_seed(0)
+    omitted = build_mnle(mixed, theta)
+    torch.manual_seed(0)
+    explicit_none = build_mnle(mixed, theta, **{name: None})
+
+    assert omitted.state_dict().keys() == explicit_none.state_dict().keys()
+    for key, value in omitted.state_dict().items():
+        assert torch.equal(value, explicit_none.state_dict()[key]), key
+
+
+def test_mixed_none_width_does_not_change_the_other_width():
+    """A None width must not make a sibling width fall back to a new source.
+
+    With `continuous_hidden_features` set, the categorical net keeps falling
+    back to `hidden_features`, whether the discrete width is omitted or None.
+    """
+    mixed, theta = _mixed_batches()
+
+    torch.manual_seed(0)
+    omitted = build_mnle(mixed, theta, continuous_hidden_features=16)
+    torch.manual_seed(0)
+    explicit_none = build_mnle(
+        mixed, theta, continuous_hidden_features=16, discrete_hidden_features=None
+    )
+
+    assert omitted.state_dict().keys() == explicit_none.state_dict().keys()
+    for key, value in omitted.state_dict().items():
+        assert torch.equal(value, explicit_none.state_dict()[key]), key
+
+
 _TAIL_BOUND_MODELS = sorted(
     name
     for name, cls in _DENSITY_CONFIGS.items()
