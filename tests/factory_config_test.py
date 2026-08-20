@@ -255,6 +255,13 @@ def _assert_same_net(expected, actual):
         assert torch.equal(value, actual.state_dict()[key]), key
 
 
+@pytest.mark.parametrize("value", [64, None], ids=["value", "none"])
+def test_mixed_still_warns_on_an_unknown_name(value):
+    """Dropping a recognised None must not swallow a typo that carries one."""
+    with pytest.warns(UserWarning, match="Unknown kwargs"):
+        likelihood_nn("mnle", hiden_features=value)
+
+
 @pytest.mark.parametrize("name", _NONE_IS_UNSET)
 @pytest.mark.parametrize(
     "factory_fn,model",
