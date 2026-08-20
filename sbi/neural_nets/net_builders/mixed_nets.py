@@ -127,6 +127,8 @@ def _config_from_flat_kwargs(log_transform_x: bool, kwargs: dict) -> MixedConfig
     from sbi.neural_nets.factory import _LIKELIHOOD_FACTORY_FIELDS, likelihood_nn
 
     extra = dict(kwargs)
+    # The flat API names the modeled variable `x` whichever one the trainer
+    # models, so the likelihood mapping fits both builders.
     family_defaults = _factory_defaults(likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS)
     flat_names = {"z_score_input": "z_score_x", "z_score_condition": "z_score_y"}
     family_args = {

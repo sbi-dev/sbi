@@ -232,12 +232,8 @@ def test_mixed_string_path_builds_the_typed_config(factory_fn, model):
 _NONE_IS_UNSET = [
     "flow_model",
     "hidden_features",
-    "num_transforms",
-    "num_bins",
     "continuous_hidden_features",
     "discrete_hidden_features",
-    "combined_embedding_features",
-    "num_categories_per_variable",
     "combined_embedding_net",
 ]
 
