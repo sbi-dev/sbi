@@ -1636,15 +1636,12 @@ def _mixed_config_from_factory_kwargs(
     extra: dict,
 ) -> MixedConfig:
     """Build a mixed config from the deprecated factories' flat arguments."""
-    # The flat path dropped every None before building, so an explicit None
-    # has to keep behaving like omitting the argument.
-    extra = {name: value for name, value in extra.items() if value is not None}
-    flow_model = extra.pop("flow_model", "nsf")
+    extra = dict(extra)
+    flow_model = extra.pop("flow_model", None)
+    if flow_model is None:
+        flow_model = "nsf"
+    config_cls = _DENSITY_CONFIGS.get(flow_model)
 
-    mixed_kwargs = {
-        "z_score_condition": family_args["z_score_condition"],
-        "embedding_net": family_args["embedding_net"],
-    }
     mixed_fields = (
         "num_categories_per_variable",
         "combined_embedding_net",
@@ -1654,6 +1651,22 @@ def _mixed_config_from_factory_kwargs(
         "combined_embedding_features",
         "dropout_probability",
     )
+    # The flat path dropped a recognised None before building, so it still
+    # means unset. A name no model knows keeps its None, and with it the
+    # warning that catches a typo.
+    recognised = {"continuous_hidden_features", *mixed_fields}
+    if config_cls is not None:
+        recognised |= {f.name for f in fields(config_cls)}
+    extra = {
+        name: value
+        for name, value in extra.items()
+        if value is not None or name not in recognised
+    }
+
+    mixed_kwargs = {
+        "z_score_condition": family_args["z_score_condition"],
+        "embedding_net": family_args["embedding_net"],
+    }
     for name in mixed_fields:
         if name in extra:
             mixed_kwargs[name] = extra.pop(name)
@@ -1683,7 +1696,6 @@ def _mixed_config_from_factory_kwargs(
         continuous_args["hidden_features"] = extra.pop("continuous_hidden_features")
 
     dropout_probability = mixed_kwargs.get("dropout_probability")
-    config_cls = _DENSITY_CONFIGS.get(flow_model)
     if (
         dropout_probability is not None
         and config_cls is not None
