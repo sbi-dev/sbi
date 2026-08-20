@@ -38,7 +38,10 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
 if TYPE_CHECKING:
-    from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
+    from sbi.neural_nets.net_builders.estimator_configs import (
+        _EstimatorBuilderBase,
+        _PerModelConfigBase,
+    )
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -323,9 +326,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
     @classmethod
     def _wrap_builder(
-        cls, builder: "_EstimatorBuilderBase"
+        cls, builder: Union["_PerModelConfigBase", "_EstimatorBuilderBase"]
     ) -> Callable[[Tensor, Tensor], ConditionalEstimatorType]:
-        """Wrap an estimator builder as a ``(batch_theta, batch_x)`` callable."""
+        """Wrap an estimator config as a ``(batch_theta, batch_x)`` callable."""
         input_is_theta = cls._INPUT_IS_THETA
 
         def build_fn(batch_theta, batch_x):
@@ -1084,10 +1087,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._neural_net.to(self._device)
 
         if not train_config.resume_training:
-            self.optimizer = Adam(
-                list(self._neural_net.parameters()),
-                lr=train_config.learning_rate,
-            )
+            parameters = [p for p in self._neural_net.parameters() if p.requires_grad]
+            if not parameters:
+                raise TypeError(
+                    f"{type(self).__name__} cannot train "
+                    f"{type(self._neural_net).__name__}: it has no trainable "
+                    "parameters."
+                )
+            self.optimizer = Adam(parameters, lr=train_config.learning_rate)
             self.epoch, self._val_loss = 0, float("Inf")
 
         while self.epoch <= train_config.max_num_epochs and not self._converged(
