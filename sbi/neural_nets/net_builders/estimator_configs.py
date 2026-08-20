@@ -1535,16 +1535,7 @@ class MixedConfig(_PerModelConfigBase):
         return _build_mixed_density_estimator(
             batch_x=batch_input,
             batch_y=batch_condition,
-            continuous_config=self.continuous,
-            z_score_y=self.z_score_condition,
-            num_categories_per_variable=self.num_categories_per_variable,
-            embedding_net=self.embedding_net,
-            combined_embedding_net=self.combined_embedding_net,
-            log_transform_x=self.log_transform_x,
-            discrete_hidden_features=self.discrete_hidden_features,
-            discrete_hidden_layers=self.discrete_hidden_layers,
-            combined_embedding_features=self.combined_embedding_features,
-            dropout_probability=self.dropout_probability,
+            config=self,
         )
 
 
@@ -1637,3 +1628,92 @@ def _config_from_factory_kwargs(
         )
 
     return config_cls(**accepted, extra_kwargs=unknown)
+
+
+def _mixed_config_from_factory_kwargs(
+    family_args: dict,
+    factory_defaults: dict,
+    extra: dict,
+) -> MixedConfig:
+    """Build a mixed config from the deprecated factories' flat arguments."""
+    extra = dict(extra)
+    flow_model = extra.pop("flow_model", None)
+    if flow_model is None:
+        flow_model = "nsf"
+    config_cls = _DENSITY_CONFIGS.get(flow_model)
+
+    mixed_fields = (
+        "num_categories_per_variable",
+        "combined_embedding_net",
+        "log_transform_x",
+        "discrete_hidden_features",
+        "discrete_hidden_layers",
+        "combined_embedding_features",
+        "dropout_probability",
+    )
+    # The flat path dropped a recognised None before building, so it still
+    # means unset, for any name the family knows rather than only the chosen
+    # model's. A name no model knows keeps its None, and with it the warning
+    # that catches a typo. A real value still raises for the wrong model.
+    recognised = {"continuous_hidden_features", *mixed_fields}
+    recognised |= {f.name for cls in _DENSITY_CONFIGS.values() for f in fields(cls)}
+    extra = {
+        name: value
+        for name, value in extra.items()
+        if value is not None or name not in recognised
+    }
+
+    mixed_kwargs = {
+        "z_score_condition": family_args["z_score_condition"],
+        "embedding_net": family_args["embedding_net"],
+    }
+    for name in mixed_fields:
+        if name in extra:
+            mixed_kwargs[name] = extra.pop(name)
+
+    continuous_args = {
+        name: family_args[name]
+        for name in (
+            "z_score_input",
+            "hidden_features",
+            "num_transforms",
+            "num_bins",
+            "num_components",
+        )
+    }
+    continuous_defaults = {name: factory_defaults[name] for name in continuous_args}
+    continuous_args = {
+        name: continuous_defaults[name] if value is None else value
+        for name, value in continuous_args.items()
+    }
+
+    if "continuous_hidden_features" in extra:
+        # The flat API let this override only the continuous width while the
+        # categorical width kept falling back to `hidden_features`.
+        mixed_kwargs.setdefault(
+            "discrete_hidden_features", continuous_args["hidden_features"]
+        )
+        continuous_args["hidden_features"] = extra.pop("continuous_hidden_features")
+
+    dropout_probability = mixed_kwargs.get("dropout_probability")
+    if (
+        dropout_probability is not None
+        and config_cls is not None
+        and "dropout_probability" in {f.name for f in fields(config_cls)}
+    ):
+        extra["dropout_probability"] = dropout_probability
+
+    # The flat mixed API passed `tail_bound` to every builder, so the models
+    # that read it saw 10.0 rather than their own narrower default.
+    if config_cls is not None and "tail_bound" in {f.name for f in fields(config_cls)}:
+        extra.setdefault("tail_bound", 10.0)
+
+    continuous = _config_from_factory_kwargs(
+        flow_model,
+        _DENSITY_CONFIGS,
+        "mixed continuous density",
+        family_args=continuous_args,
+        factory_defaults=continuous_defaults,
+        extra=extra,
+    )
+    return MixedConfig(continuous=continuous, **mixed_kwargs)

@@ -2,12 +2,13 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import inspect
-from dataclasses import MISSING, FrozenInstanceError, fields
+from dataclasses import FrozenInstanceError
 
 import pytest
 import torch
 from torch import nn
 
+from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
     _CLASSIFIER_CONFIGS,
@@ -165,27 +166,25 @@ def test_classifier_defaults_match_the_build_functions(model):
         assert _defaults_agree(value, params[name].default), f"{model}.{name} drifted"
 
 
-def test_mixed_defaults_match_the_build_function():
+def test_mixed_defaults_match_the_factory():
     """Mixed is the family where a default drift shipped once.
 
     The builder path gave `num_transforms=2` and `num_bins=5` against the
-    factory's 5 and 10, so the defaults are pinned here too.
+    factory's 5 and 10, so compare the two complete networks.
     """
-    from sbi.neural_nets.net_builders.mixed_nets import (
-        _build_mixed_density_estimator,
+    theta = torch.randn(100, 3)
+    mixed_x = torch.cat(
+        [torch.randn(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
     )
 
-    params = _params(_build_mixed_density_estimator)
-    # `continuous` is a nested config rather than a value the builder defaults.
-    to_builder = {"z_score_condition": "z_score_y"}
+    torch.manual_seed(0)
+    configured = MixedConfig().build(mixed_x, theta)
+    torch.manual_seed(0)
+    from_factory = likelihood_nn("mnle")(theta, mixed_x)
 
-    for f in fields(MixedConfig):
-        if f.name in ("continuous", "extra_kwargs"):
-            continue
-        name = to_builder.get(f.name, f.name)
-        assert name in params, f"`{name}` is not accepted by the mixed builder"
-        value = f.default_factory() if f.default_factory is not MISSING else f.default
-        assert _defaults_agree(value, params[name].default), f"mixed.{name} drifted"
+    assert configured.state_dict().keys() == from_factory.state_dict().keys()
+    for name, value in configured.state_dict().items():
+        assert torch.equal(value, from_factory.state_dict()[name]), name
 
 
 def test_legacy_public_builder_registry_remains_complete():

@@ -13,7 +13,6 @@ from sbi.neural_nets import likelihood_nn, posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
-    _MIXED_CONTINUOUS_CONFIGS,
     MAFConfig,
     MDNConfig,
     MixedConfig,
@@ -155,17 +154,6 @@ def test_mixed_rejects_a_continuous_model_it_cannot_build(continuous):
         MixedConfig(continuous=continuous)
 
 
-def test_mixed_continuous_configs_match_the_build_functions():
-    """Guard against drift between the allowed set and `mixed_nets`."""
-    from sbi.neural_nets.net_builders.estimator_configs import _DENSITY_CONFIGS
-    from sbi.neural_nets.net_builders.mixed_nets import model_builders
-
-    assert (
-        frozenset(_DENSITY_CONFIGS[name] for name in model_builders)
-        == _MIXED_CONTINUOUS_CONFIGS
-    )
-
-
 def test_mixed_requires_explicit_auxiliary_widths_for_per_transform_widths():
     """Fallback widths require the continuous config to hold one integer."""
     with pytest.raises(ValueError, match="hidden_features"):
@@ -231,22 +219,15 @@ def test_mixed_default_keeps_the_previous_continuous_net():
     The mixed build function overrode the spline tail bound with its own value,
     so the default continuous config has to carry that rather than `NSFConfig`'s.
     """
-    import inspect
-
-    from sbi.neural_nets.net_builders.mixed_nets import (
-        _build_mixed_density_estimator,
-    )
-
-    params = inspect.signature(_build_mixed_density_estimator).parameters
     continuous = MixedConfig().continuous
 
     assert isinstance(continuous, NSFConfig)
-    assert continuous.z_score_input == params["z_score_x"].default
-    assert continuous.tail_bound == params["tail_bound"].default
-    assert continuous.hidden_features == params["hidden_features"].default
-    assert continuous.num_transforms == params["num_transforms"].default
-    assert continuous.num_bins == params["num_bins"].default
-    assert MixedConfig().dropout_probability == params["dropout_probability"].default
+    assert continuous.z_score_input == "independent"
+    assert continuous.tail_bound == 10.0
+    assert continuous.hidden_features == 50
+    assert continuous.num_transforms == 5
+    assert continuous.num_bins == 10
+    assert MixedConfig().dropout_probability == 0.0
 
 
 @pytest.mark.parametrize(
