@@ -51,11 +51,14 @@ def sampling_importance_resampling(
     while num_remaining > 0:
         batch_size = min(sampling_batch_size, num_remaining)
         with torch.no_grad():
-            thetas, log_weights = importance_sample(
-                potential_fn=potential_fn,
-                proposal=proposal,
-                num_samples=batch_size * num_candidate_samples,
-            )
+            from sbi.utils.pbar import nested_pbar_context
+
+            with nested_pbar_context():
+                thetas, log_weights = importance_sample(
+                    potential_fn=potential_fn,
+                    proposal=proposal,
+                    num_samples=batch_size * num_candidate_samples,
+                )
             log_weights = log_weights.reshape(batch_size, num_candidate_samples)
             weights = log_weights.softmax(-1).cumsum(-1)
             uniform_decision = torch.rand(batch_size, 1, device=device)

@@ -12,6 +12,7 @@ from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
 from sbi.sbi_types import AcceptRejectFn, SampleProposal
+from sbi.utils.pbar import nested_pbar_context
 from sbi.utils.sbiutils import gradient_ascent
 
 
@@ -168,9 +169,10 @@ def rejection_sample(
                 )
 
             # Sample and reject.
-            candidates = proposal.sample(sampling_batch_size).reshape(
-                sampling_batch_size, -1
-            )
+            with nested_pbar_context():
+                candidates = proposal.sample(sampling_batch_size).reshape(
+                    sampling_batch_size, -1
+                )
 
             target_proposal_ratio = torch.exp(
                 potential_fn(candidates) - proposal.log_prob(candidates)
@@ -318,9 +320,8 @@ def accept_reject_sample(
     pbar = tqdm(
         disable=not show_progress_bars,
         total=num_samples,
-        desc=f"Drawing {num_samples} samples for {num_xos} observation" + "s"
-        if num_xos > 1
-        else "",
+        desc=f"Drawing {num_samples} samples"
+        + (f" for {num_xos} observations" if num_xos > 1 else ""),
     )
 
     accepted = [[] for _ in range(num_xos)]
@@ -366,10 +367,11 @@ def accept_reject_sample(
             )
 
         # Sample and reject.
-        candidates = proposal(
-            torch.Size((sampling_batch_size,)),
-            **proposal_sampling_kwargs,
-        )
+        with nested_pbar_context():
+            candidates = proposal(
+                torch.Size((sampling_batch_size,)),
+                **proposal_sampling_kwargs,
+            )
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
 
