@@ -1636,18 +1636,9 @@ def _mixed_config_from_factory_kwargs(
     extra: dict,
 ) -> MixedConfig:
     """Build a mixed config from the deprecated factories' flat arguments."""
-    # The flat API typed these as `Optional[int] = None`, so an explicit None
-    # meant "unset" and has to keep behaving like omitting the argument.
-    unset_if_none = (
-        "continuous_hidden_features",
-        "discrete_hidden_features",
-        "combined_embedding_features",
-    )
-    extra = {
-        name: value
-        for name, value in extra.items()
-        if value is not None or name not in unset_if_none
-    }
+    # The flat path dropped every None before building, so an explicit None
+    # has to keep behaving like omitting the argument.
+    extra = {name: value for name, value in extra.items() if value is not None}
     flow_model = extra.pop("flow_model", "nsf")
 
     mixed_kwargs = {
@@ -1678,6 +1669,10 @@ def _mixed_config_from_factory_kwargs(
         )
     }
     continuous_defaults = {name: factory_defaults[name] for name in continuous_args}
+    continuous_args = {
+        name: continuous_defaults[name] if value is None else value
+        for name, value in continuous_args.items()
+    }
 
     if "continuous_hidden_features" in extra:
         # The flat API let this override only the continuous width while the
