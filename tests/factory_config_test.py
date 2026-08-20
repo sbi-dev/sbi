@@ -255,6 +255,39 @@ def _assert_same_net(expected, actual):
         assert torch.equal(value, actual.state_dict()[key]), key
 
 
+@pytest.mark.parametrize(
+    "flow_model,name",
+    [
+        ("mdn", "num_blocks"),
+        ("mdn", "tail_bound"),
+        ("zuko_maf", "num_blocks"),
+        ("nsf", "num_components"),
+    ],
+)
+def test_mixed_treats_another_models_field_set_to_none_as_unset(flow_model, name):
+    """The flat path dropped a None for any name the family knows."""
+    mixed, theta = _mixed_batches()
+
+    torch.manual_seed(0)
+    omitted = build_mnle(mixed, theta, flow_model=flow_model)
+    torch.manual_seed(0)
+    explicit_none = build_mnle(mixed, theta, flow_model=flow_model, **{name: None})
+
+    _assert_same_net(omitted, explicit_none)
+
+
+@pytest.mark.parametrize(
+    "flow_model,kwarg",
+    [("mdn", {"num_blocks": 3}), ("zuko_maf", {"num_blocks": 3})],
+)
+def test_mixed_still_rejects_another_models_field_with_a_value(flow_model, kwarg):
+    """Only a None is unset. A real value the model cannot read still raises."""
+    mixed, theta = _mixed_batches()
+
+    with pytest.raises(ValueError, match="would be silently ignored"):
+        build_mnle(mixed, theta, flow_model=flow_model, **kwarg)
+
+
 @pytest.mark.parametrize("value", [64, None], ids=["value", "none"])
 def test_mixed_still_warns_on_an_unknown_name(value):
     """Dropping a recognised None must not swallow a typo that carries one."""
