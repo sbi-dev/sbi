@@ -11,7 +11,6 @@ from torch.distributions import MultivariateNormal
 from sbi.inference import MNLE, MNPE, NLE_A, NPE_A, NPE_C, NPE_PFN
 from sbi.neural_nets import likelihood_nn, posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.neural_nets.net_builders.estimator_configs import (
     _MIXED_CONTINUOUS_CONFIGS,
     MAFConfig,
@@ -368,7 +367,7 @@ def test_trainer_rejects_legacy_config_of_the_wrong_family(trainer_cls):
 def test_gradient_trainer_rejects_tabpfn(trainer_cls, density_estimator):
     """TabPFNFlow has no loss and is supported only by training-free NPE_PFN."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    with pytest.raises(TypeError, match="no training loss"):
+    with pytest.raises(TypeError, match="Use NPE_PFN instead"):
         trainer_cls(
             prior,
             density_estimator=density_estimator,
@@ -376,28 +375,11 @@ def test_gradient_trainer_rejects_tabpfn(trainer_cls, density_estimator):
         )
 
 
-@pytest.mark.parametrize("trainer_cls", [NPE_C, NLE_A], ids=["npe", "nle"])
-def test_gradient_trainer_rejects_tabpfn_builder(trainer_cls):
-    """A factory-built TabPFNFlow must be rejected before its loss is called."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    inference = trainer_cls(
-        prior,
-        density_estimator=lambda *_: TabPFNFlow.__new__(TabPFNFlow),
-        show_progress_bars=False,
-    )
-    theta, x = prior.sample((10,)), torch.randn(10, 3)
-    inference.append_simulations(theta, x)
-    inference.train_indices = torch.arange(10)
-
-    with pytest.raises(TypeError, match="no training loss"):
-        inference._initialize_neural_network(retrain_from_scratch=False, start_idx=0)
-
-
 def test_npe_pfn_accepts_tabpfn_config():
     prior = MultivariateNormal(zeros(2), eye(2))
     trainer = NPE_PFN(
         prior,
-        density_estimator=TabPFNConfig(z_score_condition="none"),
+        density_estimator=TabPFNConfig(),
         show_progress_bars=False,
     )
 
