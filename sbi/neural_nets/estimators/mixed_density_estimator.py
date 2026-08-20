@@ -53,6 +53,11 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         self.condition_embedding = embedding_net
         self.log_transform_input = log_transform_input
 
+    @property
+    def embedding_net(self) -> nn.Module:
+        r"""Return the embedding network for the condition."""
+        return self.condition_embedding
+
     def forward(self, input: Tensor):
         raise NotImplementedError(
             """The forward method is not implemented for mixed neural density

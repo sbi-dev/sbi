@@ -15,12 +15,17 @@ class PermutationInvariantEmbedding(nn.Module):
     Takes as input a tensor with (batch, permutation_dim, input_dim)
     and outputs (batch, output_dim).
 
+    The class attribute ``accepts_nan_input = True`` marks NaN input as padding
+    by design; sbi derives NaN-tolerant `x_o` validation from it.
+
     References:
     Chan et al. (2018): "A likelihood-free inference framework for population genetic
     data using exchangeable neural networks"
     Radev et al. (2020): "BayesFlow: Learning complex stochastic models with invertible
     neural networks"
     """
+
+    accepts_nan_input = True
 
     def __init__(
         self,

@@ -133,6 +133,10 @@ class EnsemblePosterior(NeuralPosterior):
             device=self.device,
         )
 
+    def _x_tolerates_nan(self) -> bool:
+        """NaN `x_o` is valid only if every component tolerates it."""
+        return all(p._x_tolerates_nan() for p in self.posteriors)
+
     def ensure_same_device(self, posteriors: List) -> str:
         """Ensures that all posteriors in the ensemble are on the same device.
 
@@ -199,6 +203,10 @@ class EnsemblePosterior(NeuralPosterior):
         Returns:
             Samples drawn from the ensemble distribution.
         """
+        # Components are drawn randomly; guard here so validation of `x` does
+        # not depend on the draw.
+        if x is not None:
+            self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indizes = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -219,6 +227,8 @@ class EnsemblePosterior(NeuralPosterior):
         x: Tensor,
         **kwargs,
     ) -> Tensor:
+        # Guard here so validation of `x` does not depend on the component draw.
+        self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -299,7 +309,9 @@ class EnsemblePosterior(NeuralPosterior):
             `EnsemblePosterior` that will use a default `x` when not explicitly
             passed.
         """
-        self._x = process_x(x, x_event_shape=None).to(self._device)
+        x = process_x(x, x_event_shape=None)
+        self._assert_finite_x(x)
+        self._x = x.to(self._device)
 
         for posterior in self.posteriors:
             posterior.set_default_x(x)

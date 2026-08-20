@@ -108,8 +108,6 @@ def get_inference():
                 "x_o",
                 "enable_transform",
                 "max_sampling_batch_size",
-                # consumed by VectorFieldPosterior, not forwarded to the potential.
-                "check_finite_x",
             },
         ),
     ],
