@@ -12,6 +12,7 @@ library-specific parameters (e.g. Zuko flow kwargs) pass through.
 
 import inspect
 import warnings
+from dataclasses import fields as dc_fields
 
 import pytest
 import torch
@@ -32,8 +33,10 @@ from sbi.neural_nets.factory import (
 from sbi.neural_nets.net_builders.estimator_configs import (
     _CLASSIFIER_CONFIGS,
     _DENSITY_CONFIGS,
-    ConditionalFlowConfig,
+    MixedConfig,
+    NSFConfig,
 )
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 
 THETA, X = torch.randn(100, 3), torch.randn(100, 5)
 
@@ -183,17 +186,75 @@ def test_unknown_model_raises():
         build_fn(THETA, X)
 
 
-def test_legacy_config_still_validates_the_mixed_string_path():
-    """MNLE and MNPE still reach `build_mnle` / `build_mnpe` with flat kwargs."""
-    cfg = ConditionalFlowConfig(hidden_features=64)
-    assert cfg.to_dict() == {"hidden_features": 64}
-
-    # The modeled variable carries the discrete column: theta for MNPE, x for MNLE.
+@pytest.mark.parametrize(
+    "factory_fn,model",
+    [(posterior_nn, "mnpe"), (likelihood_nn, "mnle")],
+    ids=["posterior", "likelihood"],
+)
+def test_mixed_string_path_builds_the_typed_config(factory_fn, model):
+    """Deprecated mixed strings must route their settings through MixedConfig."""
     mixed = torch.cat(
-        [torch.randn(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
+        [torch.rand(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
     )
-    assert isinstance(posterior_nn("mnpe")(mixed, X), MixedDensityEstimator)
-    assert isinstance(likelihood_nn("mnle")(THETA, mixed), MixedDensityEstimator)
+    config = MixedConfig(
+        continuous=NSFConfig(
+            z_score_input="none",
+            hidden_features=16,
+            num_transforms=2,
+            num_bins=4,
+            tail_bound=10.0,
+        ),
+        z_score_condition="none",
+        log_transform_x=True,
+    )
+    factory_args = (mixed, X) if factory_fn is posterior_nn else (THETA, mixed)
+    config_args = (mixed, X) if factory_fn is posterior_nn else (mixed, THETA)
+
+    torch.manual_seed(0)
+    expected = config.build(*config_args)
+    torch.manual_seed(0)
+    actual = factory_fn(
+        model,
+        z_score_theta="none",
+        z_score_x="none",
+        hidden_features=16,
+        num_transforms=2,
+        num_bins=4,
+        log_transform_x=True,
+    )(*factory_args)
+
+    assert isinstance(actual, MixedDensityEstimator)
+    assert expected.state_dict().keys() == actual.state_dict().keys()
+    for name, value in expected.state_dict().items():
+        assert torch.equal(value, actual.state_dict()[name]), name
+
+
+_TAIL_BOUND_MODELS = sorted(
+    name
+    for name, cls in _DENSITY_CONFIGS.items()
+    if "tail_bound" in {f.name for f in dc_fields(cls)}
+)
+
+
+@pytest.mark.parametrize("flow_model", _TAIL_BOUND_MODELS)
+def test_mixed_keeps_the_flat_tail_bound_for_every_model(flow_model):
+    """The flat mixed API passed `tail_bound` to whichever model reads it.
+
+    Those models default to a narrower bound on their own, and the value does
+    not change the parameter count, so only reading it off the built net keeps
+    the deprecated path honest.
+    """
+    mixed = torch.cat(
+        [torch.rand(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
+    )
+    estimator = build_mnle(mixed, THETA, flow_model=flow_model)
+
+    bounds = {
+        float(m.tail_bound)
+        for m in estimator.continuous_net.modules()
+        if hasattr(m, "tail_bound")
+    }
+    assert bounds == {10.0}
 
 
 @pytest.mark.parametrize(
