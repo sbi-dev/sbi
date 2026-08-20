@@ -3,7 +3,6 @@
 
 import warnings
 from dataclasses import replace
-from typing import TYPE_CHECKING, Optional
 
 import torch
 from torch import Tensor, nn
@@ -16,162 +15,39 @@ from sbi.neural_nets.estimators.mixed_density_estimator import (
 from sbi.neural_nets.net_builders.categorial import (
     build_categoricalmassestimator,
 )
-from sbi.neural_nets.net_builders.flow import (
-    build_made,
-    build_maf,
-    build_maf_rqs,
-    build_nsf,
-    build_zuko_bpf,
-    build_zuko_gf,
-    build_zuko_maf,
-    build_zuko_naf,
-    build_zuko_ncsf,
-    build_zuko_nice,
-    build_zuko_nsf,
-    build_zuko_sospf,
-    build_zuko_unaf,
+from sbi.neural_nets.net_builders.estimator_configs import (
+    MixedConfig,
+    _mixed_config_from_factory_kwargs,
 )
-from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.utils.sbiutils import standardizing_net, z_score_parser
 from sbi.utils.user_input_checks import check_data_device
-
-if TYPE_CHECKING:
-    # Imported for typing only: the config module imports this one at build time.
-    from sbi.neural_nets.net_builders.estimator_configs import DensityConfigBase
-
-model_builders = {
-    "mdn": build_mdn,
-    "made": build_made,
-    "maf": build_maf,
-    "maf_rqs": build_maf_rqs,
-    "nsf": build_nsf,
-    "zuko_nice": build_zuko_nice,
-    "zuko_maf": build_zuko_maf,
-    "zuko_nsf": build_zuko_nsf,
-    "zuko_ncsf": build_zuko_ncsf,
-    "zuko_sospf": build_zuko_sospf,
-    "zuko_naf": build_zuko_naf,
-    "zuko_unaf": build_zuko_unaf,
-    "zuko_gf": build_zuko_gf,
-    "zuko_bpf": build_zuko_bpf,
-}
 
 
 def _build_mixed_density_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
-    flow_model: str = "nsf",
-    continuous_config: Optional["DensityConfigBase"] = None,
-    num_categories_per_variable: Optional[Tensor] = None,
-    embedding_net: nn.Module = nn.Identity(),
-    combined_embedding_net: Optional[nn.Module] = None,
-    num_transforms: int = 5,
-    num_components: int = 10,
-    num_bins: int = 10,
-    hidden_features: int = 50,
-    tail_bound: float = 10.0,
-    log_transform_x: bool = False,
-    discrete_hidden_features: Optional[int] = None,
-    discrete_hidden_layers: int = 2,
-    combined_embedding_features: Optional[int] = None,
-    dropout_probability: float = 0.0,
-    continuous_hidden_features: Optional[int] = None,
-    **kwargs,
+    config: MixedConfig,
 ) -> MixedDensityEstimator:
-    """Base function for building mixed neural density estimators.
+    """Build a mixed density estimator from its typed configuration.
 
     This function contains the shared logic between MNLE and MNPE.
-
-    Returns a density estimator for mixed data types.
-
-    Uses an autoregressive categorical density estimator to model the discrete part
-    and a conditional density estimator to model the continuous part of the data.
-
-    Note: If the condition y is > 1D, an embedding net must be provided. Then,
-    during inference, we need to combine the embedded condition with the
-    discrete part of the input data. To do this, we use a combined embedding net
-    that takes the discrete part of the input and the embedded condition as
-    input and passes it on to the flow model.
-    To this end, we build the z-scoring and the embedding net in this function
-    here, i.e., outside of the flow model, and then pass z_score_x="none" to the
-    flow builder.
-    The y-embedding is passed to MixedDensityEstimator, which then uses it to
-    embed the continuous part and concatenate it with the discrete part during
-    log_prob evaluation and sampling.
-    The combined embedding net is passed to the flow model, which then uses it
-    to combine the already embedded and combined condition.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality.
         batch_y: Batch of ys, used to infer dimensionality and (optional)
             z-scoring.
-        z_score_x: Whether to z-score xs passing into the network, can be one of:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean
-              and std
-            over the entire batch, instead of per-dimension. Should be used when
-            each sample is, for example, a time series or an image. For MNLE,
-            this applies to the continuous part of the data only.
-        z_score_y: Whether to z-score ys passing into the network, same options
-            as z_score_x.
-        flow_model: type of flow model to use for the continuous part of the
-            data. Ignored when ``continuous_config`` is given.
-        continuous_config: Config of the model for the continuous part of the
-            data. When given, it replaces ``flow_model`` and the flat
-            continuous settings (``z_score_x``, ``num_transforms``,
-            ``num_components``, ``num_bins``, ``tail_bound``,
-            ``continuous_hidden_features``), which the config carries itself.
-        num_categories_per_variable: number of categorical columns of each variable in
-            the input data. If None, the function will infer this from the data.
-        embedding_net: Optional embedding network for y, required if y is > 1D.
-        combined_embedding_net: Optional embedding for combining the discrete
-            part of the input and the embedded condition into a joined
-            condition. If None, a shallow MLP is used.
-        num_transforms: number of transforms in the flow model.
-        num_components: number of components in the mixture model.
-        num_bins: bins per spline for NSF.
-        hidden_features: number of hidden features shared across discrete and
-            continuous sub-nets. Use ``discrete_hidden_features`` and
-            ``continuous_hidden_features`` for independent control.
-        tail_bound: spline tail bound for NSF.
-        log_transform_x: whether to apply a log-transform to x to move it to unbounded
-            space, e.g., in case x consists of reaction time data (bounded by
-            zero).
-        discrete_hidden_features: number of hidden features for the discrete
-            (categorical) net. Defaults to ``hidden_features`` if not set.
-        discrete_hidden_layers: number of hidden layers for the discrete
-            (categorical) net.
-        combined_embedding_features: number of hidden features for the combined
-            embedding net. Defaults to the continuous net's width.
-        dropout_probability: Dropout probability of the categorical net. On
-            the legacy flat path it is also passed to compatible continuous nets.
-        continuous_hidden_features: number of hidden features for the continuous
-            (flow) net and the fallback combined embedding MLP. Defaults to
-            ``hidden_features`` if not set.
-        kwargs: additional keyword arguments passed to the flow model and the
-            categorical net.
+        config: Mixed estimator configuration.
 
     Returns:
         MixedDensityEstimator: nn.Module for performing MNLE or MNPE.
     """
     check_data_device(batch_x, batch_y)
 
-    # Resolve decoupled parameters, falling back to shared defaults. A
-    # continuous config carries the continuous width itself, which then also
-    # sizes the fallback combined embedding net.
-    if continuous_config is not None:
-        _continuous_hf = continuous_config.hidden_features  # type: ignore[attr-defined]
-    else:
-        _continuous_hf = continuous_hidden_features or hidden_features
+    continuous_hidden_features = config.continuous.hidden_features  # type: ignore[attr-defined]
     _discrete_hf = (
-        discrete_hidden_features
-        if discrete_hidden_features is not None
-        else _continuous_hf
-        if continuous_config is not None
-        else hidden_features
+        config.discrete_hidden_features
+        if config.discrete_hidden_features is not None
+        else continuous_hidden_features
     )
 
     warnings.warn(
@@ -182,22 +58,19 @@ def _build_mixed_density_estimator(
     )
 
     # Separate continuous and discrete data.
-    if num_categories_per_variable is None:
+    if config.num_categories_per_variable is None:
         num_disc = int(torch.sum(_is_discrete(batch_x)))
     else:
-        num_disc = len(num_categories_per_variable)
+        num_disc = len(config.num_categories_per_variable)
     cont_x, disc_x = _separate_input(batch_x, num_discrete_columns=num_disc)
 
-    # The embeedding net is applied to the continuous part of the inputs
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    embedding_net = config.embedding_net
+    z_score_y_bool, structured_y = z_score_parser(config.z_score_condition)
     if z_score_y_bool:
         embedding_net = nn.Sequential(
             standardizing_net(batch_y, structured_y), embedding_net
         )
-    else:
-        embedding_net = embedding_net
 
-    # embed
     embedded_batch_y = embedding_net(batch_y)
     combined_condition = torch.cat([disc_x, embedded_batch_y], dim=-1)
 
@@ -208,19 +81,18 @@ def _build_mixed_density_estimator(
         z_score_x="none",  # discrete data should not be z-scored
         z_score_y="none",  # y-embedding net already z-scores
         num_hidden=_discrete_hf,
-        num_layers=discrete_hidden_layers,
+        num_layers=config.discrete_hidden_layers,
         embedding_net=embedding_net,
-        num_categories_per_variable=num_categories_per_variable,
-        dropout_probability=dropout_probability,
+        num_categories_per_variable=config.num_categories_per_variable,
+        dropout_probability=config.dropout_probability,
     )
 
+    combined_embedding_net = config.combined_embedding_net
     if combined_embedding_net is None:
-        # set up linear embedding net for combining discrete and continuous
-        # data.
         _combined_hf = (
-            combined_embedding_features
-            if combined_embedding_features is not None
-            else _continuous_hf
+            config.combined_embedding_features
+            if config.combined_embedding_features is not None
+            else continuous_hidden_features
         )
         combined_embedding_net = nn.Sequential(
             nn.Linear(combined_condition.shape[-1], _combined_hf),
@@ -230,48 +102,52 @@ def _build_mixed_density_estimator(
         )
 
     # TODO: add support for optional log-transform in flow builders.
-    continuous_x = (
-        torch.log(cont_x + 1e-10)
-        if log_transform_x  # can apply log transform if data is strictly positive
-        else cont_x
-    )
+    continuous_x = torch.log(cont_x + 1e-10) if config.log_transform_x else cont_x
 
-    # Set up a flow for modelling the continuous data, conditioned on the discrete data.
-    if continuous_config is not None:
-        # The combined condition is already z-scored and is embedded by the
-        # combined embedding net, so those two settings are not the user's here.
-        continuous_net = replace(
-            continuous_config,
-            z_score_condition="none",
-            embedding_net=combined_embedding_net,
-        ).build(batch_input=continuous_x, batch_condition=combined_condition)
-    else:
-        # On the legacy path, nflows uses the same dropout for both sub-nets.
-        if not flow_model.startswith("zuko"):
-            kwargs["dropout_probability"] = dropout_probability
-
-        continuous_net = model_builders[flow_model](
-            batch_x=continuous_x,
-            batch_y=combined_condition,
-            z_score_x=z_score_x,
-            z_score_y="none",  # combined condition is already z-scored
-            # combined embedding net for discrete and continuous data.
-            embedding_net=combined_embedding_net,
-            num_bins=num_bins,
-            num_transforms=num_transforms,
-            num_components=num_components,
-            tail_bound=tail_bound,
-            hidden_features=_continuous_hf,
-            **kwargs,
-        )
+    # The combined condition is already z-scored and embedded here.
+    continuous_net = replace(
+        config.continuous,
+        z_score_condition="none",
+        embedding_net=combined_embedding_net,
+    ).build(batch_input=continuous_x, batch_condition=combined_condition)
 
     return MixedDensityEstimator(
         discrete_net=discrete_net,
         continuous_net=continuous_net,
         embedding_net=embedding_net,  # pass embedding for continuous condition part.
-        log_transform_input=log_transform_x,
+        log_transform_input=config.log_transform_x,
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
+    )
+
+
+def _config_from_flat_kwargs(log_transform_x: bool, kwargs: dict) -> MixedConfig:
+    """Translate the exported mixed builders' legacy flat arguments."""
+    extra = dict(kwargs)
+    family_defaults = {
+        "z_score_input": "independent",
+        "hidden_features": 50,
+        "num_transforms": 5,
+        "num_bins": 10,
+        "num_components": 10,
+    }
+    family_args = {
+        "z_score_input": extra.pop("z_score_x", "independent"),
+        "z_score_condition": extra.pop("z_score_y", "independent"),
+        "hidden_features": extra.pop("hidden_features", 50),
+        "num_transforms": extra.pop("num_transforms", 5),
+        "num_bins": extra.pop("num_bins", 10),
+        "embedding_net": extra.pop("embedding_net", nn.Identity()),
+        "num_components": extra.pop("num_components", 10),
+    }
+    for name in ("z_score_input", "z_score_condition"):
+        if family_args[name] is None:
+            family_args[name] = "none"
+    extra["log_transform_x"] = log_transform_x
+    return _mixed_config_from_factory_kwargs(
+        family_args=family_args,
+        factory_defaults=family_defaults,
+        extra=extra,
     )
 
 
@@ -290,14 +166,12 @@ def build_mnle(
         batch_y: Batch of ys (parameters), used to infer dimensionality.
         log_transform_x: whether to apply a log-transform to x. This is by default false
             because x has to be strictly positive to apply log-transform.
-        **kwargs: Additional arguments passed to _build_mixed_density_estimator.
+        **kwargs: Legacy flat mixed-estimator arguments.
 
     Returns:
         MixedDensityEstimator for MNLE.
     """
-    return _build_mixed_density_estimator(
-        batch_x=batch_x, batch_y=batch_y, log_transform_x=log_transform_x, **kwargs
-    )
+    return _config_from_flat_kwargs(log_transform_x, kwargs).build(batch_x, batch_y)
 
 
 def build_mnpe(
@@ -315,11 +189,9 @@ def build_mnpe(
         batch_y: Batch of ys (data), used to infer dimensionality.
         log_transform_x: whether to apply a log-transform to x. This is by default false
             because x has to be strictly positive to apply log-transform.
-        **kwargs: Additional arguments passed to _build_mixed_density_estimator.
+        **kwargs: Legacy flat mixed-estimator arguments.
 
     Returns:
         MixedDensityEstimator for MNPE.
     """
-    return _build_mixed_density_estimator(
-        batch_x=batch_x, batch_y=batch_y, log_transform_x=log_transform_x, **kwargs
-    )
+    return _config_from_flat_kwargs(log_transform_x, kwargs).build(batch_x, batch_y)
