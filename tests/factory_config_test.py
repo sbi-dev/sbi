@@ -229,10 +229,16 @@ def test_mixed_string_path_builds_the_typed_config(factory_fn, model):
         assert torch.equal(value, actual.state_dict()[name]), name
 
 
-_UNSET_IF_NONE = [
+_NONE_IS_UNSET = [
+    "flow_model",
+    "hidden_features",
+    "num_transforms",
+    "num_bins",
     "continuous_hidden_features",
     "discrete_hidden_features",
     "combined_embedding_features",
+    "num_categories_per_variable",
+    "combined_embedding_net",
 ]
 
 
@@ -243,9 +249,34 @@ def _mixed_batches():
     return mixed, THETA
 
 
-@pytest.mark.parametrize("name", _UNSET_IF_NONE)
-def test_mixed_treats_an_explicit_none_width_as_unset(name):
-    """The flat API typed these as `Optional[int] = None`, so None means unset."""
+def _assert_same_net(expected, actual):
+    assert expected.state_dict().keys() == actual.state_dict().keys()
+    for key, value in expected.state_dict().items():
+        assert torch.equal(value, actual.state_dict()[key]), key
+
+
+@pytest.mark.parametrize("name", _NONE_IS_UNSET)
+@pytest.mark.parametrize(
+    "factory_fn,model",
+    [(posterior_nn, "mnpe"), (likelihood_nn, "mnle")],
+    ids=["posterior", "likelihood"],
+)
+def test_mixed_factory_treats_none_as_unset(factory_fn, model, name):
+    """The flat path dropped every None, so None must still mean omitted."""
+    mixed, theta = _mixed_batches()
+    args = (mixed, X) if factory_fn is posterior_nn else (theta, mixed)
+
+    torch.manual_seed(0)
+    omitted = factory_fn(model)(*args)
+    torch.manual_seed(0)
+    explicit_none = factory_fn(model, **{name: None})(*args)
+
+    _assert_same_net(omitted, explicit_none)
+
+
+@pytest.mark.parametrize("name", _NONE_IS_UNSET)
+def test_mixed_builder_treats_none_as_unset(name):
+    """`build_mnle` reads the same flat arguments as the factories."""
     mixed, theta = _mixed_batches()
 
     torch.manual_seed(0)
@@ -253,9 +284,7 @@ def test_mixed_treats_an_explicit_none_width_as_unset(name):
     torch.manual_seed(0)
     explicit_none = build_mnle(mixed, theta, **{name: None})
 
-    assert omitted.state_dict().keys() == explicit_none.state_dict().keys()
-    for key, value in omitted.state_dict().items():
-        assert torch.equal(value, explicit_none.state_dict()[key]), key
+    _assert_same_net(omitted, explicit_none)
 
 
 def test_mixed_none_width_does_not_change_the_other_width():
@@ -273,9 +302,7 @@ def test_mixed_none_width_does_not_change_the_other_width():
         mixed, theta, continuous_hidden_features=16, discrete_hidden_features=None
     )
 
-    assert omitted.state_dict().keys() == explicit_none.state_dict().keys()
-    for key, value in omitted.state_dict().items():
-        assert torch.equal(value, explicit_none.state_dict()[key]), key
+    _assert_same_net(omitted, explicit_none)
 
 
 _TAIL_BOUND_MODELS = sorted(
