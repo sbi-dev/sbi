@@ -121,7 +121,7 @@ class RejectionPosterior(NeuralPosterior):
         )
         warn("The log-probability is unnormalized!", stacklevel=2)
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -175,7 +175,7 @@ class RejectionPosterior(NeuralPosterior):
             Samples from posterior.
         """
         num_samples = torch.Size(sample_shape).numel()
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         potential = partial(self.potential_fn, track_gradients=True)
 
