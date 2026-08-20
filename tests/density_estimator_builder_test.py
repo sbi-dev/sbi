@@ -20,6 +20,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MLPClassifierConfig,
     MixedConfig,
     NSFConfig,
+    PretrainedConfigBase,
     ResNetClassifierConfig,
     ZukoNCSFConfig,
     ZukoNSFConfig,
@@ -321,13 +322,14 @@ def test_configs_are_immutable(config_cls):
     "base,example",
     [
         (DensityConfigBase, "NSFConfig"),
+        (PretrainedConfigBase, "TabPFNConfig"),
         (ClassifierConfigBase, "ResNetClassifierConfig"),
     ],
-    ids=["density", "classifier"],
+    ids=["density", "pretrained", "classifier"],
 )
 def test_role_bases_are_not_usable_on_their_own(base, example):
     """A role base holds no model, so it must not pass as a config."""
-    with pytest.raises(TypeError, match="per-model config"):
+    with pytest.raises(TypeError, match=f"per-model config.*{example}"):
         base()
 
 
