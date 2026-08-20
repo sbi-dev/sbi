@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import inspect
-from dataclasses import FrozenInstanceError
+from dataclasses import MISSING, FrozenInstanceError, fields
 
 import pytest
 import torch
@@ -162,6 +162,29 @@ def test_classifier_defaults_match_the_build_functions(model):
     for name, value in config_cls()._build_kwargs().items():
         assert name in params, f"`{name}` is not accepted by {model}"
         assert _defaults_agree(value, params[name].default), f"{model}.{name} drifted"
+
+
+def test_mixed_defaults_match_the_build_function():
+    """Mixed is the family where a default drift shipped once.
+
+    The builder path gave `num_transforms=2` and `num_bins=5` against the
+    factory's 5 and 10, so the defaults are pinned here too.
+    """
+    from sbi.neural_nets.net_builders.mixed_nets import (
+        _build_mixed_density_estimator,
+    )
+
+    params = _params(_build_mixed_density_estimator)
+    # `continuous` is a nested config rather than a value the builder defaults.
+    to_builder = {"z_score_condition": "z_score_y"}
+
+    for f in fields(MixedConfig):
+        if f.name in ("continuous", "extra_kwargs"):
+            continue
+        name = to_builder.get(f.name, f.name)
+        assert name in params, f"`{name}` is not accepted by the mixed builder"
+        value = f.default_factory() if f.default_factory is not MISSING else f.default
+        assert _defaults_agree(value, params[name].default), f"mixed.{name} drifted"
 
 
 def test_legacy_public_builder_registry_remains_complete():
