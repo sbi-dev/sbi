@@ -29,7 +29,11 @@ from sbi.neural_nets.factory import (
     posterior_nn,
     posterior_score_nn,
 )
-from sbi.neural_nets.net_builders.estimator_configs import ConditionalFlowConfig
+from sbi.neural_nets.net_builders.estimator_configs import (
+    _CLASSIFIER_CONFIGS,
+    _DENSITY_CONFIGS,
+    ConditionalFlowConfig,
+)
 
 THETA, X = torch.randn(100, 3), torch.randn(100, 5)
 
@@ -99,23 +103,23 @@ def test_factory_rejects_a_setting_the_model_does_not_use(factory_fn, model, kwa
 
 @pytest.mark.parametrize(
     "factory_fn,model",
-    [
-        (posterior_nn, "mdn"),
-        (posterior_nn, "made"),
-        (posterior_nn, "maf"),
-        (posterior_nn, "zuko_nsf"),
-        (likelihood_nn, "nsf"),
-        (classifier_nn, "linear"),
-        (classifier_nn, "resnet"),
-    ],
+    [(fn, m) for fn in (posterior_nn, likelihood_nn) for m in sorted(_DENSITY_CONFIGS)]
+    + [(classifier_nn, m) for m in sorted(_CLASSIFIER_CONFIGS)],
 )
-def test_factory_defaults_still_build_every_model(factory_fn, model):
+def test_factory_defaults_configure_every_model(factory_fn, model):
     """The family-wide defaults must not reject the models that ignore them.
 
-    `posterior_nn("mdn")` passes `num_bins=10` that MDN has no field for; it is
-    the factory's own default, so it is dropped rather than rejected.
+    `posterior_nn("mdn")` passes `num_bins=10` that MDN has no field for, and
+    `tabpfn` narrows `z_score_input` to `none`. Both are the factory's own
+    defaults, so they are dropped rather than written over the config's.
+
+    Construction is what fails, so `tabpfn` needs neither data nor its
+    optional dependency here.
     """
-    assert factory_fn(model)(THETA, X) is not None
+    build_fn = factory_fn(model)
+    assert build_fn is not None
+    if model != "tabpfn":
+        assert build_fn(THETA, X) is not None
 
 
 def test_num_bins_still_reaches_the_zuko_flows():
@@ -190,3 +194,34 @@ def test_legacy_config_still_validates_the_mixed_string_path():
     )
     assert isinstance(posterior_nn("mnpe")(mixed, X), MixedDensityEstimator)
     assert isinstance(likelihood_nn("mnle")(THETA, mixed), MixedDensityEstimator)
+
+
+@pytest.mark.parametrize(
+    "factory_fn,z_kwargs",
+    [
+        (posterior_nn, {"z_score_theta": None, "z_score_x": None}),
+        (likelihood_nn, {"z_score_theta": None, "z_score_x": None}),
+    ],
+    ids=["posterior", "likelihood"],
+)
+def test_none_means_no_z_scoring(factory_fn, z_kwargs):
+    """The factories document `None` as "do not z-score", so it must not.
+
+    The configs do not accept `None`, so it is translated in the factory. No
+    test asserted the effect on the built network before.
+    """
+    explicit = {k: "none" for k in z_kwargs}
+    from_none = factory_fn("nsf", **z_kwargs)(THETA, X)
+    from_none_str = factory_fn("nsf", **explicit)(THETA, X)
+    z_scored = factory_fn("nsf")(THETA, X)
+
+    def standardizing(net):
+        return [
+            type(m).__name__
+            for m in net.modules()
+            if type(m).__name__ in ("Standardize", "PointwiseAffineTransform")
+        ]
+
+    assert standardizing(from_none) == []
+    assert standardizing(from_none) == standardizing(from_none_str)
+    assert standardizing(z_scored) != []
