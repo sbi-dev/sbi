@@ -279,7 +279,11 @@ def test_mixed_treats_another_models_field_set_to_none_as_unset(flow_model, name
 
 @pytest.mark.parametrize(
     "flow_model,kwarg",
-    [("mdn", {"num_blocks": 3}), ("zuko_maf", {"num_blocks": 3})],
+    [
+        ("mdn", {"num_blocks": 3}),
+        ("zuko_maf", {"num_blocks": 3}),
+        ("nsf", {"num_components": 5}),
+    ],
 )
 def test_mixed_still_rejects_another_models_field_with_a_value(flow_model, kwarg):
     """Only a None is unset. A real value the model cannot read still raises."""
