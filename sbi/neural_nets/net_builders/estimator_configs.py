@@ -1652,11 +1652,11 @@ def _mixed_config_from_factory_kwargs(
         "dropout_probability",
     )
     # The flat path dropped a recognised None before building, so it still
-    # means unset. A name no model knows keeps its None, and with it the
-    # warning that catches a typo.
+    # means unset, for any name the family knows rather than only the chosen
+    # model's. A name no model knows keeps its None, and with it the warning
+    # that catches a typo. A real value still raises for the wrong model.
     recognised = {"continuous_hidden_features", *mixed_fields}
-    if config_cls is not None:
-        recognised |= {f.name for f in fields(config_cls)}
+    recognised |= {f.name for cls in _DENSITY_CONFIGS.values() for f in fields(cls)}
     extra = {
         name: value
         for name, value in extra.items()
