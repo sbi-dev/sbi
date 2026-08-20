@@ -176,10 +176,6 @@ class NPE_A(PosteriorEstimatorTrainer):
                 "MDNConfig, a callable, or the string 'mdn_snpe_a'!"
             )
 
-        # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
-        # requiring the signature to have `num_components`, save it for use below, and
-        # continue. It's sneaky because we are using the object (self) as a namespace
-        # to pass arguments between functions, and that's implicit state management.
         kwargs = del_entries(
             locals(),
             entries=("self", "__class__", "num_components"),
