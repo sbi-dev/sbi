@@ -1754,7 +1754,7 @@ def _sbc_rank_plot(
     num_sbc_runs, num_parameters = ranks_list[0].shape
     num_ranks = len(ranks_list)
 
-    if num_ranks > 1 or plot_type in ("hist", "cdf", "cdf-diff"):
+    if num_ranks > 1 or plot_type == "hist":
         params_in_subplots = True
 
     for ranki in ranks_list:
