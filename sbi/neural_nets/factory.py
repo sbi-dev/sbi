@@ -9,13 +9,12 @@ from torch import Tensor, nn
 
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
-    _BUILD_KWARG_ALIASES,
     _CLASSIFIER_CONFIGS,
     _DENSITY_CONFIGS,
-    ConditionalFlowConfig,
     MarginalFlowConfig,
     _config_from_factory_kwargs,
     _factory_defaults,
+    _mixed_config_from_factory_kwargs,
 )
 from sbi.neural_nets.net_builders.flow import (
     build_made,
@@ -139,34 +138,11 @@ def _density_family_args(embedding_net: nn.Module, **family_args: Any) -> dict:
     )
 
 
-def _legacy_density_build_fn(
-    model: str,
-    family_args: dict,
-    extra: dict,
-    input_is_theta: bool,
-) -> Callable:
-    """Return a build function for the models that have no config yet.
-
-    ``mnle`` and ``mnpe`` are reached through the density factories by the
-    deprecated string path of MNLE and MNPE, and are built from flat kwargs by
-    ``build_mnle`` / ``build_mnpe`` rather than from a config.
-    """
-    config = ConditionalFlowConfig.from_kwargs(
-        **{_BUILD_KWARG_ALIASES.get(k, k): v for k, v in family_args.items()},
-        **extra,
-    )
-    builder_kwargs = config.to_dict()
+def _unknown_density_build_fn(model: str) -> Callable:
+    """Preserve the factories' build-time error for unknown model names."""
 
     def build_fn(batch_theta, batch_x):
-        if model not in model_builders:
-            raise NotImplementedError(f"Model {model} is not implemented")
-
-        modeled, condition = (
-            (batch_theta, batch_x) if input_is_theta else (batch_x, batch_theta)
-        )
-        return model_builders[model](
-            batch_x=modeled, batch_y=condition, **builder_kwargs
-        )
+        raise NotImplementedError(f"Model {model} is not implemented")
 
     return build_fn
 
@@ -299,19 +275,27 @@ def likelihood_nn(
         embedding_net=embedding_net,
         num_components=num_components,
     )
-    if model not in _DENSITY_CONFIGS:
-        return _legacy_density_build_fn(
-            model, family_args, kwargs, input_is_theta=False
+    if model in ("mnle", "mnpe"):
+        config = _mixed_config_from_factory_kwargs(
+            family_args=family_args,
+            factory_defaults=_factory_defaults(
+                likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS
+            ),
+            extra=kwargs,
         )
-
-    config = _config_from_factory_kwargs(
-        model,
-        _DENSITY_CONFIGS,
-        "density",
-        family_args=family_args,
-        factory_defaults=_factory_defaults(likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS),
-        extra=kwargs,
-    )
+    elif model in _DENSITY_CONFIGS:
+        config = _config_from_factory_kwargs(
+            model,
+            _DENSITY_CONFIGS,
+            "density",
+            family_args=family_args,
+            factory_defaults=_factory_defaults(
+                likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS
+            ),
+            extra=kwargs,
+        )
+    else:
+        return _unknown_density_build_fn(model)
 
     def build_fn(batch_theta, batch_x):
         # NLE models p(x|theta), so the modeled variable is x.
@@ -411,17 +395,23 @@ def posterior_nn(
 
         return build_fn_snpe_a
 
-    if model not in _DENSITY_CONFIGS:
-        return _legacy_density_build_fn(model, family_args, kwargs, input_is_theta=True)
-
-    config = _config_from_factory_kwargs(
-        model,
-        _DENSITY_CONFIGS,
-        "density",
-        family_args=family_args,
-        factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
-        extra=kwargs,
-    )
+    if model in ("mnle", "mnpe"):
+        config = _mixed_config_from_factory_kwargs(
+            family_args=family_args,
+            factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
+            extra=kwargs,
+        )
+    elif model in _DENSITY_CONFIGS:
+        config = _config_from_factory_kwargs(
+            model,
+            _DENSITY_CONFIGS,
+            "density",
+            family_args=family_args,
+            factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
+            extra=kwargs,
+        )
+    else:
+        return _unknown_density_build_fn(model)
 
     def build_fn(batch_theta, batch_x):
         # NPE models p(theta|x), so the modeled variable is theta.
