@@ -1087,10 +1087,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._neural_net.to(self._device)
 
         if not train_config.resume_training:
-            self.optimizer = Adam(
-                list(self._neural_net.parameters()),
-                lr=train_config.learning_rate,
-            )
+            parameters = [p for p in self._neural_net.parameters() if p.requires_grad]
+            if not parameters:
+                raise TypeError(
+                    f"{type(self).__name__} cannot train "
+                    f"{type(self._neural_net).__name__}: it has no trainable "
+                    "parameters."
+                )
+            self.optimizer = Adam(parameters, lr=train_config.learning_rate)
             self.epoch, self._val_loss = 0, float("Inf")
 
         while self.epoch <= train_config.max_num_epochs and not self._converged(

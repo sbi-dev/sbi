@@ -11,7 +11,7 @@ from torch.distributions import MultivariateNormal
 from sbi.inference import MNLE, MNPE, NLE_A, NPE_A, NPE_C, NPE_PFN
 from sbi.neural_nets import likelihood_nn, posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
     _MIXED_CONTINUOUS_CONFIGS,
     MAFConfig,
@@ -396,21 +396,40 @@ def test_gradient_trainer_rejects_tabpfn(trainer_cls, density_estimator):
         )
 
 
+class _FrozenDensityEstimator(ConditionalDensityEstimator):
+    """Well-formed estimator with nothing to fit, like a pretrained wrapper."""
+
+    def __init__(self):
+        net = torch.nn.Linear(3, 2)
+        for parameter in net.parameters():
+            parameter.requires_grad_(False)
+        super().__init__(net=net, input_shape=(2,), condition_shape=(3,))
+
+    def log_prob(self, input, condition, **kwargs):
+        return zeros(input.shape[:2])
+
+    def loss(self, input, condition, **kwargs):
+        return zeros(input.shape[0])
+
+    def sample(self, sample_shape, condition, **kwargs):
+        return zeros(*sample_shape, condition.shape[0], 2)
+
+
 @pytest.mark.parametrize("trainer_cls", [NPE_C, NLE_A], ids=["npe", "nle"])
-def test_gradient_trainer_rejects_tabpfn_from_a_custom_builder(trainer_cls):
-    """Callable builders bypass config checks, so validate their built estimator."""
+def test_gradient_trainer_rejects_estimators_with_nothing_to_fit(trainer_cls):
+    """Callable builders bypass the config checks, so the shared training
+    loop rejects the built estimator before the optimizer is created."""
     prior = MultivariateNormal(zeros(2), eye(2))
     inference = trainer_cls(
         prior,
-        density_estimator=lambda *_: TabPFNFlow.__new__(TabPFNFlow),
+        density_estimator=lambda *_: _FrozenDensityEstimator(),
         show_progress_bars=False,
     )
     theta, x = prior.sample((10,)), torch.randn(10, 3)
     inference.append_simulations(theta, x)
-    inference.train_indices = torch.arange(10)
 
-    with pytest.raises(TypeError, match="no training loss"):
-        inference._initialize_neural_network(retrain_from_scratch=False, start_idx=0)
+    with pytest.raises(TypeError, match="no trainable parameters"):
+        inference.train(max_num_epochs=1)
 
 
 def test_npe_pfn_accepts_tabpfn_config():

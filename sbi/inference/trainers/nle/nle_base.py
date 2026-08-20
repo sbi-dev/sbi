@@ -36,7 +36,6 @@ from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
-from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.neural_nets.net_builders.estimator_configs import (
     _DENSITY_CONFIGS,
     _ESTIMATOR_CONFIG_BASES,
@@ -438,11 +437,6 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
-            if isinstance(self._neural_net, TabPFNFlow):
-                raise TypeError(
-                    f"{type(self).__name__} cannot train TabPFNFlow because it has "
-                    "no training loss."
-                )
             assert len(x_shape_from_simulation(x.to("cpu"))) < 3, (
                 "NLE cannot handle multi-dimensional simulator output."
             )
