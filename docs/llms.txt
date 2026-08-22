@@ -10,7 +10,7 @@ sbi provides both a simple one-line interface (`sbi.inference.infer`) and a
 flexible class-based interface (`NPE`, `NLE`, `NRE`, `FMPE`). The typical
 workflow is: define a prior and simulator, generate simulations, train a neural
 density estimator, build a posterior, and validate with diagnostics (SBC,
-expected coverage, TARP, L-C2ST).
+expected coverage, TARP, L-C2ST, sequential convergence).
 
 ## Tutorials
 
@@ -42,6 +42,7 @@ expected coverage, TARP, L-C2ST).
 - [TARP](https://sbi.readthedocs.io/en/latest/how_to_guide/17_tarp.html): Calibration without density evaluation
 - [L-C2ST](https://sbi.readthedocs.io/en/latest/how_to_guide/13_diagnostics_lc2st.html): Per-observation local coverage test
 - [Model Misspecification](https://sbi.readthedocs.io/en/latest/how_to_guide/18_model_misspecification.html): Detecting if x_o is outside simulator range
+- [Sequential Convergence](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.diagnostics.SequentialConvergenceTracker.html): Track how a posterior estimate evolves across rounds of sequential inference
 
 ## Advanced Topics
 
