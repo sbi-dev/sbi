@@ -240,6 +240,29 @@ def test_distance_basic_functionality():
     assert wasserstein_distance(xo_stat, x_stat).min() >= 0
 
 
+def test_l1_matches_manhattan_distance_definition():
+    """l1 should sum absolute differences, matching l2's sum-based convention.
+
+    l1 and l2 are documented and used interchangeably as swappable pairwise
+    distance choices (see sbi.diagnostics.tarp and sbi.inference.abc.abc_base),
+    so they must scale consistently with dimensionality. l1 previously averaged
+    instead of summing, silently shrinking relative to l2 as dimensionality grew.
+    """
+    x = torch.zeros(10)
+    y = torch.zeros(10)
+    y[0] = 1.0
+
+    assert torch.allclose(l1(x, y), torch.tensor(1.0))
+    assert torch.allclose(l2(x, y), torch.tensor(1.0))
+
+    # Manhattan distance sums every dimension's contribution, so it should scale
+    # linearly with the number of differing dimensions, not shrink with more
+    # (identical) dimensions added.
+    y_wide = torch.zeros(20)
+    y_wide[0] = 1.0
+    assert torch.allclose(l1(torch.zeros(20), y_wide), torch.tensor(1.0))
+
+
 def test_distance_output_shapes():
     """Test that distance functions return correct output shapes."""
     # Test pairwise distances
