@@ -64,6 +64,7 @@ class NeuralPosterior:
                 potential_fn, prior=None, x_o=None, device=potential_device
             )
 
+        previous_x = getattr(self, "_x", None)
         self._device = process_device(potential_fn.device if device is None else device)
         self._check_finite_x = check_finite_x
 
@@ -82,7 +83,11 @@ class NeuralPosterior:
         # If the sampler interface (#573) is used, the user might have passed `x_o`
         # already to the potential function builder. If so, this `x_o` will be used
         # as default x.
-        x_o = self.potential_fn.return_x_o()
+        x_o = (
+            previous_x.to(self._device)
+            if previous_x is not None
+            else self.potential_fn.return_x_o()
+        )
         if x_o is not None and self._check_finite_x:
             assert_all_finite(x_o, "Observed data x_o")
         self._x = x_o
