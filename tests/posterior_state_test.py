@@ -8,17 +8,24 @@ from sbi.inference.potentials.base_potential import BasePotential
 
 
 class DummyPotential(BasePotential):
+    """Minimal potential used to exercise posterior state rebuilding."""
+
     def __call__(
         self, theta: torch.Tensor, track_gradients: bool = True
     ) -> torch.Tensor:
+        """Return a simple negative squared norm for each parameter value."""
         return -theta.square().sum(dim=-1)
 
 
 class DummyPosterior(NeuralPosterior):
+    """Minimal posterior exposing the base class initialization behavior."""
+
     def sample(self, *args, **kwargs):
+        """Keep sampling outside the scope of this state regression test."""
         raise NotImplementedError
 
     def sample_batched(self, *args, **kwargs):
+        """Keep batched sampling outside the scope of this state regression test."""
         raise NotImplementedError
 
 
