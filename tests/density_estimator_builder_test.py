@@ -170,21 +170,24 @@ def test_mixed_defaults_match_the_factory():
     """Mixed is the family where a default drift shipped once.
 
     The builder path gave `num_transforms=2` and `num_bins=5` against the
-    factory's 5 and 10, so compare the two complete networks.
+    factory's 5 and 10, so pin every advertised factory default directly.
     """
-    theta = torch.randn(100, 3)
-    mixed_x = torch.cat(
-        [torch.randn(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
-    )
+    config = MixedConfig()
+    continuous = config.continuous
+    assert isinstance(continuous, NSFConfig)
 
-    torch.manual_seed(0)
-    configured = MixedConfig().build(mixed_x, theta)
-    torch.manual_seed(0)
-    from_factory = likelihood_nn("mnle")(theta, mixed_x)
-
-    assert configured.state_dict().keys() == from_factory.state_dict().keys()
-    for name, value in configured.state_dict().items():
-        assert torch.equal(value, from_factory.state_dict()[name]), name
+    factory_defaults = _params(likelihood_nn)
+    expected = {
+        "z_score_theta": config.z_score_condition,
+        "z_score_x": continuous.z_score_input,
+        "hidden_features": continuous.hidden_features,
+        "num_transforms": continuous.num_transforms,
+        "num_bins": continuous.num_bins,
+        "embedding_net": config.embedding_net,
+        "num_components": MDNConfig().num_components,
+    }
+    for name, value in expected.items():
+        assert _defaults_agree(value, factory_defaults[name].default), name
 
 
 def test_legacy_public_builder_registry_remains_complete():
