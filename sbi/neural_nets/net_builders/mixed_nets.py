@@ -1,6 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+"""Builders for density estimators over mixed continuous and discrete data.
+
+The conditioning variable ``y`` is z-scored and embedded here, then concatenated
+with the discrete columns. The combined net becomes the continuous flow's
+``embedding_net``, so the flow disables its own condition z-scoring.
+"""
+
 import warnings
 from dataclasses import replace
 
@@ -122,7 +129,9 @@ def _build_mixed_density_estimator(
     )
 
 
-def _config_from_flat_kwargs(log_transform_x: bool, kwargs: dict) -> MixedConfig:
+def _config_from_flat_kwargs(
+    log_transform_x: bool, kwargs: dict, model: str = "mixed"
+) -> MixedConfig:
     """Translate the exported mixed builders' legacy flat arguments."""
     from sbi.neural_nets.factory import _LIKELIHOOD_FACTORY_FIELDS, likelihood_nn
 
@@ -140,6 +149,7 @@ def _config_from_flat_kwargs(log_transform_x: bool, kwargs: dict) -> MixedConfig
             family_args[name] = "none"
     extra["log_transform_x"] = log_transform_x
     return _mixed_config_from_factory_kwargs(
+        model=model,
         family_args=family_args,
         factory_defaults=family_defaults,
         extra=extra,
@@ -166,7 +176,9 @@ def build_mnle(
     Returns:
         MixedDensityEstimator for MNLE.
     """
-    return _config_from_flat_kwargs(log_transform_x, kwargs).build(batch_x, batch_y)
+    return _config_from_flat_kwargs(log_transform_x, kwargs, model="mnle").build(
+        batch_x, batch_y
+    )
 
 
 def build_mnpe(
@@ -189,4 +201,6 @@ def build_mnpe(
     Returns:
         MixedDensityEstimator for MNPE.
     """
-    return _config_from_flat_kwargs(log_transform_x, kwargs).build(batch_x, batch_y)
+    return _config_from_flat_kwargs(log_transform_x, kwargs, model="mnpe").build(
+        batch_x, batch_y
+    )
