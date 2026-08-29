@@ -16,25 +16,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     _factory_defaults,
     _mixed_config_from_factory_kwargs,
 )
-from sbi.neural_nets.net_builders.flow import (
-    build_made,
-    build_maf,
-    build_maf_rqs,
-    build_nsf,
-    build_tabpfn_flow,
-    build_zuko_bpf,
-    build_zuko_gf,
-    build_zuko_maf,
-    build_zuko_naf,
-    build_zuko_ncsf,
-    build_zuko_nice,
-    build_zuko_nsf,
-    build_zuko_sospf,
-    build_zuko_unaf,
-    build_zuko_unconditional_flow,
-)
-from sbi.neural_nets.net_builders.mdn import build_mdn
-from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
+from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
 from sbi.neural_nets.net_builders.vector_field_nets import (
     FlowEstimatorConfig,
     ScoreEstimatorConfig,
@@ -42,26 +24,6 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
 )
 from sbi.utils.nn_utils import check_net_device
 from sbi.utils.vector_field_utils import VectorFieldNet
-
-model_builders = {
-    "mdn": build_mdn,
-    "made": build_made,
-    "maf": build_maf,
-    "maf_rqs": build_maf_rqs,
-    "nsf": build_nsf,
-    "mnle": build_mnle,
-    "mnpe": build_mnpe,
-    "zuko_nice": build_zuko_nice,
-    "zuko_maf": build_zuko_maf,
-    "zuko_nsf": build_zuko_nsf,
-    "zuko_ncsf": build_zuko_ncsf,
-    "zuko_sospf": build_zuko_sospf,
-    "zuko_naf": build_zuko_naf,
-    "zuko_unaf": build_zuko_unaf,
-    "zuko_gf": build_zuko_gf,
-    "zuko_bpf": build_zuko_bpf,
-    "tabpfn": build_tabpfn_flow,
-}
 
 
 # TODO: currently only used for marginal_nn, adapt to use for all
@@ -277,6 +239,7 @@ def likelihood_nn(
     )
     if model in ("mnle", "mnpe"):
         config = _mixed_config_from_factory_kwargs(
+            model=model,
             family_args=family_args,
             factory_defaults=_factory_defaults(
                 likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS
@@ -397,6 +360,7 @@ def posterior_nn(
 
     if model in ("mnle", "mnpe"):
         config = _mixed_config_from_factory_kwargs(
+            model=model,
             family_args=family_args,
             factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
             extra=kwargs,
