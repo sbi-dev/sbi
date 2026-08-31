@@ -1883,24 +1883,49 @@ def _sbc_rank_plot(
         plt.sca(ax)
         ranki = ranks_list[0]
         for jj in range(num_parameters):
-            _plot_ranks_as_cdf(
-                ranki[:, jj],  # type: ignore
-                num_bins,
-                num_repeats,
-                ranks_label=parameter_labels[jj],
-                color=f"C{jj}" if colors is None else colors[jj],
-                xlabel="posterior rank",
-                # Plot ylabel and legend at last.
-                show_ylabel=jj == (num_parameters - 1),
-                alpha=line_alpha,
-            )
+            if plot_type == "cdf":
+                _plot_ranks_as_cdf(
+                    ranki[:, jj],  # type: ignore
+                    num_bins,
+                    num_repeats,
+                    ranks_label=parameter_labels[jj],
+                    color=f"C{jj}" if colors is None else colors[jj],
+                    xlabel="posterior rank",
+                    # Plot ylabel and legend at last.
+                    show_ylabel=jj == (num_parameters - 1),
+                    alpha=line_alpha,
+                )
+            elif plot_type == "cdf-diff":
+                _plot_ranks_as_cdf_diff(
+                    ranki[:, jj],  # type: ignore
+                    num_bins,
+                    num_repeats,
+                    ranks_label=parameter_labels[jj],
+                    color=f"C{jj}" if colors is None else colors[jj],
+                    xlabel="posterior rank",
+                    # Plot ylabel and legend at last.
+                    show_ylabel=jj == (num_parameters - 1),
+                    alpha=line_alpha,
+                )
+            else:
+                raise ValueError(
+                    f"plot_type {plot_type} not defined, use one in {plot_types}"
+                )
         if show_uniform_region:
-            _plot_cdf_region_expected_under_uniformity(
-                num_sbc_runs,
-                num_bins,
-                num_repeats,
-                alpha=uniform_region_alpha,
-            )
+            if plot_type == "cdf":
+                _plot_cdf_region_expected_under_uniformity(
+                    num_sbc_runs,
+                    num_bins,
+                    num_repeats,
+                    alpha=uniform_region_alpha,
+                )
+            else:
+                _plot_cdf_diff_region_expected_under_uniformity(
+                    num_sbc_runs,
+                    num_bins,
+                    num_repeats,
+                    alpha=uniform_region_alpha,
+                )
         # show legend on the last subplot.
         plt.legend(**legend_kwargs)
 
