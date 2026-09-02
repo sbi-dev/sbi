@@ -8,6 +8,7 @@ from torch import Tensor
 from tqdm.auto import tqdm
 
 from sbi.samplers.importance.importance_sampling import importance_sample
+from sbi.utils.pbar import nested_pbar_context
 
 
 def sampling_importance_resampling(
@@ -51,8 +52,6 @@ def sampling_importance_resampling(
     while num_remaining > 0:
         batch_size = min(sampling_batch_size, num_remaining)
         with torch.no_grad():
-            from sbi.utils.pbar import nested_pbar_context
-
             with nested_pbar_context():
                 thetas, log_weights = importance_sample(
                     potential_fn=potential_fn,

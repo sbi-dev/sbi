@@ -16,7 +16,7 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
 from sbi.samplers import rejection
-from sbi.samplers.importance.sir import sampling_importance_resampling
+from sbi.samplers.importance import sir
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
@@ -724,7 +724,7 @@ class RestrictedPrior(Distribution):
                 torch.float32
             )
 
-            samples = sampling_importance_resampling(
+            samples = sir.sampling_importance_resampling(
                 accept_reject_fn,
                 proposal=self._posterior,
                 num_samples=num_samples,
