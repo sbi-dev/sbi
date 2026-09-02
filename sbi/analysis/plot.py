@@ -59,7 +59,7 @@ def marginal_plot(
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
-    limits: Optional[Union[List, torch.Tensor]] = None,
+    limits: Optional[Union[List, torch.Tensor, np.ndarray]] = None,
     subset: Optional[List[int]] = None,
     diag: Optional[Union[List[Optional[str]], str]] = "hist",
     figsize: Optional[Tuple] = (10, 2),
@@ -158,7 +158,7 @@ def pairplot(
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
-    limits: Optional[Union[List, torch.Tensor]] = None,
+    limits: Optional[Union[List, torch.Tensor, np.ndarray]] = None,
     subset: Optional[List[int]] = None,
     upper: Optional[Union[List[Optional[UpperLiteral]], UpperLiteral]] = "hist",
     lower: Optional[Union[List[Optional[LowerLiteral]], LowerLiteral]] = None,
@@ -841,7 +841,7 @@ def prepare_for_plot(
 
     dim = samples[0].shape[1]
 
-    if limits is None or limits == []:
+    if limits is None or len(limits) == 0:
         limits = infer_limits(samples, dim, points)
     else:
         limits = [limits[0] for _ in range(dim)] if len(limits) == 1 else limits

@@ -32,6 +32,21 @@ def test_pairplot1D(samples, limits):
     close()
 
 
+def test_pairplot_accepts_numpy_limits():
+    limits = np.array([[-1.0, 1.0], [-2.0, 2.0]])
+
+    fig, axes = pairplot(
+        samples=torch.randn(100, 2),
+        limits=limits,
+        fig_kwargs=FigOptions(x_lim_add_eps=0.0),
+    )
+
+    assert axes[0, 0].get_xlim() == pytest.approx((-1.0, 1.0))
+    assert axes[0, 1].get_xlim() == pytest.approx((-2.0, 2.0))
+    assert axes[0, 1].get_ylim() == pytest.approx((-1.0, 1.0))
+    close(fig)
+
+
 @pytest.mark.parametrize("samples", (torch.randn(100, 2),))
 @pytest.mark.parametrize("limits", ([(-1, 1)], None))
 def test_nan_inf(samples, limits):
