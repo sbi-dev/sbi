@@ -7,7 +7,7 @@ from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import (
@@ -351,6 +351,10 @@ class NeuralPosterior:
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
 
+        `torch.load(..., map_location=...)` remaps the tensors but not the stored device
+        strings. If the restored tensors live on another device than `_device` claims,
+        the device strings of the posterior, its potential and its prior are updated.
+
         Args:
             state_dict: State to be restored.
         """
@@ -364,25 +368,13 @@ class NeuralPosterior:
         ):
             return
 
+        # The tensors already live on `actual_device`. Only the device strings, and the
+        # distributions that cache one, must follow.
         self._device = actual_device
-        if getattr(self, "device", None) is not None:
+        if hasattr(self, "device"):
             self.device = actual_device
-
-        if hasattr(self, "potential_fn"):
-            self.potential_fn.to(actual_device)  # type: ignore[union-attr]
-        for attr in ("prior", "proposal"):
+        self.potential_fn.to(actual_device)  # type: ignore[union-attr]
+        for attr in ("prior", "_prior", "proposal"):
             value = getattr(self, attr, None)
             if isinstance(value, Distribution):
                 setattr(self, attr, move_distribution_to_device(value, actual_device))
-        for attr in (
-            "posterior_estimator",
-            "vector_field_estimator",
-            "_q",
-            "_amortized_q",
-        ):
-            value = getattr(self, attr, None)
-            if isinstance(value, nn.Module):
-                value.to(actual_device)
-        x = getattr(self, "_x", None)
-        if x is not None:
-            self._x = x.to(actual_device)
