@@ -16,7 +16,7 @@ from sbi.inference.abc.abc_base import ABCBASE
 from sbi.sbi_types import Array
 from sbi.utils.kde import KDEWrapper, get_kde
 from sbi.utils.sbiutils import within_support
-from sbi.utils.torchutils import BoxUniform
+from sbi.utils.torchutils import BoxUniform, assert_all_finite
 from sbi.utils.user_input_checks import process_x
 
 
@@ -103,7 +103,7 @@ class SMCABC(ABCBASE):
         algorithm_variants = ("A", "B", "C")
         assert algorithm_variant in algorithm_variants, (
             f"SMCABC variant '{algorithm_variant}' not supported, choose one from"
-            " {algorithm_variants}."
+            f" {algorithm_variants}."
         )
         self.algorithm_variant = algorithm_variant
         self.distance_to_x0 = None
@@ -191,6 +191,17 @@ class SMCABC(ABCBASE):
             summary (if return_summary True): dictionary containing the accepted
                 paramters (if kde True), distances and simulated data x of all
                 populations.
+
+        Examples:
+            >>> from sbi.inference import SMCABC
+            >>> inference = SMCABC(simulator, prior)
+            >>> samples = inference(
+            ...     x_o,
+            ...     num_particles=100,
+            ...     num_initial_pop=1000,
+            ...     num_simulations=5000,
+            ...     epsilon_decay=0.5,
+            ... )
         """
 
         pop_idx = 0
@@ -236,13 +247,13 @@ class SMCABC(ABCBASE):
         )
         log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
-        self.logger.info((
+        self.logger.info(
             "population=%s, eps=%s, ess=%s, num_sims=%s",
             pop_idx,
             epsilon,
             1.0,
             num_initial_pop,
-        ))
+        )
 
         all_particles = [particles]
         all_log_weights = [log_weights]
@@ -284,12 +295,12 @@ class SMCABC(ABCBASE):
                     particles, log_weights, ess_min, pop_idx
                 )
 
-            self.logger.info((
-                "population=%s done: eps={epsilon:.6f}, num_sims=%s.",
+            self.logger.info(
+                "population=%s done: eps=%.6f, num_sims=%s.",
                 pop_idx,
                 epsilon,
                 self.simulation_counter,
-            ))
+            )
 
             # collect results
             all_particles.append(particles)
@@ -390,6 +401,7 @@ class SMCABC(ABCBASE):
         else:
             self.x_shape = x[0, 0].shape
         self.x_o = process_x(x_o, self.x_shape)
+        assert_all_finite(self.x_o, "Observed data x_o")
 
         distances = self.distance(self.x_o, x)
         sortidx = torch.argsort(distances)
@@ -545,12 +557,12 @@ class SMCABC(ABCBASE):
         try:
             qidx = torch.where(distances_cdf >= quantile)[0][0]
         except IndexError:
-            self.logger.warning((
-                """Accepted unique distances=%s don't match quantile=%s. Selecting
-                    last distance.""",
+            self.logger.warning(
+                "Accepted unique distances=%s don't match quantile=%s. "
+                "Selecting last distance.",
                 distances,
                 quantile,
-            ))
+            )
             qidx = -1
 
         # The new epsilon is given by that distance.

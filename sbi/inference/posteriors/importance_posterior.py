@@ -12,7 +12,7 @@ from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
@@ -87,6 +87,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Args:
             device: Device on which to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
@@ -128,7 +129,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         x = self._x_else_default_x(x)
-        self.potential_fn.set_x(x)
+        self.potential_fn = self.potential_fn.bind(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -212,7 +213,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         method = self.method if method is None else method
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         if method == "sir":
             return self._sir_sample(

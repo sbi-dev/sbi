@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import asdict, replace
-from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, eye, ones
@@ -31,7 +31,12 @@ from sbi.inference.trainers.base import (
     NeuralInference,
 )
 from sbi.neural_nets import classifier_nn
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.net_builders.estimator_configs import (
+    _ESTIMATOR_CONFIG_BASES,
+    ClassifierConfigBase,
+    ResNetClassifierConfig,
+)
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -42,10 +47,17 @@ from sbi.utils.torchutils import repeat_rows
 
 
 class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
+    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (ClassifierConfigBase,)
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, ConditionalEstimatorBuilder[RatioEstimator]] = "resnet",
+        classifier: Union[
+            Literal["linear", "mlp", "resnet"],
+            ClassifierConfigBase,
+            ConditionalEstimatorBuildFn[RatioEstimator],
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -70,13 +82,14 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
           (normalizing constant) of the data $x$.
 
         Args:
-            classifier: Classifier trained to approximate likelihood ratios. If it is
-                a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet), or a callable that implements the
-                `ConditionalEstimatorBuilder` protocol. The callable will
-                be called with the first batch of simulations (theta, x), which can thus
-                be used for shape inference and potentially for z-scoring. It returns a
-                `RatioEstimator`.
+            classifier: The classifier used to approximate the
+                likelihood-to-evidence ratio. If ``None`` (default), uses
+                ``ResNetClassifierConfig()``. A per-model config can be
+                passed to configure the classifier. If it is a string
+                (deprecated), use a
+                pre-configured network of the provided type (one of
+                linear, mlp, resnet). Alternatively, a function that
+                builds a custom neural network can be provided.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -90,14 +103,27 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             show_progress_bars=show_progress_bars,
         )
 
-        # As detailed in the docstring, `density_estimator` is either a string or
-        # a callable. The function creating the neural network is attached to
-        # `_build_neural_net`. It will be called in the first round and receive
-        # thetas and xs as inputs, so that they can be used for shape inference and
-        # potentially for z-scoring.
-        check_estimator_arg(classifier)
-        if isinstance(classifier, str):
+        if classifier is not None:
+            check_estimator_arg(classifier)
+        if classifier is None:
+            self._build_neural_net = self._wrap_builder(ResNetClassifierConfig())
+        elif isinstance(classifier, str):
+            warnings.warn(
+                "Passing a string for `classifier` is deprecated. "
+                "Use a per-model config instead, e.g. "
+                "`from sbi.neural_nets import ResNetClassifierConfig`.",
+                FutureWarning,
+                stacklevel=3,
+            )
             self._build_neural_net = classifier_nn(model=classifier)
+        elif isinstance(classifier, _ESTIMATOR_CONFIG_BASES):
+            if not isinstance(classifier, self._ALLOWED_BUILDER_TYPES):
+                allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
+                raise TypeError(
+                    f"{type(self).__name__} requires a {allowed}; got "
+                    f"{type(classifier).__name__}."
+                )
+            self._build_neural_net = self._wrap_builder(classifier)
         else:
             self._build_neural_net = classifier
 
@@ -110,7 +136,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         x: Tensor,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
-        algorithm: str = "SNRE",
+        algorithm: str = "NRE",
         data_device: Optional[str] = None,
     ) -> Self:
         r"""Store parameters and simulation outputs to use them for later training.
@@ -230,14 +256,9 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
                 stacklevel=2,
             )
 
+        # Defensive only: every subclass supplies `loss_kwargs` before delegating here.
         if loss_kwargs is None:
             loss_kwargs = LossArgsNRE()
-            warnings.warn(
-                "No value provided for loss_kwargs. NRE loss arguments like "
-                "num_atoms should be set via `LossArgsNRE. A default of  "
-                "num_atoms={loss_kwargs.num_atoms} will be used.",
-                stacklevel=2,
-            )
 
         if not issubclass(type(loss_kwargs), LossArgsNRE):
             raise TypeError(

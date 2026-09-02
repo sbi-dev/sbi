@@ -20,7 +20,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import check_prior
 
 
@@ -49,6 +49,7 @@ class DirectPosterior(NeuralPosterior):
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
         enable_transform: bool = True,
+        check_finite_x: bool = True,
     ):
         """
         Args:
@@ -62,6 +63,9 @@ class DirectPosterior(NeuralPosterior):
             enable_transform: Whether to transform parameters to unconstrained space
                 during MAP optimization. When False, an identity transform will be
                 returned for `theta_transform`.
+            check_finite_x: Whether to raise if the observed data `x_o` contains NaNs
+                or Infs. Set to False when the embedding net expects NaNs, e.g., when
+                `PermutationInvariantEmbedding` pads a varying number of trials.
         """
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
@@ -81,6 +85,7 @@ class DirectPosterior(NeuralPosterior):
             theta_transform=theta_transform,
             device=device,
             x_shape=x_shape,
+            check_finite_x=check_finite_x,
         )
 
         self.device = device
@@ -102,6 +107,7 @@ class DirectPosterior(NeuralPosterior):
         Args:
             device: device where to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         if hasattr(self.prior, "to"):
             self.prior.to(device)  # type: ignore
@@ -127,6 +133,7 @@ class DirectPosterior(NeuralPosterior):
             theta_transform=theta_transform,
             device=device,
             x_shape=self.x_shape,
+            check_finite_x=self._check_finite_x,
         )
         # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:

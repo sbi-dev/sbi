@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -32,10 +31,11 @@ from sbi.neural_nets.estimators import ZukoUnconditionalFlow
 from sbi.samplers.vi.vi_utils import (
     LearnableGaussian,
     TransformedZukoFlow,
+    detach_and_deepcopy,
     filter_kwargs_for_func,
-    make_object_deepcopy_compatible,
 )
 from sbi.sbi_types import Array
+from sbi.utils.torchutils import set_validate_args
 from sbi.utils.user_input_checks import check_prior
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
@@ -121,7 +121,7 @@ class DivergenceOptimizer(ABC):
         self._kwargs = kwargs
 
         if prior is not None:
-            self.prior.set_default_validate_args(False)  # type: ignore
+            set_validate_args(self.prior, False)  # type: ignore
 
         # Manage modules - only add q if it's an nn.Module (not for external dists)
         from torch.nn import Module as TorchModule
@@ -443,8 +443,7 @@ class ElboOptimizer(DivergenceOptimizer):
         super().__init__(*args, **kwargs)
 
         self.stick_the_landing = stick_the_landing
-        make_object_deepcopy_compatible(self.q)
-        self._surrogate_q = deepcopy(self.q)
+        self._surrogate_q = detach_and_deepcopy(self.q)
 
         self.eps = 1e-5
         self.HYPER_PARAMETERS += ["stick_the_landing"]
@@ -479,7 +478,7 @@ class ElboOptimizer(DivergenceOptimizer):
             samples = self.q.rsample(torch.Size((num_samples,)))
             log_q = self.q.log_prob(samples)
 
-        self.potential_fn.x_o = x_o
+        self.potential_fn = self.potential_fn.bind(x_o)
         log_potential = self.potential_fn(samples)
         elbo = log_potential - log_q
         return elbo
@@ -536,8 +535,6 @@ class IWElboOptimizer(ElboOptimizer):
         self.loss_name = "iwelbo"
         self.eps = 1e-7
         self.dreg = dreg
-        if not hasattr(self, 'HYPER_PARAMETERS'):
-            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["K", "dreg"]
         if dreg:
             self.stick_the_landing = True
@@ -638,7 +635,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         if hasattr(self.q, "clear_cache"):
             self.q.clear_cache()
         logq = self.q.log_prob(samples)
-        self.potential_fn.x_o = x_o
+        self.potential_fn = self.potential_fn.bind(x_o)
         logp = self.potential_fn(samples)
         with torch.no_grad():
             logweights = logp - logq
@@ -698,8 +695,6 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         self.alpha = alpha
         self.unbiased = unbiased
         super().__init__(*args, **kwargs)
-        if not hasattr(self, 'HYPER_PARAMETERS'):
-            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["alpha", "unbiased", "dreg"]
         self.eps = 1e-5
         self.dreg = dreg

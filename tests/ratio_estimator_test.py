@@ -24,9 +24,16 @@ class EmbeddingNet(torch.nn.Module):
         return x
 
 
+class ChannelLastCNNEmbedding(CNNEmbedding):
+    """Adapt channel-last test inputs to the CNN's channel-first contract."""
+
+    def forward(self, x):
+        return super().forward(x.movedim(-1, 1))
+
+
 def get_embedding_net(shape: torch.Size) -> torch.nn.Module:
     if len(shape) == 3:
-        return CNNEmbedding(shape[:2], shape[-1], kernel_size=2)
+        return ChannelLastCNNEmbedding(shape[:2], shape[-1], kernel_size=2)
     else:
         return EmbeddingNet(shape)
 

@@ -13,7 +13,7 @@ from sbi.inference.potentials.base_potential import BasePotential, CustomPotenti
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -81,6 +81,7 @@ class RejectionPosterior(NeuralPosterior):
         Args:
             device: The device to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
@@ -120,7 +121,7 @@ class RejectionPosterior(NeuralPosterior):
         )
         warn("The log-probability is unnormalized!", stacklevel=2)
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -174,7 +175,7 @@ class RejectionPosterior(NeuralPosterior):
             Samples from posterior.
         """
         num_samples = torch.Size(sample_shape).numel()
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         potential = partial(self.potential_fn, track_gradients=True)
 

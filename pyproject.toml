@@ -46,7 +46,8 @@ dependencies = [
 [project.optional-dependencies]
 tabpfn = ["tabpfn"]
 notebook = ["notebook"]
-pymc = ["pymc>=5.0.0"]
+# pymc>=5.28.1 on py>=3.12 avoids the pymc/arviz-1.x import break (see PR #1907).
+pymc = ["pymc>=5.0.0", "pymc>=5.28.1; python_version >= '3.12'"]
 pyro = ["pyro-ppl>=1.3.1"]
 all = ["sbi[pymc]", "sbi[pyro]", "sbi[tabpfn]"]
 doc = [
@@ -84,7 +85,7 @@ dev = [
 ]
 
 [project.urls]
-documentation = "https://sbi-dev.github.io/sbi/"
+documentation = "https://sbi.readthedocs.io/"
 source = "https://github.com/sbi-dev/sbi"
 tracker = "https://github.com/sbi-dev/sbi/issues"
 
@@ -149,7 +150,7 @@ xfail_strict = true
 # Pyright configuration
 [tool.pyright]
 include = ["sbi"]
-exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "mkdocs", "tests"]
+exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "tests"]
 pythonVersion = "3.10"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
@@ -165,3 +166,7 @@ reportIndexIssue = false
 reportReturnType = false
 reportPrivateImportUsage = false
 typeCheckingMode = "basic"
+
+[tool.uv]
+# No pre-releases in uv.lock; uv's fallback strategy picked a broken numba beta (#1969).
+prerelease = "disallow"

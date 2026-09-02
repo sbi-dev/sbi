@@ -19,13 +19,23 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     to generate samples from the target distribution by solving the SDE starting from
     the base (Gaussian) distribution.
 
+    See [2]_ for the denoising diffusion formulation and [3]_ for the
+    noise-conditional score network formulation.
+
     We assume the following SDE:
-                        dx = A(t)xdt + B(t)dW,
+
+    .. math::
+        dx = A(t) x \, dt + B(t) \, dW,
+
     where A(t) and B(t) are the drift and diffusion functions, respectively, and dW is
     a Wiener process. This will lead to marginal distribution of the form:
-                        p(xt|x0) = N(xt; mean_t(t)*x0, std_t(t)),
+
+    .. math::
+        p(x_t | x_0) = N(x_t; \text{mean}_t(t) \cdot x_0, \text{std}_t(t)^2),
+
     where mean_t(t) and std_t(t) are the conditional mean and standard deviation at a
-    given time t, respectively.
+    given time t, respectively. The second argument of N is the variance, which
+    matches `std_fn`.
 
     References
     ----------
@@ -127,14 +137,14 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # and std for the "base" distribution.
         # Create t on the correct device to avoid CPU/GPU mismatch
         t_tensor = torch.as_tensor([t_max], device=self.mean_0.device)
-        mean_t = self.approx_marginal_mean(t_tensor)
-        std_t = self.approx_marginal_std(t_tensor)
-        mean_t = torch.broadcast_to(mean_t, (1, *input_shape))
-        std_t = torch.broadcast_to(std_t, (1, *input_shape))
-
-        # Update the base distribution parameters
-        self._mean_base = mean_t
-        self._std_base = std_t
+        # `clone()`: these are buffers, and `load_state_dict` cannot write into the
+        # stride-0 view `broadcast_to` returns.
+        self._mean_base = torch.broadcast_to(
+            self.approx_marginal_mean(t_tensor), (1, *input_shape)
+        ).clone()
+        self._std_base = torch.broadcast_to(
+            self.approx_marginal_std(t_tensor), (1, *input_shape)
+        ).clone()
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         r"""Forward pass of the score estimator
@@ -152,7 +162,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
         """
-
         # Continue with standard processing (broadcast shapes etc.)
         batch_shape_input = input.shape[: -len(self.input_shape)]
         batch_shape_cond = condition.shape[: -len(self.condition_shape)]
@@ -248,6 +257,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             MSE between target score and network output, scaled by the weight function.
 
         """
+        if self.compose_enabled:
+            input = self.to_z(input)
+
         # Sample times from the Markov chain, use batch dimension
         if times is None:
             times = self.train_schedule(input.shape[0])

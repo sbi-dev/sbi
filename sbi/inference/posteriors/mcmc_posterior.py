@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 import inspect
 import warnings
-from copy import deepcopy
 from functools import partial
 from math import ceil
 from typing import Any, Callable, Dict, Literal, Optional, Union
@@ -30,7 +29,12 @@ from sbi.samplers.mcmc import (
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
-from sbi.utils.torchutils import ensure_theta_batched, tensor2numpy
+from sbi.utils.torchutils import (
+    ensure_theta_batched,
+    process_device,
+    tensor2numpy,
+)
+from sbi.utils.typechecks import validate_target_accept
 
 
 class MCMCPosterior(NeuralPosterior):
@@ -59,11 +63,11 @@ class MCMCPosterior(NeuralPosterior):
         num_chains: int = 20,
         init_strategy: Literal["proposal", "sir", "resample"] = "resample",
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
-        init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
         mp_context: Literal["fork", "spawn"] = "spawn",
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
+        target_accept: Optional[float] = None,
     ):
         """
         Args:
@@ -87,7 +91,7 @@ class MCMCPosterior(NeuralPosterior):
             init_strategy: The initialisation strategy for chains; `proposal` will draw
                 init locations from `proposal`, whereas `sir` will use Sequential-
                 Importance-Resampling (SIR). SIR initially samples
-                `init_strategy_num_candidates` from the `proposal`, evaluates all of
+                `num_candidate_samples` from the `proposal`, evaluates all of
                 them under the `potential_fn` and `proposal`, and then resamples the
                 initial locations with weights proportional to `exp(potential_fn -
                 proposal.log_prob`. `resample` is the same as `sir` but
@@ -96,9 +100,6 @@ class MCMCPosterior(NeuralPosterior):
                 init strategy, e.g., for `init_strategy=sir` this could be
                 `num_candidate_samples`, i.e., the number of candidates to find init
                 locations (internal default is `1000`), or `device`.
-            init_strategy_num_candidates: Number of candidates to find init
-                 locations in `init_strategy=sir` (deprecated, use
-                 init_strategy_parameters instead).
             num_workers: number of cpu cores used to parallelize mcmc
             mp_context: Multiprocessing start method, either `"fork"` or `"spawn"`
                 (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
@@ -107,17 +108,12 @@ class MCMCPosterior(NeuralPosterior):
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Deprecated, should not be passed.
+            target_accept: Target acceptance probability used only by the PyMC
+                samplers `hmc_pymc` and `nuts_pymc`; it is ignored by `slice_pymc`,
+                the Pyro samplers (`hmc_pyro`, `nuts_pyro`) and the numpy slice
+                samplers. If `None`, `hmc_pymc` uses `0.9` and `nuts_pymc` keeps
+                PyMC's backend default. See `MCMCPosteriorParameters` for details.
         """
-        if method == "slice":
-            warn(
-                "The Pyro-based slice sampler is deprecated, and the method `slice` "
-                "has been changed to `slice_np`, i.e., the custom "
-                "numpy-based slice sampler.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            method = "slice_np"
-
         thin = _process_thin_default(thin)
 
         super().__init__(
@@ -136,22 +132,14 @@ class MCMCPosterior(NeuralPosterior):
         self.init_strategy_parameters = init_strategy_parameters or {}
         self.num_workers = num_workers
         self.mp_context = mp_context
+        validate_target_accept(target_accept)
+        self.target_accept = target_accept
         self._posterior_sampler = None
+        self._mcmc_init_params: Optional[Tensor] = None
 
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
         self.x_shape = x_shape
-
-        if init_strategy_num_candidates is not None:
-            warn(
-                "Passing `init_strategy_num_candidates` is deprecated as of sbi "
-                "v0.19.0. Instead, use e.g., `init_strategy_parameters "
-                f"={'num_candidate_samples': 1000}`",
-                stacklevel=2,
-            )
-            self.init_strategy_parameters["num_candidate_samples"] = (
-                init_strategy_num_candidates
-            )
 
         self.potential_ = self._prepare_potential(method)
 
@@ -168,6 +156,7 @@ class MCMCPosterior(NeuralPosterior):
         Args:
             device: Device to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
@@ -237,7 +226,7 @@ class MCMCPosterior(NeuralPosterior):
         warn("The log-probability is unnormalized!", stacklevel=2)
 
         x = self._x_else_default_x(x)
-        self.potential_fn.set_x(x, x_is_iid=True)
+        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -257,6 +246,7 @@ class MCMCPosterior(NeuralPosterior):
         num_workers: Optional[int] = None,
         mp_context: Optional[str] = None,
         show_progress_bars: bool = True,
+        target_accept: Optional[float] = None,
     ) -> Tensor:
         r"""Draw samples from the approximate posterior distribution $p(\theta|x)$.
 
@@ -285,13 +275,17 @@ class MCMCPosterior(NeuralPosterior):
             mp_context: Multiprocessing context (`fork` or `spawn`). If not provided,
                 uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
+            target_accept: Target acceptance probability used only by the PyMC
+                samplers `hmc_pymc` and `nuts_pymc`; it is ignored by `slice_pymc`,
+                the Pyro samplers (`hmc_pyro`, `nuts_pyro`) and the numpy slice
+                samplers. If not provided, uses the value specified at initialization.
 
         Returns:
             Samples from posterior.
         """
 
         x = self._x_else_default_x(x)
-        self.potential_fn.set_x(x, x_is_iid=True)
+        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -301,6 +295,10 @@ class MCMCPosterior(NeuralPosterior):
         init_strategy = self.init_strategy if init_strategy is None else init_strategy
         num_workers = self.num_workers if num_workers is None else num_workers
         mp_context = self.mp_context if mp_context is None else mp_context
+        if target_accept is None:
+            target_accept = self.target_accept  # already validated in `__init__`.
+        else:
+            validate_target_accept(target_accept)
         init_strategy_parameters = (
             self.init_strategy_parameters
             if init_strategy_parameters is None
@@ -354,6 +352,7 @@ class MCMCPosterior(NeuralPosterior):
                     num_chains=num_chains,
                     show_progress_bars=show_progress_bars,
                     mp_context=mp_context,
+                    target_accept=target_accept,
                 )
             else:
                 raise NameError(f"The sampling method {method} is not implemented!")
@@ -451,7 +450,7 @@ class MCMCPosterior(NeuralPosterior):
         # in the order of the observations.
         x_ = x.repeat_interleave(num_chains, dim=0)
 
-        self.potential_fn.set_x(x_, x_is_iid=False)
+        self.potential_fn = self.potential_fn.bind(x_, x_is_iid=False)
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
         # For each observation in the batch, we have num_chains independent chains.
@@ -536,22 +535,9 @@ class MCMCPosterior(NeuralPosterior):
 
         Returns: Initialization function.
         """
-        if init_strategy == "proposal" or init_strategy == "prior":
-            if init_strategy == "prior":
-                warn(
-                    "You set `init_strategy=prior`. As of sbi v0.18.0, this is "
-                    "deprecated and it will be removed in a future release. Use "
-                    "`init_strategy=proposal` instead.",
-                    stacklevel=2,
-                )
+        if init_strategy == "proposal":
             return lambda: proposal_init(proposal, transform=transform, **kwargs)
         elif init_strategy == "sir":
-            warn(
-                "As of sbi v0.19.0, the behavior of the SIR initialization for MCMC "
-                "has changed. If you wish to restore the behavior of sbi v0.18.0, set "
-                "`init_strategy='resample'.`",
-                stacklevel=2,
-            )
             return lambda: sir_init(
                 proposal, potential_fn, transform=transform, **kwargs
             )
@@ -560,10 +546,45 @@ class MCMCPosterior(NeuralPosterior):
                 proposal, potential_fn, transform=transform, **kwargs
             )
         elif init_strategy == "latest_sample":
-            latest_sample = IterateParameters(self._mcmc_init_params, **kwargs)
-            return latest_sample
+            # `getattr`: posteriors unpickled from older sbi versions lack the
+            # attribute entirely.
+            stored_params = getattr(self, "_mcmc_init_params", None)
+            if stored_params is None:
+                raise ValueError(
+                    "`init_strategy='latest_sample'` continues the chains of an "
+                    "earlier `sample()` call, but this posterior holds no chain "
+                    "states. Only `method='slice_np'` and "
+                    "`method='slice_np_vectorized'` record them, and only after a "
+                    "`sample()` or `sample_batched()` call. Use another init "
+                    "strategy, for example 'proposal' or 'sir'."
+                )
+            return IterateParameters(stored_params, **kwargs)
         else:
-            raise NotImplementedError
+            raise NotImplementedError(
+                f"Init strategy {init_strategy} is not implemented."
+            )
+
+    def _check_latest_sample_supply(self, init_strategy: str, num_needed: int) -> None:
+        """Fail before sampling if `latest_sample` cannot supply enough chain states.
+
+        Args:
+            init_strategy: The requested init strategy.
+            num_needed: Number of initial parameters this call draws.
+
+        Raises:
+            ValueError: If the last run stored fewer states than this call needs.
+        """
+        stored_params = getattr(self, "_mcmc_init_params", None)
+        if init_strategy != "latest_sample" or stored_params is None:
+            return
+
+        stored = len(stored_params)
+        if num_needed > stored:
+            raise ValueError(
+                f"`init_strategy='latest_sample'` has {stored} chain state(s) from "
+                f"the last run, but this call needs {num_needed}. Run at most "
+                f"{stored} chain(s), or use another init strategy."
+            )
 
     def _get_initial_params(
         self,
@@ -588,6 +609,8 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Tensor: initial parameters, one for each chain
         """
+        self._check_latest_sample_supply(init_strategy, num_chains)
+
         # Build init function
         init_fn = self._build_mcmc_init_fn(
             self.proposal,
@@ -662,25 +685,28 @@ class MCMCPosterior(NeuralPosterior):
             Tensor: initial parameters, one for each chain
         """
 
-        potential_ = deepcopy(self.potential_fn)
+        # One init per chain per observation, all drawn from the same iterator.
+        self._check_latest_sample_supply(init_strategy, len(x) * num_chains_per_x)
+
+        potential_ = self.potential_fn
         initial_params = []
-        init_fn = self._build_mcmc_init_fn(
-            self.proposal,
-            potential_fn=potential_,
-            transform=self.theta_transform,
-            init_strategy=init_strategy,  # type: ignore
-            **kwargs,
-        )
         for xi in x:
-            # Build init function
-            potential_.set_x(xi)
+            # Build init function with bound potential for this specific xi
+            potential_bound = potential_.bind(xi)
+            init_fn = self._build_mcmc_init_fn(
+                self.proposal,
+                potential_fn=potential_bound,
+                transform=self.theta_transform,
+                init_strategy=init_strategy,  # type: ignore
+                **kwargs,
+            )
 
             # Parallelize inits for resampling or sir.
             if num_workers > 1 and (
                 init_strategy == "resample" or init_strategy == "sir"
             ):
 
-                def seeded_init_fn(seed):
+                def seeded_init_fn(seed, init_fn=init_fn):
                     torch.manual_seed(seed)
                     return init_fn()
 
@@ -816,11 +842,13 @@ class MCMCPosterior(NeuralPosterior):
         try:
             from pyro.infer.mcmc import HMC, NUTS
             from pyro.infer.mcmc.api import MCMC
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
-                "pyro-ppl is required for Pyro-based MCMC. "
-                "Install it with: pip install 'sbi[pyro]'"
-            ) from None
+                "Failed to import the Pyro sampler. If pyro-ppl is not installed, "
+                "install it with `pip install 'sbi[pyro]'`. If pyro-ppl is "
+                "installed, the import failed for another reason (e.g. an "
+                f"incompatible dependency): {e}"
+            ) from e
 
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
@@ -860,6 +888,7 @@ class MCMCPosterior(NeuralPosterior):
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
         mp_context: str = "spawn",
+        target_accept: Optional[float] = None,
     ) -> Tensor:
         r"""Return samples obtained using PyMC's HMC, NUTS or slice samplers.
 
@@ -869,23 +898,28 @@ class MCMCPosterior(NeuralPosterior):
                 is picklable for PyMC MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
             initial_params: Initial parameters for MCMC chain.
-            mcmc_method: mcmc_method: Pyro MCMC method to use, either `"hmc_pymc"` or
+            mcmc_method: PyMC MCMC method to use, either `"hmc_pymc"`,
                 `"slice_pymc"`, or `"nuts_pymc"` (default).
             thin: Thinning (subsampling) factor, default 1 (no thinning).
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progress_bars: Whether to show a progressbar during sampling.
+            target_accept: Target acceptance probability for HMC/NUTS. If `None`,
+                HMC uses `0.9` and NUTS keeps PyMC's default. Ignored by the slice
+                sampler.
 
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
         try:
             from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
-                "pymc is required for PyMC-based MCMC. "
-                "Install it with: pip install 'sbi[pymc]'"
-            ) from None
+                "Failed to import the PyMC sampler. If pymc is not installed, "
+                "install it with `pip install 'sbi[pymc]'`. If pymc is installed, "
+                "the import failed for another reason (e.g. an incompatible "
+                f"dependency): {e}"
+            ) from e
 
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
@@ -902,6 +936,7 @@ class MCMCPosterior(NeuralPosterior):
             progressbar=show_progress_bars,
             param_name=self.param_name,
             device=self._device,
+            target_accept=target_accept,
         )
         samples = sampler.run()
         samples = torch.from_numpy(samples).to(dtype=torch.float32, device=self._device)
@@ -933,13 +968,6 @@ class MCMCPosterior(NeuralPosterior):
             track_gradients = False
             pyro = False
         else:
-            if "hmc" in method or "nuts" in method:
-                warn(
-                    "The kwargs 'hmc' and 'nuts' are deprecated. Use 'hmc_pyro', "
-                    "'nuts_pyro', 'hmc_pymc', or 'nuts_pymc' instead.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
             raise NotImplementedError(f"MCMC method {method} is not implemented.")
 
         prepared_potential = partial(

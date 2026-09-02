@@ -11,7 +11,7 @@ This module tests both:
 
 from __future__ import annotations
 
-import tempfile
+import pickle
 from copy import deepcopy
 
 import numpy as np
@@ -28,12 +28,14 @@ from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
 from sbi.neural_nets.factory import ZukoFlowType
+from sbi.samplers.vi.vi_utils import AdaptedVariationalDistribution, LearnableGaussian
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import MultipleIndependent
 from sbi.utils.metrics import c2st, check_c2st
+from sbi.utils.user_input_checks import process_x
 
 # Supported variational families for VI
 FLOWS = ["maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"]
@@ -57,6 +59,15 @@ class FakePotential(BasePotential):
     def allow_iid_x(self) -> bool:
         return True
 
+    def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
+        """Create new potential with x bound, without mutable state."""
+
+        bound = FakePotential(prior=self.prior, device=self.device)
+        x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        return bound
+
 
 def make_tractable_potential(target_distribution, prior):
     """Create a potential function from a known target distribution."""
@@ -69,6 +80,17 @@ def make_tractable_potential(target_distribution, prior):
 
         def allow_iid_x(self) -> bool:
             return True
+
+        def bind(
+            self, x_o: torch.Tensor, x_is_iid: bool = True
+        ) -> "TractablePotential":
+            """Create new potential with x bound, without mutable state."""
+
+            bound = TractablePotential(prior=self.prior, device=self.device)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
+            return bound
 
     return TractablePotential(prior=prior)
 
@@ -275,72 +297,278 @@ def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int):
     check_c2st(samples, target_samples, alg="slice_np")
 
 
+# =============================================================================
+# Serialization
+# =============================================================================
+
+
+def _build_diag_gaussian_q(event_shape, link_transform, device="cpu"):
+    """A user-style `q` builder. Module-level, since pickling cannot capture a local."""
+    return LearnableGaussian(
+        dim=event_shape[0],
+        full_covariance=False,
+        link_transform=link_transform,
+        device=device,
+    )
+
+
+class _ParamNormal(torch.distributions.Independent):
+    """A base distribution that exposes its own trainable tensors."""
+
+    def __init__(self, loc, scale):
+        base = torch.distributions.Normal(loc, scale, validate_args=False)
+        super().__init__(base, 1, validate_args=False)
+        self._params = [loc, scale]
+
+    def parameters(self):
+        return iter(self._params)
+
+
+class _ModuleNormal(torch.nn.Module, torch.distributions.Distribution):
+    """A trainable distribution built as a module, a natural way to write one."""
+
+    support = torch.distributions.constraints.real_vector
+    has_rsample = True
+    arg_constraints: dict = {}
+
+    def __init__(self, num_dim: int):
+        torch.nn.Module.__init__(self)
+        self.loc = torch.nn.Parameter(zeros(num_dim))
+        self.log_scale = torch.nn.Parameter(zeros(num_dim))
+        torch.distributions.Distribution.__init__(
+            self, torch.Size([]), torch.Size([num_dim]), validate_args=False
+        )
+
+    def _dist(self):
+        return torch.distributions.Independent(
+            torch.distributions.Normal(self.loc, self.log_scale.exp()), 1
+        )
+
+    def rsample(self, sample_shape=torch.Size()):
+        return self._dist().rsample(sample_shape)
+
+    def log_prob(self, value):
+        return self._dist().log_prob(value)
+
+
+def _make_posterior(kind: str, num_dim: int = 2, prior=None):
+    """Build an untrained VIPosterior for each way of specifying `q`.
+
+    Args:
+        kind: One of `Q_KINDS`.
+        num_dim: Dimensionality of the problem.
+        prior: Overrides the default unbounded prior. When given, the link transform is
+            derived from it rather than forced to the identity, which is what makes a
+            bounded prior meaningful.
+    """
+    extra = (
+        {} if prior is not None else {"theta_transform": torch_tf.identity_transform}
+    )
+    prior = (
+        prior if prior is not None else MultivariateNormal(zeros(num_dim), eye(num_dim))
+    )
+
+    if kind in ("distribution", "transformed"):
+        loc = zeros(num_dim, requires_grad=True)
+        scale = ones(num_dim, requires_grad=True)
+        if kind == "distribution":
+            q = torch.distributions.Independent(
+                torch.distributions.Normal(loc, scale), 1
+            )
+            extra["parameters"] = [loc, scale]
+        else:
+            # Trainable tensors sit on the base, so `parameters=` stays optional.
+            q = torch.distributions.TransformedDistribution(
+                _ParamNormal(loc, scale),
+                [torch_tf.AffineTransform(zeros(num_dim), ones(num_dim))],
+            )
+    elif kind == "callable":
+        q = _build_diag_gaussian_q
+    else:
+        q = "maf" if kind == "flow" else "gaussian"
+
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q=q, **extra)
+    posterior.set_default_x(zeros(1, num_dim))
+    return posterior
+
+
+TRAIN_KWARGS = dict(
+    max_num_iters=10, check_for_convergence=False, quality_control=False
+)
+Q_KINDS = ["flow", "gaussian", "callable", "distribution", "transformed"]
+
+
+@pytest.mark.parametrize("kind", Q_KINDS)
+def test_trained_posterior_survives_roundtrip(kind: str):
+    """Pickling preserves training, leaves the original untouched, and the copy
+    stays fully usable."""
+    num_dim = 2
+    posterior = _make_posterior(kind, num_dim)
+    posterior.train(**TRAIN_KWARGS)
+    trained_on, optimizer = posterior._trained_on, posterior._optimizer
+
+    torch.manual_seed(0)
+    expected = posterior.sample((5,))
+    reloaded = pickle.loads(pickle.dumps(posterior))
+
+    assert posterior._trained_on is trained_on
+    assert posterior._optimizer is optimizer
+    assert reloaded._trained_on is not None
+    torch.manual_seed(0)
+    assert torch.allclose(reloaded.sample((5,)), expected)
+    reloaded.train(**TRAIN_KWARGS, retrain_from_scratch=True)
+    assert reloaded.sample((5,)).shape == (5, num_dim)
+
+
+# Deepcopy shares the pickle path, so one seeded compare per family suffices.
 @pytest.mark.parametrize("q", FLOWS)
-def test_deepcopy_support(q: str):
-    """Test that VIPosterior supports deepcopy for all flow types."""
+def test_every_flow_family_pickles(q: str):
+    """Each family builds different modules, which all must survive pickling."""
     num_dim = 2
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    potential_fn = FakePotential(prior=prior)
-    theta_transform = torch_tf.identity_transform
+    posterior = VIPosterior(
+        FakePotential(prior=prior),
+        prior,
+        q=q,
+        theta_transform=torch_tf.identity_transform,
+    )
 
-    posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
-    posterior_copy = deepcopy(posterior)
-    posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    assert posterior._x != posterior_copy._x, "Deepcopy should create independent copy"
+    reloaded = pickle.loads(pickle.dumps(posterior))
 
-    posterior_copy = deepcopy(posterior)
-    assert (posterior._x == posterior_copy._x).all(), "Deepcopy should preserve values"
-
-    # Verify samples are reproducible
     torch.manual_seed(0)
-    if hasattr(posterior._q, "rsample"):
-        s1 = posterior._q.rsample()
-    else:
-        s1 = posterior._q.sample((1,)).squeeze(0)
+    expected = posterior._q.sample((3,))
     torch.manual_seed(0)
-    if hasattr(posterior_copy._q, "rsample"):
-        s2 = posterior_copy._q.rsample()
-    else:
-        s2 = posterior_copy._q.sample((1,)).squeeze(0)
-    assert torch.allclose(s1, s2), "Samples should match after deepcopy"
-
-    # Test deepcopy after sampling (can produce nonleaf tensors in cache)
-    if hasattr(posterior.q, "rsample"):
-        posterior.q.rsample()
-    else:
-        posterior.q.sample((1,))
-    deepcopy(posterior)  # Should not raise
+    assert torch.allclose(reloaded._q.sample((3,)), expected)
 
 
-@pytest.mark.parametrize("q", FLOWS)
-def test_pickle_support(q: str):
-    """Test that VIPosterior can be saved and loaded via pickle."""
+def test_deepcopy_of_trained_posterior_rewires_optimizer():
+    """A copy's optimizer must step the copy's own `q`, not the original's."""
+    posterior = _make_posterior("gaussian")
+    posterior.train(**TRAIN_KWARGS)
+
+    copied = deepcopy(posterior)
+    copied.train(**TRAIN_KWARGS)
+
+    assert copied._optimizer.q is copied._q
+    assert copied._optimizer.q is not posterior._q
+
+
+def test_multi_round_q_is_an_independent_warm_start():
+    """Passing a trained posterior as `q` copies its flow rather than aliasing it."""
+    first = _make_posterior("flow")
+    first.train(**TRAIN_KWARGS)
+
+    prior = MultivariateNormal(zeros(2), eye(2))
+    second = VIPosterior(FakePotential(prior=prior), prior, q=first)
+
+    assert second._q is not first._q
+    assert all(
+        torch.allclose(a, b)
+        for a, b in zip(second._q.parameters(), first._q.parameters(), strict=True)
+    )
+
+
+def test_amortized_posterior_survives_roundtrip():
+    """Amortized mode had no serialization coverage."""
     num_dim = 2
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    potential_fn = FakePotential(prior=prior)
-    theta_transform = torch_tf.identity_transform
+    posterior = _make_posterior("flow", num_dim)
+    theta = posterior._prior.sample((128,))
+    posterior.train_amortized(
+        theta, torch.randn(128, num_dim), max_num_iters=3, batch_size=16
+    )
 
-    posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
-    posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
+    x_o = zeros(1, num_dim)
+    for candidate in (pickle.loads(pickle.dumps(posterior)), deepcopy(posterior)):
+        assert candidate._mode == "amortized"
+        assert candidate.sample((5,), x=x_o).shape == (5, num_dim)
 
-    with tempfile.NamedTemporaryFile(suffix=".pt") as f:
-        torch.save(posterior, f.name)
-        posterior_loaded = torch.load(f.name, weights_only=False)
-        assert (posterior._x == posterior_loaded._x).all()
 
-    # Verify samples are reproducible
-    torch.manual_seed(0)
-    if hasattr(posterior._q, "rsample"):
-        s1 = posterior._q.rsample()
+def test_retrain_from_scratch_with_bounded_prior():
+    """Retraining an already-wrapped `q` must not apply the link transform twice.
+
+    Needs a bounded prior: with an unbounded one the link transform is the identity
+    and applying it twice is unobservable.
+    """
+    num_dim = 2
+    prior = torch.distributions.Independent(Gamma(2 * ones(num_dim), ones(num_dim)), 1)
+    posterior = _make_posterior("distribution", num_dim, prior=prior)
+    posterior.train(**TRAIN_KWARGS)
+
+    posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
+
+    samples = posterior.sample((20,))
+    assert samples.shape == (20, num_dim)
+    assert torch.isfinite(posterior.log_prob(samples)).all()
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_parameters_outside_q_and_its_base_must_be_passed(nested: bool):
+    """sbi only looks on `q` and its base, so anything else must fail loudly.
+
+    Torch keeps a `ComposeTransform` as one entry in `q.transforms`, so a transform
+    nested inside one has to be found too.
+    """
+    num_dim = 2
+    transform = torch_tf.AffineTransform(zeros(num_dim), ones(num_dim))
+    transform.parameters = lambda: iter(())  # A transform owning trainable tensors.
+    q = torch.distributions.TransformedDistribution(
+        _ParamNormal(zeros(num_dim, requires_grad=True), ones(num_dim)),
+        [torch_tf.ComposeTransform([transform]) if nested else transform],
+    )
+
+    with pytest.raises(ValueError, match="transforms"):
+        AdaptedVariationalDistribution(
+            q,
+            MultivariateNormal(zeros(num_dim), eye(num_dim)),
+            torch_tf.identity_transform,
+        )
+
+
+# The three wrapper shapes: parameters passed explicitly, auto-detected from the
+# base, and exposed by a module.
+@pytest.mark.parametrize("kind", ["distribution", "transformed", "module"])
+def test_adapted_q_moves_across_devices(kind: str):
+    """`VIPosterior.to` only moves a `q` that offers `to`, so the wrapper must.
+
+    A module moves to the meta device, observable without a GPU. Plain tensors move
+    by `.data` reassignment, which meta refuses, so those kinds need real hardware.
+    """
+    num_dim = 2
+    if kind == "module":
+        device = "meta"
+        prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+        posterior = VIPosterior(
+            FakePotential(prior=prior),
+            prior,
+            q=_ModuleNormal(num_dim),
+            theta_transform=torch_tf.identity_transform,
+        )
     else:
-        s1 = posterior._q.sample((1,)).squeeze(0)
-    torch.manual_seed(0)
-    if hasattr(posterior_loaded._q, "rsample"):
-        s2 = posterior_loaded._q.rsample()
-    else:
-        s2 = posterior_loaded._q.sample((1,)).squeeze(0)
+        if torch.backends.mps.is_available():
+            device = "mps"
+        elif torch.cuda.is_available():
+            device = "cuda"
+        else:
+            pytest.skip("Moving plain tensors needs a real second device.")
+        posterior = _make_posterior(kind, num_dim)
 
-    assert torch.allclose(s1, s2), "Samples should match after unpickling"
+    posterior.to(device)
+
+    assert all(p.device.type == device for p in posterior.q.parameters())
+
+
+def test_retrain_fails_after_setting_an_already_built_q():
+    """An already-built `q` cannot be rebuilt, so retraining must fail loudly."""
+    posterior = _make_posterior("flow")
+    replacement = LearnableGaussian(
+        dim=2, full_covariance=False, link_transform=posterior.link_transform
+    )
+
+    posterior.set_q(replacement)
+
+    assert posterior.q is replacement
+    with pytest.raises(ValueError, match="Cannot rebuild"):
+        posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
 
 
 def test_vi_posterior_interface():
@@ -706,3 +934,33 @@ def test_amortized_vi_with_fake_potential():
     log_probs = posterior.log_prob(samples, x=x_test)
     assert log_probs.shape == (100,)
     assert torch.isfinite(log_probs).all()
+
+
+def test_vi_posterior_stores_resolved_device():
+    """Test that potential and posterior resolve devices, whatever the spelling."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    potential_fn = FakePotential(prior=prior, device="cpu:0")
+    assert potential_fn.device == "cpu"
+
+    potential_fn.to("cpu:0")
+    assert potential_fn.device == "cpu"
+
+    posterior = VIPosterior(potential_fn, prior, device="cpu:0")
+    assert posterior._device == "cpu"
+
+    posterior.to("cpu:0")
+    assert posterior._device == "cpu"
+
+
+def test_learnable_gaussian_ignores_the_upper_triangle_of_scale_tril():
+    """`scale_tril` is optimized unconstrained, so it drifts off the identity.
+
+    `rsample` then used the full matrix while `log_prob` ignored the upper triangle,
+    which biased the ELBO by the difference.
+    """
+    q = LearnableGaussian(dim=3, full_covariance=True)
+    with torch.no_grad():
+        q.scale_tril.add_(0.5)
+
+    scale_tril = q._base_dist().scale_tril
+    assert torch.equal(scale_tril, scale_tril.tril())

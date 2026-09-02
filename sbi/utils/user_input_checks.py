@@ -2,24 +2,43 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import torch
 from numpy import ndarray
-from scipy.stats._distn_infrastructure import rv_frozen
-from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
-from sbi.sbi_types import Array
+from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
-from sbi.utils.torchutils import BoxUniform, assert_all_finite, atleast_2d
+from sbi.utils.torchutils import (
+    BoxUniform,
+    atleast_2d,
+    canonical_device,
+    set_validate_args,
+)
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     OneDimPriorWrapper,
     PytorchReturnTypeWrapper,
 )
+
+if TYPE_CHECKING:
+    from sbi.neural_nets.net_builders.estimator_configs import (
+        _EstimatorBuilderBase,
+        _PerModelConfigBase,
+    )
 
 
 def check_prior(prior: Any) -> None:
@@ -30,13 +49,13 @@ def check_prior(prior: Any) -> None:
     else:
         assert isinstance(
             prior, Distribution
-        ), """Prior must be a PyTorch Distribution. See FAQ 7 for more details or use
-        `sbi.utils.user_input_checks.process_prior` for wrapping scipy and lists of
-        independent priors."""
+        ), """Prior must be a PyTorch Distribution. Use
+        `sbi.utils.user_input_checks.process_prior` for wrapping custom priors and
+        lists of independent priors."""
 
 
 def process_prior(
-    prior: Union[Sequence[Distribution], Distribution, rv_frozen, multi_rv_frozen],
+    prior: Union[Sequence[Distribution], Distribution, CustomPrior],
     custom_prior_wrapper_kwargs: Optional[Dict] = None,
 ) -> Tuple[Distribution, int, bool]:
     """
@@ -100,13 +119,6 @@ def process_prior(
 
     if isinstance(prior, Distribution):
         return process_pytorch_prior(prior)
-
-    # If prior is given as `scipy.stats` object, wrap as PyTorch.
-    elif isinstance(prior, (rv_frozen, multi_rv_frozen)):
-        raise NotImplementedError(
-            "Passing a prior as scipy.stats object is deprecated. "
-            "Please pass it as a PyTorch Distribution."
-        )
 
     # Otherwise it is a custom prior - check for `.sample()` and `.log_prob()`.
     else:
@@ -210,7 +222,7 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
 
     # Turn off validation of input arguments to allow `log_prob()` on samples outside
     # of the support.
-    prior.set_default_validate_args(False)
+    set_validate_args(prior, False)
 
     # Reject unwrapped scalar priors.
     # This will reject Uniform priors with dimension larger than 1.
@@ -612,8 +624,6 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
-    assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
-
     if x_event_shape is not None and len(x_event_shape) > len(x.shape):
         raise ValueError(
             f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
@@ -635,51 +645,6 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
             f"the shape of simulated data x ({x_event_shape})."
         )
     return x
-
-
-def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
-    """Prepare simulator and prior for usage in sbi.
-
-    NOTE: This method is deprecated as of sbi version v0.23.0. and will be removed in a
-    future release. Please use `process_prior` and `process_simulator` in the future.
-    This is a wrapper around `process_prior` and `process_simulator` which can be
-    used in isolation as well.
-
-    Attempts to meet the following requirements by reshaping and type-casting:
-
-    - the simulator function receives as input and returns a Tensor.<br/>
-    - the simulator can simulate batches of parameters and return batches of data.<br/>
-    - the prior does not produce batches and samples and evaluates to Tensor.<br/>
-    - the output shape is a `torch.Size((1,N))` (i.e, has a leading batch dimension 1).
-
-    If this is not possible, a suitable exception will be raised.
-
-    Args:
-        simulator: Simulator as provided by the user.
-        prior: Prior as provided by the user.
-
-    Returns:
-        Tuple (simulator, prior) checked and matching the requirements of sbi.
-    """
-
-    warnings.warn(
-        "This method is deprecated as of sbi version v0.23.0. and will be removed in a \
-        future release."
-        "Please use `process_prior` and `process_simulator` in the future.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    # Check prior, return PyTorch prior.
-    prior, _, prior_returns_numpy = process_prior(prior)
-
-    # Check simulator, returns PyTorch simulator able to simulate batches.
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-
-    # Consistency check after making ready for sbi.
-    check_sbi_inputs(simulator, prior)
-
-    return simulator, prior
 
 
 def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
@@ -710,14 +675,34 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
         num_samples={num_prior_samples}."""
 
 
-def check_estimator_arg(estimator: Union[str, Callable]) -> None:
-    """Check (density or ratio) estimator argument passed by the user."""
-    assert isinstance(estimator, str) or (
-        isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
-    ), (
-        "The passed density estimator / classifier must be a string or a function "
-        f"returning a nn.Module, but is {type(estimator)}"
-    )
+def check_estimator_arg(
+    estimator: Union[str, Callable, "_PerModelConfigBase", "_EstimatorBuilderBase"],
+) -> None:
+    """Check (density or ratio) estimator argument passed by the user.
+
+    Accepts a string identifier, an estimator config, or a build function
+    returning an ``nn.Module``.
+
+    Args:
+        estimator: The estimator argument to check.
+    """
+    from sbi.neural_nets.net_builders.estimator_configs import _ESTIMATOR_CONFIG_BASES
+
+    if isinstance(estimator, type) and issubclass(estimator, _ESTIMATOR_CONFIG_BASES):
+        raise TypeError(
+            f"Got the config class {estimator.__name__}, not an instance. "
+            f"Use {estimator.__name__}()."
+        )
+
+    if not (
+        isinstance(estimator, (str, *_ESTIMATOR_CONFIG_BASES))
+        or (isinstance(estimator, Callable) and not isinstance(estimator, nn.Module))
+    ):
+        raise TypeError(
+            "The passed density estimator / classifier must be a string, "
+            "an estimator config (e.g. NSFConfig), or a "
+            f"function returning a nn.Module, but is {type(estimator)}"
+        )
 
 
 def validate_theta_and_x(
@@ -758,7 +743,7 @@ def validate_theta_and_x(
     assert theta.dtype == float32, "Type of parameters must be float32."
     assert x.dtype == float32, "Type of simulator outputs must be float32."
 
-    if str(x.device) != str(data_device):
+    if canonical_device(x.device) != canonical_device(data_device):
         warnings.warn(
             f"Data x has device '{x.device}'. "
             f"Moving x to the data_device '{data_device}'. "
@@ -767,7 +752,7 @@ def validate_theta_and_x(
         )
         x = x.to(data_device)
 
-    if str(theta.device) != str(data_device):
+    if canonical_device(theta.device) != canonical_device(data_device):
         warnings.warn(
             f"Parameters theta has device '{theta.device}'. "
             f"Moving theta to the data_device '{data_device}'. "

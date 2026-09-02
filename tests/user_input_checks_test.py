@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import pickle
 from typing import Callable, Tuple
 
 import numpy as np
@@ -20,6 +21,13 @@ from torch.distributions import (
 
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+)
+from sbi.inference.potentials.posterior_based_potential import (
+    posterior_estimator_based_potential,
+)
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MultivariateGaussianMDN,
 )
@@ -108,6 +116,11 @@ torch.set_default_dtype(torch.float32)
             Exponential(torch.tensor([3.0])),
             dict(),
         ),
+        (
+            OneDimPriorWrapper,
+            Exponential(torch.tensor([3.0])),
+            dict(validate_args=True),
+        ),
     ),
 )
 def test_prior_wrappers(wrapper, prior, kwargs):
@@ -135,6 +148,60 @@ def test_prior_wrappers(wrapper, prior, kwargs):
 
     # For 1D priors, the `log_prob()` should not have a batch dim.
     assert len(prior.log_prob(prior.sample((10,))).shape) == 1
+
+
+def test_multiple_independent_sets_validation_per_instance():
+    """`validate_args` must configure the members, not torch's global default."""
+    default = torch.distributions.Distribution._validate_args
+    prior = MultipleIndependent(
+        [Gamma(ones(1), ones(1)), BoxUniform(zeros(1), ones(1))],
+        validate_args=True,
+    )
+
+    assert torch.distributions.Distribution._validate_args is default
+    assert prior._validate_args
+    assert all(d._validate_args for d in prior.dists)
+    assert prior.dists[1].base_dist._validate_args
+
+
+@pytest.mark.parametrize(
+    "build",
+    (
+        lambda: MultipleIndependent(
+            [Gamma(ones(1), ones(1)), Beta(2 * ones(1), 2 * ones(1))],
+            validate_args=False,
+        ),
+        lambda: OneDimPriorWrapper(Exponential(3 * ones(1)), validate_args=False),
+    ),
+    ids=("MultipleIndependent", "OneDimPriorWrapper"),
+)
+def test_validate_args_false_survives_a_polluted_global(build):
+    """MCMC evaluates out-of-support and NaN values and needs `log_prob` not to raise.
+
+    These wrappers delegate `log_prob`, so the members must carry the setting too.
+    """
+    default = torch.distributions.Distribution._validate_args
+    try:
+        torch.distributions.Distribution._validate_args = True
+        prior = build()
+        bad = torch.full((1, prior.sample().numel()), float("nan"))
+
+        assert prior.log_prob(bad).isnan().all()
+        # Turning the global off would silence the raise too, so pin it untouched.
+        assert torch.distributions.Distribution._validate_args
+    finally:
+        torch.distributions.Distribution._validate_args = default
+
+
+def test_one_dim_wrapper_constructs_with_validation_on():
+    """The wrapper must construct and honour `validate_args=True`.
+
+    Torch reads `arg_constraints` during `__init__`, which dereferences `self.prior`.
+    """
+    prior = OneDimPriorWrapper(Exponential(torch.tensor([3.0])), validate_args=True)
+
+    assert prior._validate_args
+    assert prior.log_prob(prior.sample((3,))).shape == (3,)
 
 
 def test_reinterpreted_batch_dim_prior():
@@ -212,25 +279,78 @@ def test_process_prior(prior):
         (ones(10, 3), torch.Size([10, 3])),  # 2D data / iid NPE
         pytest.param(ones(10, 3), None),  # 2D data / iid NPE without x_shape
         (ones(10, 10), torch.Size([10])),  # iid likelihood based
-        pytest.param(
+        (
             torch.cat([ones(3), torch.tensor([float("nan")]), ones(3)]),  # contains nan
             torch.Size([7]),
-            marks=pytest.mark.xfail(
-                reason="process_x must raise error if x contains NaNs or Infs."
-            ),
         ),
-        pytest.param(
+        (
             # contains inf
             torch.cat([ones(3), torch.tensor([float("inf")]), ones(3)]).expand(10, -1),
             torch.Size([7]),
-            marks=pytest.mark.xfail(
-                reason="process_x must raise error if x contains NaNs or Infs."
-            ),
         ),
     ),
 )
 def test_process_x(x, x_shape):
     process_x(x, x_shape)
+
+
+@pytest.fixture(scope="module")
+def trained_npe():
+    """A minimally trained NPE, shared by the `check_finite_x` tests."""
+    prior = BoxUniform(zeros(2), ones(2))
+    inference = NPE_C(prior=prior, show_progress_bars=False)
+    theta = prior.sample((100,))
+    estimator = inference.append_simulations(theta, torch.randn(100, 2)).train(
+        max_num_epochs=1
+    )
+    return prior, inference, estimator
+
+
+@pytest.mark.parametrize("check_finite_x", (True, False))
+def test_posterior_check_finite_x(check_finite_x: bool, trained_npe):
+    """`x_o` with NaNs must raise unless the user opts out via `check_finite_x`.
+
+    Covers both guarded paths: `set_default_x` and, via `log_prob(x=...)`,
+    `_x_else_default_x`.
+    """
+    prior, inference, _ = trained_npe
+    posterior = inference.build_posterior(
+        posterior_parameters=DirectPosteriorParameters(check_finite_x=check_finite_x)
+    )
+    x_with_nan = torch.tensor([0.0, float("nan")])
+
+    if check_finite_x:
+        with pytest.raises(ValueError, match="NaN/Inf"):
+            posterior.set_default_x(x_with_nan)
+        with pytest.raises(ValueError, match="NaN/Inf"):
+            posterior.log_prob(prior.sample((2,)), x=x_with_nan)
+    else:
+        posterior.set_default_x(x_with_nan)
+        assert posterior.default_x.isnan().any()
+
+
+def test_check_finite_x_on_preconditioned_potential(trained_npe):
+    """`x_o` passed to the potential builder (#573) must be checked too."""
+    prior, _, estimator = trained_npe
+    potential_fn, theta_transform = posterior_estimator_based_potential(
+        estimator, prior, x_o=torch.tensor([[0.0, float("nan")]])
+    )
+
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        MCMCPosterior(potential_fn, theta_transform=theta_transform, proposal=prior)
+
+
+def test_posterior_unpickles_without_check_finite_x(trained_npe):
+    """Posteriors pickled before `check_finite_x` existed must still load."""
+    _, inference, _ = trained_npe
+    state = inference.build_posterior().__getstate__().copy()
+    del state["_check_finite_x"]
+
+    restored = DirectPosterior.__new__(DirectPosterior)
+    restored.__setstate__(pickle.loads(pickle.dumps(state)))
+
+    assert restored._check_finite_x
+    restored.set_default_x(torch.zeros(1, 2))
 
 
 @pytest.mark.parametrize(

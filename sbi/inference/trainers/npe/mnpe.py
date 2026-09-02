@@ -1,7 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Dict, Literal, Optional, Union
+import warnings
+from typing import Any, ClassVar, Dict, Literal, Optional, Tuple, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -15,8 +16,12 @@ from sbi.inference.posteriors.posterior_parameters import (
     VIPosteriorParameters,
 )
 from sbi.inference.trainers.npe.npe_c import NPE_C
+from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.net_builders.estimator_configs import (
+    MixedConfig,
+)
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 
@@ -26,8 +31,8 @@ class MNPE(NPE_C):
 
     MNPE (Mixed Neural Posterior Estimation) is similar to NPE: it directly
     estimates a distribution over parameters given data. Unlike NPE, it is designed to
-    be applied to parmaeters with mixed types, i.e., continuous and discrete parameters.
-    This can occur, for example, in models with switching components. The emebedding
+    be applied to parameters with mixed types, i.e., continuous and discrete parameters.
+    This can occur, for example, in models with switching components. The embedding
     net will only operate on the continuous parameters, note this to design the
     dimension of the embedding net.
 
@@ -63,13 +68,18 @@ class MNPE(NPE_C):
         samples = posterior.sample((100,), x=x_o)
     """
 
+    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (MixedConfig,)
+    _BUILDER_TYPE_HINT: ClassVar[str] = "Use MixedConfig(continuous=...)."
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["mnpe"],
-            ConditionalEstimatorBuilder[MixedDensityEstimator],
-        ] = "mnpe",
+            MixedConfig,
+            ConditionalEstimatorBuildFn[MixedDensityEstimator],
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -82,14 +92,14 @@ class MNPE(NPE_C):
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. If `None`, the
                 prior must be passed to `.build_posterior()`.
-            density_estimator: If it is a string, it must be "mnpe" to use the
-                preconfigured neural nets for MNPE. Alternatively, a function
-                that builds a custom neural network, which adheres to
-                `ConditionalEstimatorBuilder` protocol can be provided. The function
-                will be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. The
-                density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `MixedDensityEstimator`.
+            density_estimator: If ``None`` (default), uses a
+                ``MixedConfig()``. A ``MixedConfig`` can be passed to configure
+                the mixed neural network. If it is a string (deprecated), it
+                must be ``"mnpe"``. Alternatively, a function that builds a
+                custom neural network can be provided. The function will be
+                called with the first batch of simulations (theta, x), which
+                can thus be used for shape inference and potentially for
+                z-scoring.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -101,11 +111,22 @@ class MNPE(NPE_C):
                 sampling.
         """
 
-        if isinstance(density_estimator, str):
-            assert (
-                density_estimator == "mnpe"
-            ), f"""MNPE can be used with preconfigured 'mnpe' density estimator only,
-                not with {density_estimator}."""
+        if density_estimator is None:
+            density_estimator = MixedConfig()
+        elif isinstance(density_estimator, str):
+            if density_estimator != "mnpe":
+                raise ValueError(
+                    "MNPE supports only the preconfigured 'mnpe' density estimator, "
+                    f"not {density_estimator!r}."
+                )
+            warnings.warn(
+                "Passing a string for `density_estimator` is deprecated. "
+                "Use MixedConfig(...) instead, e.g. "
+                "`from sbi.neural_nets import MixedConfig`.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            density_estimator = posterior_nn(model="mnpe")
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 

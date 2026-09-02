@@ -74,8 +74,9 @@ def build_made(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_made",
-        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
-        "or one of 'none', 'independent', 'structured'.",
+        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
+        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
+        "'structured'.",
     )
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
@@ -159,8 +160,9 @@ def build_maf(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_maf",
-        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
-        "or one of 'none', 'independent', 'structured'.",
+        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
+        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
+        "'structured'.",
     )
     x_numel = get_numel(
         batch_x,
@@ -273,8 +275,9 @@ def build_maf_rqs(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_maf_rqs",
-        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
-        "or one of 'none', 'independent', 'structured'.",
+        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
+        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
+        "'structured'.",
     )
     x_numel = get_numel(
         batch_x,
@@ -382,8 +385,9 @@ def build_nsf(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_nsf",
-        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
-        "or one of 'none', 'independent', 'structured'.",
+        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
+        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
+        "'structured'.",
     )
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
@@ -583,7 +587,7 @@ def build_zuko_nsf(
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    num_bins: int = 8,
+    num_bins: int = 10,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -616,7 +620,7 @@ def build_zuko_nsf(
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
-        num_bins: The number of bins in the spline transformations. Defaults to 8.
+        num_bins: The number of bins in the spline transformations. Defaults to 10.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NSF"
@@ -648,7 +652,7 @@ def build_zuko_ncsf(
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    num_bins: int = 8,
+    num_bins: int = 10,
     **kwargs,
 ) -> ZukoFlow:
     r"""
@@ -676,7 +680,7 @@ def build_zuko_ncsf(
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
-        num_bins: The number of bins in the spline transformations. Defaults to 8.
+        num_bins: The number of bins in the spline transformations. Defaults to 10.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NCSF"
@@ -962,7 +966,7 @@ def build_zuko_gf(
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
-    num_transforms: int = 3,
+    num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     components: int = 8,
     **kwargs,
@@ -1023,7 +1027,7 @@ def build_zuko_bpf(
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
-    num_transforms: int = 3,
+    num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     degree: int = 16,
     **kwargs,
@@ -1177,7 +1181,7 @@ def build_tabpfn_flow(
     ] = "none",
     z_score_y: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    ] = "none",
     embedding_net: nn.Module = nn.Identity(),
     regressor_init_kwargs: Optional[dict] = None,
     max_context_size: int = 10_000,
@@ -1306,7 +1310,9 @@ def _prepare_x_transforms(
                 "`x_dist` requires a `.support` attribute for"
                 "an unconstrained transformation."
             )
-        transform_to_unconstrained = biject_transform_zuko(mcmc_transform(x_dist))
+        transform_to_unconstrained = biject_transform_zuko(
+            mcmc_transform(x_dist, device=batch_x.device)
+        )
         transforms = (transform_to_unconstrained,)
     elif z_score_x_bool:
         z_score_transform = standardizing_transform_zuko(batch_x, structured_x)

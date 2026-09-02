@@ -167,17 +167,7 @@ def z_score_parser(
     Returns:
         Flag for whether or not to z-score, and whether data is structured
     """
-    if isinstance(z_score_flag, bool):
-        # Raise warning if boolean was passed.
-        warnings.warn(
-            "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
-            "removed in a future release. Use 'none', 'independent', or 'structured' "
-            "to indicate z-scoring option.",
-            stacklevel=2,
-        )
-        z_score_bool, structured_data = z_score_flag, False
-
-    elif (z_score_flag is None) or (z_score_flag == "none"):
+    if (z_score_flag is None) or (z_score_flag == "none"):
         # Return Falses if "none" or None was passed.
         z_score_bool, structured_data = False, False
 
@@ -211,8 +201,9 @@ def assert_transform_to_unconstrained_supported(
     set, so the caller is responsible for only invoking it from such builders.
 
     The ``transform_to_unconstrained`` z-scoring option derives a bijection from the
-    prior's support (rather than batch statistics) and is only implemented for the
-    conditional Zuko builders. For the other builders, ``z_score_parser`` returns
+    prior's support (rather than batch statistics). It is implemented for the
+    conditional Zuko builders and for ``build_mdn``. For the other builders,
+    ``z_score_parser`` returns
     ``(False, False)`` for this flag, which would otherwise make the option a silent
     no-op (the model is built with no reparametrization at all). This guard turns that
     silent no-op into a clear error.
@@ -286,14 +277,81 @@ def standardizing_transform_zuko(
     )
 
 
-class CallableTransform:
-    """Wraps a PyTorch Transform to be used in Zuko UnconditionalTransform."""
+def _patch_inverse_transform_pickling() -> None:
+    """Keep ``_inv`` when pickling ``_InverseTransform`` (pytorch/pytorch#191197).
 
-    def __init__(self, transform):
-        self.transform = transform
+    ``Transform.__getstate__`` clears ``_inv`` as a reciprocal cache, but
+    ``_InverseTransform`` stores its wrapped transform there, so pickling it yields
+    ``Inverse(None)``. Applied at import since ``__getstate__`` runs when writing.
+    """
+    if "__getstate__" in torch_tf._InverseTransform.__dict__:
+        return
 
-    def __call__(self):
+    def __getstate__(self) -> Dict[str, Any]:
+        return self.__dict__.copy()  # Keep `_inv`: wrapped transform, not a cache.
+
+    torch_tf._InverseTransform.__getstate__ = __getstate__
+
+
+_patch_inverse_transform_pickling()
+
+
+def _contains_inverse_transform(transform: TorchTransform) -> bool:
+    """Return whether a transform tree contains an inverse wrapper."""
+    seen = set()
+
+    def contains_inverse(current: TorchTransform) -> bool:
+        if id(current) in seen:
+            return False
+        seen.add(id(current))
+        if isinstance(current, torch_tf._InverseTransform):
+            return True
+        for key, value in current.__dict__.items():
+            if key == "_inv":
+                continue
+            if isinstance(value, TorchTransform) and contains_inverse(value):
+                return True
+            if isinstance(value, (list, tuple)) and any(
+                isinstance(item, TorchTransform) and contains_inverse(item)
+                for item in value
+            ):
+                return True
+        return False
+
+    return contains_inverse(transform)
+
+
+class CallableTransform(nn.Module):
+    """Own a PyTorch transform as a movable, picklable module.
+
+    Transform tensors are intentionally absent from ``state_dict``; callers rebuild
+    the transform before loading estimator weights.
+    """
+
+    def __init__(self, transform: TorchTransform):
+        super().__init__()
+        self._is_inverse = _contains_inverse_transform(transform)
+        self._transform = transform.inv if self._is_inverse else transform
+        if not isinstance(
+            self._transform, TorchTransform
+        ) or _contains_inverse_transform(self._transform):
+            raise ValueError(
+                "CallableTransform requires one transform orientation without "
+                "nested inverse wrappers."
+            )
+
+    @property
+    def transform(self) -> TorchTransform:
+        """Return the transform in the orientation supplied at construction."""
+        return self._transform.inv if self._is_inverse else self._transform
+
+    def forward(self) -> TorchTransform:
         return self.transform
+
+    def _apply(self, fn):
+        super()._apply(fn)
+        _apply_to_transform(self._transform, fn)
+        return self
 
 
 def biject_transform_zuko(
@@ -486,7 +544,7 @@ def npe_msg_on_invalid_x(
         else:
             logging.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "They are not excluded from training due to `exclude_invalid_x=False`. "
                 "Training will likely fail, we strongly recommend "
                 f"`exclude_invalid_x=True` for {algorithm}."
             )
@@ -495,18 +553,18 @@ def npe_msg_on_invalid_x(
 def nle_nre_apt_msg_on_invalid_x(
     num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
 ) -> None:
-    """Warn or raise if there are NaNs or Infs, appropriate to SNLE, SNRE, or APT.
+    """Warn or raise on NaNs or Infs, for NLE, NRE, or atomic NPE-C.
 
     This will raise an error in the default case of `exclude_invalid_x=False` since
-    SNLE/SNRE/APT do not allow to discard invalid simulations (Glöckler et al. 2021).
-    If `exclude_invalid_x` has explicitly been set to `True` by the user, this
+    NLE/NRE/atomic NPE-C do not allow to discard invalid simulations (Glöckler et al.
+    2021). If `exclude_invalid_x` has explicitly been set to `True` by the user, this
     function will give a warning about the systematic error.
     """
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
             logging.warning(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"These will be discarded from training due to "
                 f"`exclude_invalid_x=True`. Please be aware that this gives "
                 f"systematically wrong results for {algorithm} and is only recommended "
@@ -514,46 +572,10 @@ def nle_nre_apt_msg_on_invalid_x(
             )
         else:
             raise ValueError(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
-                f"{algorithm} does not allow invalid simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                f"{algorithm} does not allow invalid simulations. "
                 f"Replace the invalid values with an unreasonably low or high value."
             )
-
-
-def check_warn_and_setstate(
-    state_dict: Dict,
-    key_name: str,
-    replacement_value: Any,
-    warning_msg: str = "",
-) -> Tuple[Dict, str]:
-    """
-    Check if `key_name` is in `state_dict` and add it if not.
-
-    If the key already existed in the `state_dict`, the dictionary remains
-    unaltered. This function also appends to a warning string.
-
-    For developers: The reason that this method only appends to a warning string
-    instead of warning directly is that the user might get multiple very similar
-    warnings if multiple attributes had to be replaced. Thus, we start off with an
-    emtpy string and keep appending all missing attributes. Then, in the end,
-    all attributes are displayed along with a full description of the warning.
-
-    Args:
-        attribute_name: The name of the attribute to check.
-        state_dict: The dictionary to search (and write to if the key does not yet
-            exist).
-        replacement_value: The value to be written to the `state_dict`.
-        warning_msg: String to which the warning message should be appended to.
-
-    Returns:
-        A dictionary which contains the key `attribute_name` and a string with an
-        appended warning message.
-    """
-
-    if key_name not in state_dict:
-        state_dict[key_name] = replacement_value
-        warning_msg += " `self." + key_name + f" = {str(replacement_value)}`"
-    return state_dict, warning_msg
 
 
 def get_simulations_since_round(
@@ -672,7 +694,7 @@ def check_dist_class(
     """Returns whether the `dist` is instance of `class_to_check`.
 
     The dist can be hidden in an Independent distribution, a Boxuniform or in a wrapper.
-    E.g., when the user called `prepare_for_sbi`, the distribution will in fact be a
+    E.g., when the user called `process_prior`, the distribution will in fact be a
     `PytorchReturnTypeWrapper`. Thus, we need additional checks.
 
     Args:
@@ -713,9 +735,9 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
     checking whether the log-probabilty is not `-inf` will not work because, as of
     torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
-    sample is out of the support (see #451). In `prepare_for_sbi()`, we set
+    sample is out of the support (see #451). In `process_prior()`, we set
     `validate_args=False`. This would take care of this, but requires running
-    `prepare_for_sbi()` and otherwise throws a cryptic error.
+    `process_prior()` and otherwise throws a cryptic error.
 
     Args:
         distribution: Distribution under which to evaluate the `samples`, e.g., a
@@ -809,6 +831,37 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
     ])
 
     return theta_repeated, x_repeated
+
+
+def _apply_to_transform(
+    transform: TorchTransform, fn: Callable[[Tensor], Tensor]
+) -> None:
+    """Apply fn to all tensors in a transform tree.
+
+    Walks ComposeTransform.parts, IndependentTransform.base_transform,
+    etc., so .to() calls propagate into the transform.
+
+    Args:
+        transform: Root of the transform tree.
+        fn: Callable applied to each tensor (e.g. ``lambda t: t.to(device)``).
+    """
+    seen = set()
+
+    def _walk(t):
+        if id(t) in seen:
+            return
+        seen.add(id(t))
+        for key, val in list(t.__dict__.items()):
+            if isinstance(val, Tensor):
+                object.__setattr__(t, key, fn(val))
+            elif isinstance(val, (list, tuple)):
+                for item in val:
+                    if isinstance(item, TorchTransform):
+                        _walk(item)
+            elif isinstance(val, TorchTransform):
+                _walk(val)
+
+    _walk(transform)
 
 
 def mcmc_transform(
@@ -924,6 +977,9 @@ def mcmc_transform(
         )
 
     check_transform(prior, transform)  # type: ignore
+
+    if enable_transform:
+        _apply_to_transform(transform, lambda t: t.to(device))
 
     return transform.inv  # type: ignore
 

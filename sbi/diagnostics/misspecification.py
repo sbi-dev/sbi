@@ -141,17 +141,17 @@ def calc_misspecification_mmd(
     elif mode == "embedding":
         if inference is None:
             raise ValueError(
-                "inference should not be None if mode is 'embedding'."
-                "please provide an sbi inference object"
+                "inference should not be None if mode is 'embedding'. "
+                "Please provide an sbi inference object."
             )
-        if not hasattr(inference, "_neural_net"):
+        if getattr(inference, "_neural_net", None) is None:
             raise ValueError(
-                "no neural net found,"
-                "neural_net should not be None when mode is 'embedding'"
+                "No neural net found. The inference object must be trained before "
+                "computing the MMD in mode 'embedding'."
             )
         if isinstance(inference._neural_net.embedding_net, nn.modules.linear.Identity):
             warnings.warn(
-                "The embedding net might be the identity function,"
+                "The embedding net might be the identity function, "
                 "in that case the MMD is computed in the x-space.",
                 stacklevel=2,
             )

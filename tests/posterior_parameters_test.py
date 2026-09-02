@@ -62,7 +62,6 @@ def get_inference():
                 "potential_fn",
                 "proposal",
                 "device",
-                "init_strategy_num_candidates",
                 "theta_transform",
             },
         ),
@@ -109,6 +108,8 @@ def get_inference():
                 "x_o",
                 "enable_transform",
                 "max_sampling_batch_size",
+                # consumed by VectorFieldPosterior, not forwarded to the potential.
+                "check_finite_x",
             },
         ),
     ],
@@ -394,6 +395,20 @@ def test_invalid_literal_field_values():
     """
 
     MCMCPosteriorParameters(method="invalid")
+
+
+@pytest.mark.parametrize("target_accept", [None, 0.5, 0.9, 0.99])
+def test_mcmc_target_accept_accepts_valid_values(target_accept):
+    """target_accept accepts None or a probability in (0, 1)."""
+    params = MCMCPosteriorParameters(target_accept=target_accept)
+    assert params.target_accept == target_accept
+
+
+@pytest.mark.parametrize("target_accept", [0.0, 1.0, 1.5, -0.1])
+def test_mcmc_target_accept_rejects_invalid_values(target_accept):
+    """target_accept outside (0, 1) is rejected."""
+    with pytest.raises(ValueError, match="target_accept"):
+        MCMCPosteriorParameters(target_accept=target_accept)
 
 
 @pytest.mark.parametrize(

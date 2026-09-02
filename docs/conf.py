@@ -22,8 +22,8 @@ import shutil
 # -- Project information -----------------------------------------------------
 
 project = 'sbi'
-copyright = '2020, sbi team'
 author = 'sbi team'
+copyright = f'2020-%Y, {author}'
 
 
 # -- General configuration ---------------------------------------------------
@@ -54,6 +54,9 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+
+# Serve llms.txt at the docs URL root for AI agent discoverability.
+html_extra_path = ['llms.txt']
 
 # Myst-NB
 myst_enable_extensions = [

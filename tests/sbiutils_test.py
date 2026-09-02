@@ -369,8 +369,6 @@ def test_kde(bandwidth, transform, sample_weights):
 @pytest.mark.parametrize(
     "z_x",
     [
-        True,
-        False,
         None,
         "none",
         "independent",
@@ -388,8 +386,6 @@ def test_kde(bandwidth, transform, sample_weights):
 @pytest.mark.parametrize(
     "z_theta",
     [
-        True,
-        False,
         None,
         "none",
         "independent",
@@ -406,19 +402,18 @@ def test_kde(bandwidth, transform, sample_weights):
 )
 def test_z_score_parser(z_x, z_theta):
     """Test the z_score_parser function."""
-    if z_x is bool or z_theta is bool:
-        with pytest.warns(
-            UserWarning,
-            match="Boolean values for z-scoring are deprecated and will",
-        ):
-            z_score_parser(z_x)
-            z_score_parser(z_theta)
-
     result_x = z_score_parser(z_x)
     result_theta = z_score_parser(z_theta)
 
     assert result_x is not None, f"z_score_parser({z_x}) returned None"
     assert result_theta is not None, f"z_score_parser({z_theta}) returned None"
+
+
+@pytest.mark.parametrize("z_score_flag", (True, False))
+def test_z_score_parser_rejects_bool(z_score_flag):
+    """Booleans were deprecated in v0.18.0 and are no longer accepted."""
+    with pytest.raises(ValueError, match="Invalid z-scoring option"):
+        z_score_parser(z_score_flag)
 
 
 @pytest.mark.parametrize(
@@ -471,13 +466,14 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     elif build_fn == classifier_nn:
         models = ["linear", "mlp", "resnet"]
 
-    # `transform_to_unconstrained` is only implemented for the conditional Zuko
-    # builders; nflows/mdn/mnle and the ratio-based classifiers now raise a
-    # ValueError instead of silently no-op-ing. The factory maps the *modeled*
-    # variable's z-scoring to the builder's z_score_x: theta for posterior_nn and
-    # classifier_nn (`z_score_x=z_score_theta`), x for likelihood_nn.
-    # posterior_nn and classifier_nn both map z_score_x <- z_score_theta.
+    # `transform_to_unconstrained` is only implemented on the modeled side of
+    # the conditional Zuko builders and the MDN. The factories build a per-model
+    # config, which offers the option only there and raises everywhere else,
+    # rather than letting `z_score_parser` turn it into a silent no-op. The
+    # factories map the *modeled* variable's z-scoring to the builder's
+    # z_score_x: theta for posterior_nn and classifier_nn, x for likelihood_nn.
     modeled_z = z_x if build_fn == likelihood_nn else z_theta
+    condition_z = z_theta if build_fn == likelihood_nn else z_x
 
     for model in models:
         if model == "mnle":
@@ -486,22 +482,33 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
         else:
             model_x = x
 
+        implements_transform = model.startswith("zuko") or model == "mdn"
+        # `mnle` has no config yet, so it keeps the lenient factory path where
+        # an unusable setting is forwarded and ignored downstream.
+        legacy = model == "mnle"
+
+        # The factories reject a setting the chosen model does not use, so only
+        # the ones this model has are passed.
         kwargs = {
             "model": model,
             "z_score_theta": z_theta,
             "z_score_x": z_x,
-            "hidden_features": 8,
         }
+        if model != "linear":
+            kwargs["hidden_features"] = 8
         if build_fn in [likelihood_nn, posterior_nn]:
-            kwargs.update({"x_dist": dist, "num_transforms": 1})
+            if model not in ("mdn", "made"):
+                kwargs["num_transforms"] = 1
+            # `x_dist` is read only by the unconstrained transform.
+            if modeled_z == "transform_to_unconstrained" and (
+                implements_transform or legacy
+            ):
+                kwargs["x_dist"] = dist
 
-        # Unsupported combination: the modeled variable requests the unconstrained
-        # transform on a non-Zuko-conditional builder -> expect a clear ValueError.
-        if (
-            modeled_z == "transform_to_unconstrained"
-            and not model.startswith("zuko")
-            and model != "mdn"
-        ):
+        unsupported = (
+            modeled_z == "transform_to_unconstrained" and not implements_transform
+        ) or (condition_z == "transform_to_unconstrained" and not legacy)
+        if unsupported:
             with pytest.raises(ValueError, match="transform_to_unconstrained"):
                 build_fun = build_fn(**kwargs)
                 build_fun(theta, model_x)
@@ -709,3 +716,91 @@ def test_mdn_transform_to_unconstrained():
     assert torch.allclose(lp, mog.log_prob(z) + ldj, atol=1e-5)
     s = est.sample((10,), cond)
     assert s.shape[0] == 10 and torch.isfinite(s).all()
+
+
+def test_inverse_transform_survives_pickle():
+    """Inverse transforms keep their wrapped transform through pickling (#1952)."""
+    import pickle
+
+    import torch.distributions.transforms as torch_tf
+
+    # Mirrors `mcmc_transform` output: IndependentTransform does not override `.inv`,
+    # so this is a true inverse wrapper (unlike `ComposeTransform.inv`).
+    transform = torch_tf.IndependentTransform(
+        torch_tf.ComposeTransform([
+            torch_tf.SigmoidTransform(),
+            torch_tf.AffineTransform(-3 * torch.ones(1), 6 * torch.ones(1)),
+        ]),
+        1,
+    ).inv
+    assert isinstance(transform, torch_tf._InverseTransform)
+    x = torch.tensor([[0.5]])
+
+    reloaded = pickle.loads(pickle.dumps(transform))
+
+    assert reloaded._inv is not None
+    assert torch.allclose(reloaded(x), transform(x))
+    assert torch.allclose(reloaded.inv(reloaded(x)), x, atol=1e-5)
+    assert torch.isfinite(reloaded.log_abs_det_jacobian(x, reloaded(x))).all()
+
+
+def test_mcmc_transform_survives_pickle():
+    """`mcmc_transform` output stays usable after pickling (#1952)."""
+    import pickle
+
+    from sbi.utils.sbiutils import mcmc_transform
+
+    prior = BoxUniform(-3 * torch.ones(2), 3 * torch.ones(2))
+    transform = mcmc_transform(prior)
+    theta = prior.sample((4,))
+
+    reloaded = pickle.loads(pickle.dumps(transform))
+
+    assert torch.allclose(reloaded(theta), transform(theta))
+    assert torch.allclose(reloaded.inv(reloaded(theta)), theta, atol=1e-4)
+
+
+def test_mdn_prior_transform_is_read_only():
+    """Assigning `_prior_transform` fails loudly instead of shadowing the module.
+
+    `nn.Module.__setattr__` must not absorb the assignment, and pyright cannot catch
+    it here because `reportAttributeAccessIssue` is disabled repo-wide.
+    """
+    from sbi.neural_nets.net_builders.mdn import build_mdn
+
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    bx, by = prior.sample((256,)), torch.randn(256, 3)
+    est = build_mdn(bx, by, z_score_x="transform_to_unconstrained", x_dist=prior)
+
+    # No `match`: the wording differs across Python versions ("can't set attribute"
+    # before 3.11, "has no setter" after).
+    with pytest.raises(AttributeError):
+        est._prior_transform = None
+
+    assert est._prior_transform is not None
+
+
+@pytest.mark.parametrize("orientation", ["concrete", "inverse", "composed_inverse"])
+def test_callable_transform_preserves_orientation_and_dtype(orientation):
+    """CallableTransform safely owns concrete and inverse transforms."""
+    import pickle
+
+    from torch.distributions.transforms import AffineTransform, ComposeTransform
+
+    from sbi.utils.sbiutils import CallableTransform
+
+    transform = AffineTransform(torch.zeros(2), 2 * torch.ones(2))
+    if orientation == "inverse":
+        transform = transform.inv
+    elif orientation == "composed_inverse":
+        transform = ComposeTransform([
+            transform,
+            AffineTransform(torch.ones(2), 3 * torch.ones(2)),
+        ]).inv
+
+    wrapped = pickle.loads(pickle.dumps(CallableTransform(transform)))
+    x = torch.ones(2)
+    assert torch.allclose(wrapped.transform(x), transform(x))
+
+    wrapped.double()
+    assert wrapped.transform(x.double()).dtype == torch.float64

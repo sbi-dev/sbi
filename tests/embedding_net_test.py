@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+import pickle
 from typing import Callable
 
 import pytest
@@ -13,7 +14,10 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils
 from sbi.inference import NLE, NPE, NRE, simulate_for_sbi
-from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
+from sbi.inference.posteriors.posterior_parameters import (
+    DirectPosteriorParameters,
+    MCMCPosteriorParameters,
+)
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
@@ -169,6 +173,31 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
     _test_embedding_forward_pass(embedding_net, (num_channels, *input_shape), 20)
     _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "maf", "NPE")
+
+
+@pytest.mark.parametrize(
+    ("embedding_cls", "input_shape", "kwargs"),
+    [
+        (CNNEmbedding, (32, 32), {}),
+        (CausalCNNEmbedding, (64,), {"pool_kernel_size": 2}),
+    ],
+)
+def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
+    """CNN embeddings accept strided inputs and reject channel-last inputs."""
+    embedding_net = embedding_cls(input_shape, in_channels=3, **kwargs)
+    channel_last_input = torch.randn(4, *input_shape, 3)
+    non_contiguous_input = channel_last_input.movedim(-1, 1)
+
+    assert not non_contiguous_input.is_contiguous()
+    channel_first_embedding = embedding_net(non_contiguous_input)
+    assert channel_first_embedding.shape == (4, 20)
+    torch.testing.assert_close(
+        embedding_net(non_contiguous_input.flatten(start_dim=1)),
+        channel_first_embedding,
+    )
+
+    with pytest.raises(ValueError, match="Expected flat or channel-first input"):
+        embedding_net(channel_last_input)
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
@@ -445,11 +474,6 @@ def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    raises=ValueError,
-    reason="Padding with NaNs causes error in new NaN check on x_o, see #1701, #1717",
-    strict=True,
-)
 def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     """Test inference accuracy with embeddings for varying number of trials.
 
@@ -499,7 +523,9 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(
         training_batch_size=100
     )
-    posterior = inference.build_posterior()
+    posterior = inference.build_posterior(
+        posterior_parameters=DirectPosteriorParameters(check_finite_x=False)
+    )
 
     num_samples = 1000
     # test different number of trials
@@ -758,6 +784,19 @@ def test_lru_embedding_net_isolated(
     assert x_embed.shape == (batch_size, output_dim)
 
 
+@pytest.mark.parametrize("aggregate_fcn", ["last_step", "mean"])
+def test_lru_embedding_net_is_picklable(aggregate_fcn: str):
+    """Every aggregation preset must survive pickling, since posteriors get pickled."""
+    embedding_net = LRUEmbedding(
+        input_dim=3, output_dim=4, num_blocks=1, aggregate_fcn=aggregate_fcn
+    )
+    x = torch.randn(2, 5, 3)
+
+    reloaded = pickle.loads(pickle.dumps(embedding_net))
+
+    assert torch.allclose(reloaded(x), embedding_net(x))
+
+
 def test_lru_pipeline(embedding_feat_dim: int = 17):
     """Smoke-test an entire pipeline run using the LRU embedding."""
 
@@ -907,3 +946,28 @@ def test_scan(
     assert torch.allclose(y_scan, y_loop, atol=1e-5)
 
     torch.compiler.reset()
+
+
+LRU_DEFAULTS = dict(
+    input_dim=4,
+    state_dim=8,
+    r_min=0.0,
+    r_max=1.0,
+    phase_max=torch.pi,
+    bidirectional=False,
+    mode="scan",
+)
+
+
+def test_lru_rejects_invalid_state_dim():
+    """The check read `input_dim`, so an invalid `state_dim` passed silently."""
+    with pytest.raises(ValueError, match="state_dim"):
+        LRU(**{**LRU_DEFAULTS, "state_dim": -5})
+
+
+def test_lru_forward_rejects_invalid_mode():
+    """`forward()`'s `match mode` must stay in sync with the constructor."""
+    layer = LRU(**LRU_DEFAULTS)
+
+    with pytest.raises(ValueError, match="mode"):
+        layer.forward(torch.randn(2, 6, LRU_DEFAULTS["input_dim"]), mode="invalid")

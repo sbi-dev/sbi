@@ -1,7 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from copy import deepcopy
+from dataclasses import replace
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
@@ -16,15 +18,18 @@ from sbi.inference.trainers.npe.npe_base import (
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
-    ConditionalEstimatorBuilder,
+    ConditionalEstimatorBuildFn,
 )
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
 from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 from sbi.utils.torchutils import BoxUniform
+
+_MDN_DEFAULT_COMPONENTS = MDNConfig().num_components
 
 # Constant for numerical stability in matrix operations.
 _CORRECTION_EPSILON: float = 1e-6
@@ -77,7 +82,9 @@ class NPE_A(PosteriorEstimatorTrainer):
         for round_idx in range(5):
             theta = proposal.sample((100,))
             x = simulator(theta)
-            density_estimator = inference.append_simulations(theta, x).train()
+            density_estimator = inference.append_simulations(
+                theta, x, proposal=proposal
+            ).train()
             posterior = inference.build_posterior(density_estimator)
             proposal = posterior.set_default_x(x_o)
 
@@ -90,8 +97,10 @@ class NPE_A(PosteriorEstimatorTrainer):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["mdn_snpe_a"],
-            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
-        ] = "mdn_snpe_a",
+            MDNConfig,
+            ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
+            None,
+        ] = None,
         num_components: int = 10,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -106,10 +115,13 @@ class NPE_A(PosteriorEstimatorTrainer):
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            density_estimator: If it is a string (only "mdn_snpe_a" is valid), use a
-                pre-configured mixture of densities network. Alternatively, a function
-                that builds a custom neural network, which adheres to
-                `ConditionalEstimatorBuilder` protocol can be provided. The function
+            density_estimator: If `None` (default), uses `MDNConfig()`. NPE-A
+                needs a mixture of Gaussians, so `MDNConfig` is the only config it
+                accepts; its `num_components` is set by this class's
+                `num_components` argument. If it is a string (deprecated), only
+                "mdn_snpe_a" is valid. Alternatively, a function that builds a
+                custom neural network, which adheres to
+                `ConditionalEstimatorBuildFn` protocol can be provided. The function
                 will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
@@ -129,24 +141,51 @@ class NPE_A(PosteriorEstimatorTrainer):
             show_progress_bars: Whether to show a progressbar during training.
         """
 
-        # Catch invalid inputs.
-        if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
+        if density_estimator is None:
+            density_estimator = MDNConfig(num_components=num_components)
+        elif isinstance(density_estimator, MDNConfig):
+            if (
+                density_estimator.num_components != _MDN_DEFAULT_COMPONENTS
+                and density_estimator.num_components != num_components
+            ):
+                raise ValueError(
+                    "`num_components` was set both on the config "
+                    f"({density_estimator.num_components}) and on NPE_A "
+                    f"({num_components}). For NPE-A it belongs on the trainer."
+                )
+            density_estimator = replace(
+                density_estimator, num_components=num_components
+            )
+        elif isinstance(density_estimator, str):
+            if density_estimator != "mdn_snpe_a":
+                raise TypeError(
+                    "The `density_estimator` passed to NPE_A needs to be a "
+                    "MDNConfig, a callable, or the string 'mdn_snpe_a'!"
+                )
+            warnings.warn(
+                "Passing a string for `density_estimator` is deprecated. "
+                "Use MDNConfig() instead, e.g. "
+                "`from sbi.neural_nets import MDNConfig`.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            density_estimator = MDNConfig(num_components=num_components)
+        elif not callable(density_estimator):
             raise TypeError(
-                "The `density_estimator` passed to SNPE_A needs to be a "
-                "callable or the string 'mdn_snpe_a'!"
+                "The `density_estimator` passed to NPE_A needs to be a "
+                "MDNConfig, a callable, or the string 'mdn_snpe_a'!"
             )
 
-        self._num_components = num_components
-
-        # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
-        # requiring the signature to have `num_components`, save it for use below, and
-        # continue. It's sneaky because we are using the object (self) as a namespace
-        # to pass arguments between functions, and that's implicit state management.
         kwargs = del_entries(
             locals(),
             entries=("self", "__class__", "num_components"),
         )
         super().__init__(**kwargs)
+
+        if not isinstance(density_estimator, MDNConfig):
+            self._build_neural_net = partial(
+                self._build_neural_net, num_components=num_components
+            )
 
     def train(
         self,
@@ -201,7 +240,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         """
 
         assert not retrain_from_scratch, """Retraining from scratch is not supported in
-            SNPE-A yet. The reason for this is that, if we reininitialized the density
+            NPE-A yet. The reason for this is that, if we reininitialized the density
             estimator, the z-scoring would change, which would break the posthoc
             correction. This is a pure implementation issue."""
 
@@ -224,11 +263,6 @@ class NPE_A(PosteriorEstimatorTrainer):
             )
 
         self._round = max(self._data_round_index)
-
-        # Always use the specified number of components
-        self._build_neural_net = partial(
-            self._build_neural_net, num_components=self._num_components
-        )
 
         density_estimator = super().train(**kwargs)
 
@@ -260,14 +294,14 @@ class NPE_A(PosteriorEstimatorTrainer):
             default_x = proposal.default_x
             if default_x is None:
                 raise ValueError(
-                    "Proposal posterior must have a default_x set for SNPE-A "
+                    "Proposal posterior must have a default_x set for NPE-A "
                     "correction. Call posterior.set_default_x(x_o) before using "
                     "as proposal."
                 )
             if default_x.shape[0] != 1:
                 raise ValueError(
-                    f"SNPE-A requires default_x batch size of 1, got "
-                    f"{default_x.shape[0]}. SNPE-A only supports single "
+                    f"NPE-A requires default_x batch size of 1, got "
+                    f"{default_x.shape[0]}. NPE-A only supports single "
                     "observations for correction."
                 )
             return proposal.get_mog_params(default_x)
@@ -293,7 +327,7 @@ class NPE_A(PosteriorEstimatorTrainer):
                 )
             if default_x.shape[0] != 1:
                 raise ValueError(
-                    f"SNPE-A requires default_x batch size of 1, got "
+                    f"NPE-A requires default_x batch size of 1, got "
                     f"{default_x.shape[0]}."
                 )
             mog = proposal.get_mog_params(default_x)
@@ -306,7 +340,7 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         # Unsupported type
         raise TypeError(
-            f"For multi-round SNPE-A, proposal must be one of: NPE_A_Posterior, "
+            f"For multi-round NPE-A, proposal must be one of: NPE_A_Posterior, "
             f"MultivariateNormal, MoG, or an object with get_mog_params() method. "
             f"Got {type(proposal).__name__}. For custom proposals, construct "
             f"NPE_A_Posterior directly with your proposal_mog parameter."
@@ -468,6 +502,19 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         return self._posterior
 
+    def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
+        """Return True: NPE-A trains on the plain log-prob for any proposal.
+
+        The proposal correction is applied analytically after training, not in the loss.
+
+        Args:
+            proposal: Unused, the answer does not depend on it.
+
+        Returns:
+            True.
+        """
+        return True
+
     def _log_prob_proposal_posterior(
         self,
         theta: Tensor,
@@ -562,7 +609,7 @@ def _correct_for_proposal(
     except torch.linalg.LinAlgError as e:
         raise ValueError(
             "Posterior precision matrix is not positive definite. "
-            "This is a known issue with SNPE-A when the proposal and density "
+            "This is a known issue with NPE-A when the proposal and density "
             "estimator don't align well. Try different hyperparameters. "
             f"Original error: {e}"
         ) from e

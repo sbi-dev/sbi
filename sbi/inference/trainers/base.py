@@ -1,16 +1,20 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import os
 import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime
+from inspect import currentframe
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
+    ClassVar,
     Dict,
     Generic,
     List,
@@ -32,6 +36,12 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from sbi.neural_nets.net_builders.estimator_configs import (
+        _EstimatorBuilderBase,
+        _PerModelConfigBase,
+    )
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -82,6 +92,33 @@ from sbi.utils.user_input_checks import (
     process_simulator,
 )
 
+_SBI_ROOT = str(Path(__file__).parents[2]) + os.sep
+
+
+def _stacklevel_to_caller(default: int = 2) -> int:
+    """Return the `warnings.warn` stacklevel of the first frame outside sbi.
+
+    Trainers reach the training loop through a different number of internal frames
+    each, so no constant is right for all of them. A constant also makes Python's
+    "once per location" filter collapse every training run in a process into one
+    warning. (`warn(skip_file_prefixes=...)` would do this, but needs Python 3.12.)
+
+    Args:
+        default: Stacklevel to fall back to if every frame is inside sbi.
+
+    Returns:
+        Stacklevel that attributes the warning to the caller's own code.
+    """
+    frame = currentframe()
+    frame = frame.f_back if frame is not None else None
+    level = 1
+    while frame is not None:
+        if not frame.f_code.co_filename.startswith(_SBI_ROOT):
+            return level
+        frame = frame.f_back
+        level += 1
+    return default
+
 
 def infer(
     simulator: Callable,
@@ -102,7 +139,7 @@ def infer(
     The scope of this function is limited to the most essential features of sbi. For
     more flexibility (e.g. multi-round inference, different density estimators) please
     use the flexible interface described here:
-    https://sbi-dev.github.io/sbi/latest/tutorials/02_multiround_inference/
+    https://sbi.readthedocs.io/en/latest/advanced_tutorials/02_multiround_inference.html
 
     Args:
         simulator: A function that takes parameters $\theta$ and maps them to
@@ -113,7 +150,12 @@ def infer(
             parameters, e.g. which ranges are meaningful for them. Any
             object with `.log_prob()`and `.sample()` (for example, a PyTorch
             distribution) can be used.
-        method: What inference method to use. Either of SNPE, SNLE or SNRE.
+        method: What inference method to use, case-insensitively: any neural
+            trainer `sbi.inference` exports, for example 'npe', 'nle', 'nre',
+            'npe_a', 'fmpe' or 'npse'. The legacy names 'snpe', 'snle' and 'snre'
+            still work but emit a `FutureWarning`. The ABC methods are not
+            supported, because they take the simulator at construction; call
+            `MCABC`/`SMCABC` directly.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
@@ -125,14 +167,40 @@ def infer(
     Returns: Posterior over parameters conditional on observations (amortized).
     """
 
-    try:
-        # Moved here to avoid circular imports at initialization.
-        import sbi.inference  # noqa: R0401
+    # Moved here to avoid circular imports at initialization.
+    import sbi.inference  # noqa: R0401
 
-        method_fun: Callable = getattr(sbi.inference, method.upper())
+    # Resolve legacy method strings here: going through the module `__getattr__`
+    # would attribute the warning to this file instead of the caller.
+    name = method.upper()
+    canonical = sbi.inference._DEPRECATED_ALIASES.get(name)
+    resolved = canonical if canonical is not None else name
+
+    # Before the deprecation warning: advising a spelling `infer` cannot run either
+    # would only send the user around the loop again.
+    if resolved in sbi.inference._abc_family:
+        raise ValueError(
+            f"`infer` does not support '{method}'. It trains a neural network on "
+            "simulations it draws itself, while the ABC methods take the simulator "
+            f"at construction and have no training step. Use {resolved} directly. "
+            f"Its `__call__` docstring shows an example."
+        )
+
+    if canonical is not None:
+        warn(
+            f"method='{method}' is deprecated since sbi v0.27.0 and will be "
+            f"removed in v0.28.0. Use method='{canonical.lower()}' instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+
+    try:
+        method_fun: Callable = getattr(sbi.inference, resolved)
     except AttributeError as err:
         raise NameError(
-            "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
+            f"Method '{method}' not available. `method` must name a neural trainer "
+            "exported by `sbi.inference`, for example 'npe', 'nle', 'nre', 'npe_a', "
+            "'fmpe' or 'npse'."
         ) from err
 
     if (
@@ -143,7 +211,7 @@ def infer(
         warn(
             "We discourage the use the simple interface in more complicated settings. "
             "Have a look into the flexible interface, e.g. in our tutorial "
-            "(https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started).",
+            "(https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html).",
             stacklevel=2,
         )
     # Set variables to empty dicts to be able to pass them
@@ -174,6 +242,9 @@ def infer(
 
 class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     """Abstract base class for neural inference methods."""
+
+    # Overridden by subclasses when needed (e.g., LikelihoodEstimatorTrainer).
+    _INPUT_IS_THETA: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -225,6 +296,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._round = 0
         self._val_loss = float("Inf")
         self._best_val_loss = float("Inf")
+        self._best_model_state_dict = None
         self._epochs_since_last_improvement = 0
 
         if summary_writer is not None:
@@ -251,6 +323,20 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     @property
     def summary(self):
         return self._summary
+
+    @classmethod
+    def _wrap_builder(
+        cls, builder: Union["_PerModelConfigBase", "_EstimatorBuilderBase"]
+    ) -> Callable[[Tensor, Tensor], ConditionalEstimatorType]:
+        """Wrap an estimator config as a ``(batch_theta, batch_x)`` callable."""
+        input_is_theta = cls._INPUT_IS_THETA
+
+        def build_fn(batch_theta, batch_x):
+            if input_is_theta:
+                return builder.build(batch_input=batch_theta, batch_condition=batch_x)
+            return builder.build(batch_input=batch_x, batch_condition=batch_theta)
+
+        return build_fn
 
     @abstractmethod
     def append_simulations(
@@ -718,8 +804,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
         else:
             raise NotImplementedError(
-                "Posterior parameter construction not implemented for",
-                f"'{sample_with}'",
+                f"Posterior parameter construction not implemented for '{sample_with}'"
             )
 
         return posterior_parameters
@@ -919,8 +1004,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 )
             if sample_with not in ("ode", "sde"):
                 raise ValueError(
-                    "`sample_with` must be either",
-                    f" 'ode' or 'sde', got '{sample_with}'",
+                    f"`sample_with` must be either 'ode' or 'sde', got '{sample_with}'"
                 )
             posterior = VectorFieldPosterior(
                 vector_field_estimator=vector_field_estimator,
@@ -969,8 +1053,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 )
             else:
                 raise NotImplementedError(
-                    "Sampling method not implemented for",
-                    f"'{posterior_parameters}'",
+                    f"Sampling method not implemented for '{posterior_parameters}'"
                 )
         return posterior
 
@@ -1004,11 +1087,15 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._neural_net.to(self._device)
 
         if not train_config.resume_training:
-            self.optimizer = Adam(
-                list(self._neural_net.parameters()),
-                lr=train_config.learning_rate,
-            )
-            self.epoch, self.val_loss = 0, float("Inf")
+            parameters = [p for p in self._neural_net.parameters() if p.requires_grad]
+            if not parameters:
+                raise TypeError(
+                    f"{type(self).__name__} cannot train "
+                    f"{type(self._neural_net).__name__}: it has no trainable "
+                    "parameters."
+                )
+            self.optimizer = Adam(parameters, lr=train_config.learning_rate)
+            self.epoch, self._val_loss = 0, float("Inf")
 
         while self.epoch <= train_config.max_num_epochs and not self._converged(
             self.epoch, train_config.stop_after_epochs
@@ -1032,9 +1119,16 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             self.epoch += 1
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        self._report_convergence_at_end(
-            self.epoch, train_config.stop_after_epochs, train_config.max_num_epochs
-        )
+        if self.epoch > train_config.max_num_epochs:
+            # The `and` above short-circuits on the last check, so `_converged` never
+            # saw the final epoch. Score it here before choosing the weights to keep.
+            if self._val_loss < self._best_val_loss:
+                self._best_val_loss = self._val_loss
+                self._best_model_state_dict = deepcopy(self._neural_net.state_dict())
+            elif self._best_model_state_dict is not None:
+                self._neural_net.load_state_dict(self._best_model_state_dict)
+
+        self._report_convergence_at_end(self.epoch, train_config.max_num_epochs)
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
@@ -1198,20 +1292,26 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         )
         return TensorBoardTracker(SummaryWriter(logdir))
 
-    def _report_convergence_at_end(
-        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
-    ) -> None:
-        if self._converged(epoch, stop_after_epochs):
+    def _report_convergence_at_end(self, epoch: int, max_num_epochs: int) -> None:
+        """Report why the training loop stopped.
+
+        Args:
+            epoch: Epoch counter as the training loop left it.
+            max_num_epochs: The epoch budget the loop was given.
+        """
+        # Not `_converged()`: it advances the counter it reads, so a second call can
+        # flip its own verdict.
+        if epoch <= max_num_epochs:
             print(
                 "\r",
                 f"Neural network successfully converged after {epoch} epochs.",
                 end="",
             )
-        elif max_num_epochs == epoch:
+        else:
             warn(
-                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
+                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached, "
                 "but network has not yet fully converged. Consider increasing it.",
-                stacklevel=2,
+                stacklevel=_stacklevel_to_caller(),
             )
 
     def _summarize(

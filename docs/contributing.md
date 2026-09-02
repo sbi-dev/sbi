@@ -27,14 +27,30 @@ To give credit to contributors, we consider adding contributors who repeatedly
 and substantially contributed to `sbi` to the list of authors of the package at
 the end of every year. Additionally, we mention all contributors in the releases.
 
-> To avoid doing duplicated work, we strongly suggest that you go take
-a look at our current [open issues](https://github.com/sbi-dev/sbi/issues) and
-[pull requests](https://github.com/sbi-dev/sbi/pulls) to see if someone else is
-already doing it. Also, in case you're planning to work on something that has not
-yet been proposed by others (e.g. adding a new feature, adding a new example),
-it is preferable to first open a new issue explaining what you intend to
-propose and then working on your pull request after getting some feedback from
-others.
+To avoid duplicated work, please look at our current
+[open issues](https://github.com/sbi-dev/sbi/issues) and
+[pull requests](https://github.com/sbi-dev/sbi/pulls) first, to see if somebody is
+already working on it.
+
+For a small and obvious change, for example a typo or a clear bug fix, open a pull
+request directly.
+
+For all other issues, comment on the issue first. Tell us what causes the problem, how
+you want to solve it, and how you want to test it. This proposal is your claim on the
+issue. It shows us that you understand the problem, and it lets us tell you early if we
+want a different solution. Please write this comment yourself, see
+[Using AI Coding Assistants](#using-ai-coding-assistants). We do not assign issues.
+Comments that only ask for permission are not claims, and we usually do not answer them.
+Please send the proposal instead.
+
+If you plan a larger change that nobody proposed yet, for example a new feature or a new
+example, open an issue first and describe what you intend to do. This prevents wasted
+work on both sides.
+
+We review pull requests when we can. We are a small team, and we cannot give guidance on
+how to make a contribution outside of our hackathons and our Google Summer of Code
+projects. If your pull request does not get a review quickly, this is a question of our
+capacity, not of your work.
 
 ### Contribution workflow
 
@@ -282,8 +298,14 @@ be displayed locally.
 ### Using AI Coding Assistants
 
 We understand that AI coding assistants (like GitHub Copilot, ChatGPT, etc.) can be
-helpful tools.  You are welcome to use them when contributing to this project, but *with
+helpful tools. You are welcome to use them when contributing to this project, but *with
 caution and responsibility*.
+
+`sbi` is a community project. It is fine to use an AI assistant to read the code, to
+understand a problem, and to check your plan. It is a good way to learn a codebase
+quickly. But a contribution is more than the patch: we want to grow the group of people
+who understand `sbi`. This is why we ask that you can explain every part of what you
+submit, in your own words.
 
 - **Understand the Code:** Do *not* blindly accept suggestions from AI assistants. You
     are responsible for ensuring that any code you submit (whether written by you or
@@ -302,7 +324,31 @@ caution and responsibility*.
   code's correctness.
 - **Maintainability:** Make sure the code is well-formatted, commented and does follow
   our code style.
+- **Write your issue comments yourself:** when you propose a solution on an issue, write
+  the comment in your own words. Use an AI assistant to understand the code first, if
+  that helps you. We react to your proposal, so it has to show what *you* understood.
+- **Do not use AI assistants to review the code of others:** see
+  [Reviewing pull requests](#reviewing-pull-requests) below.
 
 **In essence: Use AI assistants as a *tool* to enhance your productivity, but *you* are
 the programmer.  You are ultimately responsible for the quality and correctness of the
 code you contribute.**
+
+### Reviewing pull requests
+
+Reviews come from the maintainers, or from somebody that the author or a maintainer
+asked directly. In addition, we use [CodeRabbit](https://coderabbit.ai) for automated
+reviews. Its comments are marked as automated.
+
+Please do not post unsolicited reviews on the pull requests of other contributors, and
+do not post reviews that an AI assistant wrote for you. These reviews look thorough, but
+they are often quite verbose and can report problems that do not exist. Somebody then
+has to spend time to show that the problem is not real, which costs more than the review
+saves.
+
+If you want to help with a pull request, tell us what you tested and what you saw. A
+short comment with a concrete result is more useful to us than a long list of possible
+problems.
+
+If you would like to become a reviewer, the best way is to contribute code first. We ask
+contributors who know the codebase to review.

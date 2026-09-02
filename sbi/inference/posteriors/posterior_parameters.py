@@ -23,6 +23,7 @@ from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_float,
     is_positive_int,
+    validate_target_accept,
 )
 
 
@@ -119,10 +120,14 @@ class DirectPosteriorParameters(PosteriorParameters):
         enable_transform: Whether to transform parameters to unconstrained space
             during MAP optimization. When False, an identity transform will be
             returned for `theta_transform`.
+        check_finite_x: Whether to raise if the observed data `x_o` contains NaNs or
+            Infs. Set to False when the embedding net expects NaNs, e.g., when
+            `PermutationInvariantEmbedding` pads a varying number of trials.
     """
 
     max_sampling_batch_size: int = 10_000
     enable_transform: bool = True
+    check_finite_x: bool = True
 
     def validate(self):
         """Validate DirectPosteriorParameters fields."""
@@ -230,7 +235,7 @@ class MCMCPosteriorParameters(PosteriorParameters):
         init_strategy: The initialisation strategy for chains; `proposal` will draw
             init locations from `proposal`, whereas `sir` will use Sequential-
             Importance-Resampling (SIR). SIR initially samples
-            `init_strategy_num_candidates` from the `proposal`, evaluates all of
+            `num_candidate_samples` from the `proposal`, evaluates all of
             them under the `potential_fn` and `proposal`, and then resamples the
             initial locations with weights proportional to `exp(potential_fn -
             proposal.log_prob`. `resample` is the same as `sir` but
@@ -244,6 +249,14 @@ class MCMCPosteriorParameters(PosteriorParameters):
             (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
             faster than `"spawn"` but is only supported on POSIX-based systems
             (e.g. Linux and macOS, not Windows).
+        target_accept: Target acceptance probability used only by the PyMC samplers
+            `hmc_pymc` and `nuts_pymc`, controlling step-size adaptation during
+            warmup. Higher values generally result in smaller steps and fewer
+            rejections, at the cost of speed. If `None`, `hmc_pymc` uses `0.9`
+            because PyMC's `0.65` default mixed poorly in sbi's Gaussian regression
+            test, and `nuts_pymc` keeps PyMC's backend default. Ignored by
+            `slice_pymc`, the Pyro samplers (`hmc_pyro`, `nuts_pyro`) and the numpy
+            slice samplers.
     """
 
     method: Literal[
@@ -262,9 +275,12 @@ class MCMCPosteriorParameters(PosteriorParameters):
     init_strategy_parameters: Optional[Dict[str, Any]] = None
     num_workers: int = 1
     mp_context: Literal["fork", "spawn"] = "spawn"
+    target_accept: Optional[float] = None
 
     def validate(self):
         """Validate MCMCPosteriorParameters fields."""
+
+        validate_target_accept(self.target_accept)
 
         if not (
             self.init_strategy_parameters is None
@@ -334,10 +350,14 @@ class VectorFieldPosteriorParameters(PosteriorParameters):
         neural_ode_backend: The backend to use for the neural ODE. Currently,
             only "zuko" is supported.
         neural_ode_kwargs: Additional keyword arguments for the neural ODE.
+        check_finite_x: Whether to raise if the observed data `x_o` contains NaNs or
+            Infs. Set to False when the embedding net expects NaNs, e.g., when
+            `PermutationInvariantEmbedding` pads a varying number of trials.
     """
 
     max_sampling_batch_size: int = 10_000
     enable_transform: bool = True
+    check_finite_x: bool = True
 
     # fields passed from VectorfieldPosterior as keyword arguments
     # to VectorFieldBasedPotential __init__ method

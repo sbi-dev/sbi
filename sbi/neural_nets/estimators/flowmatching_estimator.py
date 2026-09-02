@@ -17,7 +17,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     Rectified flow matching estimator class that estimates the conditional vector field,
     :math:`v(\theta_t, t; x_o) = \mathbb{E}[\theta_1 - \theta_0 | \theta_t, x_o = x_o]`
 
-    This estimator implements the flow matching approach where the vector field is
+    This estimator implements the flow matching approach [2]_ where the vector field is
     learned by matching the flow between the base and target distributions. The vector
     field represents the instantaneous change in the distribution at time t.
 
@@ -108,6 +108,15 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         std_0_tensor = torch.as_tensor(std_0).expand(input_shape).clone()
         self.register_buffer("mean_0", mean_0_tensor)
         self.register_buffer("std_0", std_0_tensor)
+
+    def _check_compose_baseline_compatible(self) -> None:
+        """Reject incompatible analytical and composed standardization baselines."""
+        if self.gaussian_baseline and self.compose_enabled:
+            raise ValueError(
+                "gaussian_baseline and composed standardization cannot be used "
+                "together. Set gaussian_baseline=False to use composed "
+                "standardization."
+            )
 
     def _get_time_dependent_stats(self, time: Tensor) -> Tuple[Tensor, Tensor]:
         """Compute time-dependent mean and std for z-scoring.
@@ -283,6 +292,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Loss value.
         """
+        if self.compose_enabled:
+            input = self.to_z(input)
+
         # Randomly sample time steps
         if times is None:
             times = torch.rand(input.shape[:-1], device=input.device, dtype=input.dtype)
@@ -366,11 +378,13 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         .. math::
             \nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / t
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / t
 
         Taking into account the noise scale :math:`\sigma_{min}`, the score function is
-        :math:`\nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / (t + \sigma_{min})`.
+
+        .. math::
+            \nabla_{\theta_t} \log p(\theta_t | x_o) =
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / (t + \sigma_{min}).
 
         Args:
             input: variable whose distribution is estimated.

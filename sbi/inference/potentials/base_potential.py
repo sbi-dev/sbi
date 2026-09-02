@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import copy
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Protocol, Union
 
@@ -8,6 +9,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks import process_x
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
@@ -28,9 +30,12 @@ class BasePotential(metaclass=ABCMeta):
             x_o: Observed data.
             device: Device on which to evaluate the potential function.
         """
-        self.device = device
+        self.device = process_device(device)
         self.prior = prior
-        self.set_x(x_o)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        self._x_o = x_o
+        self._x_is_iid = True
 
     @abstractmethod
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
@@ -49,15 +54,24 @@ class BasePotential(metaclass=ABCMeta):
             return self._x_is_iid
         else:
             raise ValueError(
-                "No observed data is available. Use `potential_fn.set_x(x_o)`."
+                "No observed data is available. Use `potential_fn.bind(x_o)`."
             )
 
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = True):
-        """Check the shape of the observed data and, if valid, set it."""
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        self._x_o = x_o
-        self._x_is_iid = x_is_iid
+        """Check the shape of the observed data and, if valid, set it.
+
+        DEPRECATED: Use bind() instead. This method delegates to bind() internally.
+        """
+        import warnings
+
+        warnings.warn(
+            "set_x() is deprecated, use bind() instead",
+            FutureWarning,
+            stacklevel=2,
+        )
+        bound = self.bind(x_o, x_is_iid=x_is_iid)
+        self._x_o = bound._x_o
+        self._x_is_iid = bound._x_is_iid
 
     @property
     def x_o(self) -> Tensor:
@@ -66,13 +80,32 @@ class BasePotential(metaclass=ABCMeta):
             return self._x_o
         else:
             raise ValueError(
-                "No observed data is available. Use `potential_fn.set_x(x_o)`."
+                "No observed data is available. Use `potential_fn.bind(x_o)`."
             )
 
-    @x_o.setter
-    def x_o(self, x_o: Optional[Tensor]) -> None:
-        """Check the shape of the observed data and, if valid, set it."""
-        self.set_x(x_o)
+    def bind(self, x_o: Optional[Tensor], x_is_iid: bool = True) -> "BasePotential":
+        """Create new potential with x bound, without mutable state.
+
+        `bind()` does not modify the original potential. A reference to the
+        original keeps the old state; always use the returned potential.
+
+        The default returns a shallow copy, so the bound potential shares the
+        estimator, prior, and every other attribute with the original.
+        Subclasses override this only to rebuild state derived from `x_o`.
+
+        Args:
+            x_o: Observed data to bind.
+            x_is_iid: Whether x represents iid observations.
+
+        Returns:
+            New potential instance with x bound.
+        """
+        bound = copy.copy(self)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        return bound
 
     def return_x_o(self) -> Optional[Tensor]:
         """Return the observed data at which the potential is evaluated.
@@ -94,6 +127,7 @@ class BasePotential(metaclass=ABCMeta):
             Self for method chaining.
         """
 
+        device = process_device(device)
         self.device = device
         if self.prior is not None:
             self.prior = move_distribution_to_device(self.prior, device)
@@ -154,3 +188,16 @@ class CustomPotentialWrapper(BasePotential):
         """
         with torch.set_grad_enabled(track_gradients):
             return self.potential_fn(theta, self.x_o)
+
+    def bind(
+        self, x_o: Optional[Tensor], x_is_iid: bool = True
+    ) -> "CustomPotentialWrapper":
+        """Create new potential with x bound, without mutable state."""
+        bound = CustomPotentialWrapper(
+            potential_fn=self.potential_fn,
+            prior=self.prior,
+            x_o=x_o,
+            device=self.device,
+        )
+        bound._x_is_iid = x_is_iid
+        return bound

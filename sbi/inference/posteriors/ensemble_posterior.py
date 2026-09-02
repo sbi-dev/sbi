@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -12,7 +13,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import process_x
 
 
@@ -104,6 +105,7 @@ class EnsemblePosterior(NeuralPosterior):
         Args:
             device: The device to move the ensemble posterior to.
         """
+        device = process_device(device)
         self.device = device
         self._device = device
         for i in range(len(self.posteriors)):
@@ -317,7 +319,7 @@ class EnsemblePosterior(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -398,7 +400,7 @@ class EnsemblePosterior(NeuralPosterior):
             return log_weights, maps
 
         else:
-            self.potential_fn.set_x(self._x_else_default_x(x))
+            self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
             if init_method == "posterior":
                 inits = self.sample((num_init_samples,), self._x_else_default_x(x))
@@ -452,6 +454,8 @@ class EnsemblePotential(BasePotential):
         self._weights = weights
         self.potential_fns = potential_fns
         super().__init__(prior, x_o, device)
+        if self._x_o is not None:
+            self.potential_fns = [p.bind(self._x_o) for p in self.potential_fns]
 
     def to(self, device: Union[str, torch.device]) -> None:
         """
@@ -462,6 +466,7 @@ class EnsemblePotential(BasePotential):
         Args:
             device: The device to move the ensemble potential to.
         """
+        device = process_device(device)
         self.device = device
         for i in range(len(self.potential_fns)):
             self.potential_fns[i].to(device)
@@ -479,14 +484,56 @@ class EnsemblePotential(BasePotential):
         )
 
     def set_x(self, x_o: Optional[Tensor]):
-        """Check the shape of the observed data and, if valid, set it."""
+        """Check the shape of the observed data and, if valid, set it.
+
+        DEPRECATED: Use bind() instead. This method delegates to bind() internally.
+        It will be removed in a future release.
+        """
+
+        warnings.warn(
+            "set_x() is deprecated and will be removed in a future release. "
+            "Use bind() instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        bound = self.bind(x_o)
+        self._x_o = bound._x_o
+        self.potential_fns = bound.potential_fns
+
+    def bind(
+        self,
+        x_o: Optional[Tensor],
+        x_is_iid: Optional[bool] = None,
+        **kwargs,
+    ) -> "EnsemblePotential":
+        """Return a new EnsemblePotential with x_o bound to all component potentials.
+
+        Args:
+            x_o: Observed data to bind.
+            x_is_iid: Whether x_o is a batch of iid observations. With None,
+                every component keeps its own iid default.
+            kwargs: Forwarded to each component's bind().
+
+        Returns:
+            A new EnsemblePotential with bound components.
+        """
         if x_o is not None:
-            x_o = process_x(x_o).to(  # type: ignore
-                self.device
-            )
-        self._x_o = x_o
-        for comp_potential in self.potential_fns:
-            comp_potential.set_x(x_o)
+            x_o = process_x(x_o).to(self.device)
+
+        iid_kwargs = {} if x_is_iid is None else {"x_is_iid": x_is_iid}
+        bound_potentials = [
+            p.bind(x_o, **iid_kwargs, **kwargs) for p in self.potential_fns
+        ]
+
+        bound = EnsemblePotential(
+            potential_fns=bound_potentials,
+            weights=self._weights,
+            prior=self.prior,
+            x_o=None,
+            device=self.device,
+        )
+        bound._x_o = x_o
+        return bound
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.

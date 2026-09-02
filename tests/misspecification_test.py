@@ -13,7 +13,7 @@ from sbi.diagnostics.misspecification import (
 )
 from sbi.inference import NPE
 from sbi.inference.trainers.marginal import MarginalTrainer
-from sbi.neural_nets import posterior_nn
+from sbi.neural_nets import MarginalNSFConfig, posterior_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils.sbiutils import seed_all_backends
 
@@ -207,7 +207,7 @@ def test_marginal_log_prob_x_space(D: int, N: int):
     x_train = simulator(theta_train)
 
     # Instantiate a trainer for the marginal pdf and train it
-    trainer = MarginalTrainer(density_estimator='NSF')
+    trainer = MarginalTrainer(density_estimator=MarginalNSFConfig())
     print(f"Training marginal q(x) on {x_train.shape[0]} samples...")
     trainer.append_samples(x_train)
     est = trainer.train(max_num_epochs=3000)
@@ -226,3 +226,11 @@ def test_marginal_log_prob_x_space(D: int, N: int):
     assert p_val_mis < 0.05, (
         f"Expected small p_val for misspecified data, obtained {p_val_mis}"
     )
+
+
+def test_mmd_embedding_mode_requires_trained_inference():
+    """An untrained trainer must raise a `ValueError`, not crash."""
+    x = torch.randn(10, 2)
+
+    with pytest.raises(ValueError, match="No neural net found"):
+        calc_misspecification_mmd(x_obs=x[:1], x=x, inference=NPE(), mode="embedding")

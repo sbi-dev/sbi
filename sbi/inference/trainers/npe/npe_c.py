@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Dict, Literal, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Union
 
 import torch
 from torch import Tensor, eye, ones
@@ -14,7 +14,7 @@ from sbi.inference.trainers.npe.npe_base import (
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
-    ConditionalEstimatorBuilder,
+    ConditionalEstimatorBuildFn,
 )
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
@@ -24,6 +24,7 @@ from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
+from sbi.neural_nets.net_builders.estimator_configs import DensityConfigBase
 from sbi.sbi_types import Tracker
 from sbi.utils import (
     batched_mixture_mv,
@@ -77,7 +78,9 @@ class NPE_C(PosteriorEstimatorTrainer):
         for round_idx in range(5):
             theta = proposal.sample((100,))
             x = simulator(theta)
-            density_estimator = inference.append_simulations(theta, x).train()
+            density_estimator = inference.append_simulations(
+                theta, x, proposal=proposal
+            ).train()
             posterior = inference.build_posterior(density_estimator)
             proposal = posterior.set_default_x(x_o)
 
@@ -90,8 +93,10 @@ class NPE_C(PosteriorEstimatorTrainer):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
-            ConditionalEstimatorBuilder[ConditionalDensityEstimator],
-        ] = "maf",
+            DensityConfigBase,
+            ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -103,14 +108,12 @@ class NPE_C(PosteriorEstimatorTrainer):
         Args:
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them.
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type (one of nsf, maf, mdn, made). Alternatively, a function
-                that builds a custom neural network, which adheres to
-                `ConditionalEstimatorBuilder` protocol can be provided. The function
-                will be called with the first batch of simulations (theta, x), which can
-                thus be used for shape inference and potentially for z-scoring. The
-                density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
+            density_estimator: If it is a string (deprecated), use a pre-configured
+                network of the provided type (one of nsf, maf, mdn, made). If it is
+                a per-model config, its ``build()`` method will be
+                called with the first batch of simulations. Alternatively, a function
+                that builds a custom neural network can be provided. If None, it
+                uses ``MAFConfig()``.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -208,17 +211,10 @@ class NPE_C(PosteriorEstimatorTrainer):
             # SNPE, we only use the latest data that was passed, i.e. the one from the
             # last proposal.
             proposal = self._proposal_roundwise[-1]
-            self.use_non_atomic_loss = (
-                isinstance(proposal, DirectPosterior)
-                and isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
-                and isinstance(self._neural_net, MixtureDensityEstimator)
-                and check_dist_class(
-                    self._prior, class_to_check=(Uniform, MultivariateNormal)
-                )[0]
-            )
+            self.use_non_atomic_loss = self._multiround_loss_is_per_row(proposal)
 
             algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
-            print(f"Using SNPE-C with {algorithm} loss")
+            print(f"Using {type(self).__name__} with {algorithm} loss")
 
             if self.use_non_atomic_loss:
                 # Take care of z-scoring, pre-compute and store prior terms.
@@ -307,6 +303,28 @@ class NPE_C(PosteriorEstimatorTrainer):
         else:
             self._maybe_z_scored_prior = self._prior
 
+    def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
+        """Return whether the MoG closed-form correction applies to `proposal`.
+
+        The correction is a product of Gaussians, so it needs a MoG proposal, a MoG
+        density estimator and a Gaussian or uniform prior. Unlike the atomic loss it
+        has no cross-row dependence.
+
+        Args:
+            proposal: The distribution the parameters of a round were sampled from.
+
+        Returns:
+            Whether the non-atomic loss applies.
+        """
+        return (
+            isinstance(proposal, DirectPosterior)
+            and isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
+            and isinstance(self._neural_net, MixtureDensityEstimator)
+            and check_dist_class(
+                self._prior, class_to_check=(Uniform, MultivariateNormal)
+            )[0]
+        )
+
     def _log_prob_proposal_posterior(
         self,
         theta: Tensor,
@@ -331,20 +349,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
 
         if self.use_non_atomic_loss:
-            if not isinstance(self._neural_net, MixtureDensityEstimator):
-                raise ValueError(
-                    "The density estimator must be a MixtureDensityEstimator "
-                    "for non-atomic loss."
-                )
-
             return self._log_prob_proposal_posterior_mog(theta, x, proposal)
         else:
-            if not hasattr(self._neural_net, "log_prob"):
-                raise ValueError(
-                    "The neural estimator must have a log_prob method, for\
-                                 atomic loss. It should at best follow the \
-                                 sbi.neural_nets 'DensityEstiamtor' interface."
-                )
             return self._log_prob_proposal_posterior_atomic(theta, x, masks)
 
     def _log_prob_proposal_posterior_atomic(
