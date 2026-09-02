@@ -12,7 +12,7 @@ from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
 from sbi.sbi_types import AcceptRejectFn, SampleProposal
-from sbi.utils.pbar import nested_pbar_context
+from sbi.utils.pbar import is_nested, nested_pbar_context
 from sbi.utils.sbiutils import gradient_ascent
 
 
@@ -77,7 +77,8 @@ def rejection_sample(
             torch_tf.identity_transform, reinterpreted_batch_ndims=1
         )
 
-    samples_to_find_max = proposal.sample((num_samples_to_find_max,))
+    with nested_pbar_context():
+        samples_to_find_max = proposal.sample((num_samples_to_find_max,))
 
     # Define a potential as the ratio between target distribution and proposal.
     def potential_over_proposal(theta):
@@ -132,7 +133,7 @@ def rejection_sample(
         # Progress bar can be skipped, e.g. when sampling after each round just for
         # logging.
         pbar = tqdm(
-            disable=not show_progress_bars,
+            disable=not show_progress_bars or is_nested(),
             total=num_samples,
             desc=f"Drawing {num_samples} posterior samples",
         )
@@ -318,7 +319,7 @@ def accept_reject_sample(
         num_xos = proposal_sampling_kwargs["condition"].shape[0]
 
     pbar = tqdm(
-        disable=not show_progress_bars,
+        disable=not show_progress_bars or is_nested(),
         total=num_samples,
         desc=f"Drawing {num_samples} samples"
         + (f" for {num_xos} observations" if num_xos > 1 else ""),
