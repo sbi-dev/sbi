@@ -15,8 +15,6 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
-from sbi.samplers import rejection
-from sbi.samplers.importance import sir
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
@@ -685,6 +683,11 @@ class RestrictedPrior(Distribution):
         Returns:
             Samples from the `RestrictedPrior`.
         """
+        # The samplers import `sbi.utils`, so importing them at module level would
+        # make every `sbi.utils` import inside `sbi.samplers` a circular import.
+        from sbi.samplers import rejection
+        from sbi.samplers.importance.sir import sampling_importance_resampling
+
         num_samples = torch.Size(sample_shape).numel()
         sample_with = self._sample_with if sample_with is None else sample_with
 
@@ -724,7 +727,7 @@ class RestrictedPrior(Distribution):
                 torch.float32
             )
 
-            samples = sir.sampling_importance_resampling(
+            samples = sampling_importance_resampling(
                 accept_reject_fn,
                 proposal=self._posterior,
                 num_samples=num_samples,
