@@ -466,13 +466,14 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     elif build_fn == classifier_nn:
         models = ["linear", "mlp", "resnet"]
 
-    # `transform_to_unconstrained` is only implemented for the conditional Zuko
-    # builders; nflows/mdn/mnle and the ratio-based classifiers now raise a
-    # ValueError instead of silently no-op-ing. The factory maps the *modeled*
-    # variable's z-scoring to the builder's z_score_x: theta for posterior_nn and
-    # classifier_nn (`z_score_x=z_score_theta`), x for likelihood_nn.
-    # posterior_nn and classifier_nn both map z_score_x <- z_score_theta.
+    # `transform_to_unconstrained` is only implemented on the modeled side of
+    # the conditional Zuko builders and the MDN. The factories build a per-model
+    # config, which offers the option only there and raises everywhere else,
+    # rather than letting `z_score_parser` turn it into a silent no-op. The
+    # factories map the *modeled* variable's z-scoring to the builder's
+    # z_score_x: theta for posterior_nn and classifier_nn, x for likelihood_nn.
     modeled_z = z_x if build_fn == likelihood_nn else z_theta
+    condition_z = z_theta if build_fn == likelihood_nn else z_x
 
     for model in models:
         if model == "mnle":
@@ -481,22 +482,33 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
         else:
             model_x = x
 
+        implements_transform = model.startswith("zuko") or model == "mdn"
+        # `mnle` has no config yet, so it keeps the lenient factory path where
+        # an unusable setting is forwarded and ignored downstream.
+        legacy = model == "mnle"
+
+        # The factories reject a setting the chosen model does not use, so only
+        # the ones this model has are passed.
         kwargs = {
             "model": model,
             "z_score_theta": z_theta,
             "z_score_x": z_x,
-            "hidden_features": 8,
         }
+        if model != "linear":
+            kwargs["hidden_features"] = 8
         if build_fn in [likelihood_nn, posterior_nn]:
-            kwargs.update({"x_dist": dist, "num_transforms": 1})
+            if model not in ("mdn", "made"):
+                kwargs["num_transforms"] = 1
+            # `x_dist` is read only by the unconstrained transform.
+            if modeled_z == "transform_to_unconstrained" and (
+                implements_transform or legacy
+            ):
+                kwargs["x_dist"] = dist
 
-        # Unsupported combination: the modeled variable requests the unconstrained
-        # transform on a non-Zuko-conditional builder -> expect a clear ValueError.
-        if (
-            modeled_z == "transform_to_unconstrained"
-            and not model.startswith("zuko")
-            and model != "mdn"
-        ):
+        unsupported = (
+            modeled_z == "transform_to_unconstrained" and not implements_transform
+        ) or (condition_z == "transform_to_unconstrained" and not legacy)
+        if unsupported:
             with pytest.raises(ValueError, match="transform_to_unconstrained"):
                 build_fun = build_fn(**kwargs)
                 build_fun(theta, model_x)

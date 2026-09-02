@@ -35,6 +35,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import MultipleIndependent
 from sbi.utils.metrics import c2st, check_c2st
+from sbi.utils.user_input_checks import process_x
 
 # Supported variational families for VI
 FLOWS = ["maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"]
@@ -58,6 +59,15 @@ class FakePotential(BasePotential):
     def allow_iid_x(self) -> bool:
         return True
 
+    def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
+        """Create new potential with x bound, without mutable state."""
+
+        bound = FakePotential(prior=self.prior, device=self.device)
+        x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        return bound
+
 
 def make_tractable_potential(target_distribution, prior):
     """Create a potential function from a known target distribution."""
@@ -70,6 +80,17 @@ def make_tractable_potential(target_distribution, prior):
 
         def allow_iid_x(self) -> bool:
             return True
+
+        def bind(
+            self, x_o: torch.Tensor, x_is_iid: bool = True
+        ) -> "TractablePotential":
+            """Create new potential with x bound, without mutable state."""
+
+            bound = TractablePotential(prior=self.prior, device=self.device)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
+            return bound
 
     return TractablePotential(prior=prior)
 

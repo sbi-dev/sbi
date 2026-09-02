@@ -19,8 +19,7 @@ from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.net_builders.estimator_configs import (
-    MixedDensityEstimatorBuilder,
-    _EstimatorBuilderBase,
+    MixedConfig,
 )
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
@@ -67,14 +66,15 @@ class MNLE(LikelihoodEstimatorTrainer):
         samples = posterior.sample((1000,), x=x_o)
     """
 
-    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (MixedDensityEstimatorBuilder,)
+    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (MixedConfig,)
+    _BUILDER_TYPE_HINT: ClassVar[str] = "Use MixedConfig(continuous=...)."
 
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["mnle"],
-            MixedDensityEstimatorBuilder,
+            MixedConfig,
             ConditionalEstimatorBuildFn[MixedDensityEstimator],
             None,
         ] = None,
@@ -91,8 +91,7 @@ class MNLE(LikelihoodEstimatorTrainer):
                 parameters, e.g. which ranges are meaningful for them. If `None`, the
                 prior must be passed to `.build_posterior()`.
             density_estimator: If ``None`` (default), uses a
-                ``MixedDensityEstimatorBuilder`` with default settings. A
-                ``MixedDensityEstimatorBuilder`` can be passed to configure
+                ``MixedConfig()``. A ``MixedConfig`` can be passed to configure
                 the mixed neural network. If it is a string (deprecated), it
                 must be ``"mnle"``. Alternatively, a function that builds a
                 custom neural network can be provided. The function will be
@@ -111,7 +110,7 @@ class MNLE(LikelihoodEstimatorTrainer):
         """
 
         if density_estimator is None:
-            density_estimator = MixedDensityEstimatorBuilder()
+            density_estimator = MixedConfig()
         elif isinstance(density_estimator, str):
             if density_estimator != "mnle":
                 raise ValueError(
@@ -120,20 +119,12 @@ class MNLE(LikelihoodEstimatorTrainer):
                 )
             warnings.warn(
                 "Passing a string for `density_estimator` is deprecated. "
-                "Use MixedDensityEstimatorBuilder(...) instead, e.g. "
-                "`from sbi.neural_nets import MixedDensityEstimatorBuilder`.",
+                "Use MixedConfig(...) instead, e.g. "
+                "`from sbi.neural_nets import MixedConfig`.",
                 FutureWarning,
                 stacklevel=2,
             )
             density_estimator = likelihood_nn(model="mnle")
-        elif isinstance(density_estimator, _EstimatorBuilderBase) and not isinstance(
-            density_estimator, MixedDensityEstimatorBuilder
-        ):
-            raise TypeError(
-                "MNLE requires a MixedDensityEstimatorBuilder; got "
-                f"{type(density_estimator).__name__}. Use "
-                "MixedDensityEstimatorBuilder(continuous_model=...)."
-            )
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 

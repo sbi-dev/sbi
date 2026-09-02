@@ -52,7 +52,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaus
 from sbi.utils import BoxUniform
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
-from sbi.utils.user_input_checks import validate_theta_and_x
+from sbi.utils.user_input_checks import process_x, validate_theta_and_x
 from tests.test_utils import mps_fallback_disabled
 from tests.vi_test import FakePotential as VIFakePotential
 
@@ -412,6 +412,15 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str):
         def allow_iid_x(self) -> bool:
             return True
 
+        def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
+            """Create new potential with x bound, without mutable state."""
+
+            bound = FakePotential(prior=self.prior, device=self.device)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
+            return bound
+
     potential_fn = FakePotential(
         prior=MultivariateNormal(
             zeros(num_dim, device=device), eye(num_dim, device=device)
@@ -465,6 +474,15 @@ def test_amortized_vi_on_gpu(num_dim: int, flow_type: str):
 
         def allow_iid_x(self) -> bool:
             return True
+
+        def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
+            """Create new potential with x bound, without mutable state."""
+
+            bound = FakePotential(prior=self.prior, device=self.device)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
+            return bound
 
     potential_fn = FakePotential(prior=prior, device=device)
 
@@ -780,8 +798,8 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
     assert sample_device.device.type == device.split(":")[0], (
         f"sample was not correctly moved to {device}."
     )
-    posterior.potential_fn.set_x(x_o)
-    potential_values = posterior.potential_fn(sample_device)
+    bound_potential = posterior.potential_fn.bind(x_o)
+    potential_values = bound_potential(sample_device)
     assert potential_values.device.type == device.split(":")[0], (
         f"potential was not correctly evaluated on {device}."
     )

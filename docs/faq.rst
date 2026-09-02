@@ -9,3 +9,4 @@ FAQ
    faq/question_01_leakage
    faq/question_02_nans
    faq/question_03_pickling_error
+   faq/question_04_unconstrained
