@@ -5,7 +5,7 @@ import warnings
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 from zuko.distributions import NormalizingFlow
 
@@ -84,6 +84,11 @@ class VectorFieldBasedPotential(BasePotential):
         self._x_is_iid = False
         if self._x_o is not None:
             self.flow = self.rebuild_flow()
+
+    @property
+    def x_embedding_net(self) -> nn.Module:
+        """Return the net embedding `x`: the estimator's condition is `x`."""
+        return self.vector_field_estimator.embedding_net
 
     def to(self, device: Union[str, torch.device]) -> None:
         """

@@ -7,7 +7,7 @@ from typing import Callable, List, Optional, Tuple, Union
 import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
@@ -402,6 +402,11 @@ class ConditionedPotential(BasePotential):
         theta_condition[:, self.dims_to_sample] = theta_
 
         return self.potential_fn(theta_condition, track_gradients=track_gradients)
+
+    @property
+    def x_embedding_net(self) -> Optional[nn.Module]:
+        """Delegate to the wrapped potential, like `set_x` and `return_x_o`."""
+        return self.potential_fn.x_embedding_net
 
     @property
     def x_is_iid(self) -> bool:
