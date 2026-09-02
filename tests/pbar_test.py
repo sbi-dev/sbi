@@ -178,12 +178,13 @@ def test_importance_sample_shows_proposal_bar_only_on_request(show_progress_bars
 
 
 @pytest.mark.filterwarnings("ignore:.*lie outside the prior support")
+@pytest.mark.parametrize("batched", [False, True])
 @pytest.mark.parametrize("reject_outside_prior", [True, False])
 @pytest.mark.parametrize("show_progress_bars", [True, False])
 def test_vector_field_posterior_shows_at_most_one_bar(
-    reject_outside_prior, show_progress_bars, recorded_bars
+    batched, reject_outside_prior, show_progress_bars, recorded_bars
 ):
-    """Regression test for #1811.
+    """Regression test for #1811, for `sample()` and `sample_batched()`.
 
     With rejection sampling, only the rejection bar is shown. Without it, the
     diffusion bar must stay visible because it is the only one.
@@ -195,9 +196,10 @@ def test_vector_field_posterior_shows_at_most_one_bar(
     estimator = posterior_score_nn(sde_type="vp")(theta, x)
     posterior = VectorFieldPosterior(vector_field_estimator=estimator, prior=prior)
 
-    posterior.sample(
+    sample_fn = posterior.sample_batched if batched else posterior.sample
+    sample_fn(
         (10,),
-        x=x[:1],
+        x=x[:2] if batched else x[:1],
         steps=3,
         show_progress_bars=show_progress_bars,
         reject_outside_prior=reject_outside_prior,
