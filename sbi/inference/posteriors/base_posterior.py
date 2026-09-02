@@ -373,8 +373,12 @@ class NeuralPosterior:
         self._device = actual_device
         if hasattr(self, "device"):
             self.device = actual_device
+        shared_prior = getattr(self.potential_fn, "prior", None)
         self.potential_fn.to(actual_device)  # type: ignore[union-attr]
         for attr in ("prior", "_prior", "proposal"):
             value = getattr(self, attr, None)
-            if isinstance(value, Distribution):
+            if value is shared_prior and value is not None:
+                # The potential moved this object already. Keep sharing it.
+                setattr(self, attr, self.potential_fn.prior)  # type: ignore[union-attr]
+            elif isinstance(value, Distribution):
                 setattr(self, attr, move_distribution_to_device(value, actual_device))

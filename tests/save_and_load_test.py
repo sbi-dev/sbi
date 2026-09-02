@@ -10,6 +10,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
+from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
@@ -161,11 +162,23 @@ def test_unconstraining_transform_follows_dtype_cast(builder_name):
     assert torch.isfinite(log_probs).all()
 
 
-def _build_direct_posterior(prior, num_dim: int = 2):
-    """A small trained `DirectPosterior` on CPU for `torch.load` round-trips."""
+def _box_uniform():
+    return utils.BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+
+
+def _mvn():
+    return MultivariateNormal(torch.zeros(2), torch.eye(2))
+
+
+def _build_posterior(kind: str, prior, num_dim: int = 2):
+    """A small trained posterior on CPU for `torch.load` round-trips."""
+    if kind == "ensemble":
+        posteriors = [_build_posterior("direct", prior) for _ in range(2)]
+        return EnsemblePosterior(posteriors).set_default_x(torch.zeros(1, num_dim))
     theta = prior.sample((200,))
     x = theta + 0.1 * torch.randn_like(theta)
-    trainer = NPE(prior=prior, show_progress_bars=False)
+    trainer_cls = FMPE if kind == "vector_field" else NPE
+    trainer = trainer_cls(prior=prior, show_progress_bars=False)
     trainer.append_simulations(theta, x).train(max_num_epochs=1)
     return trainer.build_posterior().set_default_x(torch.zeros(1, num_dim))
 
@@ -178,25 +191,22 @@ def _torch_load_roundtrip(posterior, map_location: str):
 
 
 @pytest.mark.parametrize(
-    "make_prior",
+    "kind, make_prior",
     [
-        pytest.param(
-            lambda: utils.BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2)),
-            id="box_uniform",
-        ),
-        pytest.param(
-            lambda: MultivariateNormal(torch.zeros(2), torch.eye(2)), id="mvn"
-        ),
+        pytest.param("direct", _box_uniform, id="direct-box_uniform"),
+        pytest.param("direct", _mvn, id="direct-mvn"),
+        pytest.param("vector_field", _mvn, id="vector_field-mvn"),
+        pytest.param("ensemble", _mvn, id="ensemble-mvn"),
     ],
 )
-def test_torch_load_map_location_reconciles_claimed_device(make_prior):
+def test_torch_load_map_location_reconciles_claimed_device(kind, make_prior):
     """A posterior whose device strings disagree with its tensors is reconciled on load.
 
     Claiming `cuda:0` on a CPU posterior simulates one that was saved on a GPU and
     loaded with `map_location="cpu"`, so the reconciliation runs on CPU-only CI. The
-    plain torch prior covers `move_distribution_to_device()` for priors without `.to()`.
+    plain torch prior has no `.to()`, which every potential must handle without raising.
     """
-    posterior = _build_direct_posterior(make_prior())
+    posterior = _build_posterior(kind, make_prior())
     posterior._device = posterior.device = posterior.potential_fn.device = "cuda:0"
     if hasattr(posterior.prior, "device"):
         posterior.prior.device = "cuda:0"
@@ -209,6 +219,7 @@ def test_torch_load_map_location_reconciles_claimed_device(make_prior):
         f"potential_fn.device is {loaded.potential_fn.device!r}"
     )
     assert getattr(loaded.prior, "device", "cpu") == "cpu"
+    assert loaded.prior is loaded.potential_fn.prior, "prior is no longer shared"
     samples = loaded.sample((10,))
     assert samples.device.type == "cpu", f"samples on {samples.device}"
     potential = loaded.potential(samples)
@@ -217,7 +228,7 @@ def test_torch_load_map_location_reconciles_claimed_device(make_prior):
 
 def test_torch_load_map_location_same_device_is_passthrough():
     """Loading a CPU posterior with `map_location="cpu"` leaves its state unchanged."""
-    posterior = _build_direct_posterior(utils.BoxUniform(-torch.ones(2), torch.ones(2)))
+    posterior = _build_posterior("direct", _box_uniform())
 
     loaded = _torch_load_roundtrip(posterior, map_location="cpu")
 
