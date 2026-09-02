@@ -56,7 +56,6 @@ from sbi.utils.torchutils import (
     tensor2numpy,
     tile,
 )
-from sbi.utils.pbar import is_nested, nested_pbar_context
 from sbi.utils.typechecks import (
     is_bool,
     is_int,
