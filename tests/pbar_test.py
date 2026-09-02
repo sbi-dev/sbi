@@ -11,6 +11,7 @@ from tqdm.auto import tqdm
 from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.importance import sir
+from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score import diffuser
 from sbi.utils import BoxUniform
@@ -158,6 +159,22 @@ def test_sampler_nests_proposal_calls_and_shows_one_bar(run_sampler, recorded_ba
     with nested_pbar_context():
         run_sampler(proposal, potential_fn)
     assert shown(recorded_bars) == [], "a nested sampler must not show a bar"
+
+
+@pytest.mark.parametrize("show_progress_bars", [True, False])
+def test_importance_sample_shows_proposal_bar_only_on_request(show_progress_bars):
+    """`importance_sample` has no bar of its own. The bar of the proposal, if it has
+    one, is shown only if progress bars are requested."""
+    proposal = RecordingProposal(MultivariateNormal(torch.zeros(2), torch.eye(2)))
+
+    importance_sample(
+        lambda theta: -0.5 * (theta**2).sum(-1),
+        proposal,
+        num_samples=5,
+        show_progress_bars=show_progress_bars,
+    )
+
+    assert proposal.nested_at_sample == [not show_progress_bars]
 
 
 @pytest.mark.filterwarnings("ignore:.*lie outside the prior support")
