@@ -210,6 +210,11 @@ def test_estimator_config_rejects_an_invalid_network():
         FlowMatchingConfig(net="mlp")
 
 
+def test_net_config_rejects_embedding_net_in_extra_kwargs():
+    with pytest.raises(ValueError, match="embedding_net"):
+        MLPConfig(extra_kwargs={"embedding_net": nn.Identity()})
+
+
 # --------------------------------------------------------------------------
 # Wiring
 # --------------------------------------------------------------------------

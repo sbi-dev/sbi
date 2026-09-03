@@ -1368,6 +1368,8 @@ class _VectorFieldNetConfigBase(_PerModelConfigBase):
     _BUILD_FN: ClassVar[Callable]
     """Network build function this config feeds, set by each subclass."""
 
+    _SHADOWED_EXTRA_KWARGS: ClassVar[frozenset[str]] = frozenset({"embedding_net"})
+
     def __post_init__(self):
         self._reject_if_abstract(_VectorFieldNetConfigBase, "MLPConfig()")
         if not isinstance(self.hidden_features, int) or isinstance(
