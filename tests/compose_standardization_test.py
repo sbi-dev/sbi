@@ -105,26 +105,30 @@ def test_affine_contract():
     )
 
 
-def test_compose_shift_must_be_finite():
-    with pytest.raises(ValueError, match="compose_shift"):
+@pytest.mark.parametrize(
+    "affine_name,value",
+    [
+        ("compose_shift", float("nan")),
+        ("compose_shift", float("inf")),
+        ("compose_scale", 0.0),
+        ("compose_scale", -1.0),
+        ("compose_scale", float("nan")),
+        ("compose_scale", float("inf")),
+    ],
+)
+def test_compose_affine_rejects_invalid_values(affine_name, value):
+    affine_kwargs = {
+        "compose_shift": torch.zeros(NUM_DIM),
+        "compose_scale": torch.ones(NUM_DIM),
+    }
+    affine_kwargs[affine_name] = torch.full((NUM_DIM,), value)
+
+    with pytest.raises(ValueError, match=affine_name):
         FlowMatchingEstimator(
             net=torch.nn.Identity(),
             input_shape=torch.Size([NUM_DIM]),
             condition_shape=torch.Size([NUM_DIM]),
-            compose_shift=torch.tensor([0.0, float("nan"), 0.0]),
-            compose_scale=torch.ones(NUM_DIM),
-        )
-
-
-@pytest.mark.parametrize("value", [0.0, -1.0, float("nan"), float("inf")])
-def test_compose_scale_must_be_positive_and_finite(value):
-    with pytest.raises(ValueError, match="compose_scale"):
-        FlowMatchingEstimator(
-            net=torch.nn.Identity(),
-            input_shape=torch.Size([NUM_DIM]),
-            condition_shape=torch.Size([NUM_DIM]),
-            compose_shift=torch.zeros(NUM_DIM),
-            compose_scale=torch.full((NUM_DIM,), value),
+            **affine_kwargs,
         )
 
 
@@ -196,11 +200,20 @@ def test_checkpoint_loading(case):
     assert torch.equal(destination._theta_scale, source._theta_scale)
 
 
-def test_checkpoint_loading_rejects_invalid_compose_affine():
+@pytest.mark.parametrize(
+    "buffer_name,value,error_match",
+    [
+        ("_theta_shift", float("nan"), "compose_shift"),
+        ("_theta_scale", 0.0, "compose_scale"),
+    ],
+)
+def test_checkpoint_loading_rejects_invalid_compose_affine(
+    buffer_name, value, error_match
+):
     state_dict = _build().state_dict()
-    state_dict["_theta_scale"][0, 0] = 0.0
+    state_dict[buffer_name][0, 0] = value
 
-    with pytest.raises(ValueError, match="compose_scale"):
+    with pytest.raises(ValueError, match=error_match):
         _build(compose=False).load_state_dict(state_dict)
 
 

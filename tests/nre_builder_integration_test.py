@@ -63,8 +63,7 @@ def test_wrong_config_family_raises(trainer_cls):
         trainer_cls(prior, classifier=MAFConfig(), show_progress_bars=False)
 
 
-def test_rejects_legacy_config_of_the_wrong_family():
-    """The flat vector-field config must not fall through as a callable."""
+def test_rejects_vector_field_config():
     prior = MultivariateNormal(zeros(2), eye(2))
     with pytest.raises(TypeError, match="ClassifierConfigBase"):
         NRE_A(

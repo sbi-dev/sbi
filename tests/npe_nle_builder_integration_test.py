@@ -351,8 +351,7 @@ def test_wrong_config_family_raises(trainer_cls, config):
     [NPE_C, NLE_A, MNPE, MNLE, NPE_PFN],
     ids=["npe", "nle", "mnpe", "mnle", "npe_pfn"],
 )
-def test_trainer_rejects_legacy_config_of_the_wrong_family(trainer_cls):
-    """The remaining flat vector-field config must not fall through as callable."""
+def test_trainer_rejects_vector_field_config(trainer_cls):
     prior = MultivariateNormal(zeros(2), eye(2))
     with pytest.raises(TypeError):
         trainer_cls(
