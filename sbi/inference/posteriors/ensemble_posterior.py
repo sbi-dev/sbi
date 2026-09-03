@@ -466,14 +466,10 @@ class EnsemblePotential(BasePotential):
         Args:
             device: The device to move the ensemble potential to.
         """
-        device = process_device(device)
-        self.device = device
-        for i in range(len(self.potential_fns)):
-            self.potential_fns[i].to(device)
-        self._weights = self._weights.to(device)
-        self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
+        super().to(device)
+        for potential_fn in self.potential_fns:
+            potential_fn.to(self.device)
+        self._weights = self._weights.to(self.device)
 
     def allow_iid_x(self) -> bool:
         # in case there is different kinds of posteriors, this will produce an error

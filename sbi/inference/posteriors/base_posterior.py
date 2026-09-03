@@ -8,6 +8,7 @@ from warnings import warn
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
+from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,
@@ -16,8 +17,15 @@ from sbi.inference.potentials.base_potential import (
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent
-from sbi.utils.torchutils import assert_all_finite, ensure_theta_batched, process_device
+from sbi.utils.torchutils import (
+    assert_all_finite,
+    canonical_device,
+    ensure_theta_batched,
+    infer_tensor_device,
+    process_device,
+)
 from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class NeuralPosterior:
@@ -343,9 +351,34 @@ class NeuralPosterior:
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
 
+        `torch.load(..., map_location=...)` remaps the tensors but not the stored device
+        strings. If the restored tensors live on another device than `_device` claims,
+        the device strings of the posterior, its potential and its prior are updated.
+
         Args:
             state_dict: State to be restored.
         """
         # Posteriors pickled before `check_finite_x` was introduced carry no such key.
         state_dict.setdefault("_check_finite_x", True)
         self.__dict__ = state_dict
+
+        actual_device = infer_tensor_device(self)
+        if actual_device is None or canonical_device(actual_device) == canonical_device(
+            self._device
+        ):
+            return
+
+        # The tensors already live on `actual_device`. Only the device strings, and the
+        # distributions that cache one, must follow.
+        self._device = actual_device
+        if hasattr(self, "device"):
+            self.device = actual_device
+        shared_prior = getattr(self.potential_fn, "prior", None)
+        self.potential_fn.to(actual_device)  # type: ignore[union-attr]
+        for attr in ("prior", "_prior", "proposal"):
+            value = getattr(self, attr, None)
+            if value is shared_prior and value is not None:
+                # The potential moved this object already. Keep sharing it.
+                setattr(self, attr, self.potential_fn.prior)  # type: ignore[union-attr]
+            elif isinstance(value, Distribution):
+                setattr(self, attr, move_distribution_to_device(value, actual_device))

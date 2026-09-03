@@ -22,7 +22,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.samplers.ode_solvers import build_neural_ode
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
 
 
@@ -87,21 +87,15 @@ class VectorFieldBasedPotential(BasePotential):
 
     def to(self, device: Union[str, torch.device]) -> None:
         """
-        Moves score_estimator, prior and x_o to the given device.
+        Moves the vector field estimator, prior and x_o to the given device.
 
         It also sets the device attribute to the given device.
 
         Args:
-            device: Device to move the score_estimator, prior and x_o to.
+            device: Device to move the vector field estimator, prior and x_o to.
         """
-
-        device = process_device(device)
-        self.device = device
-        self.vector_field_estimator.to(device)
-        if self.prior:
-            self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
+        super().to(device)
+        self.vector_field_estimator.to(self.device)
 
     def set_x(
         self,

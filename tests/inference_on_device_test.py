@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import io
 import warnings
 from dataclasses import asdict
 from typing import Tuple, Union
@@ -25,6 +26,8 @@ from sbi.inference.posteriors.posterior_parameters import (
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
+    VIPosteriorParameters,
+    VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -999,3 +1002,61 @@ def test_zuko_device_transform():
     cond = torch.randn(1, 3).to(device)
     assert est.log_prob(theta.unsqueeze(1), cond).device.type == device.split(":")[0]
     assert est.sample((10,), cond).device.type == device.split(":")[0]
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "posterior_parameters",
+    [
+        pytest.param(DirectPosteriorParameters(), id="direct"),
+        pytest.param(RejectionPosteriorParameters(), id="rejection"),
+        pytest.param(ImportanceSamplingPosteriorParameters(), id="importance"),
+        pytest.param(
+            MCMCPosteriorParameters(num_chains=1, warmup_steps=1, thin=1), id="mcmc"
+        ),
+        pytest.param(VIPosteriorParameters(q="gaussian"), id="vi"),
+        pytest.param(VectorFieldPosteriorParameters(), id="vector_field"),
+    ],
+)
+def test_torch_load_map_location_reconciles_device(posterior_parameters):
+    """A posterior saved on the GPU and loaded with `map_location="cpu"` runs on CPU.
+
+    `torch.load` remaps the tensors. `NeuralPosterior.__setstate__` must update the
+    device strings of the posterior, its potential and its prior to match.
+    """
+    device = process_device("gpu")
+    num_dim = 2
+    prior = BoxUniform(-ones(num_dim, device=device), ones(num_dim, device=device))
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    is_vector_field = isinstance(posterior_parameters, VectorFieldPosteriorParameters)
+    trainer_cls = FMPE if is_vector_field else NPE
+    trainer = trainer_cls(prior=prior, device=device, show_progress_bars=False)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = trainer.build_posterior(posterior_parameters=posterior_parameters)
+    posterior.set_default_x(zeros(1, num_dim, device=device))
+    if isinstance(posterior, VIPosterior):
+        posterior.train(
+            max_num_iters=10,
+            check_for_convergence=False,
+            quality_control=False,
+            show_progress_bar=False,
+        )
+
+    buffer = io.BytesIO()
+    torch.save(posterior, buffer)
+    buffer.seek(0)
+    loaded = torch.load(buffer, weights_only=False, map_location="cpu")
+
+    assert loaded._device == "cpu", f"_device is {loaded._device!r}"
+    assert loaded.potential_fn.device == "cpu", (
+        f"potential_fn.device is {loaded.potential_fn.device!r}"
+    )
+    assert loaded.potential_fn.prior.device == "cpu", (
+        f"prior.device is {loaded.potential_fn.prior.device!r}"
+    )
+    samples = loaded.sample((10,))
+    assert samples.device.type == "cpu", f"samples on {samples.device}"
+    potential = loaded.potential(samples)
+    assert potential.device.type == "cpu", f"potential on {potential.device}"
