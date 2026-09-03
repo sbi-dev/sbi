@@ -867,7 +867,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
     def marginal_denoising_posterior_precision_est_fn(
         self,
         time: Tensor,
-        inputs: Optional[Tensor],
+        inputs: Tensor,
         conditions: Tensor,
     ) -> Tensor:
         r"""Estimates the marginal posterior precision.
@@ -1288,7 +1288,7 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     def marginal_denoising_posterior_precision_est_fn(
         self,
         time: Tensor,
-        inputs: Optional[Tensor],
+        inputs: Tensor,
         conditions: Tensor,
     ) -> Tensor:
         r"""
@@ -1304,16 +1304,7 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
 
         Returns:
             Estimated marginal posterior precision.
-
-        Raises:
-            ValueError: If ``inputs`` is ``None``, as the Jacobian of the score
-                function is evaluated at the inputs.
         """
-        if inputs is None:
-            raise ValueError(
-                "JacCorrectedScoreFn requires `inputs` to estimate the marginal "
-                "posterior precision; got None."
-            )
         d = inputs.shape[-1]
         with torch.enable_grad():
             # NOTE: torch.func can be relatively unstable...

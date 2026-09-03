@@ -68,15 +68,13 @@ class Corrector(ABC):
         self.potential_fn = predictor.potential_fn
         self.device = predictor.device
 
-    def __call__(
-        self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None
-    ) -> Tensor:
+    def __call__(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
         """Correct the samples.
 
         Args:
             theta: The samples to correct.
             t0: The current time.
-            t1: The next time. Defaults to None.
+            t1: The next time.
 
         Returns:
             Tensor: The corrected samples.
@@ -84,7 +82,7 @@ class Corrector(ABC):
         return self.correct(theta, t0, t1)
 
     @abstractmethod
-    def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
+    def correct(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
         """Correct the samples."""
         pass
 
@@ -158,19 +156,8 @@ class GibbsCorrector(Corrector):
         dt_sqrt = torch.sqrt(dt)
         return theta + f * dt + g * eps * dt_sqrt
 
-    def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
-        """Correct the samples using Gibbs sampling.
-
-        Args:
-            theta: The samples to correct.
-            t0: The current time.
-            t1: The next time. Required by Gibbs dynamics.
-
-        Raises:
-            ValueError: If ``t1`` is ``None``, since Gibbs sampling needs a target time.
-        """
-        if t1 is None:
-            raise ValueError("GibbsCorrector requires the next time `t1`; got None.")
+    def correct(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
+        """Correct the samples using Gibbs sampling."""
         for _ in range(self.num_steps):
             theta = self.noise(theta, t0, t1)
             theta = self.predictor(theta, t1, t0)
