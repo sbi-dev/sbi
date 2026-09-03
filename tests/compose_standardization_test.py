@@ -11,6 +11,7 @@ from torch.distributions import Independent, Normal
 
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
+from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
 from sbi.neural_nets.net_builders.vector_field_nets import (
     build_vector_field_estimator,
@@ -104,6 +105,29 @@ def test_affine_contract():
     )
 
 
+def test_compose_shift_must_be_finite():
+    with pytest.raises(ValueError, match="compose_shift"):
+        FlowMatchingEstimator(
+            net=torch.nn.Identity(),
+            input_shape=torch.Size([NUM_DIM]),
+            condition_shape=torch.Size([NUM_DIM]),
+            compose_shift=torch.tensor([0.0, float("nan"), 0.0]),
+            compose_scale=torch.ones(NUM_DIM),
+        )
+
+
+@pytest.mark.parametrize("value", [0.0, -1.0, float("nan"), float("inf")])
+def test_compose_scale_must_be_positive_and_finite(value):
+    with pytest.raises(ValueError, match="compose_scale"):
+        FlowMatchingEstimator(
+            net=torch.nn.Identity(),
+            input_shape=torch.Size([NUM_DIM]),
+            condition_shape=torch.Size([NUM_DIM]),
+            compose_shift=torch.zeros(NUM_DIM),
+            compose_scale=torch.full((NUM_DIM,), value),
+        )
+
+
 @pytest.mark.gpu
 def test_affine_contract_cuda():
     estimator = _build().cuda()
@@ -170,6 +194,14 @@ def test_checkpoint_loading(case):
     assert destination.compose_enabled
     assert torch.equal(destination._theta_shift, source._theta_shift)
     assert torch.equal(destination._theta_scale, source._theta_scale)
+
+
+def test_checkpoint_loading_rejects_invalid_compose_affine():
+    state_dict = _build().state_dict()
+    state_dict["_theta_scale"][0, 0] = 0.0
+
+    with pytest.raises(ValueError, match="compose_scale"):
+        _build(compose=False).load_state_dict(state_dict)
 
 
 @pytest.mark.parametrize(
