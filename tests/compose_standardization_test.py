@@ -11,6 +11,7 @@ from torch.distributions import Independent, Normal
 
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
+from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
 from sbi.neural_nets.net_builders.vector_field_nets import (
     build_vector_field_estimator,
@@ -104,6 +105,33 @@ def test_affine_contract():
     )
 
 
+@pytest.mark.parametrize(
+    "affine_name,value",
+    [
+        ("compose_shift", float("nan")),
+        ("compose_shift", float("inf")),
+        ("compose_scale", 0.0),
+        ("compose_scale", -1.0),
+        ("compose_scale", float("nan")),
+        ("compose_scale", float("inf")),
+    ],
+)
+def test_compose_affine_rejects_invalid_values(affine_name, value):
+    affine_kwargs = {
+        "compose_shift": torch.zeros(NUM_DIM),
+        "compose_scale": torch.ones(NUM_DIM),
+    }
+    affine_kwargs[affine_name] = torch.full((NUM_DIM,), value)
+
+    with pytest.raises(ValueError, match=affine_name):
+        FlowMatchingEstimator(
+            net=torch.nn.Identity(),
+            input_shape=torch.Size([NUM_DIM]),
+            condition_shape=torch.Size([NUM_DIM]),
+            **affine_kwargs,
+        )
+
+
 @pytest.mark.gpu
 def test_affine_contract_cuda():
     estimator = _build().cuda()
@@ -170,6 +198,23 @@ def test_checkpoint_loading(case):
     assert destination.compose_enabled
     assert torch.equal(destination._theta_shift, source._theta_shift)
     assert torch.equal(destination._theta_scale, source._theta_scale)
+
+
+@pytest.mark.parametrize(
+    "buffer_name,value,error_match",
+    [
+        ("_theta_shift", float("nan"), "compose_shift"),
+        ("_theta_scale", 0.0, "compose_scale"),
+    ],
+)
+def test_checkpoint_loading_rejects_invalid_compose_affine(
+    buffer_name, value, error_match
+):
+    state_dict = _build().state_dict()
+    state_dict[buffer_name][0, 0] = value
+
+    with pytest.raises(ValueError, match=error_match):
+        _build(compose=False).load_state_dict(state_dict)
 
 
 @pytest.mark.parametrize(

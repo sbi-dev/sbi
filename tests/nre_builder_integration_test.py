@@ -15,8 +15,8 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MAFConfig,
     MLPClassifierConfig,
     ResNetClassifierConfig,
-    VectorFieldEstimatorBuilder,
 )
+from sbi.neural_nets.net_builders.vector_field_nets import FlowMatchingConfig
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.user_input_checks import check_estimator_arg
 
@@ -63,13 +63,12 @@ def test_wrong_config_family_raises(trainer_cls):
         trainer_cls(prior, classifier=MAFConfig(), show_progress_bars=False)
 
 
-def test_rejects_legacy_config_of_the_wrong_family():
-    """The flat vector-field config must not fall through as a callable."""
+def test_rejects_vector_field_config():
     prior = MultivariateNormal(zeros(2), eye(2))
     with pytest.raises(TypeError, match="ClassifierConfigBase"):
         NRE_A(
             prior,
-            classifier=VectorFieldEstimatorBuilder(),
+            classifier=FlowMatchingConfig(),
             show_progress_bars=False,
         )
 

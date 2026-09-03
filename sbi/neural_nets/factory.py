@@ -18,9 +18,9 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
 from sbi.neural_nets.net_builders.vector_field_nets import (
-    FlowEstimatorConfig,
-    ScoreEstimatorConfig,
-    build_vector_field_estimator,
+    FlowMatchingConfig,
+    _score_config_from_sde_type,
+    _vf_config_from_factory_kwargs,
 )
 from sbi.utils.nn_utils import check_net_device
 from sbi.utils.vector_field_utils import VectorFieldNet
@@ -440,8 +440,8 @@ def posterior_score_nn(
         compose_standardization: Opt-in per-dim affine standardization theta<->z
             for scale-equivariant calibration. Defaults to False.
         **kwargs: Additional estimator / network arguments.  Valid keys are
-            defined by ``ScoreEstimatorConfig``; unknown keys raise
-            ``TypeError``.
+            the fields of the chosen score config and of the network's config;
+            an unknown key warns and is forwarded to the network builder.
 
     Returns:
         Constructor function for NPSE.
@@ -451,33 +451,30 @@ def posterior_score_nn(
             "compose_standardization=True requires z_score_theta='independent'."
         )
 
-    # Map user-facing parameter names to internal names.
-    # Builder takes batch_x=batch_theta, so its z_score_x is the theta setting.
-    mapped = dict(
-        z_score_x=z_score_theta,
-        z_score_y=z_score_x,
-        hidden_features=hidden_features,
-        num_layers=num_layers,
-        embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-        time_embedding_dim=t_embedding_dim,
-        time_emb_type=time_emb_type,
-        net=model,
-        compose_standardization=compose_standardization,
+    config = _vf_config_from_factory_kwargs(
+        _score_config_from_sde_type(sde_type),
+        model,
+        named_net=dict(
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            time_embedding_dim=t_embedding_dim,
+            time_emb_type=time_emb_type,
+        ),
+        named_estimator=_normalize_z_scoring(
+            dict(
+                z_score_input=z_score_theta,
+                z_score_condition=z_score_x,
+                embedding_net=check_net_device(
+                    embedding_net, "cpu", embedding_net_warn_msg
+                ),
+                compose_standardization=compose_standardization,
+            )
+        ),
+        extra=kwargs,
     )
 
-    # Validate against known fields — warns on unknown kwargs (typos)
-    # while still forwarding them to the underlying builder.
-    config = ScoreEstimatorConfig.from_kwargs(**mapped, **kwargs)
-    builder_kwargs = config.to_dict()
-
     def build_fn(batch_theta, batch_x):
-        return build_vector_field_estimator(
-            batch_x=batch_theta,
-            batch_y=batch_x,
-            estimator_type="score",
-            sde_type=sde_type,
-            **builder_kwargs,
-        )
+        return config.build(batch_input=batch_theta, batch_condition=batch_x)
 
     return build_fn
 
@@ -533,8 +530,8 @@ def posterior_flow_nn(
         compose_standardization: Opt-in per-dim affine standardization theta<->z
             for scale-equivariant calibration. Defaults to False.
         **kwargs: Additional estimator / network arguments.  Valid keys are
-            defined by ``FlowEstimatorConfig``; unknown keys raise
-            ``TypeError``.
+            the fields of ``FlowMatchingConfig`` and of the network's config;
+            an unknown key warns and is forwarded to the network builder.
 
     Returns:
         Constructor function for FMPE.
@@ -544,32 +541,31 @@ def posterior_flow_nn(
             "compose_standardization=True requires z_score_theta='independent'."
         )
 
-    # Map user-facing parameter names to internal names.
-    mapped = dict(
-        z_score_x=z_score_theta,
-        z_score_y=z_score_x,
-        hidden_features=hidden_features,
-        num_layers=num_layers,
-        embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-        time_embedding_dim=t_embedding_dim,
-        time_emb_type=time_emb_type,
-        net=model,
-        gaussian_baseline=gaussian_baseline,
-        compose_standardization=compose_standardization,
+    config = _vf_config_from_factory_kwargs(
+        FlowMatchingConfig(),
+        model,
+        named_net=dict(
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            time_embedding_dim=t_embedding_dim,
+            time_emb_type=time_emb_type,
+        ),
+        named_estimator=_normalize_z_scoring(
+            dict(
+                z_score_input=z_score_theta,
+                z_score_condition=z_score_x,
+                embedding_net=check_net_device(
+                    embedding_net, "cpu", embedding_net_warn_msg
+                ),
+                gaussian_baseline=gaussian_baseline,
+                compose_standardization=compose_standardization,
+            )
+        ),
+        extra=kwargs,
     )
 
-    # Validate against known fields — warns on unknown kwargs (typos)
-    # while still forwarding them to the underlying builder.
-    config = FlowEstimatorConfig.from_kwargs(**mapped, **kwargs)
-    builder_kwargs = config.to_dict()
-
     def build_fn(batch_theta, batch_x):
-        return build_vector_field_estimator(
-            batch_x=batch_theta,
-            batch_y=batch_x,
-            estimator_type="flow",
-            **builder_kwargs,
-        )
+        return config.build(batch_input=batch_theta, batch_condition=batch_x)
 
     return build_fn
 

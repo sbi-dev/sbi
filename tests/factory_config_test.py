@@ -66,7 +66,6 @@ def test_factory_field_maps_name_real_parameters(factory_fn, fields):
         (marginal_nn, (ZukoFlowType.NSF,), {"num_tranforms": 3}),
         (posterior_score_nn, (), {"sigmaMin": 0.01}),
         (posterior_flow_nn, (), {"hiden_features": 64}),
-        (posterior_flow_nn, (), {"sigma_min": 0.01}),  # score-only param
     ],
 )
 def test_factory_warns_on_unknown_kwargs(factory_fn, factory_args, bad_kwarg):
@@ -84,6 +83,13 @@ def test_factory_warns_on_unknown_kwargs(factory_fn, factory_args, bad_kwarg):
         (classifier_nn, "linear", {"hidden_features": 64}),
         (posterior_nn, "mdn", {"num_blocks": 7}),
         (classifier_nn, "linear", {"num_blocks": 7}),
+        (posterior_flow_nn, "mlp", {"sigma_min": 0.01}),
+        (posterior_flow_nn, "mlp", {"num_heads": 2}),
+        (
+            posterior_score_nn,
+            "mlp",
+            {"sde_type": "vp", "sigma_max": 20.0},
+        ),
     ],
     ids=[
         "mdn-bins",
@@ -93,6 +99,9 @@ def test_factory_warns_on_unknown_kwargs(factory_fn, factory_args, bad_kwarg):
         "linear-width",
         "mdn-other-model-field",
         "linear-other-model-field",
+        "flow-score-field",
+        "mlp-transformer-field",
+        "vp-ve-field",
     ],
 )
 def test_factory_rejects_a_setting_the_model_does_not_use(factory_fn, model, kwarg):

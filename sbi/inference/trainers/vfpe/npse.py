@@ -2,8 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from dataclasses import replace
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -18,7 +17,10 @@ from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.factory import posterior_score_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
-    VectorFieldEstimatorBuilder,
+)
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    ScoreConfigBase,
+    _score_config_from_sde_type,
 )
 from sbi.sbi_types import Tracker
 
@@ -66,12 +68,14 @@ class NPSE(VectorFieldTrainer):
         samples = posterior.sample((1000,), x=x_o)
     """
 
+    _ALLOWED_CONFIG_TYPE: ClassVar[type] = ScoreConfigBase
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         vf_estimator: Union[
             VF_MODELS,
-            VectorFieldEstimatorBuilder,
+            ScoreConfigBase,
             ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
             None,
         ] = None,
@@ -97,8 +101,8 @@ class NPSE(VectorFieldTrainer):
             prior: Prior distribution.
             vf_estimator: The vector-field estimator used for score-matching
                 inference. If ``None`` (default), uses a
-                ``VectorFieldEstimatorBuilder`` with default settings. A
-                ``VectorFieldEstimatorBuilder`` can be passed to configure
+                ``VEScoreConfig`` with default settings. A
+                score config can be passed to configure
                 the estimator. If it is a string (deprecated), use a
                 pre-configured network of the provided type (one of
                 mlp, ada_mlp, transformer, transformer_cross_attn).
@@ -109,10 +113,9 @@ class NPSE(VectorFieldTrainer):
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
                 Defaults to ``None`` (resolved to ``"ve"``). When
                 ``vf_estimator`` is ``None``, forwarded to the default
-                builder. When a ``VectorFieldEstimatorBuilder`` is passed,
-                a non-``None`` ``sde_type`` that differs from the builder's
-                value raises ``ValueError`` (set it on the builder instead).
-                When a string (deprecated), forwarded to
+                config. When a score config is passed, any non-``None``
+                ``sde_type`` raises ``ValueError`` because the config class
+                already selects the SDE. When a string (deprecated), forwarded to
                 ``posterior_score_nn``.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
@@ -157,45 +160,22 @@ class NPSE(VectorFieldTrainer):
             )
             vf_estimator = density_estimator
 
-        # Builder owns sde_type; reject only when both are explicitly supplied
-        # and they disagree.
-        if (
-            isinstance(vf_estimator, VectorFieldEstimatorBuilder)
-            and sde_type is not None
-            and vf_estimator.sde_type is not None
-            and sde_type != vf_estimator.sde_type
-        ):
+        if isinstance(vf_estimator, ScoreConfigBase) and sde_type is not None:
             raise ValueError(
                 f"Conflicting `sde_type`: trainer received {sde_type!r} but "
-                f"the builder has {vf_estimator.sde_type!r}. Set `sde_type` "
-                "on the builder only: "
-                f"VectorFieldEstimatorBuilder(sde_type={sde_type!r})."
+                f"{type(vf_estimator).__name__} already selects the SDE. Pass "
+                "the config only."
             )
 
-        # Resolve sde_type sentinel for non-builder paths.
         resolved_sde_type = sde_type if sde_type is not None else "ve"
 
         if vf_estimator is None:
-            vf_estimator = VectorFieldEstimatorBuilder(
-                estimator_type="score",
-                sde_type=resolved_sde_type,
-            )
-        elif isinstance(vf_estimator, VectorFieldEstimatorBuilder):
-            if vf_estimator.estimator_type is None:
-                vf_estimator = replace(vf_estimator, estimator_type="score")
-            elif vf_estimator.estimator_type != "score":
-                raise ValueError(
-                    "NPSE builds score estimators; got a builder with "
-                    f"estimator_type={vf_estimator.estimator_type!r}."
-                )
-            # Forward trainer's sde_type when the builder's is unset.
-            if vf_estimator.sde_type is None and sde_type is not None:
-                vf_estimator = replace(vf_estimator, sde_type=sde_type)
+            vf_estimator = _score_config_from_sde_type(resolved_sde_type)
         elif isinstance(vf_estimator, str):
             warnings.warn(
                 "Passing a string for `vf_estimator` is deprecated. "
-                "Use VectorFieldEstimatorBuilder(model=...) instead, e.g. "
-                "`from sbi.neural_nets import VectorFieldEstimatorBuilder`.",
+                "Use a score config instead, e.g. "
+                "`from sbi.neural_nets import VEScoreConfig`.",
                 FutureWarning,
                 stacklevel=2,
             )

@@ -32,7 +32,6 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     NSFConfig,
     ResNetClassifierConfig,
     TabPFNConfig,
-    VectorFieldEstimatorBuilder,
     ZukoBPFConfig,
     ZukoGFConfig,
     ZukoMAFConfig,
@@ -43,6 +42,17 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     ZukoSOSPFConfig,
     ZukoUNAFConfig,
 )
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    AdaMLPConfig,
+    FlowMatchingConfig,
+    MLPConfig,
+    ScoreConfigBase,
+    SubVPScoreConfig,
+    TransformerConfig,
+    VEScoreConfig,
+    VPScoreConfig,
+    VectorFieldConfigBase,
+)
 
 __all__ = [
     "classifier_nn",
@@ -51,7 +61,16 @@ __all__ = [
     "posterior_nn",
     "posterior_score_nn",
     "posterior_flow_nn",
-    "VectorFieldEstimatorBuilder",
+    # Vector field estimators (FMPE / NPSE).
+    "VectorFieldConfigBase",
+    "FlowMatchingConfig",
+    "ScoreConfigBase",
+    "VEScoreConfig",
+    "VPScoreConfig",
+    "SubVPScoreConfig",
+    "MLPConfig",
+    "AdaMLPConfig",
+    "TransformerConfig",
     # Conditional density estimators (NPE / NLE).
     "DensityConfigBase",
     "MAFConfig",
