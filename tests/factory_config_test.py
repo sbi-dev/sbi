@@ -35,6 +35,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     _DENSITY_CONFIGS,
     MixedConfig,
     NSFConfig,
+    _mixed_config_from_factory_kwargs,
 )
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 
@@ -186,6 +187,20 @@ def test_unknown_model_raises():
         build_fn(THETA, X)
 
 
+def _mixed_batches():
+    mixed = torch.cat(
+        [torch.rand(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
+    )
+    return mixed, THETA
+
+
+def _assert_same_net(expected, actual):
+    """Whether two built estimators carry the same parameters, name by name."""
+    assert expected.state_dict().keys() == actual.state_dict().keys()
+    for key, value in expected.state_dict().items():
+        assert torch.equal(value, actual.state_dict()[key]), key
+
+
 @pytest.mark.parametrize(
     "factory_fn,model",
     [(posterior_nn, "mnpe"), (likelihood_nn, "mnle")],
@@ -193,9 +208,7 @@ def test_unknown_model_raises():
 )
 def test_mixed_string_path_builds_the_typed_config(factory_fn, model):
     """Deprecated mixed strings must route their settings through MixedConfig."""
-    mixed = torch.cat(
-        [torch.rand(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
-    )
+    mixed, theta = _mixed_batches()
     config = MixedConfig(
         continuous=NSFConfig(
             z_score_input="none",
@@ -207,8 +220,8 @@ def test_mixed_string_path_builds_the_typed_config(factory_fn, model):
         z_score_condition="none",
         log_transform_x=True,
     )
-    factory_args = (mixed, X) if factory_fn is posterior_nn else (THETA, mixed)
-    config_args = (mixed, X) if factory_fn is posterior_nn else (mixed, THETA)
+    factory_args = (mixed, X) if factory_fn is posterior_nn else (theta, mixed)
+    config_args = (mixed, X) if factory_fn is posterior_nn else (mixed, theta)
 
     torch.manual_seed(0)
     expected = config.build(*config_args)
@@ -224,9 +237,7 @@ def test_mixed_string_path_builds_the_typed_config(factory_fn, model):
     )(*factory_args)
 
     assert isinstance(actual, MixedDensityEstimator)
-    assert expected.state_dict().keys() == actual.state_dict().keys()
-    for name, value in expected.state_dict().items():
-        assert torch.equal(value, actual.state_dict()[name]), name
+    _assert_same_net(expected, actual)
 
 
 _NONE_IS_UNSET = [
@@ -236,20 +247,6 @@ _NONE_IS_UNSET = [
     "discrete_hidden_features",
     "combined_embedding_net",
 ]
-
-
-def _mixed_batches():
-    mixed = torch.cat(
-        [torch.rand(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
-    )
-    return mixed, THETA
-
-
-def _assert_same_net(expected, actual):
-    """Whether two built estimators carry the same parameters, name by name."""
-    assert expected.state_dict().keys() == actual.state_dict().keys()
-    for key, value in expected.state_dict().items():
-        assert torch.equal(value, actual.state_dict()[key]), key
 
 
 @pytest.mark.parametrize(
@@ -287,6 +284,39 @@ def test_mixed_still_rejects_another_models_field_with_a_value(flow_model, kwarg
 
     with pytest.raises(ValueError, match="would be silently ignored"):
         build_mnle(mixed, theta, flow_model=flow_model, **kwarg)
+
+
+def test_mixed_factory_error_names_the_outer_model_and_config():
+    with pytest.raises(ValueError) as exc_info:
+        likelihood_nn("mnle", num_components=5)
+
+    message = str(exc_info.value)
+    assert "model='mnle'" in message
+    assert "MixedConfig(continuous=NSFConfig(...))" in message
+    assert "model='nsf'" not in message
+
+
+def test_mixed_factory_defaults_do_not_override_mixed_config_defaults():
+    embedding_net = torch.nn.Linear(3, 3)
+    family_args = {
+        "z_score_input": "independent",
+        "z_score_condition": "structured",
+        "hidden_features": 50,
+        "num_transforms": 5,
+        "num_bins": 10,
+        "embedding_net": embedding_net,
+        "num_components": 10,
+    }
+
+    config = _mixed_config_from_factory_kwargs(
+        model="mnle",
+        family_args=family_args,
+        factory_defaults=family_args,
+        extra={},
+    )
+
+    assert config.z_score_condition == MixedConfig().z_score_condition
+    assert type(config.embedding_net) is type(MixedConfig().embedding_net)
 
 
 @pytest.mark.parametrize("value", [64, None], ids=["value", "none"])
@@ -361,10 +391,8 @@ def test_mixed_keeps_the_flat_tail_bound_for_every_model(flow_model):
     not change the parameter count, so only reading it off the built net keeps
     the deprecated path honest.
     """
-    mixed = torch.cat(
-        [torch.rand(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
-    )
-    estimator = build_mnle(mixed, THETA, flow_model=flow_model)
+    mixed, theta = _mixed_batches()
+    estimator = build_mnle(mixed, theta, flow_model=flow_model)
 
     bounds = {
         float(m.tail_bound)
