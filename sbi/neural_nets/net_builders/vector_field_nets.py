@@ -1726,18 +1726,40 @@ def _vf_config_from_factory_kwargs(
     net_config = _vf_net_config_from_model(model) if isinstance(model, str) else model
     is_config = isinstance(net_config, _VectorFieldNetConfigBase)
 
-    net_fields = {f.name for f in fields(net_config)} if is_config else set()
+    net_fields = (
+        {f.name for f in fields(net_config)} - {"extra_kwargs"} if is_config else set()
+    )
     estimator_fields = {
         f.name for f in fields(estimator_config)
     } - VectorFieldConfigBase._SHARED_FIELDS
-    net_kwargs, estimator_kwargs, unknown = {}, {}, {}
+    net_family_fields = {
+        f.name
+        for config_cls in set(_VF_NET_CONFIGS.values())
+        for f in fields(config_cls)
+        if f.name != "extra_kwargs"
+    }
+    estimator_family_fields = {
+        f.name
+        for config_cls in {FlowMatchingConfig, *_SDE_CONFIGS.values()}
+        for f in fields(config_cls)
+    } - VectorFieldConfigBase._SHARED_FIELDS
+    net_kwargs, estimator_kwargs, unknown, ignored = {}, {}, {}, []
     for name, value in extra.items():
         if name in net_fields:
             net_kwargs[name] = value
         elif name in estimator_fields:
             estimator_kwargs[name] = value
+        elif name in net_family_fields or name in estimator_family_fields:
+            ignored.append(name)
         else:
             unknown[name] = value
+    if ignored:
+        raise ValueError(
+            f"Argument(s) {sorted(ignored)} are not used by "
+            f"{type(estimator_config).__name__} with {type(net_config).__name__} "
+            "and would be silently ignored. Configure the estimator and network "
+            "directly with their per-model configs."
+        )
     if unknown:
         warnings.warn(
             f"Unknown kwargs passed to {type(estimator_config).__name__}: "

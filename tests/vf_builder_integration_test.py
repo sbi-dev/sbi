@@ -456,6 +456,19 @@ def test_factory_warns_on_an_unknown_name():
         posterior_flow_nn(hiden_features=64)
 
 
+@pytest.mark.parametrize(
+    "factory_fn, kwargs",
+    [
+        (posterior_flow_nn, {"model": "mlp", "num_heads": 2}),
+        (posterior_score_nn, {"sde_type": "vp", "sigma_max": 20.0}),
+        (posterior_flow_nn, {"beta_min": 0.1}),
+    ],
+)
+def test_factory_rejects_settings_for_another_config(factory_fn, kwargs):
+    with pytest.raises(ValueError, match="silently ignored"):
+        factory_fn(**kwargs)
+
+
 def test_factory_rejects_network_settings_for_a_custom_network(batches):
     """A custom network is built by the user, so a setting it cannot read raises."""
     theta, x = batches
