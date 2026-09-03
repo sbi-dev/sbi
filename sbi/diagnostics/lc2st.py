@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+# pyright: reportIncompatibleMethodOverride=true
+
 import warnings
 from dataclasses import dataclass
 from enum import Enum, auto

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
 
 import pytest
@@ -699,33 +698,6 @@ def test_lc2st_false_positive_rate(method, sim_setup, well_trained_npe, set_seed
         f"Expected: {expected_rate * 100:.1f}%, Observed: {num_rejections}%, "
         f"p-value: {result.pvalue:.4f}"
     )
-
-
-def test_lc2st_nf_overrides_accept_base_parameters():
-    """LC2ST_NF overrides must accept the LC2ST base parameters, in the same order.
-
-    Regression test for #1979: the overrides previously dropped ``theta_o`` from
-    five methods, which is an incompatible method override.
-    """
-    methods = (
-        "get_scores",
-        "get_statistic_on_observed_data",
-        "p_value",
-        "reject_test",
-        "get_statistics_under_null_hypothesis",
-    )
-    for method_name in methods:
-        base_params = [
-            name
-            for name in inspect.signature(getattr(LC2ST, method_name)).parameters
-            if name != "self"
-        ]
-        override_params = inspect.signature(getattr(LC2ST_NF, method_name)).parameters
-        override_ordered = [name for name in override_params if name in base_params]
-        assert override_ordered == base_params, (
-            f"LC2ST_NF.{method_name} must accept the LC2ST parameters "
-            f"`{base_params}` in order, got `{list(override_params)}`."
-        )
 
 
 def test_lc2st_classifier_kwargs_override(cal_data):
