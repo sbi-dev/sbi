@@ -1370,6 +1370,10 @@ class _VectorFieldNetConfigBase(_PerModelConfigBase):
 
     def __post_init__(self):
         self._reject_if_abstract(_VectorFieldNetConfigBase, "MLPConfig()")
+        if not isinstance(self.hidden_features, int) or isinstance(
+            self.hidden_features, bool
+        ):
+            raise TypeError("`hidden_features` must be an int.")
         super().__post_init__()
 
     def build(self, batch_input: Tensor, batch_condition: Tensor) -> VectorFieldNet:
@@ -1453,7 +1457,7 @@ class VectorFieldConfigBase(_PerModelConfigBase):
     Neither choice constrains the other, so there is no discriminator field.
 
     Args:
-        net: Config of the network to wrap, or a ready ``VectorFieldNet``.
+        net: Config of the network to wrap, or a ready custom network module.
         z_score_input: Whether to z-score the modeled variable, one of `none`,
             `independent`, or `structured`.
         z_score_condition: Whether to z-score the conditioning variable, same
@@ -1466,9 +1470,7 @@ class VectorFieldConfigBase(_PerModelConfigBase):
             settings belong in ``net.extra_kwargs``.
     """
 
-    net: Union[_VectorFieldNetConfigBase, VectorFieldNet] = field(
-        default_factory=MLPConfig
-    )
+    net: Union[_VectorFieldNetConfigBase, nn.Module] = field(default_factory=MLPConfig)
     z_score_input: Literal["none", "independent", "structured"] = "independent"
     z_score_condition: Literal["none", "independent", "structured"] = "independent"
     embedding_net: nn.Module = field(default_factory=nn.Identity)
@@ -1488,6 +1490,10 @@ class VectorFieldConfigBase(_PerModelConfigBase):
 
     def __post_init__(self):
         self._reject_if_abstract(VectorFieldConfigBase, "FlowMatchingConfig()")
+        if not isinstance(self.net, (_VectorFieldNetConfigBase, nn.Module)):
+            raise TypeError(
+                "`net` must be a vector-field network config or an nn.Module."
+            )
         super().__post_init__()
 
     def _build_kwargs(self) -> dict:
@@ -1517,9 +1523,9 @@ class VectorFieldConfigBase(_PerModelConfigBase):
         check_data_device(batch_input, batch_condition)
 
         if isinstance(self.net, _VectorFieldNetConfigBase):
-            # The network takes the embedded condition only to read its shape,
-            # so the embedding runs once here and lives on the estimator alone.
-            embedded_condition = self.embedding_net(batch_condition[:1])
+            embedded_condition = self.embedding_net.to(batch_condition.device)(
+                batch_condition[:1]
+            )
             vectorfield_net = self.net.build(batch_input, embedded_condition)
         else:
             vectorfield_net = self.net
@@ -1745,8 +1751,6 @@ def _vf_config_from_factory_kwargs(
             net_config, **named_net, **net_kwargs, extra_kwargs=unknown
         )
     else:
-        # A custom network is built by the user, so a network setting it cannot
-        # read would be silently ignored.
         defaults = _net_config_defaults()
         ignored = sorted(
             {k for k, v in named_net.items() if v != defaults[k]}

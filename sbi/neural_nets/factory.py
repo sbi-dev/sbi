@@ -451,7 +451,6 @@ def posterior_score_nn(
             "compose_standardization=True requires z_score_theta='independent'."
         )
 
-    # The estimator models theta given x, so its input is the theta setting.
     config = _vf_config_from_factory_kwargs(
         _score_config_from_sde_type(sde_type),
         model,
@@ -461,7 +460,7 @@ def posterior_score_nn(
             time_embedding_dim=t_embedding_dim,
             time_emb_type=time_emb_type,
         ),
-        named_estimator=_drop_unset_z_scoring(
+        named_estimator=_normalize_z_scoring(
             dict(
                 z_score_input=z_score_theta,
                 z_score_condition=z_score_x,
@@ -542,7 +541,6 @@ def posterior_flow_nn(
             "compose_standardization=True requires z_score_theta='independent'."
         )
 
-    # The estimator models theta given x, so its input is the theta setting.
     config = _vf_config_from_factory_kwargs(
         FlowMatchingConfig(),
         model,
@@ -552,7 +550,7 @@ def posterior_flow_nn(
             time_embedding_dim=t_embedding_dim,
             time_emb_type=time_emb_type,
         ),
-        named_estimator=_drop_unset_z_scoring(
+        named_estimator=_normalize_z_scoring(
             dict(
                 z_score_input=z_score_theta,
                 z_score_condition=z_score_x,

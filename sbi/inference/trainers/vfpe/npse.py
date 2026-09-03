@@ -113,10 +113,9 @@ class NPSE(VectorFieldTrainer):
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
                 Defaults to ``None`` (resolved to ``"ve"``). When
                 ``vf_estimator`` is ``None``, forwarded to the default
-                config. When a score config is passed,
-                a non-``None`` ``sde_type`` that differs from the builder's
-                value raises ``ValueError`` (set it on the builder instead).
-                When a string (deprecated), forwarded to
+                config. When a score config is passed, any non-``None``
+                ``sde_type`` raises ``ValueError`` because the config class
+                already selects the SDE. When a string (deprecated), forwarded to
                 ``posterior_score_nn``.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
@@ -161,8 +160,6 @@ class NPSE(VectorFieldTrainer):
             )
             vf_estimator = density_estimator
 
-        # A config carries the SDE as its class, so the deprecated kwarg has
-        # nothing left to say.
         if isinstance(vf_estimator, ScoreConfigBase) and sde_type is not None:
             raise ValueError(
                 f"Conflicting `sde_type`: trainer received {sde_type!r} but "
@@ -170,7 +167,6 @@ class NPSE(VectorFieldTrainer):
                 "the config only."
             )
 
-        # Resolve sde_type sentinel for non-config paths.
         resolved_sde_type = sde_type if sde_type is not None else "ve"
 
         if vf_estimator is None:

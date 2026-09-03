@@ -10,6 +10,7 @@ being dropped on the way to the network.
 """
 
 import inspect
+import warnings
 from dataclasses import fields as dc_fields
 from typing import get_args
 
@@ -66,6 +67,14 @@ def gaussian_sims():
 @pytest.fixture
 def batches():
     return torch.randn(32, 2), torch.randn(32, 3)
+
+
+def _assert_same_state(actual, expected):
+    assert type(actual) is type(expected)
+    assert type(actual.net) is type(expected.net)
+    assert actual.state_dict().keys() == expected.state_dict().keys()
+    for name, value in actual.state_dict().items():
+        torch.testing.assert_close(value, expected.state_dict()[name])
 
 
 # --------------------------------------------------------------------------
@@ -131,6 +140,11 @@ def test_net_config_rejects_a_setting_it_does_not_have(net_cls, bad_kwarg):
         net_cls(**bad_kwarg)
 
 
+def test_net_config_rejects_a_sequence_width():
+    with pytest.raises(TypeError, match="hidden_features"):
+        MLPConfig(hidden_features=[16, 32])
+
+
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS + NET_CONFIGS)
 def test_invalid_literal_value_raises(config_cls):
     """Fail-fast on `Literal` values, which the type checker cannot see at runtime."""
@@ -182,8 +196,18 @@ def test_cross_attention_takes_a_sequence_condition():
 def test_custom_network_module_is_accepted(batches):
     """A user with their own architecture must still be able to pass it."""
     theta, x = batches
-    custom = build_standard_mlp_network(theta, x)
+
+    class CustomNet(nn.Module):
+        def forward(self, input, condition, time):
+            return torch.zeros_like(input)
+
+    custom = CustomNet()
     assert FlowMatchingConfig(net=custom).build(theta, x).net is custom
+
+
+def test_estimator_config_rejects_an_invalid_network():
+    with pytest.raises(TypeError, match="nn.Module"):
+        FlowMatchingConfig(net="mlp")
 
 
 # --------------------------------------------------------------------------
@@ -307,6 +331,18 @@ def test_npse_rejects_sde_type_together_with_a_config(gaussian_sims):
         NPSE(prior, VEScoreConfig(), sde_type="vp", show_progress_bars=False)
 
 
+@pytest.mark.parametrize(
+    "trainer_cls, config",
+    [(FMPE, FlowMatchingConfig()), (NPSE, VEScoreConfig())],
+)
+def test_supported_estimator_inputs_do_not_warn(trainer_cls, config, gaussian_sims):
+    prior, _, _ = gaussian_sims
+    for estimator in (None, config, lambda theta, x: None):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", FutureWarning)
+            trainer_cls(prior, vf_estimator=estimator, show_progress_bars=False)
+
+
 @pytest.mark.parametrize("trainer_cls", [FMPE, NPSE])
 def test_string_path_warns_and_names_the_import(trainer_cls, gaussian_sims):
     prior, _, _ = gaussian_sims
@@ -316,7 +352,11 @@ def test_string_path_warns_and_names_the_import(trainer_cls, gaussian_sims):
 
 @pytest.mark.parametrize(
     "trainer_cls, kwarg",
-    [(FMPE, "density_estimator"), (NPSE, "score_estimator")],
+    [
+        (FMPE, "density_estimator"),
+        (NPSE, "score_estimator"),
+        (NPSE, "density_estimator"),
+    ],
 )
 def test_legacy_kwarg_warns(trainer_cls, kwarg, gaussian_sims):
     prior, _, _ = gaussian_sims
@@ -326,7 +366,11 @@ def test_legacy_kwarg_warns(trainer_cls, kwarg, gaussian_sims):
 
 @pytest.mark.parametrize(
     "trainer_cls, kwarg",
-    [(FMPE, "density_estimator"), (NPSE, "score_estimator")],
+    [
+        (FMPE, "density_estimator"),
+        (NPSE, "score_estimator"),
+        (NPSE, "density_estimator"),
+    ],
 )
 def test_legacy_and_vf_estimator_conflict(trainer_cls, kwarg, gaussian_sims):
     prior, _, _ = gaussian_sims
@@ -421,24 +465,74 @@ def test_factory_rejects_network_settings_for_a_custom_network(batches):
 
 
 @pytest.mark.parametrize(
-    "factory_fn, config_cls",
-    [(posterior_flow_nn, FlowMatchingConfig), (posterior_score_nn, VEScoreConfig)],
-    ids=["flow", "score"],
+    "factory_fn, factory_kwargs, config_cls",
+    [
+        (posterior_flow_nn, {}, FlowMatchingConfig),
+        (posterior_score_nn, {"sde_type": "ve"}, VEScoreConfig),
+        (posterior_score_nn, {"sde_type": "vp"}, VPScoreConfig),
+        (posterior_score_nn, {"sde_type": "subvp"}, SubVPScoreConfig),
+    ],
+    ids=["flow", "ve", "vp", "subvp"],
 )
-def test_factory_defaults_match_the_config_defaults(factory_fn, config_cls, batches):
+def test_estimator_config_defaults_match_the_factory(
+    factory_fn, factory_kwargs, config_cls, batches
+):
     """The configs document what the public path has always produced.
 
     Pinned against the dispatcher-effective values rather than the inner build
     signatures, which are allowed to differ.
     """
-    from_factory = factory_fn()(*batches)
+    torch.manual_seed(0)
+    from_factory = factory_fn(**factory_kwargs)(*batches)
+    torch.manual_seed(0)
     from_config = config_cls().build(*batches)
 
-    assert type(from_factory) is type(from_config)
-    assert type(from_factory.net) is type(from_config.net)
-    assert sum(p.numel() for p in from_factory.parameters()) == sum(
-        p.numel() for p in from_config.parameters()
-    )
+    _assert_same_state(from_factory, from_config)
+
+
+@pytest.mark.parametrize(
+    "model, net_config, sequence_condition",
+    [
+        ("mlp", MLPConfig(), False),
+        ("ada_mlp", AdaMLPConfig(), False),
+        ("transformer", TransformerConfig(), False),
+        (
+            "transformer_cross_attn",
+            TransformerConfig(is_x_emb_seq=True),
+            True,
+        ),
+    ],
+)
+def test_network_config_defaults_match_the_factory(
+    model, net_config, sequence_condition, batches
+):
+    theta, condition = batches
+    if sequence_condition:
+        condition = torch.randn(32, 5, 3)
+
+    torch.manual_seed(0)
+    from_factory = posterior_flow_nn(model=model)(theta, condition)
+    torch.manual_seed(0)
+    from_config = FlowMatchingConfig(net=net_config).build(theta, condition)
+
+    _assert_same_state(from_factory, from_config)
+
+
+@pytest.mark.parametrize("factory_fn", [posterior_flow_nn, posterior_score_nn])
+def test_factory_none_means_no_z_scoring(factory_fn):
+    theta = torch.randn(32, 2) + 5.0
+    x = torch.randn(32, 3) + 7.0
+
+    from_none = factory_fn(z_score_theta=None, z_score_x=None)(theta, x)
+    explicit = factory_fn(z_score_theta="none", z_score_x="none")(theta, x)
+    default = factory_fn()(theta, x)
+
+    assert torch.equal(from_none.mean_0, explicit.mean_0)
+    assert torch.equal(from_none.std_0, explicit.std_0)
+    assert isinstance(from_none._embedding_net, nn.Identity)
+    assert isinstance(explicit._embedding_net, nn.Identity)
+    assert not torch.equal(default.mean_0, from_none.mean_0)
+    assert isinstance(default._embedding_net, nn.Sequential)
 
 
 @pytest.mark.parametrize(
