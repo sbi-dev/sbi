@@ -483,9 +483,6 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
             model_x = x
 
         implements_transform = model.startswith("zuko") or model == "mdn"
-        # `mnle` has no config yet, so it keeps the lenient factory path where
-        # an unusable setting is forwarded and ignored downstream.
-        legacy = model == "mnle"
 
         # The factories reject a setting the chosen model does not use, so only
         # the ones this model has are passed.
@@ -500,14 +497,12 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
             if model not in ("mdn", "made"):
                 kwargs["num_transforms"] = 1
             # `x_dist` is read only by the unconstrained transform.
-            if modeled_z == "transform_to_unconstrained" and (
-                implements_transform or legacy
-            ):
+            if modeled_z == "transform_to_unconstrained" and implements_transform:
                 kwargs["x_dist"] = dist
 
         unsupported = (
             modeled_z == "transform_to_unconstrained" and not implements_transform
-        ) or (condition_z == "transform_to_unconstrained" and not legacy)
+        ) or condition_z == "transform_to_unconstrained"
         if unsupported:
             with pytest.raises(ValueError, match="transform_to_unconstrained"):
                 build_fun = build_fn(**kwargs)

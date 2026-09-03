@@ -12,6 +12,7 @@ library-specific parameters (e.g. Zuko flow kwargs) pass through.
 
 import inspect
 import warnings
+from dataclasses import fields as dc_fields
 
 import pytest
 import torch
@@ -32,8 +33,11 @@ from sbi.neural_nets.factory import (
 from sbi.neural_nets.net_builders.estimator_configs import (
     _CLASSIFIER_CONFIGS,
     _DENSITY_CONFIGS,
-    ConditionalFlowConfig,
+    MixedConfig,
+    NSFConfig,
+    _mixed_config_from_factory_kwargs,
 )
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 
 THETA, X = torch.randn(100, 3), torch.randn(100, 5)
 
@@ -183,17 +187,219 @@ def test_unknown_model_raises():
         build_fn(THETA, X)
 
 
-def test_legacy_config_still_validates_the_mixed_string_path():
-    """MNLE and MNPE still reach `build_mnle` / `build_mnpe` with flat kwargs."""
-    cfg = ConditionalFlowConfig(hidden_features=64)
-    assert cfg.to_dict() == {"hidden_features": 64}
-
-    # The modeled variable carries the discrete column: theta for MNPE, x for MNLE.
+def _mixed_batches():
     mixed = torch.cat(
-        [torch.randn(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
+        [torch.rand(100, 2), torch.randint(0, 3, (100, 1)).float()], dim=-1
     )
-    assert isinstance(posterior_nn("mnpe")(mixed, X), MixedDensityEstimator)
-    assert isinstance(likelihood_nn("mnle")(THETA, mixed), MixedDensityEstimator)
+    return mixed, THETA
+
+
+def _assert_same_net(expected, actual):
+    """Whether two built estimators carry the same parameters, name by name."""
+    assert expected.state_dict().keys() == actual.state_dict().keys()
+    for key, value in expected.state_dict().items():
+        assert torch.equal(value, actual.state_dict()[key]), key
+
+
+@pytest.mark.parametrize(
+    "factory_fn,model",
+    [(posterior_nn, "mnpe"), (likelihood_nn, "mnle")],
+    ids=["posterior", "likelihood"],
+)
+def test_mixed_string_path_builds_the_typed_config(factory_fn, model):
+    """Deprecated mixed strings must route their settings through MixedConfig."""
+    mixed, theta = _mixed_batches()
+    config = MixedConfig(
+        continuous=NSFConfig(
+            z_score_input="none",
+            hidden_features=16,
+            num_transforms=2,
+            num_bins=4,
+            tail_bound=10.0,
+        ),
+        z_score_condition="none",
+        log_transform_x=True,
+    )
+    factory_args = (mixed, X) if factory_fn is posterior_nn else (theta, mixed)
+    config_args = (mixed, X) if factory_fn is posterior_nn else (mixed, theta)
+
+    torch.manual_seed(0)
+    expected = config.build(*config_args)
+    torch.manual_seed(0)
+    actual = factory_fn(
+        model,
+        z_score_theta="none",
+        z_score_x="none",
+        hidden_features=16,
+        num_transforms=2,
+        num_bins=4,
+        log_transform_x=True,
+    )(*factory_args)
+
+    assert isinstance(actual, MixedDensityEstimator)
+    _assert_same_net(expected, actual)
+
+
+_NONE_IS_UNSET = [
+    "flow_model",
+    "hidden_features",
+    "continuous_hidden_features",
+    "discrete_hidden_features",
+    "combined_embedding_net",
+]
+
+
+@pytest.mark.parametrize(
+    "flow_model,name",
+    [
+        ("mdn", "num_blocks"),
+        ("mdn", "tail_bound"),
+        ("zuko_maf", "num_blocks"),
+        ("nsf", "num_components"),
+    ],
+)
+def test_mixed_treats_another_models_field_set_to_none_as_unset(flow_model, name):
+    """The flat path dropped a None for any name the family knows."""
+    mixed, theta = _mixed_batches()
+
+    torch.manual_seed(0)
+    omitted = build_mnle(mixed, theta, flow_model=flow_model)
+    torch.manual_seed(0)
+    explicit_none = build_mnle(mixed, theta, flow_model=flow_model, **{name: None})
+
+    _assert_same_net(omitted, explicit_none)
+
+
+@pytest.mark.parametrize(
+    "flow_model,kwarg",
+    [
+        ("mdn", {"num_blocks": 3}),
+        ("zuko_maf", {"num_blocks": 3}),
+        ("nsf", {"num_components": 5}),
+    ],
+)
+def test_mixed_still_rejects_another_models_field_with_a_value(flow_model, kwarg):
+    """Only a None is unset. A real value the model cannot read still raises."""
+    mixed, theta = _mixed_batches()
+
+    with pytest.raises(ValueError, match="would be silently ignored"):
+        build_mnle(mixed, theta, flow_model=flow_model, **kwarg)
+
+
+def test_mixed_factory_error_names_the_outer_model_and_config():
+    with pytest.raises(ValueError) as exc_info:
+        likelihood_nn("mnle", num_components=5)
+
+    message = str(exc_info.value)
+    assert "model='mnle'" in message
+    assert "MixedConfig(continuous=NSFConfig(...))" in message
+    assert "model='nsf'" not in message
+
+
+def test_mixed_factory_defaults_do_not_override_mixed_config_defaults():
+    embedding_net = torch.nn.Linear(3, 3)
+    family_args = {
+        "z_score_input": "independent",
+        "z_score_condition": "structured",
+        "hidden_features": 50,
+        "num_transforms": 5,
+        "num_bins": 10,
+        "embedding_net": embedding_net,
+        "num_components": 10,
+    }
+
+    config = _mixed_config_from_factory_kwargs(
+        model="mnle",
+        family_args=family_args,
+        factory_defaults=family_args,
+        extra={},
+    )
+
+    assert config.z_score_condition == MixedConfig().z_score_condition
+    assert type(config.embedding_net) is type(MixedConfig().embedding_net)
+
+
+@pytest.mark.parametrize("value", [64, None], ids=["value", "none"])
+def test_mixed_still_warns_on_an_unknown_name(value):
+    """Dropping a recognised None must not swallow a typo that carries one."""
+    with pytest.warns(UserWarning, match="Unknown kwargs"):
+        likelihood_nn("mnle", hiden_features=value)
+
+
+@pytest.mark.parametrize("name", _NONE_IS_UNSET)
+@pytest.mark.parametrize(
+    "factory_fn,model",
+    [(posterior_nn, "mnpe"), (likelihood_nn, "mnle")],
+    ids=["posterior", "likelihood"],
+)
+def test_mixed_factory_treats_none_as_unset(factory_fn, model, name):
+    """The flat path dropped every None, so None must still mean omitted."""
+    mixed, theta = _mixed_batches()
+    args = (mixed, X) if factory_fn is posterior_nn else (theta, mixed)
+
+    torch.manual_seed(0)
+    omitted = factory_fn(model)(*args)
+    torch.manual_seed(0)
+    explicit_none = factory_fn(model, **{name: None})(*args)
+
+    _assert_same_net(omitted, explicit_none)
+
+
+@pytest.mark.parametrize("name", _NONE_IS_UNSET)
+def test_mixed_builder_treats_none_as_unset(name):
+    """`build_mnle` reads the same flat arguments as the factories."""
+    mixed, theta = _mixed_batches()
+
+    torch.manual_seed(0)
+    omitted = build_mnle(mixed, theta)
+    torch.manual_seed(0)
+    explicit_none = build_mnle(mixed, theta, **{name: None})
+
+    _assert_same_net(omitted, explicit_none)
+
+
+def test_mixed_none_width_does_not_change_the_other_width():
+    """A None width must not make a sibling width fall back to a new source.
+
+    With `continuous_hidden_features` set, the categorical net keeps falling
+    back to `hidden_features`, whether the discrete width is omitted or None.
+    """
+    mixed, theta = _mixed_batches()
+
+    torch.manual_seed(0)
+    omitted = build_mnle(mixed, theta, continuous_hidden_features=16)
+    torch.manual_seed(0)
+    explicit_none = build_mnle(
+        mixed, theta, continuous_hidden_features=16, discrete_hidden_features=None
+    )
+
+    _assert_same_net(omitted, explicit_none)
+
+
+_TAIL_BOUND_MODELS = sorted(
+    name
+    for name, cls in _DENSITY_CONFIGS.items()
+    if "tail_bound" in {f.name for f in dc_fields(cls)}
+)
+
+
+@pytest.mark.parametrize("flow_model", _TAIL_BOUND_MODELS)
+def test_mixed_keeps_the_flat_tail_bound_for_every_model(flow_model):
+    """The flat mixed API passed `tail_bound` to whichever model reads it.
+
+    Those models default to a narrower bound on their own, and the value does
+    not change the parameter count, so only reading it off the built net keeps
+    the deprecated path honest.
+    """
+    mixed, theta = _mixed_batches()
+    estimator = build_mnle(mixed, theta, flow_model=flow_model)
+
+    bounds = {
+        float(m.tail_bound)
+        for m in estimator.continuous_net.modules()
+        if hasattr(m, "tail_bound")
+    }
+    assert bounds == {10.0}
 
 
 @pytest.mark.parametrize(

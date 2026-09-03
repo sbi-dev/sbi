@@ -17,10 +17,9 @@ therefore not a field on its config, and raises ``TypeError`` at construction
 rather than being ignored.  Fields carry real defaults, which makes the class
 the reference for the values a build actually uses.
 
-The legacy ``*Config`` classes above them are the factory-side validators from
-before that change.  They keep one flat field set per family with ``None`` as
-the "unset" sentinel, and ``from_kwargs()`` warns on unknown names while still
-forwarding them.  Only the paths without a per-model config still use them.
+The legacy ``MarginalFlowConfig`` is the factory-side validator from before
+that change. It keeps a flat field set with ``None`` as the "unset" sentinel,
+and ``from_kwargs()`` warns on unknown names while still forwarding them.
 
 ``VectorFieldEstimatorBuilder`` is likewise still a flat builder, with the
 signature-derived ``_reject_inapplicable_fields`` guard that the per-model
@@ -292,86 +291,6 @@ class _EstimatorBuilderBase:
         }
         d.update(self.extra_kwargs)
         return d
-
-
-@dataclass(frozen=True, eq=False, repr=False)
-class ConditionalFlowConfig(_EstimatorBuilderBase):
-    """Configuration for conditional normalizing-flow density estimator builders.
-
-    Used by ``posterior_nn`` and ``likelihood_nn``.  Fields cover all parameters
-    accepted by any downstream builder (NFlows, Zuko, MDN, MADE, MNLE, MNPE).
-    """
-
-    # --- Shared across most builders ---
-    z_score_x: Optional[Any] = None
-    z_score_y: Optional[Any] = None
-    hidden_features: Optional[Any] = None
-    num_transforms: Optional[int] = None
-    # num_bins: used by NFlows builders directly; Zuko wrappers (build_zuko_nsf,
-    # build_zuko_ncsf) translate it to 'bins' before calling build_zuko_flow.
-    num_bins: Optional[int] = None
-    embedding_net: Optional[Any] = None
-    num_components: Optional[int] = None
-
-    # --- NFlows-specific (MAF, NSF, MAF-RQS) ---
-    num_blocks: Optional[int] = None
-    dropout_probability: Optional[float] = None
-    use_batch_norm: Optional[bool] = None
-    tail_bound: Optional[float] = None
-    hidden_layers_spline_context: Optional[int] = None
-    tails: Optional[str] = None
-    min_bin_width: Optional[float] = None
-    min_bin_height: Optional[float] = None
-    min_derivative: Optional[float] = None
-
-    # --- MADE-specific ---
-    num_mixture_components: Optional[int] = None
-
-    # --- Zuko shared ---
-    x_dist: Optional[Any] = None
-
-    # --- Zuko per-model kwargs (model-specific; ignored by models that don't use them)
-    randperm: Optional[bool] = None  # zuko_maf, zuko_naf, zuko_unaf
-    randmask: Optional[bool] = None  # zuko_nice
-    signal: Optional[int] = None  # zuko_naf, zuko_unaf
-    degree: Optional[int] = None  # zuko_sospf, zuko_bpf
-    polynomials: Optional[int] = None  # zuko_sospf
-    components: Optional[int] = None  # zuko_gf
-
-    # --- Mixed-net specific (MNLE / MNPE) ---
-    flow_model: Optional[str] = None
-    log_transform_x: Optional[bool] = None
-    num_categories_per_variable: Optional[Any] = None
-    combined_embedding_net: Optional[Any] = None
-    discrete_hidden_features: Optional[int] = None
-    discrete_hidden_layers: Optional[int] = None
-    continuous_hidden_features: Optional[int] = None
-
-    # --- TabPFN-specific ---
-    regressor_init_kwargs: Optional[dict] = None
-
-    # --- Base distribution ---
-    dtype: Optional[Any] = None
-
-
-@dataclass(frozen=True, eq=False, repr=False)
-class ClassifierConfig(_EstimatorBuilderBase):
-    """Configuration for classifier builders (NRE).
-
-    Covers parameters accepted by ``build_linear_classifier``,
-    ``build_mlp_classifier``, and ``build_resnet_classifier``.
-    """
-
-    z_score_x: Optional[Any] = None
-    z_score_y: Optional[Any] = None
-    hidden_features: Optional[int] = None
-    embedding_net_x: Optional[Any] = None
-    embedding_net_y: Optional[Any] = None
-
-    # --- ResNet-specific ---
-    num_blocks: Optional[int] = None
-    dropout_probability: Optional[float] = None
-    use_batch_norm: Optional[bool] = None
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -1535,16 +1454,7 @@ class MixedConfig(_PerModelConfigBase):
         return _build_mixed_density_estimator(
             batch_x=batch_input,
             batch_y=batch_condition,
-            continuous_config=self.continuous,
-            z_score_y=self.z_score_condition,
-            num_categories_per_variable=self.num_categories_per_variable,
-            embedding_net=self.embedding_net,
-            combined_embedding_net=self.combined_embedding_net,
-            log_transform_x=self.log_transform_x,
-            discrete_hidden_features=self.discrete_hidden_features,
-            discrete_hidden_layers=self.discrete_hidden_layers,
-            combined_embedding_features=self.combined_embedding_features,
-            dropout_probability=self.dropout_probability,
+            config=self,
         )
 
 
@@ -1569,6 +1479,8 @@ def _config_from_factory_kwargs(
     family_args: dict,
     factory_defaults: dict,
     extra: dict,
+    error_model: Optional[str] = None,
+    config_guidance: Optional[str] = None,
 ) -> _PerModelConfigBase:
     """Build a per-model config from a factory's arguments.
 
@@ -1588,6 +1500,10 @@ def _config_from_factory_kwargs(
             field names.
         factory_defaults: Default of each family-wide argument.
         extra: The factory's ``**kwargs``.
+        error_model: Model name to show for rejected arguments. Defaults to
+            ``model``.
+        config_guidance: Replacement configuration guidance for rejected
+            arguments.
 
     Returns:
         The config for that model.
@@ -1621,11 +1537,14 @@ def _config_from_factory_kwargs(
         else:
             unknown[name] = value
     if ignored:
+        model_for_error = model if error_model is None else error_model
+        guidance = config_guidance or (
+            f"Configure the model directly with {config_cls.__name__}, or use "
+            "`extra_kwargs` to forward library-specific options."
+        )
         raise ValueError(
-            f"Argument(s) {sorted(ignored)} are not used by model={model!r} "
-            f"and would be silently ignored. Configure the model directly with "
-            f"{config_cls.__name__}, or use `extra_kwargs` to forward "
-            f"library-specific options."
+            f"Argument(s) {sorted(ignored)} are not used by "
+            f"model={model_for_error!r} and would be silently ignored. {guidance}"
         )
     if unknown:
         warnings.warn(
@@ -1637,3 +1556,111 @@ def _config_from_factory_kwargs(
         )
 
     return config_cls(**accepted, extra_kwargs=unknown)
+
+
+def _mixed_config_from_factory_kwargs(
+    family_args: dict,
+    factory_defaults: dict,
+    extra: dict,
+    model: str = "mixed",
+) -> MixedConfig:
+    """Translate deprecated flat mixed-estimator arguments into a typed config.
+
+    The ``mnle`` and ``mnpe`` string paths expose settings for both the mixed
+    estimator and every supported continuous estimator in one flat argument
+    list. This function separates the mixed settings, selects and configures
+    the nested continuous model, and preserves the legacy defaults and ``None``
+    handling. Model-specific validation is delegated to the continuous config,
+    while errors refer to the outer model selected by the caller.
+
+    Args:
+        family_args: Named arguments shared by the density-estimator factory.
+        factory_defaults: Defaults for the entries in ``family_args``.
+        extra: Additional flat mixed or continuous-model arguments.
+        model: Mixed estimator name selected by the caller.
+
+    Returns:
+        A typed mixed-estimator configuration.
+    """
+    extra = dict(extra)
+    flow_model = extra.pop("flow_model", None)
+    if flow_model is None:
+        flow_model = "nsf"
+    config_cls = _DENSITY_CONFIGS.get(flow_model)
+
+    mixed_fields = (
+        "num_categories_per_variable",
+        "combined_embedding_net",
+        "log_transform_x",
+        "discrete_hidden_features",
+        "discrete_hidden_layers",
+        "combined_embedding_features",
+        "dropout_probability",
+    )
+    recognised = {"continuous_hidden_features", *mixed_fields}
+    recognised |= {f.name for cls in _DENSITY_CONFIGS.values() for f in fields(cls)}
+    extra = {
+        name: value
+        for name, value in extra.items()
+        if value is not None or name not in recognised
+    }
+
+    mixed_kwargs = {
+        name: family_args[name]
+        for name in ("z_score_condition", "embedding_net")
+        if family_args[name] != factory_defaults[name]
+    }
+    for name in mixed_fields:
+        if name in extra:
+            mixed_kwargs[name] = extra.pop(name)
+
+    continuous_args = {
+        name: family_args[name]
+        for name in (
+            "z_score_input",
+            "hidden_features",
+            "num_transforms",
+            "num_bins",
+            "num_components",
+        )
+    }
+    continuous_defaults = {name: factory_defaults[name] for name in continuous_args}
+    continuous_args = {
+        name: continuous_defaults[name] if value is None else value
+        for name, value in continuous_args.items()
+    }
+
+    if "continuous_hidden_features" in extra:
+        mixed_kwargs.setdefault(
+            "discrete_hidden_features", continuous_args["hidden_features"]
+        )
+        continuous_args["hidden_features"] = extra.pop("continuous_hidden_features")
+
+    dropout_probability = mixed_kwargs.get("dropout_probability")
+    if (
+        dropout_probability is not None
+        and config_cls is not None
+        and "dropout_probability" in {f.name for f in fields(config_cls)}
+    ):
+        extra["dropout_probability"] = dropout_probability
+
+    if config_cls is not None and "tail_bound" in {f.name for f in fields(config_cls)}:
+        extra.setdefault("tail_bound", 10.0)
+
+    config_guidance = None
+    if config_cls is not None:
+        config_guidance = (
+            "Configure the continuous model through "
+            f"MixedConfig(continuous={config_cls.__name__}(...))."
+        )
+    continuous = _config_from_factory_kwargs(
+        flow_model,
+        _DENSITY_CONFIGS,
+        "mixed continuous density",
+        family_args=continuous_args,
+        factory_defaults=continuous_defaults,
+        extra=extra,
+        error_model=model,
+        config_guidance=config_guidance,
+    )
+    return MixedConfig(continuous=continuous, **mixed_kwargs)
