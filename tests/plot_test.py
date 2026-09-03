@@ -574,5 +574,7 @@ def test_pairplot_raises_on_unknown_kwarg_keys(kwarg, plot_type):
 def test_get_default_opts_deprecation_points_to_real_functions():
     """The `_get_default_opts` deprecation message must not reference the
     non-existent `_get_default_fig_kwargs`."""
-    with pytest.warns(PendingDeprecationWarning, match="FigOptions"):
-        _ = plt._get_default_opts()
+    with pytest.warns(PendingDeprecationWarning) as record:
+        plt._get_default_opts()
+    assert "_get_default_fig_kwargs" not in str(record[0].message)
+    assert "FigOptions" in str(record[0].message)
