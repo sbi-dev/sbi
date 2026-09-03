@@ -1014,9 +1014,7 @@ class LC2ST_NF(LC2ST):
         """Computes the L-C2ST scores given the trained classifiers.
 
         Args:
-            theta_o: Ignored. Samples are drawn from the base distribution at
-                initialization and stored in ``self.theta_o``. This parameter exists
-                to match the ``LC2ST`` interface.
+            theta_o: Ignored, ``LC2ST_NF`` uses the base samples drawn at init.
             x_o: The observation, of shape (,dim_x).
             trained_clfs: Trained classifiers.
             return_probs: Whether to return the predicted probabilities of being in P,
@@ -1046,9 +1044,7 @@ class LC2ST_NF(LC2ST):
         Mean over all cv-scores.
 
         Args:
-            theta_o: Ignored. Samples are drawn from the base distribution at
-                initialization and stored in ``self.theta_o``. This parameter exists
-                to match the ``LC2ST`` interface.
+            theta_o: Ignored, ``LC2ST_NF`` uses the base samples drawn at init.
             x_o: The observation, of shape (, dim_x).
             kwargs: Additional arguments used in the parent class.
 
@@ -1073,9 +1069,7 @@ class LC2ST_NF(LC2ST):
         several trials under the null hypothesis: $1/H \sum_{h=1}^{H} I(T_h < T_o)$.
 
         Args:
-            theta_o: Ignored. Samples are drawn from the base distribution at
-                initialization and stored in ``self.theta_o``. This parameter exists
-                to match the ``LC2ST`` interface.
+            theta_o: Ignored, ``LC2ST_NF`` uses the base samples drawn at init.
             x_o: The observation, of shape (, dim_x).
             kwargs: Additional arguments used in the parent class.
 
@@ -1096,9 +1090,7 @@ class LC2ST_NF(LC2ST):
         """Computes the test result for L-C2ST at a given significance level.
 
         Args:
-            theta_o: Ignored. Samples are drawn from the base distribution at
-                initialization and stored in ``self.theta_o``. This parameter exists
-                to match the ``LC2ST`` interface.
+            theta_o: Ignored, ``LC2ST_NF`` uses the base samples drawn at init.
             x_o: The observation, of shape (, dim_x).
             alpha: Significance level, defaults to 0.05.
             kwargs: Additional arguments used in the parent class.
@@ -1145,9 +1137,7 @@ class LC2ST_NF(LC2ST):
         """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
-            theta_o: Ignored. Samples are drawn from the base distribution at
-                initialization and stored in ``self.theta_o``. This parameter exists
-                to match the ``LC2ST`` interface.
+            theta_o: Ignored, ``LC2ST_NF`` uses the base samples drawn at init.
             x_o: The observation.
                 Shape (, dim_x)
             return_probs: Whether to return the predicted probabilities of being in P.
