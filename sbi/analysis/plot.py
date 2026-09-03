@@ -968,7 +968,14 @@ def _prepare_kwargs(
         zip(plot_list, plot_kwargs_list, strict=False)
     ):
         plot_kwarg_filled_i = get_default_kwargs(plot_i, i)
-        # update the defaults dictionary with user provided values
+        if plot_kwargs_i is not None and plot_kwarg_filled_i:
+            unknown_keys = set(plot_kwargs_i.keys()) - set(plot_kwarg_filled_i.keys())
+            if unknown_keys:
+                raise ValueError(
+                    "Unknown keys in plot kwargs: "
+                    f"{sorted(unknown_keys)}. "
+                    f"Valid keys are: {sorted(plot_kwarg_filled_i.keys())}."
+                )
         plot_kwarg_filled_i = update(plot_kwarg_filled_i, plot_kwargs_i)
         plot_kwargs_filled.append(plot_kwarg_filled_i)
 
@@ -1317,11 +1324,11 @@ def _arrange_grid(
         lower_funcs: List of plotting function that will be executed for the
             lower-diagonal elements of the plot. None if we are in a 1D setting.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `_get_default_diag_kwarg()`
+            see the source code in `get_default_diag_kwargs`
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
-            see the source code in `_get_default_offdiag_kwarg()`
+            see the source code in `get_default_offdiag_kwargs`
         lower_kwargs: Additional arguments to adjust the lower diagonal plot,
-            see the source code in `_get_default_offdiag_kwarg()`
+            see the source code in `get_default_offdiag_kwargs`
         samples: List of samples given to the plotting functions
         points: List of additional points to scatter.
         limits: Limits for each dimension / axis.
@@ -1333,7 +1340,7 @@ def _arrange_grid(
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `_get_default_fig_kwargs()`
+            see the source code in `FigOptions`
         discrete_indices: Optional list of dimension indices treated as discrete.
             When provided, diagonal plots for these dimensions use bar charts,
             and off-diagonal plots involving these dimensions fall back to
@@ -2992,8 +2999,9 @@ def _arrange_plots(
 
 def _get_default_opts():
     warn(
-        "_get_default_opts will be deprecated, use _get_default_fig_kwargs,"
-        "get_default_diag_kwargs, get_default_offdiag_kwargs instead",
+        "_get_default_opts will be deprecated, use FigOptions through the "
+        "fig_kwargs argument, and get_default_diag_kwargs, "
+        "get_default_offdiag_kwargs instead",
         PendingDeprecationWarning,
         stacklevel=2,
     )
