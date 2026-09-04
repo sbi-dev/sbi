@@ -23,28 +23,6 @@ from sbi.utils import BoxUniform, MultipleIndependent
 from tests.test_utils import PosteriorPotential, TractablePosterior
 
 
-@pytest.fixture
-def gaussian_setup():
-    """Fixture for common Gaussian test setup."""
-    num_dim = 2
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    return {
-        "num_dim": num_dim,
-        "prior": prior,
-        "simulator": simulator,
-        "likelihood_shift": likelihood_shift,
-        "likelihood_cov": likelihood_cov,
-    }
-
-
 def train_inference_method(
     method_cls: Callable,
     prior: torch.distributions.Distribution,
