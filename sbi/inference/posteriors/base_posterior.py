@@ -1,7 +1,10 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import importlib
+import pickle
 from abc import abstractmethod
+from pathlib import Path
 from typing import Any, Dict, Optional, Union
 from warnings import warn
 
@@ -10,6 +13,7 @@ import torch.distributions.transforms as torch_tf
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi import __version__
 from sbi.inference.potentials.base_potential import (
     BasePotential,
     CustomPotential,
@@ -339,6 +343,95 @@ class NeuralPosterior:
     def __str__(self):
         desc = f"Posterior p(θ|x) of type {self.__class__.__name__}. {self._purpose}"
         return desc
+
+    def save(self, filename: Union[str, Path]) -> None:
+        """Save the posterior to a file.
+
+        This saves the full state of the posterior including the trained network,
+        prior, and transforms. The saved file can be loaded with
+        ``NeuralPosterior.load()``.
+
+        Args:
+            filename: Path to the file where the posterior will be saved.
+
+        Example:
+            >>> posterior = inference.build_posterior()
+            >>> posterior.save("my_posterior.pkl")
+        """
+        filepath = Path(filename)
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        state = {
+            "sbi_version": __version__,
+            "class_name": self.__class__.__name__,
+            "class_module": self.__class__.__module__,
+            "state": self.__getstate__(),
+        }
+        with open(filepath, "wb") as handle:
+            pickle.dump(state, handle)
+
+    @classmethod
+    def load(cls, filename: Union[str, Path]) -> "NeuralPosterior":
+        """Load a saved posterior from a file.
+
+        This method loads a posterior that was previously saved with ``save()``.
+
+        Note:
+            The file is loaded with ``pickle``, which can execute arbitrary code.
+            Only load files from trusted sources.
+
+        Args:
+            filename: Path to the file to load.
+
+        Returns:
+            The loaded posterior object.
+
+        Raises:
+            FileNotFoundError: If the file does not exist.
+            ValueError: If the file was not created with ``save()``.
+
+        Example:
+            >>> posterior = NeuralPosterior.load("my_posterior.pkl")
+            >>> samples = posterior.sample((1000,), x=x_o)
+        """
+        filepath = Path(filename)
+        if not filepath.exists():
+            raise FileNotFoundError(f"File not found: {filepath}")
+
+        with open(filepath, "rb") as handle:
+            state = pickle.load(handle)  # noqa: S301
+
+        if not isinstance(state, dict) or not all(
+            key in state
+            for key in ("sbi_version", "class_module", "class_name", "state")
+        ):
+            raise ValueError(
+                f"The file {filepath} was not created with "
+                "`NeuralPosterior.save()`. Use `pickle.load()` directly instead."
+            )
+
+        sbi_version = state["sbi_version"]
+        if sbi_version != __version__:
+            warn(
+                f"The file was saved with sbi version {sbi_version} but the "
+                f"current version is {__version__}. This may cause compatibility "
+                "issues.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        loaded_class = getattr(
+            importlib.import_module(state["class_module"]), state["class_name"]
+        )
+        if not issubclass(loaded_class, cls):
+            raise ValueError(
+                f"The file {filepath} was saved by a {loaded_class.__name__} "
+                f"but was loaded with {cls.__name__}."
+            )
+        loaded = loaded_class.__new__(loaded_class)
+        loaded.__setstate__(state["state"])
+
+        return loaded
 
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.
