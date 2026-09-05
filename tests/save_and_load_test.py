@@ -10,6 +10,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -21,6 +22,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.inference.trainers.base import NeuralInference
 
 
 def _assert_survives_pickling(posterior, num_dim: int) -> None:
@@ -235,3 +237,105 @@ def test_torch_load_map_location_same_device_is_passthrough():
     assert loaded._device == "cpu"
     assert loaded.device == "cpu"
     assert loaded.sample((10,)).shape == (10, 2)
+
+
+@pytest.mark.parametrize("inference_method", (NPE, NPSE, FMPE))
+def test_save_and_load_inference(inference_method, tmp_path):
+    num_dim = 2
+    prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+
+    theta = prior.sample((500,))
+    x = theta + 1.0 + torch.randn_like(theta) * 0.1
+
+    inference = inference_method(prior=prior)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
+
+    filepath = tmp_path / "inference.pkl"
+    inference.save(filepath)
+    loaded = NeuralInference.load(filepath)
+
+    assert isinstance(loaded, inference_method)
+    assert loaded._round == inference._round
+    assert loaded._neural_net is not None
+    loaded.append_simulations(theta, x)
+
+
+@pytest.mark.parametrize(
+    "inference_method, posterior_parameters",
+    (
+        (NPE, DirectPosteriorParameters),
+        (NPSE, VectorFieldPosteriorParameters),
+        (FMPE, VectorFieldPosteriorParameters),
+    ),
+)
+def test_save_and_load_posterior(inference_method, posterior_parameters, tmp_path):
+    num_dim = 2
+    prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    x_o = torch.zeros(1, num_dim)
+
+    theta = prior.sample((500,))
+    x = theta + 1.0 + torch.randn_like(theta) * 0.1
+
+    inference = inference_method(prior=prior)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = inference.build_posterior(
+        posterior_parameters=posterior_parameters()
+    ).set_default_x(x_o)
+
+    filepath = tmp_path / "posterior.pkl"
+    posterior.save(filepath)
+    loaded = NeuralPosterior.load(filepath)
+
+    assert isinstance(loaded, type(posterior))
+    assert loaded._device == posterior._device
+    assert loaded.sample((10,), x=x_o).shape == (10, num_dim)
+
+
+def test_save_load_file_not_found(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        NeuralInference.load(tmp_path / "nonexistent.pkl")
+
+    with pytest.raises(FileNotFoundError):
+        NeuralPosterior.load(tmp_path / "nonexistent.pkl")
+
+
+@pytest.mark.parametrize(
+    "loader",
+    (NeuralInference.load, NeuralPosterior.load),
+)
+@pytest.mark.parametrize("payload", (None, [], {"foo": "bar"}))
+def test_save_load_rejects_invalid_payload(tmp_path, loader, payload):
+    filepath = tmp_path / "invalid.pkl"
+    with open(filepath, "wb") as handle:
+        pickle.dump(payload, handle)
+    with pytest.raises(ValueError):
+        loader(filepath)
+
+
+@pytest.mark.parametrize(
+    "loader, class_name, class_module",
+    (
+        (
+            NeuralInference.load,
+            "NPE",
+            "sbi.inference.trainers.npe",
+        ),
+        (
+            NeuralPosterior.load,
+            "DirectPosterior",
+            "sbi.inference.posteriors.direct_posterior",
+        ),
+    ),
+)
+def test_save_load_version_mismatch_warns(tmp_path, loader, class_name, class_module):
+    filepath = tmp_path / "mismatch.pkl"
+    state = {
+        "sbi_version": "0.0.0",
+        "class_name": class_name,
+        "class_module": class_module,
+        "state": {},
+    }
+    with open(filepath, "wb") as handle:
+        pickle.dump(state, handle)
+    with pytest.warns(UserWarning, match="saved with sbi version"):
+        loader(filepath)
