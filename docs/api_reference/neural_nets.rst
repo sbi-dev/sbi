@@ -25,7 +25,6 @@ For ``NPE`` and ``NLE``, passed as ``density_estimator``.
    sbi.neural_nets.MAFRQSConfig
    sbi.neural_nets.MDNConfig
    sbi.neural_nets.NSFConfig
-   sbi.neural_nets.TabPFNConfig
    sbi.neural_nets.ZukoBPFConfig
    sbi.neural_nets.ZukoGFConfig
    sbi.neural_nets.ZukoMAFConfig
@@ -35,6 +34,19 @@ For ``NPE`` and ``NLE``, passed as ``density_estimator``.
    sbi.neural_nets.ZukoNSFConfig
    sbi.neural_nets.ZukoSOSPFConfig
    sbi.neural_nets.ZukoUNAFConfig
+
+
+Pretrained estimator configs
+----------------------------
+
+For ``NPE_PFN``, passed as ``density_estimator``. ``TabPFNConfig`` is not a
+trainable density estimator for ``NPE`` or ``NLE``.
+
+.. autosummary::
+   :toctree: _autosummary
+   :nosignatures:
+
+   sbi.neural_nets.TabPFNConfig
 
 
 Mixed density estimator configs
@@ -85,16 +97,26 @@ For ``MarginalTrainer``, which fits an unconditional density.
    sbi.neural_nets.MarginalUNAFConfig
 
 
-Vector field estimator builders
--------------------------------
+Vector field estimator configs
+------------------------------
 
-For ``FMPE`` and ``NPSE``, passed as ``vf_estimator``.
+For ``FMPE`` and ``NPSE``, passed as ``vf_estimator``. The estimator config
+selects flow matching or a score estimator; its ``net`` config selects the
+network architecture.
 
 .. autosummary::
    :toctree: _autosummary
    :nosignatures:
 
-   sbi.neural_nets.VectorFieldEstimatorBuilder
+   sbi.neural_nets.VectorFieldConfigBase
+   sbi.neural_nets.FlowMatchingConfig
+   sbi.neural_nets.ScoreConfigBase
+   sbi.neural_nets.VEScoreConfig
+   sbi.neural_nets.VPScoreConfig
+   sbi.neural_nets.SubVPScoreConfig
+   sbi.neural_nets.MLPConfig
+   sbi.neural_nets.AdaMLPConfig
+   sbi.neural_nets.TransformerConfig
 
 
 Factory functions
