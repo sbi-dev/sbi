@@ -21,10 +21,7 @@ The legacy ``MarginalFlowConfig`` is the factory-side validator from before
 that change. It keeps a flat field set with ``None`` as the "unset" sentinel,
 and ``from_kwargs()`` warns on unknown names while still forwarding them.
 
-The vector-field configs live next to their build functions in
-``vector_field_nets``, because the estimator and the network it wraps are two
-separate choices and the network configs point at the ``build_*_network``
-functions directly.
+Vector-field estimator and network configs are defined in ``vector_field_nets``.
 """
 
 import inspect
