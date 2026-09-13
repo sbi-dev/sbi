@@ -169,7 +169,7 @@ def maybe_wrap_prior_as_pytorch(
             (arg_constraints), see pytorch.distributions.Distribution for more info.
 
     Raises:
-        TypeError: If prior return type is PyTorch or Numpy.
+        TypeError: If the prior returns neither PyTorch Tensors nor Numpy arrays.
 
     Returns:
         prior: Prior that emits samples and evaluates log prob as PyTorch Tensors.
@@ -734,7 +734,7 @@ def validate_theta_and_x(
     assert isinstance(x, Tensor), "Simulator output must be a `torch.Tensor`."
 
     assert theta.shape[0] == x.shape[0], (
-        f"Number of parameter sets (={theta.shape[0]} must match the number of "
+        f"Number of parameter sets (={theta.shape[0]}) must match the number of "
         f"simulation outputs (={x.shape[0]})"
     )
 
