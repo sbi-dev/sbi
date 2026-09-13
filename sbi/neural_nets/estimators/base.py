@@ -366,11 +366,11 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
                 condition.
             mean_base: Mean of the base distribution.
             std_base: Standard deviation of the base distribution.
-            compose_shift: Shift of the boundary affine, i.e. the mean of the
-                standardized coordinates the estimator is trained in. Given
-                together with `compose_scale`.
-            compose_scale: Scale of the boundary affine, given together with
-                `compose_shift`.
+            compose_shift: Mean of the modeled variable in its original
+                coordinates, used in `z = (input - compose_shift) / compose_scale`.
+                Given together with `compose_scale`.
+            compose_scale: Positive scale of the modeled variable in its original
+                coordinates, given together with `compose_shift`.
         """
         super().__init__(input_shape, condition_shape)
         self.net = net
