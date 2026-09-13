@@ -71,6 +71,17 @@ _LIKELIHOOD_FACTORY_FIELDS: dict = {
     "z_score_condition": "z_score_theta",
 }
 
+_VF_FACTORY_FIELDS: dict = {
+    "z_score_input": "z_score_theta",
+    "z_score_condition": "z_score_x",
+    "embedding_net": "embedding_net",
+    "hidden_features": "hidden_features",
+    "num_layers": "num_layers",
+    "time_embedding_dim": "t_embedding_dim",
+    "time_emb_type": "time_emb_type",
+    "compose_standardization": "compose_standardization",
+}
+
 
 _Z_SCORE_FIELDS: frozenset = frozenset({"z_score_input", "z_score_condition"})
 
@@ -454,6 +465,7 @@ def posterior_score_nn(
     config = _vf_config_from_factory_kwargs(
         _score_config_from_sde_type(sde_type),
         model,
+        factory_defaults=_factory_defaults(posterior_score_nn, _VF_FACTORY_FIELDS),
         named_net=dict(
             hidden_features=hidden_features,
             num_layers=num_layers,
@@ -544,6 +556,10 @@ def posterior_flow_nn(
     config = _vf_config_from_factory_kwargs(
         FlowMatchingConfig(),
         model,
+        factory_defaults=_factory_defaults(
+            posterior_flow_nn,
+            {**_VF_FACTORY_FIELDS, "gaussian_baseline": "gaussian_baseline"},
+        ),
         named_net=dict(
             hidden_features=hidden_features,
             num_layers=num_layers,
