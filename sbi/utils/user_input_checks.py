@@ -169,7 +169,8 @@ def maybe_wrap_prior_as_pytorch(
             (arg_constraints), see pytorch.distributions.Distribution for more info.
 
     Raises:
-        TypeError: If the prior returns neither PyTorch Tensors nor Numpy arrays.
+        TypeError: If `.sample()` and `.log_prob()` do not both return PyTorch
+            Tensors, or both return Numpy arrays.
 
     Returns:
         prior: Prior that emits samples and evaluates log prob as PyTorch Tensors.
