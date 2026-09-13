@@ -29,6 +29,7 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     AdaMLPConfig,
     FlowMatchingConfig,
     MLPConfig,
+    ScoreConfigBase,
     SubVPScoreConfig,
     TransformerConfig,
     VEScoreConfig,
@@ -36,8 +37,10 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     VectorFieldConfigBase,
     VectorFieldMLP,
     _VectorFieldNetConfigBase,
+    _vf_config_from_factory_kwargs,
     _vf_net_config_from_model,
     build_standard_mlp_network,
+    build_vector_field_estimator,
 )
 
 NET_CONFIGS = [MLPConfig, AdaMLPConfig, TransformerConfig]
@@ -133,7 +136,9 @@ def test_invalid_literal_value_raises(config_cls):
         config_cls(**{field: "not_a_value"})
 
 
-@pytest.mark.parametrize("base_cls", [VectorFieldConfigBase, _VectorFieldNetConfigBase])
+@pytest.mark.parametrize(
+    "base_cls", [VectorFieldConfigBase, ScoreConfigBase, _VectorFieldNetConfigBase]
+)
 def test_role_base_cannot_be_instantiated(base_cls):
     with pytest.raises(TypeError, match="per-model config"):
         base_cls()
@@ -181,9 +186,10 @@ def test_estimator_config_rejects_an_invalid_network():
         FlowMatchingConfig(net="mlp")
 
 
-def test_net_config_rejects_embedding_net_in_extra_kwargs():
+@pytest.mark.parametrize("net_cls", NET_CONFIGS)
+def test_net_config_rejects_embedding_net_in_extra_kwargs(net_cls):
     with pytest.raises(ValueError, match="embedding_net"):
-        MLPConfig(extra_kwargs={"embedding_net": nn.Identity()})
+        net_cls(extra_kwargs={"embedding_net": nn.Identity()})
 
 
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS)
@@ -202,6 +208,15 @@ def test_compose_standardization_is_set_by_the_constructor(config_cls, batches):
 
     assert estimator.compose_enabled
     assert (estimator.mean_0 == 0).all() and (estimator.std_0 == 1).all()
+
+
+@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
+@pytest.mark.parametrize("z_score_input", ["none", "structured"])
+def test_compose_standardization_requires_independent_z_scoring(
+    config_cls, z_score_input
+):
+    with pytest.raises(ValueError, match="z_score_input='independent'"):
+        config_cls(compose_standardization=True, z_score_input=z_score_input)
 
 
 def test_compose_standardization_rejects_the_gaussian_baseline(batches):
@@ -319,17 +334,19 @@ def test_string_path_warns_and_names_the_import(trainer_cls, gaussian_sims):
 
 
 @pytest.mark.parametrize(
-    "trainer_cls, kwarg",
+    "trainer_cls, kwarg, config_cls",
     [
-        (FMPE, "density_estimator"),
-        (NPSE, "score_estimator"),
-        (NPSE, "density_estimator"),
+        (FMPE, "density_estimator", FlowMatchingConfig),
+        (NPSE, "score_estimator", VEScoreConfig),
+        (NPSE, "density_estimator", VEScoreConfig),
     ],
 )
-def test_legacy_kwarg_warns(trainer_cls, kwarg, gaussian_sims):
+@pytest.mark.parametrize("input_kind", ["string", "config"])
+def test_legacy_kwarg_warns(trainer_cls, kwarg, config_cls, input_kind, gaussian_sims):
     prior, _, _ = gaussian_sims
+    estimator = "mlp" if input_kind == "string" else config_cls()
     with pytest.warns(FutureWarning, match="deprecated"):
-        trainer_cls(prior, **{kwarg: "mlp"}, show_progress_bars=False)
+        trainer_cls(prior, **{kwarg: estimator}, show_progress_bars=False)
 
 
 @pytest.mark.parametrize(
@@ -395,7 +412,7 @@ def test_factory_sde_type_maps_to_the_config(
     assert isinstance(factory_fn(**sde_kwargs)(*batches), estimator_cls)
 
 
-def test_factory_routes_settings_to_the_axis_that_owns_them(batches):
+def test_factory_routes_estimator_and_network_settings(batches):
     estimator = posterior_score_nn(
         model="transformer", hidden_features=64, num_heads=2, sigma_max=20.0
     )(*batches)
@@ -434,6 +451,71 @@ def test_estimator_config_defaults_match_the_factory(
     _assert_same_state(from_factory, from_config)
 
 
+@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
+@pytest.mark.parametrize("model", sorted(_VALID_VF_MODELS))
+@pytest.mark.parametrize("at_default", [True, False])
+def test_factory_named_defaults_preserve_config_defaults(config_cls, model, at_default):
+    default_config = config_cls()
+    default_net = _vf_net_config_from_model(model)
+    named_net = {
+        "hidden_features": 64,
+        "num_layers": 2,
+        "time_embedding_dim": 16,
+        "time_emb_type": "random_fourier",
+    }
+    named_estimator = {
+        "z_score_input": "none",
+        "z_score_condition": "structured",
+        "embedding_net": nn.Linear(3, 4),
+    }
+    factory_defaults = (
+        {**named_net, **named_estimator}
+        if at_default
+        else {
+            **{name: getattr(default_net, name) for name in named_net},
+            **{name: getattr(default_config, name) for name in named_estimator},
+        }
+    )
+    config = _vf_config_from_factory_kwargs(
+        default_config,
+        model,
+        named_net=named_net,
+        named_estimator=named_estimator,
+        extra={},
+        factory_defaults=factory_defaults,
+    )
+
+    for name, value in named_net.items():
+        assert getattr(config.net, name) == (
+            getattr(default_net, name) if at_default else value
+        )
+    for name, value in named_estimator.items():
+        assert getattr(config, name) == (
+            getattr(default_config, name) if at_default else value
+        )
+
+
+@pytest.mark.parametrize(
+    "config_cls, name",
+    [(config_cls, "compose_standardization") for config_cls in ALL_CONFIGS]
+    + [(FlowMatchingConfig, "gaussian_baseline")],
+)
+@pytest.mark.parametrize("at_default", [True, False])
+def test_factory_boolean_defaults_preserve_config_defaults(
+    config_cls, name, at_default
+):
+    config = _vf_config_from_factory_kwargs(
+        config_cls(),
+        "mlp",
+        named_net={},
+        named_estimator={name: True},
+        extra={},
+        factory_defaults={name: at_default},
+    )
+
+    assert getattr(config, name) is (not at_default)
+
+
 @pytest.mark.parametrize(
     "model, net_config, sequence_condition",
     [
@@ -460,6 +542,68 @@ def test_network_config_defaults_match_the_factory(
     from_config = FlowMatchingConfig(net=net_config).build(theta, condition)
 
     _assert_same_state(from_factory, from_config)
+
+
+@pytest.mark.parametrize(
+    "config_cls, estimator_type, sde_type",
+    [
+        (FlowMatchingConfig, "flow", "ve"),
+        (VEScoreConfig, "score", "ve"),
+        (VPScoreConfig, "score", "vp"),
+        (SubVPScoreConfig, "score", "subvp"),
+    ],
+)
+@pytest.mark.parametrize("model", sorted(_VALID_VF_MODELS))
+@pytest.mark.parametrize("compose_standardization", [False, True])
+def test_config_matches_legacy_builder(
+    config_cls, estimator_type, sde_type, model, compose_standardization, batches
+):
+    theta, condition = batches
+    if model == "transformer_cross_attn":
+        condition = torch.randn(32, 5, 3)
+    embedding_net = nn.Linear(3, 4)
+
+    torch.manual_seed(0)
+    expected = build_vector_field_estimator(
+        theta,
+        condition,
+        estimator_type=estimator_type,
+        sde_type=sde_type,
+        net=model,
+        embedding_net=embedding_net,
+        compose_standardization=compose_standardization,
+    )
+    torch.manual_seed(0)
+    actual = config_cls(
+        net=_vf_net_config_from_model(model),
+        embedding_net=embedding_net,
+        compose_standardization=compose_standardization,
+    ).build(theta, condition)
+
+    _assert_same_state(actual, expected)
+    times = torch.linspace(0.1, 0.9, theta.shape[0])
+    torch.testing.assert_close(
+        actual.net(theta, actual.embedding_net(condition), times),
+        expected.net(theta, expected.embedding_net(condition), times),
+    )
+
+
+@pytest.mark.parametrize(
+    "factory_fn, kwargs",
+    [
+        (posterior_flow_nn, {"layer_norm": None, "skip_connections": None}),
+        (posterior_flow_nn, {"num_heads": None}),
+        (posterior_score_nn, {"sigma_min": None, "train_schedule": None}),
+        (posterior_score_nn, {"beta_min": None}),
+    ],
+)
+def test_factory_none_keeps_known_field_defaults(factory_fn, kwargs, batches):
+    torch.manual_seed(0)
+    expected = factory_fn()(*batches)
+    torch.manual_seed(0)
+    actual = factory_fn(**kwargs)(*batches)
+
+    _assert_same_state(actual, expected)
 
 
 @pytest.mark.parametrize("factory_fn", [posterior_flow_nn, posterior_score_nn])
@@ -489,12 +633,15 @@ def test_trainer_default_matches_the_config_default(trainer_cls, config_cls, bat
     trainer = trainer_cls(prior, show_progress_bars=False)
     trainer.append_simulations(theta, x)
 
+    torch.manual_seed(0)
     from_trainer = trainer._build_neural_net(theta, x)
-    assert type(from_trainer) is type(config_cls().build(theta, x))
+    torch.manual_seed(0)
+    from_config = config_cls().build(theta, x)
+    _assert_same_state(from_trainer, from_config)
     assert isinstance(from_trainer.net, VectorFieldMLP)
 
 
-def test_extra_kwargs_has_one_bucket_per_axis(batches):
+def test_estimator_extra_kwargs_are_forwarded(batches):
     estimator = VEScoreConfig(extra_kwargs={"t_max": 0.9}).build(*batches)
     assert estimator.t_max == 0.9
 
