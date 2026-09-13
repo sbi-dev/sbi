@@ -69,9 +69,8 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             prior: Prior distribution.
             vector_field_estimator_builder: The vector-field estimator
                 used for flow-matching or score-matching inference.
-                Subclasses resolve a default config before calling the base. A
-                vector-field config of the subclass' own family can be passed
-                to configure the estimator. If it is a string
+                Subclasses supply a default config. A config must belong to the
+                trainer's estimator family. If it is a string
                 (deprecated), use a pre-configured network of the provided
                 type (one of mlp, ada_mlp, transformer,
                 transformer_cross_attn). Alternatively, a function that
