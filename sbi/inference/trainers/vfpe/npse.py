@@ -82,11 +82,16 @@ class NPSE(VectorFieldTrainer):
         score_estimator: Optional[
             Union[
                 VF_MODELS,
+                ScoreConfigBase,
                 ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
             ]
         ] = None,
         density_estimator: Optional[
-            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]
+            Union[
+                VF_MODELS,
+                ScoreConfigBase,
+                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
+            ]
         ] = None,
         sde_type: Optional[Literal["vp", "ve", "subvp"]] = None,
         device: str = "cpu",

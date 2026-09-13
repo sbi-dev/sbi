@@ -81,7 +81,11 @@ class FMPE(VectorFieldTrainer):
             None,
         ] = None,
         density_estimator: Optional[
-            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]
+            Union[
+                VF_MODELS,
+                FlowMatchingConfig,
+                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
+            ]
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -96,7 +100,7 @@ class FMPE(VectorFieldTrainer):
             vf_estimator: The vector-field estimator used for flow-matching
                 inference. If ``None`` (default), uses a
                 ``FlowMatchingConfig`` with default settings. A
-                FlowMatchingConfig can be passed to configure
+                ``FlowMatchingConfig`` can be passed to configure
                 the estimator. If it is a string (deprecated), use a
                 pre-configured network of the provided type (one of
                 mlp, ada_mlp, transformer, transformer_cross_attn).
