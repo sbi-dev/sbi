@@ -3,7 +3,7 @@
 
 import math
 import warnings
-from dataclasses import MISSING, dataclass, field, fields, replace
+from dataclasses import dataclass, field, fields, replace
 from typing import Callable, ClassVar, Literal, Optional, Sequence, Union
 
 import torch
@@ -100,8 +100,7 @@ def build_vector_field_estimator(
         compose_standardization: Whether to train and sample in per-dimension
             standardized theta coordinates. Defaults to False.
         **kwargs: Additional arguments forwarded to the estimator and network
-            constructors.  This function backs the deprecated paths only; the
-            configs are the validated surface.
+            constructors. Use per-model configs for argument validation.
 
     Returns:
         A vector field estimator (either FlowMatchingEstimator or
@@ -1340,11 +1339,6 @@ def build_transformer_network(
 class _VectorFieldNetConfigBase(_PerModelConfigBase):
     """Base configuration for the networks a vector-field estimator wraps.
 
-    Subclasses add the settings their architecture accepts and point
-    ``_BUILD_FN`` at the ``build_*_network`` function that consumes them.  A
-    setting an architecture does not accept is not a field on its config, so it
-    raises ``TypeError`` at construction rather than being ignored.
-
     Args:
         hidden_features: Width of the hidden layers.
         num_layers: Number of layers.
@@ -1456,7 +1450,6 @@ class VectorFieldConfigBase(_PerModelConfigBase):
 
     The estimator and the network it wraps are configured separately: the
     subclass selects the estimator, and ``net`` selects the architecture.
-    Neither choice constrains the other, so there is no discriminator field.
 
     Args:
         net: Config of the network to wrap, or a ready custom network module.
@@ -1466,7 +1459,8 @@ class VectorFieldConfigBase(_PerModelConfigBase):
             options as `z_score_input`.
         embedding_net: Embedding network for the conditioning variable.
         compose_standardization: Whether to train and sample in per-dimension
-            standardized coordinates of the modeled variable.
+            standardized coordinates of the modeled variable. Requires
+            `z_score_input="independent"`.
         extra_kwargs: Additional keyword arguments forwarded to the estimator
             constructor, for settings that have no field of their own. Network
             settings belong in ``net.extra_kwargs``.
@@ -1495,6 +1489,10 @@ class VectorFieldConfigBase(_PerModelConfigBase):
         if not isinstance(self.net, (_VectorFieldNetConfigBase, nn.Module)):
             raise TypeError(
                 "`net` must be a vector-field network config or an nn.Module."
+            )
+        if self.compose_standardization and self.z_score_input != "independent":
+            raise ValueError(
+                "`compose_standardization=True` requires `z_score_input='independent'`."
             )
         super().__post_init__()
 
@@ -1539,14 +1537,12 @@ class VectorFieldConfigBase(_PerModelConfigBase):
         z_score_condition_bool, structured_condition = z_score_parser(
             self.z_score_condition
         )
-        embedding_net = (
-            nn.Sequential(
+        embedding_net = self.embedding_net
+        if z_score_condition_bool:
+            embedding_net = nn.Sequential(
                 standardizing_net(batch_condition, structured_condition),
-                self.embedding_net,
+                embedding_net,
             )
-            if z_score_condition_bool
-            else self.embedding_net
-        )
 
         self._warn_unknown_extra_kwargs(self._ESTIMATOR_CLS.__init__)
         return self._ESTIMATOR_CLS(
@@ -1580,7 +1576,7 @@ class FlowMatchingConfig(VectorFieldConfigBase):
 class ScoreConfigBase(VectorFieldConfigBase):
     """Base configuration for the score-matching estimators, used by ``NPSE``.
 
-    The subclass selects the SDE, so there is no ``sde_type`` field.
+    Subclasses select the SDE.
     """
 
     def __post_init__(self):
@@ -1691,28 +1687,20 @@ def _score_config_from_sde_type(sde_type: str) -> ScoreConfigBase:
         ) from None
 
 
-def _net_config_defaults() -> dict:
-    """Default of every field shared by the network configs."""
-    return {
-        f.name: (f.default_factory() if f.default_factory is not MISSING else f.default)
-        for f in fields(MLPConfig)
-        if f.name != "extra_kwargs"
-    }
-
-
 def _vf_config_from_factory_kwargs(
     estimator_config: "VectorFieldConfigBase",
     model: Union[VF_MODELS, VectorFieldNet],
     named_net: dict,
     named_estimator: dict,
     extra: dict,
+    factory_defaults: dict,
 ) -> "VectorFieldConfigBase":
     """Assemble a vector-field config from a factory's arguments.
 
-    The factories predate the split between the estimator and the network it
-    wraps, so their arguments and ``**kwargs`` span both. Each name is routed
-    to the config that owns it; a name neither owns keeps the factories' old
-    warn-and-forward behaviour towards the network builder.
+    Flat factory arguments are split between the estimator and network configs.
+    Named arguments at factory defaults and known extra arguments set to ``None``
+    preserve config defaults. Unknown arguments warn and are forwarded to the
+    network builder.
 
     Args:
         estimator_config: Default config of the estimator to configure.
@@ -1721,12 +1709,23 @@ def _vf_config_from_factory_kwargs(
         named_estimator: The factory's named arguments that belong to the
             estimator.
         extra: The factory's ``**kwargs``.
+        factory_defaults: Defaults of the named arguments, under config field names.
 
     Returns:
         The assembled estimator config.
     """
     net_config = _vf_net_config_from_model(model) if isinstance(model, str) else model
     is_config = isinstance(net_config, _VectorFieldNetConfigBase)
+    named_net = {
+        name: value
+        for name, value in named_net.items()
+        if value != factory_defaults[name]
+    }
+    named_estimator = {
+        name: value
+        for name, value in named_estimator.items()
+        if value != factory_defaults[name]
+    }
 
     net_fields = (
         {f.name for f in fields(net_config)} - {"extra_kwargs"} if is_config else set()
@@ -1747,6 +1746,10 @@ def _vf_config_from_factory_kwargs(
     } - VectorFieldConfigBase._SHARED_FIELDS
     net_kwargs, estimator_kwargs, unknown, ignored = {}, {}, {}, []
     for name, value in extra.items():
+        if value is None and (
+            name in net_family_fields or name in estimator_family_fields
+        ):
+            continue
         if name in net_fields:
             net_kwargs[name] = value
         elif name in estimator_fields:
@@ -1775,12 +1778,10 @@ def _vf_config_from_factory_kwargs(
             net_config, **named_net, **net_kwargs, extra_kwargs=unknown
         )
     else:
-        defaults = _net_config_defaults()
-        ignored = sorted(
-            {k for k, v in named_net.items() if v != defaults[k]}
-            | set(net_kwargs)
-            | set(unknown)
-        )
+        unused_kwargs = set(named_net)
+        unused_kwargs.update(net_kwargs)
+        unused_kwargs.update(unknown)
+        ignored = sorted(unused_kwargs)
         if ignored:
             raise ValueError(
                 f"Argument(s) {ignored} are not used by a custom "
