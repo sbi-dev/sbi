@@ -75,26 +75,6 @@ def _assert_same_state(actual, expected):
 
 
 @pytest.mark.parametrize(
-    "config_cls, estimator_cls",
-    [
-        (FlowMatchingConfig, FlowMatchingEstimator),
-        (VEScoreConfig, VEScoreEstimator),
-        (VPScoreConfig, VPScoreEstimator),
-        (SubVPScoreConfig, SubVPScoreEstimator),
-    ],
-)
-def test_config_class_selects_the_estimator(config_cls, estimator_cls, batches):
-    assert isinstance(config_cls().build(*batches), estimator_cls)
-
-
-@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
-@pytest.mark.parametrize("net_cls", NET_CONFIGS)
-def test_net_choice_is_independent_of_the_estimator(config_cls, net_cls, batches):
-    estimator = config_cls(net=net_cls()).build(*batches)
-    assert type(estimator.net).__name__ == NET_CLASS_NAMES[net_cls]
-
-
-@pytest.mark.parametrize(
     "config_cls, bad_kwarg",
     [
         (FlowMatchingConfig, {"sigma_min": 0.1}),
@@ -245,7 +225,7 @@ def test_z_scoring_of_the_condition_wraps_the_embedding(config_cls, batches):
         (NPSE, SubVPScoreConfig, SubVPScoreEstimator),
     ],
 )
-def test_trainer_trains_with_a_config(
+def test_trainer_trains_and_samples_with_a_config(
     trainer_cls, config_cls, estimator_cls, gaussian_sims
 ):
     prior, theta, x = gaussian_sims
@@ -255,6 +235,16 @@ def test_trainer_trains_with_a_config(
         max_num_epochs=1, training_batch_size=100
     )
     assert isinstance(estimator, estimator_cls)
+    posterior = trainer.build_posterior(estimator)
+    samples = posterior.sample(
+        (5,),
+        x=x[:1],
+        steps=3,
+        reject_outside_prior=False,
+        show_progress_bars=False,
+    )
+    assert samples.shape == (5, theta.shape[-1])
+    assert torch.isfinite(samples).all()
 
 
 @pytest.mark.parametrize(
@@ -389,29 +379,6 @@ def test_advertised_time_emb_types_all_build(factory_fn):
         builder(torch.randn(10, 2), torch.randn(10, 3))
 
 
-@pytest.mark.parametrize("model", sorted(_VALID_VF_MODELS - {"transformer_cross_attn"}))
-@pytest.mark.parametrize(
-    "factory_fn", [posterior_flow_nn, posterior_score_nn], ids=["flow", "score"]
-)
-def test_factory_builds_every_model(factory_fn, model, batches):
-    assert factory_fn(model=model)(*batches) is not None
-
-
-@pytest.mark.parametrize(
-    "factory_fn, sde_kwargs, estimator_cls",
-    [
-        (posterior_flow_nn, {}, FlowMatchingEstimator),
-        (posterior_score_nn, {"sde_type": "ve"}, VEScoreEstimator),
-        (posterior_score_nn, {"sde_type": "vp"}, VPScoreEstimator),
-        (posterior_score_nn, {"sde_type": "subvp"}, SubVPScoreEstimator),
-    ],
-)
-def test_factory_sde_type_maps_to_the_config(
-    factory_fn, sde_kwargs, estimator_cls, batches
-):
-    assert isinstance(factory_fn(**sde_kwargs)(*batches), estimator_cls)
-
-
 def test_factory_routes_estimator_and_network_settings(batches):
     estimator = posterior_score_nn(
         model="transformer", hidden_features=64, num_heads=2, sigma_max=20.0
@@ -431,24 +398,48 @@ def test_factory_rejects_network_settings_for_a_custom_network(batches):
 
 
 @pytest.mark.parametrize(
-    "factory_fn, factory_kwargs, config_cls",
+    "factory_fn, factory_kwargs, config_cls, estimator_cls",
     [
-        (posterior_flow_nn, {}, FlowMatchingConfig),
-        (posterior_score_nn, {"sde_type": "ve"}, VEScoreConfig),
-        (posterior_score_nn, {"sde_type": "vp"}, VPScoreConfig),
-        (posterior_score_nn, {"sde_type": "subvp"}, SubVPScoreConfig),
+        (posterior_flow_nn, {}, FlowMatchingConfig, FlowMatchingEstimator),
+        (posterior_score_nn, {"sde_type": "ve"}, VEScoreConfig, VEScoreEstimator),
+        (posterior_score_nn, {"sde_type": "vp"}, VPScoreConfig, VPScoreEstimator),
+        (
+            posterior_score_nn,
+            {"sde_type": "subvp"},
+            SubVPScoreConfig,
+            SubVPScoreEstimator,
+        ),
     ],
     ids=["flow", "ve", "vp", "subvp"],
 )
-def test_estimator_config_defaults_match_the_factory(
-    factory_fn, factory_kwargs, config_cls, batches
+@pytest.mark.parametrize(
+    "model, net_config",
+    [
+        (None, MLPConfig()),
+        ("mlp", MLPConfig()),
+        ("ada_mlp", AdaMLPConfig()),
+        ("transformer", TransformerConfig()),
+        ("transformer_cross_attn", TransformerConfig(is_x_emb_seq=True)),
+    ],
+)
+def test_config_defaults_match_the_factory(
+    factory_fn, factory_kwargs, config_cls, estimator_cls, model, net_config, batches
 ):
+    theta, condition = batches
+    if model == "transformer_cross_attn":
+        condition = torch.randn(32, 5, 3)
+    if model is not None:
+        factory_kwargs = {**factory_kwargs, "model": model}
+    config = config_cls() if model is None else config_cls(net=net_config)
+
     torch.manual_seed(0)
-    from_factory = factory_fn(**factory_kwargs)(*batches)
+    from_factory = factory_fn(**factory_kwargs)(theta, condition)
     torch.manual_seed(0)
-    from_config = config_cls().build(*batches)
+    from_config = config.build(theta, condition)
 
     _assert_same_state(from_factory, from_config)
+    assert isinstance(from_config, estimator_cls)
+    assert type(from_config.net).__name__ == NET_CLASS_NAMES[type(net_config)]
 
 
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS)
@@ -517,46 +508,37 @@ def test_factory_boolean_defaults_preserve_config_defaults(
 
 
 @pytest.mark.parametrize(
-    "model, net_config, sequence_condition",
+    "config_cls, estimator_type, sde_type, scalar_fields",
     [
-        ("mlp", MLPConfig(), False),
-        ("ada_mlp", AdaMLPConfig(), False),
-        ("transformer", TransformerConfig(), False),
+        (FlowMatchingConfig, "flow", "ve", ("noise_scale", "gaussian_baseline")),
         (
-            "transformer_cross_attn",
-            TransformerConfig(is_x_emb_seq=True),
-            True,
+            VEScoreConfig,
+            "score",
+            "ve",
+            (
+                "sigma_min",
+                "sigma_max",
+                "_train_schedule_type",
+                "_solve_schedule_type",
+                "lognormal_mean",
+                "lognormal_std",
+                "power_law_exponent",
+            ),
         ),
-    ],
-)
-def test_network_config_defaults_match_the_factory(
-    model, net_config, sequence_condition, batches
-):
-    theta, condition = batches
-    if sequence_condition:
-        condition = torch.randn(32, 5, 3)
-
-    torch.manual_seed(0)
-    from_factory = posterior_flow_nn(model=model)(theta, condition)
-    torch.manual_seed(0)
-    from_config = FlowMatchingConfig(net=net_config).build(theta, condition)
-
-    _assert_same_state(from_factory, from_config)
-
-
-@pytest.mark.parametrize(
-    "config_cls, estimator_type, sde_type",
-    [
-        (FlowMatchingConfig, "flow", "ve"),
-        (VEScoreConfig, "score", "ve"),
-        (VPScoreConfig, "score", "vp"),
-        (SubVPScoreConfig, "score", "subvp"),
+        (VPScoreConfig, "score", "vp", ("beta_min", "beta_max")),
+        (SubVPScoreConfig, "score", "subvp", ("beta_min", "beta_max")),
     ],
 )
 @pytest.mark.parametrize("model", sorted(_VALID_VF_MODELS))
 @pytest.mark.parametrize("compose_standardization", [False, True])
 def test_config_matches_legacy_builder(
-    config_cls, estimator_type, sde_type, model, compose_standardization, batches
+    config_cls,
+    estimator_type,
+    sde_type,
+    scalar_fields,
+    model,
+    compose_standardization,
+    batches,
 ):
     theta, condition = batches
     if model == "transformer_cross_attn":
@@ -581,6 +563,8 @@ def test_config_matches_legacy_builder(
     ).build(theta, condition)
 
     _assert_same_state(actual, expected)
+    for name in ("t_min", "t_max", *scalar_fields):
+        assert getattr(actual, name) == getattr(expected, name), name
     times = torch.linspace(0.1, 0.9, theta.shape[0])
     torch.testing.assert_close(
         actual.net(theta, actual.embedding_net(condition), times),
@@ -588,13 +572,18 @@ def test_config_matches_legacy_builder(
     )
 
 
+@pytest.mark.parametrize("factory_fn", [posterior_flow_nn, posterior_score_nn])
 @pytest.mark.parametrize(
-    "factory_fn, kwargs",
+    "kwargs",
     [
-        (posterior_flow_nn, {"layer_norm": None, "skip_connections": None}),
-        (posterior_flow_nn, {"num_heads": None}),
-        (posterior_score_nn, {"sigma_min": None, "train_schedule": None}),
-        (posterior_score_nn, {"beta_min": None}),
+        {"hidden_features": None},
+        {"num_layers": None},
+        {"t_embedding_dim": None},
+        {"time_emb_type": None},
+        {"layer_norm": None, "skip_connections": None},
+        {"num_heads": None},
+        {"sigma_min": None, "train_schedule": None},
+        {"beta_min": None},
     ],
 )
 def test_factory_none_keeps_known_field_defaults(factory_fn, kwargs, batches):
