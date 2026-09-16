@@ -341,3 +341,17 @@ def test_compose_requires_independent_theta_z_score(factory, z_score_theta):
             compose_standardization=True,
             z_score_theta=z_score_theta,
         )
+
+
+@pytest.mark.parametrize("estimator_type", ["flow", "score"])
+@pytest.mark.parametrize("z_score_x", [None, "none", "structured"])
+def test_direct_builder_compose_requires_independent_z_score(estimator_type, z_score_x):
+    theta, x = _batches()
+    with pytest.raises(ValueError, match="z_score_x='independent'"):
+        build_vector_field_estimator(
+            theta,
+            x,
+            estimator_type=estimator_type,
+            compose_standardization=True,
+            z_score_x=z_score_x,
+        )

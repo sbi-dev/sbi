@@ -98,7 +98,8 @@ def build_vector_field_estimator(
             derived from Bayes' rule. The network then only learns the residual.
             Only used when estimator_type="flow". Defaults to False.
         compose_standardization: Whether to train and sample in per-dimension
-            standardized theta coordinates. Defaults to False.
+            standardized theta coordinates. Requires `z_score_x="independent"`.
+            Defaults to False.
         **kwargs: Additional arguments forwarded to the estimator and network
             constructors. Use per-model configs for argument validation.
 
@@ -114,6 +115,10 @@ def build_vector_field_estimator(
         "Vector field estimators (flow matching / score matching) do not implement "
         "it; use one of 'none', 'independent', or 'structured' instead.",
     )
+    if compose_standardization and z_score_x != "independent":
+        raise ValueError(
+            "`compose_standardization=True` requires `z_score_x='independent'`."
+        )
 
     # Build network if not provided
     if net == "mlp":
