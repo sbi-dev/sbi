@@ -1703,9 +1703,9 @@ def _vf_config_from_factory_kwargs(
     """Assemble a vector-field config from a factory's arguments.
 
     Flat factory arguments are split between the estimator and network configs.
-    Named arguments at factory defaults and known extra arguments set to ``None``
-    preserve config defaults. Unknown arguments warn and are forwarded to the
-    network builder.
+    Named arguments at factory defaults preserve config defaults. ``None`` also
+    preserves defaults for named network and known extra arguments. Unknown
+    arguments warn and are forwarded to the network builder.
 
     Args:
         estimator_config: Default config of the estimator to configure.
@@ -1724,7 +1724,7 @@ def _vf_config_from_factory_kwargs(
     named_net = {
         name: value
         for name, value in named_net.items()
-        if value != factory_defaults[name]
+        if value is not None and value != factory_defaults[name]
     }
     named_estimator = {
         name: value
