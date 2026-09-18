@@ -52,7 +52,8 @@ trainable density estimator for ``NPE`` or ``NLE``.
 Mixed density estimator configs
 -------------------------------
 
-For ``MNPE`` and ``MNLE``, where part of the data is discrete.
+For ``MNPE`` and ``MNLE``, where the modeled variable has continuous and
+discrete components.
 
 .. autosummary::
    :toctree: _autosummary
