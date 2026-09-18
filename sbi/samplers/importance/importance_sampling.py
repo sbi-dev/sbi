@@ -1,11 +1,14 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from contextlib import nullcontext
 from math import sqrt
 from typing import Tuple
 
 import torch
 from torch import Tensor
+
+from sbi.utils.pbar import nested_pbar_context
 
 
 def importance_sample(
@@ -20,14 +23,15 @@ def importance_sample(
         potential_fn: Unnormalized potential function.
         proposal: Proposal distribution with `.sample()` and `.log_prob()` methods.
         num_samples: Number of samples to draw.
+        show_progress_bars: Whether to show the progress bar of the proposal, if it
+            has one.
 
     Returns:
         Samples and logarithm of importance weights.
     """
-    # Use progress bars when available (e.g., for multi-round proposals)
-    try:
-        samples = proposal.sample((num_samples,), show_progress_bar=show_progress_bars)
-    except TypeError:
+    # The proposal's own progress bar, if it has one, is the only bar here. It is
+    # suppressed like a nested bar unless progress bars are requested.
+    with nullcontext() if show_progress_bars else nested_pbar_context():
         samples = proposal.sample((num_samples,))
 
     potential_logprobs = potential_fn(samples)

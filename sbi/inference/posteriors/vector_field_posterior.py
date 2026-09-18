@@ -59,6 +59,7 @@ class VectorFieldPosterior(NeuralPosterior):
         device: Optional[Union[str, torch.device]] = None,
         enable_transform: bool = True,
         sample_with: Literal["ode", "sde"] = "sde",
+        check_finite_x: bool = True,
         **kwargs,
     ):
         """
@@ -74,6 +75,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 returned for `theta_transform`. True is not supported yet.
             sample_with: Whether to sample from the posterior using the ODE-based
                 sampler or the SDE-based sampler.
+            check_finite_x: Whether to raise if the observed data `x_o` contains NaNs
+                or Infs. Set to False when the embedding net expects NaNs, e.g., when
+                `PermutationInvariantEmbedding` pads a varying number of trials.
             **kwargs: Additional keyword arguments passed to
                 `VectorFieldBasedPotential`.
         """
@@ -90,6 +94,7 @@ class VectorFieldPosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
+            check_finite_x=check_finite_x,
         )
         # Set the potential function type.
         self.potential_fn: VectorFieldBasedPotential = potential_fn
@@ -139,6 +144,7 @@ class VectorFieldPosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
+            check_finite_x=self._check_finite_x,
         )
         # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:
@@ -256,7 +262,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 "guided sampling. Use a single observation, or disable "
                 "compose_standardization."
             )
-        self.potential_fn.set_x(
+        self.potential_fn = self.potential_fn.bind(
             x,
             x_is_iid=is_iid,
             iid_method=iid_method or self.potential_fn.iid_method,
@@ -490,7 +496,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 "log_prob. Use a single observation, or disable "
                 "compose_standardization."
             )
-        self.potential_fn.set_x(x, x_is_iid=is_iid, **(ode_kwargs or {}))
+        self.potential_fn = self.potential_fn.bind(
+            x, x_is_iid=is_iid, **(ode_kwargs or {})
+        )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -560,7 +568,7 @@ class VectorFieldPosterior(NeuralPosterior):
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()
-        self.potential_fn.set_x(x)
+        self.potential_fn = self.potential_fn.bind(x)
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -707,7 +715,9 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if self._map is None or force_update:
             # rebuild coarse flow fast for MAP optimization.
-            self.potential_fn.set_x(self.default_x, atol=1e-2, rtol=1e-3, exact=True)
+            self.potential_fn = self.potential_fn.bind(
+                self.default_x, atol=1e-2, rtol=1e-3, exact=True
+            )
             callable_potential_fn = CallableDifferentiablePotentialFunction(
                 self.potential_fn
             )

@@ -23,7 +23,6 @@ from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import (
     BoxUniform,
-    assert_all_finite,
     atleast_2d,
     canonical_device,
     set_validate_args,
@@ -36,7 +35,10 @@ from sbi.utils.user_input_checks_utils import (
 )
 
 if TYPE_CHECKING:
-    from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
+    from sbi.neural_nets.net_builders.estimator_configs import (
+        _EstimatorBuilderBase,
+        _PerModelConfigBase,
+    )
 
 
 def check_prior(prior: Any) -> None:
@@ -622,8 +624,6 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
-    assert_all_finite(x, "Observed data x_o contains Nans or Infs.")
-
     if x_event_shape is not None and len(x_event_shape) > len(x.shape):
         raise ValueError(
             f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
@@ -676,22 +676,31 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
 
 
 def check_estimator_arg(
-    estimator: Union[str, Callable, "_EstimatorBuilderBase"],
+    estimator: Union[str, Callable, "_PerModelConfigBase", "_EstimatorBuilderBase"],
 ) -> None:
     """Check (density or ratio) estimator argument passed by the user.
 
-    Accepts a string identifier, an estimator builder (subclass of
-    ``_EstimatorBuilderBase``), or a build function returning an ``nn.Module``.
+    Accepts a string identifier, an estimator config, or a build function
+    returning an ``nn.Module``.
+
+    Args:
+        estimator: The estimator argument to check.
     """
-    from sbi.neural_nets.net_builders.estimator_configs import _EstimatorBuilderBase
+    from sbi.neural_nets.net_builders.estimator_configs import _ESTIMATOR_CONFIG_BASES
+
+    if isinstance(estimator, type) and issubclass(estimator, _ESTIMATOR_CONFIG_BASES):
+        raise TypeError(
+            f"Got the config class {estimator.__name__}, not an instance. "
+            f"Use {estimator.__name__}()."
+        )
 
     if not (
-        isinstance(estimator, (str, _EstimatorBuilderBase))
+        isinstance(estimator, (str, *_ESTIMATOR_CONFIG_BASES))
         or (isinstance(estimator, Callable) and not isinstance(estimator, nn.Module))
     ):
         raise TypeError(
             "The passed density estimator / classifier must be a string, "
-            "an estimator builder (e.g. DensityEstimatorBuilder), or a "
+            "an estimator config (e.g. NSFConfig), or a "
             f"function returning a nn.Module, but is {type(estimator)}"
         )
 

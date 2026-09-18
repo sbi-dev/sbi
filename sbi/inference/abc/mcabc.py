@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.utils.kde import KDEWrapper, get_kde
+from sbi.utils.torchutils import assert_all_finite
 from sbi.utils.user_input_checks import process_x
 
 
@@ -183,6 +184,7 @@ class MCABC(ABCBASE):
             self.x_shape = x[0, 0].shape
 
         self.x_o = process_x(x_o, self.x_shape)
+        assert_all_finite(self.x_o, "Observed data x_o")
         distances = self.distance(self.x_o, x)
 
         # Select based on acceptance threshold epsilon.

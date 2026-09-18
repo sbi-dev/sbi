@@ -8,6 +8,7 @@ from warnings import warn
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
+from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,
@@ -16,8 +17,15 @@ from sbi.inference.potentials.base_potential import (
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import (
+    assert_all_finite,
+    canonical_device,
+    ensure_theta_batched,
+    infer_tensor_device,
+    process_device,
+)
 from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class NeuralPosterior:
@@ -35,6 +43,7 @@ class NeuralPosterior:
         theta_transform: Optional[TorchTransform] = None,
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
+        check_finite_x: bool = True,
     ):
         """
         Args:
@@ -45,6 +54,9 @@ class NeuralPosterior:
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Deprecated, should not be passed.
+            check_finite_x: Whether to raise if the observed data `x_o` contains NaNs
+                or Infs. Set to False when the embedding net expects NaNs, e.g., when
+                `PermutationInvariantEmbedding` pads a varying number of trials.
         """
         if x_shape is not None:
             warn(
@@ -61,6 +73,7 @@ class NeuralPosterior:
             )
 
         self._device = process_device(potential_fn.device if device is None else device)
+        self._check_finite_x = check_finite_x
 
         self.potential_fn = potential_fn
 
@@ -77,7 +90,10 @@ class NeuralPosterior:
         # If the sampler interface (#573) is used, the user might have passed `x_o`
         # already to the potential function builder. If so, this `x_o` will be used
         # as default x.
-        self._x = self.potential_fn.return_x_o()
+        x_o = self.potential_fn.return_x_o()
+        if x_o is not None and self._check_finite_x:
+            assert_all_finite(x_o, "Observed data x_o")
+        self._x = x_o
 
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
@@ -93,7 +109,7 @@ class NeuralPosterior:
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -180,7 +196,11 @@ class NeuralPosterior:
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        self._x = process_x(x, x_event_shape=None).to(self._device)
+        x = process_x(x, x_event_shape=None)
+        if self._check_finite_x:
+            assert_all_finite(x, "Observed data x_o")
+
+        self._x = x.to(self._device)
         self._map = None
         return self
 
@@ -188,7 +208,11 @@ class NeuralPosterior:
         if x is not None:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
-            return process_x(x, x_event_shape=None)
+            x = process_x(x, x_event_shape=None)
+            if self._check_finite_x:
+                assert_all_finite(x, "Observed data x_o")
+
+            return x
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."
@@ -294,7 +318,7 @@ class NeuralPosterior:
             )
 
         if self._map is None or force_update:
-            self.potential_fn.set_x(self.default_x)
+            self.potential_fn = self.potential_fn.bind(self.default_x)
             self._map = self._calculate_map(
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,
@@ -327,7 +351,34 @@ class NeuralPosterior:
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
 
+        `torch.load(..., map_location=...)` remaps the tensors but not the stored device
+        strings. If the restored tensors live on another device than `_device` claims,
+        the device strings of the posterior, its potential and its prior are updated.
+
         Args:
             state_dict: State to be restored.
         """
+        # Posteriors pickled before `check_finite_x` was introduced carry no such key.
+        state_dict.setdefault("_check_finite_x", True)
         self.__dict__ = state_dict
+
+        actual_device = infer_tensor_device(self)
+        if actual_device is None or canonical_device(actual_device) == canonical_device(
+            self._device
+        ):
+            return
+
+        # The tensors already live on `actual_device`. Only the device strings, and the
+        # distributions that cache one, must follow.
+        self._device = actual_device
+        if hasattr(self, "device"):
+            self.device = actual_device
+        shared_prior = getattr(self.potential_fn, "prior", None)
+        self.potential_fn.to(actual_device)  # type: ignore[union-attr]
+        for attr in ("prior", "_prior", "proposal"):
+            value = getattr(self, attr, None)
+            if value is shared_prior and value is not None:
+                # The potential moved this object already. Keep sharing it.
+                setattr(self, attr, self.potential_fn.prior)  # type: ignore[union-attr]
+            elif isinstance(value, Distribution):
+                setattr(self, attr, move_distribution_to_device(value, actual_device))

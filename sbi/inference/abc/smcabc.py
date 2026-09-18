@@ -16,7 +16,7 @@ from sbi.inference.abc.abc_base import ABCBASE
 from sbi.sbi_types import Array
 from sbi.utils.kde import KDEWrapper, get_kde
 from sbi.utils.sbiutils import within_support
-from sbi.utils.torchutils import BoxUniform
+from sbi.utils.torchutils import BoxUniform, assert_all_finite
 from sbi.utils.user_input_checks import process_x
 
 
@@ -401,6 +401,7 @@ class SMCABC(ABCBASE):
         else:
             self.x_shape = x[0, 0].shape
         self.x_o = process_x(x_o, self.x_shape)
+        assert_all_finite(self.x_o, "Observed data x_o")
 
         distances = self.distance(self.x_o, x)
         sortidx = torch.argsort(distances)
