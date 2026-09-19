@@ -13,9 +13,29 @@ class DummyPosterior:
     parameter_dim = 2
 
     def sample(self, sample_shape, x, show_progress_bars=False):
+        """Return zero samples for one observation.
+
+        Args:
+            sample_shape: Requested sample dimensions.
+            x: Conditioning observation.
+            show_progress_bars: Whether to show sampling progress.
+
+        Returns:
+            Zero samples with the requested sample dimensions.
+        """
         return torch.zeros((*sample_shape, self.parameter_dim))
 
     def sample_batched(self, sample_shape, x, show_progress_bars=False):
+        """Return zero samples for each observation in a batch.
+
+        Args:
+            sample_shape: Requested sample dimensions.
+            x: Batch of conditioning observations.
+            show_progress_bars: Whether to show sampling progress.
+
+        Returns:
+            Zero samples with sample dimensions before the batch dimension.
+        """
         return torch.zeros((*sample_shape, len(x), self.parameter_dim))
 
 
