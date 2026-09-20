@@ -8,34 +8,14 @@ from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
 
 
 class DummyPosterior:
-    """Posterior returning zero samples with the requested shape."""
+    """Posterior returning zeros that follow the documented shape convention."""
 
     parameter_dim = 2
 
     def sample(self, sample_shape, x, show_progress_bars=False):
-        """Return zero samples for one observation.
-
-        Args:
-            sample_shape: Requested sample dimensions.
-            x: Conditioning observation.
-            show_progress_bars: Whether to show sampling progress.
-
-        Returns:
-            Zero samples with the requested sample dimensions.
-        """
         return torch.zeros((*sample_shape, self.parameter_dim))
 
     def sample_batched(self, sample_shape, x, show_progress_bars=False):
-        """Return zero samples for each observation in a batch.
-
-        Args:
-            sample_shape: Requested sample dimensions.
-            x: Batch of conditioning observations.
-            show_progress_bars: Whether to show sampling progress.
-
-        Returns:
-            Zero samples with sample dimensions before the batch dimension.
-        """
         return torch.zeros((*sample_shape, len(x), self.parameter_dim))
 
 
@@ -44,15 +24,11 @@ class DummyPosterior:
 def test_get_posterior_samples_preserves_sample_shape(
     use_batched_sampling, sample_shape
 ):
-    """Return every sample dimension before the observation batch dimension."""
+    """Every sample dimension must come before the observation batch dimension."""
     xs = torch.zeros(4, 1)
 
     samples = get_posterior_samples_on_batch(
-        xs=xs,
-        posterior=DummyPosterior(),
-        sample_shape=sample_shape,
-        num_workers=1,
-        use_batched_sampling=use_batched_sampling,
+        xs, DummyPosterior(), sample_shape, use_batched_sampling=use_batched_sampling
     )
 
     assert samples.shape == (*sample_shape, len(xs), DummyPosterior.parameter_dim)
