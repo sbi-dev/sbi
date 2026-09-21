@@ -27,7 +27,11 @@ def test_mcabc_performance(num_dim: int, distance: str, eps: float):
     x_o = zeros((1, num_dim))
     num_samples = 1000
     num_simulations = 120000
-    dim_scaled_eps = eps * num_dim if eps is not None else None
+    # l1 sums over dimensions where the custom distance takes an L2 norm, so it
+    # needs one more factor of num_dim to accept a comparable number of
+    # simulations.
+    eps_scale = num_dim**2 if distance == "l1" else num_dim
+    dim_scaled_eps = eps * eps_scale if eps is not None else None
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
