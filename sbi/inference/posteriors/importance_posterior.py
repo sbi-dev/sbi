@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Literal, Optional, Tuple, Union
+from typing import Callable, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -10,7 +10,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
-from sbi.sbi_types import Shape, TorchTransform
+from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched, process_device
 
@@ -28,7 +28,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Union[Callable, BasePotential],
-        proposal: Any,
+        proposal: Proposal,
         theta_transform: Optional[TorchTransform] = None,
         method: Literal["sir", "importance"] = "sir",
         oversampling_factor: int = 32,
@@ -40,7 +40,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Args:
             potential_fn: The potential function from which to draw samples. Must be a
                 `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
-            proposal: The proposal distribution.
+            proposal: The proposal distribution. Must follow the `Proposal` protocol
+                (`sample()` and `log_prob()`).
             theta_transform: Transformation that is applied to parameters. Is not used
                 during but only when calling `.map()`.
             method: Either of [`sir`|`importance`]. This sets the behavior of the

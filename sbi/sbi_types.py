@@ -68,6 +68,20 @@ class CustomPrior(Protocol):
     def log_prob(self, value) -> Any: ...
 
 
+class Proposal(Protocol):
+    """Protocol for objects that can be drawn from and scored.
+
+    A proposal provides `sample()` and `log_prob()`, which is all that the
+    samplers and posteriors need from it. Both `torch.distributions.Distribution`
+    and `NeuralPosterior` satisfy this protocol, as do the custom priors wrapped
+    by `process_prior`.
+    """
+
+    def sample(self, sample_shape: torch.Size, /) -> Tensor: ...
+
+    def log_prob(self, value: Tensor, /) -> Tensor: ...
+
+
 class Tracker(Protocol):
     """Protocol for experiment tracking integrations."""
 
@@ -97,6 +111,7 @@ __all__ = [
     "CustomPrior",
     "Shape",
     "OneOrMore",
+    "Proposal",
     "SampleProposal",
     "ScalarFloat",
     "TensorBoardSummaryWriter",

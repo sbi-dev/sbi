@@ -4,21 +4,21 @@
 import logging
 import time
 import warnings
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
-from sbi.sbi_types import AcceptRejectFn, SampleProposal
+from sbi.sbi_types import AcceptRejectFn, Proposal, SampleProposal
 from sbi.utils.pbar import is_nested, nested_pbar_context
 from sbi.utils.sbiutils import gradient_ascent
 
 
 def rejection_sample(
     potential_fn: Callable,
-    proposal: Any,
+    proposal: Proposal,
     theta_transform: Optional[torch_tf.Transform] = None,
     num_samples: int = 1,
     show_progress_bars: bool = False,
@@ -106,7 +106,7 @@ def rejection_sample(
         Proposal for rejection sampling which is strictly larger than the potential_fn.
         """
 
-        def __init__(self, proposal: Any, max_log_ratio: Tensor, log_m: Tensor):
+        def __init__(self, proposal: Proposal, max_log_ratio: Tensor, log_m: Tensor):
             self.proposal = proposal
             self.max_log_ratio = max_log_ratio
             self.log_m = log_m

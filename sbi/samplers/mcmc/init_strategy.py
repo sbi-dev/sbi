@@ -8,6 +8,7 @@ import torch.distributions.transforms as torch_tf
 from torch import Tensor
 
 from sbi.samplers.importance.sir import sampling_importance_resampling
+from sbi.sbi_types import Proposal
 
 
 class IterateParameters:
@@ -26,7 +27,7 @@ class IterateParameters:
 
 
 def proposal_init(
-    proposal: Any, transform: torch_tf.Transform, **kwargs: Any
+    proposal: Proposal, transform: torch_tf.Transform, **kwargs: Any
 ) -> Tensor:
     """Return a sample from the proposal."""
     prior_samples = proposal.sample((1,)).detach()
@@ -35,7 +36,7 @@ def proposal_init(
 
 
 def sir_init(
-    proposal: Any,
+    proposal: Proposal,
     potential_fn: Callable,
     transform: torch_tf.Transform,
     num_candidate_samples: int = 10_000,
@@ -46,7 +47,8 @@ def sir_init(
     See Rubin 1988, "Using the sir algorithm to simulate posterior distributions."
 
     Args:
-        proposal: Proposal distribution, candidate samples are drawn from it.
+        proposal: Proposal distribution, candidate samples are drawn from it. Must
+            follow the `Proposal` protocol.
         potential_fn: Potential function that the candidate samples are weighted with.
             Note that the function needs to return log probabilities.
         num_candidate_samples: Number of candidate samples per batch.
@@ -65,7 +67,7 @@ def sir_init(
 
 
 def resample_given_potential_fn(
-    proposal: Any,
+    proposal: Proposal,
     potential_fn: Callable,
     transform: torch_tf.Transform,
     num_candidate_samples: int = 10_000,
@@ -81,7 +83,8 @@ def resample_given_potential_fn(
     is SIR (i.e., with correction).
 
     Args:
-        proposal: Proposal distribution, candidate samples are drawn from it.
+        proposal: Proposal distribution, candidate samples are drawn from it. Must
+            follow the `Proposal` protocol.
         potential_fn: Potential function that the candidate samples are weighted with.
             Note that the function needs to return log probabilities.
         num_batches: Number of batches drawn.

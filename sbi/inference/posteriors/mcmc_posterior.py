@@ -26,7 +26,7 @@ from sbi.samplers.mcmc import (
     resample_given_potential_fn,
     sir_init,
 )
-from sbi.sbi_types import Shape, TorchTransform
+from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import (
@@ -47,7 +47,7 @@ class MCMCPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Union[Callable, BasePotential],
-        proposal: Any,
+        proposal: Proposal,
         theta_transform: Optional[TorchTransform] = None,
         method: Literal[
             "slice_np",
@@ -74,6 +74,7 @@ class MCMCPosterior(NeuralPosterior):
             potential_fn: The potential function from which to draw samples. Must be a
                 `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
             proposal: Proposal distribution that is used to initialize the MCMC chain.
+                Must follow the `Proposal` protocol (`sample()` and `log_prob()`).
             theta_transform: Transformation that will be applied during sampling.
                 Allows to perform MCMC in unconstrained space.
             method: Method used for MCMC sampling, one of `slice_np`,
@@ -515,7 +516,7 @@ class MCMCPosterior(NeuralPosterior):
 
     def _build_mcmc_init_fn(
         self,
-        proposal: Any,
+        proposal: Proposal,
         potential_fn: Callable,
         transform: torch_tf.Transform,
         init_strategy: str,
@@ -524,7 +525,7 @@ class MCMCPosterior(NeuralPosterior):
         """Return function that, when called, creates an initial parameter set for MCMC.
 
         Args:
-            proposal: Proposal distribution.
+            proposal: Proposal distribution, must follow the `Proposal` protocol.
             potential_fn: Potential function that the candidate samples are weighted
                 with.
             init_strategy: Specifies the initialization method. Either of
