@@ -891,8 +891,8 @@ def mcmc_transform(
         enable_transform: Whether to transform parameters to unconstrained space.
             When False, an identity transform will be returned for `theta_transform`.
 
-    Returns: A transformation that transforms whose `forward()` maps from unconstrained
-        (or z-scored) to constrained (or non-z-scored) space.
+    Returns: A transformation whose `forward()` maps from constrained (or
+        non-z-scored) to unconstrained (or z-scored) space.
     """
     if enable_transform:
 
