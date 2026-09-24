@@ -573,7 +573,8 @@ class VectorFieldPosterior(NeuralPosterior):
             )[1]
 
         is_new_x = self.default_x is None or (
-            x is not self.default_x and (x != self.default_x).any()
+            x is not self.default_x
+            and (x.to(self.default_x.device) != self.default_x).any()
         )
         if is_new_x or ode_kwargs:
             return acceptance()

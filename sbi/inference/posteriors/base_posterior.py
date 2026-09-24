@@ -360,8 +360,9 @@ class NeuralPosterior:
         Args:
             state_dict: State to be restored.
         """
-        # Posteriors pickled before `check_finite_x` was introduced carry no such key.
+        # Posteriors pickled by older sbi versions can miss these keys.
         state_dict.setdefault("_check_finite_x", True)
+        state_dict.setdefault("_leakage_density_correction_factor", None)
         self.__dict__ = state_dict
 
         actual_device = infer_tensor_device(self)
