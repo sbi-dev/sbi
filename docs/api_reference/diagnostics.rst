@@ -17,4 +17,3 @@ Diagnostics
    sbi.diagnostics.LC2ST
    sbi.diagnostics.run_sbc
    sbi.diagnostics.run_tarp
-   sbi.diagnostics.SequentialConvergenceTracker

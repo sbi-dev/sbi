@@ -9,15 +9,14 @@ import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal, Normal, kl_divergence
 
-from sbi.diagnostics import SequentialConvergenceTracker, kl_divergence_mc
-from sbi.inference import NPE_C
+from sbi.diagnostics import kl_divergence_mc
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import BoxUniform
 
-from .test_utils import PosteriorPotential, get_dkl_gaussian_prior
+from .test_utils import PosteriorPotential
 
 
 @pytest.mark.parametrize(
@@ -127,20 +126,6 @@ def test_kl_divergence_mc_raises_for_unnormalized_posterior(gaussian_setup: Dict
         kl_divergence_mc(unnormalized, prior, x_o=x_o, p_samples=prior.sample((10,)))
 
 
-def test_tracker_raises_before_sampling_for_unnormalized_posterior(
-    gaussian_setup: Dict,
-):
-    """The tracker probes on a cheap prior sample, so MCMC never starts."""
-    prior = gaussian_setup["prior"]
-    x_o = zeros(1, gaussian_setup["num_dim"])
-    unnormalized = _unnormalized_posterior(gaussian_setup, x_o)
-
-    tracker = SequentialConvergenceTracker(prior, x_o, num_samples=10)
-    with pytest.raises(NotImplementedError, match="c2st"):
-        tracker.update(unnormalized)
-
-    assert tracker.history == []
-
 
 def test_unnormalized_guard_fires_after_warning_already_shown(gaussian_setup: Dict):
     """The guard must survive Python's once-per-location warning registry.
@@ -161,147 +146,3 @@ def test_unnormalized_guard_fires_after_warning_already_shown(gaussian_setup: Di
 
     with pytest.raises(NotImplementedError, match="c2st"):
         kl_divergence_mc(prior, unnormalized, x_o=x_o, num_samples=10)
-
-
-def test_tracker_first_round_has_no_increment(gaussian_setup: Dict):
-    """Round 0 has no predecessor, so increment and ratio are undefined."""
-    prior = gaussian_setup["prior"]
-    x_o = zeros(1, gaussian_setup["num_dim"])
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o,
-        gaussian_setup["likelihood_shift"],
-        gaussian_setup["likelihood_cov"],
-        gaussian_setup["prior_mean"],
-        gaussian_setup["prior_cov"],
-    )
-
-    tracker = SequentialConvergenceTracker(prior, x_o, num_samples=2000)
-    record = tracker.update(gt_posterior)
-
-    assert record["round"] == 0
-    assert record["increment"] is None
-    assert record["ratio"] is None
-    assert record["compression"] > 0
-    assert not record["uninformative"]
-
-
-def test_tracker_compression_matches_analytic(gaussian_setup: Dict):
-    """Feeding the true posterior should recover the exact prior-to-posterior KL."""
-    prior = gaussian_setup["prior"]
-    x_o = zeros(1, gaussian_setup["num_dim"])
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o,
-        gaussian_setup["likelihood_shift"],
-        gaussian_setup["likelihood_cov"],
-        gaussian_setup["prior_mean"],
-        gaussian_setup["prior_cov"],
-    )
-    exact = float(kl_divergence(gt_posterior, prior))
-
-    tracker = SequentialConvergenceTracker(prior, x_o, num_samples=20_000)
-    record = tracker.update(gt_posterior)
-
-    assert abs(record["compression"] - exact) < 5 * record["compression_sem"]
-
-
-def test_tracker_increment_is_zero_for_repeated_posterior(gaussian_setup: Dict):
-    """Passing the same posterior twice means the round changed nothing."""
-    prior = gaussian_setup["prior"]
-    x_o = zeros(1, gaussian_setup["num_dim"])
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o,
-        gaussian_setup["likelihood_shift"],
-        gaussian_setup["likelihood_cov"],
-        gaussian_setup["prior_mean"],
-        gaussian_setup["prior_cov"],
-    )
-
-    tracker = SequentialConvergenceTracker(prior, x_o, num_samples=5000)
-    tracker.update(gt_posterior)
-    record = tracker.update(gt_posterior)
-
-    assert record["increment"] == pytest.approx(0.0, abs=1e-5)
-    assert record["ratio"] == pytest.approx(0.0, abs=1e-5)
-    assert len(tracker.history) == 2
-
-
-def test_tracker_flags_uninformative_estimate(gaussian_setup: Dict):
-    """An estimate indistinguishable from the prior is flagged, not thresholded."""
-    prior = gaussian_setup["prior"]
-    x_o = zeros(1, gaussian_setup["num_dim"])
-
-    tracker = SequentialConvergenceTracker(prior, x_o, num_samples=5000)
-    first = tracker.update(prior)
-    second = tracker.update(prior)
-
-    assert first["uninformative"]
-    assert first["compression"] == pytest.approx(0.0, abs=1e-5)
-    # The ratio has a vanishing denominator here, so it must not be reported.
-    assert second["ratio"] != second["ratio"]  # NaN
-
-
-@pytest.mark.slow
-def test_tracker_tracks_true_error_across_rounds(gaussian_setup: Dict):
-    """On a multi-round NPE run the diagnostics should be finite and informative."""
-    prior = gaussian_setup["prior"]
-    simulator = gaussian_setup["simulator"]
-    num_dim = gaussian_setup["num_dim"]
-    x_o = zeros(1, num_dim)
-
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o,
-        gaussian_setup["likelihood_shift"],
-        gaussian_setup["likelihood_cov"],
-        gaussian_setup["prior_mean"],
-        gaussian_setup["prior_cov"],
-    )
-    exact_compression = float(kl_divergence(gt_posterior, prior))
-
-    inference = NPE_C(prior=prior, show_progress_bars=False)
-    tracker = SequentialConvergenceTracker(prior, x_o, num_samples=4000)
-    proposal = prior
-    true_errors = []
-
-    for _ in range(3):
-        theta = proposal.sample((1000,))
-        x = simulator(theta)
-        inference.append_simulations(theta, x, proposal=proposal).train(
-            show_train_summary=False
-        )
-        posterior = inference.build_posterior().set_default_x(x_o)
-
-        tracker.update(posterior)
-        true_errors.append(
-            float(
-                get_dkl_gaussian_prior(
-                    posterior,
-                    x_o[0],
-                    gaussian_setup["likelihood_shift"],
-                    gaussian_setup["likelihood_cov"],
-                    gaussian_setup["prior_mean"],
-                    gaussian_setup["prior_cov"],
-                    num_samples=200,
-                )
-            )
-        )
-        proposal = posterior
-
-    assert len(tracker.history) == 3
-    assert all(
-        record["increment"] is None or record["increment"] >= 0
-        for record in tracker.history
-    )
-    assert tracker.history[0]["increment"] is None
-    assert not any(record["uninformative"] for record in tracker.history)
-
-    # The estimated compression should be in the right ballpark throughout: the
-    # posterior is learned, so allow a generous margin around the exact value.
-    for compression in tracker.compressions:
-        assert abs(compression - exact_compression) < 0.5, (
-            f"compression {compression:.3f} far from exact {exact_compression:.3f}"
-        )
-
-    # The final estimate should be a decent posterior; if it is, the diagnostic
-    # should not be reporting a large remaining increment.
-    assert true_errors[-1] < 0.5
-    assert tracker.ratios[-1] < 0.25

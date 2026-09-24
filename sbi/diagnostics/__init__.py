@@ -7,10 +7,7 @@ from sbi.diagnostics.misspecification import (
     calc_misspecification_mmd,
 )
 from sbi.diagnostics.sbc import check_sbc, get_nltp, run_sbc
-from sbi.diagnostics.sequential_convergence import (
-    SequentialConvergenceTracker,
-    kl_divergence_mc,
-)
+from sbi.diagnostics.sequential_convergence import kl_divergence_mc
 from sbi.diagnostics.tarp import check_tarp, run_tarp
 
 __all__ = [
@@ -26,5 +23,4 @@ __all__ = [
     "calc_misspecification_logprob",
     "calc_misspecification_mmd",
     "kl_divergence_mc",
-    "SequentialConvergenceTracker",
 ]
