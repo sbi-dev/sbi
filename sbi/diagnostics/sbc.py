@@ -230,7 +230,11 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
     If calculated for many thetas (>100), NLTP can be used as a comparable measure
     of posterior accuracy when comparing inference methods or settings.
 
-    Note: This is interpretable only for normalized log probs, i.e., when using (S)NPE.
+    Note: This is interpretable only for normalized log probs, i.e., for NPE, FMPE
+    and NPSE.
+    With a bounded prior, `log_prob()` estimates a leakage correction for each `x`.
+    For vector field posteriors (FMPE, NPSE), this needs ODE sampling for each `x`
+    and can be slow.
 
     Args:
         thetas: Parameters (sampled from the prior) for which to calculate NLTP values.

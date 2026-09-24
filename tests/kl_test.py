@@ -7,7 +7,9 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal, Normal, kl_divergence
 
 from sbi.diagnostics import kl_divergence_mc
+from sbi.inference import VectorFieldPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.neural_nets.net_builders.vector_field_nets import build_vector_field_estimator
 from sbi.utils import BoxUniform
 
 from .test_utils import PosteriorPotential
@@ -68,3 +70,12 @@ def test_kl_divergence_mc_refuses_unnormalized_posterior(unnormalized_arg):
 
     with pytest.raises(NotImplementedError, match="c2st"):
         kl_divergence_mc(p, q, x=zeros(1, 2), num_samples=10)
+
+
+def test_kl_divergence_mc_refuses_vector_field_posterior_with_iid_x():
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((50,))
+    posterior = VectorFieldPosterior(build_vector_field_estimator(theta, theta), prior)
+
+    with pytest.raises(NotImplementedError, match="iid"):
+        kl_divergence_mc(posterior, prior, x=zeros(3, 2), p_samples=theta)
