@@ -26,7 +26,7 @@ from sbi.samplers.mcmc import (
     resample_given_potential_fn,
     sir_init,
 )
-from sbi.sbi_types import Shape, TorchTransform
+from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import (
@@ -47,7 +47,7 @@ class MCMCPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Union[Callable, BasePotential],
-        proposal: Any,
+        proposal: Proposal,
         theta_transform: Optional[TorchTransform] = None,
         method: Literal[
             "slice_np",
@@ -515,7 +515,7 @@ class MCMCPosterior(NeuralPosterior):
 
     def _build_mcmc_init_fn(
         self,
-        proposal: Any,
+        proposal: Proposal,
         potential_fn: Callable,
         transform: torch_tf.Transform,
         init_strategy: str,

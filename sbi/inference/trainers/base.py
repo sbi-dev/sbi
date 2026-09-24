@@ -1489,7 +1489,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         vars(self).update(state_dict)
 
 
-def check_if_proposal_has_default_x(proposal: Any):
+def check_if_proposal_has_default_x(
+    proposal: Union[Distribution, NeuralPosterior],
+) -> None:
     """Check for validity of the provided proposal distribution.
 
     If the proposal is a `NeuralPosterior`, we check if the default_x is set and

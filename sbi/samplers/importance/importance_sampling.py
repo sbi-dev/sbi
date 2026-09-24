@@ -8,12 +8,13 @@ from typing import Tuple
 import torch
 from torch import Tensor
 
+from sbi.sbi_types import Proposal
 from sbi.utils.pbar import nested_pbar_context
 
 
 def importance_sample(
     potential_fn,
-    proposal,
+    proposal: Proposal,
     num_samples: int = 1,
     show_progress_bars: bool = False,
 ) -> Tuple[Tensor, Tensor]:

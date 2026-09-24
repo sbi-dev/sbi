@@ -68,6 +68,14 @@ class CustomPrior(Protocol):
     def log_prob(self, value) -> Any: ...
 
 
+class Proposal(Protocol):
+    """Protocol for proposals used by the samplers, e.g., a prior or a posterior."""
+
+    def sample(self, sample_shape: torch.Size, /) -> Tensor: ...
+
+    def log_prob(self, value: Tensor, /) -> Tensor: ...
+
+
 class Tracker(Protocol):
     """Protocol for experiment tracking integrations."""
 
@@ -97,6 +105,7 @@ __all__ = [
     "CustomPrior",
     "Shape",
     "OneOrMore",
+    "Proposal",
     "SampleProposal",
     "ScalarFloat",
     "TensorBoardSummaryWriter",

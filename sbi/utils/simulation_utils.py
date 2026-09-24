@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -10,6 +10,7 @@ from numpy import ndarray
 from torch import Tensor, float32
 from tqdm.auto import tqdm
 
+from sbi.sbi_types import Proposal
 from sbi.utils.sbiutils import seed_all_backends
 
 
@@ -20,7 +21,7 @@ from sbi.utils.sbiutils import seed_all_backends
 # restructured in the future (PR #1188).
 def simulate_for_sbi(
     simulator: Callable,
-    proposal: Any,
+    proposal: Proposal,
     num_simulations: int,
     num_workers: int = 1,
     simulation_batch_size: Union[int, None] = 1,

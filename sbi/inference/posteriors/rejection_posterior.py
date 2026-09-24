@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from functools import partial
-from typing import Any, Optional, Union
+from typing import Optional, Union
 from warnings import warn
 
 import torch
@@ -11,7 +11,7 @@ from torch import Tensor
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
-from sbi.sbi_types import Shape, TorchTransform
+from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched, process_device
 
@@ -26,7 +26,7 @@ class RejectionPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Union[BasePotential, CustomPotential],
-        proposal: Any,
+        proposal: Proposal,
         theta_transform: Optional[TorchTransform] = None,
         max_sampling_batch_size: int = 10_000,
         num_samples_to_find_max: int = 10_000,
