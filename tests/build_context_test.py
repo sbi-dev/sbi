@@ -18,7 +18,7 @@ from sbi.neural_nets.build_context import (
     compute_z_score_stats,
 )
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
-from sbi.neural_nets.net_builders.estimator_configs import ConditionalFlowConfig
+from sbi.neural_nets.net_builders.estimator_configs import MarginalFlowConfig
 
 
 def test_zscore_config_defaults():
@@ -141,7 +141,7 @@ def test_compute_z_score_stats_matches_z_standardization():
 
 def test_estimator_builder_base_build_raises():
     """Subclasses that don't override build() raise NotImplementedError."""
-    cfg = ConditionalFlowConfig(hidden_features=64)
+    cfg = MarginalFlowConfig(hidden_features=64)
     theta = torch.randn(10, 5)
     x = torch.randn(10, 3)
     with pytest.raises(NotImplementedError, match="does not implement build"):
@@ -150,16 +150,14 @@ def test_estimator_builder_base_build_raises():
 
 def test_estimator_builder_base_from_kwargs():
     """The existing from_kwargs() + to_dict() contract is preserved."""
-    cfg = ConditionalFlowConfig(hidden_features=64)
+    cfg = MarginalFlowConfig(hidden_features=64)
     d = cfg.to_dict()
     assert d == {"hidden_features": 64}
 
 
 def test_estimator_builder_base_extra_warns():
     with pytest.warns(UserWarning, match="Unknown kwargs"):
-        cfg = ConditionalFlowConfig.from_kwargs(
-            hidden_features=64, some_zuko_param=True
-        )
+        cfg = MarginalFlowConfig.from_kwargs(hidden_features=64, some_zuko_param=True)
     d = cfg.to_dict()
     assert d == {"hidden_features": 64, "some_zuko_param": True}
 
