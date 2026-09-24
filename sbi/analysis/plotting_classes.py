@@ -74,6 +74,8 @@ class OffDiagOptions:
 class KdeOffDiagOptions(OffDiagOptions):
     bw_method: str = "scott"
     bins: int = 50
+    percentile: bool = False
+    levels: Optional[list] = None
 
     def __post_init__(self):
         mpl_kwargs_defaults = {"cmap": "viridis", "origin": "lower", "aspect": "auto"}
