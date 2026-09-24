@@ -927,6 +927,10 @@ class VIPosterior(NeuralPosterior):
                 break
         # Training finished:
         self._trained_on = x
+
+        # Bind potential_fn to the trained x so it can be used for sampling/evaluation
+        self.potential_fn = self.potential_fn.bind(x)
+
         if self._mode == "amortized":
             warnings.warn(
                 "Switching from amortized to single-x mode. "
@@ -1276,7 +1280,7 @@ class VIPosterior(NeuralPosterior):
         x_expanded = x_batch.repeat(n_particles, 1)
 
         # Set x_o for batched evaluation (x_is_iid=False: each θ paired with its x)
-        self.potential_fn.set_x(x_expanded, x_is_iid=False)
+        self.potential_fn = self.potential_fn.bind(x_expanded, x_is_iid=False)
         log_potential_flat = self.potential_fn(theta_flat)
 
         # Reshape: (n_particles * batch_size,) -> (n_particles, batch_size)

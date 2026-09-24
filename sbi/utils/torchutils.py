@@ -238,6 +238,55 @@ def infer_module_device(module: torch.nn.Module, fallback: str) -> str:
             return fallback
 
 
+def infer_tensor_device(obj: Any) -> Optional[str]:
+    """Return the device of the first tensor or module parameter reachable from `obj`.
+
+    Args:
+        obj: Root object of the graph to inspect.
+
+    Returns:
+        Device string, e.g. `"cpu"`, `"cuda:0"` or `"mps:0"`, or `None` if the graph
+        contains no tensor or module with parameters or buffers.
+    """
+
+    def _infer(current: Any, seen: set) -> Optional[str]:
+        if id(current) in seen:
+            return None
+        seen.add(id(current))
+
+        if isinstance(current, Module):
+            try:
+                return str(next(current.parameters()).device)
+            except StopIteration:
+                try:
+                    return str(next(current.buffers()).device)
+                except StopIteration:
+                    pass
+
+        if isinstance(current, Tensor):
+            return str(current.device)
+
+        if isinstance(current, dict):
+            for value in current.values():
+                device = _infer(value, seen)
+                if device is not None:
+                    return device
+        elif isinstance(current, (list, tuple)):
+            for value in current:
+                device = _infer(value, seen)
+                if device is not None:
+                    return device
+        elif hasattr(current, "__dict__"):
+            for value in vars(current).values():
+                device = _infer(value, seen)
+                if device is not None:
+                    return device
+
+        return None
+
+    return _infer(obj, set())
+
+
 def tile(x: Tensor, n: int) -> Tensor:
     """Tiles a tensor `x` by repeating it `n` times along a new leading dimension.
 
@@ -777,13 +826,14 @@ def _base_recursor(
         _active: Object identities on the active recursion path. Used internally
             to avoid infinite recursion in cyclic object graphs.
     """
-    if _active is None:
-        _active = set()
+    _active_holder: Optional[set[int]] = _active
+    if _active_holder is None:
+        _active_holder = set()
 
     obj_id = id(obj)
-    if obj_id in _active:
+    if obj_id in _active_holder:
         return
-    _active.add(obj_id)
+    _active_holder.add(obj_id)
 
     if isinstance(obj, Module) and check(obj):
         action(obj)
@@ -798,7 +848,7 @@ def _base_recursor(
                     key=k,
                     check=check,
                     action=action,
-                    _active=_active,
+                    _active=_active_holder,
                 )
     elif isinstance(obj, type):
         # Skip class/type objects to avoid modifying immutable C extension types
@@ -815,7 +865,7 @@ def _base_recursor(
                     key=k,
                     check=check,
                     action=action,
-                    _active=_active,
+                    _active=_active_holder,
                 )
     elif isinstance(obj, (List, Tuple, Generator)):
         new_obj = []
@@ -823,12 +873,12 @@ def _base_recursor(
             if check(o):
                 new_obj.append(action(o))
             else:
-                _base_recursor(o, check=check, action=action, _active=_active)
+                _base_recursor(o, check=check, action=action, _active=_active_holder)
                 new_obj.append(o)
         if parent is not None and key is not None:
             setattr(parent, key, type(obj)(new_obj))  # type: ignore
 
-    _active.remove(obj_id)
+    _active_holder.remove(obj_id)
 
 
 def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> None:

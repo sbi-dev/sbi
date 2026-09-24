@@ -11,7 +11,7 @@ Our advanced tutorials provide a detailed explanation of different methods. Thes
 tutorials are meant as further reading for power-users (or users who are particularly
 interested in a particular feature of ``sbi``), but they should not be required to
 successfully run ``sbi``. If you are looking for brief answers to specific questions,
-check our `how-to guide <https://sbi.readthedocs.io/en/latest/how_to_guide.html>`_.
+check our :doc:`how-to guide <how_to_guide>`.
 
 .. toctree::
    :maxdepth: 1

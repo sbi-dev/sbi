@@ -11,6 +11,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, mcmc_transform
 from sbi.utils.torchutils import atleast_2d
+from sbi.utils.user_input_checks import process_x
 
 
 def ratio_estimator_based_potential(
@@ -81,6 +82,22 @@ class RatioBasedPotential(BasePotential):
         super().to(device)
         self.ratio_estimator.to(device)
         return self
+
+    def bind(
+        self, x_o: Optional[Tensor], x_is_iid: bool = True
+    ) -> "RatioBasedPotential":
+        """Create new potential with x bound, without mutable state."""
+        bound = RatioBasedPotential(
+            ratio_estimator=self.ratio_estimator,
+            prior=self.prior,
+            x_o=None,
+            device=self.device,
+        )
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        return bound
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for likelihood-ratio-based methods.

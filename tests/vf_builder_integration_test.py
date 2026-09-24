@@ -16,7 +16,7 @@ from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     _FLOW_ONLY_FIELDS,
     _SCORE_ONLY_FIELDS,
-    DensityEstimatorBuilder,
+    MAFConfig,
     VectorFieldEstimatorBuilder,
 )
 
@@ -75,7 +75,7 @@ def test_legacy_kwarg_warns(trainer_cls, kwarg, match, gaussian_sims):
 def test_wrong_builder_type_raises(trainer_cls, gaussian_sims):
     prior, _, _ = gaussian_sims
     with pytest.raises(TypeError, match="VectorFieldEstimatorBuilder"):
-        trainer_cls(prior=prior, vf_estimator=DensityEstimatorBuilder(model="maf"))
+        trainer_cls(prior=prior, vf_estimator=MAFConfig())
 
 
 def test_builder_invalid_model():

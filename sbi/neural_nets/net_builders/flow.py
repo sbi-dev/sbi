@@ -74,8 +74,9 @@ def build_made(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_made",
-        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
-        "or one of 'none', 'independent', 'structured'.",
+        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
+        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
+        "'structured'.",
     )
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
@@ -159,8 +160,9 @@ def build_maf(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_maf",
-        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
-        "or one of 'none', 'independent', 'structured'.",
+        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
+        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
+        "'structured'.",
     )
     x_numel = get_numel(
         batch_x,
@@ -273,8 +275,9 @@ def build_maf_rqs(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_maf_rqs",
-        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
-        "or one of 'none', 'independent', 'structured'.",
+        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
+        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
+        "'structured'.",
     )
     x_numel = get_numel(
         batch_x,
@@ -382,8 +385,9 @@ def build_nsf(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_nsf",
-        "Use a `zuko_*` model (e.g. `zuko_maf`, `zuko_nsf`), which supports it, "
-        "or one of 'none', 'independent', 'structured'.",
+        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
+        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
+        "'structured'.",
     )
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
@@ -1177,7 +1181,7 @@ def build_tabpfn_flow(
     ] = "none",
     z_score_y: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    ] = "none",
     embedding_net: nn.Module = nn.Identity(),
     regressor_init_kwargs: Optional[dict] = None,
     max_context_size: int = 10_000,

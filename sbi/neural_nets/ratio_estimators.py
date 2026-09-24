@@ -57,7 +57,7 @@ class RatioEstimator(ConditionalEstimator):
         r"""This method checks whether x has the correct shape.
 
         Args:
-            x: Tensor of shape (*batch_shape, *x_shape).
+            x: Tensor of shape `(*batch_shape, *x_shape)`.
 
         Raises:
             ValueError: If the x has a dimensionality that does not match
@@ -71,7 +71,7 @@ class RatioEstimator(ConditionalEstimator):
         r"""This method checks whether theta has the correct shape.
 
         Args:
-            theta: Tensor of shape (*batch_shape, *theta_shape).
+            theta: Tensor of shape `(*batch_shape, *theta_shape)`.
 
         Raises:
             ValueError: If the theta has a dimensionality that does not match
@@ -87,8 +87,8 @@ class RatioEstimator(ConditionalEstimator):
         r"""This method checks whether theta and x agree on the prefix of their shape.
 
         Args:
-            theta: Tensor of shape (*batch_shape, *theta_shape).
-            x: Tensor of shape (*batch_shape, *x_shape).
+            theta: Tensor of shape `(*batch_shape, *theta_shape)`.
+            x: Tensor of shape `(*batch_shape, *x_shape)`.
 
         Raises:
             ValueError: If the `batch_shape`s do not agree.
@@ -106,12 +106,17 @@ class RatioEstimator(ConditionalEstimator):
     def combine_theta_and_x(self, theta: Tensor, x: Tensor) -> Tensor:
         """After embedding them, concatenate embedded_theta and embedded_x
 
+        `theta` and `x` must agree on their shape prefix. This method does not
+        broadcast; expand `x` yourself if it lacks a sample dimension.
+
         Args:
-            theta: parameters of shape (sample_dim, batch_dim, *theta_shape).
-            x: data of shape (batch_dim, *x_shape).
+            theta: parameters of shape `(*batch_shape, *theta_shape)`, for example
+                `(sample_dim, batch_dim, *theta_shape)`.
+            x: data of shape `(*batch_shape, *x_shape)`, with the same
+                `batch_shape` as `theta`.
 
         Returns:
-            combined: shape (sample_dim, batch_dim, combined_event_dim)
+            combined: shape `(*batch_shape, combined_event_dim)`
         """
         dim = -1
         self._check_theta_shape_suffix(theta)
@@ -127,12 +132,17 @@ class RatioEstimator(ConditionalEstimator):
         r"""Return the unnormalized log ratios of the thetas given an x, or multiple
         (batched) xs.
 
+        `theta` and `x` must agree on their shape prefix. This method does not
+        broadcast; expand `x` yourself if it lacks a sample dimension.
+
         Args:
-            theta: parameters of shape (sample_dim, batch_dim, *theta_shape).
-            x: data of shape (batch_dim, *x_shape).
+            theta: parameters of shape `(*batch_shape, *theta_shape)`, for example
+                `(sample_dim, batch_dim, *theta_shape)`.
+            x: data of shape `(*batch_shape, *x_shape)`, with the same
+                `batch_shape` as `theta`.
 
         Returns:
-            Sample-wise unnormalized log ratios with shape (sample_dim, batch_dim).
+            Sample-wise unnormalized log ratios with shape `(*batch_shape)`.
             Just like log_prob, the last dimension should be squeezed.
         """
 

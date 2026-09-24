@@ -262,7 +262,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 "guided sampling. Use a single observation, or disable "
                 "compose_standardization."
             )
-        self.potential_fn.set_x(
+        self.potential_fn = self.potential_fn.bind(
             x,
             x_is_iid=is_iid,
             iid_method=iid_method or self.potential_fn.iid_method,
@@ -496,7 +496,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 "log_prob. Use a single observation, or disable "
                 "compose_standardization."
             )
-        self.potential_fn.set_x(x, x_is_iid=is_iid, **(ode_kwargs or {}))
+        self.potential_fn = self.potential_fn.bind(
+            x, x_is_iid=is_iid, **(ode_kwargs or {})
+        )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -566,7 +568,7 @@ class VectorFieldPosterior(NeuralPosterior):
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()
-        self.potential_fn.set_x(x)
+        self.potential_fn = self.potential_fn.bind(x)
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -713,7 +715,9 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if self._map is None or force_update:
             # rebuild coarse flow fast for MAP optimization.
-            self.potential_fn.set_x(self.default_x, atol=1e-2, rtol=1e-3, exact=True)
+            self.potential_fn = self.potential_fn.bind(
+                self.default_x, atol=1e-2, rtol=1e-3, exact=True
+            )
             callable_potential_fn = CallableDifferentiablePotentialFunction(
                 self.potential_fn
             )

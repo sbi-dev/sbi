@@ -11,7 +11,7 @@ from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalEstimatorBuildFn,
 )
-from sbi.neural_nets.net_builders.estimator_configs import DensityEstimatorBuilder
+from sbi.neural_nets.net_builders.estimator_configs import DensityConfigBase
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
 
@@ -61,7 +61,7 @@ class NLE_A(LikelihoodEstimatorTrainer):
         prior: Optional[Distribution] = None,
         density_estimator: Union[
             Literal["nsf", "maf", "mdn", "made"],
-            DensityEstimatorBuilder,
+            DensityConfigBase,
             ConditionalEstimatorBuildFn[ConditionalDensityEstimator],
             None,
         ] = None,
@@ -79,10 +79,10 @@ class NLE_A(LikelihoodEstimatorTrainer):
                 prior must be passed to `.build_posterior()`.
             density_estimator: If it is a string (deprecated), use a pre-configured
                 network of the provided type (one of nsf, maf, mdn, made). If it is
-                a `DensityEstimatorBuilder`, the builder's `build()` method will be
+                a per-model config, its `build()` method will be
                 called with the first batch of simulations. Alternatively, a function
                 that builds a custom neural network can be provided. If None, it
-                uses a default `DensityEstimatorBuilder` with `"maf"`.
+                uses `MAFConfig()`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
