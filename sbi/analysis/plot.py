@@ -971,10 +971,12 @@ def _prepare_kwargs(
         if plot_kwargs_i is not None and plot_kwarg_filled_i:
             unknown_keys = set(plot_kwargs_i.keys()) - set(plot_kwarg_filled_i.keys())
             if unknown_keys:
-                raise ValueError(
-                    "Unknown keys in plot kwargs: "
-                    f"{sorted(unknown_keys)}. "
-                    f"Valid keys are: {sorted(plot_kwarg_filled_i.keys())}."
+                warn(
+                    f"Ignoring unknown keys in plot kwargs: {sorted(unknown_keys)}. "
+                    f"Valid keys are: {sorted(plot_kwarg_filled_i.keys())}. "
+                    "Pass matplotlib keywords inside `mpl_kwargs`.",
+                    UserWarning,
+                    stacklevel=3,
                 )
         plot_kwarg_filled_i = update(plot_kwarg_filled_i, plot_kwargs_i)
         plot_kwargs_filled.append(plot_kwarg_filled_i)

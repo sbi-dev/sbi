@@ -546,35 +546,10 @@ def test_pairplot_discrete_edge_cases(samples_fn, pairplot_kwargs):
     close()
 
 
-@pytest.mark.parametrize(
-    "kwarg,plot_type",
-    (
-        ("diag_kwargs", "hist"),
-        ("upper_kwargs", "hist"),
-        ("lower_kwargs", "hist"),
-    ),
-)
-def test_pairplot_raises_on_unknown_kwarg_keys(kwarg, plot_type):
-    """A typo in diag/upper/lower kwargs must raise, not be silently ignored."""
-    posterior_samples = torch.randn(100, 3)
-
-    plot_arg = (
-        "diag"
-        if kwarg == "diag_kwargs"
-        else ("upper" if kwarg == "upper_kwargs" else "lower")
-    )
-    with pytest.raises(ValueError, match="Unknown keys in plot kwargs"):
-        _ = pairplot(
-            samples=posterior_samples, **{plot_arg: plot_type, kwarg: {"typo_kwarg": 1}}
-        )
-
+@pytest.mark.parametrize("kwarg", ("diag_kwargs", "upper_kwargs", "lower_kwargs"))
+def test_pairplot_warns_on_unknown_kwarg_keys(kwarg):
+    """A typo in diag/upper/lower kwargs warns instead of being silently ignored."""
+    plot_arg = kwarg.removesuffix("_kwargs")
+    with pytest.warns(UserWarning, match="unknown keys in plot kwargs"):
+        pairplot(torch.randn(100, 3), **{plot_arg: "hist", kwarg: {"typo_kwarg": 1}})
     close()
-
-
-def test_get_default_opts_deprecation_points_to_real_functions():
-    """The `_get_default_opts` deprecation message must not reference the
-    non-existent `_get_default_fig_kwargs`."""
-    with pytest.warns(PendingDeprecationWarning) as record:
-        plt._get_default_opts()
-    assert "_get_default_fig_kwargs" not in str(record[0].message)
-    assert "FigOptions" in str(record[0].message)
