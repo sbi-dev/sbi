@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import get_args
 
 import numpy as np
@@ -552,4 +553,16 @@ def test_pairplot_warns_on_unknown_kwarg_keys(kwarg):
     plot_arg = kwarg.removesuffix("_kwargs")
     with pytest.warns(UserWarning, match="unknown keys in plot kwargs"):
         pairplot(torch.randn(100, 3), **{plot_arg: "hist", kwarg: {"typo_kwarg": 1}})
+    close()
+
+
+def test_pairplot_kde_percentile_levels_are_known_keys():
+    """`percentile` and `levels` are KDE options, not unknown keys."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings("error", message=".*unknown keys in plot kwargs")
+        pairplot(
+            torch.randn(100, 2),
+            upper="kde",
+            upper_kwargs=dict(percentile=True, levels=[0.68, 0.95]),
+        )
     close()

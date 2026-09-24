@@ -528,7 +528,7 @@ def get_kde(
     )
     positions = np.vstack([X.ravel(), Y.ravel()])
     Z = np.reshape(density(positions).T, X.shape)
-    if "percentile" in offdiag_kwargs and "levels" in offdiag_kwargs:
+    if offdiag_kwargs.get("percentile") and offdiag_kwargs.get("levels") is not None:
         Z = probs2contours(Z, offdiag_kwargs["levels"])
     else:
         Z = (Z - Z.min()) / (Z.max() - Z.min())
