@@ -50,6 +50,13 @@ def test_kl_divergence_mc_raises_outside_support():
         kl_divergence_mc(p, q, num_samples=500)
 
 
+def test_kl_divergence_mc_refuses_batched_distribution():
+    p = Normal(ones(2), 0.5 * ones(2))  # batch_shape (2,), not one joint distribution
+
+    with pytest.raises(ValueError, match="Independent"):
+        kl_divergence_mc(p, Normal(zeros(2), ones(2)), num_samples=100)
+
+
 @pytest.mark.parametrize("unnormalized_arg", ("p", "q"))
 def test_kl_divergence_mc_refuses_unnormalized_posterior(unnormalized_arg):
     prior = MultivariateNormal(zeros(2), eye(2))
