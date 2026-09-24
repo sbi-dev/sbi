@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from sbi.diagnostics.kl import kl_divergence_mc
 from sbi.diagnostics.lc2st import LC2ST, LC2ST_NF, LC2STScores, LC2STState
 from sbi.diagnostics.misspecification import (
     calc_misspecification_logprob,
@@ -21,4 +22,5 @@ __all__ = [
     "LC2STState",
     "calc_misspecification_logprob",
     "calc_misspecification_mmd",
+    "kl_divergence_mc",
 ]
