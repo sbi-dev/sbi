@@ -47,8 +47,7 @@ def sir_init(
     See Rubin 1988, "Using the sir algorithm to simulate posterior distributions."
 
     Args:
-        proposal: Proposal distribution, candidate samples are drawn from it. Must
-            follow the `Proposal` protocol.
+        proposal: Proposal distribution, candidate samples are drawn from it.
         potential_fn: Potential function that the candidate samples are weighted with.
             Note that the function needs to return log probabilities.
         num_candidate_samples: Number of candidate samples per batch.
@@ -83,8 +82,7 @@ def resample_given_potential_fn(
     is SIR (i.e., with correction).
 
     Args:
-        proposal: Proposal distribution, candidate samples are drawn from it. Must
-            follow the `Proposal` protocol.
+        proposal: Proposal distribution, candidate samples are drawn from it.
         potential_fn: Potential function that the candidate samples are weighted with.
             Note that the function needs to return log probabilities.
         num_batches: Number of batches drawn.

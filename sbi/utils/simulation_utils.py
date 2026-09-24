@@ -43,7 +43,7 @@ def simulate_for_sbi(
             arrays for efficient parallelization. You can use
             `process_simulator` to ensure this.
         proposal: Probability distribution that the parameters $\theta$ are sampled
-            from. Must follow the `Proposal` protocol.
+            from.
         num_simulations: Number of simulations that are run.
         num_workers: Number of parallel workers to use for simulations.
         simulation_batch_size: Number of parameter sets of shape

@@ -74,7 +74,6 @@ class MCMCPosterior(NeuralPosterior):
             potential_fn: The potential function from which to draw samples. Must be a
                 `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
             proposal: Proposal distribution that is used to initialize the MCMC chain.
-                Must follow the `Proposal` protocol (`sample()` and `log_prob()`).
             theta_transform: Transformation that will be applied during sampling.
                 Allows to perform MCMC in unconstrained space.
             method: Method used for MCMC sampling, one of `slice_np`,
@@ -525,7 +524,7 @@ class MCMCPosterior(NeuralPosterior):
         """Return function that, when called, creates an initial parameter set for MCMC.
 
         Args:
-            proposal: Proposal distribution, must follow the `Proposal` protocol.
+            proposal: Proposal distribution.
             potential_fn: Potential function that the candidate samples are weighted
                 with.
             init_strategy: Specifies the initialization method. Either of

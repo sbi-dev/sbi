@@ -69,13 +69,7 @@ class CustomPrior(Protocol):
 
 
 class Proposal(Protocol):
-    """Protocol for objects that can be drawn from and scored.
-
-    A proposal provides `sample()` and `log_prob()`, which is all that the
-    samplers and posteriors need from it. Both `torch.distributions.Distribution`
-    and `NeuralPosterior` satisfy this protocol, as do the custom priors wrapped
-    by `process_prior`.
-    """
+    """Protocol for proposals used by the samplers, e.g., a prior or a posterior."""
 
     def sample(self, sample_shape: torch.Size, /) -> Tensor: ...
 

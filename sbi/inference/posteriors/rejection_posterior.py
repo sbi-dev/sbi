@@ -39,8 +39,7 @@ class RejectionPosterior(NeuralPosterior):
         Args:
             potential_fn: The potential function from which to draw samples. Must be a
                 `BasePotential` or a `CustomPotential`.
-            proposal: The proposal distribution. Must follow the `Proposal` protocol
-                (`sample()` and `log_prob()`).
+            proposal: The proposal distribution.
             theta_transform: Transformation that is applied to parameters. Is not used
                 during but only when calling `.map()`.
             max_sampling_batch_size: The batchsize of samples being drawn from
