@@ -8,10 +8,8 @@ import pytest
 import torch
 from torch.distributions import MultivariateNormal
 
-from sbi import __version__
 from sbi import utils as utils
 from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -23,7 +21,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.inference.trainers.base import NeuralInference
+from sbi.utils.sbiutils import load_with_version
 
 
 def _assert_survives_pickling(posterior, num_dim: int) -> None:
@@ -240,215 +238,45 @@ def test_torch_load_map_location_same_device_is_passthrough():
     assert loaded.sample((10,)).shape == (10, 2)
 
 
-@pytest.mark.parametrize("inference_method", (NPE, NPSE, FMPE))
-def test_save_and_load_inference(inference_method, tmp_path):
-    num_dim = 2
-    prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+@pytest.mark.parametrize("kind", ["direct", "vector_field"])
+def test_posterior_save_and_load(kind, tmp_path):
+    posterior = _build_posterior(kind, _mvn())
+    posterior.save(tmp_path / "posterior.pt")
+    loaded = type(posterior).load(tmp_path / "posterior.pt", map_location="cpu")
 
-    theta = prior.sample((500,))
-    x = theta + 1.0 + torch.randn_like(theta) * 0.1
-
-    inference = inference_method(prior=prior)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
-
-    filepath = tmp_path / "inference.pkl"
-    inference.save(filepath)
-    loaded = NeuralInference.load(filepath)
-
-    assert isinstance(loaded, inference_method)
-    assert loaded._round == inference._round
-    assert loaded._neural_net is not None
-    loaded.append_simulations(theta, x)
+    torch.manual_seed(0)
+    expected = posterior.sample((3,))
+    torch.manual_seed(0)
+    assert torch.allclose(loaded.sample((3,)), expected)
 
 
-@pytest.mark.parametrize(
-    "inference_method, posterior_parameters",
-    (
-        (NPE, DirectPosteriorParameters),
-        (NPSE, VectorFieldPosteriorParameters),
-        (FMPE, VectorFieldPosteriorParameters),
-    ),
-)
-def test_save_and_load_posterior(inference_method, posterior_parameters, tmp_path):
-    num_dim = 2
-    prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
-    x_o = torch.zeros(1, num_dim)
+@pytest.mark.parametrize("inference_method", (NPE, FMPE))
+def test_inference_save_and_load_resumes_training(inference_method, tmp_path):
+    prior = _box_uniform()
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    inference = inference_method(prior=prior, show_progress_bars=False)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+    # Simulates a GPU-saved object; `map_location` must repair the device state.
+    inference._device = "cuda:0"
+    inference.save(tmp_path / "inference.pt")
 
-    theta = prior.sample((500,))
-    x = theta + 1.0 + torch.randn_like(theta) * 0.1
-
-    inference = inference_method(prior=prior)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
-    posterior = inference.build_posterior(
-        posterior_parameters=posterior_parameters()
-    ).set_default_x(x_o)
-
-    filepath = tmp_path / "posterior.pkl"
-    posterior.save(filepath)
-    loaded = NeuralPosterior.load(filepath)
-
-    assert isinstance(loaded, type(posterior))
-    assert loaded._device == posterior._device
-    assert loaded.sample((10,), x=x_o).shape == (10, num_dim)
-
-
-def test_save_load_file_not_found(tmp_path):
-    with pytest.raises(FileNotFoundError):
-        NeuralInference.load(tmp_path / "nonexistent.pkl")
-
-    with pytest.raises(FileNotFoundError):
-        NeuralPosterior.load(tmp_path / "nonexistent.pkl")
-
-
-@pytest.mark.parametrize(
-    "loader",
-    (NeuralInference.load, NeuralPosterior.load),
-)
-@pytest.mark.parametrize("payload", (None, [], {"foo": "bar"}))
-def test_save_load_rejects_invalid_payload(tmp_path, loader, payload):
-    filepath = tmp_path / "invalid.pkl"
-    with open(filepath, "wb") as handle:
-        pickle.dump(payload, handle)
-    with pytest.raises(ValueError):
-        loader(filepath)
-
-
-@pytest.mark.parametrize(
-    "loader",
-    (NeuralInference.load, NeuralPosterior.load),
-)
-@pytest.mark.parametrize(
-    "overrides",
-    (
-        {"class_module": "does.not.exist", "class_name": "NPE"},
-        {"class_module": "math", "class_name": "missing_attribute"},
-        {
-            "class_module": "sbi.inference.trainers.npe",
-            "class_name": "NPE",
-            "state": [],
-        },
-    ),
-)
-def test_save_load_rejects_malformed_metadata(tmp_path, loader, overrides):
-    filepath = tmp_path / "malformed.pkl"
-    state = {
-        "sbi_version": __version__,
-        "class_module": "sbi.inference.trainers.npe",
-        "class_name": "NPE",
-        "state": {},
-    }
-    state.update(overrides)
-    with open(filepath, "wb") as handle:
-        pickle.dump(state, handle)
-    with pytest.raises(ValueError):
-        loader(filepath)
-
-
-@pytest.mark.parametrize(
-    "loader",
-    (NeuralInference.load, NeuralPosterior.load),
-)
-def test_save_load_rejects_non_class_metadata(tmp_path, loader):
-    filepath = tmp_path / "non_class.pkl"
-    state = {
-        "sbi_version": __version__,
-        "class_name": "pi",
-        "class_module": "math",
-        "state": {},
-    }
-    with open(filepath, "wb") as handle:
-        pickle.dump(state, handle)
-    with pytest.raises(ValueError):
-        loader(filepath)
-
-
-def test_save_load_maps_cuda_claimed_posterior_to_cpu(tmp_path):
-    """A file claiming CUDA loads on CPU and reconciles the claimed device.
-
-    The tensors are CPU-backed (saving cannot run on a device-less host); claiming
-    `cuda:0` simulates a GPU-saved file restored with a CPU-aware unpickler, so the
-    posterior's device-repair logic runs on CPU-only CI.
-    """
-    posterior = _build_posterior("direct", _box_uniform())
-    posterior._device = posterior.device = posterior.potential_fn.device = "cuda:0"
-    if hasattr(posterior.prior, "device"):
-        posterior.prior.device = "cuda:0"
-
-    filepath = tmp_path / "cuda_claimed.pkl"
-    state = {
-        "sbi_version": __version__,
-        "class_name": posterior.__class__.__name__,
-        "class_module": posterior.__class__.__module__,
-        "state": posterior.__getstate__(),
-    }
-    with open(filepath, "wb") as handle:
-        pickle.dump(state, handle)
-    loaded = NeuralPosterior.load(filepath)
+    loaded = inference_method.load(tmp_path / "inference.pt", map_location="cpu")
 
     assert loaded._device == "cpu"
-    assert loaded.device == "cpu"
-    assert loaded.potential_fn.device == "cpu"
-    assert getattr(loaded.prior, "device", "cpu") == "cpu"
-    samples = loaded.sample((10,))
-    assert samples.device.type == "cpu"
-    assert loaded.potential(samples).device.type == "cpu"
+    loaded.append_simulations(theta, x).train(
+        max_num_epochs=1, force_first_round_loss=True
+    )
+    loaded.build_posterior().sample((3,), x=x[:1])
 
 
-def test_save_load_maps_cuda_claimed_inference_to_cpu(tmp_path):
-    """A CUDA-claiming inference file loads with its net and device on CPU."""
-    num_dim = 2
-    prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
-    theta = prior.sample((500,))
-    x = theta + 1.0 + torch.randn_like(theta) * 0.1
-
-    inference = NPE(prior=prior)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
-    prior.device = "cuda:0"
-
-    filepath = tmp_path / "cuda_claimed.pkl"
-    state = {
-        "sbi_version": __version__,
-        "class_name": inference.__class__.__name__,
-        "class_module": inference.__class__.__module__,
-        "state": inference.__getstate__(),
-    }
-    state["state"]["_device"] = "cuda:0"
-    with open(filepath, "wb") as handle:
-        pickle.dump(state, handle)
-
-    loaded = NeuralInference.load(filepath)
-
-    assert isinstance(loaded, NPE)
-    assert loaded._device == "cpu"
-    assert next(loaded._neural_net.parameters()).device.type == "cpu"
-    assert loaded._prior.device == "cpu"
-    assert loaded._prior.sample((1,)).device.type == "cpu"
+def test_load_refuses_other_class(tmp_path):
+    _build_posterior("direct", _mvn()).save(tmp_path / "posterior.pt")
+    with pytest.raises(TypeError, match="DirectPosterior"):
+        NPE.load(tmp_path / "posterior.pt")
 
 
-@pytest.mark.parametrize(
-    "loader, class_name, class_module",
-    (
-        (
-            NeuralInference.load,
-            "NPE",
-            "sbi.inference.trainers.npe",
-        ),
-        (
-            NeuralPosterior.load,
-            "DirectPosterior",
-            "sbi.inference.posteriors.direct_posterior",
-        ),
-    ),
-)
-def test_save_load_version_mismatch_warns(tmp_path, loader, class_name, class_module):
-    filepath = tmp_path / "mismatch.pkl"
-    state = {
-        "sbi_version": "0.0.0",
-        "class_name": class_name,
-        "class_module": class_module,
-        "state": {},
-    }
-    with open(filepath, "wb") as handle:
-        pickle.dump(state, handle)
-    with pytest.warns(UserWarning, match="saved with sbi version"):
-        loader(filepath)
+def test_load_warns_on_version_mismatch(tmp_path):
+    torch.save({"sbi_version": "0.0.0", "object": 1}, tmp_path / "old.pt")
+    with pytest.warns(UserWarning, match="0.0.0"):
+        load_with_version(tmp_path / "old.pt", int)

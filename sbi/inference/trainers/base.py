@@ -1,10 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import importlib
 import os
-import pickle
-import tempfile
 import time
 import warnings
 from abc import ABC, abstractmethod
@@ -39,8 +36,6 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
-
-from sbi import __version__
 
 if TYPE_CHECKING:
     from sbi.neural_nets.net_builders.estimator_configs import (
@@ -84,9 +79,10 @@ from sbi.utils import (
     warn_if_invalid_for_zscoring,
 )
 from sbi.utils.sbiutils import (
-    CPU_Unpickler,
     ImproperEmpirical,
     get_simulations_since_round,
+    load_with_version,
+    save_with_version,
 )
 from sbi.utils.simulation_utils import simulate_for_sbi
 from sbi.utils.torchutils import (
@@ -1419,141 +1415,41 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
 
     def save(self, filename: Union[str, Path]) -> None:
-        """Save the inference object to a file.
-
-        This saves the full state of the inference object including trained neural
-        network weights, optimizer state, and all training metadata. The saved file
-        can be loaded with ``NeuralInference.load()`` or the class-specific ``load``
-        class method (e.g. ``NPE.load()``).
+        """Save the inference object to a file. Load it with `load()`.
 
         Args:
-            filename: Path to the file where the inference object will be saved.
-
-        Example:
-            >>> inference = NPE(prior=prior)
-            >>> inference.append_simulations(theta, x).train()
-            >>> inference.save("my_npe.pkl")
+            filename: Path to the file.
         """
-        filepath = Path(filename)
-        filepath.parent.mkdir(parents=True, exist_ok=True)
-
-        state = {
-            "sbi_version": __version__,
-            "class_name": self.__class__.__name__,
-            "class_module": self.__class__.__module__,
-            "state": self.__getstate__(),
-        }
-        fd, temp_path = tempfile.mkstemp(dir=filepath.parent, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "wb") as handle:
-                pickle.dump(state, handle)
-            os.replace(temp_path, filepath)
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+        save_with_version(self, filename)
 
     @classmethod
-    def load(cls, filename: Union[str, Path]) -> "NeuralInference":
-        """Load a saved inference object from a file.
+    def load(
+        cls,
+        filename: Union[str, Path],
+        map_location: Optional[Union[str, torch.device]] = None,
+    ) -> Self:
+        """Load an inference object saved with `save()`.
 
-        This method loads an inference object that was previously saved with
-        ``save()``. The loaded object retains trained network weights, optimizer
-        state, and training metadata.
-
-        Note:
-            The file is loaded with ``pickle``, which can execute arbitrary code.
-            Only load files from trusted sources.
+        The file is unpickled, which can execute arbitrary code. Only load trusted
+        files.
 
         Args:
-            filename: Path to the file to load.
+            filename: Path to the file.
+            map_location: Device to load the inference object on, e.g. `"cpu"` for
+                an object saved on a GPU. By default, the device it was saved on.
 
         Returns:
             The loaded inference object.
-
-        Raises:
-            FileNotFoundError: If the file does not exist.
-            ValueError: If the file was not created with ``save()``.
-
-        Example:
-            >>> inference = NPE.load("my_npe.pkl")
-            >>> posterior = inference.build_posterior()
         """
-        filepath = Path(filename)
-        if not filepath.exists():
-            raise FileNotFoundError(f"File not found: {filepath}")
-
-        with open(filepath, "rb") as handle:
-            state = CPU_Unpickler(handle).load()  # noqa: S301
-
-        if not isinstance(state, dict) or not all(
-            key in state
-            for key in ("sbi_version", "class_module", "class_name", "state")
-        ):
-            raise ValueError(
-                f"The file {filepath} was not created with "
-                "`NeuralInference.save()`. Use `pickle.load()` directly instead."
-            )
-
-        class_module = state["class_module"]
-        class_name = state["class_name"]
-        restored_state = state["state"]
-        if (
-            not isinstance(class_module, str)
-            or not class_module
-            or not isinstance(class_name, str)
-            or not class_name
-        ):
-            raise ValueError(
-                f"The file {filepath} contains invalid class metadata in "
-                f"`class_module` (`{class_module!r}`) or `class_name` "
-                f"(`{class_name!r}`)."
-            )
-        if not isinstance(restored_state, dict):
-            raise ValueError(
-                f"The file {filepath} contains an invalid `state` of type "
-                f"`{type(restored_state).__name__}`; expected a `dict`."
-            )
-
-        sbi_version = state["sbi_version"]
-        if sbi_version != __version__:
-            warn(
-                f"The file was saved with sbi version {sbi_version} but the "
-                f"current version is {__version__}. This may cause compatibility "
-                "issues.",
-                UserWarning,
-                stacklevel=2,
-            )
-
-        try:
-            loaded_class = getattr(importlib.import_module(class_module), class_name)
-        except (ImportError, AttributeError, TypeError) as error:
-            raise ValueError(
-                f"The file {filepath} references `{class_name}` in `{class_module}` "
-                "which cannot be resolved."
-            ) from error
-        if not isinstance(loaded_class, type) or not issubclass(loaded_class, cls):
-            raise ValueError(
-                f"The file {filepath} was saved by a {class_name} in "
-                f"{class_module} but was loaded with {cls.__name__}."
-            )
-        loaded = loaded_class.__new__(loaded_class)
-        try:
-            loaded.__setstate__(restored_state)
-        except (AttributeError, TypeError, ValueError, KeyError, ImportError) as error:
-            raise ValueError(
-                f"The file {filepath} contains a `state` that cannot restore a "
-                f"{cls.__name__}: {error}"
-            ) from error
-
-        neural_net = getattr(loaded, "_neural_net", None)
-        if neural_net is not None:
-            loaded._device = infer_module_device(neural_net, "cpu")
-
-        prior = getattr(loaded, "_prior", None)
-        if prior is not None:
-            loaded._prior = move_distribution_to_device(prior, loaded._device)
-
-        return loaded
+        inference = load_with_version(filename, cls, map_location)
+        # `map_location` moves the tensors, but not the device string and the prior.
+        if map_location is not None:
+            inference._device = str(torch.device(map_location))
+            if inference._prior is not None:
+                inference._prior = move_distribution_to_device(
+                    inference._prior, inference._device
+                )
+        return inference
 
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.

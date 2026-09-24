@@ -1,10 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import importlib
-import os
-import pickle
-import tempfile
 from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -14,15 +10,15 @@ import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
 from torch.distributions import Distribution
+from typing_extensions import Self
 
-from sbi import __version__
 from sbi.inference.potentials.base_potential import (
     BasePotential,
     CustomPotential,
     CustomPotentialWrapper,
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
-from sbi.utils.sbiutils import CPU_Unpickler, gradient_ascent
+from sbi.utils.sbiutils import gradient_ascent, load_with_version, save_with_version
 from sbi.utils.torchutils import (
     assert_all_finite,
     canonical_device,
@@ -347,129 +343,33 @@ class NeuralPosterior:
         return desc
 
     def save(self, filename: Union[str, Path]) -> None:
-        """Save the posterior to a file.
-
-        This saves the full state of the posterior including the trained network,
-        prior, and transforms. The saved file can be loaded with
-        ``NeuralPosterior.load()``.
+        """Save the posterior to a file. Load it with `load()`.
 
         Args:
-            filename: Path to the file where the posterior will be saved.
-
-        Example:
-            >>> posterior = inference.build_posterior()
-            >>> posterior.save("my_posterior.pkl")
+            filename: Path to the file.
         """
-        filepath = Path(filename)
-        filepath.parent.mkdir(parents=True, exist_ok=True)
-
-        state = {
-            "sbi_version": __version__,
-            "class_name": self.__class__.__name__,
-            "class_module": self.__class__.__module__,
-            "state": self.__getstate__(),
-        }
-        fd, temp_path = tempfile.mkstemp(dir=filepath.parent, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "wb") as handle:
-                pickle.dump(state, handle)
-            os.replace(temp_path, filepath)
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+        save_with_version(self, filename)
 
     @classmethod
-    def load(cls, filename: Union[str, Path]) -> "NeuralPosterior":
-        """Load a saved posterior from a file.
+    def load(
+        cls,
+        filename: Union[str, Path],
+        map_location: Optional[Union[str, torch.device]] = None,
+    ) -> Self:
+        """Load a posterior saved with `save()`.
 
-        This method loads a posterior that was previously saved with ``save()``.
-
-        Note:
-            The file is loaded with ``pickle``, which can execute arbitrary code.
-            Only load files from trusted sources.
+        The file is unpickled, which can execute arbitrary code. Only load trusted
+        files.
 
         Args:
-            filename: Path to the file to load.
+            filename: Path to the file.
+            map_location: Device to load the posterior on, e.g. `"cpu"` for a
+                posterior saved on a GPU. By default, the device it was saved on.
 
         Returns:
-            The loaded posterior object.
-
-        Raises:
-            FileNotFoundError: If the file does not exist.
-            ValueError: If the file was not created with ``save()``.
-
-        Example:
-            >>> posterior = NeuralPosterior.load("my_posterior.pkl")
-            >>> samples = posterior.sample((1000,), x=x_o)
+            The loaded posterior.
         """
-        filepath = Path(filename)
-        if not filepath.exists():
-            raise FileNotFoundError(f"File not found: {filepath}")
-
-        with open(filepath, "rb") as handle:
-            state = CPU_Unpickler(handle).load()  # noqa: S301
-
-        if not isinstance(state, dict) or not all(
-            key in state
-            for key in ("sbi_version", "class_module", "class_name", "state")
-        ):
-            raise ValueError(
-                f"The file {filepath} was not created with "
-                "`NeuralPosterior.save()`. Use `pickle.load()` directly instead."
-            )
-
-        class_module = state["class_module"]
-        class_name = state["class_name"]
-        restored_state = state["state"]
-        if (
-            not isinstance(class_module, str)
-            or not class_module
-            or not isinstance(class_name, str)
-            or not class_name
-        ):
-            raise ValueError(
-                f"The file {filepath} contains invalid class metadata in "
-                f"`class_module` (`{class_module!r}`) or `class_name` "
-                f"(`{class_name!r}`)."
-            )
-        if not isinstance(restored_state, dict):
-            raise ValueError(
-                f"The file {filepath} contains an invalid `state` of type "
-                f"`{type(restored_state).__name__}`; expected a `dict`."
-            )
-
-        sbi_version = state["sbi_version"]
-        if sbi_version != __version__:
-            warn(
-                f"The file was saved with sbi version {sbi_version} but the "
-                f"current version is {__version__}. This may cause compatibility "
-                "issues.",
-                UserWarning,
-                stacklevel=2,
-            )
-
-        try:
-            loaded_class = getattr(importlib.import_module(class_module), class_name)
-        except (ImportError, AttributeError, TypeError) as error:
-            raise ValueError(
-                f"The file {filepath} references `{class_name}` in `{class_module}` "
-                "which cannot be resolved."
-            ) from error
-        if not isinstance(loaded_class, type) or not issubclass(loaded_class, cls):
-            raise ValueError(
-                f"The file {filepath} was saved by a {class_name} in "
-                f"{class_module} but was loaded with {cls.__name__}."
-            )
-        loaded = loaded_class.__new__(loaded_class)
-        try:
-            loaded.__setstate__(restored_state)
-        except (AttributeError, TypeError, ValueError, KeyError, ImportError) as error:
-            raise ValueError(
-                f"The file {filepath} contains a `state` that cannot restore a "
-                f"{cls.__name__}: {error}"
-            ) from error
-
-        return loaded
+        return load_with_version(filename, cls, map_location)
 
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.
