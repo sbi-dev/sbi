@@ -5,6 +5,7 @@ import logging
 import random
 import warnings
 from math import pi
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -14,6 +15,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
 )
 
@@ -33,7 +35,55 @@ from torch.distributions import (
 )
 from torch.optim.adam import Adam
 
+from sbi import __version__
 from sbi.sbi_types import TorchTransform
+
+_T = TypeVar("_T")
+
+
+def save_with_version(obj: Any, filename: Union[str, Path]) -> None:
+    """Save an object with `torch.save()`, tagged with the current sbi version."""
+    torch.save({"sbi_version": __version__, "object": obj}, filename)
+
+
+def load_with_version(
+    filename: Union[str, Path],
+    expected_type: Type[_T],
+    map_location: Optional[Union[str, torch.device]] = None,
+) -> _T:
+    """Load an object saved with `save_with_version()`.
+
+    The file is unpickled, which can execute arbitrary code. Only load trusted files.
+
+    Args:
+        filename: Path to the file.
+        expected_type: Class that the loaded object must be an instance of.
+        map_location: Device to load the tensors on, see `torch.load()`.
+
+    Returns:
+        The loaded object.
+
+    Raises:
+        TypeError: If the file was not saved with `save()` or the loaded object is
+            not an instance of `expected_type`.
+    """
+    payload = torch.load(filename, map_location=map_location, weights_only=False)
+    if not isinstance(payload, dict) or payload.keys() != {"sbi_version", "object"}:
+        raise TypeError(f"{filename} was not saved with `save()`.")
+    if payload["sbi_version"] != __version__:
+        warnings.warn(
+            f"{filename} was saved with sbi {payload['sbi_version']}, but the "
+            f"installed version is {__version__}. Loading can fail or give a "
+            "different behavior.",
+            stacklevel=3,
+        )
+    obj = payload["object"]
+    if not isinstance(obj, expected_type):
+        raise TypeError(
+            f"{filename} contains a `{type(obj).__name__}`, not a "
+            f"`{expected_type.__name__}`."
+        )
+    return obj
 
 
 def warn_if_invalid_for_zscoring(

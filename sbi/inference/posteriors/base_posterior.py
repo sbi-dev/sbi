@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import abstractmethod
+from pathlib import Path
 from typing import Any, Dict, Optional, Union
 from warnings import warn
 
@@ -9,6 +10,7 @@ import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
 from torch.distributions import Distribution
+from typing_extensions import Self
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,
@@ -16,7 +18,7 @@ from sbi.inference.potentials.base_potential import (
     CustomPotentialWrapper,
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
-from sbi.utils.sbiutils import gradient_ascent
+from sbi.utils.sbiutils import gradient_ascent, load_with_version, save_with_version
 from sbi.utils.torchutils import (
     assert_all_finite,
     canonical_device,
@@ -339,6 +341,35 @@ class NeuralPosterior:
     def __str__(self):
         desc = f"Posterior p(θ|x) of type {self.__class__.__name__}. {self._purpose}"
         return desc
+
+    def save(self, filename: Union[str, Path]) -> None:
+        """Save the posterior to a file. Load it with `load()`.
+
+        Args:
+            filename: Path to the file.
+        """
+        save_with_version(self, filename)
+
+    @classmethod
+    def load(
+        cls,
+        filename: Union[str, Path],
+        map_location: Optional[Union[str, torch.device]] = None,
+    ) -> Self:
+        """Load a posterior saved with `save()`.
+
+        The file is unpickled, which can execute arbitrary code. Only load trusted
+        files.
+
+        Args:
+            filename: Path to the file.
+            map_location: Device to load the posterior on, e.g. `"cpu"` for a
+                posterior saved on a GPU. By default, the device it was saved on.
+
+        Returns:
+            The loaded posterior.
+        """
+        return load_with_version(filename, cls, map_location)
 
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.

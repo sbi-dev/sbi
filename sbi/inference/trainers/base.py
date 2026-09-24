@@ -78,7 +78,12 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
-from sbi.utils.sbiutils import ImproperEmpirical, get_simulations_since_round
+from sbi.utils.sbiutils import (
+    ImproperEmpirical,
+    get_simulations_since_round,
+    load_with_version,
+    save_with_version,
+)
 from sbi.utils.simulation_utils import simulate_for_sbi
 from sbi.utils.torchutils import (
     check_if_prior_on_device,
@@ -91,6 +96,7 @@ from sbi.utils.user_input_checks import (
     process_prior,
     process_simulator,
 )
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 _SBI_ROOT = str(Path(__file__).parents[2]) + os.sep
 
@@ -1407,6 +1413,43 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
             # to #330.
             print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
+
+    def save(self, filename: Union[str, Path]) -> None:
+        """Save the inference object to a file. Load it with `load()`.
+
+        Args:
+            filename: Path to the file.
+        """
+        save_with_version(self, filename)
+
+    @classmethod
+    def load(
+        cls,
+        filename: Union[str, Path],
+        map_location: Optional[Union[str, torch.device]] = None,
+    ) -> Self:
+        """Load an inference object saved with `save()`.
+
+        The file is unpickled, which can execute arbitrary code. Only load trusted
+        files.
+
+        Args:
+            filename: Path to the file.
+            map_location: Device to load the inference object on, e.g. `"cpu"` for
+                an object saved on a GPU. By default, the device it was saved on.
+
+        Returns:
+            The loaded inference object.
+        """
+        inference = load_with_version(filename, cls, map_location)
+        # `map_location` moves the tensors, but not the device string and the prior.
+        if map_location is not None:
+            inference._device = str(torch.device(map_location))
+            if inference._prior is not None:
+                inference._prior = move_distribution_to_device(
+                    inference._prior, inference._device
+                )
+        return inference
 
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.

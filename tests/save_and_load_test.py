@@ -21,6 +21,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.utils.sbiutils import load_with_version
 
 
 def _assert_survives_pickling(posterior, num_dim: int) -> None:
@@ -235,3 +236,47 @@ def test_torch_load_map_location_same_device_is_passthrough():
     assert loaded._device == "cpu"
     assert loaded.device == "cpu"
     assert loaded.sample((10,)).shape == (10, 2)
+
+
+@pytest.mark.parametrize("kind", ["direct", "vector_field"])
+def test_posterior_save_and_load(kind, tmp_path):
+    posterior = _build_posterior(kind, _mvn())
+    posterior.save(tmp_path / "posterior.pt")
+    loaded = type(posterior).load(tmp_path / "posterior.pt", map_location="cpu")
+
+    torch.manual_seed(0)
+    expected = posterior.sample((3,))
+    torch.manual_seed(0)
+    assert torch.allclose(loaded.sample((3,)), expected)
+
+
+@pytest.mark.parametrize("inference_method", (NPE, FMPE))
+def test_inference_save_and_load_resumes_training(inference_method, tmp_path):
+    prior = _box_uniform()
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    inference = inference_method(prior=prior, show_progress_bars=False)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+    # Simulates a GPU-saved object; `map_location` must repair the device state.
+    inference._device = "cuda:0"
+    inference.save(tmp_path / "inference.pt")
+
+    loaded = inference_method.load(tmp_path / "inference.pt", map_location="cpu")
+
+    assert loaded._device == "cpu"
+    loaded.append_simulations(theta, x).train(
+        max_num_epochs=1, force_first_round_loss=True
+    )
+    loaded.build_posterior().sample((3,), x=x[:1])
+
+
+def test_load_refuses_other_class(tmp_path):
+    _build_posterior("direct", _mvn()).save(tmp_path / "posterior.pt")
+    with pytest.raises(TypeError, match="DirectPosterior"):
+        NPE.load(tmp_path / "posterior.pt")
+
+
+def test_load_warns_on_version_mismatch(tmp_path):
+    torch.save({"sbi_version": "0.0.0", "object": 1}, tmp_path / "old.pt")
+    with pytest.warns(UserWarning, match="0.0.0"):
+        load_with_version(tmp_path / "old.pt", int)
