@@ -405,7 +405,11 @@ def test_pairplot_uses_labeled_samples_metadata():
 
 @pytest.mark.parametrize(
     "samples_labels, expected",
-    ((None, ["posterior", "samples_1"]), (["a", "b"], ["a", "b"])),
+    (
+        (None, ["posterior", "samples_1"]),
+        (["a", "b"], ["a", "b"]),
+        (["samples_0", "samples_1"], ["samples_0", "samples_1"]),
+    ),
 )
 def test_pairplot_legend_labels_from_labeled_samples(samples_labels, expected):
     _, axes = pairplot(
