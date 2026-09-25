@@ -860,6 +860,8 @@ def prepare_for_plot(
     samples = handle_nan_infs(samples)
 
     dim = samples[0].shape[1]
+    if any(s.shape[1] != dim for s in samples):
+        raise ValueError("All sample sets must have the same number of dimensions.")
 
     if limits is None or len(limits) == 0:
         limits = infer_limits(samples, dim, points)

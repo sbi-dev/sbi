@@ -496,6 +496,12 @@ def test_labeled_samples_validation(kwargs):
         LabeledSamples(**{"data": torch.randn(10, 2), **kwargs})
 
 
+def test_pairplot_raises_on_dimensionality_mismatch():
+    with pytest.raises(ValueError, match="same number of dimensions"):
+        pairplot([torch.randn(10, 2), torch.randn(10, 3)])
+    close()
+
+
 @pytest.mark.parametrize("square_subplots", (True, False))
 def test_plotting_subplot_aspect(square_subplots):
     """
