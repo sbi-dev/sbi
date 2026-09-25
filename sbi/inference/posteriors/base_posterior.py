@@ -180,7 +180,8 @@ class NeuralPosterior:
     def set_default_x(self, x: Tensor) -> "NeuralPosterior":
         """Set new default x for `.sample(), .log_prob` to use as conditioning context.
 
-        Reset the MAP stored for the old default x if applicable.
+        Reset the MAP and the leakage correction factor stored for the old default x
+        if applicable.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
         `.sample()` and `.log_prob()` - only $\theta$ needs to be passed.
@@ -204,6 +205,7 @@ class NeuralPosterior:
 
         self._x = x.to(self._device)
         self._map = None
+        self._leakage_density_correction_factor = None
         return self
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
@@ -389,8 +391,9 @@ class NeuralPosterior:
         Args:
             state_dict: State to be restored.
         """
-        # Posteriors pickled before `check_finite_x` was introduced carry no such key.
+        # Posteriors pickled by older sbi versions can miss these keys.
         state_dict.setdefault("_check_finite_x", True)
+        state_dict.setdefault("_leakage_density_correction_factor", None)
         self.__dict__ = state_dict
 
         actual_device = infer_tensor_device(self)
