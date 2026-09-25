@@ -12,6 +12,7 @@ Analysis
    sbi.analysis.conditional_corrcoeff
    sbi.analysis.conditional_pairplot
    sbi.analysis.conditional_potential
+   sbi.analysis.LabeledSamples
    sbi.analysis.marginal_plot
    sbi.analysis.pairplot
    sbi.analysis.plot_tarp

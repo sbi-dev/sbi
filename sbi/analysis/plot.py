@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import copy
+from dataclasses import replace
 from typing import (
     Any,
     Callable,
@@ -31,8 +32,10 @@ from torch import Tensor
 
 from sbi.analysis.conditional_density import eval_conditional_density
 from sbi.analysis.plotting_classes import (
+    DEFAULT_SAMPLES_LABELS,
     DiagOptions,
     FigOptions,
+    LabeledSamples,
     OffDiagOptions,
     get_default_diag_kwargs,
     get_default_offdiag_kwargs,
@@ -52,10 +55,13 @@ LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
 DiagLiteral = Literal["hist", "scatter", "kde", "bar"]
 K = TypeVar("K")
 KwargsType = Union[List[Optional[Union[Dict, K]]], Dict, K, None]
+SampleArray = Union[np.ndarray, torch.Tensor, LabeledSamples]
+SamplesType = Union[SampleArray, List[SampleArray]]
+PreparedSamples = Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
 
 
 def marginal_plot(
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    samples: SamplesType,
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
@@ -78,7 +84,10 @@ def marginal_plot(
     that the samples were drawn from.
 
     Args:
-        samples: Samples used to build the histogram.
+        samples: Samples used to build the histogram. Either raw arrays or
+            ``LabeledSamples`` containers carrying dimension labels, limits, and
+            ticks. Explicit function arguments take precedence over the metadata
+            stored on the containers.
         points: List of additional points to scatter.
         limits: Array containing the plot xlim for each parameter dimension. If None,
             just use the min and max of the passed samples
@@ -100,11 +109,15 @@ def marginal_plot(
     Returns: figure and axis of posterior distribution plot
     """
 
+    sample_data, labels, limits, ticks, sample_names = _unpack_labeled_samples(
+        samples, labels, limits, ticks
+    )
+
     # backwards compatibility
     if len(kwargs) > 0:
         fig, axes = _use_deprecated_plot(
             marginal_plot_dep,
-            samples=samples,
+            samples=sample_data,
             points=points,
             limits=limits,
             subset=subset,
@@ -118,19 +131,19 @@ def marginal_plot(
         )
         return fig, axes
 
-    samples, _, limits = prepare_for_plot(samples, limits)
+    sample_data, _, limits = prepare_for_plot(sample_data, limits)
 
     # prepare kwargs and functions of the subplots
     diag_kwargs_filled, diag_func = _prepare_kwargs(
         plot=diag,
-        samples=samples,
+        samples=sample_data,
         get_plot_funcs=get_diag_funcs,
         get_default_kwargs=get_default_diag_kwargs,
         plot_kwargs=diag_kwargs,
     )
 
     # prepare fig_kwargs
-    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
+    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, sample_data, sample_names)
 
     # generate plot
     return _arrange_grid(
@@ -140,7 +153,7 @@ def marginal_plot(
         diag_kwargs_filled,
         [None],
         [None],
-        samples,
+        sample_data,
         points,
         limits,
         subset,
@@ -154,7 +167,7 @@ def marginal_plot(
 
 
 def pairplot(
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    samples: SamplesType,
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
@@ -184,7 +197,10 @@ def pairplot(
     2D-marginal of the distribution.
 
     Args:
-        samples: Samples used to build the histogram.
+        samples: Samples used to build the histogram. Either raw arrays or
+            ``LabeledSamples`` containers carrying dimension labels, limits, and
+            ticks. Explicit function arguments take precedence over the metadata
+            stored on the containers.
         points: List of additional points to scatter.
         limits: Array containing the plot xlim for each parameter dimension. If None,
             just use the min and max of the passed samples
@@ -223,6 +239,10 @@ def pairplot(
     Returns: figure and axis of posterior distribution plot
     """
 
+    sample_data, labels, limits, ticks, sample_names = _unpack_labeled_samples(
+        samples, labels, limits, ticks
+    )
+
     upper = _prepare_upper(offdiag, upper)  # type: ignore
 
     plotting_styles = [
@@ -238,7 +258,7 @@ def pairplot(
     if len(kwargs) > 0:
         fig, axes = _use_deprecated_plot(
             pairplot_dep,
-            samples=samples,
+            samples=sample_data,
             points=points,
             limits=limits,
             subset=subset,
@@ -254,15 +274,15 @@ def pairplot(
         )
         return fig, axes
 
-    samples, dim, limits = prepare_for_plot(samples, limits, points)
+    sample_data, dim, limits = prepare_for_plot(sample_data, limits, points)
 
     # prepare figure kwargs
-    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
+    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, sample_data, sample_names)
 
     # Prepare diag
     diag_kwargs_filled, diag_func = _prepare_kwargs(
         plot=diag,  # type: ignore
-        samples=samples,
+        samples=sample_data,
         get_plot_funcs=get_diag_funcs,
         get_default_kwargs=get_default_diag_kwargs,
         plot_kwargs=diag_kwargs,
@@ -271,7 +291,7 @@ def pairplot(
     # Prepare upper
     upper_kwargs_filled, upper_func = _prepare_kwargs(
         plot=upper,  # type: ignore
-        samples=samples,
+        samples=sample_data,
         get_plot_funcs=get_offdiag_funcs,
         get_default_kwargs=get_default_offdiag_kwargs,
         plot_kwargs=upper_kwargs,
@@ -280,7 +300,7 @@ def pairplot(
     # Prepare lower
     lower_kwargs_filled, lower_func = _prepare_kwargs(
         plot=lower,  # type: ignore
-        samples=samples,
+        samples=sample_data,
         get_plot_funcs=get_offdiag_funcs,
         get_default_kwargs=get_default_offdiag_kwargs,
         plot_kwargs=lower_kwargs,
@@ -293,7 +313,7 @@ def pairplot(
         diag_kwargs_filled,
         upper_kwargs_filled,
         lower_kwargs_filled,
-        samples,
+        sample_data,
         points,
         limits,
         subset,
@@ -840,6 +860,8 @@ def prepare_for_plot(
     samples = handle_nan_infs(samples)
 
     dim = samples[0].shape[1]
+    if any(s.shape[1] != dim for s in samples):
+        raise ValueError("All sample sets must have the same number of dimensions.")
 
     if limits is None or len(limits) == 0:
         limits = infer_limits(samples, dim, points)
@@ -848,6 +870,47 @@ def prepare_for_plot(
 
     limits = torch.as_tensor(limits)
     return samples, dim, limits
+
+
+def _unpack_labeled_samples(
+    samples: SamplesType,
+    labels: Optional[List[str]],
+    limits: Optional[Union[List, torch.Tensor, np.ndarray]],
+    ticks: Optional[Union[List, torch.Tensor]],
+) -> Tuple[
+    PreparedSamples,
+    Optional[List[str]],
+    Optional[Union[List, torch.Tensor, np.ndarray]],
+    Optional[Union[List, torch.Tensor]],
+    Optional[List[Optional[str]]],
+]:
+    """Replace ``LabeledSamples`` by their data and fill in missing plot arguments.
+
+    Explicit arguments take precedence. Otherwise, the first container that defines
+    ``dim_labels``, ``limits`` or ``ticks`` provides the value.
+
+    Returns:
+        Sample data, labels, limits, ticks, and per-sample names for the legend
+        (``None`` if no container was passed).
+    """
+    sample_list = samples if isinstance(samples, list) else [samples]
+    containers = [s for s in sample_list if isinstance(s, LabeledSamples)]
+    if not containers:
+        return samples, labels, limits, ticks, None  # type: ignore[return-value]
+
+    def first_defined(attr: str) -> Any:
+        values = (getattr(c, attr) for c in containers)
+        return next((v for v in values if v is not None), None)
+
+    data = [s.data if isinstance(s, LabeledSamples) else s for s in sample_list]
+    names = [s.name if isinstance(s, LabeledSamples) else None for s in sample_list]
+    if labels is None:
+        labels = first_defined("dim_labels")
+    if limits is None:
+        limits = first_defined("limits")
+    if ticks is None:
+        ticks = first_defined("ticks")
+    return data, labels, limits, ticks, names  # type: ignore[return-value]
 
 
 def prepare_for_conditional_plot(condition, opts):
@@ -987,6 +1050,7 @@ def _prepare_kwargs(
 def _prepare_fig_kwargs(
     fig_kwargs: Optional[Union[Dict, FigOptions]],
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    sample_names: Optional[List[Optional[str]]] = None,
 ) -> FigOptions:
     """
     Converts user-provided figure keyword arguments into a FigOptions dataclass.
@@ -998,6 +1062,8 @@ def _prepare_fig_kwargs(
     Args:
         fig_kwargs: User-provided figure keyword arguments.
         samples: Input samples to be plotted.
+        sample_names: Per-sample names taken from ``LabeledSamples`` containers.
+            Used as legend labels when the names were not configured explicitly.
 
     Raises:
         ValueError: If the number of sample labels is less than
@@ -1012,10 +1078,19 @@ def _prepare_fig_kwargs(
     elif isinstance(fig_kwargs, dict):
         fig_kwargs = FigOptions(**fig_kwargs)
 
-    if fig_kwargs.legend and len(fig_kwargs.samples_labels) < len(samples):
+    sample_labels = fig_kwargs.samples_labels
+    if sample_names is not None and fig_kwargs.legend and sample_labels is None:
+        sample_labels = [
+            name if name is not None else f"samples_{idx}"
+            for idx, name in enumerate(sample_names)
+        ]
+    if sample_labels is None:
+        sample_labels = list(DEFAULT_SAMPLES_LABELS)
+
+    if fig_kwargs.legend and len(sample_labels) < len(samples):
         raise ValueError("Provide at least as many labels as samples.")
 
-    return fig_kwargs
+    return replace(fig_kwargs, samples_labels=sample_labels)
 
 
 def _use_deprecated_plot(
@@ -1476,7 +1551,7 @@ def _arrange_grid(
                         ):
                             diag_kw = copy.deepcopy(diag_kw)
                             diag_kw.setdefault("mpl_kwargs", {})["label"] = (
-                                fig_kwargs.samples_labels[sample_ind]
+                                fig_kwargs.samples_labels[sample_ind]  # pyright: ignore reportOptionalSubscript
                             )
                         if callable(diag_f):
                             diag_f(ax, sample[:, row], limits[row], diag_kw)

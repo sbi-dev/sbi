@@ -2,10 +2,55 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+
+from sbi.sbi_types import Array
+
+DEFAULT_SAMPLES_LABELS = [f"samples_{idx}" for idx in range(10)]
+
+
+@dataclass(frozen=True)
+class LabeledSamples:
+    """Samples together with the metadata needed to plot them.
+
+    Wrapping the raw samples in this container lets ``pairplot`` and
+    ``marginal_plot`` pick up dimension labels, axis limits and ticks
+    automatically, so they don't have to be passed on every call. Explicit
+    function arguments always take precedence over the values stored here.
+    """
+
+    data: Array
+    """Samples of shape (N, D)."""
+
+    name: Optional[str] = None
+    """Name of the sample set, used as label in the legend."""
+
+    dim_labels: Optional[List[str]] = None
+    """Labels for the D dimensions, e.g. ``["theta1", "theta2"]``."""
+
+    limits: Optional[List[Tuple[float, float]]] = None
+    """Plot limits per dimension, e.g. ``[(-1.0, 1.0), (-2.0, 2.0)]``. A single pair
+    applies to all dimensions."""
+
+    ticks: Optional[List[Tuple[float, float]]] = None
+    """Tick positions per dimension, e.g. ``[(-1.0, 1.0), (-2.0, 2.0)]``. A single
+    pair applies to all dimensions."""
+
+    def __post_init__(self):
+        if self.data.ndim != 2:
+            raise ValueError(
+                f"`data` must have shape (N, D), got {tuple(self.data.shape)}."
+            )
+        dim = self.data.shape[1]
+        if self.dim_labels is not None and len(self.dim_labels) != dim:
+            raise ValueError(f"`dim_labels` must have length {dim}.")
+        for name in ("limits", "ticks"):
+            value = getattr(self, name)
+            if value is not None and len(value) not in (1, dim):
+                raise ValueError(f"`{name}` must have length 1 or {dim}.")
 
 
 @dataclass(frozen=True)
@@ -148,10 +193,10 @@ class FigOptions:
     """Default labels for plotted points (used with `label=` argument).
     See: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html"""
 
-    samples_labels: List[str] = field(
-        default_factory=lambda: [f"samples_{idx}" for idx in range(10)]
-    )
-    """Default labels for plotted samples (used with `label=` argument).
+    samples_labels: Optional[List[str]] = None
+    """Labels for plotted samples (used with `label=` argument). If None, the
+    labels default to "samples_0", "samples_1", ... or, when plotting
+    ``LabeledSamples`` containers, to their `name` fields.
     See: https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.plot.html"""
 
     samples_colors: List[str] = field(
