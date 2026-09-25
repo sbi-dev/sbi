@@ -2,14 +2,12 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib as mpl
-import numpy as np
-import torch
 from matplotlib import pyplot as plt
 
-ArrayLike = Union[np.ndarray, torch.Tensor]
+from sbi.sbi_types import Array
 
 DEFAULT_SAMPLES_LABELS = [f"samples_{idx}" for idx in range(10)]
 
@@ -24,7 +22,7 @@ class LabeledSamples:
     function arguments always take precedence over the values stored here.
     """
 
-    data: ArrayLike
+    data: Array
     """Samples of shape (N, D)."""
 
     name: Optional[str] = None
@@ -34,10 +32,25 @@ class LabeledSamples:
     """Labels for the D dimensions, e.g. ``["theta1", "theta2"]``."""
 
     limits: Optional[List[Tuple[float, float]]] = None
-    """Plot limits per dimension, e.g. ``[(-1.0, 1.0), (-2.0, 2.0)]``."""
+    """Plot limits per dimension, e.g. ``[(-1.0, 1.0), (-2.0, 2.0)]``. A single pair
+    applies to all dimensions."""
 
     ticks: Optional[List[Tuple[float, float]]] = None
-    """Tick positions per dimension, e.g. ``[(-1.0, 1.0), (-2.0, 2.0)]``."""
+    """Tick positions per dimension, e.g. ``[(-1.0, 1.0), (-2.0, 2.0)]``. A single
+    pair applies to all dimensions."""
+
+    def __post_init__(self):
+        if self.data.ndim != 2:
+            raise ValueError(
+                f"`data` must have shape (N, D), got {tuple(self.data.shape)}."
+            )
+        dim = self.data.shape[1]
+        if self.dim_labels is not None and len(self.dim_labels) != dim:
+            raise ValueError(f"`dim_labels` must have length {dim}.")
+        for name in ("limits", "ticks"):
+            value = getattr(self, name)
+            if value is not None and len(value) not in (1, dim):
+                raise ValueError(f"`{name}` must have length 1 or {dim}.")
 
 
 @dataclass(frozen=True)

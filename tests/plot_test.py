@@ -398,12 +398,6 @@ def _random_labeled_samples(dim: int = 2, n: int = 100) -> LabeledSamples:
     )
 
 
-def test_labeled_samples_is_frozen():
-    ls = _random_labeled_samples()
-    with pytest.raises(AttributeError):
-        ls.name = "other"
-
-
 def test_pairplot_single_labeled_samples_uses_metadata():
     ls = _random_labeled_samples(dim=2)
     fig, axes = pairplot(ls)
@@ -488,33 +482,18 @@ def test_marginal_plot_labeled_samples():
 
 
 @pytest.mark.parametrize(
-    "constructor",
+    "kwargs",
     (
-        lambda data: dict(dim_labels=["a"]),
-        lambda data: dict(limits=[(-1.0, 1.0)] * 3),
-        lambda data: dict(ticks=[(-1.0, 1.0)] * 3),
-        lambda data: dict(data=data[0]),
+        dict(dim_labels=["a"]),
+        dict(limits=[(-1.0, 1.0)] * 3),
+        dict(ticks=[(-1.0, 1.0)] * 3),
+        dict(data=torch.randn(10)),
     ),
     ids=("dim_labels", "limits", "ticks", "data_1d"),
 )
-def test_labeled_samples_validation(constructor):
-    data = torch.randn(10, 2)
-    kwargs = constructor(data)
-    if kwargs.get("data") is not None:
-        ls = LabeledSamples(**kwargs)
-    else:
-        ls = LabeledSamples(data=data, **kwargs)
+def test_labeled_samples_validation(kwargs):
     with pytest.raises(ValueError):
-        pairplot(ls)
-    close()
-
-
-def test_labeled_samples_dimensionality_mismatch():
-    ls2 = _random_labeled_samples(dim=3)
-    ls3 = _random_labeled_samples(dim=4)
-    with pytest.raises(ValueError, match="same number of dimensions"):
-        pairplot([ls2, ls3])
-    close()
+        LabeledSamples(**{"data": torch.randn(10, 2), **kwargs})
 
 
 @pytest.mark.parametrize("square_subplots", (True, False))

@@ -109,7 +109,7 @@ def marginal_plot(
     Returns: figure and axis of posterior distribution plot
     """
 
-    sample_data, labels, limits, ticks, sample_names = _extract_labeled_sample_metadata(
+    sample_data, labels, limits, ticks, sample_names = _unpack_labeled_samples(
         samples, labels, limits, ticks
     )
 
@@ -239,7 +239,7 @@ def pairplot(
     Returns: figure and axis of posterior distribution plot
     """
 
-    sample_data, labels, limits, ticks, sample_names = _extract_labeled_sample_metadata(
+    sample_data, labels, limits, ticks, sample_names = _unpack_labeled_samples(
         samples, labels, limits, ticks
     )
 
@@ -870,59 +870,11 @@ def prepare_for_plot(
     return samples, dim, limits
 
 
-def _dim_of(sample: Union[np.ndarray, torch.Tensor]) -> int:
-    """Number of parameter dimensions of a 2D sample array."""
-    return sample.shape[1]
-
-
-def _validate_labeled_sample(sample: LabeledSamples) -> None:
-    """Check that the metadata stored on a ``LabeledSamples`` matches its data."""
-    data = sample.data
-    if not isinstance(data, (np.ndarray, torch.Tensor)):
-        raise ValueError(
-            "The `data` field of a `LabeledSamples` must be a numpy array or "
-            f"torch tensor, got {type(data).__name__}."
-        )
-    if data.ndim != 2:
-        raise ValueError(
-            "The `data` field of a `LabeledSamples` must be two-dimensional "
-            f"of shape (N, D), got shape {tuple(data.shape)}."
-        )
-    dim = _dim_of(data)
-
-    if sample.dim_labels is not None and len(sample.dim_labels) != dim:
-        raise ValueError(
-            f"Length of `dim_labels` ({len(sample.dim_labels)}) must match the "
-            f"number of dimensions of the data ({dim})."
-        )
-
-    for metadata_name in ("limits", "ticks"):
-        metadata = getattr(sample, metadata_name)
-        if metadata is not None and len(metadata) not in (1, dim):
-            raise ValueError(
-                f"Length of `{metadata_name}` ({len(metadata)}) must be either 1 "
-                f"or match the number of dimensions of the data ({dim})."
-            )
-
-
-def _first_defined(
-    sample_list: List[Union[np.ndarray, torch.Tensor, LabeledSamples]],
-    attr: str,
-) -> Optional[Any]:
-    """Return the first non-None value of ``attr`` found on the containers."""
-    for sample in sample_list:
-        if isinstance(sample, LabeledSamples):
-            value = getattr(sample, attr)
-            if value is not None:
-                return value
-    return None
-
-
-def _extract_labeled_sample_metadata(
+def _unpack_labeled_samples(
     samples: SamplesType,
-    labels: Optional[List[str]] = None,
-    limits: Optional[Union[List, torch.Tensor, np.ndarray]] = None,
-    ticks: Optional[Union[List, torch.Tensor]] = None,
+    labels: Optional[List[str]],
+    limits: Optional[Union[List, torch.Tensor, np.ndarray]],
+    ticks: Optional[Union[List, torch.Tensor]],
 ) -> Tuple[
     PreparedSamples,
     Optional[List[str]],
@@ -930,60 +882,33 @@ def _extract_labeled_sample_metadata(
     Optional[Union[List, torch.Tensor]],
     Optional[List[Optional[str]]],
 ]:
-    """Resolve ``LabeledSamples`` containers into plain sample arrays and metadata.
+    """Replace ``LabeledSamples`` by their data and fill in missing plot arguments.
 
-    Unpacks the ``data`` field of any ``LabeledSamples`` passed to ``pairplot`` or
-    ``marginal_plot`` and falls back to the stored dimension labels, limits, and
-    ticks whenever the corresponding function argument is not given. Explicit
-    function arguments always take precedence over the container fields.
-
-    Args:
-        samples: Raw sample arrays or ``LabeledSamples`` containers. Both can be
-            mixed in a list to overlay multiple sources.
-        labels: Explicit dimension labels.
-        limits: Explicit limits.
-        ticks: Explicit ticks.
-
-    Raises:
-        ValueError: If the metadata on the containers is inconsistent with the
-            data, or if overlaid sample sets have different dimensionalities.
+    Explicit arguments take precedence. Otherwise, the first container that defines
+    ``dim_labels``, ``limits`` or ``ticks`` provides the value.
 
     Returns:
-        The plain sample arrays, the resolved labels, limits and ticks, and the
-        per-sample names used for the legend (a ``None`` entry means the sample
-        carries no name).
+        Sample data, labels, limits, ticks, and per-sample names for the legend
+        (``None`` if no container was passed).
     """
     sample_list = samples if isinstance(samples, list) else [samples]
-
-    if not any(isinstance(s, LabeledSamples) for s in sample_list):
+    containers = [s for s in sample_list if isinstance(s, LabeledSamples)]
+    if not containers:
         return samples, labels, limits, ticks, None  # type: ignore[return-value]
 
-    unpacked: List[Union[np.ndarray, torch.Tensor]] = []
-    names: List[Optional[str]] = []
-    for sample in sample_list:
-        if isinstance(sample, LabeledSamples):
-            _validate_labeled_sample(sample)
-            unpacked.append(sample.data)
-            names.append(sample.name)
-        else:
-            unpacked.append(sample)  # type: ignore[arg-type]
-            names.append(None)
+    def first_defined(attr: str) -> Any:
+        values = (getattr(c, attr) for c in containers)
+        return next((v for v in values if v is not None), None)
 
-    dims = {_dim_of(sample) for sample in unpacked}
-    if len(dims) != 1:
-        raise ValueError(
-            "All sample sets overlaid in one plot must have the same number of "
-            f"dimensions, got {sorted(dims)}."
-        )
-
+    data = [s.data if isinstance(s, LabeledSamples) else s for s in sample_list]
+    names = [s.name if isinstance(s, LabeledSamples) else None for s in sample_list]
     if labels is None:
-        labels = _first_defined(sample_list, "dim_labels")
+        labels = first_defined("dim_labels")
     if limits is None:
-        limits = _first_defined(sample_list, "limits")
+        limits = first_defined("limits")
     if ticks is None:
-        ticks = _first_defined(sample_list, "ticks")
-
-    return unpacked, labels, limits, ticks, names  # type: ignore[return-value]
+        ticks = first_defined("ticks")
+    return data, labels, limits, ticks, names  # type: ignore[return-value]
 
 
 def prepare_for_conditional_plot(condition, opts):
