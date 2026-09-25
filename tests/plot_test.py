@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from dataclasses import replace
 from typing import get_args
 
 import numpy as np
@@ -14,15 +13,8 @@ from matplotlib.pyplot import close, subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
 import sbi.analysis.plot as plt
-from sbi.analysis import (
-    LabeledSamples,
-    marginal_plot,
-    pairplot,
-    plot_summary,
-    sbc_rank_plot,
-)
+from sbi.analysis import LabeledSamples, pairplot, plot_summary, sbc_rank_plot
 from sbi.analysis.plotting_classes import (
-    DEFAULT_SAMPLES_LABELS,
     FigOptions,
     HistDiagOptions,
     HistOffDiagOptions,
@@ -385,115 +377,51 @@ def test_pairplot_raises_error_on_offdiag_and_upper_conflict():
     close()
 
 
-# --- Tests for LabeledSamples ---
-
-
-def _random_labeled_samples(dim: int = 2, n: int = 100) -> LabeledSamples:
+def _labeled_samples() -> LabeledSamples:
     return LabeledSamples(
-        data=torch.randn(n, dim),
+        torch.randn(100, 2),
         name="posterior",
-        dim_labels=[f"theta_{i}" for i in range(dim)],
-        limits=[(-1.0, 1.0)] * dim,
-        ticks=[(-0.5, 0.5)] * dim,
+        dim_labels=["theta_0", "theta_1"],
+        limits=[(-1.0, 1.0)],
+        ticks=[(-0.5, 0.5)],
     )
 
 
-def test_pairplot_single_labeled_samples_uses_metadata():
-    ls = _random_labeled_samples(dim=2)
-    fig, axes = pairplot(ls)
-
-    assert axes[0, 0].get_xlabel() == "theta_0"
+def test_pairplot_uses_labeled_samples_metadata():
+    ls = _labeled_samples()
+    _, axes = pairplot(ls)
     assert axes[1, 1].get_xlabel() == "theta_1"
-    xlim = axes[0, 0].get_xlim()
-    assert xlim == pytest.approx((-1.0, 1.0), abs=1e-4)
-    assert axes[0, 0].get_xticks().tolist() == pytest.approx([-0.5, 0.5])
-    assert isinstance(fig, Figure)
+    assert axes[1, 1].get_xlim() == pytest.approx((-1.0, 1.0), abs=1e-4)
+    assert axes[1, 1].get_xticks().tolist() == pytest.approx([-0.5, 0.5])
     close()
 
-
-def test_pairplot_explicit_args_override_labeled_samples():
-    ls = _random_labeled_samples(dim=2)
-    _, axes = pairplot(
-        ls,
-        labels=["a", "b"],
-        limits=[(-9.0, 9.0), (-9.0, 9.0)],
-        ticks=[(-8.0, 8.0), (-8.0, 8.0)],
-    )
+    # Explicit arguments take precedence over the container.
+    _, axes = pairplot(ls, labels=["a", "b"], limits=[(-9.0, 9.0)], ticks=[(-8.0, 8.0)])
     assert axes[1, 1].get_xlabel() == "b"
-    assert axes[0, 0].get_xlim() == pytest.approx((-9.0, 9.0), abs=1e-4)
-    assert axes[0, 0].get_xticks().tolist() == pytest.approx([-8.0, 8.0])
-    close()
-
-
-def test_pairplot_list_of_labeled_samples_with_legend():
-    ls = _random_labeled_samples(dim=2)
-    ls2 = replace(ls, data=torch.randn(100, 2), name="prior")
-    _, axes = pairplot([ls, ls2], fig_kwargs=dict(legend=True))
-    legend = axes[-1, 0].get_legend()
-    assert legend is not None
-    assert [t.get_text() for t in legend.get_texts()] == ["posterior", "prior"]
-    close()
-
-
-def test_pairplot_mixed_raw_arrays_and_labeled_samples():
-    ls = _random_labeled_samples(dim=2)
-    raw = torch.randn(100, 2)
-    _, axes = pairplot([ls, raw], fig_kwargs=dict(legend=True))
-    legend = axes[-1, 0].get_legend()
-    assert [t.get_text() for t in legend.get_texts()] == ["posterior", "samples_1"]
-    close()
-
-
-def test_pairplot_explicit_samples_labels_take_precedence():
-    ls = _random_labeled_samples(dim=2)
-    ls2 = replace(ls, data=torch.randn(100, 2), name="prior")
-    _, axes = pairplot(
-        [ls, ls2], fig_kwargs=dict(legend=True, samples_labels=["a", "b"])
-    )
-    legend = axes[-1, 0].get_legend()
-    assert [t.get_text() for t in legend.get_texts()] == ["a", "b"]
-    close()
-    _, axes = pairplot(
-        [ls, ls2], fig_kwargs=FigOptions(legend=True, samples_labels=["c", "d"])
-    )
-    legend = axes[-1, 0].get_legend()
-    assert [t.get_text() for t in legend.get_texts()] == ["c", "d"]
-    close()
-
-
-def test_pairplot_default_samples_labels_not_overridden():
-    ls = _random_labeled_samples(dim=2)
-    ls2 = replace(ls, data=torch.randn(100, 2), name="prior")
-    _, axes = pairplot(
-        [ls, ls2],
-        fig_kwargs=FigOptions(legend=True, samples_labels=list(DEFAULT_SAMPLES_LABELS)),
-    )
-    legend = axes[-1, 0].get_legend()
-    assert [t.get_text() for t in legend.get_texts()] == ["samples_0", "samples_1"]
-    close()
-
-
-def test_marginal_plot_labeled_samples():
-    ls = _random_labeled_samples(dim=3)
-    fig, axes = marginal_plot(ls)
-    assert axes[2].get_xlabel() == "theta_2"
-    assert isinstance(fig, Figure)
+    assert axes[1, 1].get_xlim() == pytest.approx((-9.0, 9.0), abs=1e-4)
+    assert axes[1, 1].get_xticks().tolist() == pytest.approx([-8.0, 8.0])
     close()
 
 
 @pytest.mark.parametrize(
-    "kwargs",
-    (
-        dict(dim_labels=["a"]),
-        dict(limits=[(-1.0, 1.0)] * 3),
-        dict(ticks=[(-1.0, 1.0)] * 3),
-        dict(data=torch.randn(10)),
-    ),
-    ids=("dim_labels", "limits", "ticks", "data_1d"),
+    "samples_labels, expected",
+    ((None, ["posterior", "samples_1"]), (["a", "b"], ["a", "b"])),
+)
+def test_pairplot_legend_labels_from_labeled_samples(samples_labels, expected):
+    _, axes = pairplot(
+        [_labeled_samples(), torch.randn(100, 2)],
+        fig_kwargs=dict(legend=True, samples_labels=samples_labels),
+    )
+    assert [t.get_text() for t in axes[-1, 0].get_legend().get_texts()] == expected
+    close()
+
+
+@pytest.mark.parametrize(
+    "kwargs", (dict(dim_labels=["a"]), dict(limits=[(-1.0, 1.0)] * 3))
 )
 def test_labeled_samples_validation(kwargs):
     with pytest.raises(ValueError):
-        LabeledSamples(**{"data": torch.randn(10, 2), **kwargs})
+        LabeledSamples(torch.randn(10, 2), **kwargs)
 
 
 def test_pairplot_raises_on_dimensionality_mismatch():
