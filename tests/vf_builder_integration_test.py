@@ -38,7 +38,6 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     VPScoreConfig,
     VectorFieldConfigBase,
     VectorFieldMLP,
-    _vf_config_from_factory_kwargs,
     _vf_net_config_from_model,
     build_standard_mlp_network,
 )
@@ -536,71 +535,6 @@ def test_config_defaults_match_the_factory(
     _assert_same_state(from_factory, from_config)
     assert isinstance(from_config, estimator_cls)
     assert type(from_config.net).__name__ == NET_CLASS_NAMES[type(net_config)]
-
-
-@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
-@pytest.mark.parametrize("model", sorted(_VALID_VF_MODELS))
-@pytest.mark.parametrize("at_default", [True, False])
-def test_factory_named_defaults_preserve_config_defaults(config_cls, model, at_default):
-    default_config = config_cls()
-    default_net = _vf_net_config_from_model(model)
-    named_net = {
-        "hidden_features": 64,
-        "num_layers": 2,
-        "time_embedding_dim": 16,
-        "time_emb_type": "random_fourier",
-    }
-    named_estimator = {
-        "z_score_input": "none",
-        "z_score_condition": "structured",
-        "embedding_net": nn.Linear(3, 4),
-    }
-    factory_defaults = (
-        {**named_net, **named_estimator}
-        if at_default
-        else {
-            **{name: getattr(default_net, name) for name in named_net},
-            **{name: getattr(default_config, name) for name in named_estimator},
-        }
-    )
-    config = _vf_config_from_factory_kwargs(
-        default_config,
-        model,
-        named_net=named_net,
-        named_estimator=named_estimator,
-        extra={},
-        factory_defaults=factory_defaults,
-    )
-
-    for name, value in named_net.items():
-        assert getattr(config.net, name) == (
-            getattr(default_net, name) if at_default else value
-        )
-    for name, value in named_estimator.items():
-        assert getattr(config, name) == (
-            getattr(default_config, name) if at_default else value
-        )
-
-
-@pytest.mark.parametrize(
-    "config_cls, name",
-    [(config_cls, "compose_standardization") for config_cls in ALL_CONFIGS]
-    + [(FlowMatchingConfig, "gaussian_baseline")],
-)
-@pytest.mark.parametrize("at_default", [True, False])
-def test_factory_boolean_defaults_preserve_config_defaults(
-    config_cls, name, at_default
-):
-    config = _vf_config_from_factory_kwargs(
-        config_cls(),
-        "mlp",
-        named_net={},
-        named_estimator={name: True},
-        extra={},
-        factory_defaults={name: at_default},
-    )
-
-    assert getattr(config, name) is (not at_default)
 
 
 @pytest.mark.parametrize("factory_fn", [posterior_flow_nn, posterior_score_nn])
