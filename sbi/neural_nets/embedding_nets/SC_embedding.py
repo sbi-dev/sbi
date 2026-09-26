@@ -280,8 +280,8 @@ class SpectralConvEmbedding(nn.Module):
         data_equispaced = torch.rand(256, 3, 500)
         embedding_net = SpectralConvEmbedding(modes=15, in_channels=3,
             out_channels=1, conv_channels=5, num_layers=4)
-        neural_posterior = posterior_nn(model="nsf", embedding_net=embedding_net)
-        inference = NPE_C(prior=sbi_prior, density_estimator=neural_posterior)
+        density_estimator = NSFConfig(embedding_net=embedding_net)
+        inference = NPE_C(prior=sbi_prior, density_estimator=density_estimator)
         _ = inference.append_simulations(theta, data_equispaced)
 
         # Example for non-equispaced data with batch size of 256, 3 channels and
@@ -298,8 +298,8 @@ class SpectralConvEmbedding(nn.Module):
 
         embedding_net = SpectralConvEmbedding(modes=15, in_channels=3, out_channels=1,
             conv_channels=5, num_layers=4)
-        neural_posterior = posterior_nn(model="nsf", embedding_net=embedding_net)
-        inference = NPE_C(prior=sbi_prior, density_estimator=neural_posterior)
+        density_estimator = NSFConfig(embedding_net=embedding_net)
+        inference = NPE_C(prior=sbi_prior, density_estimator=density_estimator)
         _ = inference.append_simulations(theta, data_nonequispaced)
 
         Returns:

@@ -15,7 +15,7 @@ import torch
 from torch.distributions import Independent, Normal
 
 from sbi.inference import FMPE, NPSE
-from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
+from sbi.neural_nets import VectorFieldEstimatorBuilder
 from sbi.utils import BoxUniform
 
 N_TRAIN, N_POST, MAX_EPOCHS = 2000, 2000, 150
@@ -46,10 +46,14 @@ def _heterogeneous(seed=0):
 
 def _fit(kind, prior, theta, x, compose):
     if kind == "FMPE":
-        de = posterior_flow_nn(compose_standardization=compose)
+        de = VectorFieldEstimatorBuilder(
+            estimator_type="flow", compose_standardization=compose
+        )
         tr = FMPE(prior=prior, vf_estimator=de)
     else:
-        de = posterior_score_nn(sde_type="ve", compose_standardization=compose)
+        de = VectorFieldEstimatorBuilder(
+            estimator_type="score", sde_type="ve", compose_standardization=compose
+        )
         tr = NPSE(prior=prior, sde_type="ve", vf_estimator=de)
     tr.append_simulations(theta, x).train(
         max_num_epochs=MAX_EPOCHS, show_train_summary=False
@@ -181,7 +185,9 @@ def test_compose_boxuniform_rejection_in_original_theta_space():
     theta = prior.sample((n_train,))
     x = theta.sum(1, keepdim=True) + bound * torch.randn(n_train, 1)
 
-    de = posterior_flow_nn(compose_standardization=True)
+    de = VectorFieldEstimatorBuilder(
+        estimator_type="flow", compose_standardization=True
+    )
     tr = FMPE(prior=prior, vf_estimator=de)
     tr.append_simulations(theta, x).train(max_num_epochs=20, show_train_summary=False)
     post = tr.build_posterior()

@@ -25,7 +25,7 @@ from sbi.inference import (
 )
 from sbi.inference.posteriors import MCMCPosteriorParameters
 from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
-from sbi.neural_nets.factory import posterior_flow_nn
+from sbi.neural_nets import VectorFieldEstimatorBuilder
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -239,7 +239,9 @@ def test_vfinference_with_different_models(vector_field_type, model):
     theta = prior.sample((num_simulations,))
     x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    estimator_build_fun = posterior_flow_nn(model=model)
+    estimator_build_fun = VectorFieldEstimatorBuilder(
+        estimator_type="flow" if vector_field_type is FMPE else "score", model=model
+    )
 
     inference = vector_field_type(prior, vf_estimator=estimator_build_fun)
 
@@ -260,8 +262,10 @@ def test_fmpe_time_dependent_z_scoring_integration():
 
     inference = FMPE(
         prior,
-        vf_estimator=posterior_flow_nn(
-            z_score_theta="independent", z_score_x="independent"
+        vf_estimator=VectorFieldEstimatorBuilder(
+            estimator_type="flow",
+            z_score_input="independent",
+            z_score_condition="independent",
         ),
         show_progress_bars=False,
     )
@@ -553,8 +557,12 @@ def test_sample_conditional():
     )
 
     # Test whether fmpe works properly with structured theta z-scoring.
-    net = posterior_flow_nn(
-        "mlp", z_score_theta="structured", hidden_features=65, num_layers=5
+    net = VectorFieldEstimatorBuilder(
+        estimator_type="flow",
+        model="mlp",
+        z_score_input="structured",
+        hidden_features=65,
+        num_layers=5,
     )
 
     inference = FMPE(prior, vf_estimator=net, show_progress_bars=False)
@@ -855,8 +863,9 @@ def test_fmpe_shifted_data_c2st(z_score_theta, gaussian_baseline):
     reference_samples = x_o + 0.5 * torch.randn(1000, 2)
 
     torch.manual_seed(42)
-    vf_estimator = posterior_flow_nn(
-        z_score_theta=z_score_theta,
+    vf_estimator = VectorFieldEstimatorBuilder(
+        estimator_type="flow",
+        z_score_input=z_score_theta,
         gaussian_baseline=gaussian_baseline,
     )
     inference = FMPE(

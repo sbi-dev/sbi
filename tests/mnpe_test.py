@@ -9,7 +9,7 @@ from torch.distributions import Bernoulli, Normal
 from sbi.inference import MNPE
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.neural_nets import posterior_nn
+from sbi.neural_nets import MDNConfig, MixedConfig, NSFConfig, ZukoNSFConfig
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
@@ -94,7 +94,7 @@ def test_mnpe_indices(
     x = x_all[:-1]
     x_o = x_all[-1]
 
-    net_builder = posterior_nn("mnpe")
+    net_builder = MixedConfig()
     inference = MNPE(density_estimator=net_builder)
     inference.append_simulations(theta, x).train(max_num_epochs=1)
 
@@ -149,12 +149,16 @@ def test_batched_sampling(num_simulations: int = 100):
     assert samples.shape == (num_samples, batch_size, 3)
 
 
-@pytest.mark.parametrize("flow_model", ("mdn", "nsf", "zuko_nsf"))
+@pytest.mark.parametrize(
+    "continuous_config",
+    (MDNConfig, NSFConfig, ZukoNSFConfig),
+    ids=["mdn", "nsf", "zuko_nsf"],
+)
 @pytest.mark.parametrize("z_score_x", ("independent", "none"))
 @pytest.mark.parametrize("embedding_net", (torch.nn.Identity(), FCEmbedding(1, 1)))
 @pytest.mark.parametrize("dropout_probability", (0.0, 0.5))
 def test_mnpe_api(
-    flow_model: str,
+    continuous_config: type[NSFConfig],
     z_score_x: str,
     embedding_net: nn.Module,
     dropout_probability: float,
@@ -176,10 +180,9 @@ def test_mnpe_api(
 
     # Build estimator manually
     # x_embedding = FCEmbedding(1, 1)  # simple embedding net, 1 continuous parameter
-    density_estimator = posterior_nn(
-        model="mnpe",
-        flow_model=flow_model,
-        z_score_x=z_score_x,
+    density_estimator = MixedConfig(
+        continuous=continuous_config(),
+        z_score_condition=z_score_x,
         embedding_net=embedding_net,
         log_transform_x=False,
         dropout_probability=dropout_probability,

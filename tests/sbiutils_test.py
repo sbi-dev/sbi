@@ -18,7 +18,7 @@ from sbi.analysis import (
     sensitivity_analysis,
 )
 from sbi.inference import NPE
-from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
+from sbi.neural_nets import MDNConfig, classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
     warn_if_invalid_for_zscoring,
@@ -271,7 +271,7 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     # `_automatic_posterior_transformation()`.
     prior = BoxUniform(-5 * ones(2), 5 * ones(2))
     # Testing new z-score arg options.
-    density_estimator = posterior_nn("mdn", z_score_theta=None, z_score_x=None)
+    density_estimator = MDNConfig(z_score_input="none", z_score_condition="none")
     inference = NPE(prior=prior, density_estimator=density_estimator)
     theta_ = torch.rand(100, 2)
     x_ = torch.rand(100, 2)
@@ -437,8 +437,13 @@ def test_z_score_parser_rejects_bool(z_score_flag):
     ],
 )
 @pytest.mark.parametrize("build_fn", [likelihood_nn, posterior_nn, classifier_nn])
+@pytest.mark.filterwarnings("ignore::FutureWarning")
 def test_z_scoring_structured(z_x, z_theta, build_fn):
-    """Test z-scoring args across architectures and ensure correct input shapes."""
+    """Test z-scoring args across architectures and ensure correct input shapes.
+
+    This stays on the deprecated factories: it covers their argument
+    translation and rejection, and goes away with them in v0.29.0.
+    """
     batch_dim, num_dim = 10, 3
     dist = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
     theta = dist.sample((batch_dim,))

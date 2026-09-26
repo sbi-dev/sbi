@@ -18,7 +18,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
     MCMCPosteriorParameters,
 )
-from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
+from sbi.neural_nets import MAFConfig, MDNConfig
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     CausalCNNEmbedding,
@@ -31,11 +31,17 @@ from sbi.neural_nets.embedding_nets import (
     TransformerEmbedding,
 )
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
+from sbi.neural_nets.net_builders.estimator_configs import (
+    _CLASSIFIER_CONFIGS,
+    _DENSITY_CONFIGS,
+)
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.metrics import check_c2st
+from sbi.utils.nn_utils import check_net_device
+from sbi.utils.torchutils import gpu_available, process_device
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
@@ -114,7 +120,7 @@ def test_embedding_api_with_multiple_trials(
         trial_net_output_dim=output_dim,
     )
 
-    density_estimator = posterior_nn("maf", embedding_net=embedding_net)
+    density_estimator = MAFConfig(embedding_net=embedding_net)
     inference = NPE(prior, density_estimator=density_estimator)
 
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
@@ -389,17 +395,18 @@ def _train_and_infer_with_embedding(
 ):
     """Train a small inference pipeline and smoke test posterior sampling."""
 
-    builders = {"NPE": posterior_nn, "NLE": likelihood_nn, "NRE": classifier_nn}
     trainers = {"NPE": NPE, "NLE": NLE, "NRE": NRE}
 
     num_simulations = 100
     theta = prior.sample(torch.Size((num_simulations,)))
     x = simulator(theta)
 
-    net_key = "embedding_net_x" if method == "NRE" else "embedding_net"
-    estimator = builders[method](model=model, **{net_key: net})
-
-    trainer_key = "classifier" if method == "NRE" else "density_estimator"
+    if method == "NRE":
+        estimator = _CLASSIFIER_CONFIGS[model](embedding_net_x=net)
+        trainer_key = "classifier"
+    else:
+        estimator = _DENSITY_CONFIGS[model](embedding_net=net)
+        trainer_key = "density_estimator"
     trainer = trainers[method](
         prior,
         **{trainer_key: estimator},
@@ -511,11 +518,11 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     # test embedding net
     assert embedding_net(x[:3]).shape == (3, output_dim)
 
-    density_estimator = posterior_nn(
-        model="mdn",
+    density_estimator = MDNConfig(
         embedding_net=embedding_net,
-        z_score_x="none",  # turn off z-scoring because of NaN encodings.
-        z_score_theta="independent",
+        # turn off z-scoring because of NaN encodings.
+        z_score_condition="none",
+        z_score_input="independent",
     )
     inference = NPE(prior, density_estimator=density_estimator)
 
@@ -846,10 +853,8 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
     check_sbi_inputs(simulator_wrapper, prior)
 
     # Instantiate the neural density estimator.
-    neural_posterior = posterior_nn(model="maf", embedding_net=embedding_net)
-
     # Setup the inference procedure with NPE.
-    inferer = NPE(prior=prior, density_estimator=neural_posterior)
+    inferer = NPE(prior=prior, density_estimator=MAFConfig(embedding_net=embedding_net))
 
     # Run the inference procedure on one round.
     theta, x = simulate_for_sbi(simulator_wrapper, prior, num_simulations=10)
@@ -971,3 +976,34 @@ def test_lru_forward_rejects_invalid_mode():
 
     with pytest.raises(ValueError, match="mode"):
         layer.forward(torch.randn(2, 6, LRU_DEFAULTS["input_dim"]), mode="invalid")
+
+
+@pytest.mark.parametrize(
+    "embedding_net",
+    [
+        nn.Identity(),
+        nn.Flatten(),
+        nn.Sequential(nn.Flatten(), nn.ReLU()),
+        nn.BatchNorm1d(3, affine=False),
+    ],
+    ids=["identity", "flatten", "stateless_stack", "buffer_only"],
+)
+def test_config_accepts_embedding_net_without_parameters(embedding_net):
+    """The device check reads a tensor to compare, which such a net does not have."""
+    config = MAFConfig(embedding_net=embedding_net)
+
+    assert config.embedding_net is embedding_net
+    for tensor in [*embedding_net.parameters(), *embedding_net.buffers()]:
+        assert tensor.device.type == "cpu"
+
+
+@pytest.mark.skipif(not gpu_available(), reason="Needs a second device to split over.")
+def test_check_net_device_moves_every_tensor():
+    """A net with tensors on two devices must not keep the one that reads as cpu."""
+    net = nn.BatchNorm1d(3, affine=False)
+    net.running_var = torch.zeros(3, device=process_device("gpu"))
+
+    with pytest.warns(UserWarning, match="moved to cpu"):
+        moved = check_net_device(net, "cpu", "The passed net is moved to cpu.")
+
+    assert all(t.device.type == "cpu" for t in moved.buffers())

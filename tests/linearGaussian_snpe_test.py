@@ -31,7 +31,8 @@ from sbi.inference.posteriors.posterior_parameters import (
     FilteredDirectPosteriorParameters,
     MCMCPosteriorParameters,
 )
-from sbi.neural_nets import posterior_nn
+from sbi.neural_nets import MAFConfig, MDNConfig, TabPFNConfig
+from sbi.neural_nets.net_builders.estimator_configs import _DENSITY_CONFIGS
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -240,10 +241,9 @@ def test_c2st_npe_pfn_on_linearGaussian(num_dim: int, prior_str: str):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     # Force CPU to avoid MPS fallback issues on macOS.
-    density_estimator = posterior_nn(
-        model="tabpfn",
-        z_score_theta="none",
-        z_score_x="none",
+    density_estimator = TabPFNConfig(
+        z_score_input="none",
+        z_score_condition="none",
         regressor_init_kwargs={"device": "cpu"},
     )
     inference = NPE_PFN(
@@ -407,9 +407,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
     if method_str == "snpe_c_non_atomic":
         # Test whether NPE works properly with structured z-scoring.
-        density_estimator = posterior_nn(
-            "mdn", z_score_x="structured", num_components=5
-        )
+        density_estimator = MDNConfig(z_score_condition="structured", num_components=5)
         method_str = "snpe_c"
     elif method_str == "snpe_a":
         density_estimator = "mdn_snpe_a"
@@ -652,7 +650,7 @@ def test_sample_conditional(mcmc_params_accurate: MCMCPosteriorParameters):
         return linear_gaussian(theta, mask * likelihood_shift, likelihood_cov)
 
     # Test whether NPE works properly with structured z-scoring.
-    net = posterior_nn("maf", z_score_x="structured", hidden_features=20)
+    net = MAFConfig(z_score_condition="structured", hidden_features=20)
 
     inference = NPE_C(prior, density_estimator=net, show_progress_bars=True)
 
@@ -876,11 +874,10 @@ def test_density_estimators_unconstrained_space(
 
     # Train in unconstrained space
 
-    density_estimator_build_fun = posterior_nn(
-        model=density_estimator,
+    density_estimator_build_fun = _DENSITY_CONFIGS[density_estimator](
         hidden_features=60,
         num_transforms=3,
-        z_score_theta="transform_to_unconstrained",
+        z_score_input="transform_to_unconstrained",
         x_dist=prior,
     )
 

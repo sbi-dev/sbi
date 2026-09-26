@@ -9,7 +9,6 @@ from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import BNRE, NRE_A, NRE_B, NRE_C
-from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     LinearClassifierConfig,
     MAFConfig,
@@ -38,7 +37,7 @@ def test_no_warning_for_valid_inputs(trainer_cls):
         )
         trainer_cls(
             prior,
-            classifier=classifier_nn(model="resnet"),
+            classifier=ResNetClassifierConfig().build,
             show_progress_bars=False,
         )
 
@@ -111,7 +110,7 @@ def test_train_with_config():
         MLPClassifierConfig(),
         LinearClassifierConfig(),
         "resnet",
-        classifier_nn(model="resnet"),
+        ResNetClassifierConfig().build,
     ),
     ids=["resnet", "mlp", "linear", "string", "callable"],
 )

@@ -81,6 +81,28 @@ from sbi.neural_nets.net_builders.flow import (
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.ratio_estimators import RatioEstimator
+from sbi.utils.nn_utils import check_net_device, embedding_net_warn_msg
+
+_EMBEDDING_NET_FIELDS = ("embedding_net", "embedding_net_theta", "embedding_net_x")
+"""Fields holding a user-supplied embedding net, across the config families."""
+
+
+def _move_embedding_nets_to_cpu(config: Any) -> None:
+    """Put the config's embedding nets on cpu, warning if one had to move.
+
+    The build functions read a single batch to infer dimensions, and the
+    trainer moves the finished estimator to the training device afterwards. An
+    embedding net that is already on another device would make that inference
+    pass read foreign data, so it is moved back here.
+    """
+    for name in _EMBEDDING_NET_FIELDS:
+        net = getattr(config, name, None)
+        if net is None:
+            continue
+        object.__setattr__(
+            config, name, check_net_device(net, "cpu", embedding_net_warn_msg)
+        )
+
 
 _BUILD_KWARG_ALIASES: dict = {
     "z_score_input": "z_score_x",
@@ -139,6 +161,7 @@ class _EstimatorBuilderBase:
 
     def __post_init__(self):
         _check_literal_values(self, allow_none=True)
+        _move_embedding_nets_to_cpu(self)
 
     _DISCRIMINATORS: ClassVar[frozenset] = frozenset({
         "model",
@@ -432,6 +455,15 @@ class VectorFieldEstimatorBuilder(_EstimatorBuilderBase):
                     f"change estimator_type."
                 )
 
+        if (
+            self.compose_standardization
+            and self.z_score_input is not None
+            and self.z_score_input != "independent"
+        ):
+            raise ValueError(
+                "compose_standardization=True requires z_score_input='independent'."
+            )
+
         # Reject fields inapplicable to the chosen model architecture.
         always_ok = (
             frozenset({"z_score_input", "z_score_condition", "compose_standardization"})
@@ -524,6 +556,7 @@ class _PerModelConfigBase:
 
     def __post_init__(self):
         _check_literal_values(self, allow_none=False)
+        _move_embedding_nets_to_cpu(self)
         field_names = {f.name for f in fields(self)}
         build_names = {_BUILD_KWARG_ALIASES.get(name, name) for name in field_names}
         shadowed = set(self.extra_kwargs) & (
@@ -1230,6 +1263,32 @@ _DENSITY_CONFIGS: dict = {
 }
 
 
+def _density_config_from_model(model: str) -> Optional[DensityConfigBase]:
+    """Return the default config of a conditional density model given its name.
+
+    Args:
+        model: Name of the model.
+
+    Returns:
+        A default-constructed config for that model, or `None` for a name no model
+        knows, so that callers can reproduce the build-time error the factories
+        raise for it.
+    """
+    config_cls = _DENSITY_CONFIGS.get(model)
+    if config_cls is None:
+        return None
+    return config_cls()
+
+
+def _unknown_density_build_fn(model: str) -> Callable:
+    """Preserve the factories' build-time error for unknown model names."""
+
+    def build_fn(batch_theta, batch_x):
+        raise NotImplementedError(f"Model {model} is not implemented")
+
+    return build_fn
+
+
 @dataclass(frozen=True, eq=False, repr=False)
 class ClassifierConfigBase(_PerModelConfigBase):
     r"""Base configuration for ratio estimators / classifiers (NRE).
@@ -1336,6 +1395,25 @@ _CLASSIFIER_CONFIGS: dict = {
     "mlp": MLPClassifierConfig,
     "resnet": ResNetClassifierConfig,
 }
+
+
+def _classifier_config_from_model(model: str) -> ClassifierConfigBase:
+    """Return the default config of a classifier model given its name.
+
+    Args:
+        model: Name of the model.
+
+    Returns:
+        A default-constructed config for that model.
+    """
+    config_cls = _CLASSIFIER_CONFIGS.get(model)
+    if config_cls is None:
+        raise ValueError(
+            f"Unknown classifier model {model!r}. "
+            f"Must be one of {sorted(_CLASSIFIER_CONFIGS)}."
+        )
+    return config_cls()
+
 
 # TabPFN is the one density model the mixed build function cannot use.
 _MIXED_CONTINUOUS_CONFIGS: frozenset = frozenset(

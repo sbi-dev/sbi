@@ -2,14 +2,15 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import inspect
+import warnings
 from dataclasses import FrozenInstanceError
 
 import pytest
 import torch
 from torch import nn
 
-from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.factory import likelihood_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     _CLASSIFIER_CONFIGS,
     _DENSITY_CONFIGS,
@@ -182,7 +183,9 @@ def test_mixed_defaults_match_the_factory():
     torch.manual_seed(0)
     configured = config.build(mixed_x, theta)
     torch.manual_seed(0)
-    from_factory = likelihood_nn("mnle")(theta, mixed_x)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        from_factory = likelihood_nn("mnle")(theta, mixed_x)
 
     assert configured.state_dict().keys() == from_factory.state_dict().keys()
     for name, value in configured.state_dict().items():

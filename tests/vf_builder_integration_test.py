@@ -34,9 +34,11 @@ def test_advertised_time_emb_types_all_build(factory_fn):
     annotation = inspect.signature(factory_fn).parameters["time_emb_type"].annotation
     values = get_args(annotation)
     assert values, "time_emb_type lost its Literal annotation"
-    for value in values:
-        builder = factory_fn(model="mlp", time_emb_type=value)
-        builder(torch.randn(10, 2), torch.randn(10, 3))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        for value in values:
+            builder = factory_fn(model="mlp", time_emb_type=value)
+            builder(torch.randn(10, 2), torch.randn(10, 3))
 
 
 @pytest.fixture
@@ -318,6 +320,7 @@ def test_default_builder_matches_factory_z_scoring(est_type):
     est_builder = builder.build(batch_input=theta, batch_condition=x)
 
     # Build via factory.
+    warnings.simplefilter("ignore", FutureWarning)
     if est_type == "flow":
         from sbi.neural_nets.factory import posterior_flow_nn
 

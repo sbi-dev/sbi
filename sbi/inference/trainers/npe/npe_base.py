@@ -42,7 +42,6 @@ from sbi.inference.trainers.base import (
     NeuralInference,
     check_if_proposal_has_default_x,
 )
-from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.estimators.shape_handling import (
@@ -55,6 +54,8 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     DensityConfigBase,
     MAFConfig,
     PretrainedConfigBase,
+    _density_config_from_model,
+    _unknown_density_build_fn,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -130,11 +131,11 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         if density_estimator is None:
             self._build_neural_net = self._wrap_builder(MAFConfig())
         elif isinstance(density_estimator, str):
-            pretrained = _DENSITY_CONFIGS.get(density_estimator)
-            if pretrained is not None and issubclass(pretrained, PretrainedConfigBase):
+            config_cls = _DENSITY_CONFIGS.get(density_estimator)
+            if config_cls is not None and issubclass(config_cls, PretrainedConfigBase):
                 raise TypeError(
                     f"{type(self).__name__} requires a trainable model; got "
-                    f"{density_estimator!r}. {pretrained._REJECTION_HINT}"
+                    f"{density_estimator!r}. {config_cls._REJECTION_HINT}"
                 )
             warnings.warn(
                 "Passing a string for `density_estimator` is deprecated. "
@@ -143,7 +144,12 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 FutureWarning,
                 stacklevel=3,
             )
-            self._build_neural_net = posterior_nn(model=density_estimator)
+            config = _density_config_from_model(density_estimator)
+            self._build_neural_net = (
+                _unknown_density_build_fn(density_estimator)
+                if config is None
+                else self._wrap_builder(config)
+            )
         elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
             if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
                 allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)

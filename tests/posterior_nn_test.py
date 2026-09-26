@@ -26,7 +26,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
-from sbi.neural_nets import posterior_flow_nn
+from sbi.neural_nets import VectorFieldEstimatorBuilder
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
@@ -351,8 +351,9 @@ def test_batched_vector_field_sample_with_multidim_x(
         num_dim=num_dim, embedding_dim=10
     )
 
-    flow_estimator = posterior_flow_nn(
+    flow_estimator = VectorFieldEstimatorBuilder(
         model='mlp',
+        estimator_type="flow",
         embedding_net=embedding_net,
     )
 

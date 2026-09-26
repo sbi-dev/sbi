@@ -24,7 +24,7 @@ from sbi.inference.potentials.base_potential import (
 )
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
-from sbi.neural_nets import posterior_nn, posterior_score_nn
+from sbi.neural_nets import MDNConfig, VectorFieldEstimatorBuilder
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
 
@@ -110,8 +110,12 @@ def _build_potential(potential_type: str, x_o: Tensor | None = None) -> BasePote
     x = torch.randn(20, 2)
 
     if potential_type == "posterior":
-        return PosteriorBasedPotential(posterior_nn("mdn")(theta, x), prior, x_o=x_o)
-    return VectorFieldBasedPotential(posterior_score_nn()(theta, x), prior, x_o=x_o)
+        return PosteriorBasedPotential(MDNConfig().build(theta, x), prior, x_o=x_o)
+    return VectorFieldBasedPotential(
+        VectorFieldEstimatorBuilder(estimator_type="score").build(theta, x),
+        prior,
+        x_o=x_o,
+    )
 
 
 @pytest.mark.parametrize("potential_type", ("posterior", "vector_field"))

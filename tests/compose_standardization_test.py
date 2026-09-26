@@ -11,7 +11,7 @@ from torch.distributions import Independent, Normal
 
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
-from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
+from sbi.neural_nets import VectorFieldEstimatorBuilder
 from sbi.neural_nets.net_builders.vector_field_nets import (
     build_vector_field_estimator,
 )
@@ -286,13 +286,12 @@ def test_pre_compose_pickled_posterior_samples():
     assert samples.shape == (2, NUM_DIM)
 
 
-@pytest.mark.parametrize("factory", [posterior_flow_nn, posterior_score_nn])
-@pytest.mark.parametrize(
-    "z_score_theta", [None, "none", "structured", "transform_to_unconstrained"]
-)
-def test_compose_requires_independent_theta_z_score(factory, z_score_theta):
-    with pytest.raises(ValueError, match="z_score_theta='independent'"):
-        factory(
+@pytest.mark.parametrize("estimator_type", ["flow", "score"])
+@pytest.mark.parametrize("z_score_input", ["none", "structured"])
+def test_compose_requires_independent_theta_z_score(estimator_type, z_score_input):
+    with pytest.raises(ValueError, match="z_score_input='independent'"):
+        VectorFieldEstimatorBuilder(
+            estimator_type=estimator_type,
             compose_standardization=True,
-            z_score_theta=z_score_theta,
+            z_score_input=z_score_input,
         )

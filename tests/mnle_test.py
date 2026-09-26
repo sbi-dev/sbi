@@ -19,7 +19,7 @@ from sbi.inference.potentials.likelihood_based_potential import (
     _log_likelihood_over_iid_trials_and_local_theta,
     likelihood_estimator_based_potential,
 )
-from sbi.neural_nets import likelihood_nn
+from sbi.neural_nets import MDNConfig, MixedConfig, NSFConfig, ZukoNSFConfig
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils import BoxUniform, mcmc_transform
 from sbi.utils.metrics import check_c2st
@@ -69,18 +69,18 @@ def mnle_prior():
 @pytest.fixture(
     scope="module",
     params=[
-        pytest.param("nsf", id="nsf"),
-        pytest.param("zuko_nsf", id="zuko_nsf"),
+        pytest.param(NSFConfig, id="nsf"),
+        pytest.param(ZukoNSFConfig, id="zuko_nsf"),
     ],
 )
 def mnle_trained_accurate(request, mnle_prior):
     """MNLE trained with many simulations, parametrized by flow model."""
     seed_all_backends(1)
-    flow_model = request.param
+    continuous_config = request.param
     theta = mnle_prior.sample((4000,))
     x = mixed_simulator(theta, stimulus_condition=1.0)
-    density_estimator = likelihood_nn(
-        model="mnle", flow_model=flow_model, log_transform_x=True
+    density_estimator = MixedConfig(
+        continuous=continuous_config(), log_transform_x=True
     )
     trainer = MNLE(mnle_prior, density_estimator=density_estimator)
     trainer.append_simulations(theta, x).train(training_batch_size=200)
@@ -107,11 +107,15 @@ def test_mnle_on_device(mnle_prior, mcmc_params_fast: MCMCPosteriorParameters):
 @pytest.mark.parametrize(
     "sampler", (pytest.param("mcmc", marks=pytest.mark.mcmc), "rejection", "vi")
 )
-@pytest.mark.parametrize("flow_model", ("mdn", "nsf", "zuko_nsf"))
+@pytest.mark.parametrize(
+    "continuous_config",
+    (MDNConfig, NSFConfig, ZukoNSFConfig),
+    ids=["mdn", "nsf", "zuko_nsf"],
+)
 @pytest.mark.parametrize("z_score_theta", ("independent", "none"))
 def test_mnle_api(
     mnle_prior,
-    flow_model: str,
+    continuous_config: type[NSFConfig],
     sampler,
     mcmc_params_fast: MCMCPosteriorParameters,
     z_score_theta: str,
@@ -123,10 +127,9 @@ def test_mnle_api(
     x_o = x[0]
     # Build estimator manually.
     theta_embedding = FCEmbedding(2, 2)  # simple embedding net
-    density_estimator = likelihood_nn(
-        model="mnle",
-        flow_model=flow_model,
-        z_score_theta=z_score_theta,
+    density_estimator = MixedConfig(
+        continuous=continuous_config(),
+        z_score_condition=z_score_theta,
         embedding_net=theta_embedding,
     )
     trainer = MNLE(density_estimator=density_estimator)
@@ -323,7 +326,7 @@ def test_mnle_with_experimental_conditions(
     ).sample((num_samples,), x=x_o)
 
     # MNLE
-    estimator_fun = likelihood_nn(model="mnle", log_transform_x=True)
+    estimator_fun = MixedConfig(log_transform_x=True)
     trainer = MNLE(proposal, estimator_fun)
     estimator = trainer.append_simulations(theta, x).train()
 

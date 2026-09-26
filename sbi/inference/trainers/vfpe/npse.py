@@ -15,7 +15,6 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
-from sbi.neural_nets.factory import posterior_score_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
     VectorFieldEstimatorBuilder,
@@ -112,8 +111,7 @@ class NPSE(VectorFieldTrainer):
                 builder. When a ``VectorFieldEstimatorBuilder`` is passed,
                 a non-``None`` ``sde_type`` that differs from the builder's
                 value raises ``ValueError`` (set it on the builder instead).
-                When a string (deprecated), forwarded to
-                ``posterior_score_nn``.
+                When a string (deprecated), set on the default builder.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -265,4 +263,8 @@ class NPSE(VectorFieldTrainer):
         model: VF_MODELS,
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
     ) -> ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]:
-        return posterior_score_nn(model=model, sde_type=sde_type)
+        return self._wrap_builder(
+            VectorFieldEstimatorBuilder(
+                model=model, estimator_type="score", sde_type=sde_type
+            )
+        )

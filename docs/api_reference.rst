@@ -39,6 +39,70 @@ Prior and simulator
 Neural nets
 -----------
 
+Conditional density configs, used by ``NPE`` and ``NLE``.
+
+.. autosummary::
+   :nosignatures:
+
+   sbi.neural_nets.MADEConfig
+   sbi.neural_nets.MAFConfig
+   sbi.neural_nets.MAFRQSConfig
+   sbi.neural_nets.MDNConfig
+   sbi.neural_nets.NSFConfig
+   sbi.neural_nets.TabPFNConfig
+   sbi.neural_nets.ZukoBPFConfig
+   sbi.neural_nets.ZukoGFConfig
+   sbi.neural_nets.ZukoMAFConfig
+   sbi.neural_nets.ZukoNAFConfig
+   sbi.neural_nets.ZukoNCSFConfig
+   sbi.neural_nets.ZukoNICEConfig
+   sbi.neural_nets.ZukoNSFConfig
+   sbi.neural_nets.ZukoSOSPFConfig
+   sbi.neural_nets.ZukoUNAFConfig
+
+Mixed config, for data with continuous and categorical parts, used by ``MNPE`` and
+``MNLE``.
+
+.. autosummary::
+   :nosignatures:
+
+   sbi.neural_nets.MixedConfig
+
+Classifier configs, used by ``NRE``.
+
+.. autosummary::
+   :nosignatures:
+
+   sbi.neural_nets.LinearClassifierConfig
+   sbi.neural_nets.MLPClassifierConfig
+   sbi.neural_nets.ResNetClassifierConfig
+
+Marginal density configs, used by ``MarginalTrainer``.
+
+.. autosummary::
+   :nosignatures:
+
+   sbi.neural_nets.MarginalBPFConfig
+   sbi.neural_nets.MarginalGFConfig
+   sbi.neural_nets.MarginalMAFConfig
+   sbi.neural_nets.MarginalNAFConfig
+   sbi.neural_nets.MarginalNCSFConfig
+   sbi.neural_nets.MarginalNICEConfig
+   sbi.neural_nets.MarginalNSFConfig
+   sbi.neural_nets.MarginalSOSPFConfig
+   sbi.neural_nets.MarginalUNAFConfig
+
+Vector field builder, used by ``FMPE`` and ``NPSE``.
+
+.. autosummary::
+   :nosignatures:
+
+   sbi.neural_nets.VectorFieldEstimatorBuilder
+
+Factory functions, deprecated since v0.28.0 and to be removed in v0.29.0. Pass the
+matching config above instead, e.g. ``posterior_nn(model="nsf")`` becomes
+``NSFConfig()``.
+
 .. autosummary::
    :nosignatures:
 
