@@ -41,6 +41,82 @@ from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 
 THETA, X = torch.randn(100, 3), torch.randn(100, 5)
 
+pytestmark = pytest.mark.filterwarnings("ignore::FutureWarning")
+
+
+def _build_posterior():
+    return posterior_nn("nsf")
+
+
+def _build_likelihood():
+    return likelihood_nn("nsf")
+
+
+def _build_classifier():
+    return classifier_nn("mlp")
+
+
+def _build_score():
+    return posterior_score_nn("mlp")
+
+
+def _build_flow():
+    return posterior_flow_nn("mlp")
+
+
+def _build_marginal():
+    return marginal_nn("nsf")
+
+
+@pytest.mark.parametrize(
+    "call,name,replacement",
+    [
+        (_build_posterior, "posterior_nn", "NSFConfig"),
+        (_build_likelihood, "likelihood_nn", "NSFConfig"),
+        (_build_classifier, "classifier_nn", "ResNetClassifierConfig"),
+        (
+            _build_score,
+            "posterior_score_nn",
+            'VectorFieldEstimatorBuilder(estimator_type="score")',
+        ),
+        (
+            _build_flow,
+            "posterior_flow_nn",
+            'VectorFieldEstimatorBuilder(estimator_type="flow")',
+        ),
+        (_build_marginal, "marginal_nn", "MarginalNSFConfig"),
+    ],
+    ids=["posterior", "likelihood", "classifier", "score", "flow", "marginal"],
+)
+def test_every_factory_warns(call, name, replacement):
+    """Each factory must announce the deprecation and name the way out."""
+    with pytest.warns(FutureWarning) as record:
+        call()
+    messages = [str(w.message) for w in record if issubclass(w.category, FutureWarning)]
+    assert len(messages) == 1, messages
+    message = messages[0]
+    assert name in message
+    assert "v0.28.0" in message
+    assert "v0.29.0" in message
+    assert replacement in message
+
+
+def test_deprecation_warning_points_at_the_caller():
+    """The warning must blame the call site, not sbi's own factory wrapper."""
+    with pytest.warns(FutureWarning) as record:
+        posterior_nn("nsf")
+    assert record[0].filename == __file__, record[0].filename
+
+
+def test_no_public_factory_is_left_undeprecated():
+    """A new factory must not ship without the deprecation warning."""
+    import sbi.neural_nets
+
+    factories = {name for name in dir(sbi.neural_nets) if name.endswith("_nn")}
+    for name in factories:
+        with pytest.warns(FutureWarning):
+            getattr(sbi.neural_nets, name)("nsf" if name != "classifier_nn" else "mlp")
+
 
 @pytest.mark.parametrize(
     "factory_fn,fields",

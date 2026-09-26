@@ -15,7 +15,6 @@ from sbi.inference.posteriors.posterior_parameters import (
     VIPosteriorParameters,
 )
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
-from sbi.neural_nets import likelihood_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.net_builders.estimator_configs import (
@@ -124,7 +123,7 @@ class MNLE(LikelihoodEstimatorTrainer):
                 FutureWarning,
                 stacklevel=2,
             )
-            density_estimator = likelihood_nn(model="mnle")
+            density_estimator = MixedConfig()
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 

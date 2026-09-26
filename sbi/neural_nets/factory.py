@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from dataclasses import replace
 from enum import Enum
 from typing import Any, Callable, Literal, Optional, Union
@@ -15,6 +16,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     _config_from_factory_kwargs,
     _factory_defaults,
     _mixed_config_from_factory_kwargs,
+    _unknown_density_build_fn,
 )
 from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
 from sbi.neural_nets.net_builders.vector_field_nets import (
@@ -22,7 +24,7 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     ScoreEstimatorConfig,
     build_vector_field_estimator,
 )
-from sbi.utils.nn_utils import check_net_device
+from sbi.utils.nn_utils import check_net_device, embedding_net_warn_msg
 from sbi.utils.vector_field_utils import VectorFieldNet
 
 
@@ -41,8 +43,20 @@ class ZukoFlowType(Enum):
     UNAF = "unaf"
 
 
-embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
-                        constructing the net building function."""
+def _warn_factory_deprecated(name: str, replacement: str) -> None:
+    """Warn that one of the `*_nn` factories is on its way out.
+
+    Args:
+        name: Name of the deprecated factory.
+        replacement: The API to use instead, phrased so it can be pasted.
+    """
+    warnings.warn(
+        f"`{name}` is deprecated since sbi v0.28.0 and will be removed in v0.29.0. "
+        f"Use {replacement} instead.",
+        FutureWarning,
+        stacklevel=3,
+    )
+
 
 # Maps a config field to the name the factory exposes it under, so that the
 # factory's own defaults can be read back from its signature.
@@ -100,15 +114,6 @@ def _density_family_args(embedding_net: nn.Module, **family_args: Any) -> dict:
     )
 
 
-def _unknown_density_build_fn(model: str) -> Callable:
-    """Preserve the factories' build-time error for unknown model names."""
-
-    def build_fn(batch_theta, batch_x):
-        raise NotImplementedError(f"Model {model} is not implemented")
-
-    return build_fn
-
-
 def classifier_nn(
     model: str,
     z_score_theta: Optional[
@@ -125,6 +130,9 @@ def classifier_nn(
 
     This function will usually be used for SNRE. The returned function is to be passed
     to the inference class when using the flexible interface.
+
+    Deprecated since v0.28.0, to be removed in v0.29.0. Pass a classifier config
+    instead, e.g. ``ResNetClassifierConfig()``.
 
     Note that in the view of the SNRE classifier we build below, x=theta and y=x.
 
@@ -149,6 +157,11 @@ def classifier_nn(
             the chosen model's config; a key the model does not use raises, and
             an unknown key triggers a warning and is forwarded to the builder.
     """
+
+    _warn_factory_deprecated(
+        "classifier_nn",
+        "a per-model config from `sbi.neural_nets`, e.g. `ResNetClassifierConfig()`",
+    )
 
     # Map user-facing parameter names to the config's field names.
     family_args = _normalize_z_scoring(
@@ -200,6 +213,9 @@ def likelihood_nn(
     This function will usually be used for SNLE. The returned function is to be passed
     to the inference class when using the flexible interface.
 
+    Deprecated since v0.28.0, to be removed in v0.29.0. Pass a per-model density
+    config instead, e.g. ``NSFConfig()``.
+
     Args:
         model: The type of density estimator that will be created. One of [`mdn`,
             `made`, `maf`, `maf_rqs`, `nsf`].
@@ -227,6 +243,11 @@ def likelihood_nn(
             the chosen model's config; a key the model does not use raises, and
             an unknown key triggers a warning and is forwarded to the builder.
     """
+
+    _warn_factory_deprecated(
+        "likelihood_nn",
+        "a per-model config from `sbi.neural_nets`, e.g. `NSFConfig()`",
+    )
 
     family_args = _density_family_args(
         z_score_input=z_score_x,
@@ -286,6 +307,9 @@ def posterior_nn(
     This function will usually be used for SNPE. The returned function is to be passed
     to the inference class when using the flexible interface.
 
+    Deprecated since v0.28.0, to be removed in v0.29.0. Pass a per-model density
+    config instead, e.g. ``NSFConfig()`` or ``MixedConfig()`` for MNPE.
+
     Args:
         model: The type of density estimator that will be created. One of [`mdn`,
             `made`, `maf`, `maf_rqs`, `nsf`].
@@ -315,6 +339,11 @@ def posterior_nn(
             the chosen model's config; a key the model does not use raises, and
             an unknown key triggers a warning and is forwarded to the builder.
     """
+
+    _warn_factory_deprecated(
+        "posterior_nn",
+        "a per-model config from `sbi.neural_nets`, e.g. `NSFConfig()`",
+    )
 
     family_args = _density_family_args(
         z_score_input=z_score_theta,
@@ -407,6 +436,9 @@ def posterior_score_nn(
     """Build util function that builds a ScoreEstimator object for score-based
     posteriors.
 
+    Deprecated since v0.28.0, to be removed in v0.29.0. Pass a
+    ``VectorFieldEstimatorBuilder(estimator_type="score")`` instead.
+
     Args:
         sde_type: SDE type used, which defines the mean and std functions. One of:
             - 'vp': Variance preserving.
@@ -446,6 +478,11 @@ def posterior_score_nn(
     Returns:
         Constructor function for NPSE.
     """
+    _warn_factory_deprecated(
+        "posterior_score_nn",
+        '`VectorFieldEstimatorBuilder(estimator_type="score")` from `sbi.neural_nets`',
+    )
+
     if compose_standardization and z_score_theta != "independent":
         raise ValueError(
             "compose_standardization=True requires z_score_theta='independent'."
@@ -505,6 +542,9 @@ def posterior_flow_nn(
     """Build util function that builds a FlowMatchingEstimator object for flow-based
     posteriors.
 
+    Deprecated since v0.28.0, to be removed in v0.29.0. Pass a
+    ``VectorFieldEstimatorBuilder(estimator_type="flow")`` instead.
+
     Args:
         model: Type of regression network. One of:
             - 'mlp': Fully connected feed-forward network.
@@ -539,6 +579,11 @@ def posterior_flow_nn(
     Returns:
         Constructor function for FMPE.
     """
+    _warn_factory_deprecated(
+        "posterior_flow_nn",
+        '`VectorFieldEstimatorBuilder(estimator_type="flow")` from `sbi.neural_nets`',
+    )
+
     if compose_standardization and z_score_theta != "independent":
         raise ValueError(
             "compose_standardization=True requires z_score_theta='independent'."
@@ -588,6 +633,9 @@ def marginal_nn(
     r"""
     Returns a function that builds a density estimator for learning the marginal.
 
+    Deprecated since v0.28.0, to be removed in v0.29.0. Pass a per-model marginal
+    config instead, e.g. ``MarginalNSFConfig()``.
+
     Args:
         model: The type of density estimator that will be created.
         z_score_x: Whether to z-score samples $x$ before passing them into
@@ -600,6 +648,11 @@ def marginal_nn(
             ``MarginalFlowConfig``; unknown keys trigger a warning and are forwarded to
             the builder.
     """
+
+    _warn_factory_deprecated(
+        "marginal_nn",
+        "a per-model config from `sbi.neural_nets`, e.g. `MarginalNSFConfig()`",
+    )
 
     # Map user-facing parameter names to internal names (no renaming needed here).
     mapped = dict(

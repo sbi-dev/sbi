@@ -9,7 +9,7 @@ from torch.distributions import MultivariateNormal
 from tqdm.auto import tqdm
 
 from sbi.inference.posteriors import VectorFieldPosterior
-from sbi.neural_nets import posterior_score_nn
+from sbi.neural_nets import VectorFieldEstimatorBuilder
 from sbi.samplers.importance import sir
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.rejection import rejection
@@ -193,7 +193,9 @@ def test_vector_field_posterior_shows_at_most_one_bar(
     prior = BoxUniform(-3 * torch.ones(num_dim), 3 * torch.ones(num_dim))
     theta = prior.sample((200,))
     x = theta + 0.1 * torch.randn_like(theta)
-    estimator = posterior_score_nn(sde_type="vp")(theta, x)
+    estimator = VectorFieldEstimatorBuilder(
+        estimator_type="score", sde_type="vp"
+    ).build(theta, x)
     posterior = VectorFieldPosterior(vector_field_estimator=estimator, prior=prior)
 
     sample_fn = posterior.sample_batched if batched else posterior.sample

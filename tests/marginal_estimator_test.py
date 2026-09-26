@@ -16,7 +16,6 @@ from torch.distributions import (
 
 from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.neural_nets import MarginalConfigBase, MarginalNSFConfig
-from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
 from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import process_device
 
@@ -35,9 +34,7 @@ from sbi.utils.torchutils import process_device
     ],
 )
 @pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
-@pytest.mark.parametrize(
-    "model", [MarginalNSFConfig(), marginal_nn(model=ZukoFlowType.NSF)]
-)
+@pytest.mark.parametrize("model", [MarginalNSFConfig(), MarginalNSFConfig().build])
 def test_marginal_estimator(
     dist: torch.distributions.Distribution,
     device: str,

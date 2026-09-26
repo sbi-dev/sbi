@@ -19,7 +19,7 @@ from sbi.inference import (
     likelihood_estimator_based_potential,
 )
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
-from sbi.neural_nets import likelihood_nn
+from sbi.neural_nets.net_builders.estimator_configs import _DENSITY_CONFIGS
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -109,7 +109,7 @@ def test_c2st_nle_on_linear_gaussian_different_dims(
             num_discarded_dims=discard_dims,
         )
 
-    density_estimator = likelihood_nn(model=model_str, num_transforms=3)
+    density_estimator = _DENSITY_CONFIGS[model_str](num_transforms=3)
     inference = NLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
@@ -167,7 +167,7 @@ def test_c2st_and_map_nle_on_linearGaussian_different(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    density_estimator = likelihood_nn(model_str, num_transforms=3)
+    density_estimator = _DENSITY_CONFIGS[model_str](num_transforms=3)
     inference = NLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
@@ -533,12 +533,11 @@ def test_c2st_nle_unconstrained_space(
     # Estimate prior on x.
     x_dist = BoxUniform(low=x.min(dim=0)[0], high=x.max(dim=0)[0])
 
-    # Use likelihood_nn with z_score_theta="transform_to_unconstrained"
-    density_estimator = likelihood_nn(
-        model_str,
+    # Model x in the unconstrained space.
+    density_estimator = _DENSITY_CONFIGS[model_str](
         hidden_features=60,
         num_transforms=3,
-        z_score_x="transform_to_unconstrained",
+        z_score_input="transform_to_unconstrained",
         x_dist=x_dist,
     )
     inference = NLE(density_estimator=density_estimator)

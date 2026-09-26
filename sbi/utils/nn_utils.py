@@ -47,11 +47,18 @@ def get_numel(
     return numel
 
 
+embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
+                        constructing the net building function."""
+
+
 def check_net_device(
     net: nn.Module, device: str, message: Optional[str] = None
 ) -> nn.Module:
     """
     Check whether a net is on the desired device and move it there if not.
+
+    A net without parameters, e.g. a bare transform like ``nn.Flatten()``, has no
+    device of its own to check, so it is returned unchanged.
 
     Args:
         net: neural network.
@@ -63,7 +70,12 @@ def check_net_device(
 
     if isinstance(net, nn.Identity):
         return net
-    if canonical_device(next(net.parameters()).device) != canonical_device(device):
+    tensor = next(net.parameters(), None)
+    if tensor is None:
+        tensor = next(net.buffers(), None)
+    if tensor is None:
+        return net
+    if canonical_device(tensor.device) != canonical_device(device):
         warn(
             message or f"Network is not on the correct device. Moving it to {device}.",
             stacklevel=2,

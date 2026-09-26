@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Tuple
 
 import pytest
@@ -223,11 +224,14 @@ def _build_gaussian_score_estimator(
         def forward(self, input, condition, time):
             return torch.zeros_like(input)
 
-    score_estimator = posterior_score_nn(
-        sde_type=sde_type,
-        model=DummyNet(),
-        embedding_net=torch.nn.Identity(),
-    )(building_thetas, building_xs)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        build_fn = posterior_score_nn(
+            sde_type=sde_type,
+            model=DummyNet(),
+            embedding_net=torch.nn.Identity(),
+        )
+    score_estimator = build_fn(building_thetas, building_xs)
 
     score_fn, _ = vector_field_estimator_based_potential(
         score_estimator, prior=None, x_o=torch.ones((1,))

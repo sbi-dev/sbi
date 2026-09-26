@@ -19,7 +19,6 @@ from sbi.neural_nets.estimators.base import (
     ConditionalEstimatorBuildFn,
     ConditionalVectorFieldEstimator,
 )
-from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
     VectorFieldEstimatorBuilder,
@@ -210,4 +209,6 @@ class FMPE(VectorFieldTrainer):
         self,
         model: VF_MODELS,
     ) -> ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]:
-        return posterior_flow_nn(model=model)
+        return self._wrap_builder(
+            VectorFieldEstimatorBuilder(model=model, estimator_type="flow")
+        )

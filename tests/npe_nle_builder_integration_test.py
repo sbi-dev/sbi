@@ -9,7 +9,6 @@ from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import MNLE, MNPE, NLE_A, NPE_A, NPE_C, NPE_PFN
-from sbi.neural_nets import likelihood_nn, posterior_nn
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
@@ -25,15 +24,11 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 from sbi.utils import BoxUniform
 from sbi.utils.user_input_checks import check_estimator_arg
 
-_TRAINERS = [(NPE_C, posterior_nn, "theta"), (NLE_A, likelihood_nn, "x")]
+_TRAINERS = [(NPE_C, "theta"), (NLE_A, "x")]
 
 
-@pytest.mark.parametrize(
-    "trainer_cls,factory_fn",
-    [(t, f) for t, f, _ in _TRAINERS],
-    ids=["npe", "nle"],
-)
-def test_no_warning_for_valid_inputs(trainer_cls, factory_fn):
+@pytest.mark.parametrize("trainer_cls", [t for t, _ in _TRAINERS], ids=["npe", "nle"])
+def test_no_warning_for_valid_inputs(trainer_cls):
     """None default, config, and callable should not emit FutureWarning."""
     prior = MultivariateNormal(zeros(2), eye(2))
 
@@ -43,14 +38,14 @@ def test_no_warning_for_valid_inputs(trainer_cls, factory_fn):
         trainer_cls(prior, density_estimator=MAFConfig(), show_progress_bars=False)
         trainer_cls(
             prior,
-            density_estimator=factory_fn(model="maf"),
+            density_estimator=MAFConfig().build,
             show_progress_bars=False,
         )
 
 
 @pytest.mark.parametrize(
     "trainer_cls",
-    [t for t, _, _ in _TRAINERS],
+    [t for t, _ in _TRAINERS],
     ids=["npe", "nle"],
 )
 def test_string_emits_deprecation_warning(trainer_cls):
@@ -62,7 +57,7 @@ def test_string_emits_deprecation_warning(trainer_cls):
 
 @pytest.mark.parametrize(
     "trainer_cls,input_var",
-    [(t, v) for t, _, v in _TRAINERS],
+    [(t, v) for t, v in _TRAINERS],
     ids=["npe", "nle"],
 )
 def test_train_with_config(trainer_cls, input_var):
@@ -311,7 +306,7 @@ def test_mixed_continuous_settings_reach_the_continuous_net():
         MAFConfig(),
         MixedConfig(),
         "maf",
-        posterior_nn(model="maf"),
+        MAFConfig().build,
     ),
     ids=["density_config", "mixed_config", "string", "callable"],
 )
@@ -333,9 +328,7 @@ def test_check_estimator_arg_rejects_config_class(config_cls):
         check_estimator_arg(config_cls)
 
 
-@pytest.mark.parametrize(
-    "trainer_cls", [t for t, _, _ in _TRAINERS], ids=["npe", "nle"]
-)
+@pytest.mark.parametrize("trainer_cls", [t for t, _ in _TRAINERS], ids=["npe", "nle"])
 @pytest.mark.parametrize(
     "config", [ResNetClassifierConfig(), MixedConfig()], ids=["classifier", "mixed"]
 )

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import io
 import warnings
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from typing import Tuple, Union
 
 import pytest
@@ -45,11 +45,12 @@ from sbi.inference.trainers.npe import NPE, NPE_A, NPE_C, NPE_PFN
 from sbi.inference.trainers.nre import NRE_A, NRE_B, NRE_C
 from sbi.inference.trainers.vfpe import FMPE, NPSE
 from sbi.neural_nets.embedding_nets import FCEmbedding
-from sbi.neural_nets.factory import (
-    classifier_nn,
-    embedding_net_warn_msg,
-    likelihood_nn,
-    posterior_nn,
+from sbi.neural_nets.factory import embedding_net_warn_msg
+from sbi.neural_nets.net_builders.estimator_configs import (
+    _CLASSIFIER_CONFIGS,
+    _DENSITY_CONFIGS,
+    MDNConfig,
+    MLPClassifierConfig,
 )
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils import BoxUniform
@@ -153,22 +154,18 @@ def test_training_and_mcmc_on_device(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    if method in [NPE_A, NPE_C]:
+    if method in [NPE_A, NPE_C, NLE]:
+        config_cls = _DENSITY_CONFIGS[model]
+        config_args = {"num_transforms": 2, "dtype": torch.float32}
+        supported = {field.name for field in fields(config_cls)}
         kwargs = dict(
-            density_estimator=posterior_nn(
-                model=model, num_transforms=2, dtype=torch.float32
-            )
-        )
-        train_kwargs = dict()
-    elif method == NLE:
-        kwargs = dict(
-            density_estimator=likelihood_nn(
-                model=model, num_transforms=2, dtype=torch.float32
-            )
+            density_estimator=config_cls(**{
+                k: v for k, v in config_args.items() if k in supported
+            })
         )
         train_kwargs = dict()
     elif method in (NRE_A, NRE_B, NRE_C):
-        kwargs = dict(classifier=classifier_nn(model=model))
+        kwargs = dict(classifier=_CLASSIFIER_CONFIGS[model]())
         train_kwargs = dict()
     else:
         raise ValueError()
@@ -305,24 +302,18 @@ def test_train_with_different_data_and_training_device(
     )
 
     if inference_method in [NRE_A, NRE_B, NRE_C]:
-        net_builder_fun = classifier_nn
-        kwargs = dict(model="mlp", embedding_net_x=embedding_net)
-    elif inference_method == NLE:
-        net_builder_fun = likelihood_nn
-        kwargs = dict(model="mdn", embedding_net=embedding_net)
-    elif inference_method == NPE_A:
-        net_builder_fun = posterior_nn
-        kwargs = dict(model="mdn_snpe_a", embedding_net=embedding_net)
+        config_cls = MLPClassifierConfig
+        kwargs = dict(embedding_net_x=embedding_net)
     else:
-        net_builder_fun = posterior_nn
-        kwargs = dict(model="mdn", embedding_net=embedding_net)
+        config_cls = MDNConfig
+        kwargs = dict(embedding_net=embedding_net)
 
     # warning must be issued when embedding not on cpu.
     if embedding_device != "cpu":
         with pytest.warns(UserWarning, match=embedding_net_warn_msg):
-            net_builder = net_builder_fun(**kwargs)
+            net_builder = config_cls(**kwargs)
     else:
-        net_builder = net_builder_fun(**kwargs)
+        net_builder = config_cls(**kwargs)
 
     inference = inference_method(
         prior, net_builder, show_progress_bars=False, device=training_device

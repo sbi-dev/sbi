@@ -13,7 +13,7 @@ from sbi.diagnostics.misspecification import (
 )
 from sbi.inference import NPE
 from sbi.inference.trainers.marginal import MarginalTrainer
-from sbi.neural_nets import MarginalNSFConfig, posterior_nn
+from sbi.neural_nets import MAFConfig, MarginalNSFConfig
 from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.utils.sbiutils import seed_all_backends
 
@@ -133,8 +133,9 @@ def test_mmd_x_emedding(D: int, N: int):
     emb_net = FCEmbedding(
         input_dim=D, output_dim=D, num_layers=3, num_hiddens=20
     )  # minimal embedding network
-    neural_posterior = posterior_nn(model="maf", embedding_net=emb_net)
-    inference = NPE(prior=prior_true, density_estimator=neural_posterior)
+    inference = NPE(
+        prior=prior_true, density_estimator=MAFConfig(embedding_net=emb_net)
+    )
     inference = inference.append_simulations(theta_train, x_train)
     _ = inference.train()
 
