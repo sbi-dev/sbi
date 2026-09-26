@@ -5,6 +5,7 @@
 
 import inspect
 import warnings
+from copy import deepcopy
 from dataclasses import fields as dc_fields
 from typing import get_args
 
@@ -166,6 +167,107 @@ def test_custom_network_module_is_accepted(batches):
 def test_estimator_config_rejects_an_invalid_network(config_cls, net):
     with pytest.raises(TypeError, match="VectorFieldNet"):
         config_cls(net=net)
+
+
+@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
+@pytest.mark.parametrize("condition_dim,output_dim", [(7, 2), (3, 2), (7, 1)])
+def test_custom_network_validates_embedded_shapes_without_changing_state(
+    config_cls, condition_dim, output_dim, batches
+):
+    class CustomNet(VectorFieldNet):
+        def __init__(self):
+            super().__init__()
+            self.norm = nn.BatchNorm1d(condition_dim)
+            self.linear = nn.Linear(2 + condition_dim + 1, output_dim)
+            self.register_buffer("calls", torch.zeros(()))
+
+        def forward(self, input, condition, time):
+            self.calls.add_(1)
+            return self.linear(
+                torch.cat([input, self.norm(condition), time[:, None]], dim=-1)
+            )
+
+    net = CustomNet()
+    net.linear.eval()
+    embedding = nn.Sequential(nn.Linear(3, 7), nn.BatchNorm1d(7))
+    states = [deepcopy(module.state_dict()) for module in (net, embedding)]
+    modes = [module.training for root in (net, embedding) for module in root.modules()]
+    config = config_cls(net=net, embedding_net=embedding)
+    valid = condition_dim == 7 and output_dim == 2
+
+    if valid:
+        estimator = config.build(*batches)
+        assert estimator.net is net
+    else:
+        with pytest.raises(ValueError, match=r"embedded condition shape \(7,\)"):
+            config.build(*batches)
+
+    for module, state in zip((net, embedding), states, strict=True):
+        for name, value in module.state_dict().items():
+            torch.testing.assert_close(value, state[name], rtol=0, atol=0)
+    assert modes == [
+        module.training for root in (net, embedding) for module in root.modules()
+    ]
+    if valid:
+        assert torch.isfinite(estimator.loss(*batches)).all()
+
+
+@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
+@pytest.mark.parametrize("inplace_target", ["network", "embedding"])
+def test_custom_network_probe_preserves_input_batches(
+    config_cls, inplace_target, batches
+):
+    class CustomNet(VectorFieldNet):
+        def forward(self, input, condition, time):
+            return input.relu_() if inplace_target == "network" else input
+
+    embedding = (
+        nn.ReLU(inplace=True) if inplace_target == "embedding" else nn.Identity()
+    )
+    batches = tuple(-batch.abs() for batch in batches)
+    expected = [batch.clone() for batch in batches]
+    estimator = config_cls(net=CustomNet(), embedding_net=embedding).build(*batches)
+
+    for actual, original in zip(batches, expected, strict=True):
+        torch.testing.assert_close(actual, original, rtol=0, atol=0)
+    torch.testing.assert_close(estimator.mean_0, expected[0].mean(dim=0))
+
+
+@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
+@pytest.mark.parametrize("normalized_target", ["network", "embedding"])
+@pytest.mark.parametrize("parametrized", [False, True], ids=["legacy", "parametrized"])
+def test_custom_network_probe_accepts_weight_normalization(
+    config_cls, normalized_target, parametrized, batches
+):
+    class CustomNet(VectorFieldNet):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(5, 2)
+
+        def forward(self, input, condition, time):
+            return self.linear(torch.cat([input, condition], dim=-1))
+
+    net = CustomNet()
+    embedding = nn.Linear(3, 3)
+    namespace = nn.utils.parametrizations if parametrized else nn.utils
+    weight_norm = getattr(namespace, "weight_norm", None)
+    if weight_norm is None:
+        pytest.skip("Parametrized weight normalization is unavailable.")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        weight_norm(net.linear if normalized_target == "network" else embedding)
+    states = [deepcopy(module.state_dict()) for module in (net, embedding)]
+    estimator = config_cls(net=net, embedding_net=embedding).build(*batches)
+
+    assert estimator.net is net
+    for module, state in zip((net, embedding), states, strict=True):
+        for name, value in module.state_dict().items():
+            torch.testing.assert_close(value, state[name], rtol=0, atol=0)
+    estimator.loss(*batches).mean().backward()
+    assert all(
+        parameter.grad is not None and torch.isfinite(parameter.grad).all()
+        for parameter in estimator.parameters()
+    )
 
 
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS)

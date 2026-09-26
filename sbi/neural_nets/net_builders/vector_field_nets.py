@@ -4,6 +4,7 @@
 import math
 import warnings
 from dataclasses import dataclass, field, fields, replace
+from itertools import chain
 from typing import Callable, ClassVar, Literal, Optional, Sequence, Union
 
 import torch
@@ -30,6 +31,29 @@ from sbi.utils.sbiutils import (
 )
 from sbi.utils.user_input_checks import check_data_device
 from sbi.utils.vector_field_utils import VectorFieldNet
+
+try:
+    from torch.func import functional_call
+except ImportError:
+    from torch.nn.utils.stateless import functional_call
+
+
+@torch.no_grad()
+def _probe_module(module: nn.Module, *inputs: Tensor) -> Tensor:
+    """Probe with isolated inputs, parameters, and buffers, restoring training modes."""
+    state = {
+        name: value.detach().to(device=inputs[0].device, copy=True)
+        for name, value in chain(module.named_parameters(), module.named_buffers())
+    }
+    training_modes = {child: child.training for child in module.modules()}
+    try:
+        module.eval()
+        return functional_call(
+            module, state, tuple(value.detach().clone() for value in inputs)
+        )
+    finally:
+        for child, training in training_modes.items():
+            child.training = training
 
 
 def _compute_theta_standardization(
@@ -1291,6 +1315,10 @@ class VectorFieldConfigBase(_PerModelConfigBase):
 
         Returns:
             A ``ConditionalVectorFieldEstimator``.
+
+        Raises:
+            ValueError: If a custom network does not accept the embedded condition
+                or return the expected input shape.
         """
         check_data_device(batch_input, batch_condition)
 
@@ -1301,6 +1329,27 @@ class VectorFieldConfigBase(_PerModelConfigBase):
             vectorfield_net = self.net.build(batch_input, embedded_condition)
         else:
             vectorfield_net = self.net
+            probe_size = min(2, len(batch_input), len(batch_condition))
+            embedded_condition = _probe_module(
+                self.embedding_net, batch_condition[:probe_size]
+            )
+            probe_input = batch_input[:probe_size]
+            try:
+                output = _probe_module(
+                    vectorfield_net,
+                    probe_input,
+                    embedded_condition,
+                    probe_input.new_full((probe_size,), 0.5),
+                )
+                if not isinstance(output, Tensor) or output.shape != probe_input.shape:
+                    raise ValueError("The custom network must return the input shape.")
+            except (RuntimeError, TypeError, ValueError) as error:
+                raise ValueError(
+                    "Custom VectorFieldNet must accept input shape "
+                    f"{tuple(batch_input.shape[1:])} and embedded condition shape "
+                    f"{tuple(embedded_condition.shape[1:])}, "
+                    "and return the input shape."
+                ) from error
 
         mean_0, std_0, compose_shift, compose_scale = _compute_theta_standardization(
             batch_input, self.z_score_input, self.compose_standardization
