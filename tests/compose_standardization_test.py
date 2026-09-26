@@ -11,10 +11,9 @@ from torch.distributions import Independent, Normal
 
 from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
+from sbi.neural_nets import FlowMatchingConfig, VEScoreConfig
+from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
-from sbi.neural_nets.net_builders.vector_field_nets import (
-    build_vector_field_estimator,
-)
 from sbi.utils.sbiutils import z_standardization
 
 NUM_DIM = 3
@@ -26,37 +25,30 @@ def _batches(dim=NUM_DIM):
     return 100.0 + 5.0 * torch.randn(32, dim), torch.randn(32, dim)
 
 
-def _build(compose=True, estimator_type="flow", **kwargs):
+def _build(compose=True, config_cls=FlowMatchingConfig, **kwargs):
     theta, x = _batches()
-    return build_vector_field_estimator(
-        theta,
-        x,
-        estimator_type=estimator_type,
-        z_score_x="independent",
+    return config_cls(
         compose_standardization=compose,
         **kwargs,
-    )
+    ).build(theta, x)
 
 
 def _prior():
     return Independent(Normal(torch.zeros(NUM_DIM), 200.0 * torch.ones(NUM_DIM)), 1)
 
 
-def _posterior(estimator_type="flow", sample_with="ode", **kwargs):
+def _posterior(config_cls=FlowMatchingConfig, sample_with="ode", **kwargs):
     return VectorFieldPosterior(
-        vector_field_estimator=_build(estimator_type=estimator_type, **kwargs),
+        vector_field_estimator=_build(config_cls=config_cls, **kwargs),
         prior=_prior(),
         sample_with=sample_with,
     )
 
 
-@pytest.mark.parametrize(
-    "estimator_type,kwargs",
-    [("flow", {}), ("score", {"sde_type": "ve"})],
-)
-def test_build_compose_on_unit_stats_and_affine(estimator_type, kwargs):
+@pytest.mark.parametrize("config_cls", [FlowMatchingConfig, VEScoreConfig])
+def test_build_compose_on_unit_stats_and_affine(config_cls):
     theta, _ = _batches()
-    estimator = _build(estimator_type=estimator_type, **kwargs)
+    estimator = _build(config_cls=config_cls)
     shift, scale = z_standardization(theta, structured_dims=False)
 
     assert estimator.compose_enabled
@@ -68,12 +60,9 @@ def test_build_compose_on_unit_stats_and_affine(estimator_type, kwargs):
     )
 
 
-@pytest.mark.parametrize(
-    "estimator_type,kwargs",
-    [("flow", {}), ("score", {"sde_type": "ve"})],
-)
-def test_build_compose_off_has_identity_affine(estimator_type, kwargs):
-    estimator = _build(compose=False, estimator_type=estimator_type, **kwargs)
+@pytest.mark.parametrize("config_cls", [FlowMatchingConfig, VEScoreConfig])
+def test_build_compose_off_has_identity_affine(config_cls):
+    estimator = _build(compose=False, config_cls=config_cls)
 
     assert not estimator.compose_enabled
     assert torch.equal(estimator._theta_shift, torch.zeros_like(estimator._theta_shift))
@@ -83,14 +72,10 @@ def test_build_compose_off_has_identity_affine(estimator_type, kwargs):
 def test_build_rejects_compose_plus_baseline():
     theta, x = _batches()
     with pytest.raises(ValueError, match="cannot be used together"):
-        build_vector_field_estimator(
-            theta,
-            x,
-            estimator_type="flow",
-            z_score_x="independent",
+        FlowMatchingConfig(
             gaussian_baseline=True,
             compose_standardization=True,
-        )
+        ).build(theta, x)
 
 
 def test_affine_contract():
@@ -102,6 +87,33 @@ def test_affine_contract():
     assert torch.allclose(
         estimator.log_abs_det(), torch.log(torch.tensor([2.0, 3.0, 5.0])).sum()
     )
+
+
+@pytest.mark.parametrize(
+    "affine_name,value",
+    [
+        ("compose_shift", float("nan")),
+        ("compose_shift", float("inf")),
+        ("compose_scale", 0.0),
+        ("compose_scale", -1.0),
+        ("compose_scale", float("nan")),
+        ("compose_scale", float("inf")),
+    ],
+)
+def test_compose_affine_rejects_invalid_values(affine_name, value):
+    affine_kwargs = {
+        "compose_shift": torch.zeros(NUM_DIM),
+        "compose_scale": torch.ones(NUM_DIM),
+    }
+    affine_kwargs[affine_name] = torch.full((NUM_DIM,), value)
+
+    with pytest.raises(ValueError, match=affine_name):
+        FlowMatchingEstimator(
+            net=torch.nn.Identity(),
+            input_shape=torch.Size([NUM_DIM]),
+            condition_shape=torch.Size([NUM_DIM]),
+            **affine_kwargs,
+        )
 
 
 @pytest.mark.gpu
@@ -173,6 +185,23 @@ def test_checkpoint_loading(case):
 
 
 @pytest.mark.parametrize(
+    "buffer_name,value,error_match",
+    [
+        ("_theta_shift", float("nan"), "compose_shift"),
+        ("_theta_scale", 0.0, "compose_scale"),
+    ],
+)
+def test_checkpoint_loading_rejects_invalid_compose_affine(
+    buffer_name, value, error_match
+):
+    state_dict = _build().state_dict()
+    state_dict[buffer_name][0, 0] = value
+
+    with pytest.raises(ValueError, match=error_match):
+        _build(compose=False).load_state_dict(state_dict)
+
+
+@pytest.mark.parametrize(
     "entrypoint,error_match",
     [
         ("sample_iid", "iid"),
@@ -215,17 +244,16 @@ def test_unsupported_entrypoints_raise(entrypoint, error_match):
 
 
 @pytest.mark.parametrize(
-    "estimator_type,sample_with,kwargs",
+    "config_cls,sample_with",
     [
-        ("flow", "ode", {}),
-        ("score", "sde", {"sde_type": "ve"}),
+        (FlowMatchingConfig, "ode"),
+        (VEScoreConfig, "sde"),
     ],
 )
-def test_samples_are_returned_in_theta_space(estimator_type, sample_with, kwargs):
+def test_samples_are_returned_in_theta_space(config_cls, sample_with):
     posterior = _posterior(
-        estimator_type=estimator_type,
+        config_cls=config_cls,
         sample_with=sample_with,
-        **kwargs,
     )
     samples = posterior.sample(
         (5,),
@@ -243,13 +271,7 @@ def test_samples_are_returned_in_theta_space(estimator_type, sample_with, kwargs
 def test_single_observation_log_prob_jacobian_exact():
     dim = 2
     theta, x = _batches(dim)
-    estimator = build_vector_field_estimator(
-        theta,
-        x,
-        estimator_type="flow",
-        z_score_x="independent",
-        compose_standardization=True,
-    )
+    estimator = FlowMatchingConfig(compose_standardization=True).build(theta, x)
     prior = Independent(Normal(torch.zeros(dim), 100.0 * torch.ones(dim)), 1)
     potential = VectorFieldBasedPotential(
         estimator, prior=prior, x_o=None, device="cpu"

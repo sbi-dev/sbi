@@ -3,8 +3,7 @@
 
 
 import warnings
-from dataclasses import replace
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -22,7 +21,10 @@ from sbi.neural_nets.estimators.base import (
 from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
-    VectorFieldEstimatorBuilder,
+)
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    FlowMatchingConfig,
+    VectorFieldConfigBase,
 )
 from sbi.sbi_types import Tracker
 
@@ -70,17 +72,23 @@ class FMPE(VectorFieldTrainer):
         samples = posterior.sample((1000,), x=x_o)
     """
 
+    _ALLOWED_CONFIG_TYPE: ClassVar[type[VectorFieldConfigBase]] = FlowMatchingConfig
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         vf_estimator: Union[
             VF_MODELS,
-            VectorFieldEstimatorBuilder,
+            FlowMatchingConfig,
             ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
             None,
         ] = None,
         density_estimator: Optional[
-            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]
+            Union[
+                VF_MODELS,
+                FlowMatchingConfig,
+                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
+            ]
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -94,8 +102,8 @@ class FMPE(VectorFieldTrainer):
             prior: Prior distribution.
             vf_estimator: The vector-field estimator used for flow-matching
                 inference. If ``None`` (default), uses a
-                ``VectorFieldEstimatorBuilder`` with default settings. A
-                ``VectorFieldEstimatorBuilder`` can be passed to configure
+                ``FlowMatchingConfig`` with default settings. A
+                ``FlowMatchingConfig`` can be passed to configure
                 the estimator. If it is a string (deprecated), use a
                 pre-configured network of the provided type (one of
                 mlp, ada_mlp, transformer, transformer_cross_attn).
@@ -126,22 +134,12 @@ class FMPE(VectorFieldTrainer):
             vf_estimator = density_estimator
 
         if vf_estimator is None:
-            vf_estimator = VectorFieldEstimatorBuilder(
-                estimator_type="flow",
-            )
-        elif isinstance(vf_estimator, VectorFieldEstimatorBuilder):
-            if vf_estimator.estimator_type is None:
-                vf_estimator = replace(vf_estimator, estimator_type="flow")
-            elif vf_estimator.estimator_type != "flow":
-                raise ValueError(
-                    "FMPE builds flow-matching estimators; got a builder with "
-                    f"estimator_type={vf_estimator.estimator_type!r}."
-                )
+            vf_estimator = FlowMatchingConfig()
         elif isinstance(vf_estimator, str):
             warnings.warn(
                 "Passing a string for `vf_estimator` is deprecated. "
-                "Use VectorFieldEstimatorBuilder(model=...) instead, e.g. "
-                "`from sbi.neural_nets import VectorFieldEstimatorBuilder`.",
+                "Use FlowMatchingConfig() instead, e.g. "
+                "`from sbi.neural_nets import FlowMatchingConfig`.",
                 FutureWarning,
                 stacklevel=2,
             )

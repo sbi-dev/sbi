@@ -3,27 +3,28 @@
 
 import math
 import warnings
-from dataclasses import dataclass
-from typing import Any, Literal, Optional, Sequence, Union
+from dataclasses import dataclass, field, fields, replace
+from itertools import chain
+from typing import Callable, ClassVar, Literal, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 
+from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.neural_nets.estimators.score_estimator import (
-    ConditionalScoreEstimator,
     SubVPScoreEstimator,
     VEScoreEstimator,
     VPScoreEstimator,
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
-    _EstimatorBuilderBase,
+    _VALID_VF_MODELS,
+    _PerModelConfigBase,
 )
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
-    assert_transform_to_unconstrained_supported,
     standardizing_net,
     z_score_parser,
     z_standardization,
@@ -31,87 +32,28 @@ from sbi.utils.sbiutils import (
 from sbi.utils.user_input_checks import check_data_device
 from sbi.utils.vector_field_utils import VectorFieldNet
 
-
-@dataclass(frozen=True, eq=False, repr=False)
-class _VectorFieldBaseConfig(_EstimatorBuilderBase):
-    """Shared configuration fields for all vector field estimator builders.
-
-    Inherits ``to_dict()`` from ``_EstimatorBuilderBase``.
-    Defaults are ``None`` so that only explicitly-set fields are forwarded — the
-    actual default values live in the estimator / network constructors.
-    """
-
-    # Network architecture extras (shared)
-    activation: Optional[Any] = None
-    sinusoidal_max_freq: Optional[float] = None
-    fourier_scale: Optional[float] = None
-
-    # Apply a per-dimension boundary affine around the vector-field estimator.
-    compose_standardization: Optional[bool] = None
-
-    # MLP-specific
-    layer_norm: Optional[bool] = None
-    skip_connections: Optional[bool] = None
-
-    # AdaMLP-specific
-    condition_emb_dim: Optional[int] = None
-    num_intermediate_mlp_layers: Optional[int] = None
-    adamlp_ratio: Optional[int] = None
-
-    # Transformer-specific
-    is_x_emb_seq: Optional[bool] = None
-
-    # Params that are explicit in build_vector_field_estimator but may be
-    # passed through **kwargs at the factory level
-    net: Optional[Any] = None
-    z_score_x: Optional[Any] = None
-    z_score_y: Optional[Any] = None
-    hidden_features: Optional[Any] = None
-    num_layers: Optional[int] = None
-    time_embedding_dim: Optional[int] = None
-    num_heads: Optional[int] = None
-    mlp_ratio: Optional[int] = None
-    embedding_net: Optional[Any] = None
-    time_emb_type: Optional[str] = None
+try:
+    from torch.func import functional_call
+except ImportError:
+    from torch.nn.utils.stateless import functional_call
 
 
-@dataclass(frozen=True, eq=False, repr=False)
-class ScoreEstimatorConfig(_VectorFieldBaseConfig):
-    """Configuration for score-matching estimator builders (NPSE).
-
-    Extends the base config with SDE-specific parameters for VE, VP, and SubVP
-    noise schedules.  Unknown parameters raise ``TypeError`` on direct
-    construction but are warned-and-forwarded via ``from_kwargs()``.
-    """
-
-    # VE schedule params (Karras et al. 2022)
-    train_schedule: Optional[Literal["uniform", "lognormal"]] = None
-    solve_schedule: Optional[Literal["uniform", "power_law"]] = None
-    sigma_min: Optional[float] = None
-    sigma_max: Optional[float] = None
-    lognormal_mean: Optional[float] = None
-    lognormal_std: Optional[float] = None
-    power_law_exponent: Optional[float] = None
-
-    # VP / SubVP params
-    beta_min: Optional[float] = None
-    beta_max: Optional[float] = None
-
-    # Note: ``sde_type`` and ``estimator_type`` are intentionally absent.
-    # They are consumed at the factory level (``posterior_score_nn``) before
-    # config construction and are not forwarded through the config.
-
-
-@dataclass(frozen=True, eq=False, repr=False)
-class FlowEstimatorConfig(_VectorFieldBaseConfig):
-    """Configuration for flow-matching estimator builders (FMPE).
-
-    Currently identical to the base config.  Unknown parameters raise
-    ``TypeError`` on direct construction but are warned-and-forwarded
-    via ``from_kwargs()``.
-    """
-
-    gaussian_baseline: Optional[bool] = None
+@torch.no_grad()
+def _probe_module(module: nn.Module, *inputs: Tensor) -> Tensor:
+    """Probe with isolated inputs, parameters, and buffers, restoring training modes."""
+    state = {
+        name: value.detach().to(device=inputs[0].device, copy=True)
+        for name, value in chain(module.named_parameters(), module.named_buffers())
+    }
+    training_modes = {child: child.training for child in module.modules()}
+    try:
+        module.eval()
+        return functional_call(
+            module, state, tuple(value.detach().clone() for value in inputs)
+        )
+    finally:
+        for child, training in training_modes.items():
+            child.training = training
 
 
 def _compute_theta_standardization(
@@ -131,234 +73,6 @@ def _compute_theta_standardization(
     else:
         mean_0, std_0 = 0, 1
     return mean_0, std_0, None, None
-
-
-def build_vector_field_estimator(
-    batch_x: Tensor,
-    batch_y: Tensor,
-    estimator_type: Literal["flow", "score"] = "flow",
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
-    embedding_net: nn.Module = nn.Identity(),
-    sde_type: str = "ve",  # Only used for score estimator
-    hidden_features: Union[Sequence[int], int] = 100,
-    time_embedding_dim: int = 32,
-    num_layers: int = 5,
-    num_heads: int = 10,
-    mlp_ratio: int = 4,
-    net: Union[VF_MODELS, VectorFieldNet] = "mlp",
-    gaussian_baseline: bool = False,
-    compose_standardization: bool = False,
-    **kwargs,
-) -> Union[FlowMatchingEstimator, ConditionalScoreEstimator]:
-    """Builds a vector field estimator (flow matching or score matching) with the given
-    network.
-
-    Args:
-        batch_x: Batch of xs, used to infer dimensionality.
-        batch_y: Batch of ys, used to infer dimensionality.
-        estimator_type: Type of estimator to build, either "flow" or "score".
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
-        embedding_net: Embedding network for batch_y.
-        sde_type: SDE type for score estimator, one of "vp", "subvp", or "ve".
-        hidden_features: Number of hidden features in each layer (for MLP) or dimension
-            of hidden features (for transformer).
-        time_embedding_dim: Number of dimensions for time embedding.
-        num_layers: Number of layers in the network.
-        num_heads: Number of attention heads per block (for transformer).
-        mlp_ratio: Ratio for MLP hidden dimension (for transformer and the
-            global MLP of ada_mlp).
-        net: Type of architecture to use, either "mlp", "ada_mlp", "transformer",
-            "transformer_cross_attn" or a custom network following the
-            VectorFieldNet protocol. ``"transformer_cross_attn"`` requires
-            sequence-shaped conditioning (3-D ``batch_y`` or an ``embedding_net``
-            that returns ``(batch, seq_len, emb_dim)``).
-        gaussian_baseline: If True, use analytical Gaussian baseline velocity
-            derived from Bayes' rule. The network then only learns the residual.
-            Only used when estimator_type="flow". Defaults to False.
-        compose_standardization: Whether to train and sample in per-dimension
-            standardized theta coordinates. Defaults to False.
-        **kwargs: Additional arguments forwarded to the estimator and network
-            constructors.  Valid keys are defined by ``ScoreEstimatorConfig``
-            and ``FlowEstimatorConfig``; validation happens in the upstream
-            factory functions (``posterior_score_nn`` / ``posterior_flow_nn``).
-
-    Returns:
-        A vector field estimator (either FlowMatchingEstimator or
-        ConditionalScoreEstimator).
-    """
-    # Check inputs and device
-    check_data_device(batch_x, batch_y)
-    assert_transform_to_unconstrained_supported(
-        z_score_x,
-        "build_vector_field_estimator",
-        "Vector field estimators (flow matching / score matching) do not implement "
-        "it; use one of 'none', 'independent', or 'structured' instead.",
-    )
-
-    # Build network if not provided
-    if net == "mlp":
-        # Filter out AdaMLP-specific parameters
-        mlp_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k
-            not in [
-                "condition_emb_dim",
-                "mlp_ratio",
-                "num_intermediate_mlp_layers",
-                "adamlp_ratio",
-            ]
-        }
-        vectorfield_net = build_standard_mlp_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_features,
-            num_layers=num_layers,
-            time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net,
-            **mlp_kwargs,
-        )
-    elif net == "ada_mlp":
-        vectorfield_net = build_adamlp_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_features,
-            num_layers=num_layers,
-            time_embedding_dim=time_embedding_dim,
-            mlp_ratio=mlp_ratio,
-            embedding_net=embedding_net,
-            **kwargs,
-        )
-    elif net in ("transformer", "transformer_cross_attn"):
-        # For transformer, hidden_features must be an int
-        hidden_features_int = (
-            hidden_features if isinstance(hidden_features, int) else hidden_features[0]
-        )
-        # Let an explicit kwarg win; fall back to deriving from net name.
-        is_x_emb_seq = kwargs.pop("is_x_emb_seq", net == "transformer_cross_attn")
-        vectorfield_net = build_transformer_network(
-            batch_x=batch_x,
-            batch_y=batch_y,
-            hidden_features=hidden_features_int,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            mlp_ratio=mlp_ratio,
-            time_embedding_dim=time_embedding_dim,
-            embedding_net=embedding_net,
-            is_x_emb_seq=is_x_emb_seq,
-            **kwargs,
-        )
-    else:
-        if isinstance(net, nn.Module):
-            vectorfield_net = net
-        else:
-            raise ValueError(f"Unknown architecture: {net}")
-
-    mean_0, std_0, compose_shift, compose_scale = _compute_theta_standardization(
-        batch_x, z_score_x, compose_standardization
-    )
-
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
-    embedding_net_y = (
-        nn.Sequential(standardizing_net(batch_y, structured_y), embedding_net)
-        if z_score_y_bool
-        else embedding_net
-    )
-
-    def _wire_compose(estimator):
-        """Attach and validate the boundary affine."""
-        if compose_shift is not None and compose_scale is not None:
-            shift = compose_shift.reshape(1, *estimator.input_shape).float()
-            scale = compose_scale.reshape(1, *estimator.input_shape).float()
-            estimator._theta_shift.copy_(shift)
-            estimator._theta_scale.copy_(scale)
-            estimator._compose_standardization.fill_(True)
-        estimator._check_compose_internal_stats_unit()
-        baseline_check = getattr(estimator, "_check_compose_baseline_compatible", None)
-        if baseline_check is not None:
-            baseline_check()
-        return estimator
-
-    if estimator_type == "flow":
-        return _wire_compose(
-            FlowMatchingEstimator(
-                net=vectorfield_net,
-                input_shape=batch_x[0].shape,
-                condition_shape=batch_y[0].shape,
-                embedding_net=embedding_net_y,
-                mean_0=mean_0,
-                std_0=std_0,
-                gaussian_baseline=gaussian_baseline,
-            )
-        )
-    elif estimator_type == "score":
-        # Choose the appropriate score estimator based on SDE type
-        if sde_type == "vp":
-            estimator_cls = VPScoreEstimator
-        elif sde_type == "subvp":
-            estimator_cls = SubVPScoreEstimator
-        elif sde_type == "ve":
-            estimator_cls = VEScoreEstimator
-        else:
-            raise ValueError(f"Unknown SDE type: {sde_type}")
-
-        # Extract estimator-specific kwargs based on SDE type
-        estimator_kwargs = {}
-        if sde_type == "ve":
-            # VE-specific parameters: sigma bounds and EDM-style schedules
-            ve_keys = [
-                "sigma_min",
-                "sigma_max",
-                "train_schedule",
-                "solve_schedule",
-                "lognormal_mean",
-                "lognormal_std",
-                "power_law_exponent",
-            ]
-            estimator_kwargs = {k: kwargs[k] for k in ve_keys if k in kwargs}
-        elif sde_type in ("vp", "subvp"):
-            # VP/SubVP-specific beta parameters
-            vp_keys = ["beta_min", "beta_max"]
-            estimator_kwargs = {k: kwargs[k] for k in vp_keys if k in kwargs}
-
-        return _wire_compose(
-            estimator_cls(
-                net=vectorfield_net,
-                input_shape=batch_x[0].shape,
-                condition_shape=batch_y[0].shape,
-                embedding_net=embedding_net_y,
-                mean_0=mean_0,
-                std_0=std_0,
-                **estimator_kwargs,
-            )
-        )
-    else:
-        raise ValueError(f"Unknown estimator type: {estimator_type}")
-
-
-# For backward compatibility
-def build_flow_matching_estimator(*args, **kwargs):
-    warnings.warn(
-        "`build_flow_matching_estimator` is deprecated since sbi v0.27.0 and will "
-        "be removed in v0.28.0. Use "
-        "`build_vector_field_estimator(..., estimator_type='flow')` instead.",
-        FutureWarning,
-        stacklevel=2,
-    )
-    return build_vector_field_estimator(*args, estimator_type="flow", **kwargs)
-
-
-def build_score_matching_estimator(*args, **kwargs):
-    warnings.warn(
-        "`build_score_matching_estimator` is deprecated since sbi v0.27.0 and will "
-        "be removed in v0.28.0. Use "
-        "`build_vector_field_estimator(..., estimator_type='score')` instead.",
-        FutureWarning,
-        stacklevel=2,
-    )
-    return build_vector_field_estimator(*args, estimator_type="score", **kwargs)
 
 
 # ======= Time Embedding Shared Components =======
@@ -1205,7 +919,6 @@ def build_adamlp_network(
     num_layers: int = 5,
     time_embedding_dim: int = 32,
     condition_emb_dim: int = 100,
-    embedding_net: nn.Module = nn.Identity(),
     mlp_ratio: int = 4,
     num_intermediate_mlp_layers: int = 0,
     adamlp_ratio: int = 4,
@@ -1219,12 +932,11 @@ def build_adamlp_network(
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality.
-        batch_y: Batch of ys, used to infer dimensionality.
+        batch_y: Batch of embedded conditions, used to infer dimensionality.
         hidden_features: Number of hidden features in each layer.
         num_layers: Number of layers in the network.
         time_embedding_dim: Number of dimensions for time embedding.
         condition_emb_dim: Dimension of the conditioning embedding.
-        embedding_net: Embedding network for batch_y.
         mlp_ratio: Ratio of hidden dim to intermediate dim in global MLP.
         num_intermediate_mlp_layers: Number of intermediate layers in global MLP.
         adamlp_ratio: Ratio of hidden dim to intermediate dim in AdaMLPBlock.
@@ -1243,7 +955,7 @@ def build_adamlp_network(
 
     # Get dimensions
     x_numel = get_numel(batch_x)
-    y_numel = get_numel(batch_y, embedding_net=embedding_net)
+    y_numel = get_numel(batch_y)
 
     # Create time embedding dimension
     time_emb_dim = time_embedding_dim
@@ -1279,7 +991,6 @@ def build_standard_mlp_network(
     hidden_features: Union[Sequence[int], int] = 100,
     num_layers: int = 5,
     time_embedding_dim: int = 32,
-    embedding_net: nn.Module = nn.Identity(),
     activation: type[nn.Module] = nn.GELU,
     layer_norm: bool = True,
     skip_connections: bool = True,
@@ -1292,11 +1003,10 @@ def build_standard_mlp_network(
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality.
-        batch_y: Batch of ys, used to infer dimensionality.
+        batch_y: Batch of embedded conditions, used to infer dimensionality.
         hidden_features: Number of hidden features in each layer.
         num_layers: Number of layers in the network.
         time_embedding_dim: Number of dimensions for time embedding.
-        embedding_net: Embedding network for batch_y.
         activation: Activation function.
         layer_norm: Whether to use layer normalization.
         skip_connections: Whether to use skip connections.
@@ -1315,7 +1025,7 @@ def build_standard_mlp_network(
 
     # Get dimensions
     x_numel = get_numel(batch_x)
-    y_numel = get_numel(batch_y, embedding_net=embedding_net)
+    y_numel = get_numel(batch_y)
 
     # Create time embedding dimension
     time_emb_dim = time_embedding_dim
@@ -1351,7 +1061,6 @@ def build_transformer_network(
     num_heads: int = 10,
     mlp_ratio: int = 4,
     time_embedding_dim: int = 32,
-    embedding_net: nn.Module = nn.Identity(),
     time_emb_type: str = "sinusoidal",
     sinusoidal_max_freq: float = 1000.0,
     fourier_scale: float = 30.0,
@@ -1363,13 +1072,12 @@ def build_transformer_network(
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality.
-        batch_y: Batch of ys, used to infer dimensionality.
+        batch_y: Batch of embedded conditions, used to infer dimensionality.
         hidden_features: Dimension of hidden features.
         num_layers: Number of transformer layers.
         num_heads: Number of attention heads per block.
         mlp_ratio: Ratio for MLP hidden dimension.
         time_embedding_dim: Number of dimensions for time embedding.
-        embedding_net: Embedding network for batch_y.
         time_emb_type: Type of time embedding ("sinusoidal" or "random_fourier").
         sinusoidal_max_freq: Max frequency for sinusoidal embeddings.
         fourier_scale: Scale for random fourier embeddings.
@@ -1387,16 +1095,15 @@ def build_transformer_network(
     # Get dimensions
     x_numel = get_numel(batch_x)
     if not is_x_emb_seq:
-        y_numel = get_numel(batch_y, embedding_net=embedding_net)
+        y_numel = get_numel(batch_y)
     else:
-        y_embed = embedding_net(batch_y[:1])
-        if y_embed.ndim != 3:
+        if batch_y.ndim != 3:
             raise ValueError(
                 "If is_x_emb_seq is True, embedding must be sequence of values of shape"
                 f" (batch_size, sequence_length, embedding_dim), but got"
-                f" {y_embed.shape}"
+                f" {batch_y.shape}"
             )
-        y_numel = y_embed.shape[-1]
+        y_numel = batch_y.shape[-1]
 
     # Create the vector field network (Transformer)
     vectorfield_net = VectorFieldTransformer(
@@ -1415,3 +1122,506 @@ def build_transformer_network(
     )
 
     return vectorfield_net
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class VectorFieldNetConfigBase(_PerModelConfigBase):
+    """Base configuration for the networks a vector-field estimator wraps.
+
+    Args:
+        hidden_features: Width of the hidden layers.
+        num_layers: Number of layers.
+        time_embedding_dim: Number of dimensions of the time embedding.
+        activation: Activation function.
+        time_emb_type: Type of time embedding.
+        sinusoidal_max_freq: Maximum frequency of the sinusoidal embedding.
+        fourier_scale: Scale of the random Fourier embedding.
+        extra_kwargs: Additional keyword arguments forwarded to the network
+            build function, for settings that have no field of their own.
+    """
+
+    hidden_features: int = 100
+    num_layers: int = 5
+    time_embedding_dim: int = 32
+    activation: type[nn.Module] = nn.GELU
+    time_emb_type: Literal["sinusoidal", "random_fourier"] = "sinusoidal"
+    sinusoidal_max_freq: float = 1000.0
+    fourier_scale: float = 30.0
+
+    _BUILD_FN: ClassVar[Callable[..., VectorFieldNet]]
+    """Network build function this config feeds, set by each subclass."""
+
+    def __post_init__(self):
+        self._reject_if_abstract(VectorFieldNetConfigBase, "MLPConfig()")
+        if not isinstance(self.hidden_features, int) or isinstance(
+            self.hidden_features, bool
+        ):
+            raise TypeError("`hidden_features` must be an int.")
+        super().__post_init__()
+
+    def build(self, batch_input: Tensor, batch_condition: Tensor) -> VectorFieldNet:
+        """Build the network.
+
+        Args:
+            batch_input: Batch of the modeled variable, used for shape
+                inference.
+            batch_condition: Batch of the embedded conditioning variable, used
+                for shape inference. The estimator owns the embedding net, so
+                the network never holds one.
+
+        Returns:
+            A ``VectorFieldNet``.
+        """
+        self._warn_unknown_extra_kwargs(self._BUILD_FN)
+        return self._BUILD_FN(
+            batch_x=batch_input, batch_y=batch_condition, **self._build_kwargs()
+        )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class MLPConfig(VectorFieldNetConfigBase):
+    """Standard vector-field MLP.
+
+    Args:
+        layer_norm: Whether to apply layer normalization.
+        skip_connections: Whether to use skip connections between layers.
+    """
+
+    layer_norm: bool = True
+    skip_connections: bool = True
+
+    _BUILD_FN: ClassVar[Callable[..., VectorFieldNet]] = staticmethod(
+        build_standard_mlp_network
+    )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class AdaMLPConfig(VectorFieldNetConfigBase):
+    """MLP with adaptive layer normalization conditioned on time.
+
+    Args:
+        condition_emb_dim: Dimension of the condition embedding.
+        num_intermediate_mlp_layers: Number of intermediate blocks in the global
+            embedding MLP.
+        adamlp_ratio: Ratio of the hidden dimension in each AdaMLP block.
+        mlp_ratio: Ratio of the hidden dimension in the global embedding MLP.
+    """
+
+    condition_emb_dim: int = 100
+    num_intermediate_mlp_layers: int = 0
+    adamlp_ratio: int = 4
+    mlp_ratio: int = 4
+
+    _BUILD_FN: ClassVar[Callable[..., VectorFieldNet]] = staticmethod(
+        build_adamlp_network
+    )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class TransformerConfig(VectorFieldNetConfigBase):
+    """Diffusion transformer.
+
+    Args:
+        num_heads: Number of attention heads per block.
+        mlp_ratio: Ratio of the hidden dimension in each block's MLP.
+        is_x_emb_seq: Whether the embedded condition is a sequence, which
+            selects cross-attention instead of adaptive layer normalization.
+    """
+
+    num_heads: int = 10
+    mlp_ratio: int = 4
+    is_x_emb_seq: bool = False
+
+    _BUILD_FN: ClassVar[Callable[..., VectorFieldNet]] = staticmethod(
+        build_transformer_network
+    )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class VectorFieldConfigBase(_PerModelConfigBase):
+    """Base configuration for vector-field estimators (FMPE / NPSE).
+
+    The estimator and the network it wraps are configured separately: the
+    subclass selects the estimator, and ``net`` selects the architecture.
+
+    Args:
+        net: Network config or a custom `VectorFieldNet` that accepts the
+            embedded condition.
+        z_score_input: Whether to z-score the modeled variable, one of `none`,
+            `independent`, or `structured`.
+        z_score_condition: Whether to z-score the conditioning variable, same
+            options as `z_score_input`.
+        embedding_net: Embedding network for the conditioning variable.
+        compose_standardization: Whether to train and sample in per-dimension
+            standardized coordinates of the modeled variable. Requires
+            `z_score_input="independent"`.
+        extra_kwargs: Additional keyword arguments forwarded to the estimator
+            constructor, for settings that have no field of their own. Network
+            settings belong in ``net.extra_kwargs``.
+    """
+
+    net: Union[VectorFieldNetConfigBase, VectorFieldNet] = field(
+        default_factory=MLPConfig
+    )
+    z_score_input: Literal["none", "independent", "structured"] = "independent"
+    z_score_condition: Literal["none", "independent", "structured"] = "independent"
+    embedding_net: nn.Module = field(default_factory=nn.Identity)
+    compose_standardization: bool = False
+
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]]
+    """Estimator class this config builds, set by each subclass."""
+
+    _SHARED_FIELDS: ClassVar[frozenset] = frozenset({
+        "net",
+        "z_score_input",
+        "z_score_condition",
+        "embedding_net",
+        "compose_standardization",
+        "extra_kwargs",
+    })
+
+    def __post_init__(self):
+        self._reject_if_abstract(VectorFieldConfigBase, "FlowMatchingConfig()")
+        if not isinstance(self.net, (VectorFieldNetConfigBase, VectorFieldNet)):
+            raise TypeError(
+                "`net` must be a VectorFieldNetConfigBase or a VectorFieldNet."
+            )
+        if self.compose_standardization and self.z_score_input != "independent":
+            raise ValueError(
+                "`compose_standardization=True` requires `z_score_input='independent'`."
+            )
+        super().__post_init__()
+
+    def _build_kwargs(self) -> dict:
+        """The estimator-specific fields, with ``extra_kwargs`` merged in."""
+        d = {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in self._SHARED_FIELDS
+        }
+        d.update(self.extra_kwargs)
+        return d
+
+    def build(
+        self, batch_input: Tensor, batch_condition: Tensor
+    ) -> ConditionalVectorFieldEstimator:
+        """Build the vector-field estimator.
+
+        Args:
+            batch_input: Batch of the modeled variable, used for shape
+                inference and z-scoring.
+            batch_condition: Batch of the conditioning variable, used for shape
+                inference and z-scoring.
+
+        Returns:
+            A ``ConditionalVectorFieldEstimator``.
+
+        Raises:
+            ValueError: If a custom network does not accept the embedded condition
+                or return the expected input shape.
+        """
+        check_data_device(batch_input, batch_condition)
+
+        if isinstance(self.net, VectorFieldNetConfigBase):
+            embedded_condition = self.embedding_net.to(batch_condition.device)(
+                batch_condition[:1]
+            )
+            vectorfield_net = self.net.build(batch_input, embedded_condition)
+        else:
+            vectorfield_net = self.net
+            probe_size = min(2, len(batch_input), len(batch_condition))
+            embedded_condition = _probe_module(
+                self.embedding_net, batch_condition[:probe_size]
+            )
+            probe_input = batch_input[:probe_size]
+            try:
+                output = _probe_module(
+                    vectorfield_net,
+                    probe_input,
+                    embedded_condition,
+                    probe_input.new_full((probe_size,), 0.5),
+                )
+                if not isinstance(output, Tensor) or output.shape != probe_input.shape:
+                    raise ValueError("The custom network must return the input shape.")
+            except (RuntimeError, TypeError, ValueError) as error:
+                raise ValueError(
+                    "Custom VectorFieldNet must accept input shape "
+                    f"{tuple(batch_input.shape[1:])} and embedded condition shape "
+                    f"{tuple(embedded_condition.shape[1:])}, "
+                    "and return the input shape."
+                ) from error
+
+        mean_0, std_0, compose_shift, compose_scale = _compute_theta_standardization(
+            batch_input, self.z_score_input, self.compose_standardization
+        )
+
+        z_score_condition_bool, structured_condition = z_score_parser(
+            self.z_score_condition
+        )
+        embedding_net = self.embedding_net
+        if z_score_condition_bool:
+            embedding_net = nn.Sequential(
+                standardizing_net(batch_condition, structured_condition),
+                embedding_net,
+            )
+
+        self._warn_unknown_extra_kwargs(self._ESTIMATOR_CLS.__init__)
+        return self._ESTIMATOR_CLS(
+            net=vectorfield_net,
+            input_shape=batch_input[0].shape,
+            condition_shape=batch_condition[0].shape,
+            embedding_net=embedding_net,
+            mean_0=mean_0,
+            std_0=std_0,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
+            **self._build_kwargs(),
+        )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class FlowMatchingConfig(VectorFieldConfigBase):
+    """Flow-matching estimator, used by ``FMPE``.
+
+    Args:
+        gaussian_baseline: Whether to use the analytical Gaussian baseline
+            velocity, so that the network only learns the residual.
+    """
+
+    gaussian_baseline: bool = False
+
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]] = (
+        FlowMatchingEstimator
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.compose_standardization and self.gaussian_baseline:
+            raise ValueError(
+                "`compose_standardization=True` and `gaussian_baseline=True` "
+                "cannot be used together."
+            )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class ScoreConfigBase(VectorFieldConfigBase):
+    """Base configuration for the score-matching estimators, used by ``NPSE``.
+
+    Subclasses select the SDE.
+    """
+
+    def __post_init__(self):
+        self._reject_if_abstract(ScoreConfigBase, "VEScoreConfig()")
+        super().__post_init__()
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class VEScoreConfig(ScoreConfigBase):
+    """Variance-exploding score estimator.
+
+    Args:
+        sigma_min: Lowest noise level.
+        sigma_max: Highest noise level.
+        train_schedule: Distribution the training times are drawn from.
+        solve_schedule: Spacing of the time steps used when solving.
+        lognormal_mean: Mean of the lognormal training schedule.
+        lognormal_std: Standard deviation of the lognormal training schedule.
+        power_law_exponent: Exponent of the power-law solve schedule.
+    """
+
+    sigma_min: float = 1e-4
+    sigma_max: float = 10.0
+    train_schedule: Literal["uniform", "lognormal"] = "uniform"
+    solve_schedule: Literal["uniform", "power_law"] = "uniform"
+    lognormal_mean: float = -1.2
+    lognormal_std: float = 1.2
+    power_law_exponent: float = 7.0
+
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]] = VEScoreEstimator
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class _BetaScoreConfigBase(ScoreConfigBase):
+    """Shared noise schedule of the variance-preserving score estimators.
+
+    Args:
+        beta_min: Lowest value of the noise schedule.
+        beta_max: Highest value of the noise schedule.
+    """
+
+    beta_min: float = 0.01
+    beta_max: float = 10.0
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class VPScoreConfig(_BetaScoreConfigBase):
+    """Variance-preserving score estimator."""
+
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]] = VPScoreEstimator
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class SubVPScoreConfig(_BetaScoreConfigBase):
+    """Sub-variance-preserving score estimator."""
+
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]] = (
+        SubVPScoreEstimator
+    )
+
+
+_VF_NET_CONFIGS: dict[str, type[VectorFieldNetConfigBase]] = {
+    "mlp": MLPConfig,
+    "ada_mlp": AdaMLPConfig,
+    "transformer": TransformerConfig,
+}
+
+_SDE_CONFIGS: dict[str, type[ScoreConfigBase]] = {
+    "ve": VEScoreConfig,
+    "vp": VPScoreConfig,
+    "subvp": SubVPScoreConfig,
+}
+
+
+def _vf_net_config_from_model(model: str) -> VectorFieldNetConfigBase:
+    """Return the default network config of an architecture given its name.
+
+    Args:
+        model: Name of the architecture.
+
+    Returns:
+        A default-constructed config for that architecture. The cross-attention
+        name selects the transformer with a sequence condition.
+    """
+    if model == "transformer_cross_attn":
+        return TransformerConfig(is_x_emb_seq=True)
+    try:
+        return _VF_NET_CONFIGS[model]()
+    except KeyError:
+        raise ValueError(
+            f"Unknown vector field model {model!r}. "
+            f"Must be one of {sorted(_VALID_VF_MODELS)}."
+        ) from None
+
+
+def _score_config_from_sde_type(sde_type: str) -> ScoreConfigBase:
+    """Return the default score config of an SDE given its name.
+
+    Args:
+        sde_type: Name of the SDE.
+
+    Returns:
+        A default-constructed config for that SDE.
+    """
+    try:
+        return _SDE_CONFIGS[sde_type]()
+    except KeyError:
+        raise ValueError(
+            f"Unknown SDE type {sde_type!r}. Must be one of {sorted(_SDE_CONFIGS)}."
+        ) from None
+
+
+def _vf_config_from_factory_kwargs(
+    estimator_config: "VectorFieldConfigBase",
+    model: Union[VF_MODELS, VectorFieldNet],
+    named_net: dict,
+    named_estimator: dict,
+    extra: dict,
+    factory_defaults: dict,
+) -> "VectorFieldConfigBase":
+    """Assemble a vector-field config from a factory's arguments.
+
+    Flat factory arguments are split between the estimator and network configs.
+    Named arguments at factory defaults preserve config defaults. ``None`` also
+    preserves defaults for named network and known extra arguments. Unknown
+    arguments warn and are forwarded to the network builder.
+
+    Args:
+        estimator_config: Default config of the estimator to configure.
+        model: Name of the architecture, or a ready ``VectorFieldNet``.
+        named_net: The factory's named arguments that belong to the network.
+        named_estimator: The factory's named arguments that belong to the
+            estimator.
+        extra: The factory's ``**kwargs``.
+        factory_defaults: Defaults of the named arguments, under config field names.
+
+    Returns:
+        The assembled estimator config.
+    """
+    net_config = _vf_net_config_from_model(model) if isinstance(model, str) else model
+    is_config = isinstance(net_config, VectorFieldNetConfigBase)
+    named_net = {
+        name: value
+        for name, value in named_net.items()
+        if value is not None and value != factory_defaults[name]
+    }
+    named_estimator = {
+        name: value
+        for name, value in named_estimator.items()
+        if value != factory_defaults[name]
+    }
+
+    net_fields = (
+        {f.name for f in fields(net_config)} - {"extra_kwargs"} if is_config else set()
+    )
+    estimator_fields = {
+        f.name for f in fields(estimator_config)
+    } - VectorFieldConfigBase._SHARED_FIELDS
+    net_family_fields = {
+        f.name
+        for config_cls in set(_VF_NET_CONFIGS.values())
+        for f in fields(config_cls)
+        if f.name != "extra_kwargs"
+    }
+    estimator_family_fields = {
+        f.name
+        for config_cls in {FlowMatchingConfig, *_SDE_CONFIGS.values()}
+        for f in fields(config_cls)
+    } - VectorFieldConfigBase._SHARED_FIELDS
+    net_kwargs, estimator_kwargs, unknown, ignored = {}, {}, {}, []
+    for name, value in extra.items():
+        if value is None and (
+            name in net_family_fields or name in estimator_family_fields
+        ):
+            continue
+        if name in net_fields:
+            net_kwargs[name] = value
+        elif name in estimator_fields:
+            estimator_kwargs[name] = value
+        elif name in net_family_fields or name in estimator_family_fields:
+            ignored.append(name)
+        else:
+            unknown[name] = value
+    if ignored:
+        raise ValueError(
+            f"Argument(s) {sorted(ignored)} are not used by "
+            f"{type(estimator_config).__name__} with {type(net_config).__name__} "
+            "and would be silently ignored. Configure the estimator and network "
+            "directly with their per-model configs."
+        )
+    if unknown:
+        warnings.warn(
+            f"Unknown kwargs passed to {type(estimator_config).__name__}: "
+            f"{sorted(unknown)}. These will be forwarded to the underlying "
+            f"builder. If this is unintentional, check for typos.",
+            stacklevel=3,
+        )
+
+    if is_config:
+        net_config = replace(
+            net_config, **named_net, **net_kwargs, extra_kwargs=unknown
+        )
+    else:
+        unused_kwargs = set(named_net)
+        unused_kwargs.update(net_kwargs)
+        unused_kwargs.update(unknown)
+        ignored = sorted(unused_kwargs)
+        if ignored:
+            raise ValueError(
+                f"Argument(s) {ignored} are not used by a custom "
+                f"`VectorFieldNet` and would be silently ignored. Configure "
+                f"the network before passing it."
+            )
+
+    return replace(
+        estimator_config, net=net_config, **named_estimator, **estimator_kwargs
+    )

@@ -19,9 +19,9 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     NSFConfig,
     ResNetClassifierConfig,
     TabPFNConfig,
-    VectorFieldEstimatorBuilder,
     ZukoNSFConfig,
 )
+from sbi.neural_nets.net_builders.vector_field_nets import FlowMatchingConfig
 from sbi.utils import BoxUniform
 from sbi.utils.user_input_checks import check_estimator_arg
 
@@ -326,7 +326,7 @@ def test_check_estimator_arg_rejects_module():
         check_estimator_arg(torch.nn.Linear(3, 3))
 
 
-@pytest.mark.parametrize("config_cls", [MAFConfig, VectorFieldEstimatorBuilder])
+@pytest.mark.parametrize("config_cls", [MAFConfig, FlowMatchingConfig])
 def test_check_estimator_arg_rejects_config_class(config_cls):
     """A forgotten pair of parentheses must fail before training."""
     with pytest.raises(TypeError, match="not an instance"):
@@ -351,13 +351,12 @@ def test_wrong_config_family_raises(trainer_cls, config):
     [NPE_C, NLE_A, MNPE, MNLE, NPE_PFN],
     ids=["npe", "nle", "mnpe", "mnle", "npe_pfn"],
 )
-def test_trainer_rejects_legacy_config_of_the_wrong_family(trainer_cls):
-    """The remaining flat vector-field config must not fall through as callable."""
+def test_trainer_rejects_vector_field_config(trainer_cls):
     prior = MultivariateNormal(zeros(2), eye(2))
     with pytest.raises(TypeError):
         trainer_cls(
             prior,
-            density_estimator=VectorFieldEstimatorBuilder(),
+            density_estimator=FlowMatchingConfig(),
             show_progress_bars=False,
         )
 
