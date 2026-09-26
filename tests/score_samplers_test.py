@@ -16,6 +16,7 @@ from sbi.inference.potentials.vector_field_potential import (
 from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.utils import BoxUniform, MultipleIndependent
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 def build_random_priors(num_dim: int):
@@ -215,7 +216,7 @@ def _build_gaussian_score_estimator(
 
     # Note the precondition predicts a correct Gaussian score by default if the neural
     # net predicts 0!
-    class DummyNet(torch.nn.Module):
+    class DummyNet(VectorFieldNet):
         def __init__(self):
             super().__init__()
             self.dummy_param_for_device_detection = torch.nn.Linear(1, 1)
