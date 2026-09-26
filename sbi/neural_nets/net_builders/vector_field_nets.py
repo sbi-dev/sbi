@@ -1345,6 +1345,14 @@ class FlowMatchingConfig(VectorFieldConfigBase):
         FlowMatchingEstimator
     )
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.compose_standardization and self.gaussian_baseline:
+            raise ValueError(
+                "`compose_standardization=True` and `gaussian_baseline=True` "
+                "cannot be used together."
+            )
+
 
 @dataclass(frozen=True, eq=False, repr=False)
 class ScoreConfigBase(VectorFieldConfigBase):

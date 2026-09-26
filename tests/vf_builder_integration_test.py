@@ -195,11 +195,9 @@ def test_compose_standardization_requires_independent_z_scoring(
         config_cls(compose_standardization=True, z_score_input=z_score_input)
 
 
-def test_compose_standardization_rejects_the_gaussian_baseline(batches):
+def test_compose_standardization_rejects_the_gaussian_baseline():
     with pytest.raises(ValueError, match="gaussian_baseline"):
-        FlowMatchingConfig(compose_standardization=True, gaussian_baseline=True).build(
-            *batches
-        )
+        FlowMatchingConfig(compose_standardization=True, gaussian_baseline=True)
 
 
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS)
