@@ -40,6 +40,8 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.metrics import check_c2st
+from sbi.utils.nn_utils import check_net_device
+from sbi.utils.torchutils import gpu_available, process_device
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
@@ -993,3 +995,15 @@ def test_config_accepts_embedding_net_without_parameters(embedding_net):
     assert config.embedding_net is embedding_net
     for tensor in [*embedding_net.parameters(), *embedding_net.buffers()]:
         assert tensor.device.type == "cpu"
+
+
+@pytest.mark.skipif(not gpu_available(), reason="Needs a second device to split over.")
+def test_check_net_device_moves_every_tensor():
+    """A net with tensors on two devices must not keep the one that reads as cpu."""
+    net = nn.BatchNorm1d(3, affine=False)
+    net.running_var = torch.zeros(3, device=process_device("gpu"))
+
+    with pytest.warns(UserWarning, match="moved to cpu"):
+        moved = check_net_device(net, "cpu", "The passed net is moved to cpu.")
+
+    assert all(t.device.type == "cpu" for t in moved.buffers())
