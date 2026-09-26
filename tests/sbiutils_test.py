@@ -597,20 +597,12 @@ def test_transform_to_unconstrained_raises_for_zuko_unconditional():
 
 @pytest.mark.parametrize("estimator_type", ["flow", "score"])
 def test_transform_to_unconstrained_raises_for_vector_field(estimator_type):
-    """Vector field builders (FMPE / NPSE) raise rather than silently treating
-    `transform_to_unconstrained` as a no-op via `z_score_parser`."""
-    from sbi.neural_nets.net_builders.vector_field_nets import (
-        build_vector_field_estimator,
-    )
+    """Vector-field configs reject unsupported input transforms."""
+    from sbi.neural_nets import FlowMatchingConfig, VEScoreConfig
 
-    theta, x = torch.rand(20, 3), torch.rand(20, 2)
+    config_cls = FlowMatchingConfig if estimator_type == "flow" else VEScoreConfig
     with pytest.raises(ValueError, match="transform_to_unconstrained"):
-        build_vector_field_estimator(
-            theta,
-            x,
-            estimator_type=estimator_type,
-            z_score_x="transform_to_unconstrained",
-        )
+        config_cls(z_score_input="transform_to_unconstrained")
 
 
 class TestWarnIfInvalidForZscoring:

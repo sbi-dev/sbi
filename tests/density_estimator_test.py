@@ -14,6 +14,7 @@ from sbi.inference import NLE, NPE, NRE
 from sbi.inference.trainers.base import NeuralInference
 from sbi.inference.trainers.vfpe.fmpe import FMPE
 from sbi.inference.trainers.vfpe.npse import NPSE
+from sbi.neural_nets import FlowMatchingConfig, VEScoreConfig
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
@@ -27,7 +28,6 @@ from sbi.neural_nets.net_builders import (
     build_mnpe,
     build_nsf,
     build_tabpfn_flow,
-    build_vector_field_estimator,
     build_zuko_bpf,
     build_zuko_gf,
     build_zuko_maf,
@@ -606,11 +606,11 @@ def build_estimator(theta, x):
 
 
 def build_vf_estimator_npse(theta, x):
-    return build_vector_field_estimator(theta, x, "score")
+    return VEScoreConfig().build(theta, x)
 
 
 def build_vf_estimator_fmpe(theta, x):
-    return build_vector_field_estimator(theta, x, "flow")
+    return FlowMatchingConfig().build(theta, x)
 
 
 def build_estimator_missing_args():

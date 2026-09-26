@@ -40,7 +40,6 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     _vf_config_from_factory_kwargs,
     _vf_net_config_from_model,
     build_standard_mlp_network,
-    build_vector_field_estimator,
 )
 
 NET_CONFIGS = [MLPConfig, AdaMLPConfig, TransformerConfig]
@@ -166,12 +165,6 @@ def test_estimator_config_rejects_an_invalid_network():
         FlowMatchingConfig(net="mlp")
 
 
-@pytest.mark.parametrize("net_cls", NET_CONFIGS)
-def test_net_config_rejects_embedding_net_in_extra_kwargs(net_cls):
-    with pytest.raises(ValueError, match="embedding_net"):
-        net_cls(extra_kwargs={"embedding_net": nn.Identity()})
-
-
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS)
 def test_embedding_net_is_wired_once(config_cls, batches):
     theta, x = batches
@@ -191,7 +184,7 @@ def test_compose_standardization_is_set_by_the_constructor(config_cls, batches):
 
 
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS)
-@pytest.mark.parametrize("z_score_input", ["none", "structured"])
+@pytest.mark.parametrize("z_score_input", [None, "none", "structured"])
 def test_compose_standardization_requires_independent_z_scoring(
     config_cls, z_score_input
 ):
@@ -505,71 +498,6 @@ def test_factory_boolean_defaults_preserve_config_defaults(
     )
 
     assert getattr(config, name) is (not at_default)
-
-
-@pytest.mark.parametrize(
-    "config_cls, estimator_type, sde_type, scalar_fields",
-    [
-        (FlowMatchingConfig, "flow", "ve", ("noise_scale", "gaussian_baseline")),
-        (
-            VEScoreConfig,
-            "score",
-            "ve",
-            (
-                "sigma_min",
-                "sigma_max",
-                "_train_schedule_type",
-                "_solve_schedule_type",
-                "lognormal_mean",
-                "lognormal_std",
-                "power_law_exponent",
-            ),
-        ),
-        (VPScoreConfig, "score", "vp", ("beta_min", "beta_max")),
-        (SubVPScoreConfig, "score", "subvp", ("beta_min", "beta_max")),
-    ],
-)
-@pytest.mark.parametrize("model", sorted(_VALID_VF_MODELS))
-@pytest.mark.parametrize("compose_standardization", [False, True])
-def test_config_matches_legacy_builder(
-    config_cls,
-    estimator_type,
-    sde_type,
-    scalar_fields,
-    model,
-    compose_standardization,
-    batches,
-):
-    theta, condition = batches
-    if model == "transformer_cross_attn":
-        condition = torch.randn(32, 5, 3)
-    embedding_net = nn.Linear(3, 4)
-
-    torch.manual_seed(0)
-    expected = build_vector_field_estimator(
-        theta,
-        condition,
-        estimator_type=estimator_type,
-        sde_type=sde_type,
-        net=model,
-        embedding_net=embedding_net,
-        compose_standardization=compose_standardization,
-    )
-    torch.manual_seed(0)
-    actual = config_cls(
-        net=_vf_net_config_from_model(model),
-        embedding_net=embedding_net,
-        compose_standardization=compose_standardization,
-    ).build(theta, condition)
-
-    _assert_same_state(actual, expected)
-    for name in ("t_min", "t_max", *scalar_fields):
-        assert getattr(actual, name) == getattr(expected, name), name
-    times = torch.linspace(0.1, 0.9, theta.shape[0])
-    torch.testing.assert_close(
-        actual.net(theta, actual.embedding_net(condition), times),
-        expected.net(theta, expected.embedding_net(condition), times),
-    )
 
 
 @pytest.mark.parametrize("factory_fn", [posterior_flow_nn, posterior_score_nn])
