@@ -14,6 +14,7 @@ from torch import nn, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import FMPE, NPSE
+from sbi.neural_nets import VectorFieldNetConfigBase
 from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.neural_nets.estimators.score_estimator import (
     SubVPScoreEstimator,
@@ -36,11 +37,11 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     VPScoreConfig,
     VectorFieldConfigBase,
     VectorFieldMLP,
-    _VectorFieldNetConfigBase,
     _vf_config_from_factory_kwargs,
     _vf_net_config_from_model,
     build_standard_mlp_network,
 )
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 NET_CONFIGS = [MLPConfig, AdaMLPConfig, TransformerConfig]
 SCORE_CONFIGS = [VEScoreConfig, VPScoreConfig, SubVPScoreConfig]
@@ -116,7 +117,7 @@ def test_invalid_literal_value_raises(config_cls):
 
 
 @pytest.mark.parametrize(
-    "base_cls", [VectorFieldConfigBase, ScoreConfigBase, _VectorFieldNetConfigBase]
+    "base_cls", [VectorFieldConfigBase, ScoreConfigBase, VectorFieldNetConfigBase]
 )
 def test_role_base_cannot_be_instantiated(base_cls):
     with pytest.raises(TypeError, match="per-model config"):
@@ -126,7 +127,7 @@ def test_role_base_cannot_be_instantiated(base_cls):
 @pytest.mark.parametrize("model", sorted(_VALID_VF_MODELS))
 def test_every_advertised_model_maps_to_a_net_config(model):
     net_config = _vf_net_config_from_model(model)
-    assert isinstance(net_config, _VectorFieldNetConfigBase)
+    assert isinstance(net_config, VectorFieldNetConfigBase)
     if model == "transformer_cross_attn":
         assert net_config.is_x_emb_seq
 
@@ -152,7 +153,7 @@ def test_cross_attention_takes_a_sequence_condition():
 def test_custom_network_module_is_accepted(batches):
     theta, x = batches
 
-    class CustomNet(nn.Module):
+    class CustomNet(VectorFieldNet):
         def forward(self, input, condition, time):
             return torch.zeros_like(input)
 
@@ -160,9 +161,11 @@ def test_custom_network_module_is_accepted(batches):
     assert FlowMatchingConfig(net=custom).build(theta, x).net is custom
 
 
-def test_estimator_config_rejects_an_invalid_network():
-    with pytest.raises(TypeError, match="nn.Module"):
-        FlowMatchingConfig(net="mlp")
+@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
+@pytest.mark.parametrize("net", ["mlp", nn.Linear(3, 3)])
+def test_estimator_config_rejects_an_invalid_network(config_cls, net):
+    with pytest.raises(TypeError, match="VectorFieldNet"):
+        config_cls(net=net)
 
 
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS)

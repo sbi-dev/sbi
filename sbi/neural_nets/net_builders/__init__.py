@@ -68,4 +68,5 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     VEScoreConfig,
     VPScoreConfig,
     VectorFieldConfigBase,
+    VectorFieldNetConfigBase,
 )

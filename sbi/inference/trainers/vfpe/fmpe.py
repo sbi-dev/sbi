@@ -22,7 +22,10 @@ from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
 )
-from sbi.neural_nets.net_builders.vector_field_nets import FlowMatchingConfig
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    FlowMatchingConfig,
+    VectorFieldConfigBase,
+)
 from sbi.sbi_types import Tracker
 
 
@@ -69,7 +72,7 @@ class FMPE(VectorFieldTrainer):
         samples = posterior.sample((1000,), x=x_o)
     """
 
-    _ALLOWED_CONFIG_TYPE: ClassVar[type] = FlowMatchingConfig
+    _ALLOWED_CONFIG_TYPE: ClassVar[type[VectorFieldConfigBase]] = FlowMatchingConfig
 
     def __init__(
         self,

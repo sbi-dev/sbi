@@ -109,7 +109,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
 
         self._proposal_roundwise = []
 
-    _ALLOWED_CONFIG_TYPE: ClassVar[type] = VectorFieldConfigBase
+    _ALLOWED_CONFIG_TYPE: ClassVar[type[VectorFieldConfigBase]] = VectorFieldConfigBase
     """Config family this trainer accepts, narrowed by each subclass."""
 
     @abstractmethod

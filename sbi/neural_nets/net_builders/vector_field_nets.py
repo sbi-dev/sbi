@@ -1101,7 +1101,7 @@ def build_transformer_network(
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class _VectorFieldNetConfigBase(_PerModelConfigBase):
+class VectorFieldNetConfigBase(_PerModelConfigBase):
     """Base configuration for the networks a vector-field estimator wraps.
 
     Args:
@@ -1124,11 +1124,11 @@ class _VectorFieldNetConfigBase(_PerModelConfigBase):
     sinusoidal_max_freq: float = 1000.0
     fourier_scale: float = 30.0
 
-    _BUILD_FN: ClassVar[Callable]
+    _BUILD_FN: ClassVar[Callable[..., VectorFieldNet]]
     """Network build function this config feeds, set by each subclass."""
 
     def __post_init__(self):
-        self._reject_if_abstract(_VectorFieldNetConfigBase, "MLPConfig()")
+        self._reject_if_abstract(VectorFieldNetConfigBase, "MLPConfig()")
         if not isinstance(self.hidden_features, int) or isinstance(
             self.hidden_features, bool
         ):
@@ -1155,7 +1155,7 @@ class _VectorFieldNetConfigBase(_PerModelConfigBase):
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class MLPConfig(_VectorFieldNetConfigBase):
+class MLPConfig(VectorFieldNetConfigBase):
     """Standard vector-field MLP.
 
     Args:
@@ -1166,11 +1166,13 @@ class MLPConfig(_VectorFieldNetConfigBase):
     layer_norm: bool = True
     skip_connections: bool = True
 
-    _BUILD_FN: ClassVar[Callable] = staticmethod(build_standard_mlp_network)
+    _BUILD_FN: ClassVar[Callable[..., VectorFieldNet]] = staticmethod(
+        build_standard_mlp_network
+    )
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class AdaMLPConfig(_VectorFieldNetConfigBase):
+class AdaMLPConfig(VectorFieldNetConfigBase):
     """MLP with adaptive layer normalization conditioned on time.
 
     Args:
@@ -1186,11 +1188,13 @@ class AdaMLPConfig(_VectorFieldNetConfigBase):
     adamlp_ratio: int = 4
     mlp_ratio: int = 4
 
-    _BUILD_FN: ClassVar[Callable] = staticmethod(build_adamlp_network)
+    _BUILD_FN: ClassVar[Callable[..., VectorFieldNet]] = staticmethod(
+        build_adamlp_network
+    )
 
 
 @dataclass(frozen=True, eq=False, repr=False)
-class TransformerConfig(_VectorFieldNetConfigBase):
+class TransformerConfig(VectorFieldNetConfigBase):
     """Diffusion transformer.
 
     Args:
@@ -1204,7 +1208,9 @@ class TransformerConfig(_VectorFieldNetConfigBase):
     mlp_ratio: int = 4
     is_x_emb_seq: bool = False
 
-    _BUILD_FN: ClassVar[Callable] = staticmethod(build_transformer_network)
+    _BUILD_FN: ClassVar[Callable[..., VectorFieldNet]] = staticmethod(
+        build_transformer_network
+    )
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -1215,7 +1221,8 @@ class VectorFieldConfigBase(_PerModelConfigBase):
     subclass selects the estimator, and ``net`` selects the architecture.
 
     Args:
-        net: Config of the network to wrap, or a ready custom network module.
+        net: Network config or a custom `VectorFieldNet` that accepts the
+            embedded condition.
         z_score_input: Whether to z-score the modeled variable, one of `none`,
             `independent`, or `structured`.
         z_score_condition: Whether to z-score the conditioning variable, same
@@ -1229,13 +1236,15 @@ class VectorFieldConfigBase(_PerModelConfigBase):
             settings belong in ``net.extra_kwargs``.
     """
 
-    net: Union[_VectorFieldNetConfigBase, nn.Module] = field(default_factory=MLPConfig)
+    net: Union[VectorFieldNetConfigBase, VectorFieldNet] = field(
+        default_factory=MLPConfig
+    )
     z_score_input: Literal["none", "independent", "structured"] = "independent"
     z_score_condition: Literal["none", "independent", "structured"] = "independent"
     embedding_net: nn.Module = field(default_factory=nn.Identity)
     compose_standardization: bool = False
 
-    _ESTIMATOR_CLS: ClassVar[type]
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]]
     """Estimator class this config builds, set by each subclass."""
 
     _SHARED_FIELDS: ClassVar[frozenset] = frozenset({
@@ -1249,9 +1258,9 @@ class VectorFieldConfigBase(_PerModelConfigBase):
 
     def __post_init__(self):
         self._reject_if_abstract(VectorFieldConfigBase, "FlowMatchingConfig()")
-        if not isinstance(self.net, (_VectorFieldNetConfigBase, nn.Module)):
+        if not isinstance(self.net, (VectorFieldNetConfigBase, VectorFieldNet)):
             raise TypeError(
-                "`net` must be a vector-field network config or an nn.Module."
+                "`net` must be a VectorFieldNetConfigBase or a VectorFieldNet."
             )
         if self.compose_standardization and self.z_score_input != "independent":
             raise ValueError(
@@ -1285,7 +1294,7 @@ class VectorFieldConfigBase(_PerModelConfigBase):
         """
         check_data_device(batch_input, batch_condition)
 
-        if isinstance(self.net, _VectorFieldNetConfigBase):
+        if isinstance(self.net, VectorFieldNetConfigBase):
             embedded_condition = self.embedding_net.to(batch_condition.device)(
                 batch_condition[:1]
             )
@@ -1332,7 +1341,9 @@ class FlowMatchingConfig(VectorFieldConfigBase):
 
     gaussian_baseline: bool = False
 
-    _ESTIMATOR_CLS: ClassVar[type] = FlowMatchingEstimator
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]] = (
+        FlowMatchingEstimator
+    )
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -1369,7 +1380,7 @@ class VEScoreConfig(ScoreConfigBase):
     lognormal_std: float = 1.2
     power_law_exponent: float = 7.0
 
-    _ESTIMATOR_CLS: ClassVar[type] = VEScoreEstimator
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]] = VEScoreEstimator
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -1389,30 +1400,32 @@ class _BetaScoreConfigBase(ScoreConfigBase):
 class VPScoreConfig(_BetaScoreConfigBase):
     """Variance-preserving score estimator."""
 
-    _ESTIMATOR_CLS: ClassVar[type] = VPScoreEstimator
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]] = VPScoreEstimator
 
 
 @dataclass(frozen=True, eq=False, repr=False)
 class SubVPScoreConfig(_BetaScoreConfigBase):
     """Sub-variance-preserving score estimator."""
 
-    _ESTIMATOR_CLS: ClassVar[type] = SubVPScoreEstimator
+    _ESTIMATOR_CLS: ClassVar[type[ConditionalVectorFieldEstimator]] = (
+        SubVPScoreEstimator
+    )
 
 
-_VF_NET_CONFIGS: dict = {
+_VF_NET_CONFIGS: dict[str, type[VectorFieldNetConfigBase]] = {
     "mlp": MLPConfig,
     "ada_mlp": AdaMLPConfig,
     "transformer": TransformerConfig,
 }
 
-_SDE_CONFIGS: dict = {
+_SDE_CONFIGS: dict[str, type[ScoreConfigBase]] = {
     "ve": VEScoreConfig,
     "vp": VPScoreConfig,
     "subvp": SubVPScoreConfig,
 }
 
 
-def _vf_net_config_from_model(model: str) -> _VectorFieldNetConfigBase:
+def _vf_net_config_from_model(model: str) -> VectorFieldNetConfigBase:
     """Return the default network config of an architecture given its name.
 
     Args:
@@ -1478,7 +1491,7 @@ def _vf_config_from_factory_kwargs(
         The assembled estimator config.
     """
     net_config = _vf_net_config_from_model(model) if isinstance(model, str) else model
-    is_config = isinstance(net_config, _VectorFieldNetConfigBase)
+    is_config = isinstance(net_config, VectorFieldNetConfigBase)
     named_net = {
         name: value
         for name, value in named_net.items()

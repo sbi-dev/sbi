@@ -20,6 +20,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.neural_nets.net_builders.vector_field_nets import (
     ScoreConfigBase,
+    VectorFieldConfigBase,
     _score_config_from_sde_type,
 )
 from sbi.sbi_types import Tracker
@@ -68,7 +69,7 @@ class NPSE(VectorFieldTrainer):
         samples = posterior.sample((1000,), x=x_o)
     """
 
-    _ALLOWED_CONFIG_TYPE: ClassVar[type] = ScoreConfigBase
+    _ALLOWED_CONFIG_TYPE: ClassVar[type[VectorFieldConfigBase]] = ScoreConfigBase
 
     def __init__(
         self,

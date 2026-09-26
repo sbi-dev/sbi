@@ -52,6 +52,7 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     VEScoreConfig,
     VPScoreConfig,
     VectorFieldConfigBase,
+    VectorFieldNetConfigBase,
 )
 
 __all__ = [
@@ -68,6 +69,7 @@ __all__ = [
     "VEScoreConfig",
     "VPScoreConfig",
     "SubVPScoreConfig",
+    "VectorFieldNetConfigBase",
     "MLPConfig",
     "AdaMLPConfig",
     "TransformerConfig",
