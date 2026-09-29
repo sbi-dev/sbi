@@ -108,6 +108,32 @@ def test_deprecation_warning_points_at_the_caller():
     assert record[0].filename == __file__, record[0].filename
 
 
+@pytest.mark.parametrize(
+    "call,model,replacement,other",
+    [
+        (posterior_nn, "mnpe", "MixedConfig", "NSFConfig"),
+        (likelihood_nn, "mnle", "MixedConfig", "NSFConfig"),
+        (posterior_nn, "nsf", "NSFConfig", "MixedConfig"),
+        (likelihood_nn, "nsf", "NSFConfig", "MixedConfig"),
+    ],
+    ids=["posterior_mnpe", "likelihood_mnle", "posterior_nsf", "likelihood_nsf"],
+)
+def test_deprecation_warning_names_the_config_that_model_builds(
+    call, model, replacement, other
+):
+    """The suggested replacement must be the config type that path builds.
+
+    The mixed models build a `MixedConfig`, so pointing those callers at
+    `NSFConfig` would hand them a type their trainer rejects.
+    """
+    with pytest.warns(FutureWarning) as record:
+        call(model)
+
+    message = str(record[0].message)
+    assert f"`{replacement}()`" in message
+    assert f"`{other}()`" not in message
+
+
 def test_no_public_factory_is_left_undeprecated():
     """A new factory must not ship without the deprecation warning."""
     import sbi.neural_nets

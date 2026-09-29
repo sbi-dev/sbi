@@ -89,6 +89,9 @@ _LIKELIHOOD_FACTORY_FIELDS: dict = {
 _Z_SCORE_FIELDS: frozenset = frozenset({"z_score_input", "z_score_condition"})
 
 
+_MIXED_MODELS: tuple = ("mnle", "mnpe")
+
+
 def _normalize_z_scoring(family_args: dict) -> dict:
     """Map the z-scoring arguments left at ``None`` to ``"none"``.
 
@@ -246,7 +249,8 @@ def likelihood_nn(
 
     _warn_factory_deprecated(
         "likelihood_nn",
-        "a per-model config from `sbi.neural_nets`, e.g. `NSFConfig()`",
+        "a per-model config from `sbi.neural_nets`, e.g. "
+        + ("`MixedConfig()`" if model in _MIXED_MODELS else "`NSFConfig()`"),
     )
 
     family_args = _density_family_args(
@@ -258,7 +262,7 @@ def likelihood_nn(
         embedding_net=embedding_net,
         num_components=num_components,
     )
-    if model in ("mnle", "mnpe"):
+    if model in _MIXED_MODELS:
         config = _mixed_config_from_factory_kwargs(
             model=model,
             family_args=family_args,
@@ -342,7 +346,8 @@ def posterior_nn(
 
     _warn_factory_deprecated(
         "posterior_nn",
-        "a per-model config from `sbi.neural_nets`, e.g. `NSFConfig()`",
+        "a per-model config from `sbi.neural_nets`, e.g. "
+        + ("`MixedConfig()`" if model in _MIXED_MODELS else "`NSFConfig()`"),
     )
 
     family_args = _density_family_args(
@@ -387,7 +392,7 @@ def posterior_nn(
 
         return build_fn_snpe_a
 
-    if model in ("mnle", "mnpe"):
+    if model in _MIXED_MODELS:
         config = _mixed_config_from_factory_kwargs(
             model=model,
             family_args=family_args,
