@@ -3,6 +3,7 @@
 
 import math
 import warnings
+from copy import deepcopy
 from dataclasses import dataclass, field, fields, replace
 from itertools import chain
 from typing import Callable, ClassVar, Literal, Optional, Sequence, Union
@@ -41,9 +42,29 @@ except ImportError:
 @torch.no_grad()
 def _probe_module(module: nn.Module, *inputs: Tensor) -> Tensor:
     """Probe with isolated inputs, parameters, and buffers, restoring training modes."""
+    if isinstance(module, nn.DataParallel):
+        return _probe_module(module.module, *inputs)
+
+    tensors = dict(chain(module.named_parameters(), module.named_buffers()))
+    if any(nn.parameter.is_lazy(value) for value in tensors.values()) or any(
+        isinstance(child, torch.jit.ScriptModule) for child in module.modules()
+    ):
+        # Stateless calls require initialized tensors and do not support TorchScript.
+        devices = [inputs[0].device] if inputs[0].is_cuda else []
+        with torch.random.fork_rng(devices=devices):
+            # Legacy weight normalization caches non-leaf tensors on the module.
+            memo = {
+                id(value): value.detach().clone()
+                for child in module.modules()
+                for value in vars(child).values()
+                if isinstance(value, Tensor) and not value.is_leaf
+            }
+            probe = deepcopy(module, memo).to(device=inputs[0].device).eval()
+            return probe(*(value.detach().clone() for value in inputs))
+
     state = {
         name: value.detach().to(device=inputs[0].device, copy=True)
-        for name, value in chain(module.named_parameters(), module.named_buffers())
+        for name, value in tensors.items()
     }
     training_modes = {child: child.training for child in module.modules()}
     try:

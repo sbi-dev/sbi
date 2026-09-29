@@ -432,7 +432,7 @@ def posterior_score_nn(
             - 'transformer_cross_attn': Transformer with cross-attention.
                 Requires sequence-shaped conditioning (3-D ``batch_y`` or an
                 ``embedding_net`` returning ``(batch, seq_len, emb_dim)``).
-            -  nn.Module: Custom network
+            - `VectorFieldNet`: Custom network implementing `forward(theta, x, t)`.
             Defaults to 'mlp'.
         z_score_theta: Whether to z-score thetas passing into the network, can be one
             of:
@@ -523,7 +523,7 @@ def posterior_flow_nn(
             - 'transformer_cross_attn': Transformer with cross-attention.
                 Requires sequence-shaped conditioning (3-D ``batch_y`` or an
                 ``embedding_net`` returning ``(batch, seq_len, emb_dim)``).
-            -  nn.Module: Custom network
+            - `VectorFieldNet`: Custom network implementing `forward(theta, x, t)`.
             Defaults to 'mlp'.
         z_score_theta: Whether to z-score theta for time-dependent normalization.
             This enables time-dependent z-scoring which helps FMPE learn when

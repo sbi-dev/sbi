@@ -169,15 +169,28 @@ def test_estimator_config_rejects_an_invalid_network(config_cls, net):
 
 
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS)
-@pytest.mark.parametrize("condition_dim,output_dim", [(7, 2), (3, 2), (7, 1)])
+@pytest.mark.parametrize(
+    "condition_dim,output_dim,probe_kind",
+    [
+        (7, 2, "normal"),
+        (3, 2, "normal"),
+        (7, 1, "normal"),
+        (3, 2, "jit"),
+        (7, 1, "lazy"),
+    ],
+)
 def test_custom_network_validates_embedded_shapes_without_changing_state(
-    config_cls, condition_dim, output_dim, batches
+    config_cls, condition_dim, output_dim, probe_kind, batches
 ):
     class CustomNet(VectorFieldNet):
         def __init__(self):
             super().__init__()
             self.norm = nn.BatchNorm1d(condition_dim)
-            self.linear = nn.Linear(2 + condition_dim + 1, output_dim)
+            self.linear = (
+                nn.LazyLinear(output_dim)
+                if probe_kind == "lazy"
+                else nn.Linear(2 + condition_dim + 1, output_dim)
+            )
             self.register_buffer("calls", torch.zeros(()))
 
         def forward(self, input, condition, time):
@@ -189,6 +202,8 @@ def test_custom_network_validates_embedded_shapes_without_changing_state(
     net = CustomNet()
     net.linear.eval()
     embedding = nn.Sequential(nn.Linear(3, 7), nn.BatchNorm1d(7))
+    if probe_kind == "jit":
+        embedding = torch.jit.trace(embedding, batches[1])
     states = [deepcopy(module.state_dict()) for module in (net, embedding)]
     modes = [module.training for root in (net, embedding) for module in root.modules()]
     config = config_cls(net=net, embedding_net=embedding)
@@ -203,7 +218,10 @@ def test_custom_network_validates_embedded_shapes_without_changing_state(
 
     for module, state in zip((net, embedding), states, strict=True):
         for name, value in module.state_dict().items():
-            torch.testing.assert_close(value, state[name], rtol=0, atol=0)
+            if nn.parameter.is_lazy(state[name]):
+                assert nn.parameter.is_lazy(value)
+            else:
+                torch.testing.assert_close(value, state[name], rtol=0, atol=0)
     assert modes == [
         module.training for root in (net, embedding) for module in root.modules()
     ]
@@ -266,6 +284,92 @@ def test_custom_network_probe_accepts_weight_normalization(
     assert all(
         parameter.grad is not None and torch.isfinite(parameter.grad).all()
         for parameter in estimator.parameters()
+    )
+
+
+@pytest.mark.parametrize("config_cls", [FlowMatchingConfig, VEScoreConfig])
+@pytest.mark.parametrize("use_factory", [False, True], ids=["config", "factory"])
+@pytest.mark.parametrize(
+    "module_kind",
+    [
+        "lazy_net",
+        "lazy_embedding",
+        "lazy_weight_norm_embedding",
+        "jit_embedding",
+        "parallel_embedding",
+    ],
+)
+def test_custom_network_probe_supports_specialized_modules(
+    config_cls, use_factory, module_kind, batches
+):
+    class CustomNet(VectorFieldNet):
+        def __init__(self):
+            super().__init__()
+            self.linear = (
+                nn.LazyLinear(2) if module_kind == "lazy_net" else nn.Linear(5, 2)
+            )
+            self.register_buffer("calls", torch.zeros(()))
+
+        def forward(self, input, condition, time):
+            self.calls.add_(1)
+            return self.linear(torch.cat([input, condition], dim=-1))
+
+    net = CustomNet()
+    net.linear.eval()
+    embedding = nn.Sequential(
+        nn.LazyLinear(3)
+        if module_kind in ("lazy_embedding", "lazy_weight_norm_embedding")
+        else nn.Linear(3, 3),
+        nn.BatchNorm1d(3).eval(),
+    )
+    if module_kind == "lazy_weight_norm_embedding":
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            embedding.append(nn.utils.weight_norm(nn.Linear(3, 3)))
+    elif module_kind == "jit_embedding":
+        embedding = torch.jit.trace(embedding, batches[1])
+    elif module_kind == "parallel_embedding":
+        embedding = nn.DataParallel(embedding)
+
+    modules = [child for root in (net, embedding) for child in root.modules()]
+    modes = [child.training for child in modules]
+    module_types = [type(child) for child in modules]
+    states = [deepcopy(root.state_dict()) for root in (net, embedding)]
+    inputs = [batch.clone() for batch in batches]
+    rng_state = torch.random.get_rng_state()
+    if use_factory:
+        factory = (
+            posterior_flow_nn
+            if config_cls is FlowMatchingConfig
+            else posterior_score_nn
+        )
+        builder = factory(model=net, embedding_net=embedding)
+        estimator = builder(*batches)
+    else:
+        estimator = config_cls(net=net, embedding_net=embedding).build(*batches)
+
+    assert estimator.net is net
+    assert torch.equal(torch.random.get_rng_state(), rng_state)
+    assert modes == [child.training for child in modules]
+    assert module_types == [type(child) for child in modules]
+    for root, state in zip((net, embedding), states, strict=True):
+        for name, value in root.state_dict().items():
+            if nn.parameter.is_lazy(state[name]):
+                assert nn.parameter.is_lazy(value)
+            else:
+                torch.testing.assert_close(value, state[name], rtol=0, atol=0)
+    for batch, original in zip(batches, inputs, strict=True):
+        torch.testing.assert_close(batch, original, rtol=0, atol=0)
+
+    loss = estimator.loss(*batches).mean()
+    assert torch.isfinite(loss)
+    loss.backward()
+    parameters = list(estimator.parameters())
+    assert all(p.grad is not None and torch.isfinite(p.grad).all() for p in parameters)
+    before_step = [p.detach().clone() for p in parameters]
+    torch.optim.SGD(parameters, lr=0.01).step()
+    assert any(
+        not torch.equal(p, old) for p, old in zip(parameters, before_step, strict=True)
     )
 
 
