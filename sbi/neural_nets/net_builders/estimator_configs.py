@@ -83,7 +83,12 @@ from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.nn_utils import check_net_device, embedding_net_warn_msg
 
-_EMBEDDING_NET_FIELDS = ("embedding_net", "embedding_net_theta", "embedding_net_x")
+_EMBEDDING_NET_FIELDS = (
+    "embedding_net",
+    "embedding_net_theta",
+    "embedding_net_x",
+    "combined_embedding_net",
+)
 """Fields holding a user-supplied embedding net, across the config families."""
 
 

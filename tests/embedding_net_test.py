@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 import pickle
+import warnings
 from typing import Callable
 
 import pytest
@@ -18,7 +19,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
     MCMCPosteriorParameters,
 )
-from sbi.neural_nets import MAFConfig, MDNConfig
+from sbi.neural_nets import MAFConfig, MDNConfig, MixedConfig, NSFConfig
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     CausalCNNEmbedding,
@@ -1007,3 +1008,23 @@ def test_check_net_device_moves_every_tensor():
         moved = check_net_device(net, "cpu", "The passed net is moved to cpu.")
 
     assert all(t.device.type == "cpu" for t in moved.buffers())
+
+
+@pytest.mark.skipif(not gpu_available(), reason="Needs a device other than cpu.")
+@pytest.mark.parametrize("device", ["cpu", "gpu"], ids=["already_cpu", "moved_to_cpu"])
+def test_mixed_config_normalizes_combined_embedding_net(device):
+    """`combined_embedding_net` is handed to a build, so it must be on cpu."""
+    combined = nn.Sequential(nn.Linear(4, 8), nn.ReLU())
+    if device == "gpu":
+        combined = combined.to(process_device("gpu"))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        config = MixedConfig(
+            continuous=NSFConfig(z_score_input="none"),
+            num_categories_per_variable=3,
+            combined_embedding_net=combined,
+        )
+
+    combined_embedding_net = config.combined_embedding_net
+    assert all(t.device.type == "cpu" for t in combined_embedding_net.parameters())
