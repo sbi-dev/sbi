@@ -10,11 +10,7 @@ import sbi.inference
 from sbi import utils
 from sbi.inference import FMPE, NPE, VectorFieldPosterior, infer
 from sbi.inference.trainers import nle, npe, nre
-from sbi.neural_nets.net_builders import (
-    build_flow_matching_estimator,
-    build_score_matching_estimator,
-    build_vector_field_estimator,
-)
+from sbi.neural_nets import FlowMatchingConfig
 
 
 def test_infer():
@@ -215,35 +211,12 @@ def test_canonical_shorthands_do_not_warn():
         assert sbi.inference.NRE is sbi.inference.NRE_B
 
 
-def test_deprecated_vector_field_builders_warn():
-    """The flow and score wrapper builders warn and still delegate correctly.
-
-    `sde_type` is passed on purpose: with positional arguments only, a shim that
-    dropped `**kwargs` would still return the right estimator class and pass, while
-    silently building a VE rather than a VP score estimator.
-    """
-    theta, x = torch.randn(20, 2), torch.randn(20, 2)
-
-    with pytest.warns(FutureWarning, match="build_vector_field_estimator"):
-        flow = build_flow_matching_estimator(theta, x)
-    assert type(flow) is type(build_vector_field_estimator(theta, x, "flow"))
-
-    with pytest.warns(FutureWarning, match="build_vector_field_estimator"):
-        score = build_score_matching_estimator(theta, x, sde_type="vp")
-    assert type(score) is type(
-        build_vector_field_estimator(theta, x, "score", sde_type="vp")
-    )
-    assert type(score) is not type(
-        build_vector_field_estimator(theta, x, "score", sde_type="ve")
-    ), "`sde_type` did not reach the canonical builder"
-
-
 def test_vector_field_posterior_sample_with_warns():
     """Passing `sample_with` to `sample()` warns; setting it at construction is the
     supported path and must stay silent."""
     theta, x = torch.randn(20, 2), torch.randn(20, 2)
     posterior = VectorFieldPosterior(
-        vector_field_estimator=build_vector_field_estimator(theta, x, "flow"),
+        vector_field_estimator=FlowMatchingConfig().build(theta, x),
         prior=utils.BoxUniform(-torch.ones(2), torch.ones(2)),
         sample_with="ode",
     )
