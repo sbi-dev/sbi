@@ -262,10 +262,10 @@ What if you are currently working on a specific method and you want to run the
 mini-sbibm tests only for this class of methods? You can use the `--bm-mode` flag:
 
 ```bash
-pytest --bm --bm-mode nspe
+pytest --bm --bm-mode npse
 ```
 
-This will run the mini-sbibm tests only for methods of the `nspe` class, but with a
+This will run the mini-sbibm tests only for methods of the `npse` class, but with a
 few major hyperparameter choices, such as different base network architectures and
 different diffusion processes.
 
