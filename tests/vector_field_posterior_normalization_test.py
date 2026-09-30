@@ -41,7 +41,8 @@ def test_log_prob_is_normalized_inside_bounded_prior(estimator_type):
 
 
 def test_leakage_correction_caching(monkeypatch):
-    """The factor is cached at the default `x` only, and uses the `ode_kwargs`."""
+    """The factor is cached at the default `x` only, and samples at the given `x`
+    with the given `ode_kwargs`."""
     prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
     posterior = _posterior("flow", prior)
     calls = []
@@ -49,7 +50,10 @@ def test_leakage_correction_caching(monkeypatch):
     monkeypatch.setattr(
         posterior,
         "sample_via_ode",
-        lambda *args, **kwargs: calls.append(kwargs) or sample_via_ode(*args, **kwargs),
+        lambda *args, **kwargs: (
+            calls.append((kwargs, posterior.potential_fn.x_o))
+            or sample_via_ode(*args, **kwargs)
+        ),
     )
     theta = torch.ones(1, 2)
     params = {"num_rejection_samples": 100}
@@ -67,4 +71,8 @@ def test_leakage_correction_caching(monkeypatch):
     num_calls = len(calls)
     ode_kwargs = {"atol": 1e-4, "rtol": 1e-4}
     posterior.log_prob(theta, ode_kwargs=ode_kwargs, leakage_correction_params=params)
-    assert len(calls) > num_calls and calls[-1] == ode_kwargs
+    assert len(calls) > num_calls and calls[-1][0] == ode_kwargs
+
+    posterior.log_prob(theta, x=2 * torch.ones(1, 2), leakage_correction_params=params)
+    posterior.leakage_correction(posterior.default_x, force_update=True, **params)
+    assert torch.equal(calls[-1][1], posterior.default_x)

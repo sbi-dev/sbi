@@ -79,3 +79,14 @@ def test_kl_divergence_mc_refuses_vector_field_posterior_with_iid_x():
 
     with pytest.raises(NotImplementedError, match="iid"):
         kl_divergence_mc(posterior, prior, x=zeros(3, 2), p_samples=theta)
+
+
+def test_kl_divergence_mc_refuses_vector_field_posterior_sampling_with_sde():
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((50,))
+    posterior = VectorFieldPosterior(
+        build_vector_field_estimator(theta, theta), prior, sample_with="sde"
+    )
+
+    with pytest.raises(ValueError, match="sample_with"):
+        kl_divergence_mc(posterior, prior, x=zeros(1, 2), num_samples=10)

@@ -7,7 +7,7 @@ from typing import Dict, Literal, Optional, Union
 
 import torch
 from torch import Tensor
-from torch.distributions import Distribution, constraints
+from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.vector_field_potential import (
@@ -27,6 +27,7 @@ from sbi.sbi_types import Shape
 from sbi.utils import check_prior
 from sbi.utils.sbiutils import (
     gradient_ascent,
+    prior_support_is_bounded,
     warn_if_outside_prior_support,
     within_support,
 )
@@ -532,45 +533,39 @@ class VectorFieldPosterior(NeuralPosterior):
         x: Tensor,
         num_rejection_samples: int = 10_000,
         force_update: bool = False,
-        show_progress_bars: bool = False,
-        rejection_sampling_batch_size: int = 10_000,
         ode_kwargs: Optional[Dict] = None,
     ) -> Tensor:
         r"""Return the probability mass of the ODE density inside the prior support.
 
-        The mass is the acceptance rate of rejection sampling with the probability
-        flow ODE. It is 1 for unbounded priors. It is estimated once for
+        The mass is the fraction of probability flow ODE samples inside the prior
+        support. It is 1 for unbounded priors. It is estimated once for
         `self.default_x` and saved; any other `x`, or any call with `ode_kwargs`, is
         estimated on every call.
 
-        The potential must be bound to `x` before the call, as `log_prob()` does.
-
         Args:
-            x: Observed data at which the potential is bound.
-            num_rejection_samples: Number of samples used to estimate the factor.
+            x: A single observation.
+            num_rejection_samples: Number of ODE samples used to estimate the factor.
             force_update: Whether to re-estimate the saved factor at `default_x`.
-            show_progress_bars: Whether to show a progress bar during sampling.
-            rejection_sampling_batch_size: Batch size for rejection sampling.
             ode_kwargs: Additional keyword arguments for the ODE solver. Must match
                 the ones used for the density that is corrected.
 
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
-        support = getattr(self.prior, "support", None)
-        if isinstance(getattr(support, "base_constraint", support), constraints._Real):
+        if prior_support_is_bounded(self.prior) is False:
             return torch.ones((), device=self._device)
 
         def acceptance() -> Tensor:
-            return rejection.accept_reject_sample(
-                proposal=self.sample_via_ode,
-                accept_reject_fn=lambda theta: within_support(self.prior, theta),
-                num_samples=num_rejection_samples,
-                show_progress_bars=show_progress_bars,
-                sample_for_correction_factor=True,
-                max_sampling_batch_size=rejection_sampling_batch_size,
-                proposal_sampling_kwargs=ode_kwargs,
-            )[1]
+            self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
+            theta = self.sample_via_ode((num_rejection_samples,), **(ode_kwargs or {}))
+            mass = within_support(self.prior, theta).float().mean()
+            if mass == 0:
+                raise RuntimeError(
+                    f"None of {num_rejection_samples} ODE samples lie inside the prior "
+                    "support, so `log_prob()` cannot be normalized. Use "
+                    "`norm_posterior=False` to get the unnormalized log-probability."
+                )
+            return mass
 
         is_new_x = self.default_x is None or (
             x is not self.default_x
