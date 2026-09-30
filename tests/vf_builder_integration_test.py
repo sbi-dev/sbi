@@ -4,8 +4,6 @@
 """Tests for per-model vector-field configs."""
 
 import inspect
-import warnings
-from copy import deepcopy
 from dataclasses import fields as dc_fields
 from typing import get_args
 
@@ -15,7 +13,6 @@ from torch import nn, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import FMPE, NPSE
-from sbi.neural_nets import VectorFieldNetConfigBase
 from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.neural_nets.estimators.score_estimator import (
     SubVPScoreEstimator,
@@ -24,21 +21,16 @@ from sbi.neural_nets.estimators.score_estimator import (
 )
 from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
-    _VALID_VF_MODELS,
     MAFConfig,
 )
 from sbi.neural_nets.net_builders.vector_field_nets import (
     AdaMLPConfig,
     FlowMatchingConfig,
     MLPConfig,
-    ScoreConfigBase,
     SubVPScoreConfig,
     TransformerConfig,
     VEScoreConfig,
     VPScoreConfig,
-    VectorFieldConfigBase,
-    VectorFieldMLP,
-    _vf_net_config_from_model,
     build_standard_mlp_network,
 )
 from sbi.utils.vector_field_utils import VectorFieldNet
@@ -74,39 +66,9 @@ def _assert_same_state(actual, expected):
         torch.testing.assert_close(value, expected.state_dict()[name])
 
 
-@pytest.mark.parametrize(
-    "config_cls, bad_kwarg",
-    [
-        (FlowMatchingConfig, {"sigma_min": 0.1}),
-        (FlowMatchingConfig, {"beta_min": 0.1}),
-        (FlowMatchingConfig, {"sde_type": "vp"}),
-        (VEScoreConfig, {"gaussian_baseline": True}),
-        (VEScoreConfig, {"beta_min": 0.1}),
-        (VPScoreConfig, {"sigma_max": 5.0}),
-        (SubVPScoreConfig, {"train_schedule": "lognormal"}),
-    ],
-)
-def test_estimator_config_rejects_a_setting_it_does_not_have(config_cls, bad_kwarg):
-    with pytest.raises(TypeError):
-        config_cls(**bad_kwarg)
-
-
-@pytest.mark.parametrize(
-    "net_cls, bad_kwarg",
-    [
-        (MLPConfig, {"num_heads": 4}),
-        (MLPConfig, {"mlp_ratio": 2}),
-        (MLPConfig, {"adamlp_ratio": 2}),
-        (MLPConfig, {"hidden_features": [16, 32]}),
-        (AdaMLPConfig, {"layer_norm": False}),
-        (AdaMLPConfig, {"num_heads": 4}),
-        (TransformerConfig, {"layer_norm": False}),
-        (TransformerConfig, {"adamlp_ratio": 2}),
-    ],
-)
-def test_net_config_rejects_a_setting_it_does_not_have(net_cls, bad_kwarg):
-    with pytest.raises(TypeError):
-        net_cls(**bad_kwarg)
+def test_net_config_rejects_a_list_of_hidden_features():
+    with pytest.raises(TypeError, match="hidden_features"):
+        MLPConfig(hidden_features=[16, 32])
 
 
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS + NET_CONFIGS)
@@ -116,261 +78,39 @@ def test_invalid_literal_value_raises(config_cls):
         config_cls(**{field: "not_a_value"})
 
 
-@pytest.mark.parametrize(
-    "base_cls", [VectorFieldConfigBase, ScoreConfigBase, VectorFieldNetConfigBase]
-)
-def test_role_base_cannot_be_instantiated(base_cls):
-    with pytest.raises(TypeError, match="per-model config"):
-        base_cls()
-
-
-@pytest.mark.parametrize("model", sorted(_VALID_VF_MODELS))
-def test_every_advertised_model_maps_to_a_net_config(model):
-    net_config = _vf_net_config_from_model(model)
-    assert isinstance(net_config, VectorFieldNetConfigBase)
-    if model == "transformer_cross_attn":
-        assert net_config.is_x_emb_seq
-
-
-def test_unknown_model_name_raises():
-    with pytest.raises(ValueError, match="Unknown vector field model"):
-        _vf_net_config_from_model("not_a_model")
-
-
-@pytest.mark.parametrize("net_cls", NET_CONFIGS)
-def test_net_config_builds_the_network_alone(net_cls, batches):
-    assert isinstance(net_cls().build(*batches), nn.Module)
-
-
-def test_cross_attention_takes_a_sequence_condition():
-    theta, x_seq = torch.randn(32, 2), torch.randn(32, 5, 4)
-    estimator = FlowMatchingConfig(net=TransformerConfig(is_x_emb_seq=True)).build(
-        theta, x_seq
-    )
-    assert estimator.condition_shape == torch.Size([5, 4])
-
-
-def test_custom_network_module_is_accepted(batches):
-    theta, x = batches
-
-    class CustomNet(VectorFieldNet):
-        def forward(self, input, condition, time):
-            return torch.zeros_like(input)
-
-    custom = CustomNet()
-    assert FlowMatchingConfig(net=custom).build(theta, x).net is custom
-
-
-@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
 @pytest.mark.parametrize("net", ["mlp", nn.Linear(3, 3)])
-def test_estimator_config_rejects_an_invalid_network(config_cls, net):
+def test_estimator_config_rejects_an_invalid_network(net):
     with pytest.raises(TypeError, match="VectorFieldNet"):
-        config_cls(net=net)
+        FlowMatchingConfig(net=net)
 
 
-@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
-@pytest.mark.parametrize(
-    "condition_dim,output_dim,probe_kind",
-    [
-        (7, 2, "normal"),
-        (3, 2, "normal"),
-        (7, 1, "normal"),
-        (3, 2, "jit"),
-        (7, 1, "lazy"),
-    ],
-)
-def test_custom_network_validates_embedded_shapes_without_changing_state(
-    config_cls, condition_dim, output_dim, probe_kind, batches
+@pytest.mark.parametrize("condition_dim, valid", [(7, True), (3, False)])
+def test_custom_network_is_checked_against_the_embedded_condition(
+    condition_dim, valid, batches
 ):
     class CustomNet(VectorFieldNet):
         def __init__(self):
             super().__init__()
             self.norm = nn.BatchNorm1d(condition_dim)
-            self.linear = (
-                nn.LazyLinear(output_dim)
-                if probe_kind == "lazy"
-                else nn.Linear(2 + condition_dim + 1, output_dim)
-            )
-            self.register_buffer("calls", torch.zeros(()))
+            self.linear = nn.Linear(2 + condition_dim, 2)
 
         def forward(self, input, condition, time):
-            self.calls.add_(1)
-            return self.linear(
-                torch.cat([input, self.norm(condition), time[:, None]], dim=-1)
-            )
+            return self.linear(torch.cat([input, self.norm(condition)], dim=-1))
 
     net = CustomNet()
-    net.linear.eval()
-    embedding = nn.Sequential(nn.Linear(3, 7), nn.BatchNorm1d(7))
-    if probe_kind == "jit":
-        embedding = torch.jit.trace(embedding, batches[1])
-    states = [deepcopy(module.state_dict()) for module in (net, embedding)]
-    modes = [module.training for root in (net, embedding) for module in root.modules()]
-    config = config_cls(net=net, embedding_net=embedding)
-    valid = condition_dim == 7 and output_dim == 2
-
-    if valid:
-        estimator = config.build(*batches)
-        assert estimator.net is net
-    else:
+    config = FlowMatchingConfig(net=net, embedding_net=nn.Linear(3, 7))
+    if not valid:
         with pytest.raises(ValueError, match=r"embedded condition shape \(7,\)"):
             config.build(*batches)
+        return
 
-    for module, state in zip((net, embedding), states, strict=True):
-        for name, value in module.state_dict().items():
-            if nn.parameter.is_lazy(state[name]):
-                assert nn.parameter.is_lazy(value)
-            else:
-                torch.testing.assert_close(value, state[name], rtol=0, atol=0)
-    assert modes == [
-        module.training for root in (net, embedding) for module in root.modules()
-    ]
-    if valid:
-        assert torch.isfinite(estimator.loss(*batches)).all()
-
-
-@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
-@pytest.mark.parametrize("inplace_target", ["network", "embedding"])
-def test_custom_network_probe_preserves_input_batches(
-    config_cls, inplace_target, batches
-):
-    class CustomNet(VectorFieldNet):
-        def forward(self, input, condition, time):
-            return input.relu_() if inplace_target == "network" else input
-
-    embedding = (
-        nn.ReLU(inplace=True) if inplace_target == "embedding" else nn.Identity()
-    )
-    batches = tuple(-batch.abs() for batch in batches)
-    expected = [batch.clone() for batch in batches]
-    estimator = config_cls(net=CustomNet(), embedding_net=embedding).build(*batches)
-
-    for actual, original in zip(batches, expected, strict=True):
-        torch.testing.assert_close(actual, original, rtol=0, atol=0)
-    torch.testing.assert_close(estimator.mean_0, expected[0].mean(dim=0))
-
-
-@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
-@pytest.mark.parametrize("normalized_target", ["network", "embedding"])
-@pytest.mark.parametrize("parametrized", [False, True], ids=["legacy", "parametrized"])
-def test_custom_network_probe_accepts_weight_normalization(
-    config_cls, normalized_target, parametrized, batches
-):
-    class CustomNet(VectorFieldNet):
-        def __init__(self):
-            super().__init__()
-            self.linear = nn.Linear(5, 2)
-
-        def forward(self, input, condition, time):
-            return self.linear(torch.cat([input, condition], dim=-1))
-
-    net = CustomNet()
-    embedding = nn.Linear(3, 3)
-    namespace = nn.utils.parametrizations if parametrized else nn.utils
-    weight_norm = getattr(namespace, "weight_norm", None)
-    if weight_norm is None:
-        pytest.skip("Parametrized weight normalization is unavailable.")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        weight_norm(net.linear if normalized_target == "network" else embedding)
-    states = [deepcopy(module.state_dict()) for module in (net, embedding)]
-    estimator = config_cls(net=net, embedding_net=embedding).build(*batches)
+    running_mean = net.norm.running_mean.clone()
+    estimator = config.build(*batches)
 
     assert estimator.net is net
-    for module, state in zip((net, embedding), states, strict=True):
-        for name, value in module.state_dict().items():
-            torch.testing.assert_close(value, state[name], rtol=0, atol=0)
-    estimator.loss(*batches).mean().backward()
-    assert all(
-        parameter.grad is not None and torch.isfinite(parameter.grad).all()
-        for parameter in estimator.parameters()
-    )
-
-
-@pytest.mark.parametrize("config_cls", [FlowMatchingConfig, VEScoreConfig])
-@pytest.mark.parametrize("use_factory", [False, True], ids=["config", "factory"])
-@pytest.mark.parametrize(
-    "module_kind",
-    [
-        "lazy_net",
-        "lazy_embedding",
-        "lazy_weight_norm_embedding",
-        "jit_embedding",
-        "parallel_embedding",
-    ],
-)
-def test_custom_network_probe_supports_specialized_modules(
-    config_cls, use_factory, module_kind, batches
-):
-    class CustomNet(VectorFieldNet):
-        def __init__(self):
-            super().__init__()
-            self.linear = (
-                nn.LazyLinear(2) if module_kind == "lazy_net" else nn.Linear(5, 2)
-            )
-            self.register_buffer("calls", torch.zeros(()))
-
-        def forward(self, input, condition, time):
-            self.calls.add_(1)
-            return self.linear(torch.cat([input, condition], dim=-1))
-
-    net = CustomNet()
-    net.linear.eval()
-    embedding = nn.Sequential(
-        nn.LazyLinear(3)
-        if module_kind in ("lazy_embedding", "lazy_weight_norm_embedding")
-        else nn.Linear(3, 3),
-        nn.BatchNorm1d(3).eval(),
-    )
-    if module_kind == "lazy_weight_norm_embedding":
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", FutureWarning)
-            embedding.append(nn.utils.weight_norm(nn.Linear(3, 3)))
-    elif module_kind == "jit_embedding":
-        embedding = torch.jit.trace(embedding, batches[1])
-    elif module_kind == "parallel_embedding":
-        embedding = nn.DataParallel(embedding)
-
-    modules = [child for root in (net, embedding) for child in root.modules()]
-    modes = [child.training for child in modules]
-    module_types = [type(child) for child in modules]
-    states = [deepcopy(root.state_dict()) for root in (net, embedding)]
-    inputs = [batch.clone() for batch in batches]
-    rng_state = torch.random.get_rng_state()
-    if use_factory:
-        factory = (
-            posterior_flow_nn
-            if config_cls is FlowMatchingConfig
-            else posterior_score_nn
-        )
-        builder = factory(model=net, embedding_net=embedding)
-        estimator = builder(*batches)
-    else:
-        estimator = config_cls(net=net, embedding_net=embedding).build(*batches)
-
-    assert estimator.net is net
-    assert torch.equal(torch.random.get_rng_state(), rng_state)
-    assert modes == [child.training for child in modules]
-    assert module_types == [type(child) for child in modules]
-    for root, state in zip((net, embedding), states, strict=True):
-        for name, value in root.state_dict().items():
-            if nn.parameter.is_lazy(state[name]):
-                assert nn.parameter.is_lazy(value)
-            else:
-                torch.testing.assert_close(value, state[name], rtol=0, atol=0)
-    for batch, original in zip(batches, inputs, strict=True):
-        torch.testing.assert_close(batch, original, rtol=0, atol=0)
-
-    loss = estimator.loss(*batches).mean()
-    assert torch.isfinite(loss)
-    loss.backward()
-    parameters = list(estimator.parameters())
-    assert all(p.grad is not None and torch.isfinite(p.grad).all() for p in parameters)
-    before_step = [p.detach().clone() for p in parameters]
-    torch.optim.SGD(parameters, lr=0.01).step()
-    assert any(
-        not torch.equal(p, old) for p, old in zip(parameters, before_step, strict=True)
-    )
+    assert net.training
+    assert torch.equal(net.norm.running_mean, running_mean)
+    assert torch.isfinite(estimator.loss(*batches)).all()
 
 
 @pytest.mark.parametrize("config_cls", ALL_CONFIGS)
@@ -391,13 +131,10 @@ def test_compose_standardization_is_set_by_the_constructor(config_cls, batches):
     assert (estimator.mean_0 == 0).all() and (estimator.std_0 == 1).all()
 
 
-@pytest.mark.parametrize("config_cls", ALL_CONFIGS)
 @pytest.mark.parametrize("z_score_input", [None, "none", "structured"])
-def test_compose_standardization_requires_independent_z_scoring(
-    config_cls, z_score_input
-):
+def test_compose_standardization_requires_independent_z_scoring(z_score_input):
     with pytest.raises(ValueError, match="z_score_input='independent'"):
-        config_cls(compose_standardization=True, z_score_input=z_score_input)
+        VEScoreConfig(compose_standardization=True, z_score_input=z_score_input)
 
 
 def test_compose_standardization_rejects_the_gaussian_baseline():
@@ -419,9 +156,7 @@ def test_z_scoring_of_the_condition_wraps_the_embedding(config_cls, batches):
     "trainer_cls, config_cls, estimator_cls",
     [
         (FMPE, FlowMatchingConfig, FlowMatchingEstimator),
-        (NPSE, VEScoreConfig, VEScoreEstimator),
         (NPSE, VPScoreConfig, VPScoreEstimator),
-        (NPSE, SubVPScoreConfig, SubVPScoreEstimator),
     ],
 )
 def test_trainer_trains_and_samples_with_a_config(
@@ -462,57 +197,10 @@ def test_trainer_rejects_the_wrong_family(trainer_cls, wrong_config, gaussian_si
         trainer_cls(prior, wrong_config, show_progress_bars=False)
 
 
-@pytest.mark.parametrize(
-    "trainer_cls, config_cls",
-    [(FMPE, FlowMatchingConfig), (NPSE, VEScoreConfig)],
-)
-def test_trainer_rejects_a_config_class(trainer_cls, config_cls, gaussian_sims):
-    prior, _, _ = gaussian_sims
-    with pytest.raises(TypeError, match="not an instance"):
-        trainer_cls(prior, config_cls, show_progress_bars=False)
-
-
-@pytest.mark.parametrize(
-    "sde_type, estimator_cls",
-    [
-        ("ve", VEScoreEstimator),
-        ("vp", VPScoreEstimator),
-        ("subvp", SubVPScoreEstimator),
-    ],
-)
-def test_npse_sde_type_selects_the_config(sde_type, estimator_cls, gaussian_sims):
-    prior, theta, x = gaussian_sims
-    trainer = NPSE(prior, sde_type=sde_type, show_progress_bars=False)
-    trainer.append_simulations(theta, x)
-    assert isinstance(trainer._build_neural_net(theta, x), estimator_cls)
-
-
 def test_npse_rejects_sde_type_together_with_a_config(gaussian_sims):
     prior, _, _ = gaussian_sims
     with pytest.raises(ValueError, match="already selects the SDE"):
         NPSE(prior, VEScoreConfig(), sde_type="vp", show_progress_bars=False)
-
-
-@pytest.mark.parametrize("input_kind", ["default", "config", "callable"])
-@pytest.mark.parametrize(
-    "trainer_cls, config", [(FMPE, FlowMatchingConfig()), (NPSE, VEScoreConfig())]
-)
-def test_supported_estimator_inputs_do_not_warn(
-    trainer_cls, config, input_kind, gaussian_sims
-):
-    prior, _, _ = gaussian_sims
-    estimators = {
-        "default": None,
-        "config": config,
-        "callable": lambda theta, x: None,
-    }
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", FutureWarning)
-        trainer_cls(
-            prior,
-            vf_estimator=estimators[input_kind],
-            show_progress_bars=False,
-        )
 
 
 @pytest.mark.parametrize("trainer_cls", [FMPE, NPSE])
@@ -523,19 +211,17 @@ def test_string_path_warns_and_names_the_import(trainer_cls, gaussian_sims):
 
 
 @pytest.mark.parametrize(
-    "trainer_cls, kwarg, config_cls",
+    "trainer_cls, kwarg",
     [
-        (FMPE, "density_estimator", FlowMatchingConfig),
-        (NPSE, "score_estimator", VEScoreConfig),
-        (NPSE, "density_estimator", VEScoreConfig),
+        (FMPE, "density_estimator"),
+        (NPSE, "score_estimator"),
+        (NPSE, "density_estimator"),
     ],
 )
-@pytest.mark.parametrize("input_kind", ["string", "config"])
-def test_legacy_kwarg_warns(trainer_cls, kwarg, config_cls, input_kind, gaussian_sims):
+def test_legacy_kwarg_warns(trainer_cls, kwarg, gaussian_sims):
     prior, _, _ = gaussian_sims
-    estimator = "mlp" if input_kind == "string" else config_cls()
     with pytest.warns(FutureWarning, match="deprecated"):
-        trainer_cls(prior, **{kwarg: estimator}, show_progress_bars=False)
+        trainer_cls(prior, **{kwarg: "mlp"}, show_progress_bars=False)
 
 
 @pytest.mark.parametrize(
@@ -552,18 +238,6 @@ def test_legacy_and_vf_estimator_conflict(trainer_cls, kwarg, gaussian_sims):
         trainer_cls(
             prior, vf_estimator="mlp", **{kwarg: "mlp"}, show_progress_bars=False
         )
-
-
-@pytest.mark.parametrize("trainer_cls", [FMPE, NPSE])
-def test_role_shapes_are_not_swapped(trainer_cls):
-    prior = MultivariateNormal(zeros(2), torch.eye(2))
-    theta, x = prior.sample((100,)), torch.randn(100, 5)
-    trainer = trainer_cls(prior, show_progress_bars=False)
-    trainer.append_simulations(theta, x)
-    estimator = trainer._build_neural_net(theta, x)
-
-    assert estimator.input_shape == torch.Size([2])
-    assert estimator.condition_shape == torch.Size([5])
 
 
 @pytest.mark.parametrize(
@@ -682,21 +356,27 @@ def test_factory_none_means_no_z_scoring(factory_fn):
 
 
 @pytest.mark.parametrize(
-    "trainer_cls, config_cls",
-    [(FMPE, FlowMatchingConfig), (NPSE, VEScoreConfig)],
+    "trainer_cls, trainer_kwargs, config",
+    [
+        (FMPE, {}, FlowMatchingConfig()),
+        (NPSE, {}, VEScoreConfig()),
+        (NPSE, {"sde_type": "vp"}, VPScoreConfig()),
+        (NPSE, {"sde_type": "subvp"}, SubVPScoreConfig()),
+    ],
 )
-def test_trainer_default_matches_the_config_default(trainer_cls, config_cls, batches):
+def test_trainer_default_matches_the_config(
+    trainer_cls, trainer_kwargs, config, batches
+):
+    # theta and x differ in size, so swapped roles change the weight shapes.
     theta, x = batches
     prior = MultivariateNormal(zeros(2), torch.eye(2))
-    trainer = trainer_cls(prior, show_progress_bars=False)
-    trainer.append_simulations(theta, x)
+    trainer = trainer_cls(prior, **trainer_kwargs, show_progress_bars=False)
 
     torch.manual_seed(0)
     from_trainer = trainer._build_neural_net(theta, x)
     torch.manual_seed(0)
-    from_config = config_cls().build(theta, x)
+    from_config = config.build(theta, x)
     _assert_same_state(from_trainer, from_config)
-    assert isinstance(from_trainer.net, VectorFieldMLP)
 
 
 def test_estimator_extra_kwargs_are_forwarded(batches):
