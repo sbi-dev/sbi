@@ -321,6 +321,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._summary = dict(
             epochs_trained=[],
             best_validation_loss=[],
+            converged=[],
             validation_loss=[],
             training_loss=[],
             epoch_durations_sec=[],
@@ -328,6 +329,8 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
     @property
     def summary(self):
+        """Training statistics, e.g. `converged`: one entry per `train()` call, True
+        if validation loss stopped improving and False if `max_num_epochs` ran out."""
         return self._summary
 
     @classmethod
@@ -1134,11 +1137,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             elif self._best_model_state_dict is not None:
                 self._neural_net.load_state_dict(self._best_model_state_dict)
 
-        self._report_convergence_at_end(self.epoch, train_config.max_num_epochs)
+        converged = self._report_convergence_at_end(
+            self.epoch, train_config.max_num_epochs
+        )
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
         self._summary["best_validation_loss"].append(self._best_val_loss)
+        self._summary["converged"].append(converged)
 
         # Update TensorBoard and summary dict.
         self._summarize(round_=self._round)
@@ -1298,16 +1304,20 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         )
         return TensorBoardTracker(SummaryWriter(logdir))
 
-    def _report_convergence_at_end(self, epoch: int, max_num_epochs: int) -> None:
+    def _report_convergence_at_end(self, epoch: int, max_num_epochs: int) -> bool:
         """Report why the training loop stopped.
 
         Args:
             epoch: Epoch counter as the training loop left it.
             max_num_epochs: The epoch budget the loop was given.
+
+        Returns:
+            True if validation loss stopped improving, False if the budget ran out.
         """
         # Not `_converged()`: it advances the counter it reads, so a second call can
         # flip its own verdict.
-        if epoch <= max_num_epochs:
+        converged = epoch <= max_num_epochs
+        if converged:
             print(
                 "\r",
                 f"Neural network successfully converged after {epoch} epochs.",
@@ -1319,6 +1329,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 "but network has not yet fully converged. Consider increasing it.",
                 stacklevel=_stacklevel_to_caller(),
             )
+        return converged
 
     def _summarize(
         self,

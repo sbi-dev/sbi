@@ -293,6 +293,40 @@ def test_exhausted_epoch_budget_returns_the_best_weights(losses):
     )
 
 
+@pytest.mark.parametrize(
+    ("losses", "max_num_epochs", "converged"),
+    (
+        # Flat after the first epoch, so the run converges long before the budget.
+        ([1.0], 20, True),
+        # Improving every epoch, so only the budget can stop it.
+        ([10.0, 9.0, 8.0, 7.0], 3, False),
+    ),
+    ids=("converged", "max-num-epochs-reached"),
+)
+def test_summary_records_why_training_stopped(losses, max_num_epochs, converged):
+    """`summary["converged"]` says whether early stopping or the budget ended a run."""
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference = NPE(prior=prior, show_progress_bars=False)
+    inference.append_simulations(theta, x)
+
+    scripted = iter(losses)
+    inference._validate_epoch = lambda *_a, **_kw: next(scripted, losses[-1])
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        inference.train(
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=2 if converged else 50,
+            training_batch_size=50,
+        )
+
+    assert inference.summary["converged"] == [converged]
+    budget_warned = any("max_num_epochs" in str(w.message) for w in caught)
+    assert budget_warned is not converged
+
+
 def test_vector_field_converged_resets_between_runs():
     """A stale best-val-loss from run one must not leak into run two.
 

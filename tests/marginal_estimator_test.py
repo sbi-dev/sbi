@@ -84,6 +84,7 @@ def test_marginal_trainer_exhausted_epoch_budget_returns_the_best_weights():
         trainer.train(max_num_epochs=2, stop_after_epochs=50)
 
     assert trainer.epoch > 2, "the budget must run out for this to test anything"
+    assert trainer._summary["converged"] == [False]
     final = trainer._neural_net.state_dict()
     assert all(
         torch.equal(final[k], v) for k, v in trainer._best_model_state_dict.items()
