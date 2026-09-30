@@ -629,7 +629,8 @@ class Distance:
             x: Simulated data
         """
         return torch.cat([
-            self.distance_fn(x_o, x_batch) for x_batch in x.split(self.batch_size)
+            self.distance_fn(x_o, x_batch).reshape(x_batch.shape[0])
+            for x_batch in x.split(self.batch_size)
         ])
 
     @property
