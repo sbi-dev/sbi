@@ -19,6 +19,7 @@ from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.utils.torchutils import process_device
 
 CONFIGS = [FlowMatchingConfig, VPScoreConfig, SubVPScoreConfig, VEScoreConfig]
+SCORE_CONFIGS = [VPScoreConfig, SubVPScoreConfig, VEScoreConfig]
 
 
 @pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
@@ -44,6 +45,45 @@ def test_vector_field_estimator_loss_shapes(
 
     losses = estimator.loss(inputs[0], condition=conditions)
     assert losses.shape == (batch_dim,)
+
+
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,), (8,)))
+@pytest.mark.parametrize("config_cls", SCORE_CONFIGS)
+def test_score_loss_is_invariant_to_theta_dimensions(config_cls, input_event_shape):
+    """Test that the score loss does not scale with the number of theta dimensions.
+
+    With the network output pinned to a constant ``c``, the eps-dependent terms of the
+    loss cancel exactly against the control variate, so the weighted loss reduces to
+    ``weights * (c**2 + 1 / std**2)``. That value is independent of the noise draw and
+    of the number of parameters, so any scaling of the reduction (e.g. summing instead
+    of averaging over the last dimension) shows up as a mismatch that grows with
+    ``input_event_shape[-1]``.
+    """
+    score_value = 0.5
+    batch_dim = 4
+    condition_event_shape = (1,)
+
+    estimator = config_cls().build(
+        torch.randn(batch_dim, *input_event_shape),
+        torch.randn(batch_dim, *condition_event_shape),
+    )
+    estimator.forward = lambda input, condition, time: torch.full_like(
+        input, score_value
+    )
+
+    input = torch.randn(batch_dim, *input_event_shape)
+    condition = torch.randn(batch_dim, *condition_event_shape)
+    times = torch.full((batch_dim,), 0.5)
+
+    loss = estimator.loss(
+        input, condition, times=times, control_variate_threshold=float("inf")
+    )
+
+    std = torch.squeeze(estimator.std_fn(times), -1)
+    expected = estimator.weight_fn(times) * (score_value**2 + 1.0 / std**2)
+
+    assert loss.shape == (batch_dim,)
+    torch.testing.assert_close(loss, expected)
 
 
 @pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])

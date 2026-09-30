@@ -293,8 +293,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # Compute weights over time.
         weights = self.weight_fn(times)
 
-        # Compute MSE loss between network output and true score.
-        loss = torch.sum((score_pred - score_target) ** 2.0, dim=-1)
+        loss = torch.mean((score_pred - score_target) ** 2.0, dim=-1)
 
         # For times -> 0 this loss has high variance a standard method to reduce the
         # variance is to use a control variate i.e. a term that has zero expectation but
@@ -304,15 +303,14 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # NOTE: As it is a taylor expansion it will only work well for small std.
 
         if control_variate:
-            D = input.shape[-1]
             score_mean_pred = self.forward(mean, condition, times)
             s = torch.squeeze(std, -1)
 
             # Loss terms that depend on eps
-            term1 = 2 / s * torch.sum(eps * score_mean_pred, dim=-1)
-            term2 = torch.sum(eps**2, dim=-1) / s**2
+            term1 = 2 / s * torch.mean(eps * score_mean_pred, dim=-1)
+            term2 = torch.mean(eps**2, dim=-1) / s**2
             # This term is the analytical expectation of the above term
-            term3 = D / s**2
+            term3 = 1.0 / s**2
 
             control_variate = term3 - term1 - term2
 
