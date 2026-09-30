@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+# pyright: reportIncompatibleMethodOverride=true
+
 import math
 from abc import ABC, abstractmethod
 from typing import Callable, Optional, Type
@@ -68,15 +70,13 @@ class Corrector(ABC):
         self.potential_fn = predictor.potential_fn
         self.device = predictor.device
 
-    def __call__(
-        self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None
-    ) -> Tensor:
+    def __call__(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
         """Correct the samples.
 
         Args:
             theta: The samples to correct.
             t0: The current time.
-            t1: The next time. Defaults to None.
+            t1: The next time.
 
         Returns:
             Tensor: The corrected samples.
@@ -84,7 +84,7 @@ class Corrector(ABC):
         return self.correct(theta, t0, t1)
 
     @abstractmethod
-    def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
+    def correct(self, theta: Tensor, t0: Tensor, t1: Tensor) -> Tensor:
         """Correct the samples."""
         pass
 

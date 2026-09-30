@@ -207,9 +207,10 @@ class ConditionalDensityEstimator(ConditionalEstimator):
 
     Note:
         We assume that the input to the density estimator is a tensor of shape
-        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
-        of the input. The condition is a tensor of shape (batch_size, *condition_shape),
-        where condition_shape is the shape of the condition tensor.
+        `(sample_dim, batch_dim, *input_shape)`, where `input_shape` is the
+        dimensionality of the input. The condition is a tensor of shape
+        `(batch_size, *condition_shape)`, where `condition_shape` is the shape of
+        the condition tensor.
 
     """
 
@@ -277,7 +278,7 @@ class ConditionalDensityEstimator(ConditionalEstimator):
             condition: Conditions of shape `(batch_dim, *event_shape_condition)`.
 
         Returns:
-            Samples of shape (*sample_shape, batch_dim, *event_shape_input).
+            Samples of shape `(*sample_shape, batch_dim, *event_shape_input)`.
         """
 
         pass
@@ -315,9 +316,10 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
 
     Note:
         We assume that the input to the density estimator is a tensor of shape
-        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
-        of the input. The condition is a tensor of shape (batch_dim, *condition_shape),
-        where condition_shape is the shape of the condition tensor.
+        `(sample_dim, batch_dim, *input_shape)`, where `input_shape` is the
+        dimensionality of the input. The condition is a tensor of shape
+        `(batch_dim, *condition_shape)`, where `condition_shape` is the shape of
+        the condition tensor.
     """
 
     # When implementing custom estimators,
@@ -348,6 +350,8 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         embedding_net: Optional[nn.Module] = None,
         mean_base: Union[float, Tensor] = 0.0,
         std_base: Union[float, Tensor] = 1.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
         r"""Base class for vector field estimators.
 
@@ -362,6 +366,11 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
                 condition.
             mean_base: Mean of the base distribution.
             std_base: Standard deviation of the base distribution.
+            compose_shift: Mean of the modeled variable in its original
+                coordinates, used in `z = (input - compose_shift) / compose_scale`.
+                Given together with `compose_scale`.
+            compose_scale: Positive scale of the modeled variable in its original
+                coordinates, given together with `compose_shift`.
         """
         super().__init__(input_shape, condition_shape)
         self.net = net
@@ -394,6 +403,26 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         self.register_buffer(
             "_compose_standardization", torch.tensor(False), persistent=True
         )
+        if (compose_shift is None) != (compose_scale is None):
+            raise ValueError(
+                "`compose_shift` and `compose_scale` have to be given together."
+            )
+        if compose_shift is not None and compose_scale is not None:
+            shift = compose_shift.reshape(1, *self.input_shape).float()
+            scale = compose_scale.reshape(1, *self.input_shape).float()
+            self._validate_compose_affine(shift, scale)
+            self._theta_shift.copy_(shift)
+            self._theta_scale.copy_(scale)
+            self._compose_standardization.fill_(True)
+
+    @staticmethod
+    def _validate_compose_affine(shift: Tensor, scale: Tensor) -> None:
+        if not torch.isfinite(shift).all():
+            raise ValueError("`compose_shift` must contain only finite values.")
+        if not torch.isfinite(scale).all() or not (scale > 0).all():
+            raise ValueError(
+                "`compose_scale` must contain only finite, strictly positive values."
+            )
 
     def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
         r"""Load legacy checkpoints as compose-off and reject partial affines."""
@@ -416,6 +445,8 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
                 False, device=self._compose_standardization.device
             )
         super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+        if self.compose_enabled:
+            self._validate_compose_affine(self._theta_shift, self._theta_scale)
         self._check_compose_internal_stats_unit()
         baseline_check = getattr(self, "_check_compose_baseline_compatible", None)
         if baseline_check is not None:
@@ -525,11 +556,13 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
         r"""Linear coefficient mean_t of the perturbation kernel expectation
-        :math:`\mu_t(t) = E[\theta_t | \theta_0] = \text{mean_t}(t) \cdot \theta_0`
+        :math:`\mu_t(t) = E[\theta_t | \theta_0] = \text{mean}_t(t) \cdot \theta_0`
         specifying the "mean factor" at a given time, which is always multiplied by
         :math:`\theta_0` to get the mean of the noise distribution, i.e.,
-        :math:`p(\theta_t | \theta_0) = N(\theta_t;
-                \text{mean_t}(t)*\theta_0, \text{std_t}(t)).`
+
+        .. math::
+            p(\theta_t | \theta_0) =
+            N(\theta_t; \text{mean}_t(t) \cdot \theta_0, \text{std}_t(t)^2).
 
         Args:
             times: SDE time variable in [0,1].
@@ -544,8 +577,8 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
             time,
 
         .. math::
-            p(\theta_t | \theta_0) = N(\theta_t; \text{mean_t}(t) \cdot
-            \theta_0, \text{std_t}(t)^2).
+            p(\theta_t | \theta_0) = N(\theta_t; \text{mean}_t(t) \cdot
+            \theta_0, \text{std}_t(t)^2).
 
         Args:
             times: SDE time variable in [0,1].
@@ -701,8 +734,8 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
 
     Note:
         We assume that the input to the density estimator is a tensor of shape
-        (sample_dim, batch_dim, *input_shape), where input_shape is the dimensionality
-        of the input.
+        `(sample_dim, batch_dim, *input_shape)`, where `input_shape` is the
+        dimensionality of the input.
 
     """
 
@@ -739,7 +772,7 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
             sample_shape: Shape of the samples to return.
 
         Returns:
-            Samples of shape (*sample_shape, batch_dim, *event_shape_input).
+            Samples of shape `(*sample_shape, batch_dim, *event_shape_input)`.
         """
 
         return self._neural_net.sample(sample_shape)

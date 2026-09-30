@@ -4,7 +4,7 @@
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import asdict, replace
-from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, eye, ones
@@ -33,8 +33,9 @@ from sbi.inference.trainers.base import (
 from sbi.neural_nets import classifier_nn
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.net_builders.estimator_configs import (
-    RatioEstimatorBuilder,
-    _EstimatorBuilderBase,
+    _ESTIMATOR_CONFIG_BASES,
+    ClassifierConfigBase,
+    ResNetClassifierConfig,
 )
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.sbi_types import TorchTransform, Tracker
@@ -46,12 +47,14 @@ from sbi.utils.torchutils import repeat_rows
 
 
 class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
+    _ALLOWED_BUILDER_TYPES: ClassVar[Tuple[type, ...]] = (ClassifierConfigBase,)
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         classifier: Union[
             Literal["linear", "mlp", "resnet"],
-            RatioEstimatorBuilder,
+            ClassifierConfigBase,
             ConditionalEstimatorBuildFn[RatioEstimator],
             None,
         ] = None,
@@ -80,10 +83,10 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
 
         Args:
             classifier: The classifier used to approximate the
-                likelihood-to-evidence ratio. If ``None`` (default), uses a
-                ``RatioEstimatorBuilder`` with default settings. A
-                ``RatioEstimatorBuilder`` can be passed to configure
-                the classifier. If it is a string (deprecated), use a
+                likelihood-to-evidence ratio. If ``None`` (default), uses
+                ``ResNetClassifierConfig()``. A per-model config can be
+                passed to configure the classifier. If it is a string
+                (deprecated), use a
                 pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that
                 builds a custom neural network can be provided.
@@ -103,24 +106,22 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         if classifier is not None:
             check_estimator_arg(classifier)
         if classifier is None:
-            self._build_neural_net = self._wrap_builder(
-                RatioEstimatorBuilder(model="resnet")
-            )
+            self._build_neural_net = self._wrap_builder(ResNetClassifierConfig())
         elif isinstance(classifier, str):
             warnings.warn(
                 "Passing a string for `classifier` is deprecated. "
-                "Use RatioEstimatorBuilder(model=...) instead, e.g. "
-                "`from sbi.neural_nets import RatioEstimatorBuilder`.",
+                "Use a per-model config instead, e.g. "
+                "`from sbi.neural_nets import ResNetClassifierConfig`.",
                 FutureWarning,
                 stacklevel=3,
             )
             self._build_neural_net = classifier_nn(model=classifier)
-        elif isinstance(classifier, _EstimatorBuilderBase):
-            if not isinstance(classifier, RatioEstimatorBuilder):
+        elif isinstance(classifier, _ESTIMATOR_CONFIG_BASES):
+            if not isinstance(classifier, self._ALLOWED_BUILDER_TYPES):
+                allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
                 raise TypeError(
-                    "NRE requires a RatioEstimatorBuilder; got "
-                    f"{type(classifier).__name__}. Use "
-                    "RatioEstimatorBuilder(model=...)."
+                    f"{type(self).__name__} requires a {allowed}; got "
+                    f"{type(classifier).__name__}."
                 )
             self._build_neural_net = self._wrap_builder(classifier)
         else:

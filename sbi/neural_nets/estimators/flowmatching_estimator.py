@@ -17,7 +17,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     Rectified flow matching estimator class that estimates the conditional vector field,
     :math:`v(\theta_t, t; x_o) = \mathbb{E}[\theta_1 - \theta_0 | \theta_t, x_o = x_o]`
 
-    This estimator implements the flow matching approach where the vector field is
+    This estimator implements the flow matching approach [2]_ where the vector field is
     learned by matching the flow between the base and target distributions. The vector
     field represents the instantaneous change in the distribution at time t.
 
@@ -65,6 +65,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         mean_0: float = 0.0,
         std_0: float = 1.0,
         gaussian_baseline: bool = False,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -83,6 +85,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             gaussian_baseline: If True, use analytical Gaussian baseline velocity
                 derived from Bayes' rule: v = factor * (x - μ_true) - mean.
                 The network then only learns the residual. Default: False.
+            compose_shift: Shift of the boundary affine, given together with
+                `compose_scale`.
+            compose_scale: Scale of the boundary affine, given together with
+                `compose_shift`.
         """
 
         if "num_freqs" in kwargs:
@@ -99,6 +105,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             input_shape=input_shape,
             condition_shape=condition_shape,
             embedding_net=embedding_net,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
         self.noise_scale = noise_scale
         self.gaussian_baseline = gaussian_baseline
@@ -108,6 +116,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         std_0_tensor = torch.as_tensor(std_0).expand(input_shape).clone()
         self.register_buffer("mean_0", mean_0_tensor)
         self.register_buffer("std_0", std_0_tensor)
+        self._check_compose_internal_stats_unit()
+        self._check_compose_baseline_compatible()
 
     def _check_compose_baseline_compatible(self) -> None:
         """Reject incompatible analytical and composed standardization baselines."""
@@ -378,11 +388,13 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         .. math::
             \nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / t
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / t
 
         Taking into account the noise scale :math:`\sigma_{min}`, the score function is
-        :math:`\nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_0 ) / (t + \sigma_{min})`.
+
+        .. math::
+            \nabla_{\theta_t} \log p(\theta_t | x_o) =
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / (t + \sigma_{min}).
 
         Args:
             input: variable whose distribution is estimated.

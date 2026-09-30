@@ -270,7 +270,7 @@ def test_sbc_checks():
 
 
 @pytest.mark.parametrize("num_bins", (None, 30))
-@pytest.mark.parametrize("plot_type", ("cdf", "hist"))
+@pytest.mark.parametrize("plot_type", ("cdf", "hist", "cdf-diff"))
 @pytest.mark.parametrize("legend_kwargs", (None, {"loc": "upper left"}))
 @pytest.mark.parametrize("num_rank_sets", (1, 2))
 def test_sbc_plotting(

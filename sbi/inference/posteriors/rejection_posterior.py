@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from functools import partial
-from typing import Any, Optional, Union
+from typing import Optional, Union
 from warnings import warn
 
 import torch
@@ -11,7 +11,7 @@ from torch import Tensor
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
-from sbi.sbi_types import Shape, TorchTransform
+from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched, process_device
 
@@ -26,7 +26,7 @@ class RejectionPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Union[BasePotential, CustomPotential],
-        proposal: Any,
+        proposal: Proposal,
         theta_transform: Optional[TorchTransform] = None,
         max_sampling_batch_size: int = 10_000,
         num_samples_to_find_max: int = 10_000,
@@ -121,7 +121,7 @@ class RejectionPosterior(NeuralPosterior):
         )
         warn("The log-probability is unnormalized!", stacklevel=2)
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -175,7 +175,7 @@ class RejectionPosterior(NeuralPosterior):
             Samples from posterior.
         """
         num_samples = torch.Size(sample_shape).numel()
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         potential = partial(self.potential_fn, track_gradients=True)
 
@@ -287,8 +287,6 @@ class RejectionPosterior(NeuralPosterior):
                 the posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
                 have a cached value.
-            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
-                {'norm_posterior': True} for SNPE.
 
         Returns:
             The MAP estimate.

@@ -16,6 +16,7 @@ from sbi.inference.potentials.vector_field_potential import (
 from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.utils import BoxUniform, MultipleIndependent
+from sbi.utils.vector_field_utils import VectorFieldNet
 
 
 def build_random_priors(num_dim: int):
@@ -67,10 +68,10 @@ def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
 
     priors = build_random_priors(num_dim)
     x_o_iid = torch.ones((5, 1))
-    score_fn.set_x(x_o_iid, x_is_iid=True, iid_method=iid_method)
+    score_fn = score_fn.bind(x_o_iid, x_is_iid=True, iid_method=iid_method)
     inputs = torch.ones((1, 1, num_dim))
+    time = torch.ones(1)
     for prior in priors:
-        time = torch.ones(1)
         score_fn.prior = prior
         output = score_fn.gradient(inputs, time=time)
 
@@ -116,7 +117,9 @@ def test_score_fn_guidance_general(sde_type, guidance_method, num_dim):
     score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
     x_o = torch.ones((1, 1))
     guidance_name, guidance_params = guidance_method
-    score_fn.set_x(x_o, guidance_method=guidance_name, guidance_params=guidance_params)
+    score_fn = score_fn.bind(
+        x_o, guidance_method=guidance_name, guidance_params=guidance_params
+    )
     inputs = torch.ones((1, 1, num_dim))
     time = torch.ones(1)
 
@@ -149,7 +152,7 @@ def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_metho
 
     x_o_iid = torch.ones((5, 1))
     guidance_name, guidance_params = guidance_method
-    score_fn.set_x(
+    score_fn = score_fn.bind(
         x_o_iid,
         x_is_iid=True,
         iid_method=iid_method,
@@ -213,7 +216,7 @@ def _build_gaussian_score_estimator(
 
     # Note the precondition predicts a correct Gaussian score by default if the neural
     # net predicts 0!
-    class DummyNet(torch.nn.Module):
+    class DummyNet(VectorFieldNet):
         def __init__(self):
             super().__init__()
             self.dummy_param_for_device_detection = torch.nn.Linear(1, 1)

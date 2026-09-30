@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import io
 import warnings
 from dataclasses import asdict
 from typing import Tuple, Union
@@ -25,6 +26,8 @@ from sbi.inference.posteriors.posterior_parameters import (
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
+    VIPosteriorParameters,
+    VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -52,7 +55,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaus
 from sbi.utils import BoxUniform
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
-from sbi.utils.user_input_checks import validate_theta_and_x
+from sbi.utils.user_input_checks import process_x, validate_theta_and_x
 from tests.test_utils import mps_fallback_disabled
 
 pytestmark = pytest.mark.skipif(
@@ -411,6 +414,15 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str):
         def allow_iid_x(self) -> bool:
             return True
 
+        def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
+            """Create new potential with x bound, without mutable state."""
+
+            bound = FakePotential(prior=self.prior, device=self.device)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
+            return bound
+
     potential_fn = FakePotential(
         prior=MultivariateNormal(
             zeros(num_dim, device=device), eye(num_dim, device=device)
@@ -464,6 +476,15 @@ def test_amortized_vi_on_gpu(num_dim: int, flow_type: str):
 
         def allow_iid_x(self) -> bool:
             return True
+
+        def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
+            """Create new potential with x bound, without mutable state."""
+
+            bound = FakePotential(prior=self.prior, device=self.device)
+            x_o = process_x(x_o).to(self.device)
+            bound._x_o = x_o
+            bound._x_is_iid = x_is_iid
+            return bound
 
     potential_fn = FakePotential(prior=prior, device=device)
 
@@ -779,8 +800,8 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
     assert sample_device.device.type == device.split(":")[0], (
         f"sample was not correctly moved to {device}."
     )
-    posterior.potential_fn.set_x(x_o)
-    potential_values = posterior.potential_fn(sample_device)
+    bound_potential = posterior.potential_fn.bind(x_o)
+    potential_values = bound_potential(sample_device)
     assert potential_values.device.type == device.split(":")[0], (
         f"potential was not correctly evaluated on {device}."
     )
@@ -981,3 +1002,61 @@ def test_zuko_device_transform():
     cond = torch.randn(1, 3).to(device)
     assert est.log_prob(theta.unsqueeze(1), cond).device.type == device.split(":")[0]
     assert est.sample((10,), cond).device.type == device.split(":")[0]
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "posterior_parameters",
+    [
+        pytest.param(DirectPosteriorParameters(), id="direct"),
+        pytest.param(RejectionPosteriorParameters(), id="rejection"),
+        pytest.param(ImportanceSamplingPosteriorParameters(), id="importance"),
+        pytest.param(
+            MCMCPosteriorParameters(num_chains=1, warmup_steps=1, thin=1), id="mcmc"
+        ),
+        pytest.param(VIPosteriorParameters(q="gaussian"), id="vi"),
+        pytest.param(VectorFieldPosteriorParameters(), id="vector_field"),
+    ],
+)
+def test_torch_load_map_location_reconciles_device(posterior_parameters):
+    """A posterior saved on the GPU and loaded with `map_location="cpu"` runs on CPU.
+
+    `torch.load` remaps the tensors. `NeuralPosterior.__setstate__` must update the
+    device strings of the posterior, its potential and its prior to match.
+    """
+    device = process_device("gpu")
+    num_dim = 2
+    prior = BoxUniform(-ones(num_dim, device=device), ones(num_dim, device=device))
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    is_vector_field = isinstance(posterior_parameters, VectorFieldPosteriorParameters)
+    trainer_cls = FMPE if is_vector_field else NPE
+    trainer = trainer_cls(prior=prior, device=device, show_progress_bars=False)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = trainer.build_posterior(posterior_parameters=posterior_parameters)
+    posterior.set_default_x(zeros(1, num_dim, device=device))
+    if isinstance(posterior, VIPosterior):
+        posterior.train(
+            max_num_iters=10,
+            check_for_convergence=False,
+            quality_control=False,
+            show_progress_bar=False,
+        )
+
+    buffer = io.BytesIO()
+    torch.save(posterior, buffer)
+    buffer.seek(0)
+    loaded = torch.load(buffer, weights_only=False, map_location="cpu")
+
+    assert loaded._device == "cpu", f"_device is {loaded._device!r}"
+    assert loaded.potential_fn.device == "cpu", (
+        f"potential_fn.device is {loaded.potential_fn.device!r}"
+    )
+    assert loaded.potential_fn.prior.device == "cpu", (
+        f"prior.device is {loaded.potential_fn.prior.device!r}"
+    )
+    samples = loaded.sample((10,))
+    assert samples.device.type == "cpu", f"samples on {samples.device}"
+    potential = loaded.potential(samples)
+    assert potential.device.type == "cpu", f"potential on {potential.device}"

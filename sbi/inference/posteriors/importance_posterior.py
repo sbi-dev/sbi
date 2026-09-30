@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Literal, Optional, Tuple, Union
+from typing import Callable, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -10,7 +10,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
-from sbi.sbi_types import Shape, TorchTransform
+from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched, process_device
 
@@ -28,7 +28,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Union[Callable, BasePotential],
-        proposal: Any,
+        proposal: Proposal,
         theta_transform: Optional[TorchTransform] = None,
         method: Literal["sir", "importance"] = "sir",
         oversampling_factor: int = 32,
@@ -129,7 +129,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         x = self._x_else_default_x(x)
-        self.potential_fn.set_x(x)
+        self.potential_fn = self.potential_fn.bind(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -213,7 +213,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         method = self.method if method is None else method
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         if method == "sir":
             return self._sir_sample(
@@ -361,8 +361,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
                 have a cached value.
-            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
-                {'norm_posterior': True} for SNPE.
 
         Returns:
             The MAP estimate.

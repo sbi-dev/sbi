@@ -516,7 +516,7 @@ def test_posterior_based_potential_iid_log_prob(iid_batch_size: int):
     potential_fn, _ = posterior_estimator_based_potential(
         posterior_estimator, prior, x_o=None
     )
-    potential_fn.set_x(x_o, x_is_iid=True)
+    potential_fn = potential_fn.bind(x_o, x_is_iid=True)
 
     posterior_samples = true_posterior.sample((num_posterior_samples,))
     true_prob = true_posterior.log_prob(posterior_samples)

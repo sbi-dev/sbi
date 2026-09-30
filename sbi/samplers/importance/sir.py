@@ -1,18 +1,20 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable
+from typing import Callable
 
 import torch
 from torch import Tensor
 from tqdm.auto import tqdm
 
 from sbi.samplers.importance.importance_sampling import importance_sample
+from sbi.sbi_types import Proposal
+from sbi.utils.pbar import is_nested, nested_pbar_context
 
 
 def sampling_importance_resampling(
     potential_fn: Callable,
-    proposal: Any,
+    proposal: Proposal,
     num_samples: int = 1,
     num_candidate_samples: int = 32,
     max_sampling_batch_size: int = 10_000,
@@ -43,7 +45,7 @@ def sampling_importance_resampling(
 
     num_remaining = num_samples
     pbar = tqdm(
-        disable=not show_progress_bars,
+        disable=not show_progress_bars or is_nested(),
         total=num_samples,
         desc=f"Drawing {num_samples} posterior samples",
     )
@@ -51,11 +53,12 @@ def sampling_importance_resampling(
     while num_remaining > 0:
         batch_size = min(sampling_batch_size, num_remaining)
         with torch.no_grad():
-            thetas, log_weights = importance_sample(
-                potential_fn=potential_fn,
-                proposal=proposal,
-                num_samples=batch_size * num_candidate_samples,
-            )
+            with nested_pbar_context():
+                thetas, log_weights = importance_sample(
+                    potential_fn=potential_fn,
+                    proposal=proposal,
+                    num_samples=batch_size * num_candidate_samples,
+                )
             log_weights = log_weights.reshape(batch_size, num_candidate_samples)
             weights = log_weights.softmax(-1).cumsum(-1)
             uniform_decision = torch.rand(batch_size, 1, device=device)

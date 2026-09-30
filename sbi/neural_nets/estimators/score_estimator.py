@@ -19,13 +19,23 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     to generate samples from the target distribution by solving the SDE starting from
     the base (Gaussian) distribution.
 
+    See [2]_ for the denoising diffusion formulation and [3]_ for the
+    noise-conditional score network formulation.
+
     We assume the following SDE:
-                        dx = A(t)xdt + B(t)dW,
+
+    .. math::
+        dx = A(t) x \, dt + B(t) \, dW,
+
     where A(t) and B(t) are the drift and diffusion functions, respectively, and dW is
     a Wiener process. This will lead to marginal distribution of the form:
-                        p(xt|x0) = N(xt; mean_t(t)*x0, std_t(t)),
+
+    .. math::
+        p(x_t | x_0) = N(x_t; \text{mean}_t(t) \cdot x_0, \text{std}_t(t)^2),
+
     where mean_t(t) and std_t(t) are the conditional mean and standard deviation at a
-    given time t, respectively.
+    given time t, respectively. The second argument of N is the variance, which
+    matches `std_fn`.
 
     References
     ----------
@@ -73,6 +83,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-3,
         t_max: float = 1.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
         r"""Score estimator class that estimates the
         conditional score function, i.e.,
@@ -94,6 +106,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             std_0: Starting standard deviation of the target distribution.
             t_min: Minimum time for diffusion (0 can be numerically unstable).
             t_max: Maximum time for diffusion.
+            compose_shift: Shift of the boundary affine, given together with
+                `compose_scale`.
+            compose_scale: Scale of the boundary affine, given together with
+                `compose_shift`.
         """
 
         # Starting mean and std of the target distribution (otherwise assumes 0,1).
@@ -112,6 +128,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             embedding_net=embedding_net,
             t_min=t_min,
             t_max=t_max,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
 
         # Min/max values for noise variance beta
@@ -122,6 +140,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self._set_weight_fn(weight_fn)
         self.register_buffer("mean_0", mean_0.clone().detach())
         self.register_buffer("std_0", std_0.clone().detach())
+        self._check_compose_internal_stats_unit()
 
         # Now that input_shape and mean_0, std_0 is set, we can compute the proper mean
         # and std for the "base" distribution.
@@ -554,6 +573,8 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-3,
         t_max: float = 1.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
         super().__init__(
             net,
@@ -567,6 +588,8 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             beta_max=beta_max,
             t_min=t_min,
             t_max=t_max,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
@@ -667,6 +690,8 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         std_0: float = 1.0,
         t_min: float = 1e-2,
         t_max: float = 1.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
         super().__init__(
             net,
@@ -680,6 +705,8 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             std_0=std_0,
             t_min=t_min,
             t_max=t_max,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
@@ -813,6 +840,8 @@ class VEScoreEstimator(ConditionalScoreEstimator):
         lognormal_mean: float = -1.2,
         lognormal_std: float = 1.2,
         power_law_exponent: float = 7.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
         # Validate sigma bounds (required for VE SDE math and log computations).
         if sigma_min <= 0:
@@ -865,6 +894,8 @@ class VEScoreEstimator(ConditionalScoreEstimator):
             std_0=std_0,
             t_min=t_min,
             t_max=t_max,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
 
         self._warn_on_inappropriate_config()

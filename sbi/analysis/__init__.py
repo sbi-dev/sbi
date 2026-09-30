@@ -26,6 +26,7 @@ from sbi.analysis.plotting_classes import (
     HistOffDiagOptions,
     KdeDiagOptions,
     KdeOffDiagOptions,
+    LabeledSamples,
     PlotOffDiagOptions,
     ScatterDiagOptions,
     ScatterOffDiagOptions,
@@ -44,4 +45,5 @@ __all__ = [
     "sbc_rank_plot",
     "ActiveSubspace",
     "conditional_corrcoeff",
+    "LabeledSamples",
 ]
