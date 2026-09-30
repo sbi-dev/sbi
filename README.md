@@ -94,10 +94,10 @@ print(posterior)
 If you're new to `sbi`, we recommend starting with our [Getting
 Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html) tutorial.
 
-You can also access and run these tutorials directly in your browser by opening
-[Codespace](https://docs.github.com/en/codespaces/overview). To do so, click the green
-“Code” button on the GitHub repository and select “Open with Codespaces.” This provides
-a fully functional environment where you can explore `sbi` through Jupyter notebooks.
+The tutorials are Jupyter notebooks in
+[`docs/tutorials/`](https://github.com/sbi-dev/sbi/tree/main/docs/tutorials). To run
+them on your own machine, first follow the [installation instructions](#installation)
+above.
 
 You might also find this tutorial paper useful: [Deistler, M., Boelts, J., Steinbach, P., Moss, G., Moreau, T., Gloeckler, M., ... & Macke, J. H. (2025). Simulation-based inference: A practical guide. arXiv preprint arXiv:2508.12939.](https://arxiv.org/abs/2508.12939). It describes the SBI workflow and offers practical guidelines and diagnostic tools for every stage of the process: from setting up the simulator and prior, choosing and training inference networks, to performing inference and validating the results. It also includes several worked examples.
 
