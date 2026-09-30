@@ -92,6 +92,12 @@ def pytest_addoption(parser):
         default=None,
         help="Run mini-benchmark tests with specified mode",
     )
+    parser.addoption(
+        "--bm-estimators",
+        action="store",
+        default=None,
+        help="Comma-separated estimators for the selected mini-benchmark mode",
+    )
 
     parser.addoption(
         "--bm-num-simulations",

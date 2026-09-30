@@ -41,6 +41,19 @@ METHOD_GROUPS = {
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
 }
+METHOD_GROUP_IDS = {
+    "none": ["NPE", "NPE_PFN", "NRE", "NLE", "FMPE", "NPSE"],
+    "npe": ["NPE"],
+    "npe_pfn": ["NPE_PFN"],
+    "nle": ["NLE"],
+    "nre": ["NRE_A", "NRE_B", "NRE_C", "BNRE"],
+    "fmpe": ["FMPE"],
+    "npse": ["NPSE"],
+    "vfpe": ["FMPE", "NPSE"],
+    "snpe": ["NPE_C"],
+    "snle": ["NLE"],
+    "snre": ["NRE_A", "NRE_B", "NRE_C", "BNRE"],
+}
 METHOD_PARAMS = {
     "none": [{}],
     "npe": [{"density_estimator": de} for de in DENSITY_ESTIMATORS],
@@ -58,6 +71,68 @@ METHOD_PARAMS = {
     "snle": [{}],
     "snre": [{}],
 }
+ESTIMATOR_ARGUMENTS = {
+    "npe": "density_estimator",
+    "nle": "density_estimator",
+    "nre": "classifier",
+    "fmpe": "vf_estimator",
+    "npse": "vf_estimator",
+    "vfpe": "vf_estimator",
+    "snpe": "density_estimator",
+    "snle": "density_estimator",
+    "snre": "classifier",
+}
+
+
+def _benchmark_mode(config) -> str:
+    """Return and validate the selected benchmark mode."""
+    mode = config.getoption("--bm-mode")
+    name = "none" if mode is None else str(mode).lower()
+    if name not in METHOD_GROUPS:
+        supported = ", ".join(name for name in METHOD_GROUPS if name != "none")
+        raise pytest.UsageError(
+            f"Unknown benchmark mode '{mode}'. Supported modes: {supported}."
+        )
+    return name
+
+
+def _benchmark_kwargs(config, mode: str) -> list[dict]:
+    """Return method arguments, applying an optional estimator override."""
+    estimator_option = config.getoption("--bm-estimators")
+    if estimator_option is None:
+        return METHOD_PARAMS[mode]
+
+    estimator_argument = ESTIMATOR_ARGUMENTS.get(mode)
+    if estimator_argument is None:
+        raise pytest.UsageError(
+            "--bm-estimators requires a benchmark mode whose methods use the same "
+            "estimator argument."
+        )
+
+    estimators = [value.strip() for value in estimator_option.split(",")]
+    if not estimators or any(not value for value in estimators):
+        raise pytest.UsageError(
+            "--bm-estimators requires one or more comma-separated estimator names."
+        )
+
+    remaining_options = []
+    for parameters in METHOD_PARAMS[mode]:
+        options = {
+            key: value for key, value in parameters.items() if key != estimator_argument
+        }
+        if options not in remaining_options:
+            remaining_options.append(options)
+
+    return [
+        {estimator_argument: estimator, **options}
+        for estimator in estimators
+        for options in remaining_options
+    ]
+
+
+def _kwargs_id(parameters: dict) -> str:
+    """Return a readable identifier for one method configuration."""
+    return "-".join(str(value) for value in parameters.values()) or "default"
 
 
 @pytest.fixture
@@ -103,16 +178,19 @@ def pytest_generate_tests(metafunc):
     Args:
         metafunc: The metafunc object from pytest.
     """
+    if not {"inference_class", "extra_kwargs"}.intersection(metafunc.fixturenames):
+        return
+
+    mode = _benchmark_mode(metafunc.config)
     if "inference_class" in metafunc.fixturenames:
-        method_list = metafunc.config.getoption("--bm-mode")
-        name = str(method_list).lower()
-        method_group = METHOD_GROUPS.get(name, [])
-        metafunc.parametrize("inference_class", method_group)
+        metafunc.parametrize(
+            "inference_class", METHOD_GROUPS[mode], ids=METHOD_GROUP_IDS[mode]
+        )
     if "extra_kwargs" in metafunc.fixturenames:
-        kwargs_list = metafunc.config.getoption("--bm-mode")
-        name = str(kwargs_list).lower()
-        kwargs_group = METHOD_PARAMS.get(name, [])
-        metafunc.parametrize("extra_kwargs", kwargs_group)
+        kwargs_group = _benchmark_kwargs(metafunc.config, mode)
+        metafunc.parametrize(
+            "extra_kwargs", kwargs_group, ids=[_kwargs_id(p) for p in kwargs_group]
+        )
 
 
 def standard_eval_c2st_loop(posterior: NeuralPosterior, task: Task) -> float:
