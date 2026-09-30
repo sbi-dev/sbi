@@ -329,8 +329,12 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
     @property
     def summary(self):
-        """Training statistics, e.g. `converged`: one entry per `train()` call, True
-        if validation loss stopped improving and False if `max_num_epochs` ran out."""
+        """Training statistics, keyed by name.
+
+        `converged` holds one entry per `train()` call: True if validation loss
+        stopped improving, False if `max_num_epochs` ran out first, and None for calls
+        made by an sbi version that did not record it.
+        """
         return self._summary
 
     @classmethod
@@ -1497,6 +1501,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             state_dict: State to be restored.
         """
         state_dict["_tracker"] = self._default_tracker()
+        # Objects saved before `converged` was recorded carry no such entry, and the
+        # outcome of their earlier `train()` calls is unknown.
+        summary = state_dict["_summary"]
+        summary.setdefault("converged", [None] * len(summary["epochs_trained"]))
         vars(self).update(state_dict)
 
 

@@ -270,6 +270,22 @@ def test_inference_save_and_load_resumes_training(inference_method, tmp_path):
     loaded.build_posterior().sample((3,), x=x[:1])
 
 
+def test_inference_saved_without_converged_resumes_training(tmp_path):
+    """Objects saved before `converged` was recorded must still resume training."""
+    prior = _box_uniform()
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    inference = NPE(prior=prior, show_progress_bars=False)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+    del inference._summary["converged"]
+    inference.save(tmp_path / "inference.pt")
+
+    loaded = NPE.load(tmp_path / "inference.pt")
+    loaded.train(max_num_epochs=1, resume_training=True)
+
+    assert loaded.summary["converged"] == [None, False]
+
+
 def test_load_refuses_other_class(tmp_path):
     _build_posterior("direct", _mvn()).save(tmp_path / "posterior.pt")
     with pytest.raises(TypeError, match="DirectPosterior"):
