@@ -557,8 +557,18 @@ class VectorFieldPosterior(NeuralPosterior):
 
         def acceptance() -> Tensor:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
-            theta = self.sample_via_ode((num_rejection_samples,), **(ode_kwargs or {}))
-            mass = within_support(self.prior, theta).float().mean()
+            batch_size = self.max_sampling_batch_size
+            num_inside = sum(
+                within_support(
+                    self.prior,
+                    self.sample_via_ode(
+                        (min(batch_size, num_rejection_samples - start),),
+                        **(ode_kwargs or {}),
+                    ),
+                ).sum()
+                for start in range(0, num_rejection_samples, batch_size)
+            )
+            mass = torch.as_tensor(num_inside / num_rejection_samples)
             if mass == 0:
                 raise RuntimeError(
                     f"None of {num_rejection_samples} ODE samples lie inside the prior "
