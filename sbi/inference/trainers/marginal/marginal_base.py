@@ -120,7 +120,6 @@ class MarginalTrainer:
         self._summary = dict(
             epochs_trained=[],
             best_validation_loss=[],
-            converged=[],
             validation_loss=[],
             training_loss=[],
             epoch_durations_sec=[],
@@ -370,7 +369,6 @@ class MarginalTrainer:
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
         self._summary["best_validation_loss"].append(self._best_val_loss)
-        self._summary["converged"].append(self.epoch <= max_num_epochs)
 
         # Update tensorboard and summary dict.
         self._summarize(round_=self._round)
