@@ -524,8 +524,7 @@ def l2(x: Tensor, y: Tensor, axis: int = -1) -> Tensor:
 
 def l1(x: Tensor, y: Tensor, axis: int = -1) -> Tensor:
     """
-    Calculates the L1 (Manhattan) distance between two tensors, averaged over
-    the specified axis.
+    Calculates the L1 (Manhattan) distance between two tensors.
 
     Args:
         x (Tensor): The first tensor.
@@ -537,7 +536,7 @@ def l1(x: Tensor, y: Tensor, axis: int = -1) -> Tensor:
         Tensor: A tensor containing the L1 distance between x and y along the
             specified axis.
     """
-    return torch.mean(torch.abs(x - y), dim=axis)
+    return torch.sum(torch.abs(x - y), dim=axis)
 
 
 class Distance:

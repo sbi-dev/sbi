@@ -21,6 +21,7 @@ from sbi.utils.sbiutils import (
     within_support,
 )
 from sbi.utils.torchutils import ensure_theta_batched, infer_module_device
+from sbi.utils.user_input_checks import process_x
 
 
 def posterior_estimator_based_potential(
@@ -84,6 +85,7 @@ class PosteriorBasedPotential(BasePotential):
             The potential function.
         """
         super().__init__(prior, x_o, device)
+        self._x_is_iid = False
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
 
@@ -100,11 +102,39 @@ class PosteriorBasedPotential(BasePotential):
         self.posterior_estimator.to(device)
         return self
 
+    def bind(
+        self, x_o: Optional[Tensor], x_is_iid: bool = False
+    ) -> "PosteriorBasedPotential":
+        """Create new potential with x bound, without mutable state."""
+        bound = PosteriorBasedPotential(
+            posterior_estimator=self.posterior_estimator,
+            prior=self.prior,
+            x_o=None,
+            device=self.device,
+        )
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        return bound
+
     def set_x(self, x_o: Optional[Tensor], x_is_iid: Optional[bool] = False):
+        """Check the shape of the observed data and, if valid, set it.
+
+        DEPRECATED: Use bind() instead. This method delegates to bind() internally.
+        It will be removed in a future release.
         """
-        Check the shape of the observed data and, if valid, set it.
-        """
-        super().set_x(x_o, x_is_iid=x_is_iid)
+        import warnings
+
+        warnings.warn(
+            "set_x() is deprecated and will be removed in a future release. "
+            "Use bind() instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        bound = self.bind(x_o, x_is_iid=x_is_iid)
+        self._x_o = bound._x_o
+        self._x_is_iid = bound._x_is_iid
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.

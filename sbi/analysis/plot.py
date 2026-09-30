@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import copy
+from dataclasses import replace
 from typing import (
     Any,
     Callable,
@@ -31,8 +32,10 @@ from torch import Tensor
 
 from sbi.analysis.conditional_density import eval_conditional_density
 from sbi.analysis.plotting_classes import (
+    DEFAULT_SAMPLES_LABELS,
     DiagOptions,
     FigOptions,
+    LabeledSamples,
     OffDiagOptions,
     get_default_diag_kwargs,
     get_default_offdiag_kwargs,
@@ -52,14 +55,17 @@ LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
 DiagLiteral = Literal["hist", "scatter", "kde", "bar"]
 K = TypeVar("K")
 KwargsType = Union[List[Optional[Union[Dict, K]]], Dict, K, None]
+SampleArray = Union[np.ndarray, torch.Tensor, LabeledSamples]
+SamplesType = Union[SampleArray, List[SampleArray]]
+PreparedSamples = Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
 
 
 def marginal_plot(
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    samples: SamplesType,
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
-    limits: Optional[Union[List, torch.Tensor]] = None,
+    limits: Optional[Union[List, torch.Tensor, np.ndarray]] = None,
     subset: Optional[List[int]] = None,
     diag: Optional[Union[List[Optional[str]], str]] = "hist",
     figsize: Optional[Tuple] = (10, 2),
@@ -78,7 +84,10 @@ def marginal_plot(
     that the samples were drawn from.
 
     Args:
-        samples: Samples used to build the histogram.
+        samples: Samples used to build the histogram. Either raw arrays or
+            ``LabeledSamples`` containers carrying dimension labels, limits, and
+            ticks. Explicit function arguments take precedence over the metadata
+            stored on the containers.
         points: List of additional points to scatter.
         limits: Array containing the plot xlim for each parameter dimension. If None,
             just use the min and max of the passed samples
@@ -100,11 +109,15 @@ def marginal_plot(
     Returns: figure and axis of posterior distribution plot
     """
 
+    sample_data, labels, limits, ticks, sample_names = _unpack_labeled_samples(
+        samples, labels, limits, ticks
+    )
+
     # backwards compatibility
     if len(kwargs) > 0:
         fig, axes = _use_deprecated_plot(
             marginal_plot_dep,
-            samples=samples,
+            samples=sample_data,
             points=points,
             limits=limits,
             subset=subset,
@@ -118,19 +131,19 @@ def marginal_plot(
         )
         return fig, axes
 
-    samples, _, limits = prepare_for_plot(samples, limits)
+    sample_data, _, limits = prepare_for_plot(sample_data, limits)
 
     # prepare kwargs and functions of the subplots
     diag_kwargs_filled, diag_func = _prepare_kwargs(
         plot=diag,
-        samples=samples,
+        samples=sample_data,
         get_plot_funcs=get_diag_funcs,
         get_default_kwargs=get_default_diag_kwargs,
         plot_kwargs=diag_kwargs,
     )
 
     # prepare fig_kwargs
-    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
+    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, sample_data, sample_names)
 
     # generate plot
     return _arrange_grid(
@@ -140,7 +153,7 @@ def marginal_plot(
         diag_kwargs_filled,
         [None],
         [None],
-        samples,
+        sample_data,
         points,
         limits,
         subset,
@@ -154,11 +167,11 @@ def marginal_plot(
 
 
 def pairplot(
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    samples: SamplesType,
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
-    limits: Optional[Union[List, torch.Tensor]] = None,
+    limits: Optional[Union[List, torch.Tensor, np.ndarray]] = None,
     subset: Optional[List[int]] = None,
     upper: Optional[Union[List[Optional[UpperLiteral]], UpperLiteral]] = "hist",
     lower: Optional[Union[List[Optional[LowerLiteral]], LowerLiteral]] = None,
@@ -184,7 +197,10 @@ def pairplot(
     2D-marginal of the distribution.
 
     Args:
-        samples: Samples used to build the histogram.
+        samples: Samples used to build the histogram. Either raw arrays or
+            ``LabeledSamples`` containers carrying dimension labels, limits, and
+            ticks. Explicit function arguments take precedence over the metadata
+            stored on the containers.
         points: List of additional points to scatter.
         limits: Array containing the plot xlim for each parameter dimension. If None,
             just use the min and max of the passed samples
@@ -223,6 +239,10 @@ def pairplot(
     Returns: figure and axis of posterior distribution plot
     """
 
+    sample_data, labels, limits, ticks, sample_names = _unpack_labeled_samples(
+        samples, labels, limits, ticks
+    )
+
     upper = _prepare_upper(offdiag, upper)  # type: ignore
 
     plotting_styles = [
@@ -238,7 +258,7 @@ def pairplot(
     if len(kwargs) > 0:
         fig, axes = _use_deprecated_plot(
             pairplot_dep,
-            samples=samples,
+            samples=sample_data,
             points=points,
             limits=limits,
             subset=subset,
@@ -254,15 +274,15 @@ def pairplot(
         )
         return fig, axes
 
-    samples, dim, limits = prepare_for_plot(samples, limits, points)
+    sample_data, dim, limits = prepare_for_plot(sample_data, limits, points)
 
     # prepare figure kwargs
-    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, samples)
+    fig_kwargs_filled = _prepare_fig_kwargs(fig_kwargs, sample_data, sample_names)
 
     # Prepare diag
     diag_kwargs_filled, diag_func = _prepare_kwargs(
         plot=diag,  # type: ignore
-        samples=samples,
+        samples=sample_data,
         get_plot_funcs=get_diag_funcs,
         get_default_kwargs=get_default_diag_kwargs,
         plot_kwargs=diag_kwargs,
@@ -271,7 +291,7 @@ def pairplot(
     # Prepare upper
     upper_kwargs_filled, upper_func = _prepare_kwargs(
         plot=upper,  # type: ignore
-        samples=samples,
+        samples=sample_data,
         get_plot_funcs=get_offdiag_funcs,
         get_default_kwargs=get_default_offdiag_kwargs,
         plot_kwargs=upper_kwargs,
@@ -280,7 +300,7 @@ def pairplot(
     # Prepare lower
     lower_kwargs_filled, lower_func = _prepare_kwargs(
         plot=lower,  # type: ignore
-        samples=samples,
+        samples=sample_data,
         get_plot_funcs=get_offdiag_funcs,
         get_default_kwargs=get_default_offdiag_kwargs,
         plot_kwargs=lower_kwargs,
@@ -293,7 +313,7 @@ def pairplot(
         diag_kwargs_filled,
         upper_kwargs_filled,
         lower_kwargs_filled,
-        samples,
+        sample_data,
         points,
         limits,
         subset,
@@ -528,7 +548,7 @@ def get_kde(
     )
     positions = np.vstack([X.ravel(), Y.ravel()])
     Z = np.reshape(density(positions).T, X.shape)
-    if "percentile" in offdiag_kwargs and "levels" in offdiag_kwargs:
+    if offdiag_kwargs.get("percentile") and offdiag_kwargs.get("levels") is not None:
         Z = probs2contours(Z, offdiag_kwargs["levels"])
     else:
         Z = (Z - Z.min()) / (Z.max() - Z.min())
@@ -840,14 +860,57 @@ def prepare_for_plot(
     samples = handle_nan_infs(samples)
 
     dim = samples[0].shape[1]
+    if any(s.shape[1] != dim for s in samples):
+        raise ValueError("All sample sets must have the same number of dimensions.")
 
-    if limits is None or limits == []:
+    if limits is None or len(limits) == 0:
         limits = infer_limits(samples, dim, points)
     else:
         limits = [limits[0] for _ in range(dim)] if len(limits) == 1 else limits
 
     limits = torch.as_tensor(limits)
     return samples, dim, limits
+
+
+def _unpack_labeled_samples(
+    samples: SamplesType,
+    labels: Optional[List[str]],
+    limits: Optional[Union[List, torch.Tensor, np.ndarray]],
+    ticks: Optional[Union[List, torch.Tensor]],
+) -> Tuple[
+    PreparedSamples,
+    Optional[List[str]],
+    Optional[Union[List, torch.Tensor, np.ndarray]],
+    Optional[Union[List, torch.Tensor]],
+    Optional[List[Optional[str]]],
+]:
+    """Replace ``LabeledSamples`` by their data and fill in missing plot arguments.
+
+    Explicit arguments take precedence. Otherwise, the first container that defines
+    ``dim_labels``, ``limits`` or ``ticks`` provides the value.
+
+    Returns:
+        Sample data, labels, limits, ticks, and per-sample names for the legend
+        (``None`` if no container was passed).
+    """
+    sample_list = samples if isinstance(samples, list) else [samples]
+    containers = [s for s in sample_list if isinstance(s, LabeledSamples)]
+    if not containers:
+        return samples, labels, limits, ticks, None  # type: ignore[return-value]
+
+    def first_defined(attr: str) -> Any:
+        values = (getattr(c, attr) for c in containers)
+        return next((v for v in values if v is not None), None)
+
+    data = [s.data if isinstance(s, LabeledSamples) else s for s in sample_list]
+    names = [s.name if isinstance(s, LabeledSamples) else None for s in sample_list]
+    if labels is None:
+        labels = first_defined("dim_labels")
+    if limits is None:
+        limits = first_defined("limits")
+    if ticks is None:
+        ticks = first_defined("ticks")
+    return data, labels, limits, ticks, names  # type: ignore[return-value]
 
 
 def prepare_for_conditional_plot(condition, opts):
@@ -968,7 +1031,16 @@ def _prepare_kwargs(
         zip(plot_list, plot_kwargs_list, strict=False)
     ):
         plot_kwarg_filled_i = get_default_kwargs(plot_i, i)
-        # update the defaults dictionary with user provided values
+        if plot_kwargs_i is not None and plot_kwarg_filled_i:
+            unknown_keys = set(plot_kwargs_i.keys()) - set(plot_kwarg_filled_i.keys())
+            if unknown_keys:
+                warn(
+                    f"Ignoring unknown keys in plot kwargs: {sorted(unknown_keys)}. "
+                    f"Valid keys are: {sorted(plot_kwarg_filled_i.keys())}. "
+                    "Pass matplotlib keywords inside `mpl_kwargs`.",
+                    UserWarning,
+                    stacklevel=3,
+                )
         plot_kwarg_filled_i = update(plot_kwarg_filled_i, plot_kwargs_i)
         plot_kwargs_filled.append(plot_kwarg_filled_i)
 
@@ -978,6 +1050,7 @@ def _prepare_kwargs(
 def _prepare_fig_kwargs(
     fig_kwargs: Optional[Union[Dict, FigOptions]],
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    sample_names: Optional[List[Optional[str]]] = None,
 ) -> FigOptions:
     """
     Converts user-provided figure keyword arguments into a FigOptions dataclass.
@@ -989,6 +1062,8 @@ def _prepare_fig_kwargs(
     Args:
         fig_kwargs: User-provided figure keyword arguments.
         samples: Input samples to be plotted.
+        sample_names: Per-sample names taken from ``LabeledSamples`` containers.
+            Used as legend labels when the names were not configured explicitly.
 
     Raises:
         ValueError: If the number of sample labels is less than
@@ -1003,10 +1078,19 @@ def _prepare_fig_kwargs(
     elif isinstance(fig_kwargs, dict):
         fig_kwargs = FigOptions(**fig_kwargs)
 
-    if fig_kwargs.legend and len(fig_kwargs.samples_labels) < len(samples):
+    sample_labels = fig_kwargs.samples_labels
+    if sample_names is not None and fig_kwargs.legend and sample_labels is None:
+        sample_labels = [
+            name if name is not None else f"samples_{idx}"
+            for idx, name in enumerate(sample_names)
+        ]
+    if sample_labels is None:
+        sample_labels = list(DEFAULT_SAMPLES_LABELS)
+
+    if fig_kwargs.legend and len(sample_labels) < len(samples):
         raise ValueError("Provide at least as many labels as samples.")
 
-    return fig_kwargs
+    return replace(fig_kwargs, samples_labels=sample_labels)
 
 
 def _use_deprecated_plot(
@@ -1317,11 +1401,11 @@ def _arrange_grid(
         lower_funcs: List of plotting function that will be executed for the
             lower-diagonal elements of the plot. None if we are in a 1D setting.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
-            see the source code in `_get_default_diag_kwarg()`
+            see the source code in `get_default_diag_kwargs`
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
-            see the source code in `_get_default_offdiag_kwarg()`
+            see the source code in `get_default_offdiag_kwargs`
         lower_kwargs: Additional arguments to adjust the lower diagonal plot,
-            see the source code in `_get_default_offdiag_kwarg()`
+            see the source code in `get_default_offdiag_kwargs`
         samples: List of samples given to the plotting functions
         points: List of additional points to scatter.
         limits: Limits for each dimension / axis.
@@ -1333,7 +1417,7 @@ def _arrange_grid(
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         fig_kwargs: Additional arguments to adjust the overall figure,
-            see the source code in `_get_default_fig_kwargs()`
+            see the source code in `FigOptions`
         discrete_indices: Optional list of dimension indices treated as discrete.
             When provided, diagonal plots for these dimensions use bar charts,
             and off-diagonal plots involving these dimensions fall back to
@@ -1467,7 +1551,7 @@ def _arrange_grid(
                         ):
                             diag_kw = copy.deepcopy(diag_kw)
                             diag_kw.setdefault("mpl_kwargs", {})["label"] = (
-                                fig_kwargs.samples_labels[sample_ind]
+                                fig_kwargs.samples_labels[sample_ind]  # pyright: ignore reportOptionalSubscript
                             )
                         if callable(diag_f):
                             diag_f(ax, sample[:, row], limits[row], diag_kw)
@@ -1646,8 +1730,10 @@ def sbc_rank_plot(
             list of Tensors when comparing several sets of ranks, e.g., set of ranks
             obtained from different methods.
         num_bins: number of bins used for binning the ranks, default is
-            num_sbc_runs / 20.
-        plot_type: type of SBC plot, histograms ("hist") or empirical cdfs ("cdf").
+            num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
+            histograms.
+        plot_type: type of SBC plot: "hist" for histograms, "cdf" for empirical CDFs,
+            or "cdf-diff" for empirical CDF differences from uniformity.
         parameter_labels: list of labels for each parameter dimension.
         ranks_labels: list of labels for each set of ranks.
         colors: list of colors for each parameter dimension, or each set of ranks.
@@ -1701,8 +1787,10 @@ def _sbc_rank_plot(
             list of Tensors when comparing several sets of ranks, e.g., set of ranks
             obtained from different methods.
         num_bins: number of bins used for binning the ranks, default is
-            num_sbc_runs / 20.
-        plot_type: type of SBC plot, histograms ("hist") or empirical cdfs ("cdf").
+            num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
+            histograms.
+        plot_type: type of SBC plot: "hist" for histograms, "cdf" for empirical CDFs,
+            or "cdf-diff" for empirical CDF differences from uniformity.
         parameter_labels: list of labels for each parameter dimension.
         ranks_labels: list of labels for each set of ranks.
         colors: list of colors for each parameter dimension, or each set of ranks.
@@ -1738,10 +1826,11 @@ def _sbc_rank_plot(
         if isinstance(rank, Tensor):
             ranks_list[idx]: np.ndarray = rank.numpy()  # type: ignore
 
-    plot_types = ["hist", "cdf"]
-    assert plot_type in plot_types, (
-        f"plot type {plot_type} not implemented, use one in {plot_types}."
-    )
+    plot_types = ["hist", "cdf", "cdf-diff"]
+    if plot_type not in plot_types:
+        raise ValueError(
+            f"plot type {plot_type} not implemented, use one in {plot_types}."
+        )
 
     if legend_kwargs is None:
         legend_kwargs = dict(loc="best", handlelength=0.8)
@@ -1749,7 +1838,6 @@ def _sbc_rank_plot(
     num_sbc_runs, num_parameters = ranks_list[0].shape
     num_ranks = len(ranks_list)
 
-    # For multiple methods, and for the hist plots plot each param in a separate subplot
     if num_ranks > 1 or plot_type == "hist":
         params_in_subplots = True
 
@@ -1767,8 +1855,12 @@ def _sbc_rank_plot(
     if ranks_labels is None:
         ranks_labels = [f"rank set {i + 1}" for i in range(num_ranks)]
     if num_bins is None:
-        # Recommendation from Talts et al.
-        num_bins = num_sbc_runs // 20
+        num_bins = (
+            num_sbc_runs // 10
+            if plot_type in ("cdf", "cdf-diff")
+            else num_sbc_runs // 20
+        )
+    num_bins = max(num_bins, 1)
     assert isinstance(num_bins, int)
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
@@ -1838,6 +1930,25 @@ def _sbc_rank_plot(
                     if jj == 0 and ranks_labels[ii] is not None:
                         plt.legend(**legend_kwargs)
 
+                elif plot_type == "cdf-diff":
+                    _plot_ranks_as_cdf_diff(
+                        ranki[:, jj],  # type: ignore
+                        num_bins,
+                        num_repeats,
+                        ranks_label=ranks_labels[ii],
+                        color=f"C{ii}" if colors is None else colors[ii],
+                        xlabel=f"posterior ranks {parameter_labels[jj]}",
+                        show_ylabel=jj == 0,
+                        alpha=line_alpha,
+                    )
+                    if ii == 0 and show_uniform_region:
+                        _plot_cdf_diff_region_expected_under_uniformity(
+                            num_sbc_runs,
+                            num_bins,
+                            num_repeats,
+                            alpha=uniform_region_alpha,
+                        )
+
                 else:
                     raise ValueError(
                         f"plot_type {plot_type} not defined, use one in {plot_types}"
@@ -1856,24 +1967,49 @@ def _sbc_rank_plot(
         plt.sca(ax)
         ranki = ranks_list[0]
         for jj in range(num_parameters):
-            _plot_ranks_as_cdf(
-                ranki[:, jj],  # type: ignore
-                num_bins,
-                num_repeats,
-                ranks_label=parameter_labels[jj],
-                color=f"C{jj}" if colors is None else colors[jj],
-                xlabel="posterior rank",
-                # Plot ylabel and legend at last.
-                show_ylabel=jj == (num_parameters - 1),
-                alpha=line_alpha,
-            )
+            if plot_type == "cdf":
+                _plot_ranks_as_cdf(
+                    ranki[:, jj],  # type: ignore
+                    num_bins,
+                    num_repeats,
+                    ranks_label=parameter_labels[jj],
+                    color=f"C{jj}" if colors is None else colors[jj],
+                    xlabel="posterior rank",
+                    # Plot ylabel and legend at last.
+                    show_ylabel=jj == (num_parameters - 1),
+                    alpha=line_alpha,
+                )
+            elif plot_type == "cdf-diff":
+                _plot_ranks_as_cdf_diff(
+                    ranki[:, jj],  # type: ignore
+                    num_bins,
+                    num_repeats,
+                    ranks_label=parameter_labels[jj],
+                    color=f"C{jj}" if colors is None else colors[jj],
+                    xlabel="posterior rank",
+                    # Plot ylabel and legend at last.
+                    show_ylabel=jj == (num_parameters - 1),
+                    alpha=line_alpha,
+                )
+            else:
+                raise ValueError(
+                    f"plot_type {plot_type} not defined, use one in {plot_types}"
+                )
         if show_uniform_region:
-            _plot_cdf_region_expected_under_uniformity(
-                num_sbc_runs,
-                num_bins,
-                num_repeats,
-                alpha=uniform_region_alpha,
-            )
+            if plot_type == "cdf":
+                _plot_cdf_region_expected_under_uniformity(
+                    num_sbc_runs,
+                    num_bins,
+                    num_repeats,
+                    alpha=uniform_region_alpha,
+                )
+            else:
+                _plot_cdf_diff_region_expected_under_uniformity(
+                    num_sbc_runs,
+                    num_bins,
+                    num_repeats,
+                    alpha=uniform_region_alpha,
+                )
         # show legend on the last subplot.
         plt.legend(**legend_kwargs)
 
@@ -1895,19 +2031,18 @@ def _plot_ranks_as_hist(
     """Plot ranks as histograms on the current axis.
 
     Args:
-        ranks: SBC ranks in shape (num_sbc_runs, )
-        num_bins: number of bins for the histogram, recommendation is num_sbc_runs / 20.
-        num_posteriors_samples: number of posterior samples used for ranking.
+        ranks: SBC ranks in shape (num_sbc_runs, ).
+        num_bins: number of bins for the histogram, recommendation is
+            num_sbc_runs / 20.
+        num_posterior_samples: number of posterior samples used for ranking.
         ranks_label: label for the ranks, e.g., when comparing ranks of different
             methods.
         xlabel: label for the current parameter.
         color: histogram color, default from Talts et al.
         alpha: histogram transparency.
         show_ylabel: whether to show y-label "counts".
-        show_legend: whether to show the legend, e.g., when comparing multiple ranks.
         num_ticks: number of ticks on the x-axis.
         xlim_offset_factor: factor for empty space left and right of the histogram.
-        legend_kwargs: kwargs for the legend.
     """
     xlim_offset = int(num_posterior_samples * xlim_offset_factor)
     plt.hist(
@@ -1942,18 +2077,18 @@ def _plot_ranks_as_cdf(
     """Plot ranks as empirical CDFs on the current axis.
 
     Args:
-        ranks: SBC ranks in shape (num_sbc_runs, )
-        num_bins: number of bins for the histogram, recommendation is num_sbc_runs / 20.
-        num_repeats: number of repeats of each CDF step, i.e., resolution of the eCDF.
+        ranks: SBC ranks in shape (num_sbc_runs, ).
+        num_bins: number of bins for the histogram, recommendation is
+            num_sbc_runs / 10.
+        num_repeats: number of repeats of each CDF step, i.e., resolution of the
+            empirical CDF.
         ranks_label: label for the ranks, e.g., when comparing ranks of different
             methods.
-        xlabel: label for the current parameter
+        xlabel: label for the current parameter.
         color: line color for the cdf.
         alpha: line transparency.
-        show_ylabel: whether to show y-label "counts".
-        show_legend: whether to show the legend, e.g., when comparing multiple ranks.
+        show_ylabel: whether to show y-label "empirical CDF".
         num_ticks: number of ticks on the x-axis.
-        legend_kwargs: kwargs for the legend.
 
     """
     # Generate histogram of ranks.
@@ -1977,6 +2112,61 @@ def _plot_ranks_as_cdf(
         plt.yticks(np.linspace(0, 1, 3), [])
 
     plt.ylim(0, 1)
+    plt.xlim(0, num_bins)
+    plt.xticks(np.linspace(0, num_bins, num_ticks))
+    plt.xlabel("posterior rank" if xlabel is None else xlabel)
+
+
+def _plot_ranks_as_cdf_diff(
+    ranks: np.ndarray,
+    num_bins: int,
+    num_repeats: int,
+    ranks_label: Optional[str] = None,
+    xlabel: Optional[str] = None,
+    color: Optional[str] = None,
+    alpha: float = 0.8,
+    show_ylabel: bool = True,
+    num_ticks: int = 3,
+) -> None:
+    """Plot the difference between the empirical CDF and the uniform CDF.
+
+    Positive values mean more ranks accumulated than expected, negative fewer.
+
+    Args:
+        ranks: SBC ranks in shape (num_sbc_runs, )
+        num_bins: number of bins for the histogram.
+        num_repeats: number of repeats of each CDF step, i.e., resolution of the
+            empirical CDF.
+        ranks_label: label for the ranks, e.g., when comparing ranks of different
+            methods.
+        xlabel: label for the current parameter.
+        color: line color for the cdf.
+        alpha: line transparency.
+        show_ylabel: whether to show y-label.
+        num_ticks: number of ticks on the x-axis.
+    """
+    hist, *_ = np.histogram(ranks, bins=num_bins, density=False)
+    histcs = hist.cumsum()
+    ecdf = histcs / histcs.max()
+    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
+    diff = ecdf - uniform_cdf
+
+    plt.plot(
+        np.linspace(0, num_bins, num_repeats * num_bins),
+        np.repeat(diff, num_repeats),
+        label=ranks_label,
+        color=color,
+        alpha=alpha,
+    )
+
+    if show_ylabel:
+        plt.yticks(np.linspace(-0.5, 0.5, 3))
+        plt.ylabel("empirical CDF - uniform CDF")
+    else:
+        plt.yticks(np.linspace(-0.5, 0.5, 3), [])
+
+    plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
+    plt.ylim(-0.5, 0.5)
     plt.xlim(0, num_bins)
     plt.xticks(np.linspace(0, num_bins, num_ticks))
     plt.xlabel("posterior rank" if xlabel is None else xlabel)
@@ -2006,6 +2196,33 @@ def _plot_cdf_region_expected_under_uniformity(
         x=np.linspace(0, num_bins, num_repeats * num_bins),
         y1=np.repeat(lower / np.max(lower), num_repeats),
         y2=np.repeat(upper / np.max(upper), num_repeats),  # pyright: ignore[reportArgumentType]
+        color=color,
+        alpha=alpha,
+        label="expected under uniformity",
+    )
+
+
+def _plot_cdf_diff_region_expected_under_uniformity(
+    num_sbc_runs: int,
+    num_bins: int,
+    num_repeats: int,
+    alpha: float = 0.2,
+    color: str = "gray",
+) -> None:
+    """Plot region of empirical CDF differences expected under uniformity."""
+
+    uni_bins = binom(num_sbc_runs, p=1 / num_bins).ppf(0.5) * np.ones(num_bins)
+    uni_bins_cdf = uni_bins.cumsum() / uni_bins.sum()
+    uni_bins_cdf[-1] -= 1e-9
+
+    lower = [binom(num_sbc_runs, p=p).ppf(0.005) for p in uni_bins_cdf]
+    upper = [binom(num_sbc_runs, p=p).ppf(0.995) for p in uni_bins_cdf]
+
+    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
+    plt.fill_between(
+        x=np.linspace(0, num_bins, num_repeats * num_bins),
+        y1=np.repeat(np.array(lower) / np.max(lower) - uniform_cdf, num_repeats),
+        y2=np.repeat(np.array(upper) / np.max(upper) - uniform_cdf, num_repeats),
         color=color,
         alpha=alpha,
         label="expected under uniformity",
@@ -2859,8 +3076,9 @@ def _arrange_plots(
 
 def _get_default_opts():
     warn(
-        "_get_default_opts will be deprecated, use _get_default_fig_kwargs,"
-        "get_default_diag_kwargs, get_default_offdiag_kwargs instead",
+        "_get_default_opts will be deprecated, use FigOptions through the "
+        "fig_kwargs argument, and get_default_diag_kwargs, "
+        "get_default_offdiag_kwargs instead",
         PendingDeprecationWarning,
         stacklevel=2,
     )

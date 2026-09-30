@@ -10,11 +10,7 @@ import sbi.inference
 from sbi import utils
 from sbi.inference import FMPE, NPE, VectorFieldPosterior, infer
 from sbi.inference.trainers import nle, npe, nre
-from sbi.neural_nets.net_builders import (
-    build_flow_matching_estimator,
-    build_score_matching_estimator,
-    build_vector_field_estimator,
-)
+from sbi.neural_nets import FlowMatchingConfig
 
 
 def test_infer():
@@ -215,35 +211,12 @@ def test_canonical_shorthands_do_not_warn():
         assert sbi.inference.NRE is sbi.inference.NRE_B
 
 
-def test_deprecated_vector_field_builders_warn():
-    """The flow and score wrapper builders warn and still delegate correctly.
-
-    `sde_type` is passed on purpose: with positional arguments only, a shim that
-    dropped `**kwargs` would still return the right estimator class and pass, while
-    silently building a VE rather than a VP score estimator.
-    """
-    theta, x = torch.randn(20, 2), torch.randn(20, 2)
-
-    with pytest.warns(FutureWarning, match="build_vector_field_estimator"):
-        flow = build_flow_matching_estimator(theta, x)
-    assert type(flow) is type(build_vector_field_estimator(theta, x, "flow"))
-
-    with pytest.warns(FutureWarning, match="build_vector_field_estimator"):
-        score = build_score_matching_estimator(theta, x, sde_type="vp")
-    assert type(score) is type(
-        build_vector_field_estimator(theta, x, "score", sde_type="vp")
-    )
-    assert type(score) is not type(
-        build_vector_field_estimator(theta, x, "score", sde_type="ve")
-    ), "`sde_type` did not reach the canonical builder"
-
-
 def test_vector_field_posterior_sample_with_warns():
     """Passing `sample_with` to `sample()` warns; setting it at construction is the
     supported path and must stay silent."""
     theta, x = torch.randn(20, 2), torch.randn(20, 2)
     posterior = VectorFieldPosterior(
-        vector_field_estimator=build_vector_field_estimator(theta, x, "flow"),
+        vector_field_estimator=FlowMatchingConfig().build(theta, x),
         prior=utils.BoxUniform(-torch.ones(2), torch.ones(2)),
         sample_with="ode",
     )
@@ -291,6 +264,40 @@ def test_exhausted_epoch_budget_returns_the_best_weights(losses):
     assert all(
         torch.equal(final[k], v) for k, v in inference._best_model_state_dict.items()
     )
+
+
+@pytest.mark.parametrize(
+    ("losses", "max_num_epochs", "converged"),
+    (
+        # Flat after the first epoch, so the run converges long before the budget.
+        ([1.0], 20, True),
+        # Improving every epoch, so only the budget can stop it.
+        ([10.0, 9.0, 8.0, 7.0], 3, False),
+    ),
+    ids=("converged", "max-num-epochs-reached"),
+)
+def test_summary_records_why_training_stopped(losses, max_num_epochs, converged):
+    """`summary["converged"]` says whether early stopping or the budget ended a run."""
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference = NPE(prior=prior, show_progress_bars=False)
+    inference.append_simulations(theta, x)
+
+    scripted = iter(losses)
+    inference._validate_epoch = lambda *_a, **_kw: next(scripted, losses[-1])
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        inference.train(
+            max_num_epochs=max_num_epochs,
+            stop_after_epochs=2 if converged else 50,
+            training_batch_size=50,
+        )
+
+    assert inference.summary["converged"] == [converged]
+    budget_warned = any("max_num_epochs" in str(w.message) for w in caught)
+    assert budget_warned is not converged
 
 
 def test_vector_field_converged_resets_between_runs():

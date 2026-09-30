@@ -1178,7 +1178,7 @@ def build_tabpfn_flow(
     ] = "none",
     z_score_y: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    ] = "none",
     embedding_net: nn.Module = nn.Identity(),
     regressor_init_kwargs: Optional[dict] = None,
     max_context_size: int = 10_000,

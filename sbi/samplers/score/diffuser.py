@@ -10,6 +10,7 @@ from tqdm.auto import tqdm
 
 from sbi.samplers.score.correctors import Corrector, get_corrector
 from sbi.samplers.score.predictors import Predictor, get_predictor
+from sbi.utils.pbar import is_nested
 
 
 class Diffuser:
@@ -150,7 +151,7 @@ class Diffuser:
         total_time_steps = ts.numel() - 1  # We skip the first time point
         pbar = tqdm(
             range(1, ts.numel()),
-            disable=not show_progress_bars,
+            disable=not show_progress_bars or is_nested(),
             desc=f"Generating {num_samples} posterior samples in {total_time_steps} "
             "diffusion steps.",
         )

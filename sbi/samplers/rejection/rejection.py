@@ -4,20 +4,21 @@
 import logging
 import time
 import warnings
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
-from sbi.sbi_types import AcceptRejectFn, SampleProposal
+from sbi.sbi_types import AcceptRejectFn, Proposal, SampleProposal
+from sbi.utils.pbar import is_nested, nested_pbar_context
 from sbi.utils.sbiutils import gradient_ascent
 
 
 def rejection_sample(
     potential_fn: Callable,
-    proposal: Any,
+    proposal: Proposal,
     theta_transform: Optional[torch_tf.Transform] = None,
     num_samples: int = 1,
     show_progress_bars: bool = False,
@@ -76,7 +77,8 @@ def rejection_sample(
             torch_tf.identity_transform, reinterpreted_batch_ndims=1
         )
 
-    samples_to_find_max = proposal.sample((num_samples_to_find_max,))
+    with nested_pbar_context():
+        samples_to_find_max = proposal.sample((num_samples_to_find_max,))
 
     # Define a potential as the ratio between target distribution and proposal.
     def potential_over_proposal(theta):
@@ -104,7 +106,7 @@ def rejection_sample(
         Proposal for rejection sampling which is strictly larger than the potential_fn.
         """
 
-        def __init__(self, proposal: Any, max_log_ratio: Tensor, log_m: Tensor):
+        def __init__(self, proposal: Proposal, max_log_ratio: Tensor, log_m: Tensor):
             self.proposal = proposal
             self.max_log_ratio = max_log_ratio
             self.log_m = log_m
@@ -131,7 +133,7 @@ def rejection_sample(
         # Progress bar can be skipped, e.g. when sampling after each round just for
         # logging.
         pbar = tqdm(
-            disable=not show_progress_bars,
+            disable=not show_progress_bars or is_nested(),
             total=num_samples,
             desc=f"Drawing {num_samples} posterior samples",
         )
@@ -168,9 +170,10 @@ def rejection_sample(
                 )
 
             # Sample and reject.
-            candidates = proposal.sample(sampling_batch_size).reshape(
-                sampling_batch_size, -1
-            )
+            with nested_pbar_context():
+                candidates = proposal.sample(sampling_batch_size).reshape(
+                    sampling_batch_size, -1
+                )
 
             target_proposal_ratio = torch.exp(
                 potential_fn(candidates) - proposal.log_prob(candidates)
@@ -182,8 +185,8 @@ def rejection_sample(
 
             # Update.
             num_sampled_total += sampling_batch_size
+            pbar.update(min(samples.shape[0], num_remaining))
             num_remaining -= samples.shape[0]
-            pbar.update(samples.shape[0])
 
             # To avoid endless sampling when leakage is high, we raise a warning if the
             # acceptance rate is too low after the first 1_000 samples.
@@ -316,11 +319,10 @@ def accept_reject_sample(
         num_xos = proposal_sampling_kwargs["condition"].shape[0]
 
     pbar = tqdm(
-        disable=not show_progress_bars,
+        disable=not show_progress_bars or is_nested(),
         total=num_samples,
-        desc=f"Drawing {num_samples} samples for {num_xos} observation" + "s"
-        if num_xos > 1
-        else "",
+        desc=f"Drawing {num_samples} samples"
+        + (f" for {num_xos} observations" if num_xos > 1 else ""),
     )
 
     accepted = [[] for _ in range(num_xos)]
@@ -366,10 +368,11 @@ def accept_reject_sample(
             )
 
         # Sample and reject.
-        candidates = proposal(
-            torch.Size((sampling_batch_size,)),
-            **proposal_sampling_kwargs,
-        )
+        with nested_pbar_context():
+            candidates = proposal(
+                torch.Size((sampling_batch_size,)),
+                **proposal_sampling_kwargs,
+            )
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
 
@@ -391,8 +394,8 @@ def accept_reject_sample(
         num_sampled_total += num_accepted.to(num_sampled_total.device)
         num_samples_possible += sampling_batch_size
         min_num_accepted = num_accepted.min().item()
+        pbar.update(min(min_num_accepted, num_remaining))
         num_remaining -= min_num_accepted
-        pbar.update(min_num_accepted)
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.

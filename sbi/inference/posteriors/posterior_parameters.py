@@ -290,7 +290,7 @@ class MCMCPosteriorParameters(PosteriorParameters):
                 "init_strategy_parameters must be either None or of type Dict"
             )
         if self.thin != -1 and not (1 <= self.thin <= 10):
-            raise ValueError("thin must be a value between 10 to 1, or -1.")
+            raise ValueError("thin must be a value between 1 and 10, or -1.")
         if not is_nonnegative_int(self.warmup_steps):
             raise ValueError("warmup_steps must be greater than or equal to 0.")
         if not is_positive_int(self.num_chains):
