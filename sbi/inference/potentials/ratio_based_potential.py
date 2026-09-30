@@ -70,6 +70,11 @@ class RatioBasedPotential(BasePotential):
         self.ratio_estimator = ratio_estimator
         self.ratio_estimator.eval()
 
+    @property
+    def x_embedding_net(self) -> Optional[nn.Module]:
+        """Return the net embedding `x` in the ratio estimator."""
+        return getattr(self.ratio_estimator, "embedding_net_x", None)
+
     def to(self, device: Union[str, torch.device]) -> "RatioBasedPotential":
         """Move ratio estimator, prior and x_o to the given device.
 

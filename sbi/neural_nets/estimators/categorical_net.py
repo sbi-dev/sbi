@@ -265,6 +265,11 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
         self.net = net
         self.num_categories = net.max_num_categories
 
+    @property
+    def embedding_net(self) -> nn.Module:
+        r"""Return the embedding network for the condition."""
+        return self.net.embedding_net
+
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Return log-probability of samples under the categorical distribution.
 

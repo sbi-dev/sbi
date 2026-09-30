@@ -27,7 +27,10 @@ from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
-from sbi.neural_nets import posterior_nn, posterior_score_nn
+from sbi.inference.potentials.ratio_based_potential import (
+    ratio_estimator_based_potential,
+)
+from sbi.neural_nets import classifier_nn, posterior_nn, posterior_score_nn
 from sbi.neural_nets.embedding_nets import (
     FCEmbedding,
     PermutationInvariantEmbedding,
@@ -35,6 +38,7 @@ from sbi.neural_nets.embedding_nets import (
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MultivariateGaussianMDN,
 )
+from sbi.neural_nets.net_builders import build_categoricalmassestimator
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
@@ -471,6 +475,36 @@ def test_mnpe_derives_nan_tolerance_from_marked_embedding():
     posterior = DirectPosterior(
         posterior_estimator=estimator, prior=BoxUniform(zeros(3), ones(3))
     )
+
+    posterior.set_default_x(torch.tensor([[0.0, float("nan")]]))
+
+    assert posterior.default_x is not None
+    assert posterior.default_x.isnan().any()
+
+
+@pytest.mark.parametrize("estimator_type", ("nre", "categorical"))
+def test_nan_tolerance_derived_for_ratio_and_categorical(estimator_type):
+    """Ratio and categorical estimators must expose their `x` embedding."""
+
+    class NaNTolerantEmbedding(nn.Identity):
+        accepts_nan_input = True
+
+    x = torch.randn(100, 2)
+    if estimator_type == "nre":
+        prior = BoxUniform(zeros(2), ones(2))
+        estimator = classifier_nn(model="mlp", embedding_net_x=NaNTolerantEmbedding())(
+            prior.sample((100,)), x
+        )
+        potential_fn, _ = ratio_estimator_based_potential(estimator, prior, x_o=None)
+        posterior = MCMCPosterior(potential_fn=potential_fn, proposal=prior)
+    else:
+        prior = BoxUniform(zeros(1), 2 * ones(1))
+        estimator = build_categoricalmassestimator(
+            torch.randint(0, 3, (100, 1)).float(),
+            x,
+            embedding_net=NaNTolerantEmbedding(),
+        )
+        posterior = DirectPosterior(posterior_estimator=estimator, prior=prior)
 
     posterior.set_default_x(torch.tensor([[0.0, float("nan")]]))
 
