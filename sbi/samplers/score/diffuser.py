@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 
 from sbi.samplers.score.correctors import Corrector, get_corrector
 from sbi.samplers.score.predictors import Predictor, get_predictor
-from sbi.utils.pbar import is_nested
+from sbi.utils.pbar import is_nested, sampling_desc
 
 
 class Diffuser:
@@ -90,6 +90,13 @@ class Diffuser:
         else:
             self.corrector = get_corrector(corrector, self.predictor, **kwargs)
 
+    @property
+    def num_xos(self) -> int:
+        """Number of observations to draw samples for; one if they are iid."""
+        if self.predictor.potential_fn.x_is_iid:
+            return 1
+        return self.batch_shape.numel()
+
     def initialize(self, num_samples: int) -> Tensor:
         """Initialize the sampler by drawing samples from the initial distribution.
 
@@ -102,10 +109,7 @@ class Diffuser:
         Returns:
             Tensor: Initial noise samples.
         """
-        num_batches = (
-            1 if self.predictor.potential_fn.x_is_iid else self.batch_shape.numel()
-        )
-        init_shape = (num_samples, num_batches) + self.input_shape
+        init_shape = (num_samples, self.num_xos) + self.input_shape
         # NOTE: This interface is not ideal, but for one method we need to adjust the
         # initial distirbution
         init_std = self.init_std
@@ -152,8 +156,9 @@ class Diffuser:
         pbar = tqdm(
             range(1, ts.numel()),
             disable=not show_progress_bars or is_nested(),
-            desc=f"Generating {num_samples} posterior samples in {total_time_steps} "
-            "diffusion steps.",
+            desc=sampling_desc(
+                num_samples, "sde", num_xos=self.num_xos, num_steps=total_time_steps
+            ),
         )
 
         if save_intermediate:

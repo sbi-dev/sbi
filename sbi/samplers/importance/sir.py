@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.sbi_types import Proposal
-from sbi.utils.pbar import is_nested, nested_pbar_context
+from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
 
 
 def sampling_importance_resampling(
@@ -47,7 +47,7 @@ def sampling_importance_resampling(
     pbar = tqdm(
         disable=not show_progress_bars or is_nested(),
         total=num_samples,
-        desc=f"Drawing {num_samples} posterior samples",
+        desc=sampling_desc(num_samples, "sir"),
     )
 
     while num_remaining > 0:
