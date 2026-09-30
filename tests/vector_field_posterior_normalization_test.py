@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from sbi.inference import VectorFieldPosterior
-from sbi.neural_nets.net_builders.vector_field_nets import build_vector_field_estimator
+from sbi.neural_nets import posterior_flow_nn, posterior_score_nn
 from sbi.utils import BoxUniform
 
 
@@ -15,12 +15,9 @@ def _posterior(estimator_type: str, prior) -> VectorFieldPosterior:
     # The ODE density of any vector field integrates to one on R^d, so the
     # estimator does not need training.
     theta = torch.randn(200, 2)
-    estimator = build_vector_field_estimator(
-        batch_x=theta,
-        batch_y=theta + 0.1 * torch.randn_like(theta),
-        estimator_type=estimator_type,
-        hidden_features=16,
-        num_layers=2,
+    build = posterior_flow_nn if estimator_type == "flow" else posterior_score_nn
+    estimator = build(hidden_features=16, num_layers=2)(
+        theta, theta + 0.1 * torch.randn_like(theta)
     )
     return VectorFieldPosterior(estimator, prior)
 
