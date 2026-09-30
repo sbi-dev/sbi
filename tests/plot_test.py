@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import get_args
 
 import numpy as np
@@ -12,7 +13,7 @@ from matplotlib.pyplot import close, subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
 import sbi.analysis.plot as plt
-from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
+from sbi.analysis import LabeledSamples, pairplot, plot_summary, sbc_rank_plot
 from sbi.analysis.plotting_classes import (
     FigOptions,
     HistDiagOptions,
@@ -376,6 +377,63 @@ def test_pairplot_raises_error_on_offdiag_and_upper_conflict():
     close()
 
 
+def _labeled_samples() -> LabeledSamples:
+    return LabeledSamples(
+        torch.randn(100, 2),
+        name="posterior",
+        dim_labels=["theta_0", "theta_1"],
+        limits=[(-1.0, 1.0)],
+        ticks=[(-0.5, 0.5)],
+    )
+
+
+def test_pairplot_uses_labeled_samples_metadata():
+    ls = _labeled_samples()
+    _, axes = pairplot(ls)
+    assert axes[1, 1].get_xlabel() == "theta_1"
+    assert axes[1, 1].get_xlim() == pytest.approx((-1.0, 1.0), abs=1e-4)
+    assert axes[1, 1].get_xticks().tolist() == pytest.approx([-0.5, 0.5])
+    close()
+
+    # Explicit arguments take precedence over the container.
+    _, axes = pairplot(ls, labels=["a", "b"], limits=[(-9.0, 9.0)], ticks=[(-8.0, 8.0)])
+    assert axes[1, 1].get_xlabel() == "b"
+    assert axes[1, 1].get_xlim() == pytest.approx((-9.0, 9.0), abs=1e-4)
+    assert axes[1, 1].get_xticks().tolist() == pytest.approx([-8.0, 8.0])
+    close()
+
+
+@pytest.mark.parametrize(
+    "samples_labels, expected",
+    (
+        (None, ["posterior", "samples_1"]),
+        (["a", "b"], ["a", "b"]),
+        (["samples_0", "samples_1"], ["samples_0", "samples_1"]),
+    ),
+)
+def test_pairplot_legend_labels_from_labeled_samples(samples_labels, expected):
+    _, axes = pairplot(
+        [_labeled_samples(), torch.randn(100, 2)],
+        fig_kwargs=dict(legend=True, samples_labels=samples_labels),
+    )
+    assert [t.get_text() for t in axes[-1, 0].get_legend().get_texts()] == expected
+    close()
+
+
+@pytest.mark.parametrize(
+    "kwargs", (dict(dim_labels=["a"]), dict(limits=[(-1.0, 1.0)] * 3))
+)
+def test_labeled_samples_validation(kwargs):
+    with pytest.raises(ValueError):
+        LabeledSamples(torch.randn(10, 2), **kwargs)
+
+
+def test_pairplot_raises_on_dimensionality_mismatch():
+    with pytest.raises(ValueError, match="same number of dimensions"):
+        pairplot([torch.randn(10, 2), torch.randn(10, 3)])
+    close()
+
+
 @pytest.mark.parametrize("square_subplots", (True, False))
 def test_plotting_subplot_aspect(square_subplots):
     """
@@ -543,4 +601,25 @@ def test_pairplot_discrete_edge_cases(samples_fn, pairplot_kwargs):
     """Edge cases: all-discrete, lower triangle, multiple samples, subset."""
     fig, _ = pairplot(samples_fn(), **pairplot_kwargs)
     assert isinstance(fig, Figure)
+    close()
+
+
+@pytest.mark.parametrize("kwarg", ("diag_kwargs", "upper_kwargs", "lower_kwargs"))
+def test_pairplot_warns_on_unknown_kwarg_keys(kwarg):
+    """A typo in diag/upper/lower kwargs warns instead of being silently ignored."""
+    plot_arg = kwarg.removesuffix("_kwargs")
+    with pytest.warns(UserWarning, match="unknown keys in plot kwargs"):
+        pairplot(torch.randn(100, 3), **{plot_arg: "hist", kwarg: {"typo_kwarg": 1}})
+    close()
+
+
+def test_pairplot_kde_percentile_levels_are_known_keys():
+    """`percentile` and `levels` are KDE options, not unknown keys."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings("error", message=".*unknown keys in plot kwargs")
+        pairplot(
+            torch.randn(100, 2),
+            upper="kde",
+            upper_kwargs=dict(percentile=True, levels=[0.68, 0.95]),
+        )
     close()

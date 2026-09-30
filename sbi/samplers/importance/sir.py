@@ -1,19 +1,20 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable
+from typing import Callable
 
 import torch
 from torch import Tensor
 from tqdm.auto import tqdm
 
 from sbi.samplers.importance.importance_sampling import importance_sample
+from sbi.sbi_types import Proposal
 from sbi.utils.pbar import is_nested, nested_pbar_context
 
 
 def sampling_importance_resampling(
     potential_fn: Callable,
-    proposal: Any,
+    proposal: Proposal,
     num_samples: int = 1,
     num_candidate_samples: int = 32,
     max_sampling_batch_size: int = 10_000,
