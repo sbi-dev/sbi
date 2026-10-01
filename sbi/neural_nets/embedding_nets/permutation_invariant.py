@@ -90,24 +90,15 @@ class PermutationInvariantEmbedding(nn.Module):
             Network output (batch_size, output_dim).
         """
 
-        # Get number of trials from non-nan entries
-        num_batch, max_num_trials = x.shape[0], x.shape[self.aggregation_dim]
-        nan_counts = (
-            torch.isnan(x)
-            .sum(dim=self.aggregation_dim)  # count nans over trial dimension
-            .reshape(-1)[:num_batch]  # counts are the same across data dims
-            .unsqueeze(-1)  # make it (batch, 1) to match embeddings below
-        )
-        # number of non-nan trials
-        trial_counts = max_num_trials - nan_counts
+        # A trial is padding if all its features are NaN.
+        is_real_trial = ~torch.isnan(x).all(-1)
+        trial_counts = is_real_trial.sum(dim=self.aggregation_dim).unsqueeze(-1)
 
-        # get nan entries
-        is_nan = torch.isnan(x)
         # apply trial net with nan entries replaced with 0
         masked_x = torch.nan_to_num(x, nan=0.0)
         trial_embeddings = self.trial_net(masked_x)
-        # replace previous nan entries with zeros
-        trial_embeddings = trial_embeddings * (~is_nan.all(-1, keepdim=True)).float()
+        # replace embeddings of padded trials with zeros
+        trial_embeddings = trial_embeddings * is_real_trial.unsqueeze(-1).float()
 
         # Take mean over permutation dimension divide by number of trials
         # (instead of just taking torch.mean) to account for masking.

@@ -551,6 +551,25 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
             )
 
 
+@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
+def test_permutation_invariant_embedding_ignores_padding_per_observation(
+    aggregation_fn,
+):
+    """Padded trials are ignored per observation, independent of the batch."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4),
+        trial_net_output_dim=4,
+        aggregation_fn=aggregation_fn,
+    )
+    x = torch.randn(2, 3, 2)
+    x[0, 1:] = float("nan")
+
+    batched = embedding(x)
+
+    assert torch.allclose(batched[0], embedding(x[:1, :1])[0])
+    assert torch.allclose(batched[1], embedding(x[1:])[0])
+
+
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 @pytest.mark.parametrize("change_c_mode", ["conv", "zeros"])
