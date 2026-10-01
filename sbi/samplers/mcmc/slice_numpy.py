@@ -259,7 +259,7 @@ class SliceSamplerSerial:
         self.num_workers = num_workers
         self._samples = None
 
-    def run(self, num_samples: int) -> np.ndarray:
+    def run(self, num_samples: int, desc: Optional[str] = None) -> np.ndarray:
         """Runs MCMC and returns thinned samples.
 
         Sampling is performed parallelized across CPUs if self.num_workers > 1.
@@ -269,6 +269,7 @@ class SliceSamplerSerial:
 
         Args:
             num_samples: Number of samples to generate
+            desc: Description of the progress bar.
         Returns:
             MCMC samples in shape (num_chains, num_samples_per_chain, num_dim)
         """
@@ -281,9 +282,13 @@ class SliceSamplerSerial:
         with tqdm_joblib(
             tqdm(
                 range(num_chains),  # type: ignore
-                disable=not self.verbose or self.num_workers == 1,
-                desc=f"""Running {self.num_chains} MCMC chains with {self.num_workers}
-                    worker(s).""",
+                disable=not self.verbose,
+                desc=(
+                    desc
+                    if desc is not None
+                    else f"Running {self.num_chains} MCMC chains with "
+                    f"{self.num_workers} workers"
+                ),
                 total=self.num_chains,
             )
         ):
@@ -311,8 +316,7 @@ class SliceSamplerSerial:
             init_width=self.init_width,
             thin=self.thin,
             tuning=self.tuning,
-            # turn off pbars in parallel mode.
-            verbose=self.num_workers == 1 and self.verbose,
+            verbose=False,
         )
         return posterior_sampler.gen(num_samples)
 
@@ -409,11 +413,12 @@ class SliceSamplerVectorized:
             self.state[c]["width"] = None
             self.state[c]["x"] = None
 
-    def run(self, num_samples: int) -> np.ndarray:
+    def run(self, num_samples: int, desc: Optional[str] = None) -> np.ndarray:
         """Runs MCMC
 
         Args:
             num_samples: Number of samples to generate
+            desc: Description of the progress bar.
 
         Returns:
             MCMC samples
@@ -441,7 +446,11 @@ class SliceSamplerVectorized:
         if self.verbose:
             pbar = tqdm(
                 range(self.num_chains * (num_samples + self.tuning)),
-                desc=f"Running vectorized MCMC with {self.num_chains} chains",
+                desc=(
+                    desc
+                    if desc is not None
+                    else f"Running vectorized MCMC with {self.num_chains} chains"
+                ),
             )
 
         num_chains_finished = 0

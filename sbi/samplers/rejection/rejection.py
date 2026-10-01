@@ -12,7 +12,7 @@ from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
 from sbi.sbi_types import AcceptRejectFn, Proposal, SampleProposal
-from sbi.utils.pbar import is_nested, nested_pbar_context
+from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
 from sbi.utils.sbiutils import gradient_ascent
 
 
@@ -135,7 +135,7 @@ def rejection_sample(
         pbar = tqdm(
             disable=not show_progress_bars or is_nested(),
             total=num_samples,
-            desc=f"Drawing {num_samples} posterior samples",
+            desc=sampling_desc(num_samples, "rejection"),
         )
 
         num_sampled_total, num_remaining = 0, num_samples
@@ -321,8 +321,7 @@ def accept_reject_sample(
     pbar = tqdm(
         disable=not show_progress_bars or is_nested(),
         total=num_samples,
-        desc=f"Drawing {num_samples} samples"
-        + (f" for {num_xos} observations" if num_xos > 1 else ""),
+        desc=sampling_desc(num_samples, "rejection", num_xos=num_xos),
     )
 
     accepted = [[] for _ in range(num_xos)]

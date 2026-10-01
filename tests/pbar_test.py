@@ -9,13 +9,15 @@ from torch.distributions import MultivariateNormal
 from tqdm.auto import tqdm
 
 from sbi.inference.posteriors import VectorFieldPosterior
+from sbi.inference.posteriors.mcmc_posterior import build_from_potential
 from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.importance import sir
 from sbi.samplers.importance.importance_sampling import importance_sample
+from sbi.samplers.mcmc import slice_numpy
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score import diffuser
 from sbi.utils import BoxUniform
-from sbi.utils.pbar import is_nested, nested_pbar_context
+from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
 
 
 class TestNestedPbarContext:
@@ -71,6 +73,31 @@ class TestNestedPbarContext:
         assert worker_sees[0], "worker should see its own context"
 
 
+@pytest.mark.parametrize(
+    "kwargs, expected",
+    [
+        (
+            dict(num_samples=1000, method="rejection"),
+            "Drawing 1000 samples [rejection]",
+        ),
+        (
+            dict(num_samples=1, method="rejection", num_xos=5),
+            "Drawing 1 sample for each of 5 observations [rejection]",
+        ),
+        (
+            dict(num_samples=100, method="slice_np", num_chains=20, num_workers=1),
+            "Drawing 100 samples [slice_np, 20 chains, 1 worker]",
+        ),
+        (
+            dict(num_samples=100, method="sde", num_steps=499),
+            "Drawing 100 samples [sde, 499 steps]",
+        ),
+    ],
+)
+def test_sampling_desc(kwargs, expected):
+    assert sampling_desc(**kwargs) == expected
+
+
 @pytest.fixture
 def recorded_bars(monkeypatch):
     """Records `(desc, disable)` of every progress bar the samplers create.
@@ -85,8 +112,11 @@ def recorded_bars(monkeypatch):
             kwargs["disable"] = True
             super().__init__(*args, **kwargs)
 
-    for module in (rejection, sir, diffuser):
+    for module in (rejection, sir, diffuser, slice_numpy):
         monkeypatch.setattr(module, "tqdm", RecordingTqdm)
+    monkeypatch.setattr(
+        slice_numpy, "trange", lambda n, **kwargs: RecordingTqdm(range(n), **kwargs)
+    )
     return records
 
 
@@ -208,7 +238,50 @@ def test_vector_field_posterior_shows_at_most_one_bar(
     bars = shown(recorded_bars)
     if not show_progress_bars:
         assert bars == []
-    elif reject_outside_prior:
-        assert len(bars) == 1 and bars[0].startswith("Drawing")
-    else:
-        assert len(bars) == 1 and bars[0].startswith("Generating")
+        return
+    assert len(bars) == 1
+    assert ("[rejection]" in bars[0]) == reject_outside_prior
+    assert ("for each of 2 observations" in bars[0]) == batched
+
+
+def _gaussian_mcmc_posterior():
+    prior = BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+
+    def potential_fn(theta, x):
+        return -x * (theta**2).sum(axis=-1)
+
+    return build_from_potential(potential_fn, prior, x=torch.tensor([0.5]))
+
+
+@pytest.mark.mcmc
+def test_serial_slice_sampler_shows_one_bar_with_one_worker(recorded_bars):
+    """The chains must not show bars of their own, one or two per chain."""
+    _gaussian_mcmc_posterior().sample(
+        (3,),
+        method="slice_np",
+        num_chains=2,
+        num_workers=1,
+        warmup_steps=2,
+        thin=1,
+        show_progress_bars=True,
+    )
+
+    assert shown(recorded_bars) == ["Drawing 3 samples [slice_np, 2 chains, 1 worker]"]
+
+
+@pytest.mark.mcmc
+def test_batched_mcmc_bar_counts_per_observation(recorded_bars):
+    """Samples and chains in the bar are counted per observation, not in total."""
+    _gaussian_mcmc_posterior().sample_batched(
+        (3,),
+        x=torch.tensor([[0.2], [0.8]]),
+        method="slice_np_vectorized",
+        num_chains=2,
+        warmup_steps=2,
+        thin=1,
+        show_progress_bars=True,
+    )
+
+    assert shown(recorded_bars) == [
+        "Drawing 3 samples for each of 2 observations [slice_np_vectorized, 2 chains]"
+    ]
