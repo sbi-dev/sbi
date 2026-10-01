@@ -47,13 +47,13 @@ def sampling_desc(
     num_workers: Optional[int] = None,
     num_steps: Optional[int] = None,
 ) -> str:
-    """Returns the progress bar description of a posterior sampler.
+    """Returns the progress bar description of a sampler.
 
-    Example: `"Drawing 100 posterior samples for each of 5 observations [slice_np,
-    20 chains, 4 workers]"`.
+    Example: `"Drawing 100 samples for each of 5 observations [slice_np, 20 chains,
+    4 workers]"`.
 
     Args:
-        num_samples: Number of posterior samples per observation.
+        num_samples: Number of samples per observation.
         method: Name of the sampling method, e.g. `"rejection"` or `"slice_np"`.
         num_xos: Number of observations. Shown only if larger than one.
         num_chains: Number of MCMC chains per observation.
@@ -63,7 +63,7 @@ def sampling_desc(
     Returns:
         The description, with the counts that are given in brackets after the method.
     """
-    desc = f"Drawing {_count(num_samples, 'posterior sample')}"
+    desc = f"Drawing {_count(num_samples, 'sample')}"
     if num_xos > 1:
         desc += f" for each of {num_xos} observations"
     details = [method]
