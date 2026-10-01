@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Optional
 
 import torch
@@ -119,6 +120,16 @@ class PermutationInvariantEmbedding(nn.Module):
         Returns:
             Network output (batch_size, output_dim).
         """
+
+        if not getattr(self, "_warned_nan_padding", False):
+            issue = self._nan_padding_issue(x)
+            if issue is not None:
+                warnings.warn(
+                    f"{issue} NaN should only mark padded trials, with all features "
+                    "NaN.",
+                    stacklevel=1,
+                )
+                self._warned_nan_padding = True
 
         # A trial is padding if all its features are NaN.
         is_real_trial = ~torch.isnan(x).all(-1)

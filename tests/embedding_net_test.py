@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 import pickle
+import warnings
 from typing import Callable
 
 import pytest
@@ -568,6 +569,32 @@ def test_permutation_invariant_embedding_ignores_padding_per_observation(
 
     assert torch.allclose(batched[0], embedding(x[:1, :1])[0])
     assert torch.allclose(batched[1], embedding(x[1:])[0])
+
+
+@pytest.mark.parametrize(
+    "pattern", ("padded_trial", "partially_nan_trial", "no_real_trial")
+)
+def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
+    """NaN outside whole padded trials must not silently become data; warn once."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4),
+        trial_net_output_dim=4,
+        aggregation_fn="sum",
+    )
+    x = torch.randn(2, 3, 2)
+    x[0, 1:] = float("nan")
+    if pattern == "partially_nan_trial":
+        x[1, 0, 0] = float("nan")
+    elif pattern == "no_real_trial":
+        x[1] = float("nan")
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        embedding(x)
+        embedding(x)
+
+    issued = [w for w in caught if "should only mark padded trials" in str(w.message)]
+    assert len(issued) == (0 if pattern == "padded_trial" else 1)
 
 
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
