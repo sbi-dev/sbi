@@ -477,6 +477,19 @@ class Standardize(nn.Module):
         return (tensor - self._mean) / self._std
 
 
+def nan_tolerant_input_net(net: Optional[nn.Module]) -> Optional[nn.Module]:
+    """Return the module that consumes the raw `x` if it declares
+    `accepts_nan_input`, else None.
+
+    Only `net` itself or, for an `nn.Sequential`, its first layer after leading
+    `Standardize` layers counts, so NaN cannot reach an unmarked module first.
+    """
+    if isinstance(net, nn.Sequential):
+        first = next((m for m in net if not isinstance(m, Standardize)), None)
+        return nan_tolerant_input_net(first)
+    return net if getattr(net, "accepts_nan_input", False) else None
+
+
 def standardizing_net(
     batch_t: Tensor,
     structured_dims: bool = False,

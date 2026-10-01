@@ -785,11 +785,19 @@ def batched_first_of_batch(t: Tensor) -> Tensor:
     return t[:1]
 
 
-def assert_all_finite(quantity: Tensor, description: str = "tensor") -> None:
-    """Raise if tensor quantity contains any NaN or Inf element."""
+def assert_all_finite(
+    quantity: Tensor, description: str = "tensor", allow_nan: bool = False
+) -> None:
+    """Raise if tensor quantity contains NaN or Inf; `allow_nan` accepts NaN
+    (e.g., NaN-padded trials), Inf still raises."""
 
     msg = f"NaN/Inf present in {description}."
-    if not torch.isfinite(quantity).all():
+    invalid = (
+        bool(torch.isinf(quantity).any())
+        if allow_nan
+        else not bool(torch.isfinite(quantity).all())
+    )
+    if invalid:
         raise ValueError(msg)
 
 

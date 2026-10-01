@@ -409,6 +409,7 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
+        self._assert_finite_x(x)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method

@@ -49,7 +49,6 @@ class DirectPosterior(NeuralPosterior):
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
         enable_transform: bool = True,
-        check_finite_x: bool = True,
     ):
         """
         Args:
@@ -63,9 +62,6 @@ class DirectPosterior(NeuralPosterior):
             enable_transform: Whether to transform parameters to unconstrained space
                 during MAP optimization. When False, an identity transform will be
                 returned for `theta_transform`.
-            check_finite_x: Whether to raise if the observed data `x_o` contains NaNs
-                or Infs. Set to False when the embedding net expects NaNs, e.g., when
-                `PermutationInvariantEmbedding` pads a varying number of trials.
         """
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
@@ -85,7 +81,6 @@ class DirectPosterior(NeuralPosterior):
             theta_transform=theta_transform,
             device=device,
             x_shape=x_shape,
-            check_finite_x=check_finite_x,
         )
 
         self.device = device
@@ -133,7 +128,6 @@ class DirectPosterior(NeuralPosterior):
             theta_transform=theta_transform,
             device=device,
             x_shape=self.x_shape,
-            check_finite_x=self._check_finite_x,
         )
         # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:
@@ -251,6 +245,7 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
+        self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
         condition_shape = self.posterior_estimator.condition_shape
         x = reshape_to_batch_event(x, event_shape=condition_shape)
@@ -424,6 +419,7 @@ class DirectPosterior(NeuralPosterior):
             in the support of the prior, -∞ (corresponding to 0 probability) outside.
         """
 
+        self._assert_finite_x(x)
         theta = ensure_theta_batched(torch.as_tensor(theta))
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).

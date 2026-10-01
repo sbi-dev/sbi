@@ -18,7 +18,12 @@ from sbi.inference.potentials.base_potential import (
     CustomPotentialWrapper,
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
-from sbi.utils.sbiutils import gradient_ascent, load_with_version, save_with_version
+from sbi.utils.sbiutils import (
+    gradient_ascent,
+    load_with_version,
+    nan_tolerant_input_net,
+    save_with_version,
+)
 from sbi.utils.torchutils import (
     assert_all_finite,
     canonical_device,
@@ -45,7 +50,6 @@ class NeuralPosterior:
         theta_transform: Optional[TorchTransform] = None,
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
-        check_finite_x: bool = True,
     ):
         """
         Args:
@@ -56,9 +60,6 @@ class NeuralPosterior:
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Deprecated, should not be passed.
-            check_finite_x: Whether to raise if the observed data `x_o` contains NaNs
-                or Infs. Set to False when the embedding net expects NaNs, e.g., when
-                `PermutationInvariantEmbedding` pads a varying number of trials.
         """
         if x_shape is not None:
             warn(
@@ -75,7 +76,6 @@ class NeuralPosterior:
             )
 
         self._device = process_device(potential_fn.device if device is None else device)
-        self._check_finite_x = check_finite_x
 
         self.potential_fn = potential_fn
 
@@ -93,9 +93,19 @@ class NeuralPosterior:
         # already to the potential function builder. If so, this `x_o` will be used
         # as default x.
         x_o = self.potential_fn.return_x_o()
-        if x_o is not None and self._check_finite_x:
-            assert_all_finite(x_o, "Observed data x_o")
+        if x_o is not None:
+            self._assert_finite_x(x_o)
         self._x = x_o
+
+    def _assert_finite_x(self, x: Tensor) -> None:
+        """Raise if `x` contains Inf, or NaN that the net embedding `x` does not
+        accept (e.g., a NaN-padding-aware `PermutationInvariantEmbedding`)."""
+        x = torch.as_tensor(x)
+        net = nan_tolerant_input_net(self.potential_fn.x_embedding_net)
+        assert_all_finite(x, "Observed data x_o", allow_nan=net is not None)
+        validate_nan_input = getattr(net, "validate_nan_input", None)
+        if validate_nan_input is not None and torch.isnan(x).any():
+            validate_nan_input(x)
 
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
@@ -200,8 +210,7 @@ class NeuralPosterior:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
         x = process_x(x, x_event_shape=None)
-        if self._check_finite_x:
-            assert_all_finite(x, "Observed data x_o")
+        self._assert_finite_x(x)
 
         self._x = x.to(self._device)
         self._map = None
@@ -213,8 +222,7 @@ class NeuralPosterior:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
             x = process_x(x, x_event_shape=None)
-            if self._check_finite_x:
-                assert_all_finite(x, "Observed data x_o")
+            self._assert_finite_x(x)
 
             return x
         elif self.default_x is None:
@@ -391,8 +399,7 @@ class NeuralPosterior:
         Args:
             state_dict: State to be restored.
         """
-        # Posteriors pickled by older sbi versions can miss these keys.
-        state_dict.setdefault("_check_finite_x", True)
+        # Posteriors pickled by older sbi versions can miss this key.
         state_dict.setdefault("_leakage_density_correction_factor", None)
         self.__dict__ = state_dict
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 import pickle
+import warnings
 from typing import Callable
 
 import pytest
@@ -15,7 +16,6 @@ from torch.distributions import MultivariateNormal
 from sbi import utils
 from sbi.inference import NLE, NPE, NRE, simulate_for_sbi
 from sbi.inference.posteriors.posterior_parameters import (
-    DirectPosteriorParameters,
     MCMCPosteriorParameters,
 )
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
@@ -523,9 +523,7 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(
         training_batch_size=100
     )
-    posterior = inference.build_posterior(
-        posterior_parameters=DirectPosteriorParameters(check_finite_x=False)
-    )
+    posterior = inference.build_posterior()
 
     num_samples = 1000
     # test different number of trials
@@ -552,6 +550,51 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
             check_c2st(
                 samples, reference_samples, alg=f"iid-NPE with {num_trials} trials"
             )
+
+
+@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
+def test_permutation_invariant_embedding_ignores_padding_per_observation(
+    aggregation_fn,
+):
+    """Padded trials are ignored per observation, independent of the batch."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4),
+        trial_net_output_dim=4,
+        aggregation_fn=aggregation_fn,
+    )
+    x = torch.randn(2, 3, 2)
+    x[0, 1:] = float("nan")
+
+    batched = embedding(x)
+
+    assert torch.allclose(batched[0], embedding(x[:1, :1])[0])
+    assert torch.allclose(batched[1], embedding(x[1:])[0])
+
+
+@pytest.mark.parametrize(
+    "pattern", ("padded_trial", "partially_nan_trial", "no_real_trial")
+)
+def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
+    """NaN outside whole padded trials must not silently become data; warn once."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4),
+        trial_net_output_dim=4,
+        aggregation_fn="sum",
+    )
+    x = torch.randn(2, 3, 2)
+    x[0, 1:] = float("nan")
+    if pattern == "partially_nan_trial":
+        x[1, 0, 0] = float("nan")
+    elif pattern == "no_real_trial":
+        x[1] = float("nan")
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        embedding(x)
+        embedding(x)
+
+    issued = [w for w in caught if "should only mark padded trials" in str(w.message)]
+    assert len(issued) == (0 if pattern == "padded_trial" else 1)
 
 
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])

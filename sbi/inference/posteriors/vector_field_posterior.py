@@ -60,7 +60,6 @@ class VectorFieldPosterior(NeuralPosterior):
         device: Optional[Union[str, torch.device]] = None,
         enable_transform: bool = True,
         sample_with: Literal["ode", "sde"] = "sde",
-        check_finite_x: bool = True,
         **kwargs,
     ):
         """
@@ -76,9 +75,6 @@ class VectorFieldPosterior(NeuralPosterior):
                 returned for `theta_transform`. True is not supported yet.
             sample_with: Whether to sample from the posterior using the ODE-based
                 sampler or the SDE-based sampler.
-            check_finite_x: Whether to raise if the observed data `x_o` contains NaNs
-                or Infs. Set to False when the embedding net expects NaNs, e.g., when
-                `PermutationInvariantEmbedding` pads a varying number of trials.
             **kwargs: Additional keyword arguments passed to
                 `VectorFieldBasedPotential`.
         """
@@ -95,7 +91,6 @@ class VectorFieldPosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
-            check_finite_x=check_finite_x,
         )
         # Set the potential function type.
         self.potential_fn: VectorFieldBasedPotential = potential_fn
@@ -146,7 +141,6 @@ class VectorFieldPosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
-            check_finite_x=self._check_finite_x,
         )
         # super().__init__ erases the self._x, so we need to set it again
         if x_o is not None:
@@ -640,6 +634,7 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
+        self._assert_finite_x(x)
         if self.vector_field_estimator.compose_enabled:
             raise NotImplementedError(
                 "compose_standardization does not yet support sample_batched "
