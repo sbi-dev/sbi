@@ -86,6 +86,8 @@ class PermutationInvariantEmbedding(nn.Module):
 
     def _nan_padding_issue(self, x: Tensor) -> Optional[str]:
         """Describe NaN in `x` that is not padding of whole trials, else None."""
+        if x.dim() == 2:  # single observation without batch dimension
+            x = x.unsqueeze(0)
         is_nan = torch.isnan(x)
         is_padded_trial = is_nan.all(-1)
         if (is_nan.any(-1) & ~is_padded_trial).any():

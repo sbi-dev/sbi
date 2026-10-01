@@ -421,6 +421,20 @@ def test_nan_tolerant_posterior_rejects_invalid_padding(
         posterior.set_default_x(x_invalid)
 
 
+@pytest.mark.parametrize("is_valid", (True, False))
+def test_nan_padding_check_accepts_unbatched_x_o(is_valid, trained_nan_tolerant_npe):
+    """A single padded `x_o` without batch dimension is checked like a batched one."""
+    _, inference, x_nan = trained_nan_tolerant_npe
+    posterior = inference.build_posterior()
+    x_unbatched = x_nan[0].clone()
+    if is_valid:
+        posterior.set_default_x(x_unbatched)
+    else:
+        x_unbatched[0, 0] = float("nan")
+        with pytest.raises(ValueError, match="NaN may only mark padded trials"):
+            posterior.set_default_x(x_unbatched)
+
+
 def test_ensemble_derives_nan_tolerance_from_components(trained_nan_tolerant_npe):
     """An ensemble tolerates NaN iff every component does (strict-if-any-strict)."""
     prior, inference, x_nan = trained_nan_tolerant_npe
