@@ -250,8 +250,8 @@ class NeuralPosterior:
             return torch.ones((), device=self._device)
         if self._leakage_cache is not None and use_cache and not force_update:
             cached_x, factor = self._leakage_cache
-            if cached_x.shape == x.shape and torch.equal(
-                cached_x, x.to(cached_x.device)
+            if cached_x.shape == x.shape and torch.allclose(
+                cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
             ):
                 return factor
         factor = estimate_fn()

@@ -89,6 +89,19 @@ def test_leakage_correction_caching(estimator_type, monkeypatch):
     assert torch.equal(calls[-1][1], posterior.default_x)
 
 
+def test_leakage_cache_matches_nan_padded_x():
+    """NaN padding in `x` (e.g., for varying trial counts) must not defeat the cache."""
+    prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
+    posterior = _posterior("direct", prior)
+    calls = []
+    x = torch.tensor([[0.0, float("nan")]])
+    for _ in range(2):
+        posterior._cached_leakage_factor(
+            x.clone(), prior, lambda: calls.append(1) or torch.ones(())
+        )
+    assert len(calls) == 1
+
+
 @pytest.mark.gpu
 @pytest.mark.parametrize("estimator_type", ["direct", "npe_a", "flow"])
 def test_explicit_cpu_x_for_posterior_on_gpu(estimator_type):
