@@ -42,6 +42,7 @@ from sbi.neural_nets.net_builders import build_categoricalmassestimator
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
+from sbi.utils.sbiutils import Standardize, nan_tolerant_input_net
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
@@ -510,6 +511,32 @@ def test_nan_tolerance_derived_for_ratio_and_categorical(estimator_type):
 
     assert posterior.default_x is not None
     assert posterior.default_x.isnan().any()
+
+
+class _NaNTolerantIdentity(nn.Identity):
+    accepts_nan_input = True
+
+
+class _CompositeEmbedding(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.padded_part = _NaNTolerantIdentity()
+        self.other_part = nn.Linear(2, 2)
+
+
+@pytest.mark.parametrize(
+    "net, is_tolerant",
+    (
+        (_NaNTolerantIdentity(), True),
+        (nn.Sequential(Standardize(0.0, 1.0), _NaNTolerantIdentity()), True),
+        (nn.Sequential(nn.Linear(2, 2), _NaNTolerantIdentity()), False),
+        (_CompositeEmbedding(), False),
+        (None, False),
+    ),
+)
+def test_nan_tolerance_requires_marked_first_consumer(net, is_tolerant):
+    """Only a marked module that consumes the raw `x` makes `x` NaN-tolerant."""
+    assert (nan_tolerant_input_net(net) is not None) == is_tolerant
 
 
 def test_batched_apis_reject_nonfinite_x(trained_npe):

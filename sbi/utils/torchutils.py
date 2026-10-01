@@ -801,17 +801,6 @@ def assert_all_finite(
         raise ValueError(msg)
 
 
-def net_accepts_nan_input(net: Optional[Module]) -> bool:
-    """Return whether any module in `net` declares `accepts_nan_input`.
-
-    Recurses the module tree because builders wrap user embeddings, e.g.,
-    inside a standardizing `nn.Sequential`. `None` means no net consumes `x`.
-    """
-    if net is None:
-        return False
-    return any(getattr(m, "accepts_nan_input", False) for m in net.modules())
-
-
 def assert_not_nan_or_plus_inf(quantity: Tensor, description: str = "tensor") -> None:
     """Raise if tensor quantity contains any NaN or +Inf element."""
 

@@ -18,13 +18,17 @@ from sbi.inference.potentials.base_potential import (
     CustomPotentialWrapper,
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
-from sbi.utils.sbiutils import gradient_ascent, load_with_version, save_with_version
+from sbi.utils.sbiutils import (
+    gradient_ascent,
+    load_with_version,
+    nan_tolerant_input_net,
+    save_with_version,
+)
 from sbi.utils.torchutils import (
     assert_all_finite,
     canonical_device,
     ensure_theta_batched,
     infer_tensor_device,
-    net_accepts_nan_input,
     process_device,
 )
 from sbi.utils.user_input_checks import process_x
@@ -99,7 +103,7 @@ class NeuralPosterior:
         """Return whether NaN in `x_o` is consumed by design, derived at check
         time from the net that embeds `x` (e.g., a NaN-padding-aware
         `PermutationInvariantEmbedding`)."""
-        return net_accepts_nan_input(self.potential_fn.x_embedding_net)
+        return nan_tolerant_input_net(self.potential_fn.x_embedding_net) is not None
 
     def _assert_finite_x(self, x: Tensor) -> None:
         """Raise if `x` contains Inf, or NaN unless the estimator tolerates it."""
