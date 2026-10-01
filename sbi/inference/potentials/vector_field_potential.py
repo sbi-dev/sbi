@@ -44,7 +44,8 @@ class VectorFieldBasedPotential(BasePotential):
         the vector field estimator does not define the score (SCORE_DEFINED = False),
         the gradient is not available and an error is raised.
 
-        Note that the potential function is not defined for the iid setting yet.
+        For iid observations, the potential is unnormalized: it combines the
+        single-observation posteriors as $p(\theta)^{1-n} \prod_i p(\theta|x_i)$.
 
         Args:
             vector_field_estimator: The neural network modelling the vector field.

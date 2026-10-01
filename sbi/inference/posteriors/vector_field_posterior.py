@@ -3,7 +3,7 @@
 
 import math
 import warnings
-from typing import Dict, Literal, Optional, Union
+from typing import Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -27,6 +27,7 @@ from sbi.sbi_types import Shape
 from sbi.utils import check_prior
 from sbi.utils.sbiutils import (
     gradient_ascent,
+    prior_support_is_bounded,
     warn_if_outside_prior_support,
     within_support,
 )
@@ -105,6 +106,7 @@ class VectorFieldPosterior(NeuralPosterior):
             "sde",
         ], f"sample_with must be 'ode' or 'sde', but is {self.sample_with}."
         self.max_sampling_batch_size = max_sampling_batch_size
+        self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
 
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
@@ -145,6 +147,7 @@ class VectorFieldPosterior(NeuralPosterior):
             self.set_default_x(x_o)
 
         self.potential_fn: VectorFieldBasedPotential = potential_fn
+        self._leakage_cache = None
 
     def sample(
         self,
@@ -464,10 +467,16 @@ class VectorFieldPosterior(NeuralPosterior):
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
         ode_kwargs: Optional[Dict] = None,
+        norm_posterior: bool = True,
+        leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
         r"""Returns the log-probability of the posterior $p(\theta|x)$.
 
         This requires building and evaluating the probability flow ODE.
+
+        For iid `x` (batch size > 1), the log-probability is only defined up to a
+        constant: it combines the single-observation posteriors as
+        $p(\theta)^{1-n} \prod_i p(\theta|x_i)$ and drops the evidence ratio.
 
         Args:
             theta: Parameters $\theta$.
@@ -476,6 +485,11 @@ class VectorFieldPosterior(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
             ode_kwargs: Additional keyword arguments for the ODE solver.
+            norm_posterior: Whether to divide by the probability mass of the ODE
+                density inside the prior support, estimated with ODE samples. Has
+                no effect for unbounded priors or iid `x`.
+            leakage_correction_params: A `dict` of keyword arguments to override the
+                default values of `leakage_correction()`.
 
         Returns:
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
@@ -495,10 +509,79 @@ class VectorFieldPosterior(NeuralPosterior):
         )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        return self.potential_fn(
+        log_prob = self.potential_fn(
             theta.to(self._device),
             track_gradients=track_gradients,
         )
+        if is_iid:
+            warnings.warn("The log-probability is unnormalized!", stacklevel=2)
+        elif norm_posterior:
+            log_prob = log_prob - torch.log(
+                self.leakage_correction(
+                    x=x, ode_kwargs=ode_kwargs, **(leakage_correction_params or {})
+                )
+            )
+        return log_prob
+
+    def leakage_correction(
+        self,
+        x: Tensor,
+        num_rejection_samples: int = 10_000,
+        force_update: bool = False,
+        ode_kwargs: Optional[Dict] = None,
+    ) -> Tensor:
+        r"""Return the probability mass of the ODE density inside the prior support.
+
+        The mass is the fraction of probability flow ODE samples inside the prior
+        support. It is 1 for unbounded priors. The factor is saved for the last `x`
+        and re-estimated whenever `x` changes, or for any call with `ode_kwargs`.
+
+        Args:
+            x: A single observation.
+            num_rejection_samples: Number of ODE samples used to estimate the factor.
+            force_update: Whether to re-estimate the factor even if it is saved.
+            ode_kwargs: Additional keyword arguments for the ODE solver. Must match
+                the ones used for the density that is corrected.
+
+        Returns:
+            Saved or newly-estimated correction factor (as a scalar `Tensor`).
+        """
+        if prior_support_is_bounded(self.prior) is False:
+            return torch.ones((), device=self._device)
+
+        def acceptance() -> Tensor:
+            self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
+            batch_size = self.max_sampling_batch_size
+            num_inside = sum(
+                within_support(
+                    self.prior,
+                    self.sample_via_ode(
+                        (min(batch_size, num_rejection_samples - start),),
+                        **(ode_kwargs or {}),
+                    ),
+                ).sum()
+                for start in range(0, num_rejection_samples, batch_size)
+            )
+            mass = torch.as_tensor(num_inside / num_rejection_samples)
+            if mass == 0:
+                raise RuntimeError(
+                    f"None of {num_rejection_samples} ODE samples lie inside the prior "
+                    "support, so `log_prob()` cannot be normalized. Use "
+                    "`norm_posterior=False` to get the unnormalized log-probability."
+                )
+            return mass
+
+        cache = getattr(self, "_leakage_cache", None)  # Missing in older pickles.
+        if cache is not None and not (force_update or ode_kwargs):
+            cached_x, factor = cache
+            if cached_x.shape == x.shape and torch.equal(
+                cached_x, x.to(cached_x.device)
+            ):
+                return factor
+        factor = acceptance()
+        if not ode_kwargs:
+            self._leakage_cache = (x.detach().clone(), factor)
+        return factor
 
     def sample_batched(
         self,
