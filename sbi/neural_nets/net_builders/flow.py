@@ -33,6 +33,11 @@ from sbi.utils.user_input_checks import check_data_device
 
 nflow_specific_kwargs = ["num_bins", "num_components", "tail_bound"]
 
+transform_to_unconstrained_suggestion = (
+    "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
+    "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', 'structured'."
+)
+
 
 def build_made(
     batch_x: Tensor,
@@ -74,9 +79,7 @@ def build_made(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_made",
-        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
-        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
-        "'structured'.",
+        transform_to_unconstrained_suggestion,
     )
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
@@ -160,9 +163,7 @@ def build_maf(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_maf",
-        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
-        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
-        "'structured'.",
+        transform_to_unconstrained_suggestion,
     )
     x_numel = get_numel(
         batch_x,
@@ -275,9 +276,7 @@ def build_maf_rqs(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_maf_rqs",
-        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
-        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
-        "'structured'.",
+        transform_to_unconstrained_suggestion,
     )
     x_numel = get_numel(
         batch_x,
@@ -385,9 +384,7 @@ def build_nsf(
     assert_transform_to_unconstrained_supported(
         z_score_x,
         "build_nsf",
-        "Use a model that supports it, e.g. `mdn` or a `zuko_*` model "
-        "(`zuko_maf`, `zuko_nsf`), or one of 'none', 'independent', "
-        "'structured'.",
+        transform_to_unconstrained_suggestion,
     )
     x_numel = get_numel(batch_x, embedding_net=None)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)

@@ -54,10 +54,16 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
         self.log_transform_input = log_transform_input
 
     def forward(self, input: Tensor):
+        """Not implemented for mixed density estimators.
+
+        Raises:
+            NotImplementedError: Always. Use `sample` to generate samples or
+                `log_prob` to evaluate densities.
+        """
         raise NotImplementedError(
-            """The forward method is not implemented for mixed neural density
-            estimation, use '.sample(...)' to generate samples though a forward
-            pass."""
+            "The forward method is not implemented for mixed density estimators. "
+            "Use `.sample(...)` to generate samples or `.log_prob(...)` to evaluate "
+            "densities."
         )
 
     def sample(

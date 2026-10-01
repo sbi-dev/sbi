@@ -28,8 +28,8 @@ density_estimator_build_fun = posterior_nn(
     model="zuko_nsf",
     hidden_features=60,
     num_transforms=3,
-    z_score_theta="transform_to_unconstrained",  # Transform parameters to unconstrained space
-    x_dist=prior,  # For NPE, this specifies bounds for parameters (internally called 'x')
+    z_score_theta="transform_to_unconstrained",
+    x_dist=prior,
 )
 inference = NPE(prior, density_estimator=density_estimator_build_fun)
 ```
