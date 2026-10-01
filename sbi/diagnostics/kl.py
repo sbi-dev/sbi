@@ -8,14 +8,14 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference import DirectPosterior
+from sbi.inference import DirectPosterior, VectorFieldPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 
 # Objects whose `log_prob()` is a normalized density. Subclasses of `DirectPosterior`
-# (e.g. `NPE_A_Posterior`) are included. `VectorFieldPosterior` is not: with a bounded
-# prior, its `log_prob()` is not corrected for the mass outside the prior.
-_NORMALIZED = (Distribution, DirectPosterior, VIPosterior)
+# (e.g. `NPE_A_Posterior`) are included.
+_NORMALIZED = (Distribution, DirectPosterior, VIPosterior, VectorFieldPosterior)
 
 
 def kl_divergence_mc(
@@ -29,8 +29,11 @@ def kl_divergence_mc(
 
     Computes $\frac{1}{N} \sum_i \log p(\theta_i) - \log q(\theta_i)$ with
     $\theta_i \sim p$. Both `p` and `q` must have a normalized `log_prob()`. Torch
-    distributions, `DirectPosterior` and `VIPosterior` are accepted; other posteriors
-    are refused.
+    distributions, `DirectPosterior`, `VIPosterior` and `VectorFieldPosterior` are
+    accepted; other posteriors are refused. A `VectorFieldPosterior` is refused for
+    iid `x`, because its `log_prob()` is then unnormalized. Its `log_prob()` is the
+    probability flow ODE density, so `p` must sample with the ODE
+    (`sample_with="ode"`) unless `p_samples` is given.
 
     In sequential inference, `kl_divergence_mc(posterior, proposal)` shows how much
     a round changed the estimate. See the how-to guide on sequential methods.
@@ -47,15 +50,17 @@ def kl_divergence_mc(
 
     Returns:
         Estimate and its standard error, both scalar tensors. The standard error
-        includes only the sampling noise. For a `DirectPosterior` with a bounded
-        prior, `log_prob()` also contains an estimated leakage correction, whose
-        noise is not included.
+        includes only the sampling noise. For a `DirectPosterior` or a
+        `VectorFieldPosterior` with a bounded prior, `log_prob()` also contains an
+        estimated leakage correction, whose noise is not included.
 
     Raises:
-        NotImplementedError: If `p` or `q` has no normalized `log_prob()`.
-        ValueError: If a torch distribution has a batch shape, if fewer than two
-            samples are used, or if a sample of `p` is outside the support of `q`,
-            which makes the divergence infinite.
+        NotImplementedError: If `p` or `q` has no normalized `log_prob()`, or if
+            a `VectorFieldPosterior` is conditioned on iid `x`.
+        ValueError: If a torch distribution has a batch shape, if a
+            `VectorFieldPosterior` `p` samples with the SDE and no `p_samples` are
+            given, if fewer than two samples are used, or if a sample of `p` is
+            outside the support of `q`, which makes the divergence infinite.
     """
     for name, dist in (("p", p), ("q", q)):
         if not isinstance(dist, _NORMALIZED):
@@ -64,6 +69,18 @@ def kl_divergence_mc(
                 "guaranteed to be a normalized density. Use a sample-based metric "
                 "such as `sbi.utils.metrics.c2st` instead."
             )
+        if isinstance(dist, VectorFieldPosterior):
+            x_dist = x if x is not None else dist.default_x
+            condition_shape = dist.vector_field_estimator.condition_shape
+            if (
+                x_dist is not None
+                and reshape_to_batch_event(x_dist, condition_shape).shape[0] > 1
+            ):
+                raise NotImplementedError(
+                    f"`{name}` is a `VectorFieldPosterior` conditioned on iid `x`, "
+                    "whose `log_prob()` is unnormalized. Use a sample-based metric "
+                    "such as `sbi.utils.metrics.c2st` instead."
+                )
         if isinstance(dist, Distribution) and dist.batch_shape:
             raise ValueError(
                 f"`{name}` has batch shape {tuple(dist.batch_shape)}. Wrap it in "
@@ -72,6 +89,11 @@ def kl_divergence_mc(
             )
 
     if p_samples is None:
+        if isinstance(p, VectorFieldPosterior) and p.sample_with == "sde":
+            raise ValueError(
+                "`p` samples with the SDE, but its `log_prob()` is the ODE density. "
+                "Build it with `sample_with='ode'`, or pass `p_samples`."
+            )
         p_samples = (
             p.sample((num_samples,))
             if isinstance(p, Distribution)
