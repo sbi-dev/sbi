@@ -41,7 +41,7 @@ def get_posterior_samples_on_batch(
 
     if use_batched_sampling:
         try:
-            # has shape (num_samples, num_xs, dim_parameters)
+            # Has shape (*sample_shape, num_xs, dim_parameters).
             posterior_samples = posterior.sample_batched(
                 sample_shape, x=xs, show_progress_bars=show_progress_bar
             )
@@ -84,17 +84,14 @@ def get_posterior_samples_on_batch(
                 total=len(xs),
                 desc=f"Sampling {num_xs} times {sample_shape} posterior samples.",
             )
-        )  # (batch_size, num_samples, dim_parameters)
-        # Transpose to shape convention: (sample_shape, batch_size, dim_parameters)
-        posterior_samples = torch.stack(
-            outputs  # type: ignore
-        ).permute(1, 0, 2)
+        )  # (batch_size, *sample_shape, dim_parameters)
+        posterior_samples = torch.stack(outputs, dim=len(sample_shape))
 
-    assert posterior_samples.shape[:2] == sample_shape + (
-        num_xs,
-    ), f"""Expected batched posterior samples of shape {sample_shape + (num_xs,)} got {
-        posterior_samples.shape[:2]
-    }."""
+    expected_shape = sample_shape + (num_xs,)
+    assert posterior_samples.shape[: len(expected_shape)] == expected_shape, (
+        f"Expected batched posterior samples of shape {expected_shape}, got "
+        f"{posterior_samples.shape}."
+    )
     return posterior_samples
 
 

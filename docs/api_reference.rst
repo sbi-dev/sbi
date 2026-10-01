@@ -39,10 +39,6 @@ Prior and simulator
 Neural nets
 -----------
 
-Use the per-model configs listed in :doc:`api_reference/neural_nets` to select
-and configure an estimator. The following factory functions remain available
-for backwards compatibility.
-
 .. autosummary::
    :nosignatures:
 

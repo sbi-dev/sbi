@@ -65,6 +65,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         mean_0: float = 0.0,
         std_0: float = 1.0,
         gaussian_baseline: bool = False,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
         **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
@@ -83,6 +85,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             gaussian_baseline: If True, use analytical Gaussian baseline velocity
                 derived from Bayes' rule: v = factor * (x - μ_true) - mean.
                 The network then only learns the residual. Default: False.
+            compose_shift: Shift of the boundary affine, given together with
+                `compose_scale`.
+            compose_scale: Scale of the boundary affine, given together with
+                `compose_shift`.
         """
 
         if "num_freqs" in kwargs:
@@ -99,6 +105,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             input_shape=input_shape,
             condition_shape=condition_shape,
             embedding_net=embedding_net,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
         self.noise_scale = noise_scale
         self.gaussian_baseline = gaussian_baseline
@@ -108,6 +116,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         std_0_tensor = torch.as_tensor(std_0).expand(input_shape).clone()
         self.register_buffer("mean_0", mean_0_tensor)
         self.register_buffer("std_0", std_0_tensor)
+        self._check_compose_internal_stats_unit()
+        self._check_compose_baseline_compatible()
 
     def _check_compose_baseline_compatible(self) -> None:
         """Reject incompatible analytical and composed standardization baselines."""

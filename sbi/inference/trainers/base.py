@@ -78,7 +78,12 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
-from sbi.utils.sbiutils import ImproperEmpirical, get_simulations_since_round
+from sbi.utils.sbiutils import (
+    ImproperEmpirical,
+    get_simulations_since_round,
+    load_with_version,
+    save_with_version,
+)
 from sbi.utils.simulation_utils import simulate_for_sbi
 from sbi.utils.torchutils import (
     check_if_prior_on_device,
@@ -91,6 +96,7 @@ from sbi.utils.user_input_checks import (
     process_prior,
     process_simulator,
 )
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 _SBI_ROOT = str(Path(__file__).parents[2]) + os.sep
 
@@ -315,6 +321,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         self._summary = dict(
             epochs_trained=[],
             best_validation_loss=[],
+            converged=[],
             validation_loss=[],
             training_loss=[],
             epoch_durations_sec=[],
@@ -322,6 +329,12 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
     @property
     def summary(self):
+        """Training statistics, keyed by name.
+
+        `converged` holds one entry per `train()` call: True if validation loss
+        stopped improving, False if `max_num_epochs` ran out first, and None for calls
+        made by an sbi version that did not record it.
+        """
         return self._summary
 
     @classmethod
@@ -1128,11 +1141,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             elif self._best_model_state_dict is not None:
                 self._neural_net.load_state_dict(self._best_model_state_dict)
 
-        self._report_convergence_at_end(self.epoch, train_config.max_num_epochs)
+        converged = self._report_convergence_at_end(
+            self.epoch, train_config.max_num_epochs
+        )
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
         self._summary["best_validation_loss"].append(self._best_val_loss)
+        self._summary["converged"].append(converged)
 
         # Update TensorBoard and summary dict.
         self._summarize(round_=self._round)
@@ -1292,16 +1308,20 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         )
         return TensorBoardTracker(SummaryWriter(logdir))
 
-    def _report_convergence_at_end(self, epoch: int, max_num_epochs: int) -> None:
+    def _report_convergence_at_end(self, epoch: int, max_num_epochs: int) -> bool:
         """Report why the training loop stopped.
 
         Args:
             epoch: Epoch counter as the training loop left it.
             max_num_epochs: The epoch budget the loop was given.
+
+        Returns:
+            True if validation loss stopped improving, False if the budget ran out.
         """
         # Not `_converged()`: it advances the counter it reads, so a second call can
         # flip its own verdict.
-        if epoch <= max_num_epochs:
+        converged = epoch <= max_num_epochs
+        if converged:
             print(
                 "\r",
                 f"Neural network successfully converged after {epoch} epochs.",
@@ -1313,6 +1333,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
                 "but network has not yet fully converged. Consider increasing it.",
                 stacklevel=_stacklevel_to_caller(),
             )
+        return converged
 
     def _summarize(
         self,
@@ -1408,6 +1429,43 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             # to #330.
             print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
 
+    def save(self, filename: Union[str, Path]) -> None:
+        """Save the inference object to a file. Load it with `load()`.
+
+        Args:
+            filename: Path to the file.
+        """
+        save_with_version(self, filename)
+
+    @classmethod
+    def load(
+        cls,
+        filename: Union[str, Path],
+        map_location: Optional[Union[str, torch.device]] = None,
+    ) -> Self:
+        """Load an inference object saved with `save()`.
+
+        The file is unpickled, which can execute arbitrary code. Only load trusted
+        files.
+
+        Args:
+            filename: Path to the file.
+            map_location: Device to load the inference object on, e.g. `"cpu"` for
+                an object saved on a GPU. By default, the device it was saved on.
+
+        Returns:
+            The loaded inference object.
+        """
+        inference = load_with_version(filename, cls, map_location)
+        # `map_location` moves the tensors, but not the device string and the prior.
+        if map_location is not None:
+            inference._device = str(torch.device(map_location))
+            if inference._prior is not None:
+                inference._prior = move_distribution_to_device(
+                    inference._prior, inference._device
+                )
+        return inference
+
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.
 
@@ -1443,10 +1501,16 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             state_dict: State to be restored.
         """
         state_dict["_tracker"] = self._default_tracker()
+        # Objects saved before `converged` was recorded carry no such entry, and the
+        # outcome of their earlier `train()` calls is unknown.
+        summary = state_dict["_summary"]
+        summary.setdefault("converged", [None] * len(summary["epochs_trained"]))
         vars(self).update(state_dict)
 
 
-def check_if_proposal_has_default_x(proposal: Any):
+def check_if_proposal_has_default_x(
+    proposal: Union[Distribution, NeuralPosterior],
+) -> None:
     """Check for validity of the provided proposal distribution.
 
     If the proposal is a `NeuralPosterior`, we check if the default_x is set and

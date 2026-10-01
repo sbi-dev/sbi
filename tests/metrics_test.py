@@ -240,6 +240,21 @@ def test_distance_basic_functionality():
     assert wasserstein_distance(xo_stat, x_stat).min() >= 0
 
 
+def test_l1_matches_manhattan_distance_definition():
+    """l1 sums absolute differences over the last axis."""
+    y = torch.zeros(10)
+    y[0] = 1.0
+    assert torch.allclose(l1(torch.zeros(10), y), torch.tensor(1.0))
+
+    # Differing coordinates add up instead of averaging out.
+    y[1] = 2.0
+    assert torch.allclose(l1(torch.zeros(10), y), torch.tensor(3.0))
+
+    # Padding both inputs with identical coordinates leaves the distance alone.
+    y_wide = torch.cat([y, torch.zeros(10)])
+    assert torch.allclose(l1(torch.zeros(20), y_wide), torch.tensor(3.0))
+
+
 def test_distance_output_shapes():
     """Test that distance functions return correct output shapes."""
     # Test pairwise distances

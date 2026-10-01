@@ -115,6 +115,7 @@ network architecture.
    sbi.neural_nets.VEScoreConfig
    sbi.neural_nets.VPScoreConfig
    sbi.neural_nets.SubVPScoreConfig
+   sbi.neural_nets.VectorFieldNetConfigBase
    sbi.neural_nets.MLPConfig
    sbi.neural_nets.AdaMLPConfig
    sbi.neural_nets.TransformerConfig
@@ -123,9 +124,13 @@ network architecture.
 Factory functions
 -----------------
 
-The factory functions predate the config classes and are kept for backwards
-compatibility. They take the model name as a string and return a build
-function.
+The factory functions predate the config classes and remain available for
+compatibility. They return build functions. Most select a model by its string
+name; ``marginal_nn`` takes a ``ZukoFlowType`` from
+``sbi.neural_nets.factory``. The vector-field factories also accept a custom
+``VectorFieldNet`` from ``sbi.utils.vector_field_utils``.
+
+Passing a model string directly to a trainer emits a ``FutureWarning``.
 
 .. autosummary::
    :toctree: _autosummary
