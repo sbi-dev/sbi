@@ -3,11 +3,8 @@
 Tutorials
 =========
 
-Before running the notebooks, follow our instructions to
-:doc:`install sbi <installation>`.
-Alternatively, you can also open a `codespace on
-GitHub <https://codespaces.new/sbi-dev/sbi>`_ and work through the tutorials in
-the browser.
+The tutorials are Jupyter notebooks. To run them on your own machine, first
+follow our instructions to :doc:`install sbi <installation>`.
 
 Once you have familiarised yourself with the methods and identified how to apply
 ``sbi`` to your use case, you can check out our
