@@ -628,24 +628,10 @@ class Distance:
             x_o: Reference data
             x: Simulated data
         """
-        from tqdm import tqdm
-
-        num_batches = x.shape[0] // self.batch_size - 1
-        remaining = x.shape[0] % self.batch_size
-        if remaining == 0:
-            remaining = self.batch_size
-
-        distances = torch.empty(x.shape[0])
-        for i in tqdm(range(num_batches)):
-            distances[self.batch_size * i : (i + 1) * self.batch_size] = (
-                self.distance_fn(
-                    x_o, x[self.batch_size * i : (i + 1) * self.batch_size]
-                )
-            )
-        if remaining > 0:
-            distances[-remaining:] = self.distance_fn(x_o, x[-remaining:])
-
-        return distances
+        return torch.cat([
+            self.distance_fn(x_o, x_batch).reshape(x_batch.shape[0])
+            for x_batch in x.split(self.batch_size)
+        ])
 
     @property
     def requires_iid_data(self):
