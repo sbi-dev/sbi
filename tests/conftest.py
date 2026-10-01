@@ -111,7 +111,8 @@ def pytest_addoption(parser):
 @pytest.fixture
 def benchmark_mode(request):
     """Fixture to access the --bm value in test files."""
-    return request.config.getoption("--bm-mode")
+    mode = request.config.getoption("--bm-mode")
+    return None if mode is None else str(mode).lower()
 
 
 @pytest.fixture

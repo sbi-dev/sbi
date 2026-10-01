@@ -41,19 +41,6 @@ METHOD_GROUPS = {
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
 }
-METHOD_GROUP_IDS = {
-    "none": ["NPE", "NPE_PFN", "NRE", "NLE", "FMPE", "NPSE"],
-    "npe": ["NPE"],
-    "npe_pfn": ["NPE_PFN"],
-    "nle": ["NLE"],
-    "nre": ["NRE_A", "NRE_B", "NRE_C", "BNRE"],
-    "fmpe": ["FMPE"],
-    "npse": ["NPSE"],
-    "vfpe": ["FMPE", "NPSE"],
-    "snpe": ["NPE_C"],
-    "snle": ["NLE"],
-    "snre": ["NRE_A", "NRE_B", "NRE_C", "BNRE"],
-}
 METHOD_PARAMS = {
     "none": [{}],
     "npe": [{"density_estimator": de} for de in DENSITY_ESTIMATORS],
@@ -135,40 +122,6 @@ def _kwargs_id(parameters: dict) -> str:
     return "-".join(str(value) for value in parameters.values()) or "default"
 
 
-@pytest.fixture
-def method_list(benchmark_mode: str) -> list:
-    """
-    Fixture to get the list of methods based on the benchmark mode.
-
-    Args:
-        benchmark_mode (str): The benchmark mode.
-
-    Returns:
-        list: List of methods for the given benchmark mode.
-    """
-    name = str(benchmark_mode).lower()
-    if name not in METHOD_GROUPS:
-        raise ValueError(f"Benchmark mode '{benchmark_mode}' is not supported.")
-    return METHOD_GROUPS[name]
-
-
-@pytest.fixture
-def kwargs_list(benchmark_mode: str) -> list:
-    """
-    Fixture to get the list of kwargs based on the benchmark mode.
-
-    Args:
-        benchmark_mode (str): The benchmark mode.
-
-    Returns:
-        list: List of kwargs for the given benchmark mode.
-    """
-    name = str(benchmark_mode).lower()
-    if name not in METHOD_PARAMS:
-        raise ValueError(f"Benchmark mode '{benchmark_mode}' is not supported.")
-    return METHOD_PARAMS[name]
-
-
 # Use pytest.mark.parametrize dynamically
 # Generates a list of methods to test based on the benchmark mode
 def pytest_generate_tests(metafunc):
@@ -183,9 +136,7 @@ def pytest_generate_tests(metafunc):
 
     mode = _benchmark_mode(metafunc.config)
     if "inference_class" in metafunc.fixturenames:
-        metafunc.parametrize(
-            "inference_class", METHOD_GROUPS[mode], ids=METHOD_GROUP_IDS[mode]
-        )
+        metafunc.parametrize("inference_class", METHOD_GROUPS[mode])
     if "extra_kwargs" in metafunc.fixturenames:
         kwargs_group = _benchmark_kwargs(metafunc.config, mode)
         metafunc.parametrize(
