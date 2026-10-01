@@ -16,7 +16,8 @@ class PermutationInvariantEmbedding(nn.Module):
     and outputs (batch, output_dim).
 
     The class attribute ``accepts_nan_input = True`` marks NaN input as padding
-    by design; sbi derives NaN-tolerant `x_o` validation from it.
+    by design; sbi derives NaN-tolerant `x_o` validation from it and checks the
+    padding with `validate_nan_input`.
 
     References:
     Chan et al. (2018): "A likelihood-free inference framework for population genetic
@@ -81,6 +82,35 @@ class PermutationInvariantEmbedding(nn.Module):
             num_layers=num_layers,
             num_hiddens=num_hiddens,
         )
+
+    def _nan_padding_issue(self, x: Tensor) -> Optional[str]:
+        """Describe NaN in `x` that is not padding of whole trials, else None."""
+        is_nan = torch.isnan(x)
+        is_padded_trial = is_nan.all(-1)
+        if (is_nan.any(-1) & ~is_padded_trial).any():
+            return (
+                "Some trials have NaN in only some of their features. The embedding "
+                "sets these NaN to 0."
+            )
+        if is_padded_trial.all(dim=self.aggregation_dim).any():
+            return (
+                "Some observations have only padded trials. The embedding treats "
+                "them as observations with zero trials."
+            )
+        return None
+
+    def validate_nan_input(self, x: Tensor) -> None:
+        """Raise unless NaN in `x` only marks padded trials.
+
+        A padded trial has all features NaN, and each observation needs at least
+        one real trial.
+        """
+        issue = self._nan_padding_issue(x)
+        if issue is not None:
+            raise ValueError(
+                f"{issue} NaN may only mark padded trials, with all features NaN, "
+                "and each observation needs at least one real trial."
+            )
 
     def forward(self, x: Tensor) -> Tensor:
         """Network forward pass.

@@ -400,6 +400,27 @@ def test_inf_x_rejected_despite_nan_tolerance(trained_nan_tolerant_npe):
         posterior.set_default_x(x_inf)
 
 
+@pytest.mark.parametrize("pattern", ("partially_nan_trial", "no_real_trial"))
+@pytest.mark.parametrize("use_ensemble", (False, True))
+def test_nan_tolerant_posterior_rejects_invalid_padding(
+    pattern, use_ensemble, trained_nan_tolerant_npe
+):
+    """NaN may only mark whole padded trials, with at least one real trial."""
+    _, inference, x_nan = trained_nan_tolerant_npe
+    posterior = inference.build_posterior()
+    if use_ensemble:
+        posterior = EnsemblePosterior([posterior, inference.build_posterior()])
+    posterior.set_default_x(x_nan)
+
+    x_invalid = x_nan.clone()
+    if pattern == "partially_nan_trial":
+        x_invalid[0, 0, 0] = float("nan")
+    else:
+        x_invalid[0, 0] = float("nan")
+    with pytest.raises(ValueError, match="NaN may only mark padded trials"):
+        posterior.set_default_x(x_invalid)
+
+
 def test_ensemble_derives_nan_tolerance_from_components(trained_nan_tolerant_npe):
     """An ensemble tolerates NaN iff every component does (strict-if-any-strict)."""
     prior, inference, x_nan = trained_nan_tolerant_npe

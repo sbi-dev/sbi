@@ -94,22 +94,18 @@ class NeuralPosterior:
         # as default x.
         x_o = self.potential_fn.return_x_o()
         if x_o is not None:
-            assert_all_finite(
-                x_o, "Observed data x_o", allow_nan=self._x_tolerates_nan()
-            )
+            self._assert_finite_x(x_o)
         self._x = x_o
 
-    def _x_tolerates_nan(self) -> bool:
-        """Return whether NaN in `x_o` is consumed by design, derived at check
-        time from the net that embeds `x` (e.g., a NaN-padding-aware
-        `PermutationInvariantEmbedding`)."""
-        return nan_tolerant_input_net(self.potential_fn.x_embedding_net) is not None
-
     def _assert_finite_x(self, x: Tensor) -> None:
-        """Raise if `x` contains Inf, or NaN unless the estimator tolerates it."""
-        assert_all_finite(
-            torch.as_tensor(x), "Observed data x_o", allow_nan=self._x_tolerates_nan()
-        )
+        """Raise if `x` contains Inf, or NaN that the net embedding `x` does not
+        accept (e.g., a NaN-padding-aware `PermutationInvariantEmbedding`)."""
+        x = torch.as_tensor(x)
+        net = nan_tolerant_input_net(self.potential_fn.x_embedding_net)
+        assert_all_finite(x, "Observed data x_o", allow_nan=net is not None)
+        validate_nan_input = getattr(net, "validate_nan_input", None)
+        if validate_nan_input is not None and torch.isnan(x).any():
+            validate_nan_input(x)
 
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
@@ -213,7 +209,7 @@ class NeuralPosterior:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
         x = process_x(x, x_event_shape=None)
-        assert_all_finite(x, "Observed data x_o", allow_nan=self._x_tolerates_nan())
+        self._assert_finite_x(x)
 
         self._x = x.to(self._device)
         self._map = None
@@ -224,7 +220,7 @@ class NeuralPosterior:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
             x = process_x(x, x_event_shape=None)
-            assert_all_finite(x, "Observed data x_o", allow_nan=self._x_tolerates_nan())
+            self._assert_finite_x(x)
 
             return x
         elif self.default_x is None:
