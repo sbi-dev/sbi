@@ -3,7 +3,7 @@
 
 import math
 import warnings
-from typing import Dict, Literal, Optional, Union
+from typing import Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -111,7 +111,7 @@ class VectorFieldPosterior(NeuralPosterior):
             "sde",
         ], f"sample_with must be 'ode' or 'sde', but is {self.sample_with}."
         self.max_sampling_batch_size = max_sampling_batch_size
-        self._leakage_density_correction_factor = None
+        self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
 
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
@@ -153,6 +153,7 @@ class VectorFieldPosterior(NeuralPosterior):
             self.set_default_x(x_o)
 
         self.potential_fn: VectorFieldBasedPotential = potential_fn
+        self._leakage_cache = None
 
     def sample(
         self,
@@ -538,14 +539,13 @@ class VectorFieldPosterior(NeuralPosterior):
         r"""Return the probability mass of the ODE density inside the prior support.
 
         The mass is the fraction of probability flow ODE samples inside the prior
-        support. It is 1 for unbounded priors. It is estimated once for
-        `self.default_x` and saved; any other `x`, or any call with `ode_kwargs`, is
-        estimated on every call.
+        support. It is 1 for unbounded priors. The factor is saved for the last `x`
+        and re-estimated whenever `x` changes, or for any call with `ode_kwargs`.
 
         Args:
             x: A single observation.
             num_rejection_samples: Number of ODE samples used to estimate the factor.
-            force_update: Whether to re-estimate the saved factor at `default_x`.
+            force_update: Whether to re-estimate the factor even if it is saved.
             ode_kwargs: Additional keyword arguments for the ODE solver. Must match
                 the ones used for the density that is corrected.
 
@@ -577,15 +577,17 @@ class VectorFieldPosterior(NeuralPosterior):
                 )
             return mass
 
-        is_new_x = self.default_x is None or (
-            x is not self.default_x
-            and (x.to(self.default_x.device) != self.default_x).any()
-        )
-        if is_new_x or ode_kwargs:
-            return acceptance()
-        if self._leakage_density_correction_factor is None or force_update:
-            self._leakage_density_correction_factor = acceptance()
-        return self._leakage_density_correction_factor
+        cache = getattr(self, "_leakage_cache", None)  # Missing in older pickles.
+        if cache is not None and not (force_update or ode_kwargs):
+            cached_x, factor = cache
+            if cached_x.shape == x.shape and torch.equal(
+                cached_x, x.to(cached_x.device)
+            ):
+                return factor
+        factor = acceptance()
+        if not ode_kwargs:
+            self._leakage_cache = (x.detach().clone(), factor)
+        return factor
 
     def sample_batched(
         self,

@@ -38,8 +38,8 @@ def test_log_prob_is_normalized_inside_bounded_prior(estimator_type):
 
 
 def test_leakage_correction_caching(monkeypatch):
-    """The factor is cached at the default `x` only, and samples at the given `x`
-    with the given `ode_kwargs`."""
+    """The factor is saved for the last `x` only, and samples at the given `x` with
+    the given `ode_kwargs`."""
     prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
     posterior = _posterior("flow", prior)
     calls = []
@@ -54,22 +54,27 @@ def test_leakage_correction_caching(monkeypatch):
     )
     theta = torch.ones(1, 2)
     params = {"num_rejection_samples": 100}
+    x_a, x_b = torch.zeros(1, 2), torch.ones(1, 2)
 
-    posterior.set_default_x(torch.zeros(1, 2))
-    posterior.log_prob(theta, leakage_correction_params=params)
-    num_calls = len(calls)
-    posterior.log_prob(theta, leakage_correction_params=params)
-    assert len(calls) == num_calls, "The factor at the default x must be cached."
+    def estimates(**kwargs) -> int:
+        num_calls = len(calls)
+        posterior.log_prob(theta, leakage_correction_params=params, **kwargs)
+        return len(calls) - num_calls
 
-    posterior.set_default_x(torch.ones(1, 2))
-    posterior.log_prob(theta, leakage_correction_params=params)
-    assert len(calls) > num_calls
+    assert estimates(x=x_a) > 0
+    assert estimates(x=x_a.clone()) == 0, "The factor for the last x must be saved."
+    assert estimates(x=x_b) > 0, "A different x must never reuse the saved factor."
+    assert torch.equal(calls[-1][1], x_b)
+    assert estimates(x=x_a) > 0
 
-    num_calls = len(calls)
+    posterior.set_default_x(x_b)
+    assert estimates() > 0
+    assert estimates() == 0
+
     ode_kwargs = {"atol": 1e-4, "rtol": 1e-4}
-    posterior.log_prob(theta, ode_kwargs=ode_kwargs, leakage_correction_params=params)
-    assert len(calls) > num_calls and calls[-1][0] == ode_kwargs
+    assert estimates(ode_kwargs=ode_kwargs) > 0 and calls[-1][0] == ode_kwargs
+    assert estimates() == 0, "A call with `ode_kwargs` must not replace the saved one."
 
-    posterior.log_prob(theta, x=2 * torch.ones(1, 2), leakage_correction_params=params)
+    posterior.log_prob(theta, x=2 * x_b, leakage_correction_params=params)
     posterior.leakage_correction(posterior.default_x, force_update=True, **params)
     assert torch.equal(calls[-1][1], posterior.default_x)
