@@ -5,7 +5,7 @@ import warnings
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 from zuko.distributions import NormalizingFlow
 
@@ -44,7 +44,8 @@ class VectorFieldBasedPotential(BasePotential):
         the vector field estimator does not define the score (SCORE_DEFINED = False),
         the gradient is not available and an error is raised.
 
-        Note that the potential function is not defined for the iid setting yet.
+        For iid observations, the potential is unnormalized: it combines the
+        single-observation posteriors as $p(\theta)^{1-n} \prod_i p(\theta|x_i)$.
 
         Args:
             vector_field_estimator: The neural network modelling the vector field.
@@ -84,6 +85,11 @@ class VectorFieldBasedPotential(BasePotential):
         self._x_is_iid = False
         if self._x_o is not None:
             self.flow = self.rebuild_flow()
+
+    @property
+    def x_embedding_net(self) -> nn.Module:
+        """Return the net embedding `x`: the estimator's condition is `x`."""
+        return self.vector_field_estimator.embedding_net
 
     def to(self, device: Union[str, torch.device]) -> None:
         """

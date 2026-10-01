@@ -4,7 +4,7 @@
 from typing import Optional, Union
 
 import torch
-from torch import Tensor, log
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -12,14 +12,6 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
 from sbi.neural_nets.estimators.mog import MoG
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_batch_event,
-    reshape_to_sample_batch_event,
-)
-from sbi.samplers.rejection import rejection
-from sbi.sbi_types import Shape
-from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
-from sbi.utils.torchutils import ensure_theta_batched
 
 
 class NPE_A_Posterior(DirectPosterior):
@@ -44,6 +36,9 @@ class NPE_A_Posterior(DirectPosterior):
         for the correction to be valid. The NPE_A trainer handles this
         transformation automatically via ``_compute_z_scored_prior_mog()``.
     """
+
+    # NPE-A does not support `sample_with='mcmc'`.
+    _alternative_sampling_method = "using fewer samples or increasing max_sampling_time"
 
     def __init__(
         self,
@@ -120,220 +115,34 @@ class NPE_A_Posterior(DirectPosterior):
         assert self._proposal_mog is not None
         return _correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
 
-    def _corrected_sample(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
+    def _sample_estimator(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
         """Sample from the corrected MoG distribution.
 
         Args:
             sample_shape: Shape of samples to draw.
-            **kwargs: Must contain 'condition' key with conditioning observation
-                with batch_size == 1.
+            **kwargs: Must contain 'condition' key with conditioning observations,
+                shape (batch_dim, *condition_shape).
 
         Returns:
             Samples from corrected distribution, shape (*sample_shape, batch, dim).
-
-        Raises:
-            ValueError: If condition batch size is not 1.
         """
-        condition = kwargs["condition"]
-        if condition.shape[0] != 1:
-            raise ValueError(
-                f"_corrected_sample only supports batch_size=1, "
-                f"got {condition.shape[0]}"
-            )
-        corrected_mog = self._get_corrected_mog(condition)
+        corrected_mog = self._get_corrected_mog(kwargs["condition"])
         samples = corrected_mog.sample(sample_shape)
+        return self.posterior_estimator._inverse_transform_input(samples)
 
-        # Undo z-score transform if applied
-        if self.posterior_estimator.has_input_transform:
-            samples = self.posterior_estimator._inverse_transform_input(samples)
-
-        return samples
-
-    def _corrected_log_prob(self, theta: Tensor, condition: Tensor) -> Tensor:
+    def _log_prob_estimator(self, theta: Tensor, condition: Tensor) -> Tensor:
         """Compute log probability under the corrected MoG.
 
         Args:
             theta: Parameters to evaluate, shape (sample_dim, batch_dim, dim).
-            condition: Conditioning observation.
+            condition: Conditioning observations, shape (batch_dim, *condition_shape).
 
         Returns:
             Log probabilities, shape (sample_dim, batch_dim).
         """
         corrected_mog = self._get_corrected_mog(condition)
-
-        # Apply z-score transform if needed
-        if self.posterior_estimator.has_input_transform:
-            theta_transformed = self.posterior_estimator._transform_input(theta)
-        else:
-            theta_transformed = theta
-
+        theta_transformed = self.posterior_estimator._transform_input(theta)
         log_probs = corrected_mog.log_prob(theta_transformed)
-
-        # Add log det jacobian for z-score transform
-        log_probs = log_probs + self.posterior_estimator._log_det_jacobian_forward(
+        return log_probs + self.posterior_estimator._log_det_jacobian_forward(
             theta, theta_transformed
         )
-
-        return log_probs
-
-    def sample(
-        self,
-        sample_shape: Shape = torch.Size(),
-        x: Optional[Tensor] = None,
-        max_sampling_batch_size: int = 10_000,
-        show_progress_bars: bool = True,
-        reject_outside_prior: bool = True,
-        max_sampling_time: Optional[float] = None,
-    ) -> Tensor:
-        r"""Draw samples from the posterior distribution $p(\theta|x)$.
-
-        Args:
-            sample_shape: Shape of samples to draw.
-            x: Conditioning observation. Uses default_x if not provided.
-            max_sampling_batch_size: Batch size for rejection sampling.
-            show_progress_bars: Whether to show progress during sampling.
-            reject_outside_prior: If True, reject samples outside prior support.
-            max_sampling_time: Maximum time for sampling in seconds.
-
-        Returns:
-            Samples of shape (*sample_shape, dim).
-        """
-        num_samples = torch.Size(sample_shape).numel()
-        x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(
-            x, event_shape=self.posterior_estimator.condition_shape
-        )
-        assert x is not None  # For type checker
-        if x.shape[0] > 1:
-            raise ValueError(
-                ".sample() supports only `batchsize == 1`. If you intend "
-                "to sample multiple observations, use `.sample_batched()`. "
-            )
-
-        max_sampling_batch_size = (
-            self.max_sampling_batch_size
-            if max_sampling_batch_size is None
-            else max_sampling_batch_size
-        )
-
-        if reject_outside_prior:
-            samples = rejection.accept_reject_sample(
-                proposal=self._corrected_sample,
-                accept_reject_fn=lambda theta: within_support(self.prior, theta),
-                num_samples=num_samples,
-                show_progress_bars=show_progress_bars,
-                max_sampling_batch_size=max_sampling_batch_size,
-                proposal_sampling_kwargs={"condition": x},
-                alternative_method=(
-                    "using fewer samples or increasing max_sampling_time"
-                ),
-                max_sampling_time=max_sampling_time,
-            )[0]
-        else:
-            samples = self._corrected_sample(torch.Size([num_samples]), condition=x)
-            warn_if_outside_prior_support(self.prior, samples[:, 0])
-
-        return samples[:, 0]  # Remove batch dimension.
-
-    def log_prob(
-        self,
-        theta: Tensor,
-        x: Optional[Tensor] = None,
-        norm_posterior: bool = True,
-        track_gradients: bool = False,
-        leakage_correction_params: Optional[dict] = None,
-    ) -> Tensor:
-        r"""Returns the log-probability of the posterior $p(\theta|x)$.
-
-        Args:
-            theta: Parameters to evaluate.
-            x: Conditioning observation. Uses default_x if not provided.
-            norm_posterior: Whether to normalize for leakage correction.
-            track_gradients: Whether to track gradients.
-            leakage_correction_params: Parameters for leakage correction.
-
-        Returns:
-            Log probabilities for each theta value.
-        """
-        x = self._x_else_default_x(x)
-
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-        theta_density_estimator = reshape_to_sample_batch_event(
-            theta, theta.shape[1:], leading_is_sample=True
-        )
-        x_density_estimator = reshape_to_batch_event(
-            x, event_shape=self.posterior_estimator.condition_shape
-        )
-        if x_density_estimator.shape[0] > 1:
-            raise ValueError(
-                ".log_prob() supports only `batchsize == 1`. If you intend "
-                "to evaluate given multiple observations, use `.log_prob_batched()`."
-            )
-
-        self.posterior_estimator.eval()
-
-        with torch.set_grad_enabled(track_gradients):
-            unnorm_log_prob = self._corrected_log_prob(
-                theta_density_estimator, x_density_estimator
-            )
-            unnorm_log_prob = unnorm_log_prob.squeeze(dim=1)
-
-            # Mask outside prior support
-            in_prior_support = within_support(self.prior, theta)
-            masked_log_prob = torch.where(
-                in_prior_support,
-                unnorm_log_prob,
-                torch.tensor(float("-inf"), dtype=torch.float32, device=self._device),
-            )
-
-            if leakage_correction_params is None:
-                leakage_correction_params = dict()
-            log_factor = (
-                log(self.leakage_correction(x=x, **leakage_correction_params))
-                if norm_posterior
-                else 0
-            )
-
-            return masked_log_prob - log_factor
-
-    @torch.no_grad()
-    def leakage_correction(
-        self,
-        x: Tensor,
-        num_rejection_samples: int = 10_000,
-        force_update: bool = False,
-        show_progress_bars: bool = False,
-        rejection_sampling_batch_size: int = 10_000,
-    ) -> Tensor:
-        """Return leakage correction factor for posterior density estimate.
-
-        Overrides parent to use corrected sampling.
-        """
-
-        def acceptance_at(x: Tensor) -> Tensor:
-            return rejection.accept_reject_sample(
-                proposal=self._corrected_sample,
-                accept_reject_fn=lambda theta: within_support(self.prior, theta),
-                num_samples=num_rejection_samples,
-                show_progress_bars=show_progress_bars,
-                sample_for_correction_factor=True,
-                max_sampling_batch_size=rejection_sampling_batch_size,
-                proposal_sampling_kwargs={
-                    "condition": reshape_to_batch_event(
-                        x, event_shape=self.posterior_estimator.condition_shape
-                    )
-                },
-            )[1]
-
-        is_new_x = self.default_x is None or (
-            x is not self.default_x and (x != self.default_x).any()
-        )
-        not_saved_at_default_x = self._leakage_density_correction_factor is None
-
-        if is_new_x:
-            return acceptance_at(x)
-        elif not_saved_at_default_x or force_update:
-            assert self.default_x is not None
-            self._leakage_density_correction_factor = acceptance_at(self.default_x)
-
-        return self._leakage_density_correction_factor

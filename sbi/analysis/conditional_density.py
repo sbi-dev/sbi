@@ -19,7 +19,6 @@ from sbi.utils.conditional_density_utils import (
     RestrictedPriorForConditional,
     RestrictedTransformForConditional,
     compute_corrcoeff,
-    condition_mog,
     extract_and_transform_mog,
 )
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
@@ -209,18 +208,13 @@ class ConditionedMDN:
         condition = atleast_2d_float32_tensor(condition)
 
         logits, means, precfs, _ = extract_and_transform_mog(estimator=mdn, context=x_o)
-        cond_logits, cond_means, cond_precfs, _ = condition_mog(
-            condition, dims_to_sample, logits, means, precfs
+        mog = MoG(
+            logits=logits,
+            means=means,
+            precisions=precfs.transpose(3, 2) @ precfs,
+            precision_factors=precfs,
         )
-        cond_prec = cond_precfs.transpose(3, 2) @ cond_precfs
-
-        # Store the conditioned MoG for sampling and evaluation
-        self._mog = MoG(
-            logits=cond_logits,
-            means=cond_means,
-            precisions=cond_prec,
-            precision_factors=cond_precfs,
-        )
+        self._mog = mog.condition(condition, dims_to_sample)
 
     def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
         """Sample from the conditioned MoG.

@@ -11,6 +11,7 @@ import torch
 from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import (
+    Distance,
     biased_mmd_hypothesis_test,
     c2st,
     l1,
@@ -272,3 +273,17 @@ def test_distance_output_shapes():
 
     assert mmd_distance(xo_stat, x_stat).shape == (batch_size,)
     assert wasserstein_distance(xo_stat, x_stat).shape == (batch_size,)
+
+
+@pytest.mark.parametrize("distance, x_o_shape", [("l2", (3,)), ("mmd", (4, 3))])
+@pytest.mark.parametrize("batch_size", [2, 3, 5, 12])
+def test_batched_distance_matches_unbatched(distance, x_o_shape, batch_size):
+    """Test that batching gives the same distances for every batch size."""
+    torch.manual_seed(0)
+    x_o = torch.randn(x_o_shape)
+    x = torch.randn(10, *x_o_shape)
+
+    expected = Distance(distance)(x_o, x)
+    actual = Distance(distance, batch_size=batch_size)(x_o, x)
+
+    assert torch.allclose(actual, expected)

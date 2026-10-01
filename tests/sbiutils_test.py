@@ -563,7 +563,7 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
 def test_transform_to_unconstrained_raises_for_unsupported_builders(builder_name):
     """nflows and ratio-classifier builders raise a clear error for
     `transform_to_unconstrained` instead of silently building a model without the
-    reparametrization. MDN now supports it and is excluded."""
+    reparametrization. MDN supports it and is excluded."""
     from sbi.neural_nets.net_builders import flow as flow_builders
     from sbi.neural_nets.net_builders.classifier import (
         build_linear_classifier,

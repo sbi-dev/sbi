@@ -262,16 +262,34 @@ What if you are currently working on a specific method and you want to run the
 mini-sbibm tests only for this class of methods? You can use the `--bm-mode` flag:
 
 ```bash
-pytest --bm --bm-mode nspe
+pytest --bm --bm-mode npse
 ```
 
-This will run the mini-sbibm tests only for methods of the `nspe` class, but with a
+This will run the mini-sbibm tests only for methods of the `npse` class, but with a
 few major hyperparameter choices, such as different base network architectures and
 different diffusion processes.
 
 The currently available modes are: `"npe"`, `"nle"`, `"nre"`, `"fmpe"`, `"npse"`,
-`"snpe"`, `"snle"`, and `"snre"`. If you require another mode, you can add it to the
-test suite in `tests/test_bm.py`.
+`"snpe"`, `"snle"`, `"snre"`, and `"mnle"`. If you require another mode, you can add
+it to the test suite in `tests/bm_test.py`.
+
+Use `--bm-estimators` to replace the selected mode's default estimators with a
+comma-separated list. For example, the following command collects the NPE cases for
+the `nsf` and `maf` density estimators on the `two_moons` task:
+
+```bash
+pytest --bm --bm-mode npe --bm-estimators nsf,maf -k two_moons --collect-only
+```
+
+The MNLE mode runs the mixed data task. Its evaluation observations contain 10
+independent trials by default. Use `--bm-num-iid-trials` to change that number:
+
+```bash
+pytest --bm --bm-mode mnle --bm-num-iid-trials 20
+```
+
+The trial count is included in the test ID and result task name, for example
+`mixed_data-20trials`, so runs with different observation sizes remain separate.
 
 ## Contributing to the documentation
 

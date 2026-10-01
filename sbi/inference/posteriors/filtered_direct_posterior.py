@@ -50,7 +50,9 @@ class FilteredDirectPosterior(DirectPosterior):
             x_shape: Optional event shape for observations.
             enable_transform: Whether to use unconstrained-space transforms for MAP.
             filter_type: Context filtering strategy. Either `"knn"`, `"first"`,
-                or a callable returning selected indices.
+                or a callable returning selected indices. A callable must return the
+                same indices for the same `x`, because the leakage correction factor
+                is saved per `x`.
             filter_size: Maximum number of context points retained per observation.
         """
         if filter_size <= 1:

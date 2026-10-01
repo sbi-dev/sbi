@@ -28,6 +28,7 @@ from sbi.samplers.mcmc import (
 )
 from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils import mcmc_transform
+from sbi.utils.pbar import sampling_desc
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import (
     ensure_theta_batched,
@@ -408,6 +409,7 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
+        self._assert_finite_x(x)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -487,6 +489,7 @@ class MCMCPosterior(NeuralPosterior):
                 interchangeable_chains=False,
                 num_workers=num_workers,
                 show_progress_bars=show_progress_bars,
+                num_xos=batch_size,
             )
 
         # (num_chains_extended, samples_per_chain, *input_shape)
@@ -719,8 +722,8 @@ class MCMCPosterior(NeuralPosterior):
                             delayed(seeded_init_fn)(seed) for seed in seeds
                         ),
                         total=len(seeds),
-                        desc=f"""Generating {num_chains_per_x} MCMC inits with
-                                {num_workers} workers.""",
+                        desc=f"Generating {num_chains_per_x} MCMC inits via "
+                        f"{init_strategy} strategy",
                         disable=not show_progress_bars,
                     )
                 )
@@ -745,11 +748,12 @@ class MCMCPosterior(NeuralPosterior):
         num_workers: int = 1,
         init_width: Union[float, ndarray] = 0.01,
         show_progress_bars: bool = True,
+        num_xos: int = 1,
     ) -> Tensor:
         """Custom implementation of slice sampling using Numpy.
 
         Args:
-            num_samples: Desired number of samples.
+            num_samples: Desired number of samples, summed over all observations.
             potential_function: A callable **class**.
             initial_params: Initial parameters for MCMC chain.
             thin: Thinning (subsampling) factor, default 1 (no thinning).
@@ -762,6 +766,8 @@ class MCMCPosterior(NeuralPosterior):
             init_width: Inital width of brackets.
             show_progress_bars: Whether to show a progressbar during sampling;
                 can only be turned off for vectorized sampler.
+            num_xos: Number of observations. Chains and samples are split evenly
+                across them.
 
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
@@ -790,8 +796,15 @@ class MCMCPosterior(NeuralPosterior):
         )
         warmup_ = warmup_steps * thin
         num_samples_ = ceil((num_samples * thin) / num_chains)
+        desc = sampling_desc(
+            num_samples // num_xos,
+            "slice_np_vectorized" if vectorized else "slice_np",
+            num_xos=num_xos,
+            num_chains=num_chains // num_xos,
+            num_workers=None if vectorized else num_workers,
+        )
         # Run mcmc including warmup
-        samples = posterior_sampler.run(warmup_ + num_samples_)
+        samples = posterior_sampler.run(warmup_ + num_samples_, desc=desc)
         samples = samples[:, warmup_steps:, :]  # discard warmup steps
         samples = torch.from_numpy(samples)  # chains x samples x dim
 

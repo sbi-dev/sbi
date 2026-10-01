@@ -253,10 +253,9 @@ def assert_transform_to_unconstrained_supported(
     The ``transform_to_unconstrained`` z-scoring option derives a bijection from the
     prior's support (rather than batch statistics). It is implemented for the
     conditional Zuko builders and for ``build_mdn``. For the other builders,
-    ``z_score_parser`` returns
-    ``(False, False)`` for this flag, which would otherwise make the option a silent
-    no-op (the model is built with no reparametrization at all). This guard turns that
-    silent no-op into a clear error.
+    ``z_score_parser`` returns ``(False, False)`` for this flag, which would otherwise
+    make the option a silent no-op (the model is built with no reparametrization at
+    all). This guard turns that silent no-op into a clear error.
 
     Args:
         z_score_x: The z-scoring option passed by the user.
@@ -476,6 +475,19 @@ class Standardize(nn.Module):
 
     def forward(self, tensor):
         return (tensor - self._mean) / self._std
+
+
+def nan_tolerant_input_net(net: Optional[nn.Module]) -> Optional[nn.Module]:
+    """Return the module that consumes the raw `x` if it declares
+    `accepts_nan_input`, else None.
+
+    Only `net` itself or, for an `nn.Sequential`, its first layer after leading
+    `Standardize` layers counts, so NaN cannot reach an unmarked module first.
+    """
+    if isinstance(net, nn.Sequential):
+        first = next((m for m in net if not isinstance(m, Standardize)), None)
+        return nan_tolerant_input_net(first)
+    return net if getattr(net, "accepts_nan_input", False) else None
 
 
 def standardizing_net(
@@ -776,6 +788,25 @@ def check_dist_class(
         return is_instance, return_dist
 
 
+def prior_support_is_bounded(prior: Any) -> Optional[bool]:
+    """Return whether the support of a continuous prior is bounded.
+
+    Args:
+        prior: Prior distribution.
+
+    Returns:
+        False if the support is the real space, True otherwise, and None if the prior
+        does not define a `support`.
+    """
+    try:
+        support = prior.support
+    except (NotImplementedError, AttributeError):
+        return None
+    return not isinstance(
+        getattr(support, "base_constraint", support), constraints._Real
+    )
+
+
 def within_support(distribution: Any, samples: Tensor) -> Tensor:
     """
     Return whether the samples are within the support or not.
@@ -963,55 +994,18 @@ def mcmc_transform(
             transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
             return transform
 
-        # Some distributions have a support argument but it raises a
-        # NotImplementedError. We catch this case here.
-        try:
-            _ = prior.support
-            has_support = True
-        except (NotImplementedError, AttributeError):
-            # NotImplementedError -> Distribution that inherits from torch dist but
-            # does not implement support.
-            # AttributeError -> Custom distribution that has no support attribute.
+        support_is_bounded = prior_support_is_bounded(prior)
+        if support_is_bounded is None:
             warnings.warn(
                 "The passed prior has no support property, transform will be "
                 "constructed from mean and std. If the passed prior is supposed to be "
                 "bounded consider implementing the prior.support property.",
                 stacklevel=2,
             )
-            has_support = False
-
-        # If the distribution has a `support`, check if the support is bounded.
-        # If it is not bounded, we want to z-score the space. This is not done
-        # by `biject_to()`, so we have to deal with this case separately.
-        if has_support:
-            if hasattr(prior.support, "base_constraint"):
-                constraint = prior.support.base_constraint  # type: ignore
-            else:
-                constraint = prior.support
-
-            # Check if the support is discrete
-            if hasattr(prior.support, "is_discrete"):
-                is_discrete = prior.support.is_discrete  # type: ignore
-            else:
-                is_discrete = False
-
-            if is_discrete:
-                # For discrete distributions, use mean/std transform
-                transform = prior_mean_std_transform(prior, device)
-            else:
-                # For continuous distributions, check if support is bounded
-                if isinstance(constraint, constraints._Real):
-                    support_is_bounded = False
-                else:
-                    support_is_bounded = True
-
-                if support_is_bounded:
-                    transform = biject_to(prior.support)
-                else:
-                    # Use mean/std transform for unbounded continuous distributions
-                    transform = prior_mean_std_transform(prior, device)
+        # Unbounded and discrete supports are z-scored, which `biject_to()` does not do.
+        if support_is_bounded and not getattr(prior.support, "is_discrete", False):
+            transform = biject_to(prior.support)
         else:
-            # No support property, use mean/std transform
             transform = prior_mean_std_transform(prior, device)
     else:
         transform = torch_tf.identity_transform
