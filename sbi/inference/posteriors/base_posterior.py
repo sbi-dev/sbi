@@ -3,7 +3,7 @@
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 from warnings import warn
 
 import torch
@@ -22,6 +22,7 @@ from sbi.utils.sbiutils import (
     gradient_ascent,
     load_with_version,
     nan_tolerant_input_net,
+    prior_support_is_bounded,
     save_with_version,
 )
 from sbi.utils.torchutils import (
@@ -87,6 +88,7 @@ class NeuralPosterior:
             self.theta_transform = theta_transform
 
         self._map = None
+        self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
         self._purpose = ""
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
@@ -190,8 +192,7 @@ class NeuralPosterior:
     def set_default_x(self, x: Tensor) -> "NeuralPosterior":
         """Set new default x for `.sample(), .log_prob` to use as conditioning context.
 
-        Reset the MAP and the leakage correction factor stored for the old default x
-        if applicable.
+        Reset the MAP stored for the old default x if applicable.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
         `.sample()` and `.log_prob()` - only $\theta$ needs to be passed.
@@ -214,7 +215,6 @@ class NeuralPosterior:
 
         self._x = x.to(self._device)
         self._map = None
-        self._leakage_density_correction_factor = None
         return self
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
@@ -224,7 +224,7 @@ class NeuralPosterior:
             x = process_x(x, x_event_shape=None)
             self._assert_finite_x(x)
 
-            return x
+            return x.to(self._device)
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."
@@ -232,6 +232,32 @@ class NeuralPosterior:
             )
         else:
             return self.default_x
+
+    def _cached_leakage_factor(
+        self,
+        x: Tensor,
+        prior: Any,
+        estimate_fn: Callable[[], Tensor],
+        force_update: bool = False,
+        use_cache: bool = True,
+    ) -> Tensor:
+        """Return the leakage correction factor saved for `x`, or estimate it.
+
+        The factor is 1 for priors with unbounded support. Otherwise, one factor is
+        saved, for the last `x`, unless `use_cache=False`.
+        """
+        if prior_support_is_bounded(prior) is False:
+            return torch.ones((), device=self._device)
+        if self._leakage_cache is not None and use_cache and not force_update:
+            cached_x, factor = self._leakage_cache
+            if cached_x.shape == x.shape and torch.allclose(
+                cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
+            ):
+                return factor
+        factor = estimate_fn()
+        if use_cache:
+            self._leakage_cache = (x.detach().clone(), factor)
+        return factor
 
     def _calculate_map(
         self,
@@ -400,7 +426,7 @@ class NeuralPosterior:
             state_dict: State to be restored.
         """
         # Posteriors pickled by older sbi versions can miss this key.
-        state_dict.setdefault("_leakage_density_correction_factor", None)
+        state_dict.setdefault("_leakage_cache", None)
         self.__dict__ = state_dict
 
         actual_device = infer_tensor_device(self)
