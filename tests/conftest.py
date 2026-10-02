@@ -20,8 +20,6 @@ seed = 1
 harvested_fixture_data = None
 
 # Mini SBIBM results. A new run replaces the stored rows with the same key.
-RESULTS_FILE = Path(".bm_results") / "results_all.csv"
-OLD_RESULTS_FILE = RESULTS_FILE.with_name("results_all.old.csv")
 RESULT_KEY = ["label", "method", "task_name", "seed"]
 RESULT_COLUMNS = [*RESULT_KEY, "num_simulations", "c2st", "mean_err", "std_err"]
 METRIC_TITLES = {
@@ -116,6 +114,13 @@ def pytest_addoption(parser):
         "(default: the current git branch)",
     )
     parser.addoption(
+        "--bm-results-dir",
+        action="store",
+        default=".bm_results",
+        help="Folder of the mini-benchmark results file (default: .bm_results). "
+        "Use the same folder to compare runs from different checkouts",
+    )
+    parser.addoption(
         "--bm-seeds",
         action="store",
         default=1,
@@ -189,12 +194,17 @@ def _benchmark_label(config) -> str:
     return branch if branch and branch != "HEAD" else "default"
 
 
-def _read_results() -> pd.DataFrame | None:
+def _results_file(config) -> Path:
+    """Return the path of the mini SBIBM results file."""
+    return Path(config.getoption("--bm-results-dir")).expanduser() / "results_all.csv"
+
+
+def _read_results(results_file: Path) -> pd.DataFrame | None:
     """Return the stored results, or None if there are none in the current format."""
-    if not RESULTS_FILE.exists():
+    if not results_file.exists():
         return None
     try:
-        results = pd.read_csv(RESULTS_FILE, dtype={"label": str})
+        results = pd.read_csv(results_file, dtype={"label": str})
     except (pd.errors.ParserError, pd.errors.EmptyDataError):
         return None
     if not set(RESULT_COLUMNS).issubset(results.columns):
@@ -262,10 +272,11 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     terminal_width = shutil.get_terminal_size().columns
     write(f"\033[96m{' mini SBIBM results '.center(terminal_width, '=')}\033[0m")
     if config.stash.get(MOVED_OLD_RESULTS, False):
-        write(f"Moved results in an older format to {OLD_RESULTS_FILE}.")
+        old_file = _results_file(config).with_name("results_all.old.csv")
+        write(f"Moved results in an older format to {old_file}.")
 
     try:
-        results = _read_results()
+        results = _read_results(_results_file(config))
         if results is None or results.empty:
             write("No results found.")
             return
@@ -313,15 +324,16 @@ def pytest_sessionfinish(session):
         return
     results = results.assign(label=_benchmark_label(session.config))[RESULT_COLUMNS]
 
-    stored = _read_results()
+    results_file = _results_file(session.config)
+    stored = _read_results(results_file)
     if stored is not None:
         replaced = stored.set_index(RESULT_KEY).index.isin(
             results.set_index(RESULT_KEY).index
         )
         results = pd.concat([stored[~replaced], results])
-    elif RESULTS_FILE.exists():
-        RESULTS_FILE.replace(OLD_RESULTS_FILE)
+    elif results_file.exists():
+        results_file.replace(results_file.with_name("results_all.old.csv"))
         session.config.stash[MOVED_OLD_RESULTS] = True
 
-    RESULTS_FILE.parent.mkdir(exist_ok=True)
-    results.to_csv(RESULTS_FILE, index=False)
+    results_file.parent.mkdir(parents=True, exist_ok=True)
+    results.to_csv(results_file, index=False)
