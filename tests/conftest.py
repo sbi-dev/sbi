@@ -23,8 +23,12 @@ harvested_fixture_data = None
 RESULTS_FILE = Path(".bm_results") / "results_all.csv"
 OLD_RESULTS_FILE = RESULTS_FILE.with_name("results_all.old.csv")
 RESULT_KEY = ["label", "method", "task_name"]
-RESULT_COLUMNS = [*RESULT_KEY, "num_simulations", "c2st"]
-METRIC_TITLES = {"c2st": "C2ST (0.5 is best)"}
+RESULT_COLUMNS = [*RESULT_KEY, "num_simulations", "c2st", "mean_err", "std_err"]
+METRIC_TITLES = {
+    "c2st": "C2ST (0.5 is best)",
+    "mean_err": "Posterior mean error, in reference std (0 is best)",
+    "std_err": "Posterior std error, in reference std (0 is best)",
+}
 MOVED_OLD_RESULTS = pytest.StashKey[bool]()
 
 
