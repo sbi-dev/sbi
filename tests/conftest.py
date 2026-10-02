@@ -106,6 +106,13 @@ def pytest_addoption(parser):
         type=int,
         help="Run mini-benchmark tests with specified number of simulations",
     )
+    parser.addoption(
+        "--bm-num-iid-trials",
+        action="store",
+        default=10,
+        type=int,
+        help="Number of independent trials for mixed data benchmark observations",
+    )
 
 
 @pytest.fixture
@@ -119,6 +126,12 @@ def benchmark_mode(request):
 def benchmark_num_simulations(request):
     """Fixture to access the --bm-num-simulations value in test files."""
     return int(request.config.getoption("--bm-num-simulations"))
+
+
+@pytest.fixture
+def benchmark_num_iid_trials(request):
+    """Fixture to access the --bm-num-iid-trials value in test files."""
+    return int(request.config.getoption("--bm-num-iid-trials"))
 
 
 @pytest.fixture(scope="session", autouse=True)

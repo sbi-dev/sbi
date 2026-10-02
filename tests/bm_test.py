@@ -5,7 +5,7 @@ import pytest
 import torch
 from pytest_harvest import ResultsBag
 
-from sbi.inference import FMPE, NLE, NPE, NPE_PFN, NPSE, NRE
+from sbi.inference import FMPE, MNLE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
@@ -17,6 +17,7 @@ from .mini_sbibm.base_task import Task
 # Global settings
 SEED = 0
 TASKS = ["two_moons", "linear_mvg_2d", "gaussian_linear", "slcp"]
+MODE_TASKS = {"mnle": ["mixed_data"]}
 NUM_EVALUATION_OBS = 3  # Currently only 3 observation tested for speed
 NUM_ROUNDS_SEQUENTIAL = 2
 NUM_EVALUATION_OBS_SEQ = 1
@@ -40,6 +41,7 @@ METHOD_GROUPS = {
     "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
+    "mnle": [MNLE],
 }
 METHOD_PARAMS = {
     "none": [{}],
@@ -57,6 +59,7 @@ METHOD_PARAMS = {
     "snpe": [{}],
     "snle": [{}],
     "snre": [{}],
+    "mnle": [{}],
 }
 ESTIMATOR_ARGUMENTS = {
     "npe": "density_estimator",
@@ -122,6 +125,12 @@ def _kwargs_id(parameters: dict) -> str:
     return "-".join(str(value) for value in parameters.values()) or "default"
 
 
+def _get_benchmark_task(task_name: str, num_iid_trials: int) -> Task:
+    """Return a task with mode specific benchmark settings."""
+    kwargs = {"num_trials": num_iid_trials} if task_name == "mixed_data" else {}
+    return get_task(task_name, **kwargs)
+
+
 # Use pytest.mark.parametrize dynamically
 # Generates a list of methods to test based on the benchmark mode
 def pytest_generate_tests(metafunc):
@@ -131,7 +140,9 @@ def pytest_generate_tests(metafunc):
     Args:
         metafunc: The metafunc object from pytest.
     """
-    if not {"inference_class", "extra_kwargs"}.intersection(metafunc.fixturenames):
+    if not {"inference_class", "extra_kwargs", "task_name"}.intersection(
+        metafunc.fixturenames
+    ):
         return
 
     mode = _benchmark_mode(metafunc.config)
@@ -142,6 +153,9 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize(
             "extra_kwargs", kwargs_group, ids=[_kwargs_id(p) for p in kwargs_group]
         )
+    if "task_name" in metafunc.fixturenames:
+        tasks = MODE_TASKS.get(mode, TASKS)
+        metafunc.parametrize("task_name", tasks, ids=str)
 
 
 def standard_eval_c2st_loop(posterior: NeuralPosterior, task: Task) -> float:
@@ -197,6 +211,7 @@ def train_and_eval_amortized_inference(
     inference_class,
     task_name: str,
     benchmark_num_simulations: int,
+    benchmark_num_iid_trials: int,
     extra_kwargs: dict,
     results_bag: ResultsBag,
 ) -> None:
@@ -206,12 +221,14 @@ def train_and_eval_amortized_inference(
     Args:
         method: The inference method.
         task_name: The name of the task.
+        benchmark_num_simulations: Number of training simulations.
+        benchmark_num_iid_trials: Number of trials in mixed data observations.
         extra_kwargs: Additional keyword arguments for the method.
         results_bag: The results bag to store evaluation results. Subclass of dict, but
             allows item assignment with dot notation.
     """
     torch.manual_seed(SEED)
-    task = get_task(task_name)
+    task = _get_benchmark_task(task_name, benchmark_num_iid_trials)
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
@@ -233,6 +250,7 @@ def train_and_eval_sequential_inference(
     inference_class,
     task_name: str,
     benchmark_num_simulations: int,
+    benchmark_num_iid_trials: int,
     extra_kwargs: dict,
     results_bag: ResultsBag,
 ) -> None:
@@ -242,11 +260,13 @@ def train_and_eval_sequential_inference(
     Args:
         method: The inference method.
         task_name (str): The name of the task.
+        benchmark_num_simulations: Number of training simulations.
+        benchmark_num_iid_trials: Number of trials in mixed data observations.
         extra_kwargs (dict): Additional keyword arguments for the method.
         results_bag: The results bag to store evaluation results.
     """
     torch.manual_seed(SEED)
-    task = get_task(task_name)
+    task = _get_benchmark_task(task_name, benchmark_num_iid_trials)
     num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
     thetas, xs = task.get_data(num_simulations)
     prior = task.get_prior()
@@ -282,7 +302,6 @@ def train_and_eval_sequential_inference(
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("task_name", TASKS, ids=str)
 def test_run_benchmark(
     inference_class,
     task_name: str,
@@ -290,6 +309,7 @@ def test_run_benchmark(
     extra_kwargs: dict,
     benchmark_mode: str,
     benchmark_num_simulations: int,
+    benchmark_num_iid_trials: int,
 ) -> None:
     """
     Benchmark test for amortized and sequential inference methods.
@@ -301,12 +321,15 @@ def test_run_benchmark(
         extra_kwargs: Additional keyword arguments for the method.
         benchmark_mode: The benchmark mode. This is a fixture which based on user
             input, determines which type of methods should be run.
+        benchmark_num_simulations: Number of training simulations.
+        benchmark_num_iid_trials: Number of trials in mixed data observations.
     """
     if benchmark_mode in ["snpe", "snle", "snre"]:
         train_and_eval_sequential_inference(
             inference_class,
             task_name,
             benchmark_num_simulations,
+            benchmark_num_iid_trials,
             extra_kwargs,
             results_bag,
         )
@@ -315,6 +338,7 @@ def test_run_benchmark(
             inference_class,
             task_name,
             benchmark_num_simulations,
+            benchmark_num_iid_trials,
             extra_kwargs,
             results_bag,
         )
