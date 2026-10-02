@@ -212,6 +212,36 @@ def test_npe_a_batched_sample_log_prob_apply_proposal_correction(
         assert torch.allclose(samples[:, i].std(0), reference.std(0), atol=0.1)
 
 
+def test_npe_a_matches_direct_posterior_with_unconstrained_transform():
+    """Without a proposal correction, NPE-A must match DirectPosterior, also with
+    `transform_to_unconstrained`."""
+    torch.manual_seed(0)
+    prior = BoxUniform(10 * ones(2), 20 * ones(2))
+    theta = prior.sample((200,))
+    estimator = posterior_nn(
+        "mdn", z_score_theta="transform_to_unconstrained", x_dist=prior
+    )(theta, theta + 0.1 * torch.randn_like(theta))
+    direct = DirectPosterior(estimator, prior)
+    npe_a = NPE_A_Posterior(estimator, prior)
+    x = torch.tensor([[15.0, 15.0], [12.0, 18.0]])
+    theta = prior.sample((5, 2))
+    kwargs = {"show_progress_bars": False, "reject_outside_prior": False}
+
+    assert torch.allclose(
+        npe_a.log_prob_batched(theta, x, norm_posterior=False),
+        direct.log_prob_batched(theta, x, norm_posterior=False),
+        atol=1e-5,
+    )
+    assert torch.allclose(
+        npe_a.log_prob(theta[:, 0], x=x[0], norm_posterior=False),
+        direct.log_prob(theta[:, 0], x=x[0], norm_posterior=False),
+        atol=1e-5,
+    )
+    assert prior.support.check(npe_a.sample((100,), x=x[0], **kwargs)).all()
+    samples = npe_a.sample_batched((100,), x, **kwargs)
+    assert prior.support.check(samples).all()
+
+
 @pytest.mark.mcmc
 @pytest.mark.parametrize("snlre_method", [NRE_C])  # it's independent of the method
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
