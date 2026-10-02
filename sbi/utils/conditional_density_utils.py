@@ -296,9 +296,8 @@ def condition_mog(
     log_prob_y = _log_prob_gaussian_per_component(y, mu_y, precs_yy, sumlogdiag_yy)
 
     # Normalize the mixing coef: p(X|Y) = p(Y,X) / p(Y) using the marginal dist.
-    new_mcs = torch.exp(logits + log_prob_y)
-    new_mcs = new_mcs / new_mcs.sum()
-    cond_logits = torch.log(new_mcs)
+    log_weights = logits + log_prob_y
+    cond_logits = log_weights - torch.logsumexp(log_weights, dim=-1, keepdim=True)
 
     sumlogdiag = torch.sum(torch.log(torch.diagonal(precfs_xx, dim1=2, dim2=3)), dim=2)
     return cond_logits, cond_means, precfs_xx, sumlogdiag

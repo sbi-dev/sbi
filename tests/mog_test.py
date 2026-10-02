@@ -10,6 +10,7 @@ import torch
 from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.estimators.mog import MoG
+from sbi.utils.conditional_density_utils import condition_mog
 
 
 class TestMoGBasics:
@@ -198,6 +199,88 @@ class TestMoGCondition:
         cond_mog = mog.condition(condition, dims_to_sample)
 
         assert torch.allclose(cond_mog.weights.sum(dim=-1), torch.ones(3), atol=1e-6)
+
+
+class TestConditionMoG:
+    """Test `condition_mog`, the standalone conditioning helper."""
+
+    @staticmethod
+    def _mog_and_inputs(num_components: int, dim: int, condition_value: float):
+        """Build a MoG whose component means are `condition_value` away from y."""
+        eye = torch.eye(dim)
+        logits = torch.zeros(1, num_components)
+        precision_factors = eye.expand(1, num_components, dim, dim) * 2.5
+        precisions = precision_factors.transpose(3, 2) @ precision_factors
+
+        means = torch.zeros(1, num_components, dim)
+        means[:, :, -1] = torch.tensor([1.0, 2.0, 3.0, 4.0][:num_components]) * 8.0
+
+        condition = torch.zeros(1, dim)
+        condition[0, -1] = condition_value
+
+        mog = MoG(
+            logits=logits,
+            means=means,
+            precisions=precisions,
+            precision_factors=precision_factors,
+        )
+        return mog, condition, logits, means, precision_factors
+
+    @pytest.mark.parametrize("condition_value", [0.0, 1.0, 4.0])
+    def test_logits_stay_finite_far_from_component_means(self, condition_value):
+        """`condition_mog` must not underflow to -inf/NaN for distant conditions.
+
+        Normalizing the mixture weights in probability space made `exp(log_prob_y)`
+        underflow to exactly 0 once the condition was far from the component means,
+        so `log(0)` gave -inf and 0/0 gave NaN. See #2025.
+        """
+        num_components, dim = 3, 2
+        _, condition, logits, means, precision_factors = self._mog_and_inputs(
+            num_components, dim, condition_value
+        )
+
+        cond_logits, *_ = condition_mog(
+            condition, [0], logits, means, precision_factors
+        )
+
+        assert torch.isfinite(cond_logits).all(), (
+            f"condition_mog returned non-finite logits for condition={condition_value}:"
+            f" {cond_logits}"
+        )
+
+    @pytest.mark.parametrize("condition_value", [0.0, 1.0, 4.0, 10.0])
+    def test_matches_mog_condition(self, condition_value):
+        """`condition_mog` must agree with `MoG.condition`, which already used
+        `logsumexp` for the same normalization."""
+        num_components, dim = 3, 2
+        mog, condition, logits, means, precision_factors = self._mog_and_inputs(
+            num_components, dim, condition_value
+        )
+
+        cond_logits, cond_means, cond_precfs, _ = condition_mog(
+            condition, [0], logits, means, precision_factors
+        )
+        expected = mog.condition(condition, [0])
+
+        assert torch.allclose(cond_logits, expected.logits, atol=1e-4), (
+            f"logits differ for condition={condition_value}"
+        )
+        assert torch.allclose(cond_means, expected.means, atol=1e-4)
+        assert torch.allclose(cond_precfs, expected.precision_factors, atol=1e-4)
+
+    def test_weights_are_a_proper_distribution(self):
+        """The normalized log-weights must exponentiate to a valid distribution."""
+        num_components, dim = 3, 2
+        _, condition, logits, means, precision_factors = self._mog_and_inputs(
+            num_components, dim, 4.0
+        )
+
+        cond_logits, *_ = condition_mog(
+            condition, [0], logits, means, precision_factors
+        )
+
+        weights = torch.exp(cond_logits)
+        assert torch.allclose(weights.sum(dim=-1), torch.ones(1), atol=1e-6)
 
 
 class TestMoGFromGaussian:
