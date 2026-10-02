@@ -133,12 +133,7 @@ class NPE_A_Posterior(DirectPosterior):
         """
         corrected_mog = self._get_corrected_mog(kwargs["condition"])
         samples = corrected_mog.sample(sample_shape)
-
-        # Undo z-score transform if applied
-        if self.posterior_estimator.has_input_transform:
-            samples = self.posterior_estimator._inverse_transform_input(samples)
-
-        return samples
+        return self.posterior_estimator._inverse_transform_input(samples)
 
     def _log_prob_estimator(self, theta: Tensor, condition: Tensor) -> Tensor:
         """Compute log probability under the corrected MoG.
@@ -151,21 +146,11 @@ class NPE_A_Posterior(DirectPosterior):
             Log probabilities, shape (sample_dim, batch_dim).
         """
         corrected_mog = self._get_corrected_mog(condition)
-
-        # Apply z-score transform if needed
-        if self.posterior_estimator.has_input_transform:
-            theta_transformed = self.posterior_estimator._transform_input(theta)
-        else:
-            theta_transformed = theta
-
+        theta_transformed = self.posterior_estimator._transform_input(theta)
         log_probs = corrected_mog.log_prob(theta_transformed)
-
-        # Add log det jacobian for z-score transform
-        log_probs = log_probs + self.posterior_estimator._log_det_jacobian_forward(
+        return log_probs + self.posterior_estimator._log_det_jacobian_forward(
             theta, theta_transformed
         )
-
-        return log_probs
 
     def sample(
         self,
