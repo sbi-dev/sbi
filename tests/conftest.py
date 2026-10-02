@@ -22,7 +22,7 @@ harvested_fixture_data = None
 # Mini SBIBM results. A new run replaces the stored rows with the same key.
 RESULTS_FILE = Path(".bm_results") / "results_all.csv"
 OLD_RESULTS_FILE = RESULTS_FILE.with_name("results_all.old.csv")
-RESULT_KEY = ["label", "method", "task_name"]
+RESULT_KEY = ["label", "method", "task_name", "seed"]
 RESULT_COLUMNS = [*RESULT_KEY, "num_simulations", "c2st", "mean_err", "std_err"]
 METRIC_TITLES = {
     "c2st": "C2ST (0.5 is best)",
@@ -116,12 +116,25 @@ def pytest_addoption(parser):
         "(default: the current git branch)",
     )
     parser.addoption(
+        "--bm-seeds",
+        action="store",
+        default=1,
+        type=int,
+        help="Number of training seeds per mini-benchmark case",
+    )
+    parser.addoption(
         "--bm-num-simulations",
         action="store",
         default=2000,
         type=int,
         help="Run mini-benchmark tests with specified number of simulations",
     )
+
+
+def pytest_configure(config):
+    # Parallel benchmark workers would otherwise each start one torch thread per core.
+    if config.getoption("--bm") and hasattr(config, "workerinput"):
+        torch.set_num_threads(1)
 
 
 @pytest.fixture
@@ -286,16 +299,16 @@ def pytest_sessionfinish(session):
     """Merge the results of this run into the mini SBIBM results file.
 
     With xdist, the main process receives the results of all workers. Rows with the
-    same label, method and task as a new result are replaced. A results file in an
+    same label, method, task and seed as a new result are replaced. A results file in an
     older format is moved to `results_all.old.csv`.
     """
     if not session.config.getoption("--bm") or not is_main_process(session):
         return
 
     results = get_session_results_df(session)
-    if results.empty:
+    if "c2st" not in results.columns:
         return
-    results = results[results["status"] == "passed"]
+    results = results[(results["status"] == "passed") & results["c2st"].notna()]
     if results.empty:
         return
     results = results.assign(label=_benchmark_label(session.config))[RESULT_COLUMNS]

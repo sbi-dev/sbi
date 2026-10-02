@@ -152,6 +152,19 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize(
             "extra_kwargs", kwargs_group, ids=[_kwargs_id(p) for p in kwargs_group]
         )
+    num_seeds = metafunc.config.getoption("--bm-seeds")
+    if num_seeds < 1:
+        raise pytest.UsageError("--bm-seeds must be at least 1.")
+    # One seed keeps the `benchmark_seed` fixture, and with it today's test ids.
+    if "benchmark_seed" in metafunc.fixturenames and num_seeds > 1:
+        seeds = range(SEED, SEED + num_seeds)
+        metafunc.parametrize("benchmark_seed", seeds, ids=[f"seed{s}" for s in seeds])
+
+
+@pytest.fixture
+def benchmark_seed() -> int:
+    """Training seed of a benchmark case. Parametrized by --bm-seeds."""
+    return SEED
 
 
 def eval_observations(posterior: NeuralPosterior, task: Task) -> dict[str, float]:
@@ -216,6 +229,7 @@ def train_and_eval_amortized_inference(
     task_name: str,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
+    seed: int,
 ) -> dict[str, float]:
     """
     Performs amortized inference evaluation.
@@ -225,11 +239,12 @@ def train_and_eval_amortized_inference(
         task_name: The name of the task.
         benchmark_num_simulations: The number of training simulations.
         extra_kwargs: Additional keyword arguments for the method.
+        seed: The training seed.
 
     Returns:
         The metrics, averaged over the evaluation observations.
     """
-    torch.manual_seed(SEED)
+    torch.manual_seed(seed)
     task = get_task(task_name)
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
@@ -247,6 +262,7 @@ def train_and_eval_sequential_inference(
     task_name: str,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
+    seed: int,
 ) -> dict[str, float]:
     """
     Performs sequential inference evaluation.
@@ -256,17 +272,19 @@ def train_and_eval_sequential_inference(
         task_name: The name of the task.
         benchmark_num_simulations: The total number of training simulations.
         extra_kwargs: Additional keyword arguments for the method.
+        seed: The training seed.
 
     Returns:
         The metrics for the evaluation observation.
     """
-    torch.manual_seed(SEED)
     task = get_task(task_name)
+    idx_eval = NUM_EVALUATION_OBS_SEQ
+    # Load x_o before seeding: the Gaussian tasks reseed torch in get_observation.
+    x_o = task.get_observation(idx_eval)
+    torch.manual_seed(seed)
     num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
     thetas, xs = task.get_data(num_simulations)
     prior = task.get_prior()
-    idx_eval = NUM_EVALUATION_OBS_SEQ
-    x_o = task.get_observation(idx_eval)
     simulator = task.get_simulator()
 
     # Round 1
@@ -299,6 +317,7 @@ def test_run_benchmark(
     extra_kwargs: dict,
     benchmark_mode: str | None,
     benchmark_num_simulations: int,
+    benchmark_seed: int,
 ) -> None:
     """
     Benchmark test for amortized and sequential inference methods.
@@ -312,19 +331,25 @@ def test_run_benchmark(
         benchmark_mode: The benchmark mode. This is a fixture which based on user
             input, determines which type of methods should be run.
         benchmark_num_simulations: The number of training simulations.
+        benchmark_seed: The training seed.
     """
     if benchmark_mode in SEQUENTIAL_MODES:
         train_and_eval = train_and_eval_sequential_inference
     else:
         train_and_eval = train_and_eval_amortized_inference
     metrics = train_and_eval(
-        inference_class, task_name, benchmark_num_simulations, extra_kwargs
+        inference_class,
+        task_name,
+        benchmark_num_simulations,
+        extra_kwargs,
+        benchmark_seed,
     )
 
     for key, value in metrics.items():
         results_bag[key] = round(value, 3)
     results_bag.num_simulations = benchmark_num_simulations
     results_bag.task_name = task_name
+    results_bag.seed = benchmark_seed
     results_bag.method = (
         f"{_class_id(inference_class, benchmark_mode)}-{_kwargs_id(extra_kwargs)}"
     )
