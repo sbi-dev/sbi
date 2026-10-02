@@ -20,6 +20,7 @@ TASKS = ["two_moons", "linear_mvg_2d", "gaussian_linear", "slcp"]
 NUM_EVALUATION_OBS = 3  # Currently only 3 observation tested for speed
 NUM_ROUNDS_SEQUENTIAL = 2
 NUM_EVALUATION_OBS_SEQ = 1
+SEQUENTIAL_MODES = {"snpe", "snle", "snre"}
 TRAIN_KWARGS = {}
 
 # Density estimators to test
@@ -122,6 +123,12 @@ def _kwargs_id(parameters: dict) -> str:
     return "-".join(str(value) for value in parameters.values()) or "default"
 
 
+def _class_id(inference_class, mode: str | None) -> str:
+    """Return the class name, prefixed with "S" for multi-round runs."""
+    prefix = "S" if mode in SEQUENTIAL_MODES else ""
+    return prefix + inference_class.__name__
+
+
 # Use pytest.mark.parametrize dynamically
 # Generates a list of methods to test based on the benchmark mode
 def pytest_generate_tests(metafunc):
@@ -136,7 +143,10 @@ def pytest_generate_tests(metafunc):
 
     mode = _benchmark_mode(metafunc.config)
     if "inference_class" in metafunc.fixturenames:
-        metafunc.parametrize("inference_class", METHOD_GROUPS[mode])
+        classes = METHOD_GROUPS[mode]
+        metafunc.parametrize(
+            "inference_class", classes, ids=[_class_id(c, mode) for c in classes]
+        )
     if "extra_kwargs" in metafunc.fixturenames:
         kwargs_group = _benchmark_kwargs(metafunc.config, mode)
         metafunc.parametrize(
@@ -198,17 +208,18 @@ def train_and_eval_amortized_inference(
     task_name: str,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
-    results_bag: ResultsBag,
-) -> None:
+) -> float:
     """
     Performs amortized inference evaluation.
 
     Args:
-        method: The inference method.
+        inference_class: The inference class.
         task_name: The name of the task.
+        benchmark_num_simulations: The number of training simulations.
         extra_kwargs: Additional keyword arguments for the method.
-        results_bag: The results bag to store evaluation results. Subclass of dict, but
-            allows item assignment with dot notation.
+
+    Returns:
+        The mean C2ST over the evaluation observations.
     """
     torch.manual_seed(SEED)
     task = get_task(task_name)
@@ -220,13 +231,7 @@ def train_and_eval_amortized_inference(
 
     posterior = inference.build_posterior()
 
-    mean_c2st = standard_eval_c2st_loop(posterior, task)
-
-    # Cache results
-    results_bag.metric = mean_c2st
-    results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task_name
-    results_bag.method = inference_class.__name__ + str(extra_kwargs)
+    return standard_eval_c2st_loop(posterior, task)
 
 
 def train_and_eval_sequential_inference(
@@ -234,16 +239,18 @@ def train_and_eval_sequential_inference(
     task_name: str,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
-    results_bag: ResultsBag,
-) -> None:
+) -> float:
     """
     Performs sequential inference evaluation.
 
     Args:
-        method: The inference method.
-        task_name (str): The name of the task.
-        extra_kwargs (dict): Additional keyword arguments for the method.
-        results_bag: The results bag to store evaluation results.
+        inference_class: The inference class.
+        task_name: The name of the task.
+        benchmark_num_simulations: The total number of training simulations.
+        extra_kwargs: Additional keyword arguments for the method.
+
+    Returns:
+        The C2ST for the evaluation observation.
     """
     torch.manual_seed(SEED)
     task = get_task(task_name)
@@ -272,13 +279,7 @@ def train_and_eval_sequential_inference(
 
     posterior = inference.build_posterior()
 
-    c2st_val = eval_c2st(posterior, task, idx_eval)
-
-    # Cache results
-    results_bag.metric = c2st_val
-    results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task_name
-    results_bag.method = inference_class.__name__ + str(extra_kwargs)
+    return eval_c2st(posterior, task, idx_eval)
 
 
 @pytest.mark.benchmark
@@ -286,9 +287,9 @@ def train_and_eval_sequential_inference(
 def test_run_benchmark(
     inference_class,
     task_name: str,
-    results_bag,
+    results_bag: ResultsBag,
     extra_kwargs: dict,
-    benchmark_mode: str,
+    benchmark_mode: str | None,
     benchmark_num_simulations: int,
 ) -> None:
     """
@@ -297,24 +298,24 @@ def test_run_benchmark(
     Args:
         inference_class: The inference class to test i.e. NPE, NLE, NRE ...
         task_name: The name of the task.
-        results_bag: The results bag to store evaluation results.
+        results_bag: The results bag to store evaluation results. Subclass of dict,
+            but allows item assignment with dot notation.
         extra_kwargs: Additional keyword arguments for the method.
         benchmark_mode: The benchmark mode. This is a fixture which based on user
             input, determines which type of methods should be run.
+        benchmark_num_simulations: The number of training simulations.
     """
-    if benchmark_mode in ["snpe", "snle", "snre"]:
-        train_and_eval_sequential_inference(
-            inference_class,
-            task_name,
-            benchmark_num_simulations,
-            extra_kwargs,
-            results_bag,
-        )
+    if benchmark_mode in SEQUENTIAL_MODES:
+        train_and_eval = train_and_eval_sequential_inference
     else:
-        train_and_eval_amortized_inference(
-            inference_class,
-            task_name,
-            benchmark_num_simulations,
-            extra_kwargs,
-            results_bag,
-        )
+        train_and_eval = train_and_eval_amortized_inference
+    c2st_val = train_and_eval(
+        inference_class, task_name, benchmark_num_simulations, extra_kwargs
+    )
+
+    results_bag.c2st = c2st_val
+    results_bag.num_simulations = benchmark_num_simulations
+    results_bag.task_name = task_name
+    results_bag.method = (
+        f"{_class_id(inference_class, benchmark_mode)}-{_kwargs_id(extra_kwargs)}"
+    )
