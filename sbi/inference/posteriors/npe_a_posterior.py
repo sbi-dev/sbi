@@ -233,7 +233,8 @@ class NPE_A_Posterior(DirectPosterior):
             samples = self._corrected_sample(torch.Size([num_samples]), condition=x)
             warn_if_outside_prior_support(self.prior, samples[:, 0])
 
-        return samples[:, 0]  # Remove batch dimension.
+        # Remove batch dimension.
+        return self._reshape_to_sample_shape(samples[:, 0], sample_shape)
 
     def log_prob(
         self,
