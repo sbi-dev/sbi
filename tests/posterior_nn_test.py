@@ -20,14 +20,16 @@ from sbi.inference import (
     NRE_C,
     DirectPosterior,
 )
+from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
 )
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
-from sbi.neural_nets import posterior_flow_nn
+from sbi.neural_nets import posterior_flow_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import CNNEmbedding
+from sbi.neural_nets.estimators.mog import MoG
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -173,6 +175,71 @@ def test_batched_sample_log_prob_with_different_x(
             assert torch.allclose(
                 log_probs, batched_log_probs[:, idx], atol=1e-1, rtol=1e-1
             ), "Batched log probs different from non-batched log probs"
+
+
+@pytest.mark.parametrize("reject_outside_prior", [True, False])
+def test_npe_a_batched_sample_log_prob_apply_proposal_correction(
+    reject_outside_prior: bool,
+):
+    """The batched methods must use the proposal-corrected MoG for several x."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((200,))
+    # The correction is analytical, so the estimator does not need training.
+    estimator = posterior_nn("mdn")(theta, theta + 0.1 * torch.randn_like(theta))
+    posterior = NPE_A_Posterior(
+        estimator,
+        prior,
+        proposal_mog=MoG.from_gaussian(ones(2), 2 * eye(2)),
+        prior_mog=MoG.from_gaussian(zeros(2), eye(2)),
+    )
+    x = torch.tensor([[0.0, 0.0], [1.0, -1.0], [-2.0, 0.5]])
+
+    theta = prior.sample((5, 3))
+    log_probs = posterior.log_prob_batched(theta, x)
+    samples = posterior.sample_batched(
+        (10_000,),
+        x,
+        show_progress_bars=False,
+        reject_outside_prior=reject_outside_prior,
+    )
+    for i in range(3):
+        expected = posterior.log_prob(theta[:, i], x=x[i])
+        assert torch.allclose(log_probs[:, i], expected, atol=1e-5)
+
+        reference = posterior.sample((10_000,), x=x[i], show_progress_bars=False)
+        assert torch.allclose(samples[:, i].mean(0), reference.mean(0), atol=0.1)
+        assert torch.allclose(samples[:, i].std(0), reference.std(0), atol=0.1)
+
+
+def test_npe_a_matches_direct_posterior_with_unconstrained_transform():
+    """Without a proposal correction, NPE-A must match DirectPosterior, also with
+    `transform_to_unconstrained`."""
+    torch.manual_seed(0)
+    prior = BoxUniform(10 * ones(2), 20 * ones(2))
+    theta = prior.sample((200,))
+    estimator = posterior_nn(
+        "mdn", z_score_theta="transform_to_unconstrained", x_dist=prior
+    )(theta, theta + 0.1 * torch.randn_like(theta))
+    direct = DirectPosterior(estimator, prior)
+    npe_a = NPE_A_Posterior(estimator, prior)
+    x = torch.tensor([[15.0, 15.0], [12.0, 18.0]])
+    theta = prior.sample((5, 2))
+    kwargs = {"show_progress_bars": False, "reject_outside_prior": False}
+
+    assert torch.allclose(
+        npe_a.log_prob_batched(theta, x, norm_posterior=False),
+        direct.log_prob_batched(theta, x, norm_posterior=False),
+        atol=1e-5,
+    )
+    assert torch.allclose(
+        npe_a.log_prob(theta[:, 0], x=x[0], norm_posterior=False),
+        direct.log_prob(theta[:, 0], x=x[0], norm_posterior=False),
+        atol=1e-5,
+    )
+    assert prior.support.check(npe_a.sample((100,), x=x[0], **kwargs)).all()
+    samples = npe_a.sample_batched((100,), x, **kwargs)
+    assert prior.support.check(samples).all()
 
 
 @pytest.mark.mcmc
