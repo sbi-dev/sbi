@@ -56,7 +56,9 @@ git switch my-branch && pytest --bm --bm-mode npe -n auto
 ```
 
 The table then shows `NPE_C-nsf [main]` next to `NPE_C-nsf [my-branch]`. A new run
-replaces only the rows with the same label, method, task, and seed.
+replaces the rows with the same label, method, and task, also when the number of
+simulations or seeds is different. With a detached HEAD or outside git, the label is
+`default`, so set one with `--bm-label`.
 
 The results are stored in `.bm_results/results_all.csv`, in the folder that you run
 `pytest` from. If main and your branch are in different checkouts (e.g., a git
@@ -90,11 +92,12 @@ pytest --bm --bm-mode npe --bm-estimators nsf,zuko_nsf --bm-seeds 3 -n auto
 
 ### Rerun one case quickly
 
-The test ids have the form `<method>-<settings>-<task>`, so `-k` selects cases. Use a
-separate label for quick runs with a small budget:
+The test ids have the form `<method>-<settings>-<task>`, with a `seed<N>` part before
+the task when you use `--bm-seeds`. Select cases with `-k`, and use a separate label
+for quick runs with a small budget:
 
 ```bash
-pytest --bm --bm-mode npe -k "NPE_C-mdn-slcp" --bm-num-simulations 500 --bm-label quick
+pytest --bm --bm-mode npe -k "NPE_C-mdn and slcp" --bm-num-simulations 500 --bm-label quick
 ```
 
 To keep results from before and after a change on the same branch, use two labels,

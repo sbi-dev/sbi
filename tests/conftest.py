@@ -20,8 +20,9 @@ seed = 1
 harvested_fixture_data = None
 
 # Mini SBIBM results. A new run replaces the stored rows with the same key.
-RESULT_KEY = ["label", "method", "task_name", "seed"]
-RESULT_COLUMNS = [*RESULT_KEY, "num_simulations", "c2st", "mean_err", "std_err"]
+# A new run replaces all seeds of a case, so the key has no seed.
+RESULT_KEY = ["label", "method", "task_name"]
+RESULT_COLUMNS = [*RESULT_KEY, "seed", "num_simulations", "c2st", "mean_err", "std_err"]
 METRIC_TITLES = {
     "c2st": "C2ST (0.5 is best)",
     "mean_err": "Posterior mean error, in reference std (0 is best)",
@@ -310,7 +311,7 @@ def pytest_sessionfinish(session):
     """Merge the results of this run into the mini SBIBM results file.
 
     With xdist, the main process receives the results of all workers. Rows with the
-    same label, method, task and seed as a new result are replaced. A results file in an
+    same label, method and task as a new result are replaced. A results file in an
     older format is moved to `results_all.old.csv`.
     """
     if not session.config.getoption("--bm") or not is_main_process(session):
