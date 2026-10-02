@@ -205,7 +205,10 @@ def _read_results(results_file: Path) -> pd.DataFrame | None:
     if not results_file.exists():
         return None
     try:
-        results = pd.read_csv(results_file, dtype={"label": str})
+        # Only empty cells are missing, so labels like "NA" stay strings.
+        results = pd.read_csv(
+            results_file, dtype={"label": str}, keep_default_na=False, na_values=[""]
+        )
     except (pd.errors.ParserError, pd.errors.EmptyDataError):
         return None
     if not set(RESULT_COLUMNS).issubset(results.columns):
