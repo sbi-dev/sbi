@@ -20,14 +20,16 @@ from sbi.inference import (
     NRE_C,
     DirectPosterior,
 )
+from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
 )
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
-from sbi.neural_nets import posterior_flow_nn
+from sbi.neural_nets import posterior_flow_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import CNNEmbedding
+from sbi.neural_nets.estimators.mog import MoG
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -173,6 +175,41 @@ def test_batched_sample_log_prob_with_different_x(
             assert torch.allclose(
                 log_probs, batched_log_probs[:, idx], atol=1e-1, rtol=1e-1
             ), "Batched log probs different from non-batched log probs"
+
+
+@pytest.mark.parametrize("reject_outside_prior", [True, False])
+def test_npe_a_batched_sample_log_prob_apply_proposal_correction(
+    reject_outside_prior: bool,
+):
+    """The batched methods must use the proposal-corrected MoG for several x."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((200,))
+    # The correction is analytical, so the estimator does not need training.
+    estimator = posterior_nn("mdn")(theta, theta + 0.1 * torch.randn_like(theta))
+    posterior = NPE_A_Posterior(
+        estimator,
+        prior,
+        proposal_mog=MoG.from_gaussian(ones(2), 2 * eye(2)),
+        prior_mog=MoG.from_gaussian(zeros(2), eye(2)),
+    )
+    x = torch.tensor([[0.0, 0.0], [1.0, -1.0], [-2.0, 0.5]])
+
+    theta = prior.sample((5, 3))
+    log_probs = posterior.log_prob_batched(theta, x)
+    samples = posterior.sample_batched(
+        (10_000,),
+        x,
+        show_progress_bars=False,
+        reject_outside_prior=reject_outside_prior,
+    )
+    for i in range(3):
+        expected = posterior.log_prob(theta[:, i], x=x[i])
+        assert torch.allclose(log_probs[:, i], expected, atol=1e-5)
+
+        reference = posterior.sample((10_000,), x=x[i], show_progress_bars=False)
+        assert torch.allclose(samples[:, i].mean(0), reference.mean(0), atol=0.1)
+        assert torch.allclose(samples[:, i].std(0), reference.std(0), atol=0.1)
 
 
 @pytest.mark.mcmc

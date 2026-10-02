@@ -125,22 +125,13 @@ class NPE_A_Posterior(DirectPosterior):
 
         Args:
             sample_shape: Shape of samples to draw.
-            **kwargs: Must contain 'condition' key with conditioning observation
-                with batch_size == 1.
+            **kwargs: Must contain 'condition' key with conditioning observations,
+                shape (batch_dim, *condition_shape).
 
         Returns:
             Samples from corrected distribution, shape (*sample_shape, batch, dim).
-
-        Raises:
-            ValueError: If condition batch size is not 1.
         """
-        condition = kwargs["condition"]
-        if condition.shape[0] != 1:
-            raise ValueError(
-                f"_sample_estimator only supports batch_size=1, "
-                f"got {condition.shape[0]}"
-            )
-        corrected_mog = self._get_corrected_mog(condition)
+        corrected_mog = self._get_corrected_mog(kwargs["condition"])
         samples = corrected_mog.sample(sample_shape)
 
         # Undo z-score transform if applied
@@ -149,12 +140,12 @@ class NPE_A_Posterior(DirectPosterior):
 
         return samples
 
-    def _corrected_log_prob(self, theta: Tensor, condition: Tensor) -> Tensor:
+    def _log_prob_estimator(self, theta: Tensor, condition: Tensor) -> Tensor:
         """Compute log probability under the corrected MoG.
 
         Args:
             theta: Parameters to evaluate, shape (sample_dim, batch_dim, dim).
-            condition: Conditioning observation.
+            condition: Conditioning observations, shape (batch_dim, *condition_shape).
 
         Returns:
             Log probabilities, shape (sample_dim, batch_dim).
@@ -273,7 +264,7 @@ class NPE_A_Posterior(DirectPosterior):
         self.posterior_estimator.eval()
 
         with torch.set_grad_enabled(track_gradients):
-            unnorm_log_prob = self._corrected_log_prob(
+            unnorm_log_prob = self._log_prob_estimator(
                 theta_density_estimator, x_density_estimator
             )
             unnorm_log_prob = unnorm_log_prob.squeeze(dim=1)
