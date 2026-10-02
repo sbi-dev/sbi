@@ -269,9 +269,11 @@ This will run the mini-sbibm tests only for methods of the `npse` class, but wit
 few major hyperparameter choices, such as different base network architectures and
 different diffusion processes.
 
-The currently available modes are: `"npe"`, `"nle"`, `"nre"`, `"fmpe"`, `"npse"`,
-`"snpe"`, `"snle"`, and `"snre"`. If you require another mode, you can add it to the
-test suite in `tests/bm_test.py`.
+The currently available modes are: `"npe"`, `"npe_pfn"`, `"nle"`, `"nre"`, `"fmpe"`,
+`"npse"`, `"vfpe"` (FMPE and NPSE), `"snpe"`, `"snle"`, and `"snre"`. The sequential
+modes train for two rounds, and their methods are shown with an `S` prefix (e.g.,
+`SNPE_C`). If you require another mode, you can add it to the test suite in
+`tests/bm_test.py`.
 
 Use `--bm-estimators` to replace the selected mode's default estimators with a
 comma-separated list. For example, the following command collects the NPE cases for
@@ -279,6 +281,37 @@ the `nsf` and `maf` density estimators on the `two_moons` task:
 
 ```bash
 pytest --bm --bm-mode npe --bm-estimators nsf,maf -k two_moons --collect-only
+```
+
+For each method and task, the results table shows three numbers, each in its own
+table: the C2ST between posterior samples and reference samples (0.5 is best), and
+the error of the posterior mean and of the posterior standard deviation (0 is best).
+Both errors are divided by the standard deviation of the reference posterior and
+averaged over parameter dimensions. C2ST tells you that a posterior is off, the std
+error tells you how much it is too wide or too narrow. Amortized methods are averaged
+over 10 observations, sequential methods use one observation.
+
+To compare your branch with `main`, run the same benchmark on both branches. Each run
+is labeled with the current git branch, or with `--bm-label`:
+
+```bash
+git switch main
+pytest --bm --bm-mode npe -n auto
+git switch my-branch
+pytest --bm --bm-mode npe -n auto
+```
+
+The table then shows the rows of both runs, e.g., `NPE_C-nsf [main]` and
+`NPE_C-nsf [my-branch]`. A new run replaces only the rows with the same label, method,
+task, and seed. The results are kept in `.bm_results/results_all.csv`. To start from
+scratch, delete the `.bm_results` folder.
+
+A single training run can be noisy. Use `--bm-seeds` to repeat each case with several
+training seeds. The seeds run in parallel with `-n auto`, and the table shows the mean
+and the standard deviation over seeds:
+
+```bash
+pytest --bm --bm-mode npe --bm-seeds 3 -n auto
 ```
 
 ## Contributing to the documentation
