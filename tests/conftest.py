@@ -92,6 +92,12 @@ def pytest_addoption(parser):
         default=None,
         help="Run mini-benchmark tests with specified mode",
     )
+    parser.addoption(
+        "--bm-estimators",
+        action="store",
+        default=None,
+        help="Comma-separated estimators for the selected mini-benchmark mode",
+    )
 
     parser.addoption(
         "--bm-num-simulations",
@@ -105,7 +111,8 @@ def pytest_addoption(parser):
 @pytest.fixture
 def benchmark_mode(request):
     """Fixture to access the --bm value in test files."""
-    return request.config.getoption("--bm-mode")
+    mode = request.config.getoption("--bm-mode")
+    return None if mode is None else str(mode).lower()
 
 
 @pytest.fixture
