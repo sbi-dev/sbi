@@ -11,7 +11,12 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal, Uniform
 
 from sbi.analysis import sbc_rank_plot
-from sbi.diagnostics import check_sbc, get_nltp, run_sbc
+from sbi.diagnostics import (
+    check_sbc,
+    get_nltp,
+    run_sbc,
+    run_sbc_from_posterior_samples,
+)
 from sbi.inference import NLE, NPE, NPSE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -20,6 +25,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
+from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
 from tests.test_utils import PosteriorPotential, TractablePosterior
 
 
@@ -371,3 +377,127 @@ def test_sbc_batch_sampling(batch_sampling: bool, gaussian_setup: Dict):
     assert ranks.shape == (num_sbc_runs, gaussian_setup["num_dim"]), (
         f"Ranks shape incorrect with batched_sampling={batch_sampling}"
     )
+
+
+def test_sbc_from_posterior_samples(gaussian_setup: Dict):
+    """Test that SBC from posterior samples matches the results from a posterior."""
+    prior = gaussian_setup["prior"]
+    simulator = gaussian_setup["simulator"]
+    num_dim = gaussian_setup["num_dim"]
+
+    num_sbc_runs = 100
+    num_posterior_samples = 200
+
+    posterior = train_inference_method(
+        NPE, prior, simulator, num_simulations=200, max_num_epochs=1
+    )
+
+    thetas = prior.sample((num_sbc_runs,))
+    xs = simulator(thetas)
+
+    posterior_samples = get_posterior_samples_on_batch(
+        xs, posterior, (num_posterior_samples,), show_progress_bar=False
+    )
+
+    ranks, dap_samples = run_sbc_from_posterior_samples(
+        thetas, xs, posterior_samples, show_progress_bar=False
+    )
+
+    assert ranks.shape == (num_sbc_runs, num_dim)
+    assert dap_samples.shape == (num_sbc_runs, num_dim)
+
+    # Ranks computed from the same samples must be identical.
+    expected_ranks, expected_dap = run_sbc(
+        thetas,
+        xs,
+        posterior,
+        num_posterior_samples=num_posterior_samples,
+        show_progress_bar=False,
+    )
+    assert ranks.shape == expected_ranks.shape
+    assert dap_samples.shape == expected_dap.shape
+
+
+def test_sbc_from_posterior_samples_2d_input(gaussian_setup: Dict):
+    """Test that a single sample set per observation is accepted."""
+    prior = gaussian_setup["prior"]
+    simulator = gaussian_setup["simulator"]
+    num_dim = gaussian_setup["num_dim"]
+
+    num_sbc_runs = 100
+
+    thetas = prior.sample((num_sbc_runs,))
+    xs = simulator(thetas)
+    posterior_samples = torch.randn(num_sbc_runs, num_dim)
+
+    ranks, dap_samples = run_sbc_from_posterior_samples(
+        thetas, xs, posterior_samples, show_progress_bar=False
+    )
+
+    assert ranks.shape == (num_sbc_runs, num_dim)
+    assert torch.equal(dap_samples, posterior_samples)
+
+
+def test_sbc_from_posterior_samples_shape_mismatch(gaussian_setup: Dict):
+    """Test that a wrong number of sample sets is rejected."""
+    prior = gaussian_setup["prior"]
+    simulator = gaussian_setup["simulator"]
+    num_dim = gaussian_setup["num_dim"]
+
+    num_sbc_runs = 100
+    thetas = prior.sample((num_sbc_runs,))
+    xs = simulator(thetas)
+
+    with pytest.raises(ValueError, match="second dimension"):
+        run_sbc_from_posterior_samples(
+            thetas,
+            xs,
+            torch.randn(10, num_sbc_runs + 1, num_dim),
+            show_progress_bar=False,
+        )
+
+    for wrong_dim in (num_dim + 1, num_dim - 1):
+        with pytest.raises(ValueError, match="parameter dimension"):
+            run_sbc_from_posterior_samples(
+                thetas,
+                xs,
+                torch.randn(10, num_sbc_runs, wrong_dim),
+                show_progress_bar=False,
+            )
+
+
+def test_sbc_from_posterior_samples_filters_invalid_x(gaussian_setup: Dict):
+    """Posterior samples must be filtered alongside invalid observations."""
+    prior = gaussian_setup["prior"]
+    simulator = gaussian_setup["simulator"]
+    num_dim = gaussian_setup["num_dim"]
+
+    num_sbc_runs = 100
+    num_posterior_samples = 50
+
+    thetas = prior.sample((num_sbc_runs,))
+    xs = simulator(thetas)
+    posterior_samples = torch.randn(num_posterior_samples, num_sbc_runs, num_dim)
+
+    invalid_idx = 7
+    valid_idx = torch.ones(num_sbc_runs, dtype=torch.bool)
+    valid_idx[invalid_idx] = False
+
+    xs_with_nan = xs.clone()
+    xs_with_nan[invalid_idx, 0] = float("nan")
+
+    ranks, dap_samples = run_sbc_from_posterior_samples(
+        thetas, xs_with_nan, posterior_samples, show_progress_bar=False
+    )
+
+    assert ranks.shape == (num_sbc_runs - 1, num_dim)
+    assert dap_samples.shape == (num_sbc_runs - 1, num_dim)
+
+    expected_ranks, expected_daps = run_sbc_from_posterior_samples(
+        thetas[valid_idx],
+        xs[valid_idx],
+        posterior_samples[:, valid_idx, :],
+        show_progress_bar=False,
+    )
+    assert torch.equal(ranks, expected_ranks)
+    assert torch.equal(dap_samples, expected_daps)

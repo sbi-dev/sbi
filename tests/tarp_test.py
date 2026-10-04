@@ -7,7 +7,13 @@ from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
 from sbi.analysis.plot import plot_tarp
-from sbi.diagnostics.tarp import _run_tarp, check_tarp, get_tarp_references, run_tarp
+from sbi.diagnostics.tarp import (
+    _run_tarp,
+    check_tarp,
+    get_tarp_references,
+    run_tarp,
+    run_tarp_from_posterior_samples,
+)
 from sbi.inference import NPE
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform
@@ -337,3 +343,27 @@ def test_tarp_plotting(title: str, accurate_samples):
     ecp, alpha = _run_tarp(samples, theta, references)
 
     plot_tarp(ecp, alpha, title=title)
+
+
+def test_tarp_from_posterior_samples(accurate_samples):
+    theta, samples = accurate_samples
+    references = get_tarp_references(theta)
+
+    ecp, alpha = run_tarp_from_posterior_samples(
+        theta, samples, references=references, z_score_theta=False
+    )
+
+    expected_ecp, expected_alpha = _run_tarp(samples, theta, references)
+
+    assert allclose(ecp, expected_ecp)
+    assert allclose(alpha, expected_alpha)
+
+
+def test_tarp_from_posterior_samples_shape_mismatch(accurate_samples):
+    theta, samples = accurate_samples
+
+    with pytest.raises(ValueError, match="must be of shape"):
+        run_tarp_from_posterior_samples(theta, samples[0])
+
+    with pytest.raises(ValueError, match="Wrong posterior samples shape"):
+        run_tarp_from_posterior_samples(theta, samples[:, :-1, :])

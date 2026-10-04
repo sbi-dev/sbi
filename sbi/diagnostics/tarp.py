@@ -103,6 +103,76 @@ def run_tarp(
     )
 
 
+def run_tarp_from_posterior_samples(
+    thetas: Tensor,
+    posterior_samples: Tensor,
+    references: Optional[Tensor] = None,
+    distance: Callable = l2,
+    num_bins: Optional[int] = None,
+    z_score_theta: bool = True,
+) -> Tuple[Tensor, Tensor]:
+    """
+    Estimates coverage from posterior samples that were obtained beforehand.
+
+    In contrast to :func:`run_tarp`, this function does not require a posterior
+    object. It only takes posterior samples, e.g. from a previous inference run or
+    from samples stored on disk. Note that, unlike :func:`run_tarp`, the observed
+    data ``xs`` is not required, because it is not used for computing coverage.
+
+    Reference: `Lemos, Coogan et al 2023 <https://arxiv.org/abs/2302.03026>`_
+
+    Args:
+        thetas: ground-truth parameters, simulated from the prior.
+        posterior_samples: Posterior samples used for the coverage test, of shape
+            ``(num_posterior_samples, num_tarp_samples, num_dim_params)``.
+        references: reference points for TARP. If ``None``, they are sampled
+            uniformly with :func:`get_tarp_references`.
+        distance: the distance metric to use when computing the distance.
+            Should be a callable function that accepts two tensors and
+            computes the distance between them, e.g. given two tensors
+            of shape ``(batch, 3)`` and ``(batch,3)``, this function should
+            return ``(batch,1)`` distance values.
+            Possible values: ``sbi.utils.metrics.l1`` or
+            ``sbi.utils.metrics.l2``. ``l2`` is the default.
+        num_bins: number of bins to use for the credibility values.
+            If ``None``, then ``num_tarp_samples // 10`` bins are used, which targets
+            at least 10 samples per bin (requires ``num_tarp_samples >= 100``).
+        z_score_theta: whether to normalize parameters before coverage test.
+
+    Returns:
+        ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
+        alpha: credibility values, see equation 2 of the paper
+    """
+    num_tarp_samples, dim_theta = thetas.shape
+
+    if posterior_samples.ndim != 3:
+        raise ValueError(
+            "posterior_samples must be of shape "
+            "(num_posterior_samples, num_tarp_samples, num_dim_params), got shape "
+            f"{posterior_samples.shape}."
+        )
+
+    if posterior_samples.shape[1:] != (num_tarp_samples, dim_theta):
+        raise ValueError(
+            "Wrong posterior samples shape for TARP: expected "
+            f"(*, {num_tarp_samples}, {dim_theta}), got {posterior_samples.shape}."
+        )
+
+    if num_tarp_samples < 100:
+        warnings.warn(
+            "Number of TARP samples should be on the order of 100s to give reliable "
+            "results.",
+            stacklevel=2,
+        )
+
+    if references is None:
+        references = get_tarp_references(thetas)
+
+    return _run_tarp(
+        posterior_samples, thetas, references, distance, num_bins, z_score_theta
+    )
+
+
 def _run_tarp(
     posterior_samples: Tensor,
     thetas: Tensor,

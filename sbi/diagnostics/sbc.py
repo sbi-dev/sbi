@@ -18,6 +18,7 @@ from sbi.utils.diagnostics_utils import (
     remove_nans_and_infs_in_x,
 )
 from sbi.utils.metrics import c2st
+from sbi.utils.sbiutils import handle_invalid_x
 
 
 def run_sbc(
@@ -132,6 +133,79 @@ def _validate_sbc_inputs(
 
     if thetas.shape[0] != xs.shape[0]:
         raise ValueError("Unequal number of parameters and observations.")
+
+
+def run_sbc_from_posterior_samples(
+    thetas: Tensor,
+    xs: Tensor,
+    posterior_samples: Tensor,
+    reduce_fns: Union[
+        str,
+        Callable[[Tensor, Tensor], Tensor],
+        List[Callable[[Tensor, Tensor], Tensor]],
+    ] = "marginals",
+    show_progress_bar: bool = True,
+) -> Tuple[Tensor, Tensor]:
+    """Run simulation-based calibration (SBC) from precomputed posterior samples.
+
+    In contrast to :func:`run_sbc`, this function does not require a posterior object.
+    It only takes posterior samples that were obtained beforehand, e.g. from a
+    previous inference run or from samples stored on disk.
+
+    Args:
+        thetas: Ground-truth parameters for SBC, simulated from the prior.
+        xs: Observed data for SBC, simulated from thetas.
+        posterior_samples: Posterior samples used for ranking, of shape
+            ``(num_posterior_samples, num_sbc_samples, num_dim_params)``. A single set
+            of samples of shape ``(num_sbc_samples, num_dim_params)`` is also
+            accepted and treated as one posterior sample per observation.
+        reduce_fns: Function used to reduce the parameter space into 1D.
+            Simulation-based calibration can be recovered by setting this to the
+            string `"marginals"`. Sample-based expected coverage can be recovered
+            by setting it to `posterior.log_prob` (as a Callable).
+        show_progress_bar: Whether to display a progress bar over SBC runs.
+
+    Returns:
+        ranks: Ranks of the ground truth parameters under the inferred posterior.
+        dap_samples: Samples from the data-averaged posterior.
+    """
+    num_sbc_samples = thetas.shape[0]
+
+    is_valid_x, _, _ = handle_invalid_x(xs, exclude_invalid_x=True)
+    thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
+
+    if posterior_samples.ndim == 2:
+        posterior_samples = posterior_samples.unsqueeze(0)
+
+    if posterior_samples.ndim != 3:
+        raise ValueError(
+            "posterior_samples must be of shape "
+            "(num_posterior_samples, num_sbc_samples, num_dim_params), got shape "
+            f"{posterior_samples.shape}."
+        )
+
+    if posterior_samples.shape[1] != num_sbc_samples:
+        raise ValueError(
+            "posterior_samples must contain one sample set per observation, i.e. its "
+            f"second dimension must be {num_sbc_samples}, got "
+            f"{posterior_samples.shape[1]}."
+        )
+
+    if posterior_samples.shape[2] != thetas.shape[1]:
+        raise ValueError(
+            "posterior_samples must have the same parameter dimension as thetas, "
+            f"expected {thetas.shape[1]}, got {posterior_samples.shape[2]}."
+        )
+
+    posterior_samples = posterior_samples[:, is_valid_x, :]
+
+    _validate_sbc_inputs(thetas, xs, thetas.shape[0], posterior_samples.shape[0])
+
+    dap_samples = posterior_samples[0, :, :]
+
+    ranks = _run_sbc(thetas, xs, posterior_samples, reduce_fns, show_progress_bar)
+
+    return ranks, dap_samples
 
 
 def _run_sbc(

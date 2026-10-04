@@ -7,15 +7,26 @@ from sbi.diagnostics.misspecification import (
     calc_misspecification_logprob,
     calc_misspecification_mmd,
 )
-from sbi.diagnostics.sbc import check_sbc, get_nltp, run_sbc
-from sbi.diagnostics.tarp import check_tarp, run_tarp
+from sbi.diagnostics.sbc import (
+    check_sbc,
+    get_nltp,
+    run_sbc,
+    run_sbc_from_posterior_samples,
+)
+from sbi.diagnostics.tarp import (
+    check_tarp,
+    run_tarp,
+    run_tarp_from_posterior_samples,
+)
 
 __all__ = [
     "check_sbc",
     "get_nltp",
     "run_sbc",
+    "run_sbc_from_posterior_samples",
     "check_tarp",
     "run_tarp",
+    "run_tarp_from_posterior_samples",
     "LC2ST",
     "LC2ST_NF",
     "LC2STScores",
