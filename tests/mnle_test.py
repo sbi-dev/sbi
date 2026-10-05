@@ -26,22 +26,8 @@ from sbi.utils.metrics import check_c2st
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import atleast_2d, process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
+from tests.mini_sbibm.mixed_data import MixedData, mixed_simulator
 from tests.test_utils import skip_if_mps_op_unsupported
-
-
-# toy simulator for mixed data
-def mixed_simulator(theta: Tensor, stimulus_condition: Union[Tensor, float] = 2.0):
-    """Simulator for mixed data."""
-    # Extract parameters
-    beta, ps = theta[:, :1], theta[:, 1:]
-
-    # Sample choices and rts independently.
-    choices = Binomial(probs=ps).sample()
-    rts = InverseGamma(
-        concentration=stimulus_condition * torch.ones_like(beta), rate=beta
-    ).sample()
-
-    return torch.cat((rts, choices), dim=1)
 
 
 def mixed_simulator_with_conditions(
@@ -57,13 +43,7 @@ def mixed_simulator_with_conditions(
 @pytest.fixture(scope="module")
 def mnle_prior():
     """Gamma-Beta prior for MNLE tests."""
-    return MultipleIndependent(
-        [
-            Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
-            Beta(torch.tensor([2.0]), torch.tensor([2.0])),
-        ],
-        validate_args=False,
-    )
+    return MixedData().get_prior()
 
 
 @pytest.fixture(

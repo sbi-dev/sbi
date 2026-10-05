@@ -106,6 +106,13 @@ def pytest_addoption(parser):
         type=int,
         help="Run mini-benchmark tests with specified number of simulations",
     )
+    parser.addoption(
+        "--bm-num-iid-trials",
+        action="store",
+        default=10,
+        type=int,
+        help="Number of independent trials for mixed data benchmark observations",
+    )
 
 
 @pytest.fixture
