@@ -267,6 +267,42 @@ def test_npe_a_matches_direct_posterior_with_unconstrained_transform():
     assert prior.support.check(samples).all()
 
 
+def test_npe_a_map_and_potential_apply_proposal_correction():
+    """`potential()` and `map()` must use the proposal-corrected MoG."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), 4 * eye(2))
+    theta = prior.sample((500,))
+    estimator = posterior_nn("mdn", num_components=1)(
+        theta, theta + 0.5 * torch.randn_like(theta)
+    )
+    posterior = NPE_A_Posterior(
+        estimator,
+        prior,
+        proposal_mog=MoG.from_gaussian(torch.tensor([1.0, -1.0]), 3 * eye(2)),
+        prior_mog=MoG.from_gaussian(zeros(2), eye(2)),
+    )
+    x_o = torch.tensor([[0.5, 0.5]])
+    posterior.set_default_x(x_o)
+
+    theta = prior.sample((10,))
+    assert torch.allclose(
+        posterior.potential(theta),
+        posterior.log_prob(theta, norm_posterior=False),
+        atol=1e-5,
+    )
+
+    # With one component in the estimator and the proposal, the corrected posterior
+    # is a Gaussian, so its mode is its mean.
+    with torch.no_grad():
+        corrected_mean = posterior.get_mog_params(x_o).means[0, 0]
+        raw_mean = estimator.get_uncorrected_mog(x_o).means[0, 0]
+    corrected_mode = estimator._inverse_transform_input(corrected_mean)
+    raw_mode = estimator._inverse_transform_input(raw_mean)
+    assert (corrected_mode - raw_mode).norm() > 0.1, "The correction must move it."
+    map_ = posterior.map(num_iter=500, show_progress_bars=False)
+    assert torch.allclose(map_[0], corrected_mode, atol=1e-2)
+
+
 @pytest.mark.mcmc
 @pytest.mark.parametrize("snlre_method", [NRE_C])  # it's independent of the method
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))

@@ -20,9 +20,10 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
-from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.mog import MoG, _correct_for_proposal
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import CallableTransform
+from sbi.utils.torchutils import infer_module_device
 
 
 class MultivariateGaussianMDN(nn.Module):
@@ -587,3 +588,90 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         self._check_condition_shape(condition)
         embedded_condition = self._embedding_net(condition)
         return self.net.get_mixture_components(embedded_condition)
+
+
+class ProposalCorrectedMDN(ConditionalDensityEstimator):
+    """Mixture density estimator with the SNPE-A proposal correction.
+
+    Wraps a MixtureDensityEstimator trained on samples from a proposal. `sample()` and
+    `log_prob()` use the analytically corrected MoG
+        p(θ|x) ∝ q(θ|x) × prior(θ) / proposal(θ),
+    so every method of a posterior built on this estimator is corrected.
+    """
+
+    net: MixtureDensityEstimator
+
+    def __init__(
+        self,
+        estimator: MixtureDensityEstimator,
+        proposal_mog: MoG,
+        prior_mog: Optional[MoG] = None,
+    ) -> None:
+        """Initialize the corrected estimator.
+
+        Args:
+            estimator: The trained MixtureDensityEstimator.
+            proposal_mog: MoG of the proposal in the estimator's transformed space.
+            prior_mog: MoG of the prior in the estimator's transformed space. None for
+                uniform priors (which have zero precision).
+        """
+        super().__init__(estimator, estimator.input_shape, estimator.condition_shape)
+        device = infer_module_device(estimator, fallback="cpu")
+        self._proposal_mog = proposal_mog.to(device).detach()
+        self._prior_mog = (
+            prior_mog.to(device).detach() if prior_mog is not None else None
+        )
+
+    @property
+    def embedding_net(self) -> nn.Module:
+        """Return the embedding network of the wrapped estimator."""
+        return self.net.embedding_net
+
+    def get_corrected_mog(self, condition: Tensor) -> MoG:
+        """Return the proposal-corrected MoG for the given conditions.
+
+        Args:
+            condition: Conditions, shape (batch_dim, *condition_shape).
+
+        Returns:
+            Corrected MoG in the estimator's transformed space.
+        """
+        density_mog = self.net.get_uncorrected_mog(condition)
+        return _correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
+
+    def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        """Compute log probability of inputs under the corrected MoG.
+
+        Args:
+            input: Inputs to evaluate, shape (sample_dim, batch_dim, *input_shape)
+                or (batch_dim, *input_shape).
+            condition: Conditions, shape (batch_dim, *condition_shape).
+
+        Returns:
+            Log probabilities. Shape (sample_dim, batch_dim) if input has sample_dim,
+            otherwise (batch_dim,).
+        """
+        return self.net.log_prob_from_mog(input, self.get_corrected_mog(condition))
+
+    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
+        """Sample from the corrected MoG.
+
+        Args:
+            sample_shape: Shape prefix for samples.
+            condition: Conditions, shape (batch_dim, *condition_shape).
+
+        Returns:
+            Samples, shape (*sample_shape, batch_dim, *input_shape).
+        """
+        return self.net.sample_from_mog(sample_shape, self.get_corrected_mog(condition))
+
+    def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        """Not supported: train the wrapped estimator, the correction is post hoc.
+
+        Raises:
+            NotImplementedError: Always.
+        """
+        raise NotImplementedError(
+            "ProposalCorrectedMDN cannot be trained. Train the wrapped "
+            "MixtureDensityEstimator; the correction is applied after training."
+        )
