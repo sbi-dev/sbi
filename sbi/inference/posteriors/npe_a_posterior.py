@@ -11,7 +11,7 @@ from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
-from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.mog import MoG, _correct_for_proposal
 
 
 class NPE_A_Posterior(DirectPosterior):
@@ -103,9 +103,6 @@ class NPE_A_Posterior(DirectPosterior):
         Returns:
             Corrected MoG if correction is needed, otherwise raw MoG from estimator.
         """
-        # Import here to avoid circular imports
-        from sbi.inference.trainers.npe.npe_a import _correct_for_proposal
-
         density_mog = self.posterior_estimator.get_uncorrected_mog(x)
 
         if not self._apply_correction:
