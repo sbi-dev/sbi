@@ -354,58 +354,63 @@ class MoG:
         mask[dims_to_sample] = True
 
         # Extract values for fixed dimensions
-        y = condition[:, ~mask]  # (batch_size, num_fixed)
+        y = condition[:, ~mask]
 
         # Extract means for free and fixed dimensions
-        mu_x = self.means[:, :, mask]  # (batch_size, num_components, num_free)
-        mu_y = self.means[:, :, ~mask]  # (batch_size, num_components, num_fixed)
+        mu_x = self.means[:, :, mask]
+        mu_y = self.means[:, :, ~mask]
 
-        # Extract precision submatrices
-        # precfs_xx: precision factors for free dimensions
         # Note: precision_factors is guaranteed to be set by __post_init__
-        assert self.precision_factors is not None  # For type checker
+        assert self.precision_factors is not None
         precfs = self.precision_factors
 
-        precfs_xx = precfs[:, :, mask, :][:, :, :, mask]
-        precfs_yy = precfs[:, :, ~mask, :][:, :, :, ~mask]
-
-        # Compute precision matrices
-        precs_xx = torch.matmul(precfs_xx.transpose(-2, -1), precfs_xx)
-        precs_yy = torch.matmul(precfs_yy.transpose(-2, -1), precfs_yy)
-
-        # Full precision and cross terms
+        # Compute the full precision matrix.
+        # P = U^T @ U, where U is the upper-triangular precision factor.
         precs = torch.matmul(precfs.transpose(-2, -1), precfs)
-        precs_xy = precs[:, :, mask, :][:, :, :, ~mask]
 
-        # Conditional mean: mu_x|y = mu_x - precs_xx^{-1} @ precs_xy @ (y - mu_y)
-        # y: (batch_size, num_fixed) -> (batch_size, num_components, num_fixed, 1)
-        y_expanded = y.unsqueeze(1).unsqueeze(-1).expand(-1, num_components, -1, -1)
-        mu_y_col = mu_y.unsqueeze(-1)  # (batch_size, num_components, num_fixed, 1)
+        # Extract blocks from the full precision matrix.
+        precs_xx = precs[:, :, mask, :][:, :, :, mask]
+        precs_xy = precs[:, :, mask, :][:, :, :, ~mask]
+        precs_yx = precs[:, :, ~mask, :][:, :, :, mask]
+        precs_yy = precs[:, :, ~mask, :][:, :, :, ~mask]
+
+        # Conditional mean:
+        # mu_x|y = mu_x - P_xx^{-1} @ P_xy @ (y - mu_y)
+        y_expanded = y.unsqueeze(1).unsqueeze(-1).expand(
+            -1, num_components, -1, -1
+        )
+        mu_y_col = mu_y.unsqueeze(-1)
         diff_y = y_expanded - mu_y_col
 
-        # Compute precs_xx_inv @ precs_xy @ diff_y using solve for numerical stability
-        # solve(A, B) computes A^{-1} @ B more stably than inv(A) @ B
         rhs = torch.matmul(precs_xy, diff_y)
         adjustment = torch.linalg.solve(precs_xx, rhs)
         cond_means = mu_x - adjustment.squeeze(-1)
 
-        # Conditional precision factors are just precfs_xx (precision doesn't change)
-        cond_precfs = precfs_xx
+        # The conditional precision is P_xx.
         cond_precs = precs_xx
 
-        # Update mixture weights using marginal likelihood of y:
-        # p(X|Y=y) = p(Y=y, X) / p(Y=y) => weights ~ p(y | component)
-        diags_yy = torch.diagonal(precfs_yy, dim1=-2, dim2=-1)
-        sumlogdiag_yy = torch.sum(torch.log(diags_yy), dim=-1)
+        # Create an upper-triangular precision factor U such that
+        # P_xx = U^T @ U.
+        cond_precfs = torch.linalg.cholesky(cond_precs).transpose(-2, -1)
 
-        # Compute log p(y | component k) for each component k
-        # This is N(y; mu_y_k, Sigma_yy_k) - need per-component log probs
+        # The marginal precision for Y is the Schur complement:
+        #
+        # P_y = P_yy - P_yx @ P_xx^{-1} @ P_xy
+        schur_rhs = torch.linalg.solve(precs_xx, precs_xy)
+        marginal_precs_yy = precs_yy - torch.matmul(precs_yx, schur_rhs)
+
+        # Compute log determinant of the marginal precision.
+        _, logabsdet_yy = torch.linalg.slogdet(marginal_precs_yy)
+        sumlogdiag_yy = 0.5 * logabsdet_yy
+
+        # Compute log p(y | component k).
         log_prob_y_per_component = self._log_prob_gaussian_per_component(
-            y, mu_y, precs_yy, sumlogdiag_yy
+            y, mu_y, marginal_precs_yy, sumlogdiag_yy
         )
 
-        # New (unnormalized) log weights: log(w_k * p(y|k)) = log(w_k) + log(p(y|k))
+        # New (unnormalized) log weights.
         new_log_weights = self.logits + log_prob_y_per_component
+
         # Normalize
         new_logits = new_log_weights - torch.logsumexp(
             new_log_weights, dim=-1, keepdim=True

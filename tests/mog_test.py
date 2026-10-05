@@ -199,6 +199,43 @@ class TestMoGCondition:
 
         assert torch.allclose(cond_mog.weights.sum(dim=-1), torch.ones(3), atol=1e-6)
 
+    def test_condition_with_free_dimension_after_fixed_dimension(self):
+        """Test conditioning against the analytic Gaussian conditional."""
+        covariance = torch.tensor(
+            [
+                [
+                    [1.0, 0.8],
+                    [0.8, 1.0],
+                ]
+            ]
+        ).unsqueeze(0)
+
+        precision = torch.linalg.inv(covariance)
+        means = torch.zeros(1, 1, 2)
+        logits = torch.zeros(1, 1)
+
+        mog = MoG(logits=logits, means=means, precisions=precision)
+
+        # Fix dimension 0 and keep dimension 1.
+        condition = torch.tensor([[0.5, 0.0]])
+        conditioned = mog.condition(condition, dims_to_sample=[1])
+
+        # Analytic conditional:
+        # X_1 | X_0=0.5 ~ N(0.8 * 0.5, 1 - 0.8^2)
+        expected_mean = torch.tensor([[[0.4]]])
+        expected_variance = torch.tensor([[[[0.36]]]])
+        expected_precision = torch.linalg.inv(expected_variance)
+
+        assert torch.allclose(
+            conditioned.means,
+            expected_mean,
+            atol=1e-6,
+        )
+        assert torch.allclose(
+            conditioned.precisions,
+            expected_precision,
+            atol=1e-6,
+        )
 
 class TestMoGFromGaussian:
     """Test MoG.from_gaussian class method."""
