@@ -20,7 +20,11 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import (
+    ensure_theta_batched,
+    process_device,
+    split_leading_dim,
+)
 from sbi.utils.user_input_checks import check_prior
 
 
@@ -222,10 +226,9 @@ class DirectPosterior(NeuralPosterior):
 
         A partial result on timeout holds fewer samples and stays flat.
         """
-        sample_shape = torch.Size(sample_shape)
-        if samples.shape[0] != sample_shape.numel():
+        if samples.shape[0] != torch.Size(sample_shape).numel():
             return samples
-        return samples.reshape(sample_shape + samples.shape[1:])
+        return split_leading_dim(samples, sample_shape)
 
     def sample_batched(
         self,

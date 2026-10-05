@@ -192,6 +192,12 @@ def test_direct_posterior_multidimensional_sample_shape(snpe_method: type):
 
     assert samples.shape == (*sample_shape, num_dim)
     assert batched_samples.shape == (*sample_shape, num_xs, num_dim)
+    # The default empty shape gives one sample without a leading dimension.
+    assert posterior.sample(x=ones(num_dim)).shape == (num_dim,)
+    assert posterior.sample_batched((), x=ones(num_xs, num_dim)).shape == (
+        num_xs,
+        num_dim,
+    )
 
 
 @pytest.mark.mcmc
