@@ -1,17 +1,19 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from functools import partial
+
 import pytest
 import torch
 from pytest_harvest import ResultsBag
 
-from sbi.inference import FMPE, NLE, NPE, NPE_PFN, NPSE, NRE
+from sbi.inference import FMPE, MNLE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
 from sbi.utils.metrics import c2st
 
-from .mini_sbibm import get_task
+from .mini_sbibm import MixedData, get_task
 from .mini_sbibm.base_task import Task
 
 # Global settings
@@ -41,6 +43,7 @@ METHOD_GROUPS = {
     "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
+    "mnle": [MNLE],
 }
 METHOD_PARAMS = {
     "none": [{}],
@@ -58,6 +61,7 @@ METHOD_PARAMS = {
     "snpe": [{}],
     "snle": [{}],
     "snre": [{}],
+    "mnle": [{}],
 }
 ESTIMATOR_ARGUMENTS = {
     "npe": "density_estimator",
@@ -69,6 +73,7 @@ ESTIMATOR_ARGUMENTS = {
     "snpe": "density_estimator",
     "snle": "density_estimator",
     "snre": "classifier",
+    "mnle": "density_estimator",
 }
 
 
@@ -138,7 +143,9 @@ def pytest_generate_tests(metafunc):
     Args:
         metafunc: The metafunc object from pytest.
     """
-    if not {"inference_class", "extra_kwargs"}.intersection(metafunc.fixturenames):
+    if not {"inference_class", "extra_kwargs", "task"}.intersection(
+        metafunc.fixturenames
+    ):
         return
 
     mode = _benchmark_mode(metafunc.config)
@@ -159,12 +166,27 @@ def pytest_generate_tests(metafunc):
     if "benchmark_seed" in metafunc.fixturenames and num_seeds > 1:
         seeds = range(SEED, SEED + num_seeds)
         metafunc.parametrize("benchmark_seed", seeds, ids=[f"seed{s}" for s in seeds])
+    if "task" in metafunc.fixturenames:
+        if mode == "mnle":
+            num_trials = metafunc.config.getoption("--bm-num-iid-trials")
+            tasks = [partial(MixedData, num_trials=num_trials)]
+            task_ids = [f"mixed_data-{num_trials}trials"]
+        else:
+            tasks = [partial(get_task, name) for name in TASKS]
+            task_ids = TASKS
+        metafunc.parametrize("task", tasks, ids=task_ids, indirect=True)
 
 
 @pytest.fixture
 def benchmark_seed() -> int:
     """Training seed of a benchmark case. Parametrized by --bm-seeds."""
     return SEED
+
+
+@pytest.fixture
+def task(request) -> Task:
+    """Build the task selected by the benchmark mode."""
+    return request.param()
 
 
 def eval_observations(posterior: NeuralPosterior, task: Task) -> dict[str, float]:
@@ -226,7 +248,7 @@ def eval_observation(
 
 def train_and_eval_amortized_inference(
     inference_class,
-    task_name: str,
+    task: Task,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
     seed: int,
@@ -236,7 +258,7 @@ def train_and_eval_amortized_inference(
 
     Args:
         inference_class: The inference class.
-        task_name: The name of the task.
+        task: The benchmark task.
         benchmark_num_simulations: The number of training simulations.
         extra_kwargs: Additional keyword arguments for the method.
         seed: The training seed.
@@ -245,7 +267,6 @@ def train_and_eval_amortized_inference(
         The metrics, averaged over the evaluation observations.
     """
     torch.manual_seed(seed)
-    task = get_task(task_name)
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
@@ -259,7 +280,7 @@ def train_and_eval_amortized_inference(
 
 def train_and_eval_sequential_inference(
     inference_class,
-    task_name: str,
+    task: Task,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
     seed: int,
@@ -269,7 +290,7 @@ def train_and_eval_sequential_inference(
 
     Args:
         inference_class: The inference class.
-        task_name: The name of the task.
+        task: The benchmark task.
         benchmark_num_simulations: The total number of training simulations.
         extra_kwargs: Additional keyword arguments for the method.
         seed: The training seed.
@@ -277,7 +298,6 @@ def train_and_eval_sequential_inference(
     Returns:
         The metrics for the evaluation observation.
     """
-    task = get_task(task_name)
     idx_eval = NUM_EVALUATION_OBS_SEQ
     # Load x_o before seeding: the Gaussian tasks reseed torch in get_observation.
     x_o = task.get_observation(idx_eval)
@@ -309,10 +329,9 @@ def train_and_eval_sequential_inference(
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("task_name", TASKS, ids=str)
 def test_run_benchmark(
     inference_class,
-    task_name: str,
+    task: Task,
     results_bag: ResultsBag,
     extra_kwargs: dict,
     benchmark_mode: str | None,
@@ -324,7 +343,7 @@ def test_run_benchmark(
 
     Args:
         inference_class: The inference class to test i.e. NPE, NLE, NRE ...
-        task_name: The name of the task.
+        task: The benchmark task.
         results_bag: The results bag to store evaluation results. Subclass of dict,
             but allows item assignment with dot notation.
         extra_kwargs: Additional keyword arguments for the method.
@@ -339,7 +358,7 @@ def test_run_benchmark(
         train_and_eval = train_and_eval_amortized_inference
     metrics = train_and_eval(
         inference_class,
-        task_name,
+        task,
         benchmark_num_simulations,
         extra_kwargs,
         benchmark_seed,
@@ -348,7 +367,7 @@ def test_run_benchmark(
     for key, value in metrics.items():
         results_bag[key] = round(value, 3)
     results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task_name
+    results_bag.task_name = task.name
     results_bag.seed = benchmark_seed
     results_bag.method = (
         f"{_class_id(inference_class, benchmark_mode)}-{_kwargs_id(extra_kwargs)}"

@@ -120,7 +120,7 @@ class NPE_A_Posterior(DirectPosterior):
         assert self._proposal_mog is not None
         return _correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
 
-    def _corrected_sample(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
+    def _sample_estimator(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
         """Sample from the corrected MoG distribution.
 
         Args:
@@ -137,7 +137,7 @@ class NPE_A_Posterior(DirectPosterior):
         condition = kwargs["condition"]
         if condition.shape[0] != 1:
             raise ValueError(
-                f"_corrected_sample only supports batch_size=1, "
+                f"_sample_estimator only supports batch_size=1, "
                 f"got {condition.shape[0]}"
             )
         corrected_mog = self._get_corrected_mog(condition)
@@ -218,7 +218,7 @@ class NPE_A_Posterior(DirectPosterior):
 
         if reject_outside_prior:
             samples = rejection.accept_reject_sample(
-                proposal=self._corrected_sample,
+                proposal=self._sample_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
@@ -230,10 +230,11 @@ class NPE_A_Posterior(DirectPosterior):
                 max_sampling_time=max_sampling_time,
             )[0]
         else:
-            samples = self._corrected_sample(torch.Size([num_samples]), condition=x)
+            samples = self._sample_estimator(torch.Size([num_samples]), condition=x)
             warn_if_outside_prior_support(self.prior, samples[:, 0])
 
-        return samples[:, 0]  # Remove batch dimension.
+        # Remove batch dimension.
+        return self._reshape_to_sample_shape(samples[:, 0], sample_shape)
 
     def log_prob(
         self,
@@ -295,45 +296,3 @@ class NPE_A_Posterior(DirectPosterior):
             )
 
             return masked_log_prob - log_factor
-
-    @torch.no_grad()
-    def leakage_correction(
-        self,
-        x: Tensor,
-        num_rejection_samples: int = 10_000,
-        force_update: bool = False,
-        show_progress_bars: bool = False,
-        rejection_sampling_batch_size: int = 10_000,
-    ) -> Tensor:
-        """Return leakage correction factor for posterior density estimate.
-
-        Overrides parent to use corrected sampling.
-        """
-
-        def acceptance_at(x: Tensor) -> Tensor:
-            return rejection.accept_reject_sample(
-                proposal=self._corrected_sample,
-                accept_reject_fn=lambda theta: within_support(self.prior, theta),
-                num_samples=num_rejection_samples,
-                show_progress_bars=show_progress_bars,
-                sample_for_correction_factor=True,
-                max_sampling_batch_size=rejection_sampling_batch_size,
-                proposal_sampling_kwargs={
-                    "condition": reshape_to_batch_event(
-                        x, event_shape=self.posterior_estimator.condition_shape
-                    )
-                },
-            )[1]
-
-        is_new_x = self.default_x is None or (
-            x is not self.default_x and (x != self.default_x).any()
-        )
-        not_saved_at_default_x = self._leakage_density_correction_factor is None
-
-        if is_new_x:
-            return acceptance_at(x)
-        elif not_saved_at_default_x or force_update:
-            assert self.default_x is not None
-            self._leakage_density_correction_factor = acceptance_at(self.default_x)
-
-        return self._leakage_density_correction_factor

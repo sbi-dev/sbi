@@ -3,7 +3,7 @@
 
 import math
 import warnings
-from typing import Dict, Literal, Optional, Tuple, Union
+from typing import Dict, Literal, Optional, Union
 
 import torch
 from torch import Tensor
@@ -27,7 +27,6 @@ from sbi.sbi_types import Shape
 from sbi.utils import check_prior
 from sbi.utils.sbiutils import (
     gradient_ascent,
-    prior_support_is_bounded,
     warn_if_outside_prior_support,
     within_support,
 )
@@ -106,7 +105,6 @@ class VectorFieldPosterior(NeuralPosterior):
             "sde",
         ], f"sample_with must be 'ode' or 'sde', but is {self.sample_with}."
         self.max_sampling_batch_size = max_sampling_batch_size
-        self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
 
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
@@ -147,7 +145,6 @@ class VectorFieldPosterior(NeuralPosterior):
             self.set_default_x(x_o)
 
         self.potential_fn: VectorFieldBasedPotential = potential_fn
-        self._leakage_cache = None
 
     def sample(
         self,
@@ -546,8 +543,6 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
-        if prior_support_is_bounded(self.prior) is False:
-            return torch.ones((), device=self._device)
 
         def acceptance() -> Tensor:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
@@ -571,17 +566,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 )
             return mass
 
-        cache = getattr(self, "_leakage_cache", None)  # Missing in older pickles.
-        if cache is not None and not (force_update or ode_kwargs):
-            cached_x, factor = cache
-            if cached_x.shape == x.shape and torch.equal(
-                cached_x, x.to(cached_x.device)
-            ):
-                return factor
-        factor = acceptance()
-        if not ode_kwargs:
-            self._leakage_cache = (x.detach().clone(), factor)
-        return factor
+        return self._cached_leakage_factor(
+            x, self.prior, acceptance, force_update, use_cache=not ode_kwargs
+        )
 
     def sample_batched(
         self,

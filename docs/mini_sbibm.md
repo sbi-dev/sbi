@@ -4,8 +4,9 @@
 [`sbibm`](https://github.com/sbi-benchmark/sbibm). Use it to check that a change to
 `sbi` does not make inference worse, for example a new loss, network, or sampler.
 
-It trains sbi methods on four tasks with known reference posteriors (`two_moons`,
-`linear_mvg_2d`, `gaussian_linear`, `slcp`) and prints how close the posteriors are.
+It trains sbi methods on tasks with known reference posteriors (`two_moons`,
+`linear_mvg_2d`, `gaussian_linear`, `slcp`, and a mixed data task for MNLE) and prints
+how close the posteriors are.
 The tests have no thresholds: they fail only when something crashes. To see the
 quality, read the results table. mini-sbibm runs locally, not in CI.
 
@@ -17,8 +18,13 @@ pytest --bm --bm-mode npe -n auto    # one mode: NPE with several density estima
 ```
 
 The available modes are `npe`, `npe_pfn`, `nle`, `nre`, `fmpe`, `npse`, `vfpe` (FMPE
-and NPSE), `snpe`, `snle`, and `snre`. The sequential modes train for two rounds and
-show their methods with an `S` prefix, e.g. `SNPE_C`.
+and NPSE), `snpe`, `snle`, `snre`, and `mnle`. The sequential modes train for two
+rounds and show their methods with an `S` prefix, e.g. `SNPE_C`.
+
+The `mnle` mode runs MNLE on a mixed data task: each simulation is one trial with a
+reaction time and a binary choice. MNLE trains on single trials and is evaluated on
+observations with several independent trials, 10 by default. The trial count is part of
+the task name, e.g. `mixed_data-10trials`, so runs with different counts stay apart.
 
 ## Reading the results
 
@@ -112,6 +118,7 @@ e.g. `--bm-label before` and `--bm-label after`.
 | `--bm-estimators` | mode default | Comma-separated estimators for the selected mode. |
 | `--bm-num-simulations` | 2000 | Training simulations per case. Sequential methods split them over two rounds. |
 | `--bm-seeds` | 1 | Training seeds per case. |
+| `--bm-num-iid-trials` | 10 | Trials per observation in the `mnle` mode. |
 | `--bm-label` | git branch | Name of the run in the results table. |
 | `--bm-results-dir` | `.bm_results` | Folder of the results file. |
 
@@ -124,4 +131,6 @@ settings to `METHOD_PARAMS`, and, for `--bm-estimators`, the estimator argument 
 Tasks live in `tests/mini_sbibm/`. A task subclasses `Task` and provides a prior, a
 simulator, and 10 observations with at least 1000 reference posterior samples each,
 either from files or computed (see `gaussian_linear.py`). Register it in
-`tests/mini_sbibm/__init__.py` and add it to `TASKS` in `tests/bm_test.py`.
+`tests/mini_sbibm/__init__.py` and add it to `TASKS` in `tests/bm_test.py`. A task
+that only fits one mode, like the mixed data task, is selected in
+`pytest_generate_tests` instead.
