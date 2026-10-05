@@ -20,7 +20,11 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import (
+    ensure_theta_batched,
+    process_device,
+    split_leading_dim,
+)
 from sbi.utils.user_input_checks import check_prior
 
 
@@ -206,7 +210,18 @@ class DirectPosterior(NeuralPosterior):
             )
             warn_if_outside_prior_support(self.prior, samples[:, 0])
 
-        return samples[:, 0]  # Remove batch dimension.
+        # Remove batch dimension.
+        return self._reshape_to_sample_shape(samples[:, 0], sample_shape)
+
+    @staticmethod
+    def _reshape_to_sample_shape(samples: Tensor, sample_shape: Shape) -> Tensor:
+        """Reshape the leading sample dimension of `samples` into `sample_shape`.
+
+        A partial result on timeout holds fewer samples and stays flat.
+        """
+        if samples.shape[0] != torch.Size(sample_shape).numel():
+            return samples
+        return split_leading_dim(samples, sample_shape)
 
     def sample_batched(
         self,
@@ -297,7 +312,7 @@ class DirectPosterior(NeuralPosterior):
             )
             warn_if_outside_prior_support(self.prior, samples)
 
-        return samples
+        return self._reshape_to_sample_shape(samples, sample_shape)
 
     def log_prob(
         self,
