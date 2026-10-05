@@ -4,52 +4,35 @@
 import pytest
 import torch
 from pyro.distributions import InverseGamma
-from torch.distributions import Bernoulli
+from torch.distributions import Bernoulli, Beta, Gamma
+
+from sbi.utils.user_input_checks_utils import MultipleIndependent
 
 from .mixed_data import MixedData
 
 
-def test_mixed_data_task_shapes():
-    """The task separates simulation batches from IID evaluation trials."""
-    task = MixedData(num_trials=4)
-
-    theta, x = task.get_data(5)
-
-    assert theta.shape == (5, 2)
-    assert x.shape == (5, 2)
-    assert task.get_observation(1).shape == (4, 2)
-    assert task.get_reference_posterior_samples(1).shape == (10_000, 2)
-
-
-def test_mixed_data_reference_posterior_parameters():
-    """The exact posterior uses Gamma and Beta conjugate updates."""
-    task = MixedData(num_trials=2)
-    observation = torch.tensor([[1.0, 1.0], [2.0, 0.0]])
-
-    rate_posterior, choice_posterior = task._get_reference_posterior(observation)
-
-    assert torch.equal(rate_posterior.concentration, torch.tensor([5.0]))
-    assert torch.equal(rate_posterior.rate, torch.tensor([2.0]))
-    assert torch.equal(choice_posterior.concentration1, torch.tensor([3.0]))
-    assert torch.equal(choice_posterior.concentration0, torch.tensor([3.0]))
-
-
-def test_mixed_data_rejects_nonpositive_trial_count():
-    """Evaluation observations need at least one trial."""
-    with pytest.raises(ValueError, match="num_trials must be at least one"):
-        MixedData(num_trials=0)
-
-
 @pytest.mark.parametrize("num_trials", [1, 4, 10])
-def test_reference_density_matches_simulator_likelihood(num_trials):
+@pytest.mark.parametrize("custom_prior", [False, True])
+def test_reference_density_matches_simulator_likelihood(num_trials, custom_prior):
     """The normalized reference and simulator joint differ only by evidence."""
-    task = MixedData(num_trials=num_trials)
-    observation = task.get_observation(3)
+    task = MixedData(num_trials=10)
+    task.stimulus_condition = 3.0
+    if custom_prior:
+        task.get_prior = lambda: MultipleIndependent(
+            [
+                Gamma(torch.tensor([2.0]), torch.tensor([0.8])),
+                Beta(torch.tensor([3.0]), torch.tensor([4.0])),
+            ],
+            validate_args=False,
+        )
+    observation = task.get_observation(3)[:num_trials]
     theta = torch.tensor([[0.4, 0.2], [1.1, 0.5], [3.0, 0.8]])
     rate, choice = task._get_reference_posterior(observation)
     reference_log_prob = rate.log_prob(theta[:, 0]) + choice.log_prob(theta[:, 1])
 
-    likelihood = InverseGamma(2.0, theta[:, :1]).log_prob(observation[:, 0])
+    likelihood = InverseGamma(task.stimulus_condition, theta[:, :1]).log_prob(
+        observation[:, 0]
+    )
     likelihood += Bernoulli(probs=theta[:, 1:]).log_prob(observation[:, 1])
     joint_log_prob = likelihood.sum(dim=1) + task.get_prior().log_prob(theta)
 

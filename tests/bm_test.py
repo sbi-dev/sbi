@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from functools import partial
+
 import pytest
 import torch
 from pytest_harvest import ResultsBag
@@ -11,13 +13,12 @@ from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
 from sbi.utils.metrics import c2st
 
-from .mini_sbibm import get_task
+from .mini_sbibm import MixedData, get_task
 from .mini_sbibm.base_task import Task
 
 # Global settings
 SEED = 0
 TASKS = ["two_moons", "linear_mvg_2d", "gaussian_linear", "slcp"]
-MODE_TASKS = {"mnle": ["mixed_data"]}
 NUM_EVALUATION_OBS = 3  # Currently only 3 observation tested for speed
 NUM_ROUNDS_SEQUENTIAL = 2
 NUM_EVALUATION_OBS_SEQ = 1
@@ -62,6 +63,7 @@ METHOD_PARAMS = {
     "mnle": [{}],
 }
 ESTIMATOR_ARGUMENTS = {
+    "mnle": "density_estimator",
     "npe": "density_estimator",
     "nle": "density_estimator",
     "nre": "classifier",
@@ -125,10 +127,10 @@ def _kwargs_id(parameters: dict) -> str:
     return "-".join(str(value) for value in parameters.values()) or "default"
 
 
-def _get_benchmark_task(task_name: str, num_iid_trials: int) -> Task:
-    """Return a task with mode specific benchmark settings."""
-    kwargs = {"num_trials": num_iid_trials} if task_name == "mixed_data" else {}
-    return get_task(task_name, **kwargs)
+@pytest.fixture
+def task(request) -> Task:
+    """Build the task selected by the benchmark mode."""
+    return request.param()
 
 
 # Use pytest.mark.parametrize dynamically
@@ -140,7 +142,7 @@ def pytest_generate_tests(metafunc):
     Args:
         metafunc: The metafunc object from pytest.
     """
-    if not {"inference_class", "extra_kwargs", "task_name"}.intersection(
+    if not {"inference_class", "extra_kwargs", "task"}.intersection(
         metafunc.fixturenames
     ):
         return
@@ -153,9 +155,15 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize(
             "extra_kwargs", kwargs_group, ids=[_kwargs_id(p) for p in kwargs_group]
         )
-    if "task_name" in metafunc.fixturenames:
-        tasks = MODE_TASKS.get(mode, TASKS)
-        metafunc.parametrize("task_name", tasks, ids=str)
+    if "task" in metafunc.fixturenames:
+        if mode == "mnle":
+            num_trials = metafunc.config.getoption("--bm-num-iid-trials")
+            tasks = [partial(MixedData, num_trials=num_trials)]
+            task_ids = [f"mixed_data-{num_trials}trials"]
+        else:
+            tasks = [partial(get_task, name) for name in TASKS]
+            task_ids = TASKS
+        metafunc.parametrize("task", tasks, ids=task_ids, indirect=True)
 
 
 def standard_eval_c2st_loop(posterior: NeuralPosterior, task: Task) -> float:
@@ -209,9 +217,8 @@ def eval_c2st(
 
 def train_and_eval_amortized_inference(
     inference_class,
-    task_name: str,
+    task: Task,
     benchmark_num_simulations: int,
-    benchmark_num_iid_trials: int,
     extra_kwargs: dict,
     results_bag: ResultsBag,
 ) -> None:
@@ -220,15 +227,13 @@ def train_and_eval_amortized_inference(
 
     Args:
         method: The inference method.
-        task_name: The name of the task.
+        task: The benchmark task.
         benchmark_num_simulations: Number of training simulations.
-        benchmark_num_iid_trials: Number of trials in mixed data observations.
         extra_kwargs: Additional keyword arguments for the method.
         results_bag: The results bag to store evaluation results. Subclass of dict, but
             allows item assignment with dot notation.
     """
     torch.manual_seed(SEED)
-    task = _get_benchmark_task(task_name, benchmark_num_iid_trials)
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
@@ -242,15 +247,14 @@ def train_and_eval_amortized_inference(
     # Cache results
     results_bag.metric = mean_c2st
     results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task_name
+    results_bag.task_name = task.name
     results_bag.method = inference_class.__name__ + str(extra_kwargs)
 
 
 def train_and_eval_sequential_inference(
     inference_class,
-    task_name: str,
+    task: Task,
     benchmark_num_simulations: int,
-    benchmark_num_iid_trials: int,
     extra_kwargs: dict,
     results_bag: ResultsBag,
 ) -> None:
@@ -259,14 +263,12 @@ def train_and_eval_sequential_inference(
 
     Args:
         method: The inference method.
-        task_name (str): The name of the task.
+        task: The benchmark task.
         benchmark_num_simulations: Number of training simulations.
-        benchmark_num_iid_trials: Number of trials in mixed data observations.
         extra_kwargs (dict): Additional keyword arguments for the method.
         results_bag: The results bag to store evaluation results.
     """
     torch.manual_seed(SEED)
-    task = _get_benchmark_task(task_name, benchmark_num_iid_trials)
     num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
     thetas, xs = task.get_data(num_simulations)
     prior = task.get_prior()
@@ -297,48 +299,44 @@ def train_and_eval_sequential_inference(
     # Cache results
     results_bag.metric = c2st_val
     results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task_name
+    results_bag.task_name = task.name
     results_bag.method = inference_class.__name__ + str(extra_kwargs)
 
 
 @pytest.mark.benchmark
 def test_run_benchmark(
     inference_class,
-    task_name: str,
+    task: Task,
     results_bag,
     extra_kwargs: dict,
     benchmark_mode: str,
     benchmark_num_simulations: int,
-    benchmark_num_iid_trials: int,
 ) -> None:
     """
     Benchmark test for amortized and sequential inference methods.
 
     Args:
         inference_class: The inference class to test i.e. NPE, NLE, NRE ...
-        task_name: The name of the task.
+        task: The benchmark task.
         results_bag: The results bag to store evaluation results.
         extra_kwargs: Additional keyword arguments for the method.
         benchmark_mode: The benchmark mode. This is a fixture which based on user
             input, determines which type of methods should be run.
         benchmark_num_simulations: Number of training simulations.
-        benchmark_num_iid_trials: Number of trials in mixed data observations.
     """
     if benchmark_mode in ["snpe", "snle", "snre"]:
         train_and_eval_sequential_inference(
             inference_class,
-            task_name,
+            task,
             benchmark_num_simulations,
-            benchmark_num_iid_trials,
             extra_kwargs,
             results_bag,
         )
     else:
         train_and_eval_amortized_inference(
             inference_class,
-            task_name,
+            task,
             benchmark_num_simulations,
-            benchmark_num_iid_trials,
             extra_kwargs,
             results_bag,
         )

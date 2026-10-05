@@ -38,7 +38,7 @@ class MixedData(Task):
             raise ValueError("num_trials must be at least one.")
         self.num_trials = num_trials
         self.stimulus_condition = 2.0
-        super().__init__("mixed_data")
+        super().__init__(f"mixed_data-{num_trials}trials")
 
     def theta_dim(self) -> int:
         """Return the parameter dimensionality."""
@@ -85,13 +85,15 @@ class MixedData(Task):
         """Return the conjugate posterior distributions for an observation."""
         reaction_times = observation[:, :1]
         choices = observation[:, 1:]
+        num_trials = observation.shape[0]
+        rate_prior, choice_prior = self.get_prior().dists
 
         rate_posterior = Gamma(
-            torch.tensor([1.0 + self.stimulus_condition * self.num_trials]),
-            torch.tensor([0.5]) + torch.sum(reaction_times.reciprocal(), dim=0),
+            rate_prior.concentration + self.stimulus_condition * num_trials,
+            rate_prior.rate + torch.sum(reaction_times.reciprocal(), dim=0),
         )
         choice_posterior = Beta(
-            torch.tensor([2.0]) + torch.sum(choices, dim=0),
-            torch.tensor([2.0 + self.num_trials]) - torch.sum(choices, dim=0),
+            choice_prior.concentration1 + torch.sum(choices, dim=0),
+            choice_prior.concentration0 + num_trials - torch.sum(choices, dim=0),
         )
         return rate_posterior, choice_posterior

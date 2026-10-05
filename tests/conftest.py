@@ -128,12 +128,6 @@ def benchmark_num_simulations(request):
     return int(request.config.getoption("--bm-num-simulations"))
 
 
-@pytest.fixture
-def benchmark_num_iid_trials(request):
-    """Fixture to access the --bm-num-iid-trials value in test files."""
-    return int(request.config.getoption("--bm-num-iid-trials"))
-
-
 @pytest.fixture(scope="session", autouse=True)
 def finalize_fixture_store(request, fixture_store):
     # The code before `yield` runs at the start of the session (before tests).

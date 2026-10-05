@@ -288,6 +288,9 @@ independent trials by default. Use `--bm-num-iid-trials` to change that number:
 pytest --bm --bm-mode mnle --bm-num-iid-trials 20
 ```
 
+The trial count is included in the test ID and result task name, for example
+`mixed_data-20trials`, so runs with different observation sizes remain separate.
+
 ## Contributing to the documentation
 
 Most of the documentation for `sbi` is written in reStructuredText and the website is
