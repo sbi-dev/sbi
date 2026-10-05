@@ -493,7 +493,23 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             Log probabilities. Shape (sample_dim, batch_dim) if input has sample_dim,
             otherwise (batch_dim,).
         """
-        self._check_condition_shape(condition)
+        return self.log_prob_from_mog(input, self.get_uncorrected_mog(condition))
+
+    def log_prob_from_mog(self, input: Tensor, mog: MoG) -> Tensor:
+        """Compute log probability of inputs under a given MoG.
+
+        The MoG lives in transformed space. As in `log_prob()`, inputs are transformed
+        before evaluation and the log-det-jacobian is added.
+
+        Args:
+            input: Inputs to evaluate, shape (sample_dim, batch_dim, *input_shape)
+                or (batch_dim, *input_shape).
+            mog: MoG in transformed space, with batch size batch_dim or 1.
+
+        Returns:
+            Log probabilities. Shape (sample_dim, batch_dim) if input has sample_dim,
+            otherwise (batch_dim,).
+        """
         self._check_input_shape(input)
 
         # Handle input with or without sample dimension
@@ -503,9 +519,6 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
         # Apply z-score transform to input if enabled
         transformed_input = self._transform_input(input)
-
-        # Get MoG from network
-        mog = self.get_uncorrected_mog(condition)
 
         # MoG.log_prob handles (sample_dim, batch_dim, dim) input
         # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
@@ -544,18 +557,23 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         Returns:
             Samples, shape (*sample_shape, batch_dim, *input_shape).
         """
-        self._check_condition_shape(condition)
+        return self.sample_from_mog(sample_shape, self.get_uncorrected_mog(condition))
 
-        # Get MoG from network
-        mog = self.get_uncorrected_mog(condition)
+    def sample_from_mog(self, sample_shape: torch.Size, mog: MoG) -> Tensor:
+        """Sample from a given MoG and map the samples back to input space.
 
+        Args:
+            sample_shape: Shape prefix for samples.
+            mog: MoG in transformed space, with batch size batch_dim.
+
+        Returns:
+            Samples, shape (*sample_shape, batch_dim, *input_shape).
+        """
         # MoG.sample returns (*sample_shape, batch_dim, dim) - matches sbi convention
         samples = mog.sample(sample_shape)
 
         # Apply inverse transform to get samples in original space
-        samples = self._inverse_transform_input(samples)
-
-        return samples
+        return self._inverse_transform_input(samples)
 
     def get_uncorrected_mog(self, condition: Tensor) -> MoG:
         """Extract MoG parameters for a given condition.
