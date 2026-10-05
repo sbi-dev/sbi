@@ -236,6 +236,27 @@ class TestMoGCondition:
             expected_precision,
             atol=1e-6,
         )
+    @pytest.mark.parametrize("condition_value", [0.0, 4.0, 10.0])
+    def test_condition_weights_far_from_component_means(self, condition_value):
+        """Conditioned log-weights stay finite and exact far from all components."""
+        sigma = 0.4
+        means = torch.zeros(1, 3, 2)
+        means[0, :, 1] = torch.tensor([8.0, 16.0, 24.0])
+        precision_factors = torch.eye(2).expand(1, 3, 2, 2) / sigma
+        mog = MoG(
+            logits=torch.zeros(1, 3),
+            means=means,
+            precisions=precision_factors.transpose(3, 2) @ precision_factors,
+            precision_factors=precision_factors,
+        )
+        condition = torch.tensor([[0.0, condition_value]])
+
+        cond_mog = mog.condition(condition, dims_to_sample=[0])
+
+        log_weights = -0.5 * ((condition_value - means[0, :, 1]) / sigma) ** 2
+        expected = log_weights - torch.logsumexp(log_weights, dim=-1)
+        assert torch.allclose(cond_mog.logits[0], expected, rtol=1e-5, atol=1e-3)
+
 
 class TestMoGFromGaussian:
     """Test MoG.from_gaussian class method."""

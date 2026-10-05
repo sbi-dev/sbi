@@ -175,6 +175,31 @@ def test_batched_sample_log_prob_with_different_x(
             ), "Batched log probs different from non-batched log probs"
 
 
+@pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
+def test_direct_posterior_multidimensional_sample_shape(snpe_method: type):
+    """DirectPosterior keeps every sample dimension, like the other posteriors."""
+    num_dim, num_xs, sample_shape = 2, 4, (2, 3)
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    theta = prior.sample((100,))
+    inference = snpe_method(prior=prior)
+    inference.append_simulations(theta, diagonal_linear_gaussian(theta)).train(
+        max_num_epochs=1
+    )
+    posterior = inference.build_posterior()
+
+    samples = posterior.sample(sample_shape, x=ones(num_dim))
+    batched_samples = posterior.sample_batched(sample_shape, x=ones(num_xs, num_dim))
+
+    assert samples.shape == (*sample_shape, num_dim)
+    assert batched_samples.shape == (*sample_shape, num_xs, num_dim)
+    # The default empty shape gives one sample without a leading dimension.
+    assert posterior.sample(x=ones(num_dim)).shape == (num_dim,)
+    assert posterior.sample_batched((), x=ones(num_xs, num_dim)).shape == (
+        num_xs,
+        num_dim,
+    )
+
+
 @pytest.mark.mcmc
 @pytest.mark.parametrize("snlre_method", [NRE_C])  # it's independent of the method
 @pytest.mark.parametrize("x_o_batch_dim", (0, 1, 2))
