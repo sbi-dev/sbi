@@ -622,6 +622,15 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
             prior_mog.to(device).detach() if prior_mog is not None else None
         )
 
+    def _apply(self, fn, *args, **kwargs):
+        """Also move the proposal and prior MoGs, which are not buffers."""
+        super()._apply(fn, *args, **kwargs)
+        device = infer_module_device(self.net, fallback="cpu")
+        self._proposal_mog = self._proposal_mog.to(device)
+        if self._prior_mog is not None:
+            self._prior_mog = self._prior_mog.to(device)
+        return self
+
     @property
     def embedding_net(self) -> nn.Module:
         """Return the embedding network of the wrapped estimator."""
