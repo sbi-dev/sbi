@@ -27,13 +27,11 @@ from sbi.inference import (
     posterior_estimator_based_potential,
 )
 from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
-from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     FilteredDirectPosteriorParameters,
     MCMCPosteriorParameters,
 )
 from sbi.neural_nets import posterior_nn
-from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -931,34 +929,3 @@ def test_npe_a_rejects_unconstrained_transform_after_first_round(prior):
     )
     with pytest.raises(NotImplementedError, match="affine z-score"):
         inference.build_posterior()
-
-
-def test_conditioned_mdn_applies_npe_a_proposal_correction():
-    """`ConditionedMDN` of a round-2 NPE-A estimator must use the corrected MoG."""
-    torch.manual_seed(0)
-    prior = MultivariateNormal(zeros(2), 4 * eye(2))
-    theta = prior.sample((500,))
-    estimator = posterior_nn("mdn", num_components=1)(
-        theta, theta + 0.5 * torch.randn_like(theta)
-    )
-    posterior = NPE_A_Posterior(
-        estimator,
-        prior,
-        proposal_mog=MoG.from_gaussian(torch.tensor([1.0, -1.0]), 3 * eye(2)),
-        prior_mog=MoG.from_gaussian(zeros(2), eye(2)),
-    )
-    x_o = torch.tensor([[0.5, 0.5]])
-    conditioned = ConditionedMDN(
-        posterior.posterior_estimator,
-        x_o,
-        condition=torch.tensor([[0.0, 1.0]]),
-        dims_to_sample=[0],
-    )
-
-    # The conditional is proportional to the joint along the slice theta_1 = 1.
-    theta_0 = torch.linspace(-3, 3, 7).unsqueeze(1)
-    joint = posterior.log_prob(
-        torch.cat([theta_0, ones(7, 1)], dim=1), x=x_o, norm_posterior=False
-    )
-    difference = conditioned.log_prob(theta_0) - joint
-    assert torch.allclose(difference, difference[0], atol=1e-4)

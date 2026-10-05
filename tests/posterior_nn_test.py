@@ -8,6 +8,7 @@ import torch
 from torch import eye, nn, ones, zeros
 from torch.distributions import Independent, MultivariateNormal, Uniform
 
+from sbi.analysis import ConditionedMDN
 from sbi.inference import (
     FMPE,
     NLE_A,
@@ -267,8 +268,8 @@ def test_npe_a_matches_direct_posterior_with_unconstrained_transform():
     assert prior.support.check(samples).all()
 
 
-def test_npe_a_map_and_potential_apply_proposal_correction():
-    """`potential()` and `map()` must use the proposal-corrected MoG."""
+def test_npe_a_map_potential_and_conditional_apply_proposal_correction():
+    """`potential()`, `map()` and `ConditionedMDN` must use the corrected MoG."""
     torch.manual_seed(0)
     prior = MultivariateNormal(zeros(2), 4 * eye(2))
     theta = prior.sample((500,))
@@ -301,6 +302,20 @@ def test_npe_a_map_and_potential_apply_proposal_correction():
     assert (corrected_mode - raw_mode).norm() > 0.1, "The correction must move it."
     map_ = posterior.map(num_iter=500, show_progress_bars=False)
     assert torch.allclose(map_[0], corrected_mode, atol=1e-2)
+
+    # The conditional is proportional to the joint along the slice theta_1 = 1.
+    conditioned = ConditionedMDN(
+        posterior.posterior_estimator,
+        x_o,
+        condition=torch.tensor([[0.0, 1.0]]),
+        dims_to_sample=[0],
+    )
+    theta_0 = torch.linspace(-3, 3, 7).unsqueeze(1)
+    joint = posterior.log_prob(
+        torch.cat([theta_0, ones(7, 1)], dim=1), norm_posterior=False
+    )
+    difference = conditioned.log_prob(theta_0) - joint
+    assert torch.allclose(difference, difference[0], atol=1e-4)
 
 
 @pytest.mark.mcmc

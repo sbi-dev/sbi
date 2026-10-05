@@ -649,29 +649,11 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
         return _correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        """Compute log probability of inputs under the corrected MoG.
-
-        Args:
-            input: Inputs to evaluate, shape (sample_dim, batch_dim, *input_shape)
-                or (batch_dim, *input_shape).
-            condition: Conditions, shape (batch_dim, *condition_shape).
-
-        Returns:
-            Log probabilities. Shape (sample_dim, batch_dim) if input has sample_dim,
-            otherwise (batch_dim,).
-        """
+        """Log probability under the corrected MoG; shapes as in the wrapped MDN."""
         return self.net.log_prob_from_mog(input, self.get_corrected_mog(condition))
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
-        """Sample from the corrected MoG.
-
-        Args:
-            sample_shape: Shape prefix for samples.
-            condition: Conditions, shape (batch_dim, *condition_shape).
-
-        Returns:
-            Samples, shape (*sample_shape, batch_dim, *input_shape).
-        """
+        """Sample from the corrected MoG; shapes as in the wrapped MDN."""
         return self.net.sample_from_mog(sample_shape, self.get_corrected_mog(condition))
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
