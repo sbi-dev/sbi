@@ -623,12 +623,20 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
         )
 
     def _apply(self, fn, *args, **kwargs):
-        """Also move the proposal and prior MoGs, which are not buffers."""
+        """Also apply `fn` to the proposal and prior MoGs, which are not buffers."""
         super()._apply(fn, *args, **kwargs)
-        device = infer_module_device(self.net, fallback="cpu")
-        self._proposal_mog = self._proposal_mog.to(device)
+
+        def apply(mog: MoG) -> MoG:
+            return MoG(
+                fn(mog.logits),
+                fn(mog.means),
+                fn(mog.precisions),
+                fn(mog.precision_factors),
+            )
+
+        self._proposal_mog = apply(self._proposal_mog)
         if self._prior_mog is not None:
-            self._prior_mog = self._prior_mog.to(device)
+            self._prior_mog = apply(self._prior_mog)
         return self
 
     @property
