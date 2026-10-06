@@ -19,9 +19,10 @@ from .mini_sbibm.base_task import Task
 # Global settings
 SEED = 0
 TASKS = ["two_moons", "linear_mvg_2d", "gaussian_linear", "slcp"]
-NUM_EVALUATION_OBS = 3  # Currently only 3 observation tested for speed
+NUM_EVALUATION_OBS = 10
 NUM_ROUNDS_SEQUENTIAL = 2
 NUM_EVALUATION_OBS_SEQ = 1
+SEQUENTIAL_MODES = {"snpe", "snle", "snre"}
 TRAIN_KWARGS = {}
 
 # Density estimators to test
@@ -63,7 +64,6 @@ METHOD_PARAMS = {
     "mnle": [{}],
 }
 ESTIMATOR_ARGUMENTS = {
-    "mnle": "density_estimator",
     "npe": "density_estimator",
     "nle": "density_estimator",
     "nre": "classifier",
@@ -73,6 +73,7 @@ ESTIMATOR_ARGUMENTS = {
     "snpe": "density_estimator",
     "snle": "density_estimator",
     "snre": "classifier",
+    "mnle": "density_estimator",
 }
 
 
@@ -127,10 +128,10 @@ def _kwargs_id(parameters: dict) -> str:
     return "-".join(str(value) for value in parameters.values()) or "default"
 
 
-@pytest.fixture
-def task(request) -> Task:
-    """Build the task selected by the benchmark mode."""
-    return request.param()
+def _class_id(inference_class, mode: str | None) -> str:
+    """Return the class name, prefixed with "S" for multi-round runs."""
+    prefix = "S" if mode in SEQUENTIAL_MODES else ""
+    return prefix + inference_class.__name__
 
 
 # Use pytest.mark.parametrize dynamically
@@ -149,12 +150,22 @@ def pytest_generate_tests(metafunc):
 
     mode = _benchmark_mode(metafunc.config)
     if "inference_class" in metafunc.fixturenames:
-        metafunc.parametrize("inference_class", METHOD_GROUPS[mode])
+        classes = METHOD_GROUPS[mode]
+        metafunc.parametrize(
+            "inference_class", classes, ids=[_class_id(c, mode) for c in classes]
+        )
     if "extra_kwargs" in metafunc.fixturenames:
         kwargs_group = _benchmark_kwargs(metafunc.config, mode)
         metafunc.parametrize(
             "extra_kwargs", kwargs_group, ids=[_kwargs_id(p) for p in kwargs_group]
         )
+    num_seeds = metafunc.config.getoption("--bm-seeds")
+    if num_seeds < 1:
+        raise pytest.UsageError("--bm-seeds must be at least 1.")
+    # One seed keeps the `benchmark_seed` fixture, and with it today's test ids.
+    if "benchmark_seed" in metafunc.fixturenames and num_seeds > 1:
+        seeds = range(SEED, SEED + num_seeds)
+        metafunc.parametrize("benchmark_seed", seeds, ids=[f"seed{s}" for s in seeds])
     if "task" in metafunc.fixturenames:
         if mode == "mnle":
             num_trials = metafunc.config.getoption("--bm-num-iid-trials")
@@ -166,53 +177,73 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("task", tasks, ids=task_ids, indirect=True)
 
 
-def standard_eval_c2st_loop(posterior: NeuralPosterior, task: Task) -> float:
+@pytest.fixture
+def benchmark_seed() -> int:
+    """Training seed of a benchmark case. Parametrized by --bm-seeds."""
+    return SEED
+
+
+@pytest.fixture
+def task(request) -> Task:
+    """Build the task selected by the benchmark mode."""
+    return request.param()
+
+
+def eval_observations(posterior: NeuralPosterior, task: Task) -> dict[str, float]:
     """
-    Evaluates the C2ST metric for the given posterior and task.
+    Evaluates the posterior on the first `NUM_EVALUATION_OBS` observations.
 
     Args:
         posterior: The posterior distribution.
         task: The task object.
 
     Returns:
-        float: The mean C2ST value.
+        The metrics of `eval_observation`, averaged over the observations.
     """
-    c2st_scores = []
-    for i in range(1, NUM_EVALUATION_OBS + 1):
-        c2st_val = eval_c2st(posterior, task, i)
-        c2st_scores.append(c2st_val)
-
-    mean_c2st = sum(c2st_scores) / len(c2st_scores)
-    # Convert to float rounded to 3 decimal places
-    mean_c2st = float(f"{mean_c2st:.3f}")
-    return mean_c2st
+    metrics = [
+        eval_observation(posterior, task, i) for i in range(1, NUM_EVALUATION_OBS + 1)
+    ]
+    return {key: sum(m[key] for m in metrics) / len(metrics) for key in metrics[0]}
 
 
-def eval_c2st(
+def eval_observation(
     posterior: NeuralPosterior,
     task: Task,
     idx_observation: int,
     num_samples: int = 1000,
-) -> float:
+) -> dict[str, float]:
     """
-    Evaluates the C2ST metric for a specific observation.
+    Compares posterior samples with reference samples for one observation.
+
+    The mean and std errors are absolute errors of the marginal means and standard
+    deviations, divided by the reference standard deviation and averaged over
+    parameter dimensions. Unlike C2ST, the std error says directly how much too wide
+    or too narrow the posterior is.
 
     Args:
         posterior: The posterior distribution.
         task: The task object.
-        i (int): The observation index.
+        idx_observation: The observation index.
+        num_samples: The number of posterior samples.
 
     Returns:
-        float: The C2ST value.
+        The C2ST value and the mean and std errors.
     """
     x_o = task.get_observation(idx_observation)
-    posterior_samples = task.get_reference_posterior_samples(idx_observation)
-    approx_posterior_samples = posterior.sample((num_samples,), x=x_o)
-    if isinstance(approx_posterior_samples, tuple):
-        approx_posterior_samples = approx_posterior_samples[0]
-    assert posterior_samples.shape[0] >= num_samples, "Not enough reference samples"
-    c2st_val = c2st(posterior_samples[:num_samples], approx_posterior_samples)
-    return float(c2st_val)
+    reference_samples = task.get_reference_posterior_samples(idx_observation)
+    samples = posterior.sample((num_samples,), x=x_o)
+    if isinstance(samples, tuple):
+        samples = samples[0]
+    assert reference_samples.shape[0] >= num_samples, "Not enough reference samples"
+
+    reference_std = reference_samples.std(0)
+    mean_error = (samples.mean(0) - reference_samples.mean(0)).abs() / reference_std
+    std_error = (samples.std(0) - reference_std).abs() / reference_std
+    return {
+        "c2st": float(c2st(reference_samples[:num_samples], samples)),
+        "mean_err": float(mean_error.mean()),
+        "std_err": float(std_error.mean()),
+    }
 
 
 def train_and_eval_amortized_inference(
@@ -220,20 +251,22 @@ def train_and_eval_amortized_inference(
     task: Task,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
-    results_bag: ResultsBag,
-) -> None:
+    seed: int,
+) -> dict[str, float]:
     """
     Performs amortized inference evaluation.
 
     Args:
-        method: The inference method.
+        inference_class: The inference class.
         task: The benchmark task.
-        benchmark_num_simulations: Number of training simulations.
+        benchmark_num_simulations: The number of training simulations.
         extra_kwargs: Additional keyword arguments for the method.
-        results_bag: The results bag to store evaluation results. Subclass of dict, but
-            allows item assignment with dot notation.
+        seed: The training seed.
+
+    Returns:
+        The metrics, averaged over the evaluation observations.
     """
-    torch.manual_seed(SEED)
+    torch.manual_seed(seed)
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
@@ -242,13 +275,7 @@ def train_and_eval_amortized_inference(
 
     posterior = inference.build_posterior()
 
-    mean_c2st = standard_eval_c2st_loop(posterior, task)
-
-    # Cache results
-    results_bag.metric = mean_c2st
-    results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task.name
-    results_bag.method = inference_class.__name__ + str(extra_kwargs)
+    return eval_observations(posterior, task)
 
 
 def train_and_eval_sequential_inference(
@@ -256,24 +283,28 @@ def train_and_eval_sequential_inference(
     task: Task,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
-    results_bag: ResultsBag,
-) -> None:
+    seed: int,
+) -> dict[str, float]:
     """
     Performs sequential inference evaluation.
 
     Args:
-        method: The inference method.
+        inference_class: The inference class.
         task: The benchmark task.
-        benchmark_num_simulations: Number of training simulations.
-        extra_kwargs (dict): Additional keyword arguments for the method.
-        results_bag: The results bag to store evaluation results.
+        benchmark_num_simulations: The total number of training simulations.
+        extra_kwargs: Additional keyword arguments for the method.
+        seed: The training seed.
+
+    Returns:
+        The metrics for the evaluation observation.
     """
-    torch.manual_seed(SEED)
+    idx_eval = NUM_EVALUATION_OBS_SEQ
+    # Load x_o before seeding: the Gaussian tasks reseed torch in get_observation.
+    x_o = task.get_observation(idx_eval)
+    torch.manual_seed(seed)
     num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
     thetas, xs = task.get_data(num_simulations)
     prior = task.get_prior()
-    idx_eval = NUM_EVALUATION_OBS_SEQ
-    x_o = task.get_observation(idx_eval)
     simulator = task.get_simulator()
 
     # Round 1
@@ -294,23 +325,18 @@ def train_and_eval_sequential_inference(
 
     posterior = inference.build_posterior()
 
-    c2st_val = eval_c2st(posterior, task, idx_eval)
-
-    # Cache results
-    results_bag.metric = c2st_val
-    results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task.name
-    results_bag.method = inference_class.__name__ + str(extra_kwargs)
+    return eval_observation(posterior, task, idx_eval)
 
 
 @pytest.mark.benchmark
 def test_run_benchmark(
     inference_class,
     task: Task,
-    results_bag,
+    results_bag: ResultsBag,
     extra_kwargs: dict,
-    benchmark_mode: str,
+    benchmark_mode: str | None,
     benchmark_num_simulations: int,
+    benchmark_seed: int,
 ) -> None:
     """
     Benchmark test for amortized and sequential inference methods.
@@ -318,25 +344,31 @@ def test_run_benchmark(
     Args:
         inference_class: The inference class to test i.e. NPE, NLE, NRE ...
         task: The benchmark task.
-        results_bag: The results bag to store evaluation results.
+        results_bag: The results bag to store evaluation results. Subclass of dict,
+            but allows item assignment with dot notation.
         extra_kwargs: Additional keyword arguments for the method.
         benchmark_mode: The benchmark mode. This is a fixture which based on user
             input, determines which type of methods should be run.
-        benchmark_num_simulations: Number of training simulations.
+        benchmark_num_simulations: The number of training simulations.
+        benchmark_seed: The training seed.
     """
-    if benchmark_mode in ["snpe", "snle", "snre"]:
-        train_and_eval_sequential_inference(
-            inference_class,
-            task,
-            benchmark_num_simulations,
-            extra_kwargs,
-            results_bag,
-        )
+    if benchmark_mode in SEQUENTIAL_MODES:
+        train_and_eval = train_and_eval_sequential_inference
     else:
-        train_and_eval_amortized_inference(
-            inference_class,
-            task,
-            benchmark_num_simulations,
-            extra_kwargs,
-            results_bag,
-        )
+        train_and_eval = train_and_eval_amortized_inference
+    metrics = train_and_eval(
+        inference_class,
+        task,
+        benchmark_num_simulations,
+        extra_kwargs,
+        benchmark_seed,
+    )
+
+    for key, value in metrics.items():
+        results_bag[key] = round(value, 3)
+    results_bag.num_simulations = benchmark_num_simulations
+    results_bag.task_name = task.name
+    results_bag.seed = benchmark_seed
+    results_bag.method = (
+        f"{_class_id(inference_class, benchmark_mode)}-{_kwargs_id(extra_kwargs)}"
+    )
