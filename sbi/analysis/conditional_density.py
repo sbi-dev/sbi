@@ -11,6 +11,7 @@ from torch.distributions import Distribution
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
+    ProposalCorrectedMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.sbi_types import Shape, TorchTransform
@@ -187,7 +188,7 @@ def conditional_corrcoeff(
 class ConditionedMDN:
     def __init__(
         self,
-        mdn: MixtureDensityEstimator,
+        mdn: Union[MixtureDensityEstimator, ProposalCorrectedMDN],
         x_o: Tensor,
         condition: Tensor,
         dims_to_sample: List[int],
@@ -195,7 +196,8 @@ class ConditionedMDN:
         r"""Class that can sample and evaluate a conditional mixture-of-gaussians.
 
         Args:
-            mdn: MixtureDensityEstimator that models $p(\theta|x)$.
+            mdn: MixtureDensityEstimator that models $p(\theta|x)$, or the
+                `ProposalCorrectedMDN` of a multi-round NPE-A posterior.
             x_o: The datapoint at which the `net` is evaluated.
             condition: Parameter set that all dimensions not specified in
                 `dims_to_sample` will be fixed to. Should contain dim_theta elements,

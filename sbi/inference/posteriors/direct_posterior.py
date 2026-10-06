@@ -195,7 +195,7 @@ class DirectPosterior(NeuralPosterior):
         if reject_outside_prior:
             # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
-                proposal=self._sample_estimator,
+                proposal=self.posterior_estimator.sample,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
@@ -207,7 +207,7 @@ class DirectPosterior(NeuralPosterior):
             )[0]
         else:
             # Bypass rejection sampling entirely.
-            samples = self._sample_estimator(
+            samples = self.posterior_estimator.sample(
                 torch.Size([num_samples]),
                 condition=x,
             )
@@ -297,7 +297,7 @@ class DirectPosterior(NeuralPosterior):
         if reject_outside_prior:
             # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
-                proposal=self._sample_estimator,
+                proposal=self.posterior_estimator.sample,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
@@ -309,7 +309,7 @@ class DirectPosterior(NeuralPosterior):
             )[0]
         else:
             # Bypass rejection sampling entirely.
-            samples = self._sample_estimator(
+            samples = self.posterior_estimator.sample(
                 torch.Size([num_samples]),
                 condition=x,
             )
@@ -371,8 +371,8 @@ class DirectPosterior(NeuralPosterior):
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self._log_prob_estimator(
-                theta_density_estimator, x_density_estimator
+            unnorm_log_prob = self.posterior_estimator.log_prob(
+                theta_density_estimator, condition=x_density_estimator
             )
             # `log_prob` supports only a single observation (i.e. `batchsize==1`).
             # We now remove this additional dimension.
@@ -454,8 +454,8 @@ class DirectPosterior(NeuralPosterior):
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self._log_prob_estimator(
-                theta_density_estimator, x_density_estimator
+            unnorm_log_prob = self.posterior_estimator.log_prob(
+                theta_density_estimator, condition=x_density_estimator
             )
 
             # Force probability to be zero outside prior support.
@@ -505,7 +505,7 @@ class DirectPosterior(NeuralPosterior):
 
         def acceptance() -> Tensor:
             return rejection.accept_reject_sample(
-                proposal=self._sample_estimator,
+                proposal=self.posterior_estimator.sample,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_rejection_samples,
                 show_progress_bars=show_progress_bars,
@@ -519,12 +519,6 @@ class DirectPosterior(NeuralPosterior):
             )[1]
 
         return self._cached_leakage_factor(x, self.prior, acceptance, force_update)
-
-    def _sample_estimator(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
-        return self.posterior_estimator.sample(sample_shape, **kwargs)
-
-    def _log_prob_estimator(self, theta: Tensor, condition: Tensor) -> Tensor:
-        return self.posterior_estimator.log_prob(theta, condition=condition)
 
     def map(
         self,

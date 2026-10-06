@@ -21,6 +21,7 @@ from sbi.inference.posteriors.ensemble_posterior import (
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
@@ -45,6 +46,7 @@ from sbi.inference.trainers.npe import NPE, NPE_A, NPE_C, NPE_PFN
 from sbi.inference.trainers.nre import NRE_A, NRE_B, NRE_C
 from sbi.inference.trainers.vfpe import FMPE, NPSE
 from sbi.neural_nets.embedding_nets import FCEmbedding
+from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.factory import (
     classifier_nn,
     embedding_net_warn_msg,
@@ -586,6 +588,32 @@ def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C]):
         proposal = trainer.build_posterior().set_default_x(torch.zeros(num_dim))
         theta = proposal.sample((num_simulations,))
         x = simulator(theta)
+
+
+@pytest.mark.gpu
+def test_npe_a_corrected_posterior_to_device():
+    """`.to()` must move the proposal correction along with the estimator."""
+    device = process_device("gpu")
+    prior = BoxUniform(-3 * ones(2), 3 * ones(2))
+    theta = prior.sample((200,))
+    # The correction is analytical, so the estimator does not need training.
+    estimator = posterior_nn("mdn")(theta, theta + 0.5 * torch.randn_like(theta))
+    posterior = NPE_A_Posterior(
+        estimator,
+        prior,
+        proposal_mog=MoG.from_gaussian(torch.tensor([1.0, -1.0]), 3 * eye(2)),
+    )
+    posterior.set_default_x(torch.tensor([[0.5, 0.5]]))
+    theta = torch.zeros(1, 2)
+    expected = posterior.log_prob(theta, norm_posterior=False)
+
+    posterior.to(device)
+    theta = theta.to(device)
+    log_prob = posterior.log_prob(theta, norm_posterior=False)
+    assert torch.allclose(log_prob.cpu(), expected, atol=1e-4)
+    assert torch.allclose(posterior.potential(theta).cpu(), expected, atol=1e-4)
+    posterior.sample((10,), show_progress_bars=False)
+    posterior.map(num_iter=10, show_progress_bars=False)
 
 
 @pytest.mark.gpu
