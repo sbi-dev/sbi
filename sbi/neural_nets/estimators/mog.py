@@ -366,16 +366,23 @@ class MoG:
         assert self.precision_factors is not None  # For type checker
         precfs = self.precision_factors
 
-        precfs_xx = precfs[:, :, mask, :][:, :, :, mask]
-        precfs_yy = precfs[:, :, ~mask, :][:, :, :, ~mask]
+        # Sub-blocks of precfs are only valid if all free dims precede the fixed dims.
+        # QR re-triangularizes the factor in (free, fixed) order. Forming the
+        # precision instead loses the marginal precision of y in float32.
+        num_free = int(mask.sum())
+        perm = torch.cat([mask.nonzero(), (~mask).nonzero()]).squeeze(-1)
+        _, precfs_perm = torch.linalg.qr(precfs[:, :, :, perm])
+        # log_prob() and sample() expect a positive diagonal.
+        signs = torch.sign(torch.diagonal(precfs_perm, dim1=-2, dim2=-1))
+        precfs_perm = precfs_perm * signs.unsqueeze(-1)
+
+        precfs_xx = precfs_perm[:, :, :num_free, :num_free]
+        precfs_xy = precfs_perm[:, :, :num_free, num_free:]
+        precfs_yy = precfs_perm[:, :, num_free:, num_free:]
 
         # Compute precision matrices
         precs_xx = torch.matmul(precfs_xx.transpose(-2, -1), precfs_xx)
         precs_yy = torch.matmul(precfs_yy.transpose(-2, -1), precfs_yy)
-
-        # Full precision and cross terms
-        precs = torch.matmul(precfs.transpose(-2, -1), precfs)
-        precs_xy = precs[:, :, mask, :][:, :, :, ~mask]
 
         # Conditional mean: mu_x|y = mu_x - precs_xx^{-1} @ precs_xy @ (y - mu_y)
         # y: (batch_size, num_fixed) -> (batch_size, num_components, num_fixed, 1)
@@ -383,10 +390,9 @@ class MoG:
         mu_y_col = mu_y.unsqueeze(-1)  # (batch_size, num_components, num_fixed, 1)
         diff_y = y_expanded - mu_y_col
 
-        # Compute precs_xx_inv @ precs_xy @ diff_y using solve for numerical stability
-        # solve(A, B) computes A^{-1} @ B more stably than inv(A) @ B
-        rhs = torch.matmul(precs_xy, diff_y)
-        adjustment = torch.linalg.solve(precs_xx, rhs)
+        # precs_xx^{-1} @ precs_xy = precfs_xx^{-1} @ precfs_xy
+        rhs = torch.matmul(precfs_xy, diff_y)
+        adjustment = torch.linalg.solve_triangular(precfs_xx, rhs, upper=True)
         cond_means = mu_x - adjustment.squeeze(-1)
 
         # Conditional precision factors are just precfs_xx (precision doesn't change)
