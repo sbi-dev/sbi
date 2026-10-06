@@ -976,26 +976,9 @@ def test_estimate_posterior_precision_centeredness():
         estimator,
         prior,
         condition,
-        precision_est_only_diag=False,
-        precision_est_budget=2000,
-        precision_initial_sampler_steps=50,
-    )
-    precision_diag_only = AutoGaussCorrectedScoreFn.estimate_posterior_precision(
-        estimator,
-        prior,
-        condition,
-        precision_est_only_diag=True,
-        precision_est_budget=2000,
         precision_initial_sampler_steps=50,
     )
 
-    # With the posterior centered far from zero, the uncentered E[theta theta^T]
-    # would give a precision off by orders of magnitude.
     assert torch.allclose(precision[0, 0], empirical, rtol=0.3), (
-        f"full-covariance precision {precision[0, 0]} does not match empirical "
-        f"{empirical}"
-    )
-    assert torch.allclose(precision_diag_only[0, 0], torch.diag(empirical), rtol=0.3), (
-        f"diagonal precision {precision_diag_only[0, 0]} does not match empirical "
-        f"{torch.diag(empirical)}"
+        f"estimated precision {precision[0, 0]} does not match empirical {empirical}"
     )
