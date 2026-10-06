@@ -66,15 +66,17 @@ replaces the rows with the same label, method, and task, also when the number of
 simulations or seeds is different. With a detached HEAD or outside git, the label is
 `default`, so set one with `--bm-label`.
 
-The results are stored in `.bm_results/results_all.csv`, in the folder that you run
-`pytest` from. If main and your branch are in different checkouts (e.g., a git
-worktree), give both runs the same results folder:
+The results are stored in the `.bm_results` folder, in the folder that you run `pytest`
+from, with one file per label, e.g. `results-main.csv`. The table shows all labels in
+the folder. If main and your branch are in different checkouts (e.g., a git worktree),
+give both runs the same results folder. They can also run at the same time:
 
 ```bash
 pytest --bm --bm-mode npe -n auto --bm-results-dir ~/sbi-bm-results
 ```
 
-To start from scratch, delete the results folder.
+To remove the results of one label, delete its file. To start from scratch, delete the
+results folder.
 
 ### Check whether a difference is real
 
@@ -120,7 +122,7 @@ e.g. `--bm-label before` and `--bm-label after`.
 | `--bm-seeds` | 1 | Training seeds per case. |
 | `--bm-num-iid-trials` | 10 | Trials per observation in the `mnle` mode. |
 | `--bm-label` | git branch | Name of the run in the results table. |
-| `--bm-results-dir` | `.bm_results` | Folder of the results file. |
+| `--bm-results-dir` | `.bm_results` | Folder of the results files. |
 
 ## Adding a mode or a task
 

@@ -19,8 +19,8 @@ from sbi.utils.torchutils import gpu_available
 seed = 1
 harvested_fixture_data = None
 
-# Mini SBIBM results. A new run replaces the stored rows with the same key.
-# A new run replaces all seeds of a case, so the key has no seed.
+# Mini SBIBM results, one file per run label. A new run replaces the stored rows with
+# the same key. A new run replaces all seeds of a case, so the key has no seed.
 RESULT_KEY = ["label", "method", "task_name"]
 RESULT_COLUMNS = [*RESULT_KEY, "seed", "num_simulations", "c2st", "mean_err", "std_err"]
 METRIC_TITLES = {
@@ -118,7 +118,7 @@ def pytest_addoption(parser):
         "--bm-results-dir",
         action="store",
         default=".bm_results",
-        help="Folder of the mini-benchmark results file (default: .bm_results). "
+        help="Folder of the mini-benchmark results files (default: .bm_results). "
         "Use the same folder to compare runs from different checkouts",
     )
     parser.addoption(
@@ -202,9 +202,19 @@ def _benchmark_label(config) -> str:
     return branch if branch and branch != "HEAD" else "default"
 
 
-def _results_file(config) -> Path:
-    """Return the path of the mini SBIBM results file."""
-    return Path(config.getoption("--bm-results-dir")).expanduser() / "results_all.csv"
+def _results_dir(config) -> Path:
+    """Return the folder of the mini SBIBM results files."""
+    return Path(config.getoption("--bm-results-dir")).expanduser()
+
+
+def _results_file(config, label: str) -> Path:
+    """Return the results file of one run label.
+
+    Each label has its own file, so runs with different labels never overwrite each
+    other, also when they finish at the same time.
+    """
+    safe_label = re.sub(r"[^A-Za-z0-9._-]", "_", label)
+    return _results_dir(config) / f"results-{safe_label}.csv"
 
 
 def _read_results(results_file: Path) -> pd.DataFrame | None:
@@ -283,11 +293,16 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     terminal_width = shutil.get_terminal_size().columns
     write(f"\033[96m{' mini SBIBM results '.center(terminal_width, '=')}\033[0m")
     if config.stash.get(MOVED_OLD_RESULTS, False):
-        old_file = _results_file(config).with_name("results_all.old.csv")
+        old_file = _results_dir(config) / "results_all.old.csv"
         write(f"Moved results in an older format to {old_file}.")
 
     try:
-        results = _read_results(_results_file(config))
+        stored = [
+            _read_results(path)
+            for path in sorted(_results_dir(config).glob("results-*.csv"))
+        ]
+        stored = [results for results in stored if results is not None]
+        results = pd.concat(stored) if stored else None
         if results is None or results.empty:
             write("No results found.")
             return
@@ -318,11 +333,11 @@ def mcmc_params_fast() -> MCMCPosteriorParameters:
 
 
 def pytest_sessionfinish(session):
-    """Merge the results of this run into the mini SBIBM results file.
+    """Merge the results of this run into the results file of its label.
 
     With xdist, the main process receives the results of all workers. Rows with the
-    same label, method and task as a new result are replaced. A results file in an
-    older format is moved to `results_all.old.csv`.
+    same label, method and task as a new result are replaced. The single results file
+    of older versions is moved to `results_all.old.csv`.
     """
     if not session.config.getoption("--bm") or not is_main_process(session):
         return
@@ -333,18 +348,21 @@ def pytest_sessionfinish(session):
     results = results[(results["status"] == "passed") & results["c2st"].notna()]
     if results.empty:
         return
-    results = results.assign(label=_benchmark_label(session.config))[RESULT_COLUMNS]
+    label = _benchmark_label(session.config)
+    results = results.assign(label=label)[RESULT_COLUMNS]
 
-    results_file = _results_file(session.config)
+    old_file = _results_dir(session.config) / "results_all.csv"
+    if old_file.exists():
+        old_file.replace(old_file.with_name("results_all.old.csv"))
+        session.config.stash[MOVED_OLD_RESULTS] = True
+
+    results_file = _results_file(session.config, label)
     stored = _read_results(results_file)
     if stored is not None:
         replaced = stored.set_index(RESULT_KEY).index.isin(
             results.set_index(RESULT_KEY).index
         )
         results = pd.concat([stored[~replaced], results])
-    elif results_file.exists():
-        results_file.replace(results_file.with_name("results_all.old.csv"))
-        session.config.stash[MOVED_OLD_RESULTS] = True
 
     results_file.parent.mkdir(parents=True, exist_ok=True)
     results.to_csv(results_file, index=False)
