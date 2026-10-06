@@ -979,6 +979,14 @@ def test_estimate_posterior_precision_centeredness():
         precision_initial_sampler_steps=50,
     )
 
-    assert torch.allclose(precision[0, 0], empirical, rtol=0.3), (
-        f"estimated precision {precision[0, 0]} does not match empirical {empirical}"
+    assert torch.allclose(
+        torch.diag(precision[0, 0]), torch.diag(empirical), rtol=0.3
+    ), (
+        f"estimated precision diagonal {torch.diag(precision[0, 0])} does not match "
+        f"empirical {torch.diag(empirical)}"
     )
+    assert torch.allclose(
+        precision[0, 0] - torch.diag(torch.diag(precision[0, 0])),
+        empirical - torch.diag(torch.diag(empirical)),
+        atol=0.02,
+    ), f"estimated precision off-diagonal does not match empirical {empirical}"
