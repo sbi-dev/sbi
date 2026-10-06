@@ -1264,7 +1264,8 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             variances = torch.var(thetas, dim=0)
             precisions = 1 / variances
         else:
-            cov = torch.einsum("bnd,bne->nde", thetas, thetas) / (
+            thetas_centered = thetas - thetas.mean(dim=0, keepdim=True)
+            cov = torch.einsum("bnd,bne->nde", thetas_centered, thetas_centered) / (
                 precision_est_budget - 1
             )
             precisions = torch.inverse(cov)

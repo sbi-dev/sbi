@@ -922,3 +922,80 @@ def test_fmpe_untrained_gaussian_baseline_samples_prior():
     assert torch.all(sample_mean > 80) and torch.all(sample_mean < 120), (
         f"Untrained gaussian_baseline must sample near mean ~100, got {sample_mean}"
     )
+
+
+def test_estimate_posterior_precision_centeredness():
+    """Regression test for #2043. The estimated posterior precision must be the
+    inverse of the covariance (mean-centered), not the inverse of E[theta theta^T].
+    """
+    from sbi.inference.potentials.vector_field_adaptor import (
+        AutoGaussCorrectedScoreFn,
+    )
+    from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
+
+    torch.manual_seed(42)
+
+    num_dim = 2
+    prior_mean = torch.tensor([100.0, 100.0])
+    prior_std = torch.tensor([5.0, 5.0])
+    prior = BoxUniform(prior_mean - 2 * prior_std, prior_mean + 2 * prior_std)
+
+    theta_train = prior.sample((500,))
+    theta_mean = theta_train.mean(dim=0)
+    theta_std = theta_train.std(dim=0)
+
+    class ZeroNet(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, input, condition, time):
+            return torch.zeros_like(input) * self.dummy
+
+    estimator = FlowMatchingEstimator(
+        net=ZeroNet(),
+        input_shape=torch.Size([num_dim]),
+        condition_shape=torch.Size([num_dim]),
+        mean_0=theta_mean,
+        std_0=theta_std,
+        gaussian_baseline=True,
+    )
+
+    posterior = VectorFieldPosterior(prior=prior, vector_field_estimator=estimator)
+    condition = torch.tensor([[100.0, 100.0]])
+
+    samples = posterior.sample_batched(
+        sample_shape=torch.Size([2000]),
+        x=condition,
+        steps=50,
+        show_progress_bars=False,
+    ).squeeze(1)
+    empirical = torch.inverse(torch.cov(samples.T))
+
+    precision = AutoGaussCorrectedScoreFn.estimate_posterior_precision(
+        estimator,
+        prior,
+        condition,
+        precision_est_only_diag=False,
+        precision_est_budget=2000,
+        precision_initial_sampler_steps=50,
+    )
+    precision_diag_only = AutoGaussCorrectedScoreFn.estimate_posterior_precision(
+        estimator,
+        prior,
+        condition,
+        precision_est_only_diag=True,
+        precision_est_budget=2000,
+        precision_initial_sampler_steps=50,
+    )
+
+    # With the posterior centered far from zero, the uncentered E[theta theta^T]
+    # would give a precision off by orders of magnitude.
+    assert torch.allclose(precision[0, 0], empirical, rtol=0.3), (
+        f"full-covariance precision {precision[0, 0]} does not match empirical "
+        f"{empirical}"
+    )
+    assert torch.allclose(precision_diag_only[0, 0], torch.diag(empirical), rtol=0.3), (
+        f"diagonal precision {precision_diag_only[0, 0]} does not match empirical "
+        f"{torch.diag(empirical)}"
+    )
