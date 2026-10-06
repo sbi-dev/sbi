@@ -32,6 +32,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
 )
 from sbi.neural_nets import posterior_nn
+from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -898,3 +899,33 @@ def test_density_estimators_unconstrained_space(
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"npe_{density_estimator}")
+
+
+@pytest.mark.parametrize(
+    "prior",
+    [
+        MultivariateNormal(zeros(2), eye(2)),
+        utils.BoxUniform(-3 * ones(2), 3 * ones(2)),
+    ],
+    ids=["gaussian", "uniform"],
+)
+def test_npe_a_rejects_unconstrained_transform_after_first_round(prior):
+    """The analytic correction assumes an affine z-score, for every prior."""
+    inference = NPE_A(
+        prior,
+        density_estimator=MDNConfig(
+            z_score_input="transform_to_unconstrained", x_dist=prior
+        ),
+        num_components=1,
+        show_progress_bars=False,
+    )
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=1)
+    proposal = inference.build_posterior().set_default_x(zeros(1, 2))
+
+    theta = proposal.sample((100,), show_progress_bars=False)
+    inference.append_simulations(theta, theta, proposal=proposal).train(
+        max_num_epochs=1
+    )
+    with pytest.raises(NotImplementedError, match="affine z-score"):
+        inference.build_posterior()
