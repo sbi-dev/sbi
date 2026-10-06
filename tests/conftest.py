@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from urllib.parse import quote
 
 import pandas as pd
 import pytest
@@ -213,8 +214,8 @@ def _results_file(config, label: str) -> Path:
     Each label has its own file, so runs with different labels never overwrite each
     other, also when they finish at the same time.
     """
-    safe_label = re.sub(r"[^A-Za-z0-9._-]", "_", label)
-    return _results_dir(config) / f"results-{safe_label}.csv"
+    # Percent-encoding keeps different labels apart, e.g. "a/b" and "a_b".
+    return _results_dir(config) / f"results-{quote(label, safe='')}.csv"
 
 
 def _read_results(results_file: Path) -> pd.DataFrame | None:
