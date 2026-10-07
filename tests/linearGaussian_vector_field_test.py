@@ -10,7 +10,12 @@ import pytest
 import torch
 from scipy.stats import gaussian_kde
 from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import (
+    Categorical,
+    MixtureSameFamily,
+    MultivariateNormal,
+    Normal,
+)
 
 from sbi import analysis as analysis
 from sbi import utils as utils
@@ -921,4 +926,106 @@ def test_fmpe_untrained_gaussian_baseline_samples_prior():
     # Samples should be near data mean (~100), not near 0
     assert torch.all(sample_mean > 80) and torch.all(sample_mean < 120), (
         f"Untrained gaussian_baseline must sample near mean ~100, got {sample_mean}"
+    )
+
+
+def test_estimate_posterior_precision_centeredness():
+    """Regression test for #2043. The estimated posterior precision must be the
+    inverse of the covariance (mean-centered), not the inverse of E[theta theta^T].
+    """
+    from sbi.inference.potentials.vector_field_adaptor import (
+        AutoGaussCorrectedScoreFn,
+    )
+    from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
+
+    torch.manual_seed(42)
+
+    num_dim = 2
+    prior_mean = torch.tensor([100.0, 100.0])
+    prior_std = torch.tensor([5.0, 5.0])
+    prior = BoxUniform(prior_mean - 2 * prior_std, prior_mean + 2 * prior_std)
+
+    theta_train = prior.sample((500,))
+    theta_mean = theta_train.mean(dim=0)
+    theta_std = theta_train.std(dim=0)
+
+    class ZeroNet(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+        def forward(self, input, condition, time):
+            return torch.zeros_like(input) * self.dummy
+
+    estimator = FlowMatchingEstimator(
+        net=ZeroNet(),
+        input_shape=torch.Size([num_dim]),
+        condition_shape=torch.Size([num_dim]),
+        mean_0=theta_mean,
+        std_0=theta_std,
+        gaussian_baseline=True,
+    )
+
+    posterior = VectorFieldPosterior(prior=prior, vector_field_estimator=estimator)
+    condition = torch.tensor([[100.0, 100.0]])
+
+    samples = posterior.sample_batched(
+        sample_shape=torch.Size([2000]),
+        x=condition,
+        steps=50,
+        show_progress_bars=False,
+    ).squeeze(1)
+    empirical = torch.inverse(torch.cov(samples.T))
+
+    precision = AutoGaussCorrectedScoreFn.estimate_posterior_precision(
+        estimator,
+        prior,
+        condition,
+        precision_initial_sampler_steps=50,
+    )
+
+    assert torch.allclose(
+        torch.diag(precision[0, 0]), torch.diag(empirical), rtol=0.3
+    ), (
+        f"estimated precision diagonal {torch.diag(precision[0, 0])} does not match "
+        f"empirical {torch.diag(empirical)}"
+    )
+    assert torch.allclose(
+        precision[0, 0] - torch.diag(torch.diag(precision[0, 0])),
+        empirical - torch.diag(torch.diag(empirical)),
+        atol=0.02,
+    ), f"estimated precision off-diagonal does not match empirical {empirical}"
+
+
+def test_denoise_mixture_weights_equal_posterior():
+    """Regression test for #2047. `denoise` must weight mixture components by the
+    component marginal likelihood `p(x_t | k)`, not by the denoised posterior
+    density evaluated in x0-space.
+    """
+    from sbi.utils.vector_field_utils import denoise, marginalize
+
+    torch.manual_seed(42)
+
+    loc = torch.tensor([-1.5, 1.0])
+    scale = torch.tensor([0.5, 1.2])
+    prior_weights = torch.tensor([0.3, 0.7])
+    prior = MixtureSameFamily(
+        Categorical(probs=prior_weights, validate_args=False),
+        Normal(loc, scale, validate_args=False),
+    )
+
+    m = torch.tensor(0.8)
+    s = torch.tensor(0.3)
+    x_t = torch.tensor(0.6)
+
+    denoised = denoise(prior, m, s, x_t)
+
+    marg_loglike = marginalize(prior.component_distribution, m, s).log_prob(x_t)
+    exact_weights = torch.softmax(prior_weights.log() + marg_loglike, dim=-1)
+
+    assert torch.allclose(
+        denoised.mixture_distribution.probs, exact_weights, atol=1e-6
+    ), (
+        f"denoised weights {denoised.mixture_distribution.probs} do not match "
+        f"exact posterior weights {exact_weights}"
     )
