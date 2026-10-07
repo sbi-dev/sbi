@@ -10,7 +10,12 @@ import pytest
 import torch
 from scipy.stats import gaussian_kde
 from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import (
+    Categorical,
+    MixtureSameFamily,
+    MultivariateNormal,
+    Normal,
+)
 
 from sbi import analysis as analysis
 from sbi import utils as utils
@@ -990,3 +995,37 @@ def test_estimate_posterior_precision_centeredness():
         empirical - torch.diag(torch.diag(empirical)),
         atol=0.02,
     ), f"estimated precision off-diagonal does not match empirical {empirical}"
+
+
+def test_denoise_mixture_weights_equal_posterior():
+    """Regression test for #2047. `denoise` must weight mixture components by the
+    component marginal likelihood `p(x_t | k)`, not by the denoised posterior
+    density evaluated in x0-space.
+    """
+    from sbi.utils.vector_field_utils import denoise, marginalize
+
+    torch.manual_seed(42)
+
+    loc = torch.tensor([-1.5, 1.0])
+    scale = torch.tensor([0.5, 1.2])
+    prior_weights = torch.tensor([0.3, 0.7])
+    prior = MixtureSameFamily(
+        Categorical(probs=prior_weights, validate_args=False),
+        Normal(loc, scale, validate_args=False),
+    )
+
+    m = torch.tensor(0.8)
+    s = torch.tensor(0.3)
+    x_t = torch.tensor(0.6)
+
+    denoised = denoise(prior, m, s, x_t)
+
+    marg_loglike = marginalize(prior.component_distribution, m, s).log_prob(x_t)
+    exact_weights = torch.softmax(prior_weights.log() + marg_loglike, dim=-1)
+
+    assert torch.allclose(
+        denoised.mixture_distribution.probs, exact_weights, atol=1e-6
+    ), (
+        f"denoised weights {denoised.mixture_distribution.probs} do not match "
+        f"exact posterior weights {exact_weights}"
+    )
