@@ -13,7 +13,14 @@ from matplotlib.pyplot import close, subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
 import sbi.analysis.plot as plt
-from sbi.analysis import LabeledSamples, pairplot, plot_summary, sbc_rank_plot
+from sbi.analysis import (
+    LabeledSamples,
+    marginal_plot,
+    pairplot,
+    plot_summary,
+    sbc_rank_plot,
+)
+from sbi.analysis.plot import plot_tarp
 from sbi.analysis.plotting_classes import (
     FigOptions,
     HistDiagOptions,
@@ -21,6 +28,7 @@ from sbi.analysis.plotting_classes import (
 )
 from sbi.inference import NLE, NPE, NRE
 from sbi.utils import BoxUniform
+from sbi.utils.plotting_helpers import ensure_numpy
 from sbi.utils.tracking import TensorBoardTracker
 
 
@@ -623,3 +631,143 @@ def test_pairplot_kde_percentile_levels_are_known_keys():
             upper_kwargs=dict(percentile=True, levels=[0.68, 0.95]),
         )
     close()
+
+
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not torch.backends.mps.is_available(), reason="MPS unavailable"
+            ),
+        ),
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="CUDA unavailable"
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize("requires_grad", [False, True])
+def test_ensure_numpy_device_and_grad(device, requires_grad):
+    """ensure_numpy must safely handle tensors on CPU/accelerators and with grad."""
+    expected = np.array([1.0, 2.0], dtype=np.float32)
+    t = torch.tensor([1.0, 2.0], device=device, requires_grad=requires_grad)
+    res = ensure_numpy(t)
+    assert isinstance(res, np.ndarray)
+    np.testing.assert_allclose(res, expected)
+
+
+def test_ensure_numpy_preserves_numpy_arrays():
+    """ensure_numpy must leave existing numpy arrays untouched."""
+    arr = np.array([3.0, 4.0])
+    assert ensure_numpy(arr) is arr
+
+
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not torch.backends.mps.is_available(), reason="MPS unavailable"
+            ),
+        ),
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="CUDA unavailable"
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize("requires_grad", [False, True])
+def test_pairplot_and_marginal_device_and_grad(device, requires_grad):
+    """Plotting functions must accept tensors on any device or with requires_grad."""
+    samples = torch.randn(50, 2, device=device, requires_grad=requires_grad)
+
+    fig1, _ = pairplot(samples)
+    assert isinstance(fig1, Figure)
+    close(fig1)
+
+    fig2, _ = marginal_plot(samples)
+    assert isinstance(fig2, Figure)
+    close(fig2)
+
+
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not torch.backends.mps.is_available(), reason="MPS unavailable"
+            ),
+        ),
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="CUDA unavailable"
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize("requires_grad", [False, True])
+def test_pairplot_reference_arguments_device_and_grad(device, requires_grad):
+    """pairplot must accept points, limits, and ticks as device/grad tensors."""
+    samples = torch.randn(50, 2)
+    points = torch.tensor([0.0, 0.0], device=device, requires_grad=requires_grad)
+    limits = torch.tensor(
+        [[-3.0, 3.0], [-3.0, 3.0]], device=device, requires_grad=requires_grad
+    )
+    ticks = torch.tensor(
+        [[-2.0, 2.0], [-2.0, 2.0]], device=device, requires_grad=requires_grad
+    )
+
+    fig, _ = pairplot(samples, points=points, limits=limits, ticks=ticks)
+    assert isinstance(fig, Figure)
+    close(fig)
+
+
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not torch.backends.mps.is_available(), reason="MPS unavailable"
+            ),
+        ),
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="CUDA unavailable"
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize("requires_grad", [False, True])
+def test_sbc_and_tarp_plots_device_and_grad(device, requires_grad):
+    """sbc_rank_plot and plot_tarp must accept accelerator/grad tensors."""
+    if requires_grad:
+        ranks = (
+            torch.randint(0, 50, (20, 2), device=device).float().requires_grad_(True)
+        )
+    else:
+        ranks = torch.randint(0, 50, (20, 2), device=device)
+
+    fig1, _ = sbc_rank_plot(ranks, 50)
+    assert isinstance(fig1, Figure)
+    close(fig1)
+
+    alpha = torch.linspace(0, 1, 10, device=device, requires_grad=requires_grad)
+    ecp = torch.linspace(0, 1, 10, device=device, requires_grad=requires_grad)
+    fig2, _ = plot_tarp(ecp, alpha)
+    assert isinstance(fig2, Figure)
+    close(fig2)
