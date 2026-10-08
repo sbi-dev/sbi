@@ -153,19 +153,15 @@ def test_training_and_mcmc_on_device(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
+    # MDN takes neither argument, and the builder rejects unused arguments.
+    flow_kwargs = (
+        dict() if model == "mdn" else dict(num_transforms=2, dtype=torch.float32)
+    )
     if method in [NPE_A, NPE_C]:
-        kwargs = dict(
-            density_estimator=posterior_nn(
-                model=model, num_transforms=2, dtype=torch.float32
-            )
-        )
+        kwargs = dict(density_estimator=posterior_nn(model=model, **flow_kwargs))
         train_kwargs = dict()
     elif method == NLE:
-        kwargs = dict(
-            density_estimator=likelihood_nn(
-                model=model, num_transforms=2, dtype=torch.float32
-            )
-        )
+        kwargs = dict(density_estimator=likelihood_nn(model=model, **flow_kwargs))
         train_kwargs = dict()
     elif method in (NRE_A, NRE_B, NRE_C):
         kwargs = dict(classifier=classifier_nn(model=model))
