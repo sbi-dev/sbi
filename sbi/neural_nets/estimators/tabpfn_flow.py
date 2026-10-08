@@ -246,7 +246,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
                 pred_dist["logits"].to(bar_dist.borders.device),
                 test_joint[:, target_idx].to(bar_dist.borders.device),
             )
-            dim_log_prob = dim_log_prob.to("cpu")
+            dim_log_prob = dim_log_prob.to(log_prob)
 
             dim_log_prob = torch.where(
                 dim_log_prob == float("-inf"),
@@ -300,7 +300,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
                     pred_dist["logits"].to(bar_dist.borders.device),
                     sampled_dim.to(bar_dist.borders.device),
                 )
-                dim_log_prob = dim_log_prob.to("cpu")
+                dim_log_prob = dim_log_prob.to(log_prob)
 
                 dim_log_prob = torch.where(
                     dim_log_prob == float("-inf"),
@@ -309,6 +309,9 @@ class TabPFNFlow(ConditionalDensityEstimator):
                 )
                 log_prob += dim_log_prob
 
+            # predict() needs CPU inputs; since tabpfn 9.1, samples keep the
+            # criterion's device and dtype.
+            sampled_dim = sampled_dim.to(autoregressive_inputs)
             autoregressive_inputs = torch.cat(
                 [autoregressive_inputs, sampled_dim[:, None]], dim=1
             )
