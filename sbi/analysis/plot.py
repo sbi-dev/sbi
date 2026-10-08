@@ -856,6 +856,7 @@ def prepare_for_plot(
     samples = convert_to_list_of_numpy(samples)
     if points is not None:
         points = convert_to_list_of_numpy(points)
+        points = [np.atleast_2d(p) for p in points]
 
     samples = handle_nan_infs(samples)
 
@@ -866,9 +867,16 @@ def prepare_for_plot(
     if limits is None or len(limits) == 0:
         limits = infer_limits(samples, dim, points)
     else:
+        if isinstance(limits, torch.Tensor):
+            limits = ensure_numpy(limits)
+        elif isinstance(limits, list):
+            limits = [
+                ensure_numpy(lim) if isinstance(lim, torch.Tensor) else lim
+                for lim in limits
+            ]
         limits = [limits[0] for _ in range(dim)] if len(limits) == 1 else limits
 
-    limits = torch.as_tensor(limits)
+    limits = torch.as_tensor(np.asarray(limits)).detach().to("cpu")
     return samples, dim, limits
 
 
@@ -926,7 +934,14 @@ def prepare_for_conditional_plot(condition, opts):
         limits = [opts["limits"][0] for _ in range(dim)]
     else:
         limits = opts["limits"]
-    limits = torch.as_tensor(limits)
+    if isinstance(limits, torch.Tensor):
+        limits = ensure_numpy(limits)
+    elif isinstance(limits, list):
+        limits = [
+            ensure_numpy(lim) if isinstance(lim, torch.Tensor) else lim
+            for lim in limits
+        ]
+    limits = torch.as_tensor(np.asarray(limits)).detach().to("cpu")
 
     # Infer the margin. This is to avoid that we evaluate the posterior **exactly**
     # at the boundary.
@@ -943,7 +958,7 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
     """
 
     def diag_func(row, **kwargs):
-        p_vector = (
+        p_vector = ensure_numpy(
             eval_conditional_density(
                 opts["density"],
                 opts["condition"],
@@ -954,8 +969,6 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[row],
             )
-            .to("cpu")
-            .numpy()
         )
         plt.plot(
             np.linspace(
@@ -1289,7 +1302,7 @@ def conditional_pairplot(
     diag_func = get_conditional_diag_func(opts, limits, eps_margins, resolution)
 
     def offdiag_func(row, col, **kwargs):
-        p_image = (
+        p_image = ensure_numpy(
             eval_conditional_density(
                 opts["density"],
                 opts["condition"].to(device),
@@ -1300,8 +1313,6 @@ def conditional_pairplot(
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[col],
             )
-            .to("cpu")
-            .numpy()
         )
         plt.imshow(
             p_image.T,
@@ -1383,7 +1394,7 @@ def _arrange_grid(
     subset: Optional[List[int]],
     figsize: Optional[Tuple],
     labels: Optional[List[str]],
-    ticks: Optional[Union[List, torch.Tensor]],
+    ticks: Optional[Union[List, torch.Tensor, np.ndarray]],
     fig: Optional[FigureBase],
     axes: Optional[Axes],
     fig_kwargs: FigOptions,
@@ -1446,10 +1457,20 @@ def _arrange_grid(
 
     # Prepare ticks
     if ticks is not None:
-        if len(ticks) == 1:
-            ticks = [ticks[0] for _ in range(dim)]
-        elif ticks == []:
+        ticks_list: Union[List, np.ndarray] = (
+            ensure_numpy(ticks) if isinstance(ticks, torch.Tensor) else ticks
+        )
+        if isinstance(ticks_list, list):
+            ticks_list = [
+                ensure_numpy(t) if isinstance(t, torch.Tensor) else t
+                for t in ticks_list
+            ]
+        if len(ticks_list) == 1:
+            ticks = [ticks_list[0] for _ in range(dim)]
+        elif len(ticks_list) == 0:
             ticks = None
+        else:
+            ticks = ticks_list
 
     # Figure out if we subset the plot
     if subset is None:
@@ -1817,14 +1838,12 @@ def _sbc_rank_plot(
     """
 
     if isinstance(ranks, (Tensor, np.ndarray)):
-        ranks_list = [ranks]
+        ranks_list = [ensure_numpy(ranks)]
     else:
         assert isinstance(ranks, List)
-        ranks_list = ranks
-    for idx, rank in enumerate(ranks_list):
-        assert isinstance(rank, (Tensor, np.ndarray))
-        if isinstance(rank, Tensor):
-            ranks_list[idx]: np.ndarray = rank.numpy()  # type: ignore
+        ranks_list = [ensure_numpy(rank) for rank in ranks]
+    for rank in ranks_list:
+        assert isinstance(rank, np.ndarray)
 
     plot_types = ["hist", "cdf", "cdf-diff"]
     if plot_type not in plot_types:
@@ -2487,7 +2506,9 @@ def pp_plot_lc2st(
 
 
 def plot_tarp(
-    ecp: Tensor, alpha: Tensor, title: Optional[str] = None
+    ecp: Union[Tensor, np.ndarray],
+    alpha: Union[Tensor, np.ndarray],
+    title: Optional[str] = None,
 ) -> Tuple[Figure, Axes]:
     """
     Plots the expected coverage probability (ECP) against the credibility
@@ -2512,8 +2533,11 @@ def plot_tarp(
     fig = plt.figure(figsize=(6, 6))
     ax: Axes = plt.gca()
 
-    ax.plot(alpha, ecp, color="blue", label="TARP")
-    ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")
+    ecp_np = ensure_numpy(ecp)
+    alpha_np = ensure_numpy(alpha)
+
+    ax.plot(alpha_np, ecp_np, color="blue", label="TARP")
+    ax.plot(alpha_np, alpha_np, color="black", linestyle="--", label="ideal")
     ax.set_xlabel(r"Credibility Level $\alpha$")
     ax.set_ylabel(r"Expected Coverage Probability")
     ax.set_xlim(0.0, 1.0)
@@ -2871,10 +2895,15 @@ def _arrange_plots(
     if opts["ticks"] == [] or opts["ticks"] is None:
         ticks = None
     else:
-        if len(opts["ticks"]) == 1:
-            ticks = [opts["ticks"][0] for _ in range(dim)]
-        else:
-            ticks = opts["ticks"]
+        ticks = opts["ticks"]
+        if isinstance(ticks, torch.Tensor):
+            ticks = ensure_numpy(ticks)
+        elif isinstance(ticks, list):
+            ticks = [
+                ensure_numpy(t) if isinstance(t, torch.Tensor) else t for t in ticks
+            ]
+        if len(ticks) == 1:
+            ticks = [ticks[0] for _ in range(dim)]
 
     # Figure out if we subset the plot
     subset = opts["subset"]
