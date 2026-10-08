@@ -1444,11 +1444,10 @@ def _arrange_grid(
     # Prepare points
     if points is None:
         points = []
-    if not isinstance(points, list):
-        points = ensure_numpy(points)  # type: ignore
-        points = [points]
-    points = [np.atleast_2d(p) for p in points]
-    points = [np.atleast_2d(ensure_numpy(p)) for p in points]
+    elif not isinstance(points, list):
+        points = [np.atleast_2d(ensure_numpy(points))]
+    else:
+        points = [np.atleast_2d(ensure_numpy(p)) for p in points]
     # TODO: add asserts checking compatibility of dimensions
 
     # Prepare labels
@@ -2877,11 +2876,10 @@ def _arrange_plots(
     # Prepare points
     if points is None:
         points = []
-    if not isinstance(points, list):
-        points = ensure_numpy(points)  # type: ignore
-        points = [points]
-    points = [np.atleast_2d(p) for p in points]
-    points = [np.atleast_2d(ensure_numpy(p)) for p in points]
+    elif not isinstance(points, list):
+        points = [np.atleast_2d(ensure_numpy(points))]
+    else:
+        points = [np.atleast_2d(ensure_numpy(p)) for p in points]
 
     # TODO: add asserts checking compatibility of dimensions
 
@@ -2892,18 +2890,26 @@ def _arrange_plots(
         labels_dim = opts["labels"]
 
     # Prepare ticks
-    if opts["ticks"] == [] or opts["ticks"] is None:
+    raw_ticks = opts["ticks"]
+    if raw_ticks is None or (isinstance(raw_ticks, list) and len(raw_ticks) == 0):
         ticks = None
     else:
-        ticks = opts["ticks"]
-        if isinstance(ticks, torch.Tensor):
-            ticks = ensure_numpy(ticks)
-        elif isinstance(ticks, list):
-            ticks = [
-                ensure_numpy(t) if isinstance(t, torch.Tensor) else t for t in ticks
+        ticks_list: Union[List, np.ndarray] = (
+            ensure_numpy(raw_ticks)
+            if isinstance(raw_ticks, torch.Tensor)
+            else raw_ticks
+        )
+        if isinstance(ticks_list, list):
+            ticks_list = [
+                ensure_numpy(t) if isinstance(t, torch.Tensor) else t
+                for t in ticks_list
             ]
-        if len(ticks) == 1:
-            ticks = [ticks[0] for _ in range(dim)]
+        if len(ticks_list) == 1:
+            ticks = [ticks_list[0] for _ in range(dim)]
+        elif len(ticks_list) == 0:
+            ticks = None
+        else:
+            ticks = ticks_list
 
     # Figure out if we subset the plot
     subset = opts["subset"]

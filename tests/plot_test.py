@@ -771,3 +771,92 @@ def test_sbc_and_tarp_plots_device_and_grad(device, requires_grad):
     fig2, _ = plot_tarp(ecp, alpha)
     assert isinstance(fig2, Figure)
     close(fig2)
+
+
+@pytest.mark.parametrize(
+    "points_factory",
+    [
+        lambda dev, grad: [torch.tensor([0.0, 0.0], device=dev, requires_grad=grad)],
+        lambda dev, grad: [
+            torch.tensor([0.0, 0.0], device=dev, requires_grad=grad),
+            torch.tensor([1.0, 1.0], device=dev, requires_grad=grad),
+        ],
+        lambda dev, grad: np.array([0.0, 0.0]),
+        lambda dev, grad: [np.array([0.0, 0.0]), np.array([1.0, 1.0])],
+    ],
+)
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not torch.backends.mps.is_available(), reason="MPS unavailable"
+            ),
+        ),
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="CUDA unavailable"
+            ),
+        ),
+    ],
+)
+def test_pairplot_points_list_device_and_grad(points_factory, device):
+    """pairplot must accept list of points containing accelerator or grad tensors."""
+    samples = torch.randn(50, 2)
+    points = points_factory(device, True)
+    fig, _ = pairplot(samples, points=points)
+    assert isinstance(fig, Figure)
+    close(fig)
+
+
+@pytest.mark.parametrize(
+    "ticks_factory",
+    [
+        lambda dev: None,
+        lambda dev: [],
+        lambda dev: [[-2.0, 2.0], [-2.0, 2.0]],
+        lambda dev: np.array([[-2.0, 2.0], [-2.0, 2.0]]),
+        lambda dev: torch.tensor([[-2.0, 2.0], [-2.0, 2.0]], device=dev),
+        lambda dev: torch.tensor(
+            [[-2.0, 2.0], [-2.0, 2.0]], device=dev, requires_grad=True
+        ),
+        lambda dev: [torch.tensor([-2.0, 2.0], device=dev)],
+    ],
+)
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not torch.backends.mps.is_available(), reason="MPS unavailable"
+            ),
+        ),
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="CUDA unavailable"
+            ),
+        ),
+    ],
+)
+def test_ticks_handling_across_plot_arrangers(ticks_factory, device):
+    """_arrange_grid and _arrange_plots must handle diverse ticks types safely."""
+    samples = torch.randn(50, 2)
+    ticks = ticks_factory(device)
+
+    # test in pairplot (_arrange_grid)
+    fig1, _ = pairplot(samples, ticks=ticks)
+    assert isinstance(fig1, Figure)
+    close(fig1)
+
+    # test in deprecated pairplot path (_arrange_plots)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=PendingDeprecationWarning)
+        fig2, _ = plt.pairplot_dep(samples, ticks=ticks)
+        assert isinstance(fig2, Figure)
+        close(fig2)
