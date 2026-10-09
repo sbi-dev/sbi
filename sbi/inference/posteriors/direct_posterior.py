@@ -351,7 +351,7 @@ class DirectPosterior(NeuralPosterior):
         """
         x = self._x_else_default_x(x)
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
@@ -437,8 +437,8 @@ class DirectPosterior(NeuralPosterior):
         """
 
         self._assert_finite_x(x)
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-        x = x.to(self._device)
+        theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
+        x = torch.as_tensor(x, device=self._device)
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
         # overwise, the leading is sample.
