@@ -119,3 +119,58 @@ def test_explicit_cpu_x_for_posterior_on_gpu(estimator_type):
     if isinstance(posterior, DirectPosterior):
         posterior.log_prob_batched(theta, x=x, leakage_correction_params=params)
         posterior.sample_batched((2,), x=x, show_progress_bars=False)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("estimator_type", ["direct", "npe_a", "flow"])
+def test_explicit_cpu_theta_for_posterior_on_gpu(estimator_type):
+    device = process_device("gpu")
+    if mps_fallback_disabled(device):
+        pytest.skip("Needs PYTORCH_ENABLE_MPS_FALLBACK=1 on MPS.")
+    prior = BoxUniform(torch.zeros(2, device=device), 3 * torch.ones(2, device=device))
+    posterior = _posterior(estimator_type, prior, device)
+    theta, x = torch.ones(1, 2), torch.ones(1, 2)
+    params = {"num_rejection_samples": 100}
+
+    lp_unnorm = posterior.log_prob(theta, x=x, norm_posterior=False)
+    assert lp_unnorm.device.type == torch.device(device).type
+    lp_norm = posterior.log_prob(theta, x=x, leakage_correction_params=params)
+    assert lp_norm.device.type == torch.device(device).type
+
+    expected = posterior.log_prob(
+        theta.to(device), x=x.to(device), norm_posterior=False
+    )
+    assert torch.allclose(lp_unnorm, expected)
+
+    if isinstance(posterior, DirectPosterior):
+        lpb = posterior.log_prob_batched(theta, x=x, leakage_correction_params=params)
+        assert lpb.device.type == torch.device(device).type
+
+        theta_grad = torch.ones(1, 2, requires_grad=True)
+        lp_grad = posterior.log_prob(
+            theta_grad, x=x, track_gradients=True, norm_posterior=False
+        )
+        assert lp_grad.requires_grad
+
+
+@pytest.mark.gpu
+def test_direct_posterior_log_prob_array_and_list_on_gpu():
+    import numpy as np
+
+    device = process_device("gpu")
+    if mps_fallback_disabled(device):
+        pytest.skip("Needs PYTORCH_ENABLE_MPS_FALLBACK=1 on MPS.")
+    prior = BoxUniform(torch.zeros(2, device=device), 3 * torch.ones(2, device=device))
+    posterior = _posterior("direct", prior, device)
+
+    theta_np = np.ones((1, 2), dtype=np.float32)
+    x_np = np.ones((1, 2), dtype=np.float32)
+    lp_np = posterior.log_prob(theta_np, x=x_np, norm_posterior=False)
+    assert lp_np.device.type == torch.device(device).type
+    lpb_np = posterior.log_prob_batched(theta_np, x=x_np, norm_posterior=False)
+    assert lpb_np.device.type == torch.device(device).type
+
+    theta_list = [[1.0, 1.0]]
+    x_list = [[1.0, 1.0]]
+    lp_list = posterior.log_prob(theta_list, x=x_list, norm_posterior=False)
+    assert lp_list.device.type == torch.device(device).type
