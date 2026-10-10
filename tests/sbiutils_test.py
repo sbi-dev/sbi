@@ -366,6 +366,26 @@ def test_kde(bandwidth, transform, sample_weights):
     assert kde_vals.shape == torch.Size((num_draws,))
 
 
+def test_kde_cv_bandwidth_below_initial_grid():
+    """Cross-validation must find a bandwidth below the initial grid (0.1 * std).
+
+    Two well-separated unit-variance clusters have a large overall std, so the
+    best bandwidth lies at the lower edge of the first grid and the grid has to
+    be shifted. The best bandwidth for this data is around 0.4.
+    """
+    from sklearn.exceptions import FitFailedWarning
+
+    torch.manual_seed(0)
+    samples = torch.cat([torch.randn(200, 1) - 10.0, torch.randn(200, 1) + 10.0])
+
+    with warnings.catch_warnings():
+        # Fails if the grid contains invalid (non-positive) bandwidths.
+        warnings.simplefilter("error", FitFailedWarning)
+        kde = get_kde(samples, bandwidth="cv")
+
+    assert 0.2 < kde.kde.bandwidth < 0.8
+
+
 @pytest.mark.parametrize(
     "z_x",
     [
