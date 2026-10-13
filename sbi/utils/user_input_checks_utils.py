@@ -184,13 +184,17 @@ class PytorchReturnTypeWrapper(Distribution):
         self,
         prior: Distribution,  # type: ignore
         return_type: Optional[torch.dtype] = float32,
-        batch_shape=torch.Size(),
-        event_shape=torch.Size(),
+        batch_shape: Optional[torch.Size] = None,
+        event_shape: Optional[torch.Size] = None,
         validate_args=None,
     ):
         self.prior = prior
         if validate_args is not None:
             set_validate_args(prior, validate_args)
+
+        # Default batch and event shape to that of the prior if not provided.
+        batch_shape = prior.batch_shape if batch_shape is None else batch_shape
+        event_shape = prior.event_shape if event_shape is None else event_shape
 
         self.device = None
         self.return_type = return_type
