@@ -250,6 +250,10 @@ def test_reinterpreted_batch_dim_prior():
             Uniform(zeros(1), ones(1)),
             Uniform(zeros(1), ones(1)),
         ],  # multiple independent prior
+        [
+            Gamma(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64)),
+            Gamma(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64)),
+        ],  # multiple independent prior with non-float32 dtype
         pytest.param(
             [
                 UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
