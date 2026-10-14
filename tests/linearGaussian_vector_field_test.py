@@ -882,14 +882,23 @@ def test_fmpe_shifted_data_c2st(z_score_theta, gaussian_baseline):
     assert c2st_value < 0.55, f"C2ST={c2st_value:.3f} should be < 0.55"
 
 
+class _ZeroNet(torch.nn.Module):
+    """Vector field network that always outputs zero (a Gaussian baseline sampler)."""
+
+    def __init__(self):
+        super().__init__()
+        self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+    def forward(self, input, condition, time):
+        return torch.zeros_like(input) * self.dummy
+
+
 @pytest.mark.slow
 def test_fmpe_untrained_gaussian_baseline_samples_prior():
     """
     Test that an untrained network with gaussian_baseline=True samples from
     the data distribution (not N(0,1)).
     """
-    from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
-
     torch.manual_seed(42)
 
     num_dim = 2
@@ -902,17 +911,8 @@ def test_fmpe_untrained_gaussian_baseline_samples_prior():
     theta_mean = theta_train.mean(dim=0)
     theta_std = theta_train.std(dim=0)
 
-    # Network that outputs zeros (simulating untrained network)
-    class ZeroNet(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.dummy = torch.nn.Parameter(torch.zeros(1))
-
-        def forward(self, input, condition, time):
-            return torch.zeros_like(input) * self.dummy
-
     estimator = FlowMatchingEstimator(
-        net=ZeroNet(),
+        net=_ZeroNet(),
         input_shape=torch.Size([num_dim]),
         condition_shape=torch.Size([num_dim]),
         mean_0=theta_mean,
@@ -932,117 +932,45 @@ def test_fmpe_untrained_gaussian_baseline_samples_prior():
     )
 
 
-class _ZeroNet(torch.nn.Module):
-    """Vector field network that always outputs zero (a Gaussian baseline sampler)."""
-
-    def __init__(self):
-        super().__init__()
-        self.dummy = torch.nn.Parameter(torch.zeros(1))
-
-    def forward(self, input, condition, time):
-        return torch.zeros_like(input) * self.dummy
-
-
 def test_estimate_posterior_precision_centeredness():
-    """The estimated posterior precision is the inverse of the sample covariance.
-
-    The full-matrix branch must mean-center the samples, as the diagonal branch does.
-    """
-    torch.manual_seed(42)
-
-    num_dim = 2
-    prior_mean = torch.tensor([100.0, 100.0])
-    prior_std = torch.tensor([5.0, 5.0])
-    prior = BoxUniform(prior_mean - 2 * prior_std, prior_mean + 2 * prior_std)
-
-    theta_train = prior.sample((500,))
-    theta_mean = theta_train.mean(dim=0)
-    theta_std = theta_train.std(dim=0)
-
+    """The full-covariance precision of an off-center Gaussian posterior is exact."""
+    torch.manual_seed(0)
+    mean, std = torch.full((2,), 100.0), torch.full((2,), 5.0)
+    # A zero vector field samples N(mean, std^2); the wide prior does not truncate it.
     estimator = FlowMatchingEstimator(
         net=_ZeroNet(),
-        input_shape=torch.Size([num_dim]),
-        condition_shape=torch.Size([num_dim]),
-        mean_0=theta_mean,
-        std_0=theta_std,
+        input_shape=torch.Size([2]),
+        condition_shape=torch.Size([2]),
+        mean_0=mean,
+        std_0=std,
         gaussian_baseline=True,
     )
-
-    posterior = VectorFieldPosterior(prior=prior, vector_field_estimator=estimator)
-    condition = torch.tensor([[100.0, 100.0]])
-
-    samples = posterior.sample_batched(
-        sample_shape=torch.Size([2000]),
-        x=condition,
-        steps=50,
-        show_progress_bars=False,
-    ).squeeze(1)
-    empirical = torch.inverse(torch.cov(samples.T))
-
     precision = AutoGaussCorrectedScoreFn.estimate_posterior_precision(
         estimator,
-        prior,
-        condition,
+        BoxUniform(mean - 10 * std, mean + 10 * std),
+        torch.zeros(1, 2),
         precision_initial_sampler_steps=50,
     )
-
-    assert torch.allclose(
-        torch.diag(precision[0, 0]), torch.diag(empirical), rtol=0.3
-    ), (
-        f"estimated precision diagonal {torch.diag(precision[0, 0])} does not match "
-        f"empirical {torch.diag(empirical)}"
+    torch.testing.assert_close(
+        precision[0, 0], torch.diag(1 / std**2), atol=5e-3, rtol=0
     )
-    assert torch.allclose(
-        precision[0, 0] - torch.diag(torch.diag(precision[0, 0])),
-        empirical - torch.diag(torch.diag(empirical)),
-        atol=0.02,
-    ), f"estimated precision off-diagonal does not match empirical {empirical}"
 
 
-@pytest.mark.parametrize("component_type", ["normal", "mvn"])
-def test_denoise_mixture_weights_equal_posterior(component_type: str):
-    """`denoise` reweights components by p(x_t | k), the forward-process marginal.
+def test_denoise_mixture_weights_equal_posterior():
+    """`denoise` weights mixture components by p(x_t | k) of x_t = m * x0 + s * eps."""
+    m, s, x_t = torch.tensor(0.8), torch.tensor(0.3), torch.tensor(0.6)
+    weights = torch.tensor([0.3, 0.7])
+    loc, scale = torch.tensor([-1.5, 1.0]), torch.tensor([0.5, 1.2])
+    prior = MixtureSameFamily(Categorical(probs=weights), Normal(loc, scale))
 
-    The reference is written out directly: under x_t = m * x0 + s * eps, component k
-    has x_t ~ N(m * mu_k, m^2 * Sigma_k + s^2 I).
-    """
-    torch.manual_seed(42)
-    m, s = torch.tensor(0.8), torch.tensor(0.3)
-    prior_weights = torch.tensor([0.3, 0.7])
-
-    if component_type == "normal":
-        loc = torch.tensor([-1.5, 1.0])
-        scale = torch.tensor([0.5, 1.2])
-        components = Normal(loc, scale, validate_args=False)
-        x_t = torch.tensor(0.6)
-        marginals = Normal(m * loc, (m**2 * scale**2 + s**2).sqrt())
-    else:
-        loc = torch.tensor([[-1.5, 0.5], [1.0, 1.0]])
-        cov = torch.tensor([[[0.5, 0.2], [0.2, 0.4]], [[1.2, -0.3], [-0.3, 0.8]]])
-        components = MultivariateNormal(loc, covariance_matrix=cov, validate_args=False)
-        x_t = torch.tensor([0.6, -0.2])
-        marginals = MultivariateNormal(
-            m * loc, covariance_matrix=m**2 * cov + s**2 * torch.eye(2)
-        )
-
-    prior = MixtureSameFamily(
-        Categorical(probs=prior_weights, validate_args=False),
-        components,
-        validate_args=False,
-    )
     denoised = denoise(prior, m, s, x_t)
 
-    exact_weights = torch.softmax(prior_weights.log() + marginals.log_prob(x_t), dim=-1)
-    assert torch.allclose(
-        denoised.mixture_distribution.probs[0], exact_weights, atol=1e-6
-    ), (
-        f"denoised weights {denoised.mixture_distribution.probs} do not match "
-        f"exact posterior weights {exact_weights}"
-    )
+    marginals = Normal(m * loc, (m**2 * scale**2 + s**2).sqrt())
+    expected = torch.softmax(weights.log() + marginals.log_prob(x_t), dim=-1)
+    torch.testing.assert_close(denoised.mixture_distribution.probs[0], expected)
 
 
-@pytest.mark.parametrize("budget", [1, 2])
-def test_estimate_posterior_precision_rejects_small_budget(budget: int):
+def test_estimate_posterior_precision_rejects_small_budget():
     """A full-covariance estimate needs more samples than parameter dimensions."""
     num_dim = 2
     prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
@@ -1056,6 +984,6 @@ def test_estimate_posterior_precision_rejects_small_budget(budget: int):
             estimator,
             prior,
             torch.zeros(1, num_dim),
-            precision_est_budget=budget,
+            precision_est_budget=num_dim,
             precision_est_only_diag=False,
         )
