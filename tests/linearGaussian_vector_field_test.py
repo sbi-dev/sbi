@@ -30,6 +30,8 @@ from sbi.inference import (
 )
 from sbi.inference.posteriors import MCMCPosteriorParameters
 from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
+from sbi.inference.potentials.vector_field_adaptor import AutoGaussCorrectedScoreFn
+from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
@@ -41,6 +43,7 @@ from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.user_input_checks import process_simulator
+from sbi.utils.vector_field_utils import denoise
 
 from .test_utils import get_dkl_gaussian_prior
 
@@ -929,15 +932,22 @@ def test_fmpe_untrained_gaussian_baseline_samples_prior():
     )
 
 
-def test_estimate_posterior_precision_centeredness():
-    """Regression test for #2043. The estimated posterior precision must be the
-    inverse of the covariance (mean-centered), not the inverse of E[theta theta^T].
-    """
-    from sbi.inference.potentials.vector_field_adaptor import (
-        AutoGaussCorrectedScoreFn,
-    )
-    from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
+class _ZeroNet(torch.nn.Module):
+    """Vector field network that always outputs zero (a Gaussian baseline sampler)."""
 
+    def __init__(self):
+        super().__init__()
+        self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+    def forward(self, input, condition, time):
+        return torch.zeros_like(input) * self.dummy
+
+
+def test_estimate_posterior_precision_centeredness():
+    """The estimated posterior precision is the inverse of the sample covariance.
+
+    The full-matrix branch must mean-center the samples, as the diagonal branch does.
+    """
     torch.manual_seed(42)
 
     num_dim = 2
@@ -949,16 +959,8 @@ def test_estimate_posterior_precision_centeredness():
     theta_mean = theta_train.mean(dim=0)
     theta_std = theta_train.std(dim=0)
 
-    class ZeroNet(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.dummy = torch.nn.Parameter(torch.zeros(1))
-
-        def forward(self, input, condition, time):
-            return torch.zeros_like(input) * self.dummy
-
     estimator = FlowMatchingEstimator(
-        net=ZeroNet(),
+        net=_ZeroNet(),
         input_shape=torch.Size([num_dim]),
         condition_shape=torch.Size([num_dim]),
         mean_0=theta_mean,
@@ -997,35 +999,63 @@ def test_estimate_posterior_precision_centeredness():
     ), f"estimated precision off-diagonal does not match empirical {empirical}"
 
 
-def test_denoise_mixture_weights_equal_posterior():
-    """Regression test for #2047. `denoise` must weight mixture components by the
-    component marginal likelihood `p(x_t | k)`, not by the denoised posterior
-    density evaluated in x0-space.
+@pytest.mark.parametrize("component_type", ["normal", "mvn"])
+def test_denoise_mixture_weights_equal_posterior(component_type: str):
+    """`denoise` reweights components by p(x_t | k), the forward-process marginal.
+
+    The reference is written out directly: under x_t = m * x0 + s * eps, component k
+    has x_t ~ N(m * mu_k, m^2 * Sigma_k + s^2 I).
     """
-    from sbi.utils.vector_field_utils import denoise, marginalize
-
     torch.manual_seed(42)
-
-    loc = torch.tensor([-1.5, 1.0])
-    scale = torch.tensor([0.5, 1.2])
+    m, s = torch.tensor(0.8), torch.tensor(0.3)
     prior_weights = torch.tensor([0.3, 0.7])
+
+    if component_type == "normal":
+        loc = torch.tensor([-1.5, 1.0])
+        scale = torch.tensor([0.5, 1.2])
+        components = Normal(loc, scale, validate_args=False)
+        x_t = torch.tensor(0.6)
+        marginals = Normal(m * loc, (m**2 * scale**2 + s**2).sqrt())
+    else:
+        loc = torch.tensor([[-1.5, 0.5], [1.0, 1.0]])
+        cov = torch.tensor([[[0.5, 0.2], [0.2, 0.4]], [[1.2, -0.3], [-0.3, 0.8]]])
+        components = MultivariateNormal(loc, covariance_matrix=cov, validate_args=False)
+        x_t = torch.tensor([0.6, -0.2])
+        marginals = MultivariateNormal(
+            m * loc, covariance_matrix=m**2 * cov + s**2 * torch.eye(2)
+        )
+
     prior = MixtureSameFamily(
         Categorical(probs=prior_weights, validate_args=False),
-        Normal(loc, scale, validate_args=False),
+        components,
+        validate_args=False,
     )
-
-    m = torch.tensor(0.8)
-    s = torch.tensor(0.3)
-    x_t = torch.tensor(0.6)
-
     denoised = denoise(prior, m, s, x_t)
 
-    marg_loglike = marginalize(prior.component_distribution, m, s).log_prob(x_t)
-    exact_weights = torch.softmax(prior_weights.log() + marg_loglike, dim=-1)
-
+    exact_weights = torch.softmax(prior_weights.log() + marginals.log_prob(x_t), dim=-1)
     assert torch.allclose(
-        denoised.mixture_distribution.probs, exact_weights, atol=1e-6
+        denoised.mixture_distribution.probs[0], exact_weights, atol=1e-6
     ), (
         f"denoised weights {denoised.mixture_distribution.probs} do not match "
         f"exact posterior weights {exact_weights}"
     )
+
+
+@pytest.mark.parametrize("budget", [1, 2])
+def test_estimate_posterior_precision_rejects_small_budget(budget: int):
+    """A full-covariance estimate needs more samples than parameter dimensions."""
+    num_dim = 2
+    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
+    estimator = FlowMatchingEstimator(
+        net=_ZeroNet(),
+        input_shape=torch.Size([num_dim]),
+        condition_shape=torch.Size([num_dim]),
+    )
+    with pytest.raises(ValueError, match="precision_est_budget"):
+        AutoGaussCorrectedScoreFn.estimate_posterior_precision(
+            estimator,
+            prior,
+            torch.zeros(1, num_dim),
+            precision_est_budget=budget,
+            precision_est_only_diag=False,
+        )
