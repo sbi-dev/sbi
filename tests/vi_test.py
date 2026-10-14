@@ -28,6 +28,7 @@ from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
 from sbi.neural_nets.factory import ZukoFlowType
+from sbi.samplers.vi.vi_divergence_optimizers import IWElboOptimizer
 from sbi.samplers.vi.vi_utils import AdaptedVariationalDistribution, LearnableGaussian
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -569,6 +570,44 @@ def test_retrain_fails_after_setting_an_already_built_q():
     assert posterior.q is replacement
     with pytest.raises(ValueError, match="Cannot rebuild"):
         posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
+
+
+@pytest.mark.parametrize("dreg", [False, True])
+def test_iwelbo_optimizer_uses_importance_weighted_loss(monkeypatch, dreg: bool):
+    """IW training must use all K samples and the requested gradient weights."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = IWElboOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=2,
+        K=3,
+        dreg=dreg,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    particles = torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0], requires_grad=True)
+    sample_counts = []
+
+    def fixed_particles(x_o, num_samples=None):
+        sample_counts.append(num_samples)
+        return particles
+
+    monkeypatch.setattr(optimizer, "generate_elbo_particles", fixed_particles)
+    surrogate_loss, loss = optimizer.loss(zeros(1))
+
+    reshaped = particles.reshape(2, 3)
+    weights = torch.softmax(reshaped.detach(), dim=-1)
+    if dreg:
+        weights = weights.square()
+    expected_grad = -weights.flatten() / 2
+    expected_loss = -torch.log(torch.exp(reshaped).mean(-1)).mean()
+
+    assert sample_counts == [6]
+    grad = torch.autograd.grad(surrogate_loss, particles)[0]
+    assert torch.allclose(grad, expected_grad)
+    assert torch.allclose(loss, expected_loss.detach())
+    assert not loss.requires_grad
 
 
 def test_vi_posterior_interface():
