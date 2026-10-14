@@ -180,6 +180,7 @@ class TestMultivariateGaussianMDNDevice:
         assert mdn._row_ix.device.type == device
         assert mdn._column_ix.device.type == device
         assert mdn._diag_ix.device.type == device
+        assert not {"_row_ix", "_column_ix", "_diag_ix"} & set(mdn.state_dict())
 
         context = torch.randn(8, 5, device=device)
         mog = mdn(context)
