@@ -31,7 +31,7 @@ jobs:
       matrix:
         # Lowest and highest supported versions bracket the compatibility range
         # where most upstream breakages surface (e.g. requires-python bumps).
-        python-version: ['3.10', '3.13']
+        python-version: ['3.11', '3.13']
 
     steps:
     - name: Checkout
