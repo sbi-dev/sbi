@@ -15,6 +15,7 @@ from torch.distributions import (
     Exponential,
     Gamma,
     MultivariateNormal,
+    Normal,
     Uniform,
 )
 
@@ -254,6 +255,13 @@ def test_reinterpreted_batch_dim_prior():
             Gamma(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64)),
             Gamma(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64)),
         ],  # multiple independent prior with non-float32 dtype
+        [
+            Normal(zeros(1, dtype=torch.float16), ones(1, dtype=torch.float16)),
+            MultivariateNormal(
+                zeros(3, dtype=torch.float64), eye(3, dtype=torch.float64)
+            ),
+            Uniform(zeros(1), ones(1)),
+        ],  # multiple independent prior with mixed dtypes and event shapes
         pytest.param(
             [
                 UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
@@ -282,6 +290,18 @@ def test_process_prior(prior):
     assert prior.log_prob(theta).shape[0] == batch_size, (
         "Number of log probs must match number of input values."
     )
+
+
+def test_process_prior_warns_and_keeps_shapes_for_float64_prior():
+    prior = MultivariateNormal(
+        zeros(3, dtype=torch.float64), eye(3, dtype=torch.float64)
+    )
+    with pytest.warns(UserWarning, match="casts the samples and log probs"):
+        processed, parameter_dim, _ = process_prior(prior)
+
+    assert parameter_dim == 3
+    assert processed.event_shape == torch.Size([3])
+    assert processed.sample((2,)).dtype == torch.float32
 
 
 @pytest.mark.parametrize(
