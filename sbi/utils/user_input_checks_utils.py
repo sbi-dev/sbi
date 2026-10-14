@@ -368,53 +368,38 @@ class MultipleIndependent(Distribution):
         """
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
-        # Sample from every sub distribution and concatenate samples.
-        sample = torch.cat([d.sample(sample_shape) for d in self.dists], dim=-1)
-
-        # This reshape is needed to cover the case .sample() vs. .sample((n, )).
-        if sample_shape == torch.Size():
-            sample = sample.reshape(self.ndims)
-        else:
-            sample = sample.reshape(-1, self.ndims)
-
-        return sample
+        sample_shape = torch.Size(sample_shape)
+        # A component can carry its dimensions in batch_shape [1] or in event_shape.
+        samples = [
+            d.sample(sample_shape).reshape(*sample_shape, -1) for d in self.dists
+        ]
+        return torch.cat(samples, dim=-1)
 
     def log_prob(self, value) -> Tensor:
         value = self._prepare_value(value)
+        batch_shape = value.shape[:-1]
 
-        # Evaluate value per distribution, taking into account that individual
-        # distributions can be multivariate.
-        num_samples = value.shape[0]
         log_probs = []
         dims_covered = 0
-        for idx, d in enumerate(self.dists):
-            ndims = int(self.dims_per_dist[idx])
-            v = value[:, dims_covered : dims_covered + ndims]
-            # Reshape here to ensure all returned log_probs are 2D for concatenation.
-            log_probs.append(d.log_prob(v).reshape(num_samples, 1))
+        for d, ndims in zip(self.dists, self.dims_per_dist, strict=True):
+            v = value[..., dims_covered : dims_covered + ndims]
+            log_probs.append(d.log_prob(v).reshape(batch_shape))
             dims_covered += ndims
 
-        # Sum accross last dimension to get joint log prob over all distributions.
-        return torch.cat(log_probs, dim=1).sum(-1)
+        return torch.stack(log_probs, dim=-1).sum(-1)
 
     def _prepare_value(self, value) -> Tensor:
-        """Return input value with fixed shape.
+        """Return input value with at least one batch dimension.
 
         Raises:
-            AssertionError: if value has more than 2 dimensions or invalid size in
-                2nd dimension.
+            AssertionError: if the last dimension does not match the dimensions of
+                this joint.
         """
 
         if value.ndim < 2:
             value = value.unsqueeze(0)
 
-        assert value.ndim == 2, (
-            f"value in log_prob must have ndim <= 2, it is {value.ndim}."
-        )
-
-        batch_shape, num_value_dims = value.shape
-
-        assert num_value_dims == self.ndims, (
+        assert value.shape[-1] == self.ndims, (
             f"Number of dimensions must match dimensions of this joint: {self.ndims}."
         )
 

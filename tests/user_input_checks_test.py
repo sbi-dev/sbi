@@ -43,6 +43,7 @@ from sbi.neural_nets.net_builders import build_categoricalmassestimator
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
+from sbi.utils.conditional_density_utils import RestrictedPriorForConditional
 from sbi.utils.sbiutils import Standardize, nan_tolerant_input_net
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
@@ -855,6 +856,57 @@ def test_independent_joint_shapes_and_samples(dists):
     # Check support attribute.
     within_support = joint.support.check(true_samples)
     assert within_support.all()
+
+
+@pytest.mark.parametrize("sample_shape", [(), (5,), (2, 3)])
+@pytest.mark.parametrize(
+    "dists",
+    [
+        [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
+        [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
+        [MultivariateNormal(zeros(1, 3), eye(3)), Beta(ones(1), 2 * ones(1))],
+    ],
+)
+def test_independent_joint_sample_shape(dists, sample_shape):
+    joint = MultipleIndependent(dists)
+    sample_shape = torch.Size(sample_shape)
+
+    torch.manual_seed(0)
+    samples = joint.sample(sample_shape)
+    torch.manual_seed(0)
+    expected = torch.cat(
+        [d.sample(sample_shape).reshape(*sample_shape, -1) for d in dists], dim=-1
+    )
+    assert samples.shape == sample_shape + (joint.ndims,)
+    assert torch.equal(samples, expected)
+
+    log_probs = joint.log_prob(samples)
+    if sample_shape == torch.Size():
+        assert log_probs.shape == torch.Size([1])
+    else:
+        assert log_probs.shape == sample_shape
+        flat_log_probs = joint.log_prob(samples.reshape(-1, joint.ndims))
+        assert torch.equal(log_probs, flat_log_probs.reshape(sample_shape))
+
+
+@pytest.mark.parametrize(
+    "prior",
+    [
+        BoxUniform(zeros(3), ones(3)),
+        MultipleIndependent([Uniform(zeros(1), ones(1))] * 3),
+    ],
+)
+def test_restricted_prior_for_conditional_keeps_sample_shape(prior):
+    dims_to_sample = [0, 2]
+    restricted_prior = RestrictedPriorForConditional(prior, dims_to_sample)
+
+    torch.manual_seed(0)
+    samples = restricted_prior.sample((2, 3))
+    torch.manual_seed(0)
+    expected = prior.sample((2, 3))[..., dims_to_sample]
+
+    assert samples.shape == torch.Size([2, 3, 2])
+    assert torch.equal(samples, expected)
 
 
 def test_invalid_inputs():
