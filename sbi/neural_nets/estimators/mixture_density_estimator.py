@@ -14,7 +14,6 @@ Based on: C. M. Bishop, "Mixture Density Networks", NCRG Report (1994)
 
 from typing import Optional
 
-import numpy as np
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
@@ -104,8 +103,10 @@ class MultivariateGaussianMDN(nn.Module):
         self._num_upper_params = (features * (features - 1)) // 2
 
         # Indices for filling precision factor matrix
-        self._row_ix, self._column_ix = np.triu_indices(features, k=1)
-        self._diag_ix = range(features)
+        triu_indices = torch.triu_indices(features, features, offset=1)
+        self.register_buffer("_row_ix", triu_indices[0], persistent=False)
+        self.register_buffer("_column_ix", triu_indices[1], persistent=False)
+        self.register_buffer("_diag_ix", torch.arange(features), persistent=False)
 
         # Hidden network
         if hidden_net is not None:
@@ -219,9 +220,7 @@ class MultivariateGaussianMDN(nn.Module):
         )
 
         # Add epsilon to diagonal for numerical stability
-        precisions[..., torch.arange(self._features), torch.arange(self._features)] += (
-            self._epsilon
-        )
+        precisions[..., self._diag_ix, self._diag_ix] += self._epsilon
 
         return MoG(
             logits=logits,
