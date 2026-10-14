@@ -373,6 +373,13 @@ class NPE_A(PosteriorEstimatorTrainer):
             MoG representation of the z-scored prior for Gaussian priors,
             or None for uniform priors.
         """
+        if getattr(density_estimator, "_prior_transform", None) is not None:
+            raise NotImplementedError(
+                "NPE-A's analytic leakage correction does not support "
+                "z_score_theta='transform_to_unconstrained' (it assumes an affine "
+                "z-score). Use 'independent'/'structured', or a different method."
+            )
+
         # Uniform priors have zero precision, return None
         if isinstance(self._prior, BoxUniform):
             return None
@@ -388,12 +395,6 @@ class NPE_A(PosteriorEstimatorTrainer):
         prior_cov = self._prior.covariance_matrix
 
         # Apply z-score transform if enabled
-        if getattr(density_estimator, "_prior_transform", None) is not None:
-            raise NotImplementedError(
-                "NPE-A's analytic leakage correction does not support "
-                "z_score_theta='transform_to_unconstrained' (it assumes an affine "
-                "z-score). Use 'independent'/'structured', or a different method."
-            )
         if density_estimator.has_input_transform:
             shift = density_estimator._transform_shift
             scale = density_estimator._transform_scale

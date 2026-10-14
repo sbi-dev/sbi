@@ -45,6 +45,9 @@ class DirectPosterior(NeuralPosterior):
     This class can not be used in combination with NLE or NRE.
     """
 
+    # Suggested in the warning when rejection sampling accepts few samples.
+    _alternative_sampling_method = "build_posterior(..., sample_with='mcmc')"
+
     def __init__(
         self,
         posterior_estimator: ConditionalDensityEstimator,
@@ -192,19 +195,19 @@ class DirectPosterior(NeuralPosterior):
         if reject_outside_prior:
             # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
-                proposal=self.posterior_estimator.sample,
+                proposal=self._sample_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
-                alternative_method="build_posterior(..., sample_with='mcmc')",
+                alternative_method=self._alternative_sampling_method,
                 max_sampling_time=max_sampling_time,
                 return_partial_on_timeout=return_partial_on_timeout,
             )[0]
         else:
             # Bypass rejection sampling entirely.
-            samples = self.posterior_estimator.sample(
+            samples = self._sample_estimator(
                 torch.Size([num_samples]),
                 condition=x,
             )
@@ -294,19 +297,19 @@ class DirectPosterior(NeuralPosterior):
         if reject_outside_prior:
             # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
-                proposal=self.posterior_estimator.sample,
+                proposal=self._sample_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
-                alternative_method="build_posterior(..., sample_with='mcmc')",
+                alternative_method=self._alternative_sampling_method,
                 max_sampling_time=max_sampling_time,
                 return_partial_on_timeout=return_partial_on_timeout,
             )[0]
         else:
             # Bypass rejection sampling entirely.
-            samples = self.posterior_estimator.sample(
+            samples = self._sample_estimator(
                 torch.Size([num_samples]),
                 condition=x,
             )
@@ -368,8 +371,8 @@ class DirectPosterior(NeuralPosterior):
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self.posterior_estimator.log_prob(
-                theta_density_estimator, condition=x_density_estimator
+            unnorm_log_prob = self._log_prob_estimator(
+                theta_density_estimator, x_density_estimator
             )
             # `log_prob` supports only a single observation (i.e. `batchsize==1`).
             # We now remove this additional dimension.
@@ -451,8 +454,8 @@ class DirectPosterior(NeuralPosterior):
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self.posterior_estimator.log_prob(
-                theta_density_estimator, condition=x_density_estimator
+            unnorm_log_prob = self._log_prob_estimator(
+                theta_density_estimator, x_density_estimator
             )
 
             # Force probability to be zero outside prior support.
@@ -519,6 +522,9 @@ class DirectPosterior(NeuralPosterior):
 
     def _sample_estimator(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
         return self.posterior_estimator.sample(sample_shape, **kwargs)
+
+    def _log_prob_estimator(self, theta: Tensor, condition: Tensor) -> Tensor:
+        return self.posterior_estimator.log_prob(theta, condition=condition)
 
     def map(
         self,
