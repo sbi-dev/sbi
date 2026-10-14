@@ -29,7 +29,7 @@ METRIC_TITLES = {
     "mean_err": "Posterior mean error, in reference std (0 is best)",
     "std_err": "Posterior std error, in reference std (0 is best)",
 }
-MOVED_OLD_RESULTS = pytest.StashKey[bool]()
+MOVED_OLD_RESULTS = pytest.StashKey[Path]()
 
 
 # Use seed automatically for every test function.
@@ -293,9 +293,8 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     write = terminalreporter.write_line
     terminal_width = shutil.get_terminal_size().columns
     write(f"\033[96m{' mini SBIBM results '.center(terminal_width, '=')}\033[0m")
-    if config.stash.get(MOVED_OLD_RESULTS, False):
-        old_file = _results_dir(config) / "results_all.old.csv"
-        write(f"Moved results in an older format to {old_file}.")
+    if MOVED_OLD_RESULTS in config.stash:
+        write(f"Moved results in an older format to {config.stash[MOVED_OLD_RESULTS]}.")
 
     try:
         stored = [
@@ -338,7 +337,8 @@ def pytest_sessionfinish(session):
 
     With xdist, the main process receives the results of all workers. Rows with the
     same label, method and task as a new result are replaced. The single results file
-    of older versions is moved to `results_all.old.csv`.
+    of older versions is moved to `results_all.old.csv`, or to a numbered name such as
+    `results_all.old-2.csv` when that backup already exists.
     """
     if not session.config.getoption("--bm") or not is_main_process(session):
         return
@@ -354,8 +354,13 @@ def pytest_sessionfinish(session):
 
     old_file = _results_dir(session.config) / "results_all.csv"
     if old_file.exists():
-        old_file.replace(old_file.with_name("results_all.old.csv"))
-        session.config.stash[MOVED_OLD_RESULTS] = True
+        backup = old_file.with_name("results_all.old.csv")
+        number = 2
+        while backup.exists():
+            backup = old_file.with_name(f"results_all.old-{number}.csv")
+            number += 1
+        old_file.replace(backup)
+        session.config.stash[MOVED_OLD_RESULTS] = backup
 
     results_file = _results_file(session.config, label)
     stored = _read_results(results_file)
