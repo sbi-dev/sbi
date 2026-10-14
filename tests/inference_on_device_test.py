@@ -103,8 +103,8 @@ def _collect_transform_tensors(transform):
     "training_device, prior_device",
     [
         ("gpu", "gpu"),
-        pytest.param("cpu", "gpu", marks=pytest.mark.xfail),
-        pytest.param("gpu", "cpu", marks=pytest.mark.xfail),
+        pytest.param("cpu", "gpu", marks=pytest.mark.xfail(raises=AssertionError)),
+        pytest.param("gpu", "cpu", marks=pytest.mark.xfail(raises=AssertionError)),
     ],
 )
 @pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
