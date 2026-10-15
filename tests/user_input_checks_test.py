@@ -863,7 +863,6 @@ JOINT_COMPONENTS = [
     [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
     [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
     [MultivariateNormal(zeros(1, 3), eye(3)), Beta(ones(1), 2 * ones(1))],
-    [Independent(Normal(zeros(2, 3), ones(2, 3)), 2), Gamma(ones(1), ones(1))],
 ]
 
 
@@ -909,6 +908,18 @@ def test_independent_joint_empty_sample_shape(dists, sample_shape):
     joint = MultipleIndependent(dists)
     samples = joint.sample(sample_shape)
     assert samples.shape == torch.Size(sample_shape) + (joint.ndims,)
+
+
+@pytest.mark.parametrize(
+    "component, match",
+    [
+        (Normal(torch.empty(0), torch.empty(0)), "batch shape"),
+        (Independent(Uniform(zeros(2, 3), ones(2, 3)), 2), "event shape"),
+    ],
+)
+def test_independent_joint_rejects_unsupported_component(component, match):
+    with pytest.raises(AssertionError, match=match):
+        MultipleIndependent([component, Gamma(ones(1), ones(1))])
 
 
 @pytest.mark.parametrize(

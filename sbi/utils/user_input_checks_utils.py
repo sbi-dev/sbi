@@ -352,12 +352,16 @@ class MultipleIndependent(Distribution):
         ), """priors passed to MultipleIndependent must be PyTorch distributions. Make \
             sure to process custom priors individually using :func:`process_prior` \
             before passing them in a list to :func:`process_prior`."""
-        # Make sure batch shape is smaller or equal to 1.
         assert dist.batch_shape in (
             torch.Size([1]),
-            torch.Size([0]),
             torch.Size([]),
-        ), "The batch shape of every distribution must be smaller or equal to 1."
+        ), "The batch shape of every distribution must be [] or [1]."
+
+        assert len(dist.event_shape) <= 1, (
+            f"The event shape of every distribution must have at most one dimension, "
+            f"but one is {tuple(dist.event_shape)}. Define the distribution over a "
+            f"flat parameter vector instead."
+        )
 
         assert (
             len(dist.batch_shape) > 0 or len(dist.event_shape) > 0
@@ -369,8 +373,7 @@ class MultipleIndependent(Distribution):
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
         sample_shape = torch.Size(sample_shape)
-        # Each component is flattened to its own dimensions, which it can carry in
-        # batch_shape [1] or in a multi-dimensional event_shape.
+        # A component can carry its dimensions in batch_shape [1] or in event_shape.
         samples = [
             d.sample(sample_shape).reshape(*sample_shape, ndims)
             for d, ndims in zip(self.dists, self.dims_per_dist, strict=True)
