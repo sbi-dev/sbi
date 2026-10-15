@@ -244,7 +244,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
             bar_dist = pred_dist["criterion"]
             dim_log_prob = -bar_dist(
                 pred_dist["logits"].to(bar_dist.borders.device),
-                test_joint[:, target_idx].to(bar_dist.borders.device),
+                test_joint[:, target_idx].to(bar_dist.borders),
             )
             dim_log_prob = dim_log_prob.to(log_prob)
 
@@ -298,7 +298,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
                 bar_dist = pred_dist["criterion"]
                 dim_log_prob = -bar_dist(
                     pred_dist["logits"].to(bar_dist.borders.device),
-                    sampled_dim.to(bar_dist.borders.device),
+                    sampled_dim.to(bar_dist.borders),
                 )
                 dim_log_prob = dim_log_prob.to(log_prob)
 
