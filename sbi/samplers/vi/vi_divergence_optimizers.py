@@ -557,7 +557,7 @@ class IWElboOptimizer(ElboOptimizer):
         elbo_particles = elbo_particles.reshape(self.n_particles, self.K)
         weights = self.get_importance_weight(elbo_particles.clone().detach())
         surrogate_loss = -(weights * elbo_particles).sum(-1).mean(0)
-        loss = -torch.mean(torch.exp(elbo_particles) + 1e-20, -1).log().mean()
+        loss = -(torch.logsumexp(elbo_particles, dim=-1) - np.log(self.K)).mean()
         return surrogate_loss, loss.clone().detach()
 
     def get_importance_weight(self, elbo_particles: Tensor) -> Tensor:

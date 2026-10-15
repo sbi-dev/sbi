@@ -573,7 +573,10 @@ def test_retrain_fails_after_setting_an_already_built_q():
 
 
 @pytest.mark.parametrize("dreg", [False, True])
-def test_iwelbo_optimizer_uses_importance_weighted_loss(monkeypatch, dreg: bool):
+@pytest.mark.parametrize("offset", [0.0, 100.0, -100.0])
+def test_iwelbo_optimizer_uses_importance_weighted_loss(
+    monkeypatch, dreg: bool, offset: float
+):
     """IW training must use all K samples and the requested gradient weights."""
     prior = MultivariateNormal(zeros(1), eye(1))
     optimizer = IWElboOptimizer(
@@ -586,7 +589,9 @@ def test_iwelbo_optimizer_uses_importance_weighted_loss(monkeypatch, dreg: bool)
         lr=1e-3,
         gamma=0.999,
     )
-    particles = torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0], requires_grad=True)
+    particles = (
+        torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]) + offset
+    ).requires_grad_()
     sample_counts = []
 
     def fixed_particles(x_o, num_samples=None):
@@ -601,7 +606,7 @@ def test_iwelbo_optimizer_uses_importance_weighted_loss(monkeypatch, dreg: bool)
     if dreg:
         weights = weights.square()
     expected_grad = -weights.flatten() / 2
-    expected_loss = -torch.log(torch.exp(reshaped).mean(-1)).mean()
+    expected_loss = -(torch.logsumexp(reshaped, dim=-1) - np.log(3)).mean()
 
     assert sample_counts == [6]
     grad = torch.autograd.grad(surrogate_loss, particles)[0]
