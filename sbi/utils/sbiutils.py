@@ -802,9 +802,10 @@ def prior_support_is_bounded(prior: Any) -> Optional[bool]:
         support = prior.support
     except (NotImplementedError, AttributeError):
         return None
-    return not isinstance(
-        getattr(support, "base_constraint", support), constraints._Real
-    )
+    # Wrappers such as `independent` and the mixture support nest their constraint.
+    while hasattr(support, "base_constraint"):
+        support = support.base_constraint
+    return not isinstance(support, constraints._Real)
 
 
 def within_support(distribution: Any, samples: Tensor) -> Tensor:
