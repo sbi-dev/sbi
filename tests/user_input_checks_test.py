@@ -14,6 +14,7 @@ from torch.distributions import (
     Distribution,
     Exponential,
     Gamma,
+    Independent,
     MultivariateNormal,
     Normal,
     Uniform,
@@ -858,15 +859,16 @@ def test_independent_joint_shapes_and_samples(dists):
     assert within_support.all()
 
 
+JOINT_COMPONENTS = [
+    [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
+    [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
+    [MultivariateNormal(zeros(1, 3), eye(3)), Beta(ones(1), 2 * ones(1))],
+    [Independent(Normal(zeros(2, 3), ones(2, 3)), 2), Gamma(ones(1), ones(1))],
+]
+
+
 @pytest.mark.parametrize("sample_shape", [(), (5,), (2, 3)])
-@pytest.mark.parametrize(
-    "dists",
-    [
-        [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
-        [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
-        [MultivariateNormal(zeros(1, 3), eye(3)), Beta(ones(1), 2 * ones(1))],
-    ],
-)
+@pytest.mark.parametrize("dists", JOINT_COMPONENTS)
 def test_independent_joint_sample_shape(dists, sample_shape):
     joint = MultipleIndependent(dists)
     sample_shape = torch.Size(sample_shape)
@@ -874,19 +876,39 @@ def test_independent_joint_sample_shape(dists, sample_shape):
     torch.manual_seed(0)
     samples = joint.sample(sample_shape)
     torch.manual_seed(0)
+    component_samples = [d.sample(sample_shape) for d in dists]
     expected = torch.cat(
-        [d.sample(sample_shape).reshape(*sample_shape, -1) for d in dists], dim=-1
+        [
+            s.reshape(*sample_shape, ndims)
+            for s, ndims in zip(component_samples, joint.dims_per_dist, strict=True)
+        ],
+        dim=-1,
     )
     assert samples.shape == sample_shape + (joint.ndims,)
     assert torch.equal(samples, expected)
 
+    expected_log_probs = sum(
+        d.log_prob(s).reshape(sample_shape)
+        for d, s in zip(dists, component_samples, strict=True)
+    )
     log_probs = joint.log_prob(samples)
     if sample_shape == torch.Size():
         assert log_probs.shape == torch.Size([1])
     else:
         assert log_probs.shape == sample_shape
-        flat_log_probs = joint.log_prob(samples.reshape(-1, joint.ndims))
-        assert torch.equal(log_probs, flat_log_probs.reshape(sample_shape))
+    assert torch.allclose(log_probs.reshape(sample_shape), expected_log_probs)
+
+    assert joint.mean.shape == joint.variance.shape == torch.Size([joint.ndims])
+
+
+@pytest.mark.parametrize("sample_shape", [(0,), (2, 0)])
+@pytest.mark.parametrize("dists", JOINT_COMPONENTS)
+def test_independent_joint_empty_sample_shape(dists, sample_shape):
+    # torch validates log_prob inputs and rejects empty batches for some
+    # distributions, so only sampling is checked here.
+    joint = MultipleIndependent(dists)
+    samples = joint.sample(sample_shape)
+    assert samples.shape == torch.Size(sample_shape) + (joint.ndims,)
 
 
 @pytest.mark.parametrize(

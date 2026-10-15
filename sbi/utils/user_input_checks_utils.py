@@ -369,9 +369,11 @@ class MultipleIndependent(Distribution):
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
         sample_shape = torch.Size(sample_shape)
-        # A component can carry its dimensions in batch_shape [1] or in event_shape.
+        # Each component is flattened to its own dimensions, which it can carry in
+        # batch_shape [1] or in a multi-dimensional event_shape.
         samples = [
-            d.sample(sample_shape).reshape(*sample_shape, -1) for d in self.dists
+            d.sample(sample_shape).reshape(*sample_shape, ndims)
+            for d, ndims in zip(self.dists, self.dims_per_dist, strict=True)
         ]
         return torch.cat(samples, dim=-1)
 
@@ -383,6 +385,7 @@ class MultipleIndependent(Distribution):
         dims_covered = 0
         for d, ndims in zip(self.dists, self.dims_per_dist, strict=True):
             v = value[..., dims_covered : dims_covered + ndims]
+            v = v.reshape(*batch_shape, *d.batch_shape, *d.event_shape)
             log_probs.append(d.log_prob(v).reshape(batch_shape))
             dims_covered += ndims
 
@@ -407,11 +410,11 @@ class MultipleIndependent(Distribution):
 
     @property
     def mean(self) -> Tensor:
-        return torch.cat([d.mean for d in self.dists])
+        return torch.cat([d.mean.reshape(-1) for d in self.dists])
 
     @property
     def variance(self) -> Tensor:
-        return torch.cat([d.variance for d in self.dists])
+        return torch.cat([d.variance.reshape(-1) for d in self.dists])
 
     @property
     def support(self):
