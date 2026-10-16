@@ -21,6 +21,7 @@ from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
+    gradient_ascent,
     warn_if_invalid_for_zscoring,
     z_score_parser,
 )
@@ -791,3 +792,33 @@ def test_callable_transform_preserves_orientation_and_dtype(orientation):
 
     wrapped.double()
     assert wrapped.transform(x.double()).dtype == torch.float64
+
+
+def test_gradient_ascent_returns_argmax_in_original_space():
+    """Test that gradient_ascent returns the argmax in the original space.
+
+    When the best initialization already lies at the optimum, no gradient ascent step
+    improves on it, and the internally stored best parameter must not be transformed
+    back to the original space a second time.
+    """
+    from torch.distributions.transforms import AffineTransform
+
+    optimal_theta = torch.tensor([10.0])
+    theta_transform = IndependentTransform(
+        AffineTransform(loc=-optimal_theta / 2.0, scale=0.5 * torch.ones(1)), 1
+    )
+
+    def potential(theta: Tensor) -> Tensor:
+        return -((theta - optimal_theta) ** 2).sum(dim=-1)
+
+    inits = optimal_theta.repeat(4, 1) + torch.tensor([[0.0], [1.0], [-1.0], [2.0]])
+    argmax, _ = gradient_ascent(
+        potential,
+        inits,
+        theta_transform,
+        num_iter=200,
+        num_to_optimize=1,
+        learning_rate=0.01,
+    )
+
+    assert torch.allclose(argmax.reshape(-1), optimal_theta, atol=1e-4)
