@@ -7,8 +7,10 @@ import pytest
 import torch
 from torch import eye, ones, zeros
 from torch.distributions import (
+    Categorical,
     Exponential,
     LogNormal,
+    MixtureSameFamily,
     MultivariateNormal,
     TransformedDistribution,
     Uniform,
@@ -32,6 +34,13 @@ from tests.user_input_checks_test import UserNumpyUniform
         (UserNumpyUniform(torch.zeros(2), torch.ones(2)), SigmoidTransform),
         (MultivariateNormal(torch.zeros(2), torch.eye(2)), AffineTransform),
         (LogNormal(loc=torch.zeros(1), scale=torch.ones(1)), ExpTransform),
+        (
+            MixtureSameFamily(
+                Categorical(torch.ones(2)),
+                MultivariateNormal(torch.zeros(2, 2), eye(2).expand(2, 2, 2)),
+            ),
+            AffineTransform,
+        ),
     ),
 )
 def test_transforms(prior, target_transform):
