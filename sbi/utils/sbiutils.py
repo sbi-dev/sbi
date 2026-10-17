@@ -621,7 +621,7 @@ def handle_invalid_inputs_for_simformer(
             if condition_masks is not None:
                 # Only reshape if shapes do not agree
                 if is_invalid_inputs_entries.shape != condition_masks.shape:
-                    reshaped_is_invalid_inputs_entries = is_invalid_inputs_entries.sum(
+                    reshaped_is_invalid_inputs_entries = is_invalid_inputs_entries.any(
                         dim=-1
                     )
                 else:

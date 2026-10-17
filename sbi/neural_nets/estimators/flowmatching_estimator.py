@@ -742,7 +742,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         # randomly sample the time steps to compare the vector field at
         # different time steps
         if times is None:
-            times = torch.rand(input.shape[:-2], device=input.device, dtype=input.dtype)
+            times = torch.rand(B, device=input.device, dtype=input.dtype)
 
         # Ensure compatible dimensions
         times_ = times
