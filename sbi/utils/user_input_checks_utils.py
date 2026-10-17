@@ -178,19 +178,31 @@ class CustomPriorWrapper(Distribution):
 
 
 class PytorchReturnTypeWrapper(Distribution):
-    """Wrap PyTorch Distribution to return a given return type."""
+    """Wrap PyTorch Distribution to return a given return type.
+
+    Args:
+        prior: Distribution to wrap.
+        return_type: dtype of the samples, log probs, mean and variance.
+        batch_shape: Batch shape of the wrapper. Defaults to the one of `prior`.
+        event_shape: Event shape of the wrapper. Defaults to the one of `prior`.
+        validate_args: Whether to validate arguments. Defaults to the setting of
+            `prior`.
+    """
 
     def __init__(
         self,
         prior: Distribution,  # type: ignore
         return_type: Optional[torch.dtype] = float32,
-        batch_shape=torch.Size(),
-        event_shape=torch.Size(),
+        batch_shape: Optional[torch.Size] = None,
+        event_shape: Optional[torch.Size] = None,
         validate_args=None,
     ):
         self.prior = prior
         if validate_args is not None:
             set_validate_args(prior, validate_args)
+
+        batch_shape = prior.batch_shape if batch_shape is None else batch_shape
+        event_shape = prior.event_shape if event_shape is None else event_shape
 
         self.device = None
         self.return_type = return_type
