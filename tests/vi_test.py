@@ -28,7 +28,10 @@ from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
 from sbi.neural_nets.factory import ZukoFlowType
-from sbi.samplers.vi.vi_divergence_optimizers import IWElboOptimizer
+from sbi.samplers.vi.vi_divergence_optimizers import (
+    IWElboOptimizer,
+    RenyiDivergenceOptimizer,
+)
 from sbi.samplers.vi.vi_utils import AdaptedVariationalDistribution, LearnableGaussian
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -614,6 +617,38 @@ def test_iwelbo_optimizer_uses_importance_weighted_loss(
     )
     _, loss = optimizer.loss(zeros(1))
     assert torch.allclose(loss, torch.tensor(-offset))
+
+
+@pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
+@pytest.mark.parametrize("dreg_before, dreg_after", [(False, True), (True, False)])
+def test_dreg_changed_by_update_matches_new_optimizer(
+    optimizer_class, dreg_before: bool, dreg_after: bool
+):
+    """Switching `dreg` between `train` calls gives the gradient of a new optimizer."""
+    prior = MultivariateNormal(2 * ones(1), eye(1))
+    q = LearnableGaussian(dim=1, full_covariance=False)
+
+    def gradient(dreg: bool, update_to: bool | None = None):
+        optimizer = optimizer_class(
+            potential_fn=FakePotential(prior=prior),
+            q=deepcopy(q),
+            prior=prior,
+            n_particles=4,
+            dreg=dreg,
+            lr=1e-3,
+            gamma=0.999,
+        )
+        if update_to is not None:
+            # As a second `train` call does; it also rebuilds the scheduler.
+            optimizer.update({"dreg": update_to, "gamma": 0.999})
+        torch.manual_seed(0)
+        surrogate_loss, _ = optimizer.loss(zeros(1))
+        return torch.autograd.grad(surrogate_loss, list(optimizer.q.parameters()))
+
+    for updated, new in zip(
+        gradient(dreg_before, update_to=dreg_after), gradient(dreg_after), strict=True
+    ):
+        assert torch.allclose(updated, new)
 
 
 def test_vi_posterior_interface():
