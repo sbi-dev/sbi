@@ -2,9 +2,11 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import abstractmethod
+from copy import deepcopy
 from dataclasses import asdict, replace
 from typing import Any, Callable, Dict, Literal, Optional, Sequence, Tuple, Union
 
+import torch
 from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.utils import data
@@ -52,7 +54,78 @@ from sbi.utils.user_input_checks import validate_inputs
 # TODO: Maybe a mixin could be a good idea for functions which are shared among the two?
 
 
+def _converged_on_noisy_loss(self, epoch: int, stop_after_epochs: int) -> bool:
+    """Return whether the training converged yet and save best model state so far.
+
+    Diffusion or flow matching objectives are inherently more stochastic than MLE
+    for e.g. NPE because they additionally add "noise" by construction. We hence
+    use a statistical approach to detect convergence by tracking standard deviation
+    of validation losses. Training is considered converged when the current loss is
+    significantly worse than the best loss for a sustained period (more than 2 std
+    deviations above best).
+
+    NOTE: The standard deviation of the `validation_loss `is computed in a running
+        fashion over the most recent 2 × stop_after_epochs loss values.
+
+    Args:
+        epoch: Current epoch in training.
+        stop_after_epochs: How many fruitless epochs to let pass before stopping.
+
+    Returns:
+        Whether the training has stopped improving, i.e. has converged.
+    """
+    converged = False
+
+    assert self._neural_net is not None, "Initialize self._neural_net."
+    neural_net = self._neural_net
+
+    # Initialize tracking variables if not exists
+    if not hasattr(self, '_best_val_loss'):
+        self._best_val_loss = float('inf')
+        self._epochs_since_last_improvement = 0
+        self._best_model_state_dict = None
+
+    # Check if we have a new best loss
+    if self._val_loss < self._best_val_loss:
+        self._best_val_loss = self._val_loss
+        self._epochs_since_last_improvement = 0
+        self._best_model_state_dict = deepcopy(neural_net.state_dict())
+    else:
+        # Only start statistical analysis after we have enough data
+        if len(self._summary["validation_loss"]) >= stop_after_epochs:
+            # Calculate running statistics of recent losses
+            recent_losses = torch.tensor(
+                self._summary["validation_loss"][-stop_after_epochs * 2 :]
+            )
+            loss_std = recent_losses.std().item()
+
+            # Calculate how many standard deviations the current loss is from the
+            # best
+            diff_to_best_normalized = (self._val_loss - self._best_val_loss) / loss_std
+            # Consider it "no improvement" if current loss is significantly
+            # worse than the best loss (more than 2 std deviations above best)
+            # This accounts for natural fluctuations while being sensitive to
+            # real degradation
+            if diff_to_best_normalized > 2.0:
+                self._epochs_since_last_improvement += 1
+            else:
+                # Reset counter if loss is within acceptable range
+                self._epochs_since_last_improvement = 0
+        else:
+            return False
+
+    # If no validation improvement over many epochs, stop training.
+    if self._epochs_since_last_improvement > stop_after_epochs - 1:
+        if self._best_model_state_dict is not None:
+            neural_net.load_state_dict(self._best_model_state_dict)
+        converged = True
+
+    return converged
+
+
 class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
+    _converged = _converged_on_noisy_loss
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -645,6 +718,8 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
 class MaskedVectorFieldTrainer(
     MaskedNeuralInference[MaskedConditionalVectorFieldEstimator]
 ):
+    _converged = _converged_on_noisy_loss
+
     def __init__(
         self,
         mvf_estimator_builder: Union[
