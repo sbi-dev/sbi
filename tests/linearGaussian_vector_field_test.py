@@ -403,7 +403,7 @@ _trained_models_cache = {}
 
 def train_vector_field_model(vf_estimator, vector_field_type, prior_type):
     """Factory function that trains a score estimator for NPSE tests with caching."""
-    cache_key = (vector_field_type, prior_type)
+    cache_key = (vf_estimator, vector_field_type, prior_type)
 
     # Return cached model if available
     if cache_key in _trained_models_cache:
@@ -438,7 +438,7 @@ def train_vector_field_model(vf_estimator, vector_field_type, prior_type):
         vf_params = {
             "prior": prior,
         }
-        if vector_field_type == "flow":
+        if vector_field_type in ("flow", "fmpe"):
             inference = FMPE(**vf_params)
         else:
             inference = NPSE(sde_type=vector_field_type, **vf_params)  # type: ignore
@@ -904,7 +904,9 @@ def test_iid_log_prob(vf_estimator, vector_field_type, prior_type, iid_batch_siz
 )
 def test_prior_guide(vector_field_type, prior_type, covariance_type, K):
     num_samples = 1000
-    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+    vector_field_trained_model = train_vector_field_model(
+        "NeuralPosterior", vector_field_type, prior_type
+    )
 
     score_estimator = vector_field_trained_model["estimator"]
     inference = vector_field_trained_model["inference"]
@@ -964,7 +966,9 @@ def test_prior_guide(vector_field_type, prior_type, covariance_type, K):
 def test_npse_interval_guidance(vector_field_type, prior_type, guidance_params):
     """Test whether NPSE infers well a simple example with available ground truth."""
     num_samples = 1000
-    vector_field_trained_model = train_vector_field_model(vector_field_type, prior_type)
+    vector_field_trained_model = train_vector_field_model(
+        "NeuralPosterior", vector_field_type, prior_type
+    )
 
     # Extract data from fixture
     score_estimator = vector_field_trained_model["estimator"]
@@ -999,7 +1003,9 @@ def test_npse_interval_guidance(vector_field_type, prior_type, guidance_params):
 def test_npse_affine_classifier_free(vector_field_type, prior_type, guidance_params):
     """Test whether NPSE infers well a simple example with available ground truth."""
     num_samples = 1000
-    vf_trained_model = train_vector_field_model(vector_field_type, prior_type)
+    vf_trained_model = train_vector_field_model(
+        "NeuralPosterior", vector_field_type, prior_type
+    )
 
     # Extract data from fixture
     score_estimator = vf_trained_model["estimator"]
