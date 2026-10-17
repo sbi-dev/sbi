@@ -94,9 +94,6 @@ def process_device(device: Optional[Union[str, torch.device]]) -> str:
 
     if device.startswith("mps"):
         _warn_if_mps_fallback_disabled()
-        # MPS framework does not support double precision, and `check_device`
-        # below allocates a tensor.
-        torch.set_default_dtype(torch.float32)
 
     check_device(device)
 
@@ -178,10 +175,13 @@ def check_device(device: Union[str, torch.device]) -> None:
         device: target torch device
     """
     try:
-        torch.randn(1, device=device)
-    except (RuntimeError, AssertionError) as exc:
+        # MPS does not support float64, so probe with float32 if on MPS.
+        resolved = torch.device(device)
+        dtype = torch.float32 if resolved.type == "mps" else None
+        torch.empty(0, device=resolved, dtype=dtype)
+    except (RuntimeError, AssertionError, TypeError) as exc:
         raise RuntimeError(
-            f"""Could not instantiate torch.randn(1, device={device}). Make sure
+            f"""Could not instantiate tensor on device={device}. Make sure
              the device is set up properly and that you are passing the
              corresponding device string. It should be something like 'cuda',
              'cuda:0', or 'mps'. Error message: {exc}."""

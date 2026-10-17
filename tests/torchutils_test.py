@@ -343,15 +343,15 @@ def test_canonical_device_resolves_bare_cuda(monkeypatch) -> None:
 
 @pytest.mark.gpu
 @pytest.mark.parametrize("device_input", ("gpu", "mps", "mps:0"))
-def test_process_device_allows_mps_with_float64_default(device_input) -> None:
-    """Test that every MPS spelling lowers the default dtype to float32."""
+def test_process_device_preserves_default_dtype_on_mps(device_input) -> None:
+    """Test that MPS processing preserves the process-global default dtype."""
     if not torch.backends.mps.is_available():
         pytest.skip("Requires an MPS device.")
 
     torch.set_default_dtype(torch.float64)
     try:
         assert torchutils.process_device(device_input) == "mps:0"
-        assert torch.get_default_dtype() == torch.float32
+        assert torch.get_default_dtype() == torch.float64
     finally:
         torch.set_default_dtype(torch.float32)
 
