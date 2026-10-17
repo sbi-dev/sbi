@@ -99,11 +99,11 @@ __all__ = (
     + _nle_family
     + _abc_family
     + [
+        "FlowMatchingSimformer",
         "FMPE",
         "MarginalTrainer",
         "NPSE",
         "Simformer",
-        "FlowMatchingSimformer",
         "DirectPosterior",
         "EnsemblePosterior",
         "ImportanceSamplingPosterior",

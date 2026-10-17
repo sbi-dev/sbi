@@ -249,22 +249,6 @@ def infer(
     return posterior
 
 
-def check_if_proposal_has_default_x(
-    proposal: Union[NeuralPosterior, Distribution],
-) -> None:
-    """Check for validity of the provided proposal distribution.
-
-    If the proposal is a `NeuralPosterior`, we check if the default_x is set and
-    if it matches the `_x_o_training_focused_on`.
-    """
-    if isinstance(proposal, NeuralPosterior) and proposal.default_x is None:
-        raise ValueError(
-            "`proposal.default_x` is None, i.e. there is no "
-            "x_o for training. Set it with "
-            "`posterior.set_default_x(x_o)`."
-        )
-
-
 class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
     "Mixin for NeuralInference objects"
 
@@ -1986,3 +1970,19 @@ class MaskedNeuralInference(
         )
 
         return unmasked_resolved_estimator, device
+
+
+def check_if_proposal_has_default_x(
+    proposal: Union[Distribution, NeuralPosterior],
+) -> None:
+    """Check for validity of the provided proposal distribution.
+
+    If the proposal is a `NeuralPosterior`, we check if the default_x is set and
+    if it matches the `_x_o_training_focused_on`.
+    """
+    if isinstance(proposal, NeuralPosterior) and proposal.default_x is None:
+        raise ValueError(
+            "`proposal.default_x` is None, i.e. there is no "
+            "x_o for training. Set it with "
+            "`posterior.set_default_x(x_o)`."
+        )
