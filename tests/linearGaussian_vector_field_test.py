@@ -141,7 +141,6 @@ def test_c2st_vector_field_on_linearGaussian(
     tol = 0.15
 
     if vf_estimator == "Simformer":
-        num_simulations = 5000
         max_num_epochs = 500
 
     device = process_device(device)

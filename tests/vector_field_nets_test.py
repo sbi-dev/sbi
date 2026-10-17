@@ -149,7 +149,7 @@ SIMFORMER_CASE = [
     )
     for kw in _grid(
         hidden_features=[64, 128],
-        num_blocks=[2, 4],
+        num_layers=[2, 4],
         num_heads=[4, 8],
         mlp_ratio=[2, 4, 8],
         ada_time=[True, False],
