@@ -32,7 +32,7 @@ At the end of a run, mini-sbibm prints one table per metric. Rows are method
 configurations with their run label, columns are tasks:
 
 ```text
-C2ST (0.5 is best)
+== C2ST (best: 0.5) ==
                    gaussian_linear  two_moons
 ---------------------------------------------
 NPE_C-maf [main]        0.704         0.850
@@ -63,8 +63,8 @@ git switch my-branch && pytest --bm --bm-mode npe -n auto
 
 The table then shows `NPE_C-nsf [main]` next to `NPE_C-nsf [my-branch]`. A new run
 replaces the rows with the same label, method, and task, also when the number of
-simulations or seeds is different. With a detached HEAD or outside git, the label is
-`default`, so set one with `--bm-label`.
+simulations or seeds is different. The label is set when the run starts. With a
+detached HEAD, it is the short commit hash, and outside git it is `default`.
 
 The results are stored in the `.bm_results` folder, in the folder that you run `pytest`
 from, with one file per label, e.g. `results-main.csv`. The table shows all labels in
@@ -97,6 +97,11 @@ Replace the estimators of a mode with a comma-separated list:
 ```bash
 pytest --bm --bm-mode npe --bm-estimators nsf,zuko_nsf --bm-seeds 3 -n auto
 ```
+
+The names are the ones sbi uses for its per-model configs (e.g. `nsf` for
+`NSFConfig`), and the benchmark trains with these configs. An unknown name stops the
+run before training and lists the supported names. In the `mnle` mode, a flow name
+selects the model for the continuous part of the data.
 
 ### Rerun one case quickly
 

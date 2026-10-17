@@ -11,6 +11,12 @@ from sbi.inference import FMPE, MNLE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
+from sbi.neural_nets import FlowMatchingConfig, MixedConfig
+from sbi.neural_nets.net_builders.estimator_configs import (
+    _CLASSIFIER_CONFIGS,
+    _DENSITY_CONFIGS,
+)
+from sbi.neural_nets.net_builders.vector_field_nets import _SDE_CONFIGS, _VF_NET_CONFIGS
 from sbi.utils.metrics import c2st
 
 from .mini_sbibm import MixedData, get_task
@@ -64,6 +70,7 @@ METHOD_PARAMS = {
     "mnle": [{}],
 }
 ESTIMATOR_ARGUMENTS = {
+    "mnle": "density_estimator",
     "npe": "density_estimator",
     "nle": "density_estimator",
     "nre": "classifier",
@@ -73,7 +80,12 @@ ESTIMATOR_ARGUMENTS = {
     "snpe": "density_estimator",
     "snle": "density_estimator",
     "snre": "classifier",
-    "mnle": "density_estimator",
+}
+# sbi's own maps from estimator names to per-model configs.
+ESTIMATOR_CONFIGS = {
+    "density_estimator": _DENSITY_CONFIGS,
+    "classifier": _CLASSIFIER_CONFIGS,
+    "vf_estimator": _VF_NET_CONFIGS,
 }
 
 
@@ -107,6 +119,15 @@ def _benchmark_kwargs(config, mode: str) -> list[dict]:
         raise pytest.UsageError(
             "--bm-estimators requires one or more comma-separated estimator names."
         )
+    supported = set(ESTIMATOR_CONFIGS[estimator_argument])
+    if mode == "mnle":
+        supported.add("mnle")
+    unknown = [name for name in estimators if name not in supported]
+    if unknown:
+        raise pytest.UsageError(
+            f"Unknown estimators for mode '{mode}': {', '.join(unknown)}. "
+            f"Supported: {', '.join(sorted(supported))}."
+        )
 
     remaining_options = []
     for parameters in METHOD_PARAMS[mode]:
@@ -128,7 +149,36 @@ def _kwargs_id(parameters: dict) -> str:
     return "-".join(str(value) for value in parameters.values()) or "default"
 
 
-def _class_id(inference_class, mode: str | None) -> str:
+def _estimator_kwargs(inference_class, parameters: dict) -> dict:
+    """Replace estimator names with sbi's per-model configs.
+
+    The method settings keep plain names, which give the test ids and the rows of
+    the results table.
+    """
+    kwargs = dict(parameters)
+    if "density_estimator" in kwargs:
+        name = kwargs["density_estimator"]
+        if inference_class is MNLE:
+            kwargs["density_estimator"] = (
+                MixedConfig()
+                if name == "mnle"
+                else MixedConfig(continuous=_DENSITY_CONFIGS[name]())
+            )
+        else:
+            kwargs["density_estimator"] = _DENSITY_CONFIGS[name]()
+    if "classifier" in kwargs:
+        kwargs["classifier"] = _CLASSIFIER_CONFIGS[kwargs["classifier"]]()
+    if "vf_estimator" in kwargs:
+        net = _VF_NET_CONFIGS[kwargs["vf_estimator"]]()
+        if issubclass(inference_class, NPSE):
+            sde_type = kwargs.pop("sde_type", "ve")
+            kwargs["vf_estimator"] = _SDE_CONFIGS[sde_type](net=net)
+        else:
+            kwargs["vf_estimator"] = FlowMatchingConfig(net=net)
+    return kwargs
+
+
+def _class_id(inference_class, mode: str) -> str:
     """Return the class name, prefixed with "S" for multi-round runs."""
     prefix = "S" if mode in SEQUENTIAL_MODES else ""
     return prefix + inference_class.__name__
@@ -270,7 +320,9 @@ def train_and_eval_amortized_inference(
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
-    inference = inference_class(prior, **extra_kwargs)
+    inference = inference_class(
+        prior, **_estimator_kwargs(inference_class, extra_kwargs)
+    )
     _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
     posterior = inference.build_posterior()
@@ -308,7 +360,9 @@ def train_and_eval_sequential_inference(
     simulator = task.get_simulator()
 
     # Round 1
-    inference = inference_class(prior, **extra_kwargs)
+    inference = inference_class(
+        prior, **_estimator_kwargs(inference_class, extra_kwargs)
+    )
     _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
     for _ in range(NUM_ROUNDS_SEQUENTIAL - 1):
@@ -334,9 +388,9 @@ def test_run_benchmark(
     task: Task,
     results_bag: ResultsBag,
     extra_kwargs: dict,
-    benchmark_mode: str | None,
     benchmark_num_simulations: int,
     benchmark_seed: int,
+    request: pytest.FixtureRequest,
 ) -> None:
     """
     Benchmark test for amortized and sequential inference methods.
@@ -347,12 +401,12 @@ def test_run_benchmark(
         results_bag: The results bag to store evaluation results. Subclass of dict,
             but allows item assignment with dot notation.
         extra_kwargs: Additional keyword arguments for the method.
-        benchmark_mode: The benchmark mode. This is a fixture which based on user
-            input, determines which type of methods should be run.
         benchmark_num_simulations: The number of training simulations.
         benchmark_seed: The training seed.
+        request: The pytest request, to read the benchmark mode.
     """
-    if benchmark_mode in SEQUENTIAL_MODES:
+    mode = _benchmark_mode(request.config)
+    if mode in SEQUENTIAL_MODES:
         train_and_eval = train_and_eval_sequential_inference
     else:
         train_and_eval = train_and_eval_amortized_inference
@@ -370,5 +424,5 @@ def test_run_benchmark(
     results_bag.task_name = task.name
     results_bag.seed = benchmark_seed
     results_bag.method = (
-        f"{_class_id(inference_class, benchmark_mode)}-{_kwargs_id(extra_kwargs)}"
+        f"{_class_id(inference_class, mode)}-{_kwargs_id(extra_kwargs)}"
     )

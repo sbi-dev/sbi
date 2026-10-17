@@ -1,13 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import re
 import shutil
-import subprocess
 from pathlib import Path
-from urllib.parse import quote
 
-import pandas as pd
 import pytest
 import torch
 from pytest_harvest import get_session_results_df, is_main_process
@@ -16,20 +12,18 @@ from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameter
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available
 
+from .mini_sbibm.results import (
+    RESULT_COLUMNS,
+    benchmark_label,
+    merge_results,
+    write_results_tables,
+)
+
 # Seed for `set_seed` fixture. Change to random state of all seeded tests.
 seed = 1
 harvested_fixture_data = None
 
-# Mini SBIBM results, one file per run label. A new run replaces the stored rows with
-# the same key. A new run replaces all seeds of a case, so the key has no seed.
-RESULT_KEY = ["label", "method", "task_name"]
-RESULT_COLUMNS = [*RESULT_KEY, "seed", "num_simulations", "c2st", "mean_err", "std_err"]
-METRIC_TITLES = {
-    "c2st": "C2ST (0.5 is best)",
-    "mean_err": "Posterior mean error, in reference std (0 is best)",
-    "std_err": "Posterior std error, in reference std (0 is best)",
-}
-MOVED_OLD_RESULTS = pytest.StashKey[Path]()
+BENCHMARK_LABEL = pytest.StashKey[str]()
 
 
 # Use seed automatically for every test function.
@@ -146,16 +140,14 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
+    if not config.getoption("--bm"):
+        return
     # Parallel benchmark workers would otherwise each start one torch thread per core.
-    if config.getoption("--bm") and hasattr(config, "workerinput"):
+    if hasattr(config, "workerinput"):
         torch.set_num_threads(1)
-
-
-@pytest.fixture
-def benchmark_mode(request):
-    """Fixture to access the --bm value in test files."""
-    mode = request.config.getoption("--bm-mode")
-    return None if mode is None else str(mode).lower()
+    # Resolve the label at the start, so switching branches during a run does not
+    # change where its results go.
+    config.stash[BENCHMARK_LABEL] = benchmark_label(config.getoption("--bm-label"))
 
 
 @pytest.fixture
@@ -174,148 +166,17 @@ def finalize_fixture_store(request, fixture_store):
     harvested_fixture_data = dict(fixture_store)
 
 
-def strip_ansi_escape_codes(text):
-    ansi_escape = re.compile(r'\x1b\[.*?m')
-    return ansi_escape.sub('', text)
-
-
-# Function to center text with ANSI colors, adjusting for escape codes
-def center_colored_text(text, width):
-    visible_length = len(strip_ansi_escape_codes(text))
-    padding = max(0, (width - visible_length) // 2)
-    return " " * padding + text + " " * (width - visible_length - padding)
-
-
-def _benchmark_label(config) -> str:
-    """Return the run label: the --bm-label value, else the current git branch."""
-    label = config.getoption("--bm-label")
-    if label is not None:
-        return label
-    try:
-        branch = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return "default"
-    return branch if branch and branch != "HEAD" else "default"
-
-
-def _results_dir(config) -> Path:
-    """Return the folder of the mini SBIBM results files."""
-    return Path(config.getoption("--bm-results-dir")).expanduser()
-
-
-def _results_file(config, label: str) -> Path:
-    """Return the results file of one run label.
-
-    Each label has its own file, so runs with different labels never overwrite each
-    other, also when they finish at the same time.
-    """
-    # Percent-encoding keeps different labels apart, e.g. "a/b" and "a_b".
-    return _results_dir(config) / f"results-{quote(label, safe='')}.csv"
-
-
-def _read_results(results_file: Path) -> pd.DataFrame | None:
-    """Return the stored results, or None if there are none in the current format."""
-    if not results_file.exists():
-        return None
-    try:
-        # Only empty cells are missing, so labels like "NA" stay strings.
-        results = pd.read_csv(
-            results_file, dtype={"label": str}, keep_default_na=False, na_values=[""]
-        )
-    except (pd.errors.ParserError, pd.errors.EmptyDataError):
-        return None
-    if not set(RESULT_COLUMNS).issubset(results.columns):
-        return None
-    return results
-
-
-def _write_metric_table(write, means: pd.DataFrame, spreads: pd.DataFrame) -> None:
-    """Write one table with a row per method and label and a column per task.
-
-    Within each task, the best (lowest) value is green and the worst red.
-    """
-    tasks = list(means.columns)
-    texts = {}
-    for row in means.index:
-        for task in tasks:
-            mean, spread = means.at[row, task], spreads.at[row, task]
-            if pd.isna(mean):
-                texts[row, task] = "N/A"
-            elif pd.isna(spread):
-                texts[row, task] = f"{mean:.3f}"
-            else:
-                texts[row, task] = f"{mean:.3f} ±{spread:.3f}"
-
-    row_width = max(len(row) for row in means.index) + 2
-    widths = {
-        task: max(10, len(task), *(len(texts[row, task]) for row in means.index)) + 2
-        for task in tasks
-    }
-    header = " " * row_width + "".join(task.center(widths[task]) for task in tasks)
-    write(header)
-    write("-" * len(header))
-
-    for row in means.index:
-        line = row.ljust(row_width)
-        for task in tasks:
-            mean = means.at[row, task]
-            if pd.isna(mean):
-                line += texts[row, task].center(widths[task])
-                continue
-            low, high = means[task].min(), means[task].max()
-            normalized = (mean - low) / (high - low) if high > low else 0.5
-            if normalized == 0.0:
-                color = "\033[92m"  # Green for best
-            elif normalized == 1.0:
-                color = "\033[91m"  # Red for worst
-            else:
-                color = f"\033[9{int(2 + normalized * 3)}m"
-            line += center_colored_text(
-                f"{color}{texts[row, task]}\033[0m", widths[task]
-            )
-        write(line)
-
-
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
-    """Print the stored mini SBIBM results, one table per metric.
-
-    Rows are methods with their run label, columns are tasks. Several seeds of a
-    case are shown as mean and standard deviation.
-    """
+    """Print the stored mini SBIBM results of all run labels."""
     if not config.getoption("--bm"):
         return
-
     write = terminalreporter.write_line
     terminal_width = shutil.get_terminal_size().columns
     write(f"\033[96m{' mini SBIBM results '.center(terminal_width, '=')}\033[0m")
-    if MOVED_OLD_RESULTS in config.stash:
-        write(f"Moved results in an older format to {config.stash[MOVED_OLD_RESULTS]}.")
-
     try:
-        stored = [
-            _read_results(path)
-            for path in sorted(_results_dir(config).glob("results-*.csv"))
-        ]
-        stored = [results for results in stored if results is not None]
-        results = pd.concat(stored) if stored else None
-        if results is None or results.empty:
-            write("No results found.")
-            return
-
-        rows = results["method"] + " [" + results["label"]
-        if results["num_simulations"].nunique() > 1:
-            rows += ", " + results["num_simulations"].astype(str) + " sims"
-        results = results.assign(row=rows + "]")
-
-        for metric, title in METRIC_TITLES.items():
-            stats = results.groupby(["row", "task_name"])[metric].agg(["mean", "std"])
-            write(title)
-            _write_metric_table(write, stats["mean"].unstack(), stats["std"].unstack())
+        write_results_tables(
+            write, Path(config.getoption("--bm-results-dir")).expanduser()
+        )
     except Exception as e:
         write(f"Error processing results: {e}")
 
@@ -335,10 +196,7 @@ def mcmc_params_fast() -> MCMCPosteriorParameters:
 def pytest_sessionfinish(session):
     """Merge the results of this run into the results file of its label.
 
-    With xdist, the main process receives the results of all workers. Rows with the
-    same label, method and task as a new result are replaced. The single results file
-    of older versions is moved to `results_all.old.csv`, or to a numbered name such as
-    `results_all.old-2.csv` when that backup already exists.
+    With xdist, the main process receives the results of all workers.
     """
     if not session.config.getoption("--bm") or not is_main_process(session):
         return
@@ -349,26 +207,8 @@ def pytest_sessionfinish(session):
     results = results[(results["status"] == "passed") & results["c2st"].notna()]
     if results.empty:
         return
-    label = _benchmark_label(session.config)
+    label = session.config.stash[BENCHMARK_LABEL]
     results = results.assign(label=label)[RESULT_COLUMNS]
-
-    old_file = _results_dir(session.config) / "results_all.csv"
-    if old_file.exists():
-        backup = old_file.with_name("results_all.old.csv")
-        number = 2
-        while backup.exists():
-            backup = old_file.with_name(f"results_all.old-{number}.csv")
-            number += 1
-        old_file.replace(backup)
-        session.config.stash[MOVED_OLD_RESULTS] = backup
-
-    results_file = _results_file(session.config, label)
-    stored = _read_results(results_file)
-    if stored is not None:
-        replaced = stored.set_index(RESULT_KEY).index.isin(
-            results.set_index(RESULT_KEY).index
-        )
-        results = pd.concat([stored[~replaced], results])
-
-    results_file.parent.mkdir(parents=True, exist_ok=True)
-    results.to_csv(results_file, index=False)
+    merge_results(
+        Path(session.config.getoption("--bm-results-dir")).expanduser(), results
+    )
