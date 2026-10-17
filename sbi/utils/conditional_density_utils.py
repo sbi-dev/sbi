@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
+    ProposalCorrectedMDN,
 )
 from sbi.utils.torchutils import ensure_theta_batched
 
@@ -155,7 +156,8 @@ def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
 
 
 def extract_and_transform_mog(
-    estimator: MixtureDensityEstimator, context: Optional[Tensor] = None
+    estimator: Union[MixtureDensityEstimator, ProposalCorrectedMDN],
+    context: Optional[Tensor] = None,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Extracts the Mixture of Gaussians (MoG) parameters
     from an MDN based DirectPosterior at either the default x or input x.
@@ -164,7 +166,8 @@ def extract_and_transform_mog(
     transformed back to the original (un-z-scored) parameter space.
 
     Args:
-        estimator: MixtureDensityEstimator instance.
+        estimator: MixtureDensityEstimator, or a ProposalCorrectedMDN whose
+            corrected MoG is used.
         context: Conditioning context for posterior $p(\theta|x)$. If not provided,
             fall back onto `x` passed to `set_default_x()`.
 
@@ -181,8 +184,12 @@ def extract_and_transform_mog(
     if context is None:
         raise ValueError("context must be provided for extract_and_transform_mog")
 
-    # Get MoG (raw density estimator output in z-scored space)
-    mog = estimator.get_uncorrected_mog(context)
+    # Get MoG in z-scored space
+    if isinstance(estimator, ProposalCorrectedMDN):
+        mog = estimator.get_corrected_mog(context)
+        estimator = estimator.net
+    else:
+        mog = estimator.get_uncorrected_mog(context)
 
     norm_logits = mog.log_weights
     means = mog.means
