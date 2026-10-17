@@ -14,6 +14,7 @@ from torch.distributions import (
     Distribution,
     Exponential,
     Gamma,
+    Independent,
     MultivariateNormal,
     Normal,
     Uniform,
@@ -43,6 +44,7 @@ from sbi.neural_nets.net_builders import build_categoricalmassestimator
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
+from sbi.utils.conditional_density_utils import RestrictedPriorForConditional
 from sbi.utils.sbiutils import Standardize, nan_tolerant_input_net
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
@@ -855,6 +857,89 @@ def test_independent_joint_shapes_and_samples(dists):
     # Check support attribute.
     within_support = joint.support.check(true_samples)
     assert within_support.all()
+
+
+JOINT_COMPONENTS = [
+    [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
+    [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
+    [MultivariateNormal(zeros(1, 3), eye(3)), Beta(ones(1), 2 * ones(1))],
+]
+
+
+@pytest.mark.parametrize("sample_shape", [(), (5,), (2, 3)])
+@pytest.mark.parametrize("dists", JOINT_COMPONENTS)
+def test_independent_joint_sample_shape(dists, sample_shape):
+    joint = MultipleIndependent(dists)
+    sample_shape = torch.Size(sample_shape)
+
+    torch.manual_seed(0)
+    samples = joint.sample(sample_shape)
+    torch.manual_seed(0)
+    component_samples = [d.sample(sample_shape) for d in dists]
+    expected = torch.cat(
+        [
+            s.reshape(*sample_shape, ndims)
+            for s, ndims in zip(component_samples, joint.dims_per_dist, strict=True)
+        ],
+        dim=-1,
+    )
+    assert samples.shape == sample_shape + (joint.ndims,)
+    assert torch.equal(samples, expected)
+
+    expected_log_probs = sum(
+        d.log_prob(s).reshape(sample_shape)
+        for d, s in zip(dists, component_samples, strict=True)
+    )
+    log_probs = joint.log_prob(samples)
+    if sample_shape == torch.Size():
+        assert log_probs.shape == torch.Size([1])
+    else:
+        assert log_probs.shape == sample_shape
+    assert torch.allclose(log_probs.reshape(sample_shape), expected_log_probs)
+
+    assert joint.mean.shape == joint.variance.shape == torch.Size([joint.ndims])
+
+
+@pytest.mark.parametrize("sample_shape", [(0,), (2, 0)])
+@pytest.mark.parametrize("dists", JOINT_COMPONENTS)
+def test_independent_joint_empty_sample_shape(dists, sample_shape):
+    # torch validates log_prob inputs and rejects empty batches for some
+    # distributions, so only sampling is checked here.
+    joint = MultipleIndependent(dists)
+    samples = joint.sample(sample_shape)
+    assert samples.shape == torch.Size(sample_shape) + (joint.ndims,)
+
+
+@pytest.mark.parametrize(
+    "component, match",
+    [
+        (Normal(torch.empty(0), torch.empty(0)), "batch shape"),
+        (Independent(Uniform(zeros(2, 3), ones(2, 3)), 2), "event shape"),
+    ],
+)
+def test_independent_joint_rejects_unsupported_component(component, match):
+    with pytest.raises(AssertionError, match=match):
+        MultipleIndependent([component, Gamma(ones(1), ones(1))])
+
+
+@pytest.mark.parametrize(
+    "prior",
+    [
+        BoxUniform(zeros(3), ones(3)),
+        MultipleIndependent([Uniform(zeros(1), ones(1))] * 3),
+    ],
+)
+def test_restricted_prior_for_conditional_keeps_sample_shape(prior):
+    dims_to_sample = [0, 2]
+    restricted_prior = RestrictedPriorForConditional(prior, dims_to_sample)
+
+    torch.manual_seed(0)
+    samples = restricted_prior.sample((2, 3))
+    torch.manual_seed(0)
+    expected = prior.sample((2, 3))[..., dims_to_sample]
+
+    assert samples.shape == torch.Size([2, 3, 2])
+    assert torch.equal(samples, expected)
 
 
 def test_invalid_inputs():
