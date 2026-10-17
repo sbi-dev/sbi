@@ -130,10 +130,14 @@ def get_kde(
 
             second_best_index = list(grid.cv_results_["rank_test_score"]).index(2)
 
-            if (grid.best_index_ == 0) or (grid.best_index_ == steps):
-                diff = (lower - upper) / steps
-                lower = grid.best_index_ - diff
-                upper = grid.best_index_ + diff
+            if (grid.best_index_ == 0) or (grid.best_index_ == steps - 1):
+                # Best bandwidth is at the edge of the grid: shift the grid to be
+                # centered on it (in bandwidth units, not grid indices) and keep all
+                # bandwidths positive.
+                best_bandwidth = bandwidth_range[grid.best_index_]
+                half_width = (upper - lower) / 2
+                lower = max(best_bandwidth - half_width, 0.1 * best_bandwidth)
+                upper = best_bandwidth + half_width
             else:
                 upper = bandwidth_range[second_best_index]
                 lower = bandwidth_range[grid.best_index_]
