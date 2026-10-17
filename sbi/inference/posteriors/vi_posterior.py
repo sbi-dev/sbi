@@ -155,6 +155,7 @@ class VIPosterior(NeuralPosterior):
                 variance and collapse on multimodal targets (`rKL`, `alpha` for alpha >
                 1) and some are `mass covering` i.e. they overestimate variance but
                 typically cover all modes (`fKL`, `IW`, `alpha` for alpha < 1).
+                Amortized training (train_amortized) supports only `rKL`.
             device: Training device, e.g., `cpu`, `cuda` or `cuda:0`. We will ensure
                 that all other objects are also on this device.
             x_shape: Deprecated, should not be passed.
@@ -988,8 +989,9 @@ class VIPosterior(NeuralPosterior):
         """Train a conditional flow q(θ|x) for amortized variational inference.
 
         This allows sampling from q(θ|x) for any observation x without retraining.
-        Uses the ELBO (Evidence Lower Bound) objective with early stopping based on
-        validation loss.
+        Uses the reverse-KL ELBO (Evidence Lower Bound) objective with early stopping
+        based on validation loss. Only the reverse KL divergence is supported; other
+        `vi_method` values raise `NotImplementedError`.
 
         Args:
             theta: Training θ values from simulations (num_sims, θ_dim).
@@ -1029,7 +1031,19 @@ class VIPosterior(NeuralPosterior):
 
         Returns:
             self for method chaining.
+
+        Raises:
+            NotImplementedError: If `vi_method` is not `"rKL"`.
         """
+        if self.vi_method != "rKL":
+            raise NotImplementedError(
+                "train_amortized() only supports the reverse KL divergence "
+                f"(vi_method='rKL'), but the posterior was created with "
+                f"vi_method='{self.vi_method}'. Use train() for single-observation "
+                "training with this method, or construct the posterior with "
+                "vi_method='rKL'."
+            )
+
         # Resolve parameters: explicit args > params dataclass > instance attrs
         if params is not None:
             # Amortized VI only supports string flow types (not VIPosterior or Callable)

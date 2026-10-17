@@ -825,6 +825,25 @@ def test_amortized_vi_accuracy(linear_gaussian_setup_trainers):
         )
 
 
+def test_train_amortized_only_supports_rkl(linear_gaussian_setup):
+    """Test that train_amortized rejects unimplemented vi_method values."""
+    setup = linear_gaussian_setup
+
+    for vi_method in ("fKL", "IW", "alpha"):
+        posterior = VIPosterior(
+            potential_fn=setup["potential_fn"],
+            prior=setup["prior"],
+            q="maf",
+            vi_method=vi_method,
+        )
+        with pytest.raises(NotImplementedError, match="rKL"):
+            posterior.train_amortized(
+                theta=setup["theta"],
+                x=setup["x"],
+                show_progress_bar=False,
+            )
+
+
 @pytest.mark.slow
 def test_amortized_vi_batched_sampling(linear_gaussian_setup):
     """Test batched sampling from amortized VIPosterior."""
