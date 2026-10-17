@@ -539,10 +539,7 @@ class IWElboOptimizer(ElboOptimizer):
         if dreg:
             self.stick_the_landing = True
 
-    def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
-        return self.loss_rsample(xo)
-
-    def loss_rsample(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
+    def _loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the IWELBO loss.
 
         Args:

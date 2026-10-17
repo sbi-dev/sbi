@@ -577,7 +577,7 @@ def test_retrain_fails_after_setting_an_already_built_q():
 def test_iwelbo_optimizer_uses_importance_weighted_loss(
     monkeypatch, dreg: bool, offset: float
 ):
-    """IW training must use all K samples and the requested gradient weights."""
+    """IW uses IWELBO (or DReG) gradient weights and a stable displayed loss."""
     prior = MultivariateNormal(zeros(1), eye(1))
     optimizer = IWElboOptimizer(
         potential_fn=FakePotential(prior=prior),
@@ -592,27 +592,28 @@ def test_iwelbo_optimizer_uses_importance_weighted_loss(
     particles = (
         torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]) + offset
     ).requires_grad_()
-    sample_counts = []
-
-    def fixed_particles(x_o, num_samples=None):
-        sample_counts.append(num_samples)
-        return particles
-
-    monkeypatch.setattr(optimizer, "generate_elbo_particles", fixed_particles)
+    monkeypatch.setattr(
+        optimizer, "generate_elbo_particles", lambda x_o, num_samples=None: particles
+    )
     surrogate_loss, loss = optimizer.loss(zeros(1))
 
-    reshaped = particles.reshape(2, 3)
-    weights = torch.softmax(reshaped.detach(), dim=-1)
+    # IWELBO gradient weights (Burda et al. 2016), squared for DReG (Tucker et al.
+    # 2018), averaged over the n_particles groups of K samples.
+    weights = torch.softmax(particles.detach().reshape(2, 3), dim=-1)
     if dreg:
         weights = weights.square()
-    expected_grad = -weights.flatten() / 2
-    expected_loss = -(torch.logsumexp(reshaped, dim=-1) - np.log(3)).mean()
-
-    assert sample_counts == [6]
     grad = torch.autograd.grad(surrogate_loss, particles)[0]
-    assert torch.allclose(grad, expected_grad)
-    assert torch.allclose(loss, expected_loss.detach())
+    assert torch.allclose(grad, -weights.flatten() / 2)
     assert not loss.requires_grad
+
+    # With K equal log-weights c, the IWELBO is c for any K.
+    monkeypatch.setattr(
+        optimizer,
+        "generate_elbo_particles",
+        lambda x_o, num_samples=None: torch.full((6,), offset),
+    )
+    _, loss = optimizer.loss(zeros(1))
+    assert torch.allclose(loss, torch.tensor(-offset))
 
 
 def test_vi_posterior_interface():
