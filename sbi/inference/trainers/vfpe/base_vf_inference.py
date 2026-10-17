@@ -767,9 +767,6 @@ class MaskedVectorFieldTrainer(
         with flexible proposals yet.
 
         Args:
-            prior: Prior distribution. Its primary use is for rejecting samples that
-                fall outside its defined support. For the core inference process,
-                this prior is ignored.
             mvf_estimator_builder: Neural network architecture for the
                 masked vector field estimator. Can be a string (e.g. 'simformer')
                 or a callable that implements the `MaskedConditionalEstimatorBuilder`
@@ -783,7 +780,7 @@ class MaskedVectorFieldTrainer(
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
-                `vector_field_estimator_builder` is a string.
+                `mvf_estimator_builder` is a string.
         """
 
         # Unused at initialization, try to catch possible mistakenly use by the user

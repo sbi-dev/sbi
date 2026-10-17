@@ -18,6 +18,8 @@ from sbi.sbi_types import Tracker
 class Simformer(MaskedVectorFieldTrainer):
     """Simformer as in Gloeckler et al. (ICML, 2024) [1].
 
+    The underlying neural network is `VectorFieldSimformer`.
+
     Simformer enables sampling from arbitrary conditional distributions, not just
     posterior or likelihood, by operating on a unified input tensor that represents all
     variables.
@@ -66,9 +68,6 @@ class Simformer(MaskedVectorFieldTrainer):
         r"""Initialize Simformer.
 
         Args:
-            prior: Prior distribution. Its primary use is for rejecting samples that
-                fall outside its defined support. For the core inference process,
-                this prior is ignored.
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a string (e.g., `'simformer'`)
                 or a callable that implements the `MaskedConditionalEstimatorBuilder`
@@ -85,9 +84,11 @@ class Simformer(MaskedVectorFieldTrainer):
             logging_level: Logging level for the training. Can be an integer or a
                 string.
             summary_writer: Tensorboard summary writer.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
-                `score_estimator` is a string.
+                `mvf_estimator` is a string.
         """
         super().__init__(
             mvf_estimator_builder=mvf_estimator,
@@ -111,6 +112,8 @@ class Simformer(MaskedVectorFieldTrainer):
 
 class FlowMatchingSimformer(MaskedVectorFieldTrainer):
     """Flow-matching version of the Simformer, Gloeckler et al. (ICML, 2024) [1].
+
+    The underlying neural network is `VectorFieldSimformer`.
 
     The flow-matching version of the Simformer shares the same architecture
     and masking semantics as the score-based Simformer above.
@@ -143,9 +146,6 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
         r"""Initialize Flow Matching Simformer.
 
         Args:
-            prior: Prior distribution. Its primary use is for rejecting samples that
-                fall outside its defined support. For the core inference process,
-                this prior is ignored.
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a string (e.g., `'simformer'`)
                 or a callable that implements the `MaskedConditionalEstimatorBuilder`
@@ -161,9 +161,11 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             logging_level: Logging level for the training. Can be an integer or a
                 string.
             summary_writer: Tensorboard summary writer.
+            tracker: Tracking adapter used to log training metrics. If None, a
+                TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
-                `score_estimator` is a string.
+                `mvf_estimator` is a string.
         """
         super().__init__(
             mvf_estimator_builder=mvf_estimator,

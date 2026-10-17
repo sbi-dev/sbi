@@ -1090,8 +1090,10 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         """Forward pass through the Simformer.
 
         Args:
-            inputs: Input tensor on which the vector field is evaluated.
-            t: Time embedding.
+            inputs: Input tensor on which the vector field is evaluated, float, of
+                shape `(batch_size, num_variables, in_features)`, or
+                `(batch_size, num_variables)` when `in_features == 1`.
+            t: Diffusion time, float, of shape `(batch_size,)` or a scalar.
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
                     - `True` (or `1`): The variable at this position is observed and its
