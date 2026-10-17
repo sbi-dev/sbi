@@ -246,6 +246,7 @@ class VectorFieldPosterior(NeuralPosterior):
 
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
+
         is_iid = x.shape[0] > 1
         # IID and guidance require transforming the prior to standardized space.
         if self.vector_field_estimator.compose_enabled and (
@@ -630,6 +631,7 @@ class VectorFieldPosterior(NeuralPosterior):
             )
         num_samples = torch.Size(sample_shape).numel()
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
+
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()

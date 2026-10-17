@@ -587,6 +587,50 @@ def handle_invalid_x(
     return is_valid_x, num_nans, num_infs
 
 
+def handle_invalid_inputs_for_simformer(
+    inputs: Tensor,
+    condition_masks: Optional[Tensor] = None,
+    exclude_invalid_x: bool = True,
+) -> Tuple[Tensor, Optional[Tensor]]:
+    """Return a cleaned input tensor where Nan and Inf values are replaced with small
+    standard gaussian noise.
+
+    If also a condition mask is provided, it will be modified in order to set entries
+    presenting invalid values as latent (i.e., to False).
+
+    Note: If `exclude_invalid_x` is False, then nothing happens and tensors are returned
+    as is.
+    """
+    if exclude_invalid_x:
+        # Identify invalid inputs
+        is_invalid_inputs_entries = torch.isnan(inputs) | torch.isinf(inputs)
+
+        num_invalid = int(is_invalid_inputs_entries.sum().item())
+
+        assert (
+            num_invalid < inputs.numel()
+        ), """No valid data entries left after excluding NaNs and Infs. In case you are
+            encoding missing trials with NaNs consider setting exclude_invalid_x=False
+            and z_score_x = 'none' to disable z-scoring."""
+
+        if num_invalid > 0:
+            noise = torch.randn_like(inputs) * 1e-4  # Small noise
+            inputs = torch.where(is_invalid_inputs_entries, noise, inputs)
+
+            # We will simply force invalid inputs to be latent
+            if condition_masks is not None:
+                # Only reshape if shapes do not agree
+                if is_invalid_inputs_entries.shape != condition_masks.shape:
+                    reshaped_is_invalid_inputs_entries = is_invalid_inputs_entries.any(
+                        dim=-1
+                    )
+                else:
+                    reshaped_is_invalid_inputs_entries = is_invalid_inputs_entries
+                condition_masks = condition_masks & ~reshaped_is_invalid_inputs_entries
+
+    return inputs, condition_masks
+
+
 def npe_msg_on_invalid_x(
     num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
 ) -> None:
@@ -637,6 +681,25 @@ def nle_nre_apt_msg_on_invalid_x(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"{algorithm} does not allow invalid simulations. "
                 f"Replace the invalid values with an unreasonably low or high value."
+            )
+
+
+def simformer_msg_on_invalid_x(
+    num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
+) -> None:
+    if num_nans + num_infs > 0:
+        if exclude_invalid_x:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "Samples presenting invalid entries will be forced to be latent in "
+                "the condition mask."
+            )
+        else:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "Training will likely fail, we strongly recommend "
+                f"`exclude_invalid_x=True` for {algorithm}."
             )
 
 
@@ -798,6 +861,8 @@ def prior_support_is_bounded(prior: Any) -> Optional[bool]:
         False if the support is the real space, True otherwise, and None if the prior
         does not define a `support`.
     """
+    if prior is None:
+        return False
     try:
         support = prior.support
     except (NotImplementedError, AttributeError):
@@ -828,6 +893,9 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     Returns:
         Tensor of bools indicating whether each sample was within the support.
     """
+    if distribution is None:
+        return torch.ones(samples.shape[:-1], dtype=torch.bool, device=samples.device)
+
     # Try to check using the support property, use log prob method otherwise.
     # Before torch v1.7.0, `support.check()` returned bools for every element.
     # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,

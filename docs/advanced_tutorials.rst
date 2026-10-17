@@ -38,6 +38,7 @@ Neural nets
 - :doc:`advanced_tutorials/03_density_estimators`
 - :doc:`advanced_tutorials/12_iid_data_and_permutation_invariant_embeddings`
 - :doc:`advanced_tutorials/19_vector_field_methods`
+- :doc:`advanced_tutorials/22_simformer`
 
 
 Training

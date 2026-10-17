@@ -1159,7 +1159,9 @@ def train_lc2st(
 
     # labels - use float32 for skorch NeuralNetBinaryClassifier (BCEWithLogitsLoss),
     # int64 for sklearn classifiers
-    is_skorch = isinstance(clf, NeuralNetBinaryClassifier)
+    is_skorch = isinstance(clf, NeuralNetBinaryClassifier) or isinstance(
+        getattr(clf, "clf", None), NeuralNetBinaryClassifier
+    )
     label_dtype = np.float32 if is_skorch else np.int64
     target = np.concatenate((
         np.zeros((joint_p.shape[0],), dtype=label_dtype),
@@ -1287,6 +1289,9 @@ class EnsembleClassifier(BaseEstimator):
                     clf.random_state += n
                 else:
                     clf.random_state = n + 1
+            else:
+                torch.manual_seed(n + 1)
+                np.random.seed(n + 1)
             clf.fit(X, y)  # type: ignore
             self.trained_clfs.append(clf)
         return self
