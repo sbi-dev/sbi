@@ -25,6 +25,7 @@ expected coverage, TARP, L-C2ST).
 - [Summary Statistics](https://sbi.readthedocs.io/en/latest/how_to_guide/01_crafting_summary_statistics.html): Hand-crafted features for high-dim data
 - [Multi-Round Inference](https://sbi.readthedocs.io/en/latest/how_to_guide/02_multiround_inference.html): Sequential methods (SNPE, SNLE, SNRE) and monitoring convergence across rounds
 - [Density Estimators](https://sbi.readthedocs.io/en/latest/how_to_guide/03_density_estimators.html): Choosing and configuring neural networks
+- [Estimator Configs](https://sbi.readthedocs.io/en/latest/how_to_guide/27_estimator_configs.html): Per-model configs, z-scoring, embeddings, and migration from factories
 - [Embedding Networks](https://sbi.readthedocs.io/en/latest/how_to_guide/04_embedding_networks.html): FCEmbedding, CNNEmbedding, custom nn.Module
 - [Choosing Inference Method](https://sbi.readthedocs.io/en/latest/how_to_guide/06_choosing_inference_method.html): NPE vs NLE vs NRE decision guide
 - [Sampler Interface](https://sbi.readthedocs.io/en/latest/how_to_guide/09_sampler_interface.html): Choosing MCMC, rejection, VI or importance sampling for NLE/NRE posteriors
