@@ -11,7 +11,7 @@ from sbi.inference import FMPE, MNLE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
-from sbi.neural_nets import FlowMatchingConfig, MixedConfig
+from sbi.neural_nets import DensityConfigBase, FlowMatchingConfig, MixedConfig
 from sbi.neural_nets.net_builders.estimator_configs import (
     _CLASSIFIER_CONFIGS,
     _DENSITY_CONFIGS,
@@ -81,9 +81,14 @@ ESTIMATOR_ARGUMENTS = {
     "snle": "density_estimator",
     "snre": "classifier",
 }
-# sbi's own maps from estimator names to per-model configs.
+# sbi's own maps from estimator names to per-model configs. Pretrained density
+# models such as TabPFN cannot be trained, so they are left out.
 ESTIMATOR_CONFIGS = {
-    "density_estimator": _DENSITY_CONFIGS,
+    "density_estimator": {
+        name: config
+        for name, config in _DENSITY_CONFIGS.items()
+        if issubclass(config, DensityConfigBase)
+    },
     "classifier": _CLASSIFIER_CONFIGS,
     "vf_estimator": _VF_NET_CONFIGS,
 }
