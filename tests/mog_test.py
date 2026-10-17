@@ -220,6 +220,50 @@ class TestMoGCondition:
         expected = log_weights - torch.logsumexp(log_weights, dim=-1)
         assert torch.allclose(cond_mog.logits[0], expected, rtol=1e-5, atol=1e-3)
 
+    @pytest.mark.parametrize("dims_to_sample", [[0], [1], [2], [1, 3]])
+    def test_condition_matches_analytic_gaussian(self, dims_to_sample):
+        """Means, covariances and weights match the analytic Gaussian conditional."""
+        torch.manual_seed(0)
+        batch_size, num_components, dim = 2, 3, 4
+        factors = torch.randn(batch_size, num_components, dim, dim).double().triu()
+        factors.diagonal(dim1=-2, dim2=-1).abs_().add_(0.5)
+        mog = MoG(
+            logits=torch.randn(batch_size, num_components).double(),
+            means=torch.randn(batch_size, num_components, dim).double(),
+            precisions=factors.transpose(-2, -1) @ factors,
+            precision_factors=factors,
+        )
+        condition = torch.randn(batch_size, dim).double()
+        free = torch.zeros(dim, dtype=torch.bool)
+        free[dims_to_sample] = True
+
+        cond_mog = mog.condition(condition, dims_to_sample)
+
+        cov = torch.linalg.inv(mog.precisions)
+        cov_xx = cov[..., free, :][..., free]
+        cov_xy = cov[..., free, :][..., ~free]
+        cov_yy = cov[..., ~free, :][..., ~free]
+        y = condition[:, None, ~free]
+        gain = cov_xy @ torch.linalg.inv(cov_yy)
+        diff_y = (y - mog.means[..., ~free]).unsqueeze(-1)
+        expected_means = mog.means[..., free] + (gain @ diff_y).squeeze(-1)
+        expected_cov = cov_xx - gain @ cov_xy.transpose(-2, -1)
+        log_weights = mog.logits + MultivariateNormal(
+            mog.means[..., ~free], cov_yy
+        ).log_prob(y)
+
+        assert cond_mog.precision_factors is not None
+        cond_factors = cond_mog.precision_factors.triu()
+        assert torch.allclose(cond_mog.means, expected_means)
+        assert torch.allclose(torch.linalg.inv(cond_mog.precisions), expected_cov)
+        assert torch.allclose(
+            torch.linalg.inv(cond_factors.transpose(-2, -1) @ cond_factors),
+            expected_cov,
+        )
+        assert torch.allclose(
+            cond_mog.log_weights, log_weights - log_weights.logsumexp(-1, True)
+        )
+
 
 class TestMoGFromGaussian:
     """Test MoG.from_gaussian class method."""
