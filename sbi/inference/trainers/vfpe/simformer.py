@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Literal, Optional, Union
 
 from torch import Tensor
@@ -165,8 +166,15 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
             kwargs: Additional keyword arguments passed to the default builder if
-                `mvf_estimator` is a string.
+                `mvf_estimator` is a string. Flow matching does not use an SDE, so
+                `sde_type` is not supported; if passed, it is ignored with a warning.
         """
+        if "sde_type" in kwargs:
+            warnings.warn(
+                "`sde_type` is not used by FlowMatchingSimformer and is ignored.",
+                stacklevel=2,
+            )
+            kwargs.pop("sde_type")
         super().__init__(
             mvf_estimator_builder=mvf_estimator,
             posterior_latent_idx=posterior_latent_idx,
@@ -183,5 +191,4 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
         self, **kwargs
     ) -> MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator]:
         model = kwargs.pop("vector_field_estimator_builder", "simformer")
-        kwargs.pop("sde_type", None)  # sde_type is not used in FM Simformer
         return simformer_flow_nn(model=model, **kwargs)
