@@ -10,6 +10,8 @@ import numpy as np
 import six
 import torch
 
+from sbi.utils.torchutils import tensor2numpy
+
 try:
     collectionsAbc = collections.abc  # type: ignore
 except AttributeError:
@@ -78,13 +80,12 @@ def update(d: Dict, u: Optional[Dict]) -> Dict:
 
 
 def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
-    """
-    Returns np.ndarray if torch.Tensor was provided.
+    """Returns np.ndarray if torch.Tensor was provided.
 
     Used because samples_nd() can only handle np.ndarray.
     """
     if isinstance(t, torch.Tensor):
-        return t.numpy()
+        return tensor2numpy(t)
     elif not isinstance(t, np.ndarray):
         return np.array(t)
     return t
