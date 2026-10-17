@@ -206,8 +206,6 @@ class NPE_C(PosteriorEstimatorTrainer):
         self._round = max(self._data_round_index)
 
         if self._round > 0:
-            if self._neural_net is None:
-                raise RuntimeError("Neural net not initialized.")
             # Set the proposal to the last proposal that was passed by the user. For
             # atomic SNPE, it does not matter what the proposal is. For non-atomic
             # SNPE, we only use the latest data that was passed, i.e. the one from the
