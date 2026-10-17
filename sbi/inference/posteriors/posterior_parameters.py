@@ -23,6 +23,7 @@ from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_float,
     is_positive_int,
+    validate_target_accept,
 )
 
 
@@ -132,6 +133,44 @@ class DirectPosteriorParameters(PosteriorParameters):
 
 
 @dataclass(frozen=True)
+class FilteredDirectPosteriorParameters(PosteriorParameters):
+    """Parameters for initializing `FilteredDirectPosterior`.
+
+    Fields:
+        max_sampling_batch_size: Batchsize of samples drawn from
+            the proposal at every iteration.
+        enable_transform: Whether to transform parameters to unconstrained space
+            during MAP optimization. When False, an identity transform will be
+            returned for `theta_transform`.
+        filter_size: Number of context simulations retained after filtering.
+        filter_type: Filtering strategy. Either `"knn"`, `"first"`, or a
+            callable returning context indices.
+    """
+
+    max_sampling_batch_size: int = 10_000
+    enable_transform: bool = True
+    filter_size: int = 2048
+    filter_type: Union[Literal["knn", "first"], Callable] = "knn"
+
+    def validate(self):
+        """Validate `FilteredDirectPosteriorParameters` fields."""
+
+        if not is_positive_int(self.max_sampling_batch_size):
+            raise ValueError("max_sampling_batch_size must be greater than 0.")
+
+        if not is_positive_int(self.filter_size - 1):
+            raise ValueError("filter_size must be greater than 1.")
+
+        if not (
+            (isinstance(self.filter_type, str) and self.filter_type in {"knn", "first"})
+            or callable(self.filter_type)
+        ):
+            raise ValueError(
+                "filter_type must be one of ['knn', 'first'] or a callable."
+            )
+
+
+@dataclass(frozen=True)
 class ImportanceSamplingPosteriorParameters(PosteriorParameters):
     """
     Parameters for initializing ImportanceSamplingPosterior.
@@ -192,7 +231,7 @@ class MCMCPosteriorParameters(PosteriorParameters):
         init_strategy: The initialisation strategy for chains; `proposal` will draw
             init locations from `proposal`, whereas `sir` will use Sequential-
             Importance-Resampling (SIR). SIR initially samples
-            `init_strategy_num_candidates` from the `proposal`, evaluates all of
+            `num_candidate_samples` from the `proposal`, evaluates all of
             them under the `potential_fn` and `proposal`, and then resamples the
             initial locations with weights proportional to `exp(potential_fn -
             proposal.log_prob`. `resample` is the same as `sir` but
@@ -206,6 +245,14 @@ class MCMCPosteriorParameters(PosteriorParameters):
             (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
             faster than `"spawn"` but is only supported on POSIX-based systems
             (e.g. Linux and macOS, not Windows).
+        target_accept: Target acceptance probability used only by the PyMC samplers
+            `hmc_pymc` and `nuts_pymc`, controlling step-size adaptation during
+            warmup. Higher values generally result in smaller steps and fewer
+            rejections, at the cost of speed. If `None`, `hmc_pymc` uses `0.9`
+            because PyMC's `0.65` default mixed poorly in sbi's Gaussian regression
+            test, and `nuts_pymc` keeps PyMC's backend default. Ignored by
+            `slice_pymc`, the Pyro samplers (`hmc_pyro`, `nuts_pyro`) and the numpy
+            slice samplers.
     """
 
     method: Literal[
@@ -224,9 +271,12 @@ class MCMCPosteriorParameters(PosteriorParameters):
     init_strategy_parameters: Optional[Dict[str, Any]] = None
     num_workers: int = 1
     mp_context: Literal["fork", "spawn"] = "spawn"
+    target_accept: Optional[float] = None
 
     def validate(self):
         """Validate MCMCPosteriorParameters fields."""
+
+        validate_target_accept(self.target_accept)
 
         if not (
             self.init_strategy_parameters is None
@@ -236,7 +286,7 @@ class MCMCPosteriorParameters(PosteriorParameters):
                 "init_strategy_parameters must be either None or of type Dict"
             )
         if self.thin != -1 and not (1 <= self.thin <= 10):
-            raise ValueError("thin must be a value between 10 to 1, or -1.")
+            raise ValueError("thin must be a value between 1 and 10, or -1.")
         if not is_nonnegative_int(self.warmup_steps):
             raise ValueError("warmup_steps must be greater than or equal to 0.")
         if not is_positive_int(self.num_chains):
@@ -251,8 +301,6 @@ class RejectionPosteriorParameters(PosteriorParameters):
     Parameters for initializing RejectionPosterior.
 
     Fields:
-        theta_transform: Transformation that is applied to parameters. Is not used
-            during but only when calling `.map()`.
         max_sampling_batch_size: The batchsize of samples being drawn from
             the proposal at every iteration.
         num_samples_to_find_max: The number of samples that are used to find the
@@ -262,7 +310,6 @@ class RejectionPosteriorParameters(PosteriorParameters):
         m: Multiplier to the `potential_fn / proposal` ratio.
     """
 
-    theta_transform: Optional[TorchTransform] = None
     max_sampling_batch_size: int = 10_000
     num_samples_to_find_max: int = 10_000
     num_iter_to_find_max: int = 100
@@ -270,14 +317,6 @@ class RejectionPosteriorParameters(PosteriorParameters):
 
     def validate(self):
         """Validate RejectionPosteriorParameters fields."""
-
-        if not (
-            self.theta_transform is None
-            or isinstance(self.theta_transform, TorchTransform)
-        ):
-            raise TypeError(
-                "theta_transform must be either None or of type TorchTransform"
-            )
 
         if not is_positive_int(self.max_sampling_batch_size):
             raise ValueError("max_sampling_batch_size must be greater than 0.")

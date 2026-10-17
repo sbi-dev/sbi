@@ -2,12 +2,15 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Union
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
+from torch.distributions import Distribution
+from typing_extensions import Self
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,
@@ -15,9 +18,22 @@ from sbi.inference.potentials.base_potential import (
     CustomPotentialWrapper,
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
-from sbi.utils.sbiutils import gradient_ascent
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.sbiutils import (
+    gradient_ascent,
+    load_with_version,
+    nan_tolerant_input_net,
+    prior_support_is_bounded,
+    save_with_version,
+)
+from sbi.utils.torchutils import (
+    assert_all_finite,
+    canonical_device,
+    ensure_theta_batched,
+    infer_tensor_device,
+    process_device,
+)
 from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 class NeuralPosterior:
@@ -72,12 +88,26 @@ class NeuralPosterior:
             self.theta_transform = theta_transform
 
         self._map = None
+        self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
         self._purpose = ""
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
         # already to the potential function builder. If so, this `x_o` will be used
         # as default x.
-        self._x = self.potential_fn.return_x_o()
+        x_o = self.potential_fn.return_x_o()
+        if x_o is not None:
+            self._assert_finite_x(x_o)
+        self._x = x_o
+
+    def _assert_finite_x(self, x: Tensor) -> None:
+        """Raise if `x` contains Inf, or NaN that the net embedding `x` does not
+        accept (e.g., a NaN-padding-aware `PermutationInvariantEmbedding`)."""
+        x = torch.as_tensor(x)
+        net = nan_tolerant_input_net(self.potential_fn.x_embedding_net)
+        assert_all_finite(x, "Observed data x_o", allow_nan=net is not None)
+        validate_nan_input = getattr(net, "validate_nan_input", None)
+        if validate_nan_input is not None and torch.isnan(x).any():
+            validate_nan_input(x)
 
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
@@ -93,7 +123,7 @@ class NeuralPosterior:
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -180,7 +210,10 @@ class NeuralPosterior:
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        self._x = process_x(x, x_event_shape=None).to(self._device)
+        x = process_x(x, x_event_shape=None)
+        self._assert_finite_x(x)
+
+        self._x = x.to(self._device)
         self._map = None
         return self
 
@@ -188,7 +221,10 @@ class NeuralPosterior:
         if x is not None:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
-            return process_x(x, x_event_shape=None)
+            x = process_x(x, x_event_shape=None)
+            self._assert_finite_x(x)
+
+            return x.to(self._device)
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."
@@ -196,6 +232,32 @@ class NeuralPosterior:
             )
         else:
             return self.default_x
+
+    def _cached_leakage_factor(
+        self,
+        x: Tensor,
+        prior: Any,
+        estimate_fn: Callable[[], Tensor],
+        force_update: bool = False,
+        use_cache: bool = True,
+    ) -> Tensor:
+        """Return the leakage correction factor saved for `x`, or estimate it.
+
+        The factor is 1 for priors with unbounded support. Otherwise, one factor is
+        saved, for the last `x`, unless `use_cache=False`.
+        """
+        if prior_support_is_bounded(prior) is False:
+            return torch.ones((), device=self._device)
+        if self._leakage_cache is not None and use_cache and not force_update:
+            cached_x, factor = self._leakage_cache
+            if cached_x.shape == x.shape and torch.allclose(
+                cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
+            ):
+                return factor
+        factor = estimate_fn()
+        if use_cache:
+            self._leakage_cache = (x.detach().clone(), factor)
+        return factor
 
     def _calculate_map(
         self,
@@ -273,7 +335,7 @@ class NeuralPosterior:
             save_best_every: The best log-probability is computed, saved in the
                 `map`-attribute, and printed every `save_best_every`-th iteration.
                 Computing the best log-probability creates a significant overhead
-                for score-based estimators (thus, the default is `1000`.)
+                (thus, the default is `10`.)
             show_progress_bars: Whether to show a progressbar during sampling from
                 the posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
@@ -294,7 +356,7 @@ class NeuralPosterior:
             )
 
         if self._map is None or force_update:
-            self.potential_fn.set_x(self.default_x)
+            self.potential_fn = self.potential_fn.bind(self.default_x)
             self._map = self._calculate_map(
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,
@@ -316,6 +378,35 @@ class NeuralPosterior:
         desc = f"Posterior p(θ|x) of type {self.__class__.__name__}. {self._purpose}"
         return desc
 
+    def save(self, filename: Union[str, Path]) -> None:
+        """Save the posterior to a file. Load it with `load()`.
+
+        Args:
+            filename: Path to the file.
+        """
+        save_with_version(self, filename)
+
+    @classmethod
+    def load(
+        cls,
+        filename: Union[str, Path],
+        map_location: Optional[Union[str, torch.device]] = None,
+    ) -> Self:
+        """Load a posterior saved with `save()`.
+
+        The file is unpickled, which can execute arbitrary code. Only load trusted
+        files.
+
+        Args:
+            filename: Path to the file.
+            map_location: Device to load the posterior on, e.g. `"cpu"` for a
+                posterior saved on a GPU. By default, the device it was saved on.
+
+        Returns:
+            The loaded posterior.
+        """
+        return load_with_version(filename, cls, map_location)
+
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.
 
@@ -327,10 +418,34 @@ class NeuralPosterior:
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
 
-        For developers: for any new attribute added to `NeuralPosterior`, we have to
-        add an entry here using `check_warn_and_setstate()`.
+        `torch.load(..., map_location=...)` remaps the tensors but not the stored device
+        strings. If the restored tensors live on another device than `_device` claims,
+        the device strings of the posterior, its potential and its prior are updated.
 
         Args:
             state_dict: State to be restored.
         """
+        # Posteriors pickled by older sbi versions can miss this key.
+        state_dict.setdefault("_leakage_cache", None)
         self.__dict__ = state_dict
+
+        actual_device = infer_tensor_device(self)
+        if actual_device is None or canonical_device(actual_device) == canonical_device(
+            self._device
+        ):
+            return
+
+        # The tensors already live on `actual_device`. Only the device strings, and the
+        # distributions that cache one, must follow.
+        self._device = actual_device
+        if hasattr(self, "device"):
+            self.device = actual_device
+        shared_prior = getattr(self.potential_fn, "prior", None)
+        self.potential_fn.to(actual_device)  # type: ignore[union-attr]
+        for attr in ("prior", "_prior", "proposal"):
+            value = getattr(self, attr, None)
+            if value is shared_prior and value is not None:
+                # The potential moved this object already. Keep sharing it.
+                setattr(self, attr, self.potential_fn.prior)  # type: ignore[union-attr]
+            elif isinstance(value, Distribution):
+                setattr(self, attr, move_distribution_to_device(value, actual_device))

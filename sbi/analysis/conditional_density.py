@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from typing import Any, Callable, List, Optional, Tuple, Union
-from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
@@ -20,7 +19,6 @@ from sbi.utils.conditional_density_utils import (
     RestrictedPriorForConditional,
     RestrictedTransformForConditional,
     compute_corrcoeff,
-    condition_mog,
     extract_and_transform_mog,
 )
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
@@ -210,18 +208,13 @@ class ConditionedMDN:
         condition = atleast_2d_float32_tensor(condition)
 
         logits, means, precfs, _ = extract_and_transform_mog(estimator=mdn, context=x_o)
-        cond_logits, cond_means, cond_precfs, _ = condition_mog(
-            condition, dims_to_sample, logits, means, precfs
+        mog = MoG(
+            logits=logits,
+            means=means,
+            precisions=precfs.transpose(3, 2) @ precfs,
+            precision_factors=precfs,
         )
-        cond_prec = cond_precfs.transpose(3, 2) @ cond_precfs
-
-        # Store the conditioned MoG for sampling and evaluation
-        self._mog = MoG(
-            logits=cond_logits,
-            means=cond_means,
-            precisions=cond_prec,
-            precision_factors=cond_precfs,
-        )
+        self._mog = mog.condition(condition, dims_to_sample)
 
     def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
         """Sample from the conditioned MoG.
@@ -258,29 +251,6 @@ class ConditionedMDN:
         # If self._mog has batch_size=1 and theta has batch_size=N,
         # it broadcasts the MoG parameters to match theta's batch dimension.
         return self._mog.log_prob(theta)
-
-
-def conditonal_potential(
-    potential_fn: BasePotential,
-    theta_transform: TorchTransform,
-    prior: Distribution,
-    condition: Tensor,
-    dims_to_sample: List[int],
-) -> Tuple[Callable, torch_tf.Transform, Any]:
-    """
-    Only for backwards compatibility.
-
-    The name of this function was renamed until v0.19.0. (notice the missing `i` in
-    the name).
-    """
-    warn(
-        "The misspelled function `conditonal_potential` will be removed in a future "
-        "release of sbi. Please use `conditional_potential` (spelled correctly).",
-        stacklevel=2,
-    )
-    return conditional_potential(
-        potential_fn, theta_transform, prior, condition, dims_to_sample
-    )
 
 
 def conditional_potential(

@@ -22,13 +22,23 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     to generate samples from the target distribution by solving the SDE starting from
     the base (Gaussian) distribution.
 
+    See [2]_ for the denoising diffusion formulation and [3]_ for the
+    noise-conditional score network formulation.
+
     We assume the following SDE:
-                        dx = A(t)xdt + B(t)dW,
+
+    .. math::
+        dx = A(t) x \, dt + B(t) \, dW,
+
     where A(t) and B(t) are the drift and diffusion functions, respectively, and dW is
     a Wiener process. This will lead to marginal distribution of the form:
-                        p(xt|x0) = N(xt; mean_t(t)*x0, std_t(t)),
+
+    .. math::
+        p(x_t | x_0) = N(x_t; \text{mean}_t(t) \cdot x_0, \text{std}_t(t)^2),
+
     where mean_t(t) and std_t(t) are the conditional mean and standard deviation at a
-    given time t, respectively.
+    given time t, respectively. `std_fn` returns the standard deviation, so the second
+    argument of N is its square.
 
     References
     ----------
@@ -76,6 +86,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-3,
         t_max: float = 1.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
         r"""Score estimator class that estimates the
         conditional score function, i.e.,
@@ -97,6 +109,10 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             std_0: Starting standard deviation of the target distribution.
             t_min: Minimum time for diffusion (0 can be numerically unstable).
             t_max: Maximum time for diffusion.
+            compose_shift: Shift of the boundary affine, given together with
+                `compose_scale`.
+            compose_scale: Scale of the boundary affine, given together with
+                `compose_shift`.
         """
 
         # Starting mean and std of the target distribution (otherwise assumes 0,1).
@@ -115,6 +131,8 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             embedding_net=embedding_net,
             t_min=t_min,
             t_max=t_max,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
 
         # Min/max values for noise variance beta
@@ -125,21 +143,20 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         self._set_weight_fn(weight_fn)
         self.register_buffer("mean_0", mean_0.clone().detach())
         self.register_buffer("std_0", std_0.clone().detach())
+        self._check_compose_internal_stats_unit()
 
         # Now that input_shape and mean_0, std_0 is set, we can compute the proper mean
         # and std for the "base" distribution.
         # Create t on the correct device to avoid CPU/GPU mismatch
         t_tensor = torch.as_tensor([t_max], device=self.mean_0.device)
-        mean_t = self.approx_marginal_mean(t_tensor)
-        std_t = self.approx_marginal_std(t_tensor)
-        # `broadcast_to` returns a view with shared storage. Clone so these buffers are
-        # writable (e.g. when restoring checkpoints via `load_state_dict`).
-        mean_t = torch.broadcast_to(mean_t, (1, *input_shape)).clone()
-        std_t = torch.broadcast_to(std_t, (1, *input_shape)).clone()
-
-        # Update the base distribution parameters
-        self._mean_base = mean_t
-        self._std_base = std_t
+        # `clone()`: these are buffers, and `load_state_dict` cannot write into the
+        # stride-0 view `broadcast_to` returns.
+        self._mean_base = torch.broadcast_to(
+            self.approx_marginal_mean(t_tensor), (1, *input_shape)
+        ).clone()
+        self._std_base = torch.broadcast_to(
+            self.approx_marginal_std(t_tensor), (1, *input_shape)
+        ).clone()
 
     def forward(self, input: Tensor, condition: Tensor, time: Tensor) -> Tensor:
         r"""Forward pass of the score estimator
@@ -157,7 +174,6 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Returns:
             Score (gradient of the density) at a given time, matches input shape.
         """
-
         # Continue with standard processing (broadcast shapes etc.)
         batch_shape_input = input.shape[: -len(self.input_shape)]
         batch_shape_cond = condition.shape[: -len(self.condition_shape)]
@@ -253,6 +269,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             MSE between target score and network output, scaled by the weight function.
 
         """
+        if self.compose_enabled:
+            input = self.to_z(input)
+
         # Sample times from the Markov chain, use batch dimension
         if times is None:
             times = self.train_schedule(input.shape[0])
@@ -1292,6 +1311,8 @@ class VPScoreEstimator(ConditionalScoreEstimator, VariancePreservingSDE):
         std_0: Union[Tensor, float] = 1.0,
         t_min: float = 1e-3,
         t_max: float = 1.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
         super().__init__(
             net,
@@ -1305,6 +1326,8 @@ class VPScoreEstimator(ConditionalScoreEstimator, VariancePreservingSDE):
             std_0=std_0,
             t_min=t_min,
             t_max=t_max,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
@@ -1499,19 +1522,23 @@ class SubVPScoreEstimator(ConditionalScoreEstimator, SubVariancePreservingSDE):
         std_0: float = 1.0,
         t_min: float = 1e-2,
         t_max: float = 1.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
-        self.beta_min = beta_min
-        self.beta_max = beta_max
         super().__init__(
             net,
             input_shape,
             condition_shape,
             embedding_net=embedding_net,
             weight_fn=weight_fn,
+            beta_min=beta_min,
+            beta_max=beta_max,
             mean_0=mean_0,
             std_0=std_0,
             t_min=t_min,
             t_max=t_max,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
@@ -1722,6 +1749,8 @@ class VEScoreEstimator(ConditionalScoreEstimator, VarianceExplodingSDE):
         lognormal_mean: float = -1.2,
         lognormal_std: float = 1.2,
         power_law_exponent: float = 7.0,
+        compose_shift: Optional[Tensor] = None,
+        compose_scale: Optional[Tensor] = None,
     ) -> None:
         # Validate sigma bounds (required for VE SDE math and log computations).
         if sigma_min <= 0:
@@ -1774,6 +1803,8 @@ class VEScoreEstimator(ConditionalScoreEstimator, VarianceExplodingSDE):
             std_0=std_0,
             t_min=t_min,
             t_max=t_max,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
 
         self._warn_on_inappropriate_config()

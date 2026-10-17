@@ -52,7 +52,8 @@ To get started, install the ``sbi`` package with:
 
    python -m pip install sbi
 
-for more advanced install options, see our `Install Guide <https://sbi.readthedocs.io/en/latest/installation.html>`_.
+For Pyro- or PyMC-based MCMC samplers, install ``sbi[pyro]``, ``sbi[pymc]``, or
+``sbi[all]``. For more details, see our :doc:`Install Guide <installation>`.
 
 Then, check out our material:
 
@@ -71,7 +72,7 @@ Then, check out our material:
       Practical recipes for common tasks.
 
    .. grid-item-card:: 📚 API Reference
-      :link: sbi
+      :link: api_reference
       :link-type: doc
 
       Full documentation of modules and functions.
@@ -146,8 +147,8 @@ the inference on one particular observation to be more simulation-efficient
 (e.g., SNPE).
 
 Below, we list all implemented methods and their corresponding publications.
-For usage in ``sbi``, see the `Inference API reference <https://sbi.readthedocs.io/en/latest/sbi.html>`_
-and the `tutorial on implemented methods <https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html>`_.
+For usage in ``sbi``, see the :doc:`Inference API reference <api_reference>`
+and the :doc:`tutorial on implemented methods <tutorials/16_implemented_methods>`.
 
 
 Posterior estimation (``(S)NPE``)
@@ -255,7 +256,7 @@ Diagnostics
    :maxdepth: 2
    :caption: More guides/resources
 
-   sbi
+   api_reference
    faq
    contributor_guide
    changelog

@@ -3,7 +3,7 @@
 
 
 import warnings
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -15,10 +15,17 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldTrainer,
 )
 from sbi.neural_nets.estimators.base import (
-    ConditionalEstimatorBuilder,
+    ConditionalEstimatorBuildFn,
     ConditionalVectorFieldEstimator,
 )
 from sbi.neural_nets.factory import posterior_flow_nn
+from sbi.neural_nets.net_builders.estimator_configs import (
+    VF_MODELS,
+)
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    FlowMatchingConfig,
+    VectorFieldConfigBase,
+)
 from sbi.sbi_types import Tracker
 
 
@@ -65,15 +72,23 @@ class FMPE(VectorFieldTrainer):
         samples = posterior.sample((1000,), x=x_o)
     """
 
+    _ALLOWED_CONFIG_TYPE: ClassVar[type[VectorFieldConfigBase]] = FlowMatchingConfig
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         vf_estimator: Union[
-            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
-        ] = "mlp",
+            VF_MODELS,
+            FlowMatchingConfig,
+            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
+            None,
+        ] = None,
         density_estimator: Optional[
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]
+            Union[
+                VF_MODELS,
+                FlowMatchingConfig,
+                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
+            ]
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -85,13 +100,15 @@ class FMPE(VectorFieldTrainer):
 
         Args:
             prior: Prior distribution.
-            vf_estimator: Neural network architecture used to learn the
-                vector field estimator. Can be a string (e.g. 'mlp', 'ada_mlp',
-                'transformer' or 'transformer_cross_attn') or a callable that implements
-                the `ConditionalEstimatorBuilder` protocol with `__call__` that receives
-                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
-                To configure estimator-level options, use `posterior_flow_nn` to
-                build a custom callable and pass it here.
+            vf_estimator: The vector-field estimator used for flow-matching
+                inference. If ``None`` (default), uses a
+                ``FlowMatchingConfig`` with default settings. A
+                ``FlowMatchingConfig`` can be passed to configure
+                the estimator. If it is a string (deprecated), use a
+                pre-configured network of the provided type (one of
+                mlp, ada_mlp, transformer, transformer_cross_attn).
+                Alternatively, a function that builds a custom neural
+                network can be provided.
             density_estimator: Deprecated. Use `vf_estimator` instead.
             device: Device to use for training.
             logging_level: Logging level.
@@ -103,6 +120,11 @@ class FMPE(VectorFieldTrainer):
         """
 
         if density_estimator is not None:
+            if vf_estimator is not None:
+                raise ValueError(
+                    "Cannot pass both `density_estimator` and `vf_estimator`. "
+                    "Use `vf_estimator` only; `density_estimator` is deprecated."
+                )
             warnings.warn(
                 "`density_estimator` is deprecated and will be removed in a future "
                 "release. Use `vf_estimator` instead.",
@@ -110,6 +132,17 @@ class FMPE(VectorFieldTrainer):
                 stacklevel=2,
             )
             vf_estimator = density_estimator
+
+        if vf_estimator is None:
+            vf_estimator = FlowMatchingConfig()
+        elif isinstance(vf_estimator, str):
+            warnings.warn(
+                "Passing a string for `vf_estimator` is deprecated. "
+                "Use FlowMatchingConfig() instead, e.g. "
+                "`from sbi.neural_nets import FlowMatchingConfig`.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
         super().__init__(
             prior=prior,
@@ -121,7 +154,7 @@ class FMPE(VectorFieldTrainer):
             vector_field_estimator_builder=vf_estimator,
         )
 
-        # When vf_estimator is a string, build the default neural net.
+        # When vf_estimator is a string (deprecated path), build the default.
         if isinstance(vf_estimator, str):
             self._build_neural_net = self._build_default_nn_fn(model=vf_estimator)
 
@@ -150,10 +183,10 @@ class FMPE(VectorFieldTrainer):
                 flow matching estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior.
-                Can be one of 'sde' (default) or 'ode'. The 'sde' method uses
-                the score to do a Langevin diffusion step, while the 'ode' method
-                uses the score to define a probabilistic ODE and solves it with
-                a numerical ODE solver.
+                Can be one of 'ode' (default) or 'sde'. The 'ode' method uses
+                the velocity field to define a probabilistic ODE and solves it
+                with a numerical ODE solver. The 'sde' method uses the score to
+                do a Langevin diffusion step.
             vectorfield_sampling_parameters: Additional keyword arguments passed to
                 `VectorFieldPosterior`.
             posterior_parameters: Configuration passed to the init method for
@@ -173,6 +206,6 @@ class FMPE(VectorFieldTrainer):
 
     def _build_default_nn_fn(
         self,
-        model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
+        model: VF_MODELS,
+    ) -> ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]:
         return posterior_flow_nn(model=model)

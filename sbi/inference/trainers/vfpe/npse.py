@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -13,8 +13,16 @@ from sbi.inference.trainers.vfpe.base_vf_inference import (
     VectorFieldTrainer,
 )
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
+from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.factory import posterior_score_nn
+from sbi.neural_nets.net_builders.estimator_configs import (
+    VF_MODELS,
+)
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    ScoreConfigBase,
+    VectorFieldConfigBase,
+    _score_config_from_sde_type,
+)
 from sbi.sbi_types import Tracker
 
 
@@ -61,23 +69,32 @@ class NPSE(VectorFieldTrainer):
         samples = posterior.sample((1000,), x=x_o)
     """
 
+    _ALLOWED_CONFIG_TYPE: ClassVar[type[VectorFieldConfigBase]] = ScoreConfigBase
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
         vf_estimator: Union[
-            Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
-        ] = "mlp",
+            VF_MODELS,
+            ScoreConfigBase,
+            ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
+            None,
+        ] = None,
         score_estimator: Optional[
             Union[
-                Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
-                ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator],
+                VF_MODELS,
+                ScoreConfigBase,
+                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
             ]
         ] = None,
         density_estimator: Optional[
-            ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]
+            Union[
+                VF_MODELS,
+                ScoreConfigBase,
+                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
+            ]
         ] = None,
-        sde_type: Literal["vp", "ve", "subvp"] = "ve",
+        sde_type: Optional[Literal["vp", "ve", "subvp"]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -88,19 +105,24 @@ class NPSE(VectorFieldTrainer):
 
         Args:
             prior: Prior distribution.
-            vf_estimator: Neural network architecture for the
-                vector field estimator aiming to estimate the marginal scores of the
-                target diffusion process. Can be a string (e.g. 'mlp', 'ada_mlp',
-                'transformer' or 'transformer_cross_attn') or a callable that implements
-                the `ConditionalEstimatorBuilder` protocol with `__call__` that receives
-                `theta` and `x` and returns a `ConditionalVectorFieldEstimator`.
-                To configure estimator-level options (e.g. noise schedules for VE),
-                use `posterior_score_nn` to build a custom callable and pass it here.
+            vf_estimator: The vector-field estimator used for score-matching
+                inference. If ``None`` (default), uses a
+                ``VEScoreConfig`` with default settings. A
+                score config can be passed to configure
+                the estimator. If it is a string (deprecated), use a
+                pre-configured network of the provided type (one of
+                mlp, ada_mlp, transformer, transformer_cross_attn).
+                Alternatively, a function that builds a custom neural
+                network can be provided.
             score_estimator: Deprecated, use `vf_estimator` instead.
             density_estimator: Deprecated, use `vf_estimator` instead.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
-                Only used when `vf_estimator` is a string (i.e. when using the
-                default builder). Ignored when a custom callable is passed.
+                Defaults to ``None`` (resolved to ``"ve"``). When
+                ``vf_estimator`` is ``None``, forwarded to the default
+                config. When a score config is passed, any non-``None``
+                ``sde_type`` raises ``ValueError`` because the config class
+                already selects the SDE. When a string (deprecated), forwarded to
+                ``posterior_score_nn``.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -117,6 +139,11 @@ class NPSE(VectorFieldTrainer):
                 free inference with conditional score based diffusion models." ICML 2024
         """
         if score_estimator is not None:
+            if vf_estimator is not None:
+                raise ValueError(
+                    "Cannot pass both `score_estimator` and `vf_estimator`. "
+                    "Use `vf_estimator` only; `score_estimator` is deprecated."
+                )
             warnings.warn(
                 "`score_estimator` is deprecated and will be removed in a future "
                 "release. Use `vf_estimator` instead.",
@@ -126,6 +153,11 @@ class NPSE(VectorFieldTrainer):
             vf_estimator = score_estimator
 
         if density_estimator is not None:
+            if vf_estimator is not None:
+                raise ValueError(
+                    "Cannot pass both `density_estimator` and `vf_estimator`. "
+                    "Use `vf_estimator` only; `density_estimator` is deprecated."
+                )
             warnings.warn(
                 "`density_estimator` is deprecated and will be removed in a future "
                 "release. Use `vf_estimator` instead.",
@@ -133,6 +165,26 @@ class NPSE(VectorFieldTrainer):
                 stacklevel=2,
             )
             vf_estimator = density_estimator
+
+        if isinstance(vf_estimator, ScoreConfigBase) and sde_type is not None:
+            raise ValueError(
+                f"Conflicting `sde_type`: trainer received {sde_type!r} but "
+                f"{type(vf_estimator).__name__} already selects the SDE. Pass "
+                "the config only."
+            )
+
+        resolved_sde_type = sde_type if sde_type is not None else "ve"
+
+        if vf_estimator is None:
+            vf_estimator = _score_config_from_sde_type(resolved_sde_type)
+        elif isinstance(vf_estimator, str):
+            warnings.warn(
+                "Passing a string for `vf_estimator` is deprecated. "
+                "Use a score config instead, e.g. "
+                "`from sbi.neural_nets import VEScoreConfig`.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
         super().__init__(
             prior=prior,
@@ -144,11 +196,10 @@ class NPSE(VectorFieldTrainer):
             show_progress_bars=show_progress_bars,
         )
 
-        # When vf_estimator is a string, build the default neural net using
-        # the NPSE-specific builder which requires sde_type.
+        # When vf_estimator is a string (deprecated path), build the default.
         if isinstance(vf_estimator, str):
             self._build_neural_net = self._build_default_nn_fn(
-                model=vf_estimator, sde_type=sde_type
+                model=vf_estimator, sde_type=resolved_sde_type
             )
 
     def build_posterior(
@@ -197,7 +248,7 @@ class NPSE(VectorFieldTrainer):
 
     def _build_default_nn_fn(
         self,
-        model: Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        model: VF_MODELS,
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
-    ) -> ConditionalEstimatorBuilder[ConditionalVectorFieldEstimator]:
+    ) -> ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator]:
         return posterior_score_nn(model=model, sde_type=sde_type)

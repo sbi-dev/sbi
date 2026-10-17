@@ -15,8 +15,6 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
-from sbi.samplers import rejection
-from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
@@ -24,7 +22,7 @@ from sbi.utils.sbiutils import (
     standardizing_net,
     z_score_parser,
 )
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import validate_theta_and_x
 
 
@@ -165,10 +163,10 @@ class RestrictionEstimator:
     def build_mlp(self, theta) -> nn.Module:
         classifier = nn.Sequential(
             nn.Linear(theta.shape[1], self._hidden_features),
-            nn.BatchNorm1d(self._hidden_features),
+            nn.LayerNorm(self._hidden_features),
             nn.ReLU(),
             nn.Linear(self._hidden_features, self._hidden_features),
-            nn.BatchNorm1d(self._hidden_features),
+            nn.LayerNorm(self._hidden_features),
             nn.ReLU(),
             nn.Linear(self._hidden_features, 2),
         )
@@ -645,7 +643,7 @@ class RestrictedPrior(Distribution):
         self._accept_reject_fn = accept_reject_fn
         self._posterior = posterior  # Only used for SIR.
         self._sample_with = sample_with
-        self._device = device
+        self._device = process_device(device)
         self.acceptance_rate = None  # Only defined for rejection sampling.
 
     def sample(
@@ -685,6 +683,11 @@ class RestrictedPrior(Distribution):
         Returns:
             Samples from the `RestrictedPrior`.
         """
+        # The samplers import `sbi.utils`, so importing them at module level would
+        # make every `sbi.utils` import inside `sbi.samplers` a circular import.
+        from sbi.samplers import rejection
+        from sbi.samplers.importance.sir import sampling_importance_resampling
+
         num_samples = torch.Size(sample_shape).numel()
         sample_with = self._sample_with if sample_with is None else sample_with
 

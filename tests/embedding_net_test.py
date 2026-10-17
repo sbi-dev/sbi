@@ -4,15 +4,20 @@
 from __future__ import annotations
 
 import math
+import pickle
+import warnings
+from typing import Callable
 
 import pytest
 import torch
-from torch import Tensor, eye, ones, zeros
+from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils
 from sbi.inference import NLE, NPE, NRE, simulate_for_sbi
-from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
+from sbi.inference.posteriors.posterior_parameters import (
+    MCMCPosteriorParameters,
+)
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
@@ -38,15 +43,22 @@ from sbi.utils.user_input_checks import (
 )
 
 
-@pytest.mark.mcmc
-@pytest.mark.parametrize("method", ["NPE", "NLE", "NRE"])
+@pytest.mark.parametrize(
+    "method",
+    [
+        pytest.param("NPE"),
+        pytest.param("NLE", marks=pytest.mark.mcmc),
+        pytest.param("NRE", marks=pytest.mark.mcmc),
+    ],
+)
 @pytest.mark.parametrize("num_dim", [1, 2])
 @pytest.mark.parametrize("embedding_net", ["mlp"])
 def test_embedding_net_api(
     method, num_dim: int, embedding_net: str, mcmc_params_fast: MCMCPosteriorParameters
 ):
     """Tests the API when using a preconfigured embedding net."""
-
+    model_map = {"NPE": "maf", "NLE": "maf", "NRE": "resnet"}
+    model = model_map[method]
     x_o = zeros(1, num_dim)
 
     # likelihood_mean will be likelihood_shift+theta
@@ -55,37 +67,26 @@ def test_embedding_net_api(
 
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    theta = prior.sample((1000,))
-    x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     if embedding_net == "mlp":
         embedding = FCEmbedding(input_dim=num_dim)
     else:
         raise NameError(f"{embedding_net} not supported.")
 
-    if method == "NPE":
-        density_estimator = posterior_nn("maf", embedding_net=embedding)
-        inference = NPE(
-            prior, density_estimator=density_estimator, show_progress_bars=False
-        )
-    elif method == "NLE":
-        density_estimator = likelihood_nn("maf", embedding_net=embedding)
-        inference = NLE(
-            prior, density_estimator=density_estimator, show_progress_bars=False
-        )
-    elif method == "NRE":
-        classifier = classifier_nn("resnet", embedding_net_x=embedding)
-        inference = NRE(prior, classifier=classifier, show_progress_bars=False)
-    else:
-        raise NameError
+    _test_embedding_forward_pass(embedding, (num_dim,), 20)
 
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
-    posterior = inference.build_posterior(
-        posterior_parameters=mcmc_params_fast
-    ).set_default_x(x_o)
-
-    s = posterior.sample((1,))
-    _ = posterior.potential(s)
+    posterior_parameters = mcmc_params_fast if method in ("NLE", "NRE") else None
+    _train_and_infer_with_embedding(
+        prior,
+        x_o,
+        simulator,
+        embedding,
+        model,
+        method,
+        posterior_parameters=posterior_parameters,
+    )
 
 
 @pytest.mark.parametrize("num_xo_batch", [1, 2])
@@ -98,7 +99,7 @@ def test_embedding_api_with_multiple_trials(
     """Tests the API when using iid trial-based data."""
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    num_thetas = 1000
+    num_thetas = 100
     theta = prior.sample((num_thetas,))
 
     # simulate iid x.
@@ -138,12 +139,7 @@ def test_embedding_api_with_multiple_trials(
 @pytest.mark.parametrize("input_shape", [(32,), (32, 32), (32, 64)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
-    estimator_provider = posterior_nn(
-        "mdn",
-        embedding_net=CNNEmbedding(
-            input_shape, in_channels=num_channels, output_dim=20
-        ),
-    )
+    embedding_net = CNNEmbedding(input_shape, in_channels=num_channels, output_dim=20)
 
     num_dim = input_shape[0]
 
@@ -151,10 +147,21 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
         x = MultivariateNormal(
             loc=theta, covariance_matrix=0.5 * torch.eye(num_dim)
         ).sample()
-        return x.unsqueeze(2).repeat(1, 1, input_shape[1])
+
+        x = x.unsqueeze(2).repeat(1, 1, input_shape[1])
+        if num_channels > 1:
+            x = x.unsqueeze(1).repeat(
+                1, num_channels, *[1 for _ in range(len(input_shape))]
+            )
+        return x
 
     def simulator1d(theta):
-        return torch.rand_like(theta) + theta
+        x = torch.rand_like(theta) + theta
+        if num_channels > 1:
+            x = x.unsqueeze(1).repeat(
+                1, num_channels, *[1 for _ in range(len(input_shape))]
+            )
+        return x
 
     if len(input_shape) == 1:
         simulator = simulator1d
@@ -164,21 +171,59 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
         xo = torch.ones(1, num_channels, *input_shape).squeeze(1)
 
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    _test_embedding_forward_pass(embedding_net, (num_channels, *input_shape), 20)
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "maf", "NPE")
 
-    num_simulations = 1000
-    theta = prior.sample(torch.Size((num_simulations,)))
-    x = simulator(theta)
-    if num_channels > 1:
-        x = x.unsqueeze(1).repeat(
-            1, num_channels, *[1 for _ in range(len(input_shape))]
-        )
 
-    trainer = NPE(prior=prior, density_estimator=estimator_provider)
-    trainer.append_simulations(theta, x).train(max_num_epochs=2)
-    posterior = trainer.build_posterior().set_default_x(xo)
+@pytest.mark.parametrize(
+    ("embedding_cls", "input_shape", "kwargs"),
+    [
+        (CNNEmbedding, (32, 32), {}),
+        (CausalCNNEmbedding, (64,), {"pool_kernel_size": 2}),
+    ],
+)
+def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
+    """CNN embeddings accept strided inputs and reject channel-last inputs."""
+    embedding_net = embedding_cls(input_shape, in_channels=3, **kwargs)
+    channel_last_input = torch.randn(4, *input_shape, 3)
+    non_contiguous_input = channel_last_input.movedim(-1, 1)
 
-    s = posterior.sample((10,))
-    posterior.potential(s)
+    assert not non_contiguous_input.is_contiguous()
+    channel_first_embedding = embedding_net(non_contiguous_input)
+    assert channel_first_embedding.shape == (4, 20)
+    torch.testing.assert_close(
+        embedding_net(non_contiguous_input.flatten(start_dim=1)),
+        channel_first_embedding,
+    )
+
+    with pytest.raises(ValueError, match="Expected flat or channel-first input"):
+        embedding_net(channel_last_input)
+
+
+@pytest.mark.parametrize("input_shape", [(2,), (128,)])
+@pytest.mark.parametrize("num_layers", [2, 4])
+@pytest.mark.parametrize("num_hiddens", [32, 64])
+@pytest.mark.parametrize("layer_norm", [True, False])
+@pytest.mark.parametrize("activation", [nn.ReLU, nn.GELU])
+def test_1d_fc_embedding_net(
+    input_shape, num_layers, num_hiddens, layer_norm, activation
+):
+    embedding_net = FCEmbedding(
+        input_shape[0], 20, num_layers, num_hiddens, layer_norm, activation
+    )
+
+    num_dim = input_shape[0]
+
+    def simulator1d(theta):
+        return torch.rand_like(theta) + theta
+
+    if len(input_shape) == 1:
+        simulator = simulator1d
+        xo = torch.ones(1, *input_shape)
+
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    _test_embedding_forward_pass(embedding_net, input_shape, 20)
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize("input_shape", [(3, 30), (2, 3, 30)])
@@ -188,14 +233,11 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
 def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
     n_points = input_shape[-1]
     in_channels = input_shape[-2]
-    estimator_provider = posterior_nn(
-        "mdn",
-        embedding_net=SpectralConvEmbedding(
-            modes=modes,
-            in_channels=in_channels,
-            conv_channels=conv_channels,
-            num_layers=num_layers,
-        ),
+    embedding_net = SpectralConvEmbedding(
+        modes=modes,
+        in_channels=in_channels,
+        conv_channels=conv_channels,
+        num_layers=num_layers,
     )
 
     def simulator(theta, input_shape=input_shape):
@@ -213,16 +255,8 @@ def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
 
     prior = MultivariateNormal(torch.zeros(n_points), torch.eye(n_points))
 
-    num_simulations = 1000
-    theta = prior.sample(torch.Size((num_simulations,)))
-    x = simulator(theta)
-
-    trainer = NPE(prior=prior, density_estimator=estimator_provider)
-    trainer.append_simulations(theta, x).train(max_num_epochs=2)
-    posterior = trainer.build_posterior().set_default_x(xo)
-
-    s = posterior.sample((10,))
-    posterior.potential(s)
+    _test_embedding_forward_pass(embedding_net, input_shape, 2 * modes)
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 BASE_CONFIG = {
@@ -259,7 +293,7 @@ BASE_CONFIG = {
 )
 @pytest.mark.parametrize("seq_length", (24, 13, 5))
 def test_transformer_embedding(config, seq_length):
-    net = TransformerEmbedding(**config)
+    embedding_net = TransformerEmbedding(**config)
 
     def simulator(theta):
         x = MultivariateNormal(
@@ -272,8 +306,12 @@ def test_transformer_embedding(config, seq_length):
     prior = MultivariateNormal(
         torch.zeros(config["feature_space_dim"]), torch.eye(config["feature_space_dim"])
     )
-
-    _test_helper_embedding_net(prior, xo, simulator, net)
+    _test_embedding_forward_pass(
+        embedding_net,
+        (seq_length, config["feature_space_dim"]),
+        config["feature_space_dim"] // 2,
+    )
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize(
@@ -290,7 +328,7 @@ def test_transformer_embedding(config, seq_length):
 )
 @pytest.mark.parametrize("img_shape", ((3, 32, 24), (3, 64, 64)))
 def test_transformer_vitembedding(config, img_shape):
-    net = TransformerEmbedding(**config)
+    embedding_net = TransformerEmbedding(**config)
 
     def simulator(theta):
         x = MultivariateNormal(
@@ -307,7 +345,12 @@ def test_transformer_vitembedding(config, img_shape):
 
     prior = MultivariateNormal(torch.zeros(img_shape[0]), torch.eye(img_shape[0]))
 
-    _test_helper_embedding_net(prior, xo, simulator, net)
+    _test_embedding_forward_pass(
+        embedding_net,
+        img_shape,
+        config["feature_space_dim"] // 2,
+    )
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize("seq_length", (10, 20))
@@ -331,35 +374,69 @@ def test_transformer_embedding_scalar_timeseries(seq_length):
     xo = torch.randn(1, seq_length)  # shape: (1, T)
     prior = MultivariateNormal(torch.zeros(1), torch.eye(1))
 
-    _test_helper_embedding_net(prior, xo, simulator, net)
+    _test_embedding_forward_pass(net, (seq_length,), 16)
+    _train_and_infer_with_embedding(prior, xo, simulator, net, "mdn", "NPE")
 
 
-def _test_helper_embedding_net(prior, xo, simulator, net):
-    estimator_provider = posterior_nn(
-        "mdn",
-        embedding_net=net,
-    )
+def _train_and_infer_with_embedding(
+    prior: utils.BoxUniform | MultivariateNormal,
+    xo: Tensor,
+    simulator: Callable,
+    net: nn.Module,
+    model: str,
+    method: str,
+    posterior_parameters: MCMCPosteriorParameters | None = None,
+):
+    """Train a small inference pipeline and smoke test posterior sampling."""
 
-    num_simulations = 1000
+    builders = {"NPE": posterior_nn, "NLE": likelihood_nn, "NRE": classifier_nn}
+    trainers = {"NPE": NPE, "NLE": NLE, "NRE": NRE}
+
+    num_simulations = 100
     theta = prior.sample(torch.Size((num_simulations,)))
     x = simulator(theta)
 
-    trainer = NPE(prior=prior, density_estimator=estimator_provider)
-    trainer.append_simulations(theta, x).train(max_num_epochs=2)
-    posterior = trainer.build_posterior().set_default_x(xo)
+    net_key = "embedding_net_x" if method == "NRE" else "embedding_net"
+    estimator = builders[method](model=model, **{net_key: net})
 
-    s = posterior.sample((10,))
-    posterior.potential(s)
+    trainer_key = "classifier" if method == "NRE" else "density_estimator"
+    trainer = trainers[method](
+        prior,
+        **{trainer_key: estimator},
+        show_progress_bars=False,
+    )
+
+    original = [p.detach().clone() for p in net.parameters()]
+
+    _ = trainer.append_simulations(theta, x).train(max_num_epochs=2)
+
+    assert any(
+        not torch.equal(o, p) for o, p in zip(original, net.parameters(), strict=True)
+    ), "Embedding net params unchanged, gradients did not flow."
+
+    posterior = trainer.build_posterior(
+        posterior_parameters=posterior_parameters
+    ).set_default_x(xo)
+
+    s = posterior.sample((1,))
+    _ = posterior.potential(s)
+
+
+def _test_embedding_forward_pass(
+    net: nn.Module, input_shape: tuple, expected_output_dim: int
+):
+    """Fast test that embedding produces correct output shape."""
+    x = torch.randn(4, *input_shape)
+    output = net(x)
+    assert output.shape == (4, expected_output_dim)
+    assert torch.isfinite(output).all(), "Embedding output contains NaN or Inf"
 
 
 @pytest.mark.parametrize("input_shape", [(32,), (64,)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
-    estimator_provider = posterior_nn(
-        "mdn",
-        embedding_net=CausalCNNEmbedding(
-            input_shape, in_channels=num_channels, pool_kernel_size=2, output_dim=20
-        ),
+    embedding_net = CausalCNNEmbedding(
+        input_shape, in_channels=num_channels, pool_kernel_size=2, output_dim=20
     )
 
     num_dim = input_shape[0]
@@ -368,10 +445,20 @@ def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
         x = MultivariateNormal(
             loc=theta, covariance_matrix=0.5 * torch.eye(num_dim)
         ).sample()
-        return x.unsqueeze(2).repeat(1, 1, input_shape[1])
+        x = x.unsqueeze(2).repeat(1, 1, input_shape[1])
+        if num_channels > 1:
+            x = x.unsqueeze(1).repeat(
+                1, num_channels, *[1 for _ in range(len(input_shape))]
+            )
+        return x
 
     def simulator1d(theta):
-        return torch.rand_like(theta) + theta
+        x = torch.rand_like(theta) + theta
+        if num_channels > 1:
+            x = x.unsqueeze(1).repeat(
+                1, num_channels, *[1 for _ in range(len(input_shape))]
+            )
+        return x
 
     if len(input_shape) == 1:
         simulator = simulator1d
@@ -382,29 +469,11 @@ def test_1d_causal_cnn_embedding_net(input_shape, num_channels):
 
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
 
-    num_simulations = 1000
-    theta = prior.sample(torch.Size((num_simulations,)))
-    x = simulator(theta)
-
-    if num_channels > 1:
-        x = x.unsqueeze(1).repeat(
-            1, num_channels, *[1 for _ in range(len(input_shape))]
-        )
-
-    trainer = NPE(prior=prior, density_estimator=estimator_provider)
-    trainer.append_simulations(theta, x).train(max_num_epochs=2)
-    posterior = trainer.build_posterior().set_default_x(xo)
-
-    s = posterior.sample((10,))
-    posterior.potential(s)
+    _test_embedding_forward_pass(embedding_net, (num_channels, *input_shape), 20)
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    raises=ValueError,
-    reason="Padding with NaNs causes error in new NaN check on x_o, see #1701, #1717",
-    strict=True,
-)
 def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     """Test inference accuracy with embeddings for varying number of trials.
 
@@ -483,6 +552,51 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
             )
 
 
+@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
+def test_permutation_invariant_embedding_ignores_padding_per_observation(
+    aggregation_fn,
+):
+    """Padded trials are ignored per observation, independent of the batch."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4),
+        trial_net_output_dim=4,
+        aggregation_fn=aggregation_fn,
+    )
+    x = torch.randn(2, 3, 2)
+    x[0, 1:] = float("nan")
+
+    batched = embedding(x)
+
+    assert torch.allclose(batched[0], embedding(x[:1, :1])[0])
+    assert torch.allclose(batched[1], embedding(x[1:])[0])
+
+
+@pytest.mark.parametrize(
+    "pattern", ("padded_trial", "partially_nan_trial", "no_real_trial")
+)
+def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
+    """NaN outside whole padded trials must not silently become data; warn once."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4),
+        trial_net_output_dim=4,
+        aggregation_fn="sum",
+    )
+    x = torch.randn(2, 3, 2)
+    x[0, 1:] = float("nan")
+    if pattern == "partially_nan_trial":
+        x[1, 0, 0] = float("nan")
+    elif pattern == "no_real_trial":
+        x[1] = float("nan")
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        embedding(x)
+        embedding(x)
+
+    issued = [w for w in caught if "should only mark padded trials" in str(w.message)]
+    assert len(issued) == (0 if pattern == "padded_trial" else 1)
+
+
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 @pytest.mark.parametrize("change_c_mode", ["conv", "zeros"])
@@ -493,16 +607,14 @@ def test_2d_ResNet_cnn_embedding_net(
 ):
     c_stages = [16, 32, 64, 128]
     blocks_per_stage = [2, 2, 2, 2]
-    estimator_provider = posterior_nn(
-        "mdn",
-        embedding_net=ResNetEmbedding2D(
-            c_in=num_channels,
-            n_stages=n_stages,
-            change_c_mode=change_c_mode,
-            c_out=20,
-            c_stages=c_stages[:n_stages],
-            blocks_per_stage=blocks_per_stage[:n_stages],
-        ),
+
+    embedding_net = ResNetEmbedding2D(
+        c_in=num_channels,
+        n_stages=n_stages,
+        change_c_mode=change_c_mode,
+        c_out=20,
+        c_stages=c_stages[:n_stages],
+        blocks_per_stage=blocks_per_stage[:n_stages],
     )
 
     num_dim = input_shape[0]
@@ -511,27 +623,20 @@ def test_2d_ResNet_cnn_embedding_net(
         x = MultivariateNormal(
             loc=theta, covariance_matrix=0.5 * torch.eye(num_dim)
         ).sample()
-        return x.unsqueeze(2).repeat(1, 1, input_shape[1])
+        x = x.unsqueeze(2).repeat(1, 1, input_shape[1])
+        if num_channels > 1:
+            x = x.unsqueeze(1).repeat(
+                1, num_channels, *[1 for _ in range(len(input_shape))]
+            )
+        return x
 
     simulator = simulator2d
     xo = torch.ones(1, num_channels, *input_shape).squeeze(1)
 
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
 
-    num_simulations = 1000
-    theta = prior.sample(torch.Size((num_simulations,)))
-    x = simulator(theta)
-    if num_channels > 1:
-        x = x.unsqueeze(1).repeat(
-            1, num_channels, *[1 for _ in range(len(input_shape))]
-        )
-
-    trainer = NPE(prior=prior, density_estimator=estimator_provider)
-    trainer.append_simulations(theta, x).train(max_num_epochs=2)
-    posterior = trainer.build_posterior().set_default_x(xo)
-
-    s = posterior.sample((10,))
-    posterior.potential(s)
+    _test_embedding_forward_pass(embedding_net, (num_channels, *input_shape), 20)
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
@@ -539,14 +644,12 @@ def test_2d_ResNet_cnn_embedding_net(
 @pytest.mark.parametrize("c_internal", (2, 20))
 @pytest.mark.parametrize("c_hidden_final", (2, 20))
 def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_final):
-    estimator_provider = posterior_nn(
-        "mdn",
-        embedding_net=ResNetEmbedding1D(
-            c_in=input_shape[0],
-            c_out=20,
-            n_blocks=n_blocks,
-            c_internal=c_internal,
-        ),
+    embedding_net = ResNetEmbedding1D(
+        c_in=input_shape[0],
+        c_out=20,
+        n_blocks=n_blocks,
+        c_internal=c_internal,
+        c_hidden_final=c_hidden_final,
     )
 
     num_dim = input_shape[0]
@@ -560,16 +663,8 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
 
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
 
-    num_simulations = 1000
-    theta = prior.sample(torch.Size((num_simulations,)))
-    x = simulator(theta)
-
-    trainer = NPE(prior=prior, density_estimator=estimator_provider)
-    trainer.append_simulations(theta, x).train(max_num_epochs=2)
-    posterior = trainer.build_posterior().set_default_x(xo)
-
-    s = posterior.sample((10,))
-    posterior.potential(s)
+    _test_embedding_forward_pass(embedding_net, input_shape, 20)
+    _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
 @pytest.mark.parametrize("mode", ["loop", pytest.param("scan")], ids=["loop", "scan"])
@@ -732,6 +827,19 @@ def test_lru_embedding_net_isolated(
     assert x_embed.shape == (batch_size, output_dim)
 
 
+@pytest.mark.parametrize("aggregate_fcn", ["last_step", "mean"])
+def test_lru_embedding_net_is_picklable(aggregate_fcn: str):
+    """Every aggregation preset must survive pickling, since posteriors get pickled."""
+    embedding_net = LRUEmbedding(
+        input_dim=3, output_dim=4, num_blocks=1, aggregate_fcn=aggregate_fcn
+    )
+    x = torch.randn(2, 5, 3)
+
+    reloaded = pickle.loads(pickle.dumps(embedding_net))
+
+    assert torch.allclose(reloaded(x), embedding_net(x))
+
+
 def test_lru_pipeline(embedding_feat_dim: int = 17):
     """Smoke-test an entire pipeline run using the LRU embedding."""
 
@@ -881,3 +989,28 @@ def test_scan(
     assert torch.allclose(y_scan, y_loop, atol=1e-5)
 
     torch.compiler.reset()
+
+
+LRU_DEFAULTS = dict(
+    input_dim=4,
+    state_dim=8,
+    r_min=0.0,
+    r_max=1.0,
+    phase_max=torch.pi,
+    bidirectional=False,
+    mode="scan",
+)
+
+
+def test_lru_rejects_invalid_state_dim():
+    """The check read `input_dim`, so an invalid `state_dim` passed silently."""
+    with pytest.raises(ValueError, match="state_dim"):
+        LRU(**{**LRU_DEFAULTS, "state_dim": -5})
+
+
+def test_lru_forward_rejects_invalid_mode():
+    """`forward()`'s `match mode` must stay in sync with the constructor."""
+    layer = LRU(**LRU_DEFAULTS)
+
+    with pytest.raises(ValueError, match="mode"):
+        layer.forward(torch.randn(2, 6, LRU_DEFAULTS["input_dim"]), mode="invalid")

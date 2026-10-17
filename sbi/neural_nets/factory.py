@@ -1,63 +1,31 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from dataclasses import replace
 from enum import Enum
 from typing import Any, Callable, Literal, Optional, Union
 
 from torch import Tensor, nn
 
-from sbi.neural_nets.net_builders.classifier import (
-    build_linear_classifier,
-    build_mlp_classifier,
-    build_resnet_classifier,
+from sbi.neural_nets.net_builders.estimator_configs import (
+    VF_MODELS,
+    _CLASSIFIER_CONFIGS,
+    _DENSITY_CONFIGS,
+    MarginalFlowConfig,
+    _config_from_factory_kwargs,
+    _factory_defaults,
+    _mixed_config_from_factory_kwargs,
 )
-from sbi.neural_nets.net_builders.flow import (
-    build_made,
-    build_maf,
-    build_maf_rqs,
-    build_nsf,
-    build_zuko_bpf,
-    build_zuko_gf,
-    build_zuko_maf,
-    build_zuko_naf,
-    build_zuko_ncsf,
-    build_zuko_nice,
-    build_zuko_nsf,
-    build_zuko_sospf,
-    build_zuko_unaf,
-    build_zuko_unconditional_flow,
-)
-from sbi.neural_nets.net_builders.mdn import build_mdn
-from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
+from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
 from sbi.neural_nets.net_builders.vector_field_nets import (
-    FlowEstimatorConfig,
-    ScoreEstimatorConfig,
-    build_flow_matching_estimator,
+    FlowMatchingConfig,
+    _score_config_from_sde_type,
+    _vf_config_from_factory_kwargs,
     build_masked_flow_matching_estimator,
     build_masked_score_matching_estimator,
-    build_score_matching_estimator,
 )
 from sbi.utils.nn_utils import check_net_device
 from sbi.utils.vector_field_utils import VectorFieldNet
-
-model_builders = {
-    "mdn": build_mdn,
-    "made": build_made,
-    "maf": build_maf,
-    "maf_rqs": build_maf_rqs,
-    "nsf": build_nsf,
-    "mnle": build_mnle,
-    "mnpe": build_mnpe,
-    "zuko_nice": build_zuko_nice,
-    "zuko_maf": build_zuko_maf,
-    "zuko_nsf": build_zuko_nsf,
-    "zuko_ncsf": build_zuko_ncsf,
-    "zuko_sospf": build_zuko_sospf,
-    "zuko_naf": build_zuko_naf,
-    "zuko_unaf": build_zuko_unaf,
-    "zuko_gf": build_zuko_gf,
-    "zuko_bpf": build_zuko_bpf,
-}
 
 
 # TODO: currently only used for marginal_nn, adapt to use for all
@@ -78,15 +46,88 @@ class ZukoFlowType(Enum):
 embedding_net_warn_msg = """The passed embedding net will be moved to cpu for
                         constructing the net building function."""
 
+# Maps a config field to the name the factory exposes it under, so that the
+# factory's own defaults can be read back from its signature.
+_CLASSIFIER_FACTORY_FIELDS: dict = {
+    "z_score_input": "z_score_theta",
+    "z_score_condition": "z_score_x",
+    "hidden_features": "hidden_features",
+    "embedding_net_theta": "embedding_net_theta",
+    "embedding_net_x": "embedding_net_x",
+}
+
+_POSTERIOR_FACTORY_FIELDS: dict = {
+    "z_score_input": "z_score_theta",
+    "z_score_condition": "z_score_x",
+    "hidden_features": "hidden_features",
+    "num_transforms": "num_transforms",
+    "num_bins": "num_bins",
+    "embedding_net": "embedding_net",
+    "num_components": "num_components",
+}
+
+# NLE models p(x|theta), so the two z-scoring arguments swap roles.
+_LIKELIHOOD_FACTORY_FIELDS: dict = {
+    **_POSTERIOR_FACTORY_FIELDS,
+    "z_score_input": "z_score_x",
+    "z_score_condition": "z_score_theta",
+}
+
+_VF_FACTORY_FIELDS: dict = {
+    "z_score_input": "z_score_theta",
+    "z_score_condition": "z_score_x",
+    "embedding_net": "embedding_net",
+    "hidden_features": "hidden_features",
+    "num_layers": "num_layers",
+    "time_embedding_dim": "t_embedding_dim",
+    "time_emb_type": "time_emb_type",
+    "compose_standardization": "compose_standardization",
+}
+
+
+_Z_SCORE_FIELDS: frozenset = frozenset({"z_score_input", "z_score_condition"})
+
+
+def _normalize_z_scoring(family_args: dict) -> dict:
+    """Map the z-scoring arguments left at ``None`` to ``"none"``.
+
+    The factories document ``None`` as "do not z-score", and forwarded it to
+    ``z_score_parser``, which reads it that way. The configs do not accept it,
+    so it is translated here rather than reaching them.
+    """
+    return {
+        k: ("none" if v is None and k in _Z_SCORE_FIELDS else v)
+        for k, v in family_args.items()
+    }
+
+
+def _density_family_args(embedding_net: nn.Module, **family_args: Any) -> dict:
+    """Return the density factories' family-wide arguments as config fields."""
+    return _normalize_z_scoring(
+        dict(
+            family_args,
+            embedding_net=check_net_device(
+                embedding_net, "cpu", embedding_net_warn_msg
+            ),
+        )
+    )
+
+
+def _unknown_density_build_fn(model: str) -> Callable:
+    """Preserve the factories' build-time error for unknown model names."""
+
+    def build_fn(batch_theta, batch_x):
+        raise NotImplementedError(f"Model {model} is not implemented")
+
+    return build_fn
+
 
 def classifier_nn(
     model: str,
     z_score_theta: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        Literal["independent", "structured", "none"]
     ] = "independent",
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 50,
     embedding_net_theta: nn.Module = nn.Identity(),
     embedding_net_x: nn.Module = nn.Identity(),
@@ -111,49 +152,42 @@ def classifier_nn(
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network, same options as z_score_theta.
+            the network, with the same options as `z_score_theta`.
         hidden_features: Number of hidden features.
         embedding_net_theta:  Optional embedding network for parameters $\theta$.
         embedding_net_x:  Optional embedding network for simulation outputs $x$. This
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
-        kwargs: additional custom arguments passed to downstream build functions.
+        **kwargs: Additional classifier arguments.  Valid keys are the fields of
+            the chosen model's config; a key the model does not use raises, and
+            an unknown key triggers a warning and is forwarded to the builder.
     """
 
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "z_score_y",
-                "hidden_features",
-                "embedding_net_x",
-                "embedding_net_y",
+    # Map user-facing parameter names to the config's field names.
+    family_args = _normalize_z_scoring(
+        dict(
+            z_score_input=z_score_theta,
+            z_score_condition=z_score_x,
+            hidden_features=hidden_features,
+            embedding_net_theta=check_net_device(
+                embedding_net_theta, "cpu", embedding_net_warn_msg
             ),
-            (
-                z_score_theta,
-                z_score_x,
-                hidden_features,
-                check_net_device(embedding_net_theta, "cpu", embedding_net_warn_msg),
-                check_net_device(embedding_net_x, "cpu", embedding_net_warn_msg),
+            embedding_net_x=check_net_device(
+                embedding_net_x, "cpu", embedding_net_warn_msg
             ),
-            strict=False,
-        ),
-        **kwargs,
+        )
+    )
+    config = _config_from_factory_kwargs(
+        model,
+        _CLASSIFIER_CONFIGS,
+        "classifier",
+        family_args=family_args,
+        factory_defaults=_factory_defaults(classifier_nn, _CLASSIFIER_FACTORY_FIELDS),
+        extra=kwargs,
     )
 
     def build_fn(batch_theta, batch_x):
-        if model == "linear":
-            return build_linear_classifier(
-                batch_x=batch_theta, batch_y=batch_x, **kwargs
-            )
-        if model == "mlp":
-            return build_mlp_classifier(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        if model == "resnet":
-            return build_resnet_classifier(
-                batch_x=batch_theta, batch_y=batch_x, **kwargs
-            )
-        else:
-            raise NotImplementedError
+        return config.build(batch_input=batch_theta, batch_condition=batch_x)
 
     return build_fn
 
@@ -161,7 +195,7 @@ def classifier_nn(
 def likelihood_nn(
     model: str,
     z_score_theta: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        Literal["independent", "structured", "none"]
     ] = "independent",
     z_score_x: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
@@ -190,49 +224,58 @@ def likelihood_nn(
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network, same options as z_score_theta.
+            the network, with the same options as `z_score_theta`. Supported flow
+            configs additionally accept `transform_to_unconstrained` for this modeled
+            variable.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
-            `nsf`). Ignored if density estimator is a `mdn` or `made`.
-        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
-            estimator not `nsf`.
+            `nsf`). A non-default value raises if the chosen model does not use it.
+        num_bins: Number of bins used for spline models. A non-default value raises
+            if the chosen model does not use it.
         embedding_net: Optional embedding network for parameters $\theta$.
         num_components: Number of mixture components for a mixture of Gaussians.
-            Ignored if density estimator is not an mdn.
-        kwargs: additional custom arguments passed to downstream build functions.
+            A non-default value raises if the chosen model is not an MDN.
+        **kwargs: Additional estimator arguments.  Valid keys are the fields of
+            the chosen model's config; a key the model does not use raises, and
+            an unknown key triggers a warning and is forwarded to the builder.
     """
 
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "z_score_y",
-                "hidden_features",
-                "num_transforms",
-                "num_bins",
-                "embedding_net",
-                "num_components",
-            ),
-            (
-                z_score_x,
-                z_score_theta,
-                hidden_features,
-                num_transforms,
-                num_bins,
-                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-                num_components,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    family_args = _density_family_args(
+        z_score_input=z_score_x,
+        z_score_condition=z_score_theta,
+        hidden_features=hidden_features,
+        num_transforms=num_transforms,
+        num_bins=num_bins,
+        embedding_net=embedding_net,
+        num_components=num_components,
     )
+    if model in ("mnle", "mnpe"):
+        config = _mixed_config_from_factory_kwargs(
+            model=model,
+            family_args=family_args,
+            factory_defaults=_factory_defaults(
+                likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS
+            ),
+            extra=kwargs,
+        )
+    elif model in _DENSITY_CONFIGS:
+        config = _config_from_factory_kwargs(
+            model,
+            _DENSITY_CONFIGS,
+            "density",
+            family_args=family_args,
+            factory_defaults=_factory_defaults(
+                likelihood_nn, _LIKELIHOOD_FACTORY_FIELDS
+            ),
+            extra=kwargs,
+        )
+    else:
+        return _unknown_density_build_fn(model)
 
     def build_fn(batch_theta, batch_x):
-        if model not in model_builders:
-            raise NotImplementedError(f"Model {model} in not implemented")
-
-        return model_builders[model](batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        # NLE models p(x|theta), so the modeled variable is x.
+        return config.build(batch_input=batch_x, batch_condition=batch_theta)
 
     return build_fn
 
@@ -242,9 +285,7 @@ def posterior_nn(
     z_score_theta: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
     ] = "independent",
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -268,86 +309,97 @@ def posterior_nn(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
+            Supported flow configs additionally accept `transform_to_unconstrained`
+            for this modeled variable.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network, same options as z_score_theta.
+            the network: `none`, `independent`, or `structured`.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
-            `nsf`). Ignored if density estimator is a `mdn` or `made`.
-        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
-            estimator not `nsf`.
+            `nsf`). A non-default value raises if the chosen model does not use it.
+        num_bins: Number of bins used for spline models. A non-default value raises
+            if the chosen model does not use it.
         embedding_net: Optional embedding network for simulation outputs $x$. This
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
         num_components: Number of mixture components for a mixture of Gaussians.
-            Ignored if density estimator is not an mdn.
-        kwargs: additional custom arguments passed to downstream build functions.
+            A non-default value raises if the chosen model is not an MDN.
+        **kwargs: Additional estimator arguments.  Valid keys are the fields of
+            the chosen model's config; a key the model does not use raises, and
+            an unknown key triggers a warning and is forwarded to the builder.
     """
 
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "z_score_y",
-                "hidden_features",
-                "num_transforms",
-                "num_bins",
-                "embedding_net",
-                "num_components",
-            ),
-            (
-                z_score_theta,
-                z_score_x,
-                hidden_features,
-                num_transforms,
-                num_bins,
-                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-                num_components,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    family_args = _density_family_args(
+        z_score_input=z_score_theta,
+        z_score_condition=z_score_x,
+        hidden_features=hidden_features,
+        num_transforms=num_transforms,
+        num_bins=num_bins,
+        embedding_net=embedding_net,
+        num_components=num_components,
     )
-
-    def build_fn_snpe_a(batch_theta, batch_x, num_components):
-        """Build function for SNPE-A
-
-        Extract the number of components from the kwargs, such that they are exposed as
-        a kwargs, offering the possibility to later override this kwarg with
-        `functools.partial`. This is necessary in order to make sure that the MDN in
-        SNPE-A only has one component when running the Algorithm 1 part.
-        """
-        return build_mdn(
-            batch_x=batch_theta,
-            batch_y=batch_x,
-            num_components=num_components,
-            **kwargs,
-        )
-
-    def build_fn(batch_theta, batch_x):
-        if model not in model_builders:
-            raise NotImplementedError(f"Model {model} in not implemented")
-
-        # The naming might be a bit confusing.
-        # batch_x are the latent variables, batch_y the conditioned variables.
-        # batch_theta are the parameters and batch_x the observable variables.
-        return model_builders[model](batch_x=batch_theta, batch_y=batch_x, **kwargs)
 
     if model == "mdn_snpe_a":
         if num_components != 10:
             raise ValueError(
-                "You set `num_components`. For SNPE-A, this has to be done at "
+                "You set `num_components`. For NPE-A, this has to be done at "
                 "instantiation of the inference object, i.e. "
-                "`inference = SNPE_A(..., num_components=20)`"
+                "`inference = NPE_A(..., num_components=20)`"
             )
-        kwargs.pop("num_components")
+        # NPE-A overrides the number of components per round, so it stays a
+        # call-time argument rather than a field of the config.
+        base = _config_from_factory_kwargs(
+            "mdn",
+            _DENSITY_CONFIGS,
+            "density",
+            family_args={k: v for k, v in family_args.items() if k != "num_components"},
+            factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
+            extra=kwargs,
+        )
 
-    return build_fn_snpe_a if model == "mdn_snpe_a" else build_fn
+        def build_fn_snpe_a(batch_theta, batch_x, num_components):
+            """Build function for SNPE-A.
+
+            ``num_components`` stays a call-time argument so that it can later be
+            overridden with `functools.partial`. This is necessary in order to
+            make sure that the MDN in SNPE-A only has one component when running
+            the Algorithm 1 part.
+            """
+            return replace(base, num_components=num_components).build(
+                batch_input=batch_theta, batch_condition=batch_x
+            )
+
+        return build_fn_snpe_a
+
+    if model in ("mnle", "mnpe"):
+        config = _mixed_config_from_factory_kwargs(
+            model=model,
+            family_args=family_args,
+            factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
+            extra=kwargs,
+        )
+    elif model in _DENSITY_CONFIGS:
+        config = _config_from_factory_kwargs(
+            model,
+            _DENSITY_CONFIGS,
+            "density",
+            family_args=family_args,
+            factory_defaults=_factory_defaults(posterior_nn, _POSTERIOR_FACTORY_FIELDS),
+            extra=kwargs,
+        )
+    else:
+        return _unknown_density_build_fn(model)
+
+    def build_fn(batch_theta, batch_x):
+        # NPE models p(theta|x), so the modeled variable is theta.
+        return config.build(batch_input=batch_theta, batch_condition=batch_x)
+
+    return build_fn
 
 
 def posterior_score_nn(
     model: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VF_MODELS,
         VectorFieldNet,
     ] = "mlp",
     sde_type: str = "ve",
@@ -360,8 +412,9 @@ def posterior_score_nn(
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
+    time_emb_type: Literal["sinusoidal", "random_fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
+    compose_standardization: bool = False,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a ScoreEstimator object for score-based
@@ -372,14 +425,16 @@ def posterior_score_nn(
             - 'vp': Variance preserving.
             - 'subvp': Sub-variance preserving.
             - 've': Variance exploding.
-            Defaults to 'vp'.
+            Defaults to 've'.
         model: Type of regression network. One of:
             - 'mlp': Fully connected feed-forward network.
             - 'ada_mlp': Fully connected feed-forward with adaptive
                layer normalization for conditioning.
             - 'transformer': Transformer network.
-            - 'transformer_cross_attention': Transformer with cross-attention.
-            -  nn.Module: Custom network
+            - 'transformer_cross_attn': Transformer with cross-attention.
+                Requires sequence-shaped conditioning (3-D ``batch_y`` or an
+                ``embedding_net`` returning ``(batch, seq_len, emb_dim)``).
+            - `VectorFieldNet`: Custom network implementing `forward(theta, x, t)`.
             Defaults to 'mlp'.
         z_score_theta: Whether to z-score thetas passing into the network, can be one
             of:
@@ -390,61 +445,72 @@ def posterior_score_nn(
             sample is, for example, a time series or an image.
         z_score_x: Whether to z-score xs passing into the network, same options as
             z_score_theta.
-        hidden_features: Number of hidden units per layer. Defaults to 50.
+        hidden_features: Number of hidden units per layer. Defaults to 100.
         embedding_net: Embedding network for x (conditioning variable). Defaults to
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
+        compose_standardization: Opt-in per-dim affine standardization theta<->z
+            for scale-equivariant calibration. Defaults to False.
         **kwargs: Additional estimator / network arguments.  Valid keys are
-            defined by ``ScoreEstimatorConfig``; unknown keys raise
-            ``TypeError``.
+            the fields of the chosen score config and of the network's config;
+            an unknown key warns and is forwarded to the network builder.
 
     Returns:
         Constructor function for NPSE.
     """
-    # Map user-facing parameter names to internal names.
-    mapped = dict(
-        z_score_x=z_score_x,
-        z_score_y=z_score_theta,
-        hidden_features=hidden_features,
-        num_layers=num_layers,
-        embedding_net=check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-        time_embedding_dim=t_embedding_dim,
-        time_emb_type=time_emb_type,
-        net=model,
+    if compose_standardization and z_score_theta != "independent":
+        raise ValueError(
+            "compose_standardization=True requires z_score_theta='independent'."
+        )
+
+    config = _vf_config_from_factory_kwargs(
+        _score_config_from_sde_type(sde_type),
+        model,
+        factory_defaults=_factory_defaults(posterior_score_nn, _VF_FACTORY_FIELDS),
+        named_net=dict(
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            time_embedding_dim=t_embedding_dim,
+            time_emb_type=time_emb_type,
+        ),
+        named_estimator=_normalize_z_scoring(
+            dict(
+                z_score_input=z_score_theta,
+                z_score_condition=z_score_x,
+                embedding_net=check_net_device(
+                    embedding_net, "cpu", embedding_net_warn_msg
+                ),
+                compose_standardization=compose_standardization,
+            )
+        ),
+        extra=kwargs,
     )
 
-    # Validate against known fields — raises TypeError on typos or
-    config = ScoreEstimatorConfig(**mapped, **kwargs)
-    builder_kwargs = config.to_dict()
-
     def build_fn(batch_theta, batch_x):
-        return build_score_matching_estimator(
-            batch_x=batch_theta,
-            batch_y=batch_x,
-            sde_type=sde_type,
-            **builder_kwargs,
-        )
+        return config.build(batch_input=batch_theta, batch_condition=batch_x)
 
     return build_fn
 
 
 def posterior_flow_nn(
     model: Union[
-        Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"],
+        VF_MODELS,
         VectorFieldNet,
     ] = "mlp",
     z_score_theta: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = None,
+    ] = "independent",
     z_score_x: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
     ] = "independent",
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    time_emb_type: Literal["sinusoidal", "fourier"] = "sinusoidal",
+    time_emb_type: Literal["sinusoidal", "random_fourier"] = "sinusoidal",
     t_embedding_dim: int = 32,
+    gaussian_baseline: bool = False,
+    compose_standardization: bool = False,
     **kwargs: Any,
 ) -> Callable:
     """Build util function that builds a FlowMatchingEstimator object for flow-based
@@ -456,54 +522,68 @@ def posterior_flow_nn(
             - 'ada_mlp': Fully connected feed-forward with adaptive
                 layer normalization for conditioning.
             - 'transformer': Transformer network.
-            - 'transformer_cross_attention': Transformer with cross-attention.
-            -  nn.Module: Custom network
+            - 'transformer_cross_attn': Transformer with cross-attention.
+                Requires sequence-shaped conditioning (3-D ``batch_y`` or an
+                ``embedding_net`` returning ``(batch, seq_len, emb_dim)``).
+            - `VectorFieldNet`: Custom network implementing `forward(theta, x, t)`.
             Defaults to 'mlp'.
-        z_score_theta: This is not supported for FMPE and will raise an error.
-        z_score_x: Whether to z-score xs passing into the network, same options as
-            z_score_theta.
-        hidden_features: Number of hidden units per layer. Defaults to 50.
+        z_score_theta: Whether to z-score theta for time-dependent normalization.
+            This enables time-dependent z-scoring which helps FMPE learn when
+            theta is far from N(0,1). Defaults to 'independent'.
+        z_score_x: Whether to z-score observations (x) before passing to the
+            embedding network. Defaults to 'independent'.
+        hidden_features: Number of hidden units per layer. Defaults to 100.
         num_layers: Number of hidden layers. Defaults to 5.
         embedding_net: Embedding network for x (conditioning variable). Defaults to
             nn.Identity().
         time_emb_type: Type of time embedding. Defaults to 'sinusoidal'.
         t_embedding_dim: Embedding dimension of diffusion time. Defaults to 32.
+        gaussian_baseline: If True, use analytical Gaussian baseline velocity
+            derived from Bayes' rule. The network then only learns the residual.
+            Defaults to False.
+        compose_standardization: Opt-in per-dim affine standardization theta<->z
+            for scale-equivariant calibration. Defaults to False.
         **kwargs: Additional estimator / network arguments.  Valid keys are
-            defined by ``FlowEstimatorConfig``; unknown keys raise
-            ``TypeError``.
+            the fields of ``FlowMatchingConfig`` and of the network's config;
+            an unknown key warns and is forwarded to the network builder.
 
     Returns:
         Constructor function for FMPE.
     """
-    if z_score_theta is not None:
+    if compose_standardization and z_score_theta != "independent":
         raise ValueError(
-            "z_score_theta is not supported for FMPE. For simulator "
-            "parameters with highly different scales, we recommend "
-            "z-scoring the inputs manually beforehand."
+            "compose_standardization=True requires z_score_theta='independent'."
         )
 
-    # Map user-facing parameter names to internal names.
-    mapped = dict(
-        z_score_x=z_score_x,
-        z_score_y=z_score_theta,
-        hidden_features=hidden_features,
-        num_layers=num_layers,
-        embedding_net=embedding_net,
-        time_embedding_dim=t_embedding_dim,
-        time_emb_type=time_emb_type,
-        net=model,
+    config = _vf_config_from_factory_kwargs(
+        FlowMatchingConfig(),
+        model,
+        factory_defaults=_factory_defaults(
+            posterior_flow_nn,
+            {**_VF_FACTORY_FIELDS, "gaussian_baseline": "gaussian_baseline"},
+        ),
+        named_net=dict(
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            time_embedding_dim=t_embedding_dim,
+            time_emb_type=time_emb_type,
+        ),
+        named_estimator=_normalize_z_scoring(
+            dict(
+                z_score_input=z_score_theta,
+                z_score_condition=z_score_x,
+                embedding_net=check_net_device(
+                    embedding_net, "cpu", embedding_net_warn_msg
+                ),
+                gaussian_baseline=gaussian_baseline,
+                compose_standardization=compose_standardization,
+            )
+        ),
+        extra=kwargs,
     )
 
-    # Validate against known fields — raises TypeError on typos or
-    config = FlowEstimatorConfig(**mapped, **kwargs)
-    builder_kwargs = config.to_dict()
-
     def build_fn(batch_theta, batch_x):
-        return build_flow_matching_estimator(
-            batch_x=batch_theta,
-            batch_y=batch_x,
-            **builder_kwargs,
-        )
+        return config.build(batch_input=batch_theta, batch_condition=batch_x)
 
     return build_fn
 
@@ -720,33 +800,28 @@ def marginal_nn(
         num_transforms: Number of transforms when a flow is used.
         num_bins: Number of bins used for the splines in `nsf`.
         num_components: Number of mixture components for a mixture of Gaussians.
-        kwargs: additional custom arguments passed to downstream build functions.
+        **kwargs: Additional estimator arguments.  Valid keys are defined by
+            ``MarginalFlowConfig``; unknown keys trigger a warning and are forwarded to
+            the builder.
     """
 
-    kwargs = dict(
-        zip(
-            (
-                "z_score_x",
-                "hidden_features",
-                "num_transforms",
-                "num_bins",
-                "num_components",
-            ),
-            (
-                z_score_x,
-                hidden_features,
-                num_transforms,
-                num_bins,
-                num_components,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    # Map user-facing parameter names to internal names (no renaming needed here).
+    mapped = dict(
+        z_score_x=z_score_x,
+        hidden_features=hidden_features,
+        num_transforms=num_transforms,
+        num_bins=num_bins,
+        num_components=num_components,
     )
+
+    # Validate against known fields — warns on unknown kwargs (typos)
+    # while still forwarding them to the underlying builder.
+    config = MarginalFlowConfig.from_kwargs(**mapped, **kwargs)
+    builder_kwargs = config.to_dict()
 
     def build_fn(batch_x: Tensor) -> Any:
         return build_zuko_unconditional_flow(
-            which_nf=model.value.upper(), batch_x=batch_x, **kwargs
+            which_nf=model.value.upper(), batch_x=batch_x, **builder_kwargs
         )
 
     return build_fn

@@ -6,7 +6,7 @@ import torch
 from torch import Tensor, eye, norm, ones, zeros
 from torch.distributions import MultivariateNormal, biject_to
 
-from sbi.inference import MCABC, SMC
+from sbi.inference import MCABC, SMCABC
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -27,7 +27,11 @@ def test_mcabc_performance(num_dim: int, distance: str, eps: float):
     x_o = zeros((1, num_dim))
     num_samples = 1000
     num_simulations = 120000
-    dim_scaled_eps = eps * num_dim if eps is not None else None
+    # l1 sums over dimensions where the custom distance takes an L2 norm, so it
+    # needs one more factor of num_dim to accept a comparable number of
+    # simulations.
+    eps_scale = num_dim**2 if distance == "l1" else num_dim
+    dim_scaled_eps = eps * eps_scale if eps is not None else None
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -97,7 +101,7 @@ def test_smcabc_performance(prior_type: str, algorithm_variant: str, kernel: str
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SMC(
+    infer = SMCABC(
         simulator,
         prior,
         distance="l2",
@@ -216,7 +220,7 @@ def _fast_smcabc_test(**kwargs):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SMC(
+    infer = SMCABC(
         simulator,
         prior,
         distance=defaults["distance"],

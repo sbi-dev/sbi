@@ -11,6 +11,8 @@ import torch.nn as nn
 
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders.vector_field_nets import (
+    AdaMLPConfig,
+    FlowMatchingConfig,
     build_adamlp_network,
     build_simformer_network,
     build_standard_mlp_network,
@@ -120,10 +122,9 @@ def test_vector_field_builders_shape_and_build(
 
     net = builder(
         batch_x=x,
-        batch_y=y,
+        batch_y=embedding_net(y),
         time_embedding_dim=time_embedding_dim,
         time_emb_type=time_emb_type,
-        embedding_net=embedding_net,
         **builder_kwargs,
     )
 
@@ -191,3 +192,12 @@ def test_simformer_builder_shape_and_build(
         condition_mask=condition_mask,
     )
     assert out.shape == inputs.shape
+
+
+def test_mlp_ratio_reaches_the_ada_mlp_global_mlp():
+    """`mlp_ratio` controls the width of the global MLP's intermediate blocks."""
+    estimator = FlowMatchingConfig(
+        net=AdaMLPConfig(num_intermediate_mlp_layers=1, mlp_ratio=8)
+    ).build(torch.randn(10, 2), torch.randn(10, 3))
+    expand = estimator.net.global_mlp.mlp_blocks[0][1]
+    assert expand.out_features == 8 * expand.in_features

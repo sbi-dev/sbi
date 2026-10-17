@@ -26,6 +26,16 @@ source .venv/bin/activate
 uv pip install sbi
 ```
 
+### Optional dependencies
+
+Pyro and PyMC MCMC samplers are optional. Install them as needed:
+
+```bash
+uv pip install "sbi[pyro]"   # for Pyro samplers (HMC, NUTS)
+uv pip install "sbi[pymc]"   # for PyMC samplers (HMC, NUTS, Slice)
+uv pip install "sbi[all]"    # for all optional dependencies
+```
+
 ## Alternative installation methods
 
 ### Using pip
@@ -34,6 +44,12 @@ If you prefer using `pip` directly:
 
 ```bash
 python -m pip install sbi
+```
+
+For Pyro or PyMC MCMC samplers, install the corresponding extras:
+
+```bash
+python -m pip install "sbi[pyro]"   # or "sbi[pymc]", or "sbi[all]"
 ```
 
 ### Using conda
@@ -48,6 +64,13 @@ conda create -n sbi_env python=3.12 && conda activate sbi_env
 conda install --channel conda-forge sbi
 ```
 
+For Pyro or PyMC MCMC samplers, install them as additional conda packages:
+
+```bash
+conda install --channel conda-forge pyro-ppl  # for Pyro samplers
+conda install --channel conda-forge pymc       # for PyMC samplers
+```
+
 ### Using pixi
 
 To install and add `sbi` to a project with [`pixi`](https://pixi.sh/):
@@ -55,6 +78,8 @@ To install and add `sbi` to a project with [`pixi`](https://pixi.sh/):
 ```bash
 pixi add sbi
 ```
+
+For Pyro or PyMC samplers, add them separately: `pixi add pyro-ppl` or `pixi add pymc`.
 
 ## Testing the installation
 

@@ -6,6 +6,22 @@
 played a significant role in shaping `sbi`. Their valuable input, suggestions, and
 direct contributions to the codebase have been instrumental in the development of `sbi`.
 
+## Maintainers
+
+`sbi` is maintained by the following people. Current maintainers are
+
+- [Jan Teusen (né Boelts)](https://github.com/janfb)
+- [Manuel Gloeckler](https://github.com/manuelgloeckler)
+- [Daniel Gedon](https://github.com/dgedon)
+- [Stefan Wahl](https://github.com/StefanWahl)
+
+Former maintainers are
+
+- [Michael Deistler](https://github.com/michaeldeistler)
+- [Guy Moss](https://github.com/gmoss13)
+- [Jan-Matthis Lückmann](https://github.com/jan-matthis)
+- [Alvaro Tejero-Cantero](https://github.com/alvorithm)
+
 ## License
 
 `sbi` is licensed under the [Apache License
@@ -24,6 +40,8 @@ direct contributions to the codebase have been instrumental in the development o
 through project ADIMEM (FKZ 01IS18052 A-D), project SiMaLeSAM (FKZ 01IS21055A) and the
 Tübingen AI Center (FKZ 01IS18039A). Since 2024, `sbi` has been supported by the
 appliedAI Institute for Europe gGmbH.
+
+![German Federal Ministry of Education and Research Logo](_static/logo_bmbf.svg)
 
 ## Important dependencies and prior art
 

@@ -11,6 +11,8 @@ import torch.nn.functional as F
 from nflows import distributions as distributions_
 from torch import Tensor, nn
 
+from sbi.utils.torchutils import canonical_device
+
 
 def get_numel(
     batch_input: Tensor,
@@ -61,7 +63,7 @@ def check_net_device(
 
     if isinstance(net, nn.Identity):
         return net
-    if str(next(net.parameters()).device) != str(device):
+    if canonical_device(next(net.parameters()).device) != canonical_device(device):
         warn(
             message or f"Network is not on the correct device. Moving it to {device}.",
             stacklevel=2,

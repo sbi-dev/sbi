@@ -9,6 +9,7 @@ The TARP diagnostic is a global diagnostic which can be used to check a
 trained posterior against a set of true values of theta.
 """
 
+import warnings
 from typing import Callable, Optional, Tuple
 
 import torch
@@ -32,7 +33,7 @@ def run_tarp(
     num_workers: int = 1,
     show_progress_bar: bool = True,
     distance: Callable = l2,
-    num_bins: Optional[int] = 30,
+    num_bins: Optional[int] = None,
     z_score_theta: bool = True,
     use_batched_sampling: bool = True,
 ) -> Tuple[Tensor, Tensor]:
@@ -48,8 +49,7 @@ def run_tarp(
         xs: observed data for tarp, simulated from thetas.
         posterior: a posterior obtained from sbi.
         num_posterior_samples: number of approximate posterior samples used for ranking.
-        num_workers: number of CPU cores to use in parallel for running num_sbc_samples
-            inferences.
+        num_workers: number of CPU cores to use for running inference in parallel.
         show_progress_bar: whether to display a progress over sbc runs.
         distance: the distance metric to use when computing the distance.
             Should be a callable function that accepts two tensors and
@@ -59,7 +59,8 @@ def run_tarp(
             Possible values: ``sbi.utils.metrics.l1`` or
             ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
-            If ``None``, then ``num_sims // 10`` bins are used.
+            If ``None``, then ``num_tarp_samples // 10`` bins are used, which targets
+            at least 10 samples per bin (requires ``num_tarp_samples >= 100``).
         z_score_theta : whether to normalize parameters before coverage test.
         use_batched_sampling: whether to use batched sampling for posterior samples.
 
@@ -71,6 +72,13 @@ def run_tarp(
     thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
 
     num_tarp_samples, dim_theta = thetas.shape
+
+    if num_tarp_samples < 100:
+        warnings.warn(
+            "Number of TARP samples should be on the order of 100s to give reliable "
+            "results.",
+            stacklevel=2,
+        )
 
     posterior_samples = get_posterior_samples_on_batch(
         xs,
@@ -100,7 +108,7 @@ def _run_tarp(
     thetas: Tensor,
     references: Tensor,
     distance: Callable = l2,
-    num_bins: Optional[int] = 30,
+    num_bins: Optional[int] = None,
     z_score_theta: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """
@@ -111,15 +119,15 @@ def _run_tarp(
     trained posterior against a set of true values of theta.
 
     Args:
-        samples: The predicted parameter samples to compute the coverage of,
-                 these samples are expected to have shape
-                 ``(num_samples, num_sims, num_dims)``. These are obtained by
-                 sampling a trained posterior `num_samples` times. Multiple
-                 (posterior) samples for one observation are encouraged.
+        posterior_samples: The predicted parameter samples to compute the coverage of,
+                these samples are expected to have shape ``(num_samples,
+                num_tarp_samples, num_dims)``. These are obtained by sampling a trained
+                posterior `num_samples` times. Multiple (posterior) samples for one
+                observation are encouraged.
         theta: The true parameter value theta. Theta is expected to
-                 have shape ``(num_sims, num_dims)``.
+                 have shape ``(num_tarp_samples, num_dims)``.
         references: the reference points to use for the coverage regions, with
-                shape ``(1, num_sims, num_dims)``, or ``None``.
+                shape ``(1, num_tarp_samples, num_dims)``, or ``None``.
                 If ``None``, then reference points are chosen randomly from
                 the unit hypercube over the parameter space given by theta.
                 In other words, reference samples are drawn from the
@@ -132,7 +140,7 @@ def _run_tarp(
                 Possible values: ``sbi.utils.metrics.l1`` or
                 ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
-                If ``None``, then ``num_sims // 10`` bins are used.
+                If ``None``, then ``num_tarp_samples // 10`` bins are used.
         z_score_theta : whether to normalize parameters before coverage test.
 
     Returns:
@@ -155,6 +163,7 @@ def _run_tarp(
         hi = thetas.max(dim=0, keepdim=True).values  # max over batch
         posterior_samples = (posterior_samples - lo) / (hi - lo + 1e-10)
         thetas = (thetas - lo) / (hi - lo + 1e-10)
+        references = (references - lo) / (hi - lo + 1e-10)
 
     # distances between references and samples
     sample_dists = distance(references, posterior_samples)
@@ -228,8 +237,8 @@ def check_tarp(
 
     # get the index of the middle of the alpha grid
     midindex = alpha.shape[0] // 2
-    # area to curve: difference between ecp and alpha above 0.5.
-    atc = (ecp[midindex:] - alpha[midindex:]).sum().item()
+    dalpha = alpha[1] - alpha[0]
+    atc = ((ecp[midindex:] - alpha[midindex:]) * dalpha).sum().item()
 
     # Kolmogorov-Smirnov test between ecp and alpha
     kstest_pvals: float = kstest(ecp.numpy(), alpha.numpy())[1]  # type: ignore

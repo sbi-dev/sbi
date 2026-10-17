@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -32,10 +31,11 @@ from sbi.neural_nets.estimators import ZukoUnconditionalFlow
 from sbi.samplers.vi.vi_utils import (
     LearnableGaussian,
     TransformedZukoFlow,
+    detach_and_deepcopy,
     filter_kwargs_for_func,
-    make_object_deepcopy_compatible,
 )
 from sbi.sbi_types import Array
+from sbi.utils.torchutils import set_validate_args
 from sbi.utils.user_input_checks import check_prior
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
@@ -121,7 +121,7 @@ class DivergenceOptimizer(ABC):
         self._kwargs = kwargs
 
         if prior is not None:
-            self.prior.set_default_validate_args(False)  # type: ignore
+            set_validate_args(self.prior, False)  # type: ignore
 
         # Manage modules - only add q if it's an nn.Module (not for external dists)
         from torch.nn import Module as TorchModule
@@ -443,14 +443,17 @@ class ElboOptimizer(DivergenceOptimizer):
         super().__init__(*args, **kwargs)
 
         self.stick_the_landing = stick_the_landing
-        make_object_deepcopy_compatible(self.q)
-        self._surrogate_q = deepcopy(self.q)
+        self._surrogate_q = detach_and_deepcopy(self.q)
 
         self.eps = 1e-5
         self.HYPER_PARAMETERS += ["stick_the_landing"]
 
     def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
         return self._compute_elbo_loss(xo)
+
+    def _detach_log_q(self) -> bool:
+        """Whether log q is evaluated with detached parameters (path gradient)."""
+        return self.stick_the_landing
 
     def _compute_elbo_loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the ELBO"""
@@ -465,8 +468,8 @@ class ElboOptimizer(DivergenceOptimizer):
         if num_samples is None:
             num_samples = self.n_particles
 
-        if self.stick_the_landing:
-            # STL replaces log_q, so only need samples (not log_q from q).
+        if self._detach_log_q():
+            # Path gradient replaces log_q, so only need samples (not log_q from q).
             if hasattr(self.q, "sample_and_log_prob"):
                 samples, _ = self.q.sample_and_log_prob(torch.Size((num_samples,)))
             else:
@@ -479,7 +482,7 @@ class ElboOptimizer(DivergenceOptimizer):
             samples = self.q.rsample(torch.Size((num_samples,)))
             log_q = self.q.log_prob(samples)
 
-        self.potential_fn.x_o = x_o
+        self.potential_fn = self.potential_fn.bind(x_o)
         log_potential = self.potential_fn(samples)
         elbo = log_potential - log_q
         return elbo
@@ -499,10 +502,9 @@ class IWElboOptimizer(ElboOptimizer):
     ELBO, which is an tighter bound to the evidence but also promotes a support covering
     behaviour.
 
-    NOTE: You may want to turn on `stick_the_landing` here as this loss leads to
-    gradient
-    estimates with vanishing signal to noise ratio. This is relevant for large K,
-    especially K > n_particles.
+    NOTE: The gradient estimates of this loss lose signal-to-noise ratio as K grows,
+    especially for K > n_particles. Use `dreg=True` against this; `stick_the_landing`
+    alone gives a biased gradient for this objective (Tucker et al., 2018).
 
     NOTE: Technically this does not minimize a valid divergence between q and p, yet it
     does optimizer q as proposal for sampling importance resampling.
@@ -536,13 +538,13 @@ class IWElboOptimizer(ElboOptimizer):
         self.loss_name = "iwelbo"
         self.eps = 1e-7
         self.dreg = dreg
-        if not hasattr(self, 'HYPER_PARAMETERS'):
-            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["K", "dreg"]
-        if dreg:
-            self.stick_the_landing = True
 
-    def loss_rsample(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
+    def _detach_log_q(self) -> bool:
+        # Read on every step, so `dreg` set later through `update` takes effect.
+        return self.stick_the_landing or self.dreg
+
+    def _loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the IWELBO loss.
 
         Args:
@@ -557,7 +559,7 @@ class IWElboOptimizer(ElboOptimizer):
         elbo_particles = elbo_particles.reshape(self.n_particles, self.K)
         weights = self.get_importance_weight(elbo_particles.clone().detach())
         surrogate_loss = -(weights * elbo_particles).sum(-1).mean(0)
-        loss = -torch.mean(torch.exp(elbo_particles) + 1e-20, -1).log().mean()
+        loss = -(torch.logsumexp(elbo_particles, dim=-1) - np.log(self.K)).mean()
         return surrogate_loss, loss.clone().detach()
 
     def get_importance_weight(self, elbo_particles: Tensor) -> Tensor:
@@ -638,7 +640,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         if hasattr(self.q, "clear_cache"):
             self.q.clear_cache()
         logq = self.q.log_prob(samples)
-        self.potential_fn.x_o = x_o
+        self.potential_fn = self.potential_fn.bind(x_o)
         logp = self.potential_fn(samples)
         with torch.no_grad():
             logweights = logp - logq
@@ -698,13 +700,13 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         self.alpha = alpha
         self.unbiased = unbiased
         super().__init__(*args, **kwargs)
-        if not hasattr(self, 'HYPER_PARAMETERS'):
-            self.HYPER_PARAMETERS = []
         self.HYPER_PARAMETERS += ["alpha", "unbiased", "dreg"]
         self.eps = 1e-5
         self.dreg = dreg
-        if dreg:
-            self.stick_the_landing = True
+
+    def _detach_log_q(self) -> bool:
+        # Read on every step, so `dreg` set later through `update` takes effect.
+        return self.stick_the_landing or self.dreg
 
     def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
         # Zuko flows always support reparameterized sampling via sample_and_log_prob

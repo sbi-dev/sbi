@@ -1,16 +1,20 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import os
 import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime
+from inspect import currentframe
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
+    ClassVar,
     Dict,
     Generic,
     List,
@@ -32,12 +36,19 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 from typing_extensions import Self
 
+if TYPE_CHECKING:
+    from sbi.neural_nets.net_builders.estimator_configs import (
+        _EstimatorBuilderBase,
+        _PerModelConfigBase,
+    )
+
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+    FilteredDirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     PosteriorParameters,
@@ -70,15 +81,52 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
-from sbi.utils.sbiutils import NoPrior, get_simulations_since_round
+from sbi.utils.sbiutils import (
+    ImproperEmpirical,
+    get_simulations_since_round,
+    load_with_version,
+    save_with_version,
+)
 from sbi.utils.simulation_utils import simulate_for_sbi
-from sbi.utils.torchutils import check_if_prior_on_device, process_device
+from sbi.utils.torchutils import (
+    check_if_prior_on_device,
+    infer_module_device,
+    process_device,
+)
 from sbi.utils.tracking import TensorBoardTracker
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
     process_simulator,
 )
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
+
+_SBI_ROOT = str(Path(__file__).parents[2]) + os.sep
+
+
+def _stacklevel_to_caller(default: int = 2) -> int:
+    """Return the `warnings.warn` stacklevel of the first frame outside sbi.
+
+    Trainers reach the training loop through a different number of internal frames
+    each, so no constant is right for all of them. A constant also makes Python's
+    "once per location" filter collapse every training run in a process into one
+    warning. (`warn(skip_file_prefixes=...)` would do this, but needs Python 3.12.)
+
+    Args:
+        default: Stacklevel to fall back to if every frame is inside sbi.
+
+    Returns:
+        Stacklevel that attributes the warning to the caller's own code.
+    """
+    frame = currentframe()
+    frame = frame.f_back if frame is not None else None
+    level = 1
+    while frame is not None:
+        if not frame.f_code.co_filename.startswith(_SBI_ROOT):
+            return level
+        frame = frame.f_back
+        level += 1
+    return default
 
 
 def infer(
@@ -100,7 +148,7 @@ def infer(
     The scope of this function is limited to the most essential features of sbi. For
     more flexibility (e.g. multi-round inference, different density estimators) please
     use the flexible interface described here:
-    https://sbi-dev.github.io/sbi/latest/tutorials/02_multiround_inference/
+    https://sbi.readthedocs.io/en/latest/advanced_tutorials/02_multiround_inference.html
 
     Args:
         simulator: A function that takes parameters $\theta$ and maps them to
@@ -111,7 +159,12 @@ def infer(
             parameters, e.g. which ranges are meaningful for them. Any
             object with `.log_prob()`and `.sample()` (for example, a PyTorch
             distribution) can be used.
-        method: What inference method to use. Either of SNPE, SNLE or SNRE.
+        method: What inference method to use, case-insensitively: any neural
+            trainer `sbi.inference` exports, for example 'npe', 'nle', 'nre',
+            'npe_a', 'fmpe' or 'npse'. The legacy names 'snpe', 'snle' and 'snre'
+            still work but emit a `FutureWarning`. The ABC methods are not
+            supported, because they take the simulator at construction; call
+            `MCABC`/`SMCABC` directly.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
@@ -123,14 +176,40 @@ def infer(
     Returns: Posterior over parameters conditional on observations (amortized).
     """
 
-    try:
-        # Moved here to avoid circular imports at initialization.
-        import sbi.inference  # noqa: R0401
+    # Moved here to avoid circular imports at initialization.
+    import sbi.inference  # noqa: R0401
 
-        method_fun: Callable = getattr(sbi.inference, method.upper())
+    # Resolve legacy method strings here: going through the module `__getattr__`
+    # would attribute the warning to this file instead of the caller.
+    name = method.upper()
+    canonical = sbi.inference._DEPRECATED_ALIASES.get(name)
+    resolved = canonical if canonical is not None else name
+
+    # Before the deprecation warning: advising a spelling `infer` cannot run either
+    # would only send the user around the loop again.
+    if resolved in sbi.inference._abc_family:
+        raise ValueError(
+            f"`infer` does not support '{method}'. It trains a neural network on "
+            "simulations it draws itself, while the ABC methods take the simulator "
+            f"at construction and have no training step. Use {resolved} directly. "
+            f"Its `__call__` docstring shows an example."
+        )
+
+    if canonical is not None:
+        warn(
+            f"method='{method}' is deprecated since sbi v0.27.0 and will be "
+            f"removed in v0.28.0. Use method='{canonical.lower()}' instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+
+    try:
+        method_fun: Callable = getattr(sbi.inference, resolved)
     except AttributeError as err:
         raise NameError(
-            "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
+            f"Method '{method}' not available. `method` must name a neural trainer "
+            "exported by `sbi.inference`, for example 'npe', 'nle', 'nre', 'npe_a', "
+            "'fmpe' or 'npse'."
         ) from err
 
     if (
@@ -141,7 +220,7 @@ def infer(
         warn(
             "We discourage the use the simple interface in more complicated settings. "
             "Have a look into the flexible interface, e.g. in our tutorial "
-            "(https://sbi-dev.github.io/sbi/latest/tutorials/00_getting_started).",
+            "(https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html).",
             stacklevel=2,
         )
     # Set variables to empty dicts to be able to pass them
@@ -197,6 +276,9 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
     _tracker: Tracker
     _summary: Dict[str, list]
 
+    # Overridden by subclasses when needed (e.g., LikelihoodEstimatorTrainer).
+    _INPUT_IS_THETA: ClassVar[bool] = True
+
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -227,7 +309,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self._device = process_device(device)
         check_prior(prior)
         check_if_prior_on_device(self._device, prior)
-        self._prior = prior if prior is not None else NoPrior(device=self._device)
+        self._prior = prior
 
         self._posterior = None
         self._neural_net = None
@@ -244,6 +326,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self._round = 0
         self._val_loss = float("Inf")
         self._best_val_loss = float("Inf")
+        self._best_model_state_dict = None
         self._epochs_since_last_improvement = 0
 
         if summary_writer is not None:
@@ -262,10 +345,25 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self._summary = dict(
             epochs_trained=[],
             best_validation_loss=[],
+            converged=[],
             validation_loss=[],
             training_loss=[],
             epoch_durations_sec=[],
         )
+
+    @classmethod
+    def _wrap_builder(
+        cls, builder: Union["_PerModelConfigBase", "_EstimatorBuilderBase"]
+    ) -> Callable[[Tensor, Tensor], ConditionalEstimatorType]:
+        """Wrap an estimator config as a ``(batch_theta, batch_x)`` callable."""
+        input_is_theta = cls._INPUT_IS_THETA
+
+        def build_fn(batch_theta, batch_x):
+            if input_is_theta:
+                return builder.build(batch_input=batch_theta, batch_condition=batch_x)
+            return builder.build(batch_input=batch_x, batch_condition=batch_theta)
+
+        return build_fn
 
     @abstractmethod
     def append_simulations(
@@ -384,13 +482,19 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         "Abstract definition for estimator training"
         ...
 
-    def _resolve_prior(self, prior: Optional[Distribution]) -> Distribution:
+    def _resolve_prior(
+        self,
+        prior: Optional[Distribution],
+        sample_with: Literal[
+            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+        ],
+    ) -> Distribution:
         """
         Resolves the prior distribution to use.
 
         If a prior is passed, it is validated and returned.
         If not passed, attempts to use the stored `self._prior`.
-        If neither is available, uses NoPrior as an explicit filler (#1635).
+        Raises a ValueError if no valid prior is available.
 
         Args:
             prior: Optional prior distribution to resolve.
@@ -400,11 +504,18 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         """
 
         if prior is None:
-            # TODO: this could be re-designed to allow priors to be None natively
-            # rather than using the NoPrior() filler,
-            # as many methods can work without it.
-            # See Issue #1635
-            prior = NoPrior(device=self._device) if self._prior is None else self._prior
+            if self._prior is None or (
+                isinstance(self._prior, ImproperEmpirical)
+                and sample_with not in {'direct', 'sde', 'ode'}
+            ):
+                cls_name = self.__class__.__name__
+                raise ValueError(
+                    f"""You did not pass a prior. You have to pass the prior either at
+                    initialization `inference = {cls_name}(prior)` or to `
+                    .build_posterior (prior=prior)` for
+                    sample_with not in {'direct', 'sde', 'ode'}."""
+                )
+            prior = self._prior
         else:
             check_prior(prior)
 
@@ -442,15 +553,22 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                     "estimator must be ConditionalEstimator,"
                     f" got {type(estimator).__name__}",
                 )
-            # Otherwise, infer it from the device of the net parameters
-            device = str(next(estimator.parameters()).device)
+            # Otherwise, infer it from the device of the net parameters.
+            device = infer_module_device(estimator, "cpu")
 
         return estimator, device
 
     def _resolve_posterior_parameters(
         self,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "filtered_direct",
         ],
         posterior_parameters: Optional[PosteriorParameters],
         **kwargs,
@@ -497,7 +615,14 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
     def _build_posterior_parameters(
         self,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
+            "filtered_direct",
         ],
         **kwargs,
     ) -> PosteriorParameters:
@@ -516,6 +641,9 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         if sample_with == "direct":
             params = kwargs.get("direct_sampling_parameters", {}) or {}
             posterior_parameters = DirectPosteriorParameters(**params)
+        elif sample_with == "filtered_direct":
+            params = kwargs.get("filtered_direct_sampling_parameters", {}) or {}
+            posterior_parameters = FilteredDirectPosteriorParameters(**params)
         elif sample_with == "mcmc":
             params = kwargs.get("mcmc_parameters", {}) or {}
             posterior_parameters = MCMCPosteriorParameters(
@@ -537,8 +665,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             posterior_parameters = ImportanceSamplingPosteriorParameters(**params)
         else:
             raise NotImplementedError(
-                "Posterior parameter construction not implemented for",
-                f"'{sample_with}'",
+                f"Posterior parameter construction not implemented for '{sample_with}'"
             )
 
         return posterior_parameters
@@ -558,6 +685,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
 
         deprecated_params = {
             "direct_sampling_parameters",
+            "filtered_direct_sampling_parameters",
             "mcmc_parameters",
             "vectorfield_sampling_parameters",
             "rejection_sampling_parameters",
@@ -674,7 +802,13 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         estimator: ConditionalEstimator | MaskedConditionalEstimator,
         prior: Distribution,
         sample_with: Literal[
-            "mcmc", "rejection", "vi", "importance", "direct", "sde", "ode"
+            "mcmc",
+            "rejection",
+            "vi",
+            "importance",
+            "direct",
+            "sde",
+            "ode",
         ],
         device: Union[str, torch.device],
         posterior_parameters: PosteriorParameters,
@@ -731,8 +865,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                 )
             if sample_with not in ("ode", "sde"):
                 raise ValueError(
-                    "`sample_with` must be either",
-                    f" 'ode' or 'sde', got '{sample_with}'",
+                    f"`sample_with` must be either 'ode' or 'sde', got '{sample_with}'"
                 )
             posterior = VectorFieldPosterior(
                 vector_field_estimator=vector_field_estimator,
@@ -757,6 +890,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             elif isinstance(posterior_parameters, RejectionPosteriorParameters):
                 posterior = RejectionPosterior(
                     potential_fn=potential_fn,
+                    theta_transform=theta_transform,
                     proposal=prior,
                     device=device,
                     **asdict(posterior_parameters),
@@ -780,8 +914,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                 )
             else:
                 raise NotImplementedError(
-                    "Sampling method not implemented for",
-                    f"'{posterior_parameters}'",
+                    f"Sampling method not implemented for '{posterior_parameters}'"
                 )
         return posterior
 
@@ -815,11 +948,15 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self._neural_net.to(self._device)
 
         if not train_config.resume_training:
-            self.optimizer = Adam(
-                list(self._neural_net.parameters()),
-                lr=train_config.learning_rate,
-            )
-            self.epoch, self.val_loss = 0, float("Inf")
+            parameters = [p for p in self._neural_net.parameters() if p.requires_grad]
+            if not parameters:
+                raise TypeError(
+                    f"{type(self).__name__} cannot train "
+                    f"{type(self._neural_net).__name__}: it has no trainable "
+                    "parameters."
+                )
+            self.optimizer = Adam(parameters, lr=train_config.learning_rate)
+            self.epoch, self._val_loss = 0, float("Inf")
 
         while self.epoch <= train_config.max_num_epochs and not self._converged(
             self.epoch, train_config.stop_after_epochs
@@ -843,13 +980,23 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             self.epoch += 1
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        self._report_convergence_at_end(
-            self.epoch, train_config.stop_after_epochs, train_config.max_num_epochs
+        if self.epoch > train_config.max_num_epochs:
+            # The `and` above short-circuits on the last check, so `_converged` never
+            # saw the final epoch. Score it here before choosing the weights to keep.
+            if self._val_loss < self._best_val_loss:
+                self._best_val_loss = self._val_loss
+                self._best_model_state_dict = deepcopy(self._neural_net.state_dict())
+            elif self._best_model_state_dict is not None:
+                self._neural_net.load_state_dict(self._best_model_state_dict)
+
+        converged = self._report_convergence_at_end(
+            self.epoch, train_config.max_num_epochs
         )
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
         self._summary["best_validation_loss"].append(self._best_val_loss)
+        self._summary["converged"].append(converged)
 
         # Update TensorBoard and summary dict.
         self._summarize(round_=self._round)
@@ -1013,24 +1160,41 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         )
         return TensorBoardTracker(SummaryWriter(logdir))
 
-    def _report_convergence_at_end(
-        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
-    ) -> None:
-        if self._converged(epoch, stop_after_epochs):
+    def _report_convergence_at_end(self, epoch: int, max_num_epochs: int) -> bool:
+        """Report why the training loop stopped.
+
+        Args:
+            epoch: Epoch counter as the training loop left it.
+            max_num_epochs: The epoch budget the loop was given.
+
+        Returns:
+            True if validation loss stopped improving, False if the budget ran out.
+        """
+        # Not `_converged()`: it advances the counter it reads, so a second call can
+        # flip its own verdict.
+        converged = epoch <= max_num_epochs
+        if converged:
             print(
                 "\r",
                 f"Neural network successfully converged after {epoch} epochs.",
                 end="",
             )
-        elif max_num_epochs == epoch:
+        else:
             warn(
-                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
+                f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached, "
                 "but network has not yet fully converged. Consider increasing it.",
-                stacklevel=2,
+                stacklevel=_stacklevel_to_caller(),
             )
+        return converged
 
     @property
     def summary(self):
+        """Training statistics, keyed by name.
+
+        `converged` holds one entry per `train()` call: True if validation loss
+        stopped improving, False if `max_num_epochs` ran out first, and None for calls
+        made by an sbi version that did not record it.
+        """
         return self._summary
 
     def _default_summary_writer(self) -> SummaryWriter:
@@ -1136,6 +1300,43 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             # to #330.
             print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
 
+    def save(self, filename: Union[str, Path]) -> None:
+        """Save the inference object to a file. Load it with `load()`.
+
+        Args:
+            filename: Path to the file.
+        """
+        save_with_version(self, filename)
+
+    @classmethod
+    def load(
+        cls,
+        filename: Union[str, Path],
+        map_location: Optional[Union[str, torch.device]] = None,
+    ) -> Self:
+        """Load an inference object saved with `save()`.
+
+        The file is unpickled, which can execute arbitrary code. Only load trusted
+        files.
+
+        Args:
+            filename: Path to the file.
+            map_location: Device to load the inference object on, e.g. `"cpu"` for
+                an object saved on a GPU. By default, the device it was saved on.
+
+        Returns:
+            The loaded inference object.
+        """
+        inference = load_with_version(filename, cls, map_location)
+        # `map_location` moves the tensors, but not the device string and the prior.
+        if map_location is not None:
+            inference._device = str(torch.device(map_location))
+            if inference._prior is not None:
+                inference._prior = move_distribution_to_device(
+                    inference._prior, inference._device
+                )
+        return inference
+
     def __getstate__(self) -> Dict:
         """Returns the state of the object that is supposed to be pickled.
 
@@ -1171,6 +1372,10 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             state_dict: State to be restored.
         """
         state_dict["_tracker"] = self._default_tracker()
+        # Objects saved before `converged` was recorded carry no such entry, and the
+        # outcome of their earlier `train()` calls is unknown.
+        summary = state_dict["_summary"]
+        summary.setdefault("converged", [None] * len(summary["epochs_trained"]))
         vars(self).update(state_dict)
 
 
@@ -1332,7 +1537,7 @@ class NeuralInference(
             NeuralPosterior object.
         """
 
-        prior = self._resolve_prior(prior)
+        prior = self._resolve_prior(prior, sample_with)
         estimator, device = self._resolve_estimator(estimator)
 
         posterior_parameters = self._resolve_posterior_parameters(
@@ -1693,7 +1898,9 @@ class MaskedNeuralInference(
         if edge_mask is not None:
             edge_mask = torch.as_tensor(edge_mask)
 
-        prior = self._resolve_prior(prior)
+        # Sampling with "sde" / "ode" needs no prior, so it may stay None.
+        prior = self._prior if prior is None else prior
+        check_prior(prior)
         vf_estimator, device = self._resolve_estimator(
             mvf_estimator,
             condition_mask,

@@ -20,32 +20,6 @@ from sbi.utils.metrics import check_c2st
 from tests.test_utils import get_dkl_gaussian_prior
 
 
-def test_import_before_deprecation():
-    with pytest.warns(DeprecationWarning):
-        from sbi.utils.posterior_ensemble import NeuralPosteriorEnsemble
-
-        num_simulations = 100
-
-        likelihood_shift = -1.0 * ones(2)
-        likelihood_cov = 0.3 * eye(2)
-
-        prior_mean = zeros(2)
-        prior_cov = eye(2)
-        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-
-        def simulator(theta):
-            return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-        theta = prior.sample((num_simulations,))
-        x = simulator(theta)
-        inferer = NPE_C(prior)
-        inferer.append_simulations(theta, x).train(max_num_epochs=1)
-        posterior = inferer.build_posterior()
-
-        # create ensemble
-        posterior = NeuralPosteriorEnsemble([posterior])
-
-
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "inference_method, num_trials",

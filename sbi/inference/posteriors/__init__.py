@@ -3,11 +3,13 @@
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
+from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+    FilteredDirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
@@ -28,9 +30,11 @@ __all__ = [
     "VectorFieldPosterior",
     "VIPosterior",
     "DirectPosteriorParameters",
+    "FilteredDirectPosteriorParameters",
     "ImportanceSamplingPosteriorParameters",
     "MCMCPosteriorParameters",
     "RejectionPosteriorParameters",
     "VectorFieldPosteriorParameters",
     "VIPosteriorParameters",
+    "FilteredDirectPosterior",
 ]

@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+# pyright: reportIncompatibleMethodOverride=true
+
 import functools
 import math
 from abc import ABC, abstractmethod
@@ -867,7 +869,7 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
     def marginal_denoising_posterior_precision_est_fn(
         self,
         time: Tensor,
-        inputs: Optional[Tensor],
+        inputs: Tensor,
         conditions: Tensor,
     ) -> Tensor:
         r"""Estimates the marginal posterior precision.
@@ -1083,7 +1085,13 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
                 prior, scale_from_prior_precision
             )
         assert posterior_precision is not None
-        self.posterior_precision = posterior_precision
+        self.posterior_precision = posterior_precision.to(device)
+
+    def to(self, device: Union[str, torch.device]) -> None:
+        """Moves all tensors including posterior_precision to the given device."""
+        super().to(device)
+        if isinstance(self.posterior_precision, Tensor):
+            self.posterior_precision = self.posterior_precision.to(device)
 
     def posterior_precision_est_fn(self, conditions: Tensor) -> Tensor:
         r"""
@@ -1245,6 +1253,13 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             else:
                 precision_est_budget = min(int(prior.event_shape[0] * 1000), 5000)
 
+        if not precision_est_only_diag and precision_est_budget <= prior.event_shape[0]:
+            raise ValueError(
+                f"precision_est_budget must be larger than the parameter dimension "
+                f"{prior.event_shape[0]} for full-covariance precision estimation, "
+                f"got {precision_est_budget}."
+            )
+
         thetas = posterior.sample_batched(
             sample_shape=torch.Size([precision_est_budget]),
             x=conditions,
@@ -1256,7 +1271,8 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             variances = torch.var(thetas, dim=0)
             precisions = 1 / variances
         else:
-            cov = torch.einsum("bnd,bne->nde", thetas, thetas) / (
+            thetas_centered = thetas - thetas.mean(dim=0, keepdim=True)
+            cov = torch.einsum("bnd,bne->nde", thetas_centered, thetas_centered) / (
                 precision_est_budget - 1
             )
             precisions = torch.inverse(cov)

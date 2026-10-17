@@ -5,6 +5,7 @@ import logging
 import random
 import warnings
 from math import pi
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -14,6 +15,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
 )
 
@@ -22,7 +24,6 @@ import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
 import zuko
-from pyro.distributions import Empirical
 from torch import Tensor, ones, zeros
 from torch import nn as nn
 from torch.distributions import (
@@ -34,8 +35,55 @@ from torch.distributions import (
 )
 from torch.optim.adam import Adam
 
+from sbi import __version__
 from sbi.sbi_types import TorchTransform
-from sbi.utils.torchutils import atleast_2d, process_device
+
+_T = TypeVar("_T")
+
+
+def save_with_version(obj: Any, filename: Union[str, Path]) -> None:
+    """Save an object with `torch.save()`, tagged with the current sbi version."""
+    torch.save({"sbi_version": __version__, "object": obj}, filename)
+
+
+def load_with_version(
+    filename: Union[str, Path],
+    expected_type: Type[_T],
+    map_location: Optional[Union[str, torch.device]] = None,
+) -> _T:
+    """Load an object saved with `save_with_version()`.
+
+    The file is unpickled, which can execute arbitrary code. Only load trusted files.
+
+    Args:
+        filename: Path to the file.
+        expected_type: Class that the loaded object must be an instance of.
+        map_location: Device to load the tensors on, see `torch.load()`.
+
+    Returns:
+        The loaded object.
+
+    Raises:
+        TypeError: If the file was not saved with `save()` or the loaded object is
+            not an instance of `expected_type`.
+    """
+    payload = torch.load(filename, map_location=map_location, weights_only=False)
+    if not isinstance(payload, dict) or payload.keys() != {"sbi_version", "object"}:
+        raise TypeError(f"{filename} was not saved with `save()`.")
+    if payload["sbi_version"] != __version__:
+        warnings.warn(
+            f"{filename} was saved with sbi {payload['sbi_version']}, but the "
+            f"installed version is {__version__}. Loading can fail or give a "
+            "different behavior.",
+            stacklevel=3,
+        )
+    obj = payload["object"]
+    if not isinstance(obj, expected_type):
+        raise TypeError(
+            f"{filename} contains a `{type(obj).__name__}`, not a "
+            f"`{expected_type.__name__}`."
+        )
+    return obj
 
 
 def warn_if_invalid_for_zscoring(
@@ -169,17 +217,7 @@ def z_score_parser(
     Returns:
         Flag for whether or not to z-score, and whether data is structured
     """
-    if isinstance(z_score_flag, bool):
-        # Raise warning if boolean was passed.
-        warnings.warn(
-            "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
-            "removed in a future release. Use 'none', 'independent', or 'structured' "
-            "to indicate z-scoring option.",
-            stacklevel=2,
-        )
-        z_score_bool, structured_data = z_score_flag, False
-
-    elif (z_score_flag is None) or (z_score_flag == "none"):
+    if (z_score_flag is None) or (z_score_flag == "none"):
         # Return Falses if "none" or None was passed.
         z_score_bool, structured_data = False, False
 
@@ -199,6 +237,39 @@ def z_score_parser(
         )
 
     return z_score_bool, structured_data
+
+
+def assert_transform_to_unconstrained_supported(
+    z_score_x: Optional[str],
+    builder_name: str,
+    suggestion: str,
+) -> None:
+    """Raise whenever ``z_score_x == "transform_to_unconstrained"``.
+
+    This is a guard to be called from builders that do *not* implement the
+    ``transform_to_unconstrained`` option; it unconditionally raises when the flag is
+    set, so the caller is responsible for only invoking it from such builders.
+
+    The ``transform_to_unconstrained`` z-scoring option derives a bijection from the
+    prior's support (rather than batch statistics). It is implemented for the
+    conditional Zuko builders and for ``build_mdn``. For the other builders,
+    ``z_score_parser`` returns ``(False, False)`` for this flag, which would otherwise
+    make the option a silent no-op (the model is built with no reparametrization at
+    all). This guard turns that silent no-op into a clear error.
+
+    Args:
+        z_score_x: The z-scoring option passed by the user.
+        builder_name: Name of the calling builder, for the error message.
+        suggestion: Builder-specific hint on what to use instead.
+
+    Raises:
+        ValueError: If ``z_score_x == "transform_to_unconstrained"``.
+    """
+    if z_score_x == "transform_to_unconstrained":
+        raise ValueError(
+            f"`z_score_x='transform_to_unconstrained'` is not supported by "
+            f"`{builder_name}`. {suggestion}"
+        )
 
 
 def standardizing_transform(
@@ -255,14 +326,81 @@ def standardizing_transform_zuko(
     )
 
 
-class CallableTransform:
-    """Wraps a PyTorch Transform to be used in Zuko UnconditionalTransform."""
+def _patch_inverse_transform_pickling() -> None:
+    """Keep ``_inv`` when pickling ``_InverseTransform`` (pytorch/pytorch#191197).
 
-    def __init__(self, transform):
-        self.transform = transform
+    ``Transform.__getstate__`` clears ``_inv`` as a reciprocal cache, but
+    ``_InverseTransform`` stores its wrapped transform there, so pickling it yields
+    ``Inverse(None)``. Applied at import since ``__getstate__`` runs when writing.
+    """
+    if "__getstate__" in torch_tf._InverseTransform.__dict__:
+        return
 
-    def __call__(self):
+    def __getstate__(self) -> Dict[str, Any]:
+        return self.__dict__.copy()  # Keep `_inv`: wrapped transform, not a cache.
+
+    torch_tf._InverseTransform.__getstate__ = __getstate__
+
+
+_patch_inverse_transform_pickling()
+
+
+def _contains_inverse_transform(transform: TorchTransform) -> bool:
+    """Return whether a transform tree contains an inverse wrapper."""
+    seen = set()
+
+    def contains_inverse(current: TorchTransform) -> bool:
+        if id(current) in seen:
+            return False
+        seen.add(id(current))
+        if isinstance(current, torch_tf._InverseTransform):
+            return True
+        for key, value in current.__dict__.items():
+            if key == "_inv":
+                continue
+            if isinstance(value, TorchTransform) and contains_inverse(value):
+                return True
+            if isinstance(value, (list, tuple)) and any(
+                isinstance(item, TorchTransform) and contains_inverse(item)
+                for item in value
+            ):
+                return True
+        return False
+
+    return contains_inverse(transform)
+
+
+class CallableTransform(nn.Module):
+    """Own a PyTorch transform as a movable, picklable module.
+
+    Transform tensors are intentionally absent from ``state_dict``; callers rebuild
+    the transform before loading estimator weights.
+    """
+
+    def __init__(self, transform: TorchTransform):
+        super().__init__()
+        self._is_inverse = _contains_inverse_transform(transform)
+        self._transform = transform.inv if self._is_inverse else transform
+        if not isinstance(
+            self._transform, TorchTransform
+        ) or _contains_inverse_transform(self._transform):
+            raise ValueError(
+                "CallableTransform requires one transform orientation without "
+                "nested inverse wrappers."
+            )
+
+    @property
+    def transform(self) -> TorchTransform:
+        """Return the transform in the orientation supplied at construction."""
+        return self._transform.inv if self._is_inverse else self._transform
+
+    def forward(self) -> TorchTransform:
         return self.transform
+
+    def _apply(self, fn):
+        super()._apply(fn)
+        _apply_to_transform(self._transform, fn)
+        return self
 
 
 def biject_transform_zuko(
@@ -337,6 +475,19 @@ class Standardize(nn.Module):
 
     def forward(self, tensor):
         return (tensor - self._mean) / self._std
+
+
+def nan_tolerant_input_net(net: Optional[nn.Module]) -> Optional[nn.Module]:
+    """Return the module that consumes the raw `x` if it declares
+    `accepts_nan_input`, else None.
+
+    Only `net` itself or, for an `nn.Sequential`, its first layer after leading
+    `Standardize` layers counts, so NaN cannot reach an unmarked module first.
+    """
+    if isinstance(net, nn.Sequential):
+        first = next((m for m in net if not isinstance(m, Standardize)), None)
+        return nan_tolerant_input_net(first)
+    return net if getattr(net, "accepts_nan_input", False) else None
 
 
 def standardizing_net(
@@ -499,7 +650,7 @@ def npe_msg_on_invalid_x(
         else:
             logging.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "They are not excluded from training due to `exclude_invalid_x=False`. "
                 "Training will likely fail, we strongly recommend "
                 f"`exclude_invalid_x=True` for {algorithm}."
             )
@@ -508,18 +659,18 @@ def npe_msg_on_invalid_x(
 def nle_nre_apt_msg_on_invalid_x(
     num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
 ) -> None:
-    """Warn or raise if there are NaNs or Infs, appropriate to SNLE, SNRE, or APT.
+    """Warn or raise on NaNs or Infs, for NLE, NRE, or atomic NPE-C.
 
     This will raise an error in the default case of `exclude_invalid_x=False` since
-    SNLE/SNRE/APT do not allow to discard invalid simulations (Glöckler et al. 2021).
-    If `exclude_invalid_x` has explicitly been set to `True` by the user, this
+    NLE/NRE/atomic NPE-C do not allow to discard invalid simulations (Glöckler et al.
+    2021). If `exclude_invalid_x` has explicitly been set to `True` by the user, this
     function will give a warning about the systematic error.
     """
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
             logging.warning(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"These will be discarded from training due to "
                 f"`exclude_invalid_x=True`. Please be aware that this gives "
                 f"systematically wrong results for {algorithm} and is only recommended "
@@ -527,8 +678,8 @@ def nle_nre_apt_msg_on_invalid_x(
             )
         else:
             raise ValueError(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
-                f"{algorithm} does not allow invalid simulations."
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                f"{algorithm} does not allow invalid simulations. "
                 f"Replace the invalid values with an unreasonably low or high value."
             )
 
@@ -550,42 +701,6 @@ def simformer_msg_on_invalid_x(
                 "Training will likely fail, we strongly recommend "
                 f"`exclude_invalid_x=True` for {algorithm}."
             )
-
-
-def check_warn_and_setstate(
-    state_dict: Dict,
-    key_name: str,
-    replacement_value: Any,
-    warning_msg: str = "",
-) -> Tuple[Dict, str]:
-    """
-    Check if `key_name` is in `state_dict` and add it if not.
-
-    If the key already existed in the `state_dict`, the dictionary remains
-    unaltered. This function also appends to a warning string.
-
-    For developers: The reason that this method only appends to a warning string
-    instead of warning directly is that the user might get multiple very similar
-    warnings if multiple attributes had to be replaced. Thus, we start off with an
-    emtpy string and keep appending all missing attributes. Then, in the end,
-    all attributes are displayed along with a full description of the warning.
-
-    Args:
-        attribute_name: The name of the attribute to check.
-        state_dict: The dictionary to search (and write to if the key does not yet
-            exist).
-        replacement_value: The value to be written to the `state_dict`.
-        warning_msg: String to which the warning message should be appended to.
-
-    Returns:
-        A dictionary which contains the key `attribute_name` and a string with an
-        appended warning message.
-    """
-
-    if key_name not in state_dict:
-        state_dict[key_name] = replacement_value
-        warning_msg += " `self." + key_name + f" = {str(replacement_value)}`"
-    return state_dict, warning_msg
 
 
 def get_simulations_since_round(
@@ -704,7 +819,7 @@ def check_dist_class(
     """Returns whether the `dist` is instance of `class_to_check`.
 
     The dist can be hidden in an Independent distribution, a Boxuniform or in a wrapper.
-    E.g., when the user called `prepare_for_sbi`, the distribution will in fact be a
+    E.g., when the user called `process_prior`, the distribution will in fact be a
     `PytorchReturnTypeWrapper`. Thus, we need additional checks.
 
     Args:
@@ -736,6 +851,27 @@ def check_dist_class(
         return is_instance, return_dist
 
 
+def prior_support_is_bounded(prior: Any) -> Optional[bool]:
+    """Return whether the support of a continuous prior is bounded.
+
+    Args:
+        prior: Prior distribution.
+
+    Returns:
+        False if the support is the real space, True otherwise, and None if the prior
+        does not define a `support`.
+    """
+    if prior is None:
+        return False
+    try:
+        support = prior.support
+    except (NotImplementedError, AttributeError):
+        return None
+    return not isinstance(
+        getattr(support, "base_constraint", support), constraints._Real
+    )
+
+
 def within_support(distribution: Any, samples: Tensor) -> Tensor:
     """
     Return whether the samples are within the support or not.
@@ -745,9 +881,9 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
     checking whether the log-probabilty is not `-inf` will not work because, as of
     torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
-    sample is out of the support (see #451). In `prepare_for_sbi()`, we set
+    sample is out of the support (see #451). In `process_prior()`, we set
     `validate_args=False`. This would take care of this, but requires running
-    `prepare_for_sbi()` and otherwise throws a cryptic error.
+    `process_prior()` and otherwise throws a cryptic error.
 
     Args:
         distribution: Distribution under which to evaluate the `samples`, e.g., a
@@ -757,6 +893,9 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     Returns:
         Tensor of bools indicating whether each sample was within the support.
     """
+    if distribution is None:
+        return torch.ones(samples.shape[:-1], dtype=torch.bool, device=samples.device)
+
     # Try to check using the support property, use log prob method otherwise.
     # Before torch v1.7.0, `support.check()` returned bools for every element.
     # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,
@@ -843,6 +982,37 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
     return theta_repeated, x_repeated
 
 
+def _apply_to_transform(
+    transform: TorchTransform, fn: Callable[[Tensor], Tensor]
+) -> None:
+    """Apply fn to all tensors in a transform tree.
+
+    Walks ComposeTransform.parts, IndependentTransform.base_transform,
+    etc., so .to() calls propagate into the transform.
+
+    Args:
+        transform: Root of the transform tree.
+        fn: Callable applied to each tensor (e.g. ``lambda t: t.to(device)``).
+    """
+    seen = set()
+
+    def _walk(t):
+        if id(t) in seen:
+            return
+        seen.add(id(t))
+        for key, val in list(t.__dict__.items()):
+            if isinstance(val, Tensor):
+                object.__setattr__(t, key, fn(val))
+            elif isinstance(val, (list, tuple)):
+                for item in val:
+                    if isinstance(item, TorchTransform):
+                        _walk(item)
+            elif isinstance(val, TorchTransform):
+                _walk(val)
+
+    _walk(transform)
+
+
 def mcmc_transform(
     prior: Distribution,
     num_prior_samples_for_zscoring: int = 1000,
@@ -870,8 +1040,8 @@ def mcmc_transform(
         enable_transform: Whether to transform parameters to unconstrained space.
             When False, an identity transform will be returned for `theta_transform`.
 
-    Returns: A transformation that transforms whose `forward()` maps from unconstrained
-        (or z-scored) to constrained (or non-z-scored) space.
+    Returns: A transformation whose `forward()` maps from constrained (or
+        non-z-scored) to unconstrained (or z-scored) space.
     """
     if enable_transform:
 
@@ -892,55 +1062,18 @@ def mcmc_transform(
             transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
             return transform
 
-        # Some distributions have a support argument but it raises a
-        # NotImplementedError. We catch this case here.
-        try:
-            _ = prior.support
-            has_support = True
-        except (NotImplementedError, AttributeError):
-            # NotImplementedError -> Distribution that inherits from torch dist but
-            # does not implement support.
-            # AttributeError -> Custom distribution that has no support attribute.
+        support_is_bounded = prior_support_is_bounded(prior)
+        if support_is_bounded is None:
             warnings.warn(
                 "The passed prior has no support property, transform will be "
                 "constructed from mean and std. If the passed prior is supposed to be "
                 "bounded consider implementing the prior.support property.",
                 stacklevel=2,
             )
-            has_support = False
-
-        # If the distribution has a `support`, check if the support is bounded.
-        # If it is not bounded, we want to z-score the space. This is not done
-        # by `biject_to()`, so we have to deal with this case separately.
-        if has_support:
-            if hasattr(prior.support, "base_constraint"):
-                constraint = prior.support.base_constraint  # type: ignore
-            else:
-                constraint = prior.support
-
-            # Check if the support is discrete
-            if hasattr(prior.support, "is_discrete"):
-                is_discrete = prior.support.is_discrete  # type: ignore
-            else:
-                is_discrete = False
-
-            if is_discrete:
-                # For discrete distributions, use mean/std transform
-                transform = prior_mean_std_transform(prior, device)
-            else:
-                # For continuous distributions, check if support is bounded
-                if isinstance(constraint, constraints._Real):
-                    support_is_bounded = False
-                else:
-                    support_is_bounded = True
-
-                if support_is_bounded:
-                    transform = biject_to(prior.support)
-                else:
-                    # Use mean/std transform for unbounded continuous distributions
-                    transform = prior_mean_std_transform(prior, device)
+        # Unbounded and discrete supports are z-scored, which `biject_to()` does not do.
+        if support_is_bounded and not getattr(prior.support, "is_discrete", False):
+            transform = biject_to(prior.support)
         else:
-            # No support property, use mean/std transform
             transform = prior_mean_std_transform(prior, device)
     else:
         transform = torch_tf.identity_transform
@@ -956,6 +1089,9 @@ def mcmc_transform(
         )
 
     check_transform(prior, transform)  # type: ignore
+
+    if enable_transform:
+        _apply_to_transform(transform, lambda t: t.to(device))
 
     return transform.inv  # type: ignore
 
@@ -985,33 +1121,7 @@ def check_transform(
     ), "Original and re-transformed parameters must be close to each other."
 
 
-class NoPrior(Distribution):
-    """
-    Explicit filler object for cases where no prior is provided.
-    Implements log_prob to always return 0 and gaussian noise on sample.
-    See #1635.
-    """
-
-    support = constraints.real  # type: ignore
-
-    def __init__(
-        self, batch_shape=torch.Size(), event_shape=torch.Size(), device: str = 'cpu'
-    ):
-        super().__init__(batch_shape, event_shape)
-        self.device = process_device(device)
-
-    def sample(self, sample_shape=torch.Size()):
-        return torch.randn(
-            torch.Size(sample_shape) + self.batch_shape + self.event_shape,
-            device=self.device,
-        )
-
-    def log_prob(self, value):
-        value = atleast_2d(value)
-        return torch.zeros(value.shape[0], device=value.device)
-
-
-class ImproperEmpirical(Empirical):
+class ImproperEmpirical(Distribution):
     """
     Wrapper around pyro's `Emprirical` distribution that returns constant `log_prob()`.
 
@@ -1025,7 +1135,7 @@ class ImproperEmpirical(Empirical):
     """
 
     def __init__(self, values: Tensor, log_weights: Optional[Tensor] = None):
-        super().__init__(values, log_weights=log_weights)
+        super().__init__()
         # Warn if extremely large to inform about memory/serialization cost.
         self._mean = self._compute_mean(values, log_weights)
         self._variance = self._compute_variance(values, log_weights)
@@ -1039,7 +1149,7 @@ class ImproperEmpirical(Empirical):
 
     def log_prob(self, value: Tensor) -> Tensor:
         """
-        Return ones as a constant log-prob for each input.
+        Return ones as a constant log-prob(zeros) for each input.
 
         Args:
             value: The parameters at which to evaluate the log-probability.
@@ -1047,11 +1157,7 @@ class ImproperEmpirical(Empirical):
         Returns:
             Tensor of as many ones as there were parameter sets.
         """
-        raise NotImplementedError(
-            "Evaluating log_prob from ImproperEmpirical is not supported. If you are "
-            "using likelihood or ratio estimation, or multi-round inference, you need "
-            "to define a prior distribution."
-        )
+        return torch.zeros(value.shape[:-1], device=value.device, dtype=value.dtype)
 
     def _compute_mean(self, values: Tensor, weights: Optional[Tensor] = None) -> Tensor:
         """
@@ -1107,7 +1213,7 @@ class ImproperEmpirical(Empirical):
     def stddev(self) -> Tensor:
         return torch.sqrt(self._variance)
 
-    def to(self, device: Union[str, torch.device]) -> None:
+    def to(self, device: Union[str, torch.device]) -> "ImproperEmpirical":
         """
         Move the distribution to a different device.
 
@@ -1119,7 +1225,7 @@ class ImproperEmpirical(Empirical):
         """
         self._mean = self._mean.to(device)
         self._variance = self._variance.to(device)
-        super().to(device)
+        return self
 
 
 def mog_log_prob(

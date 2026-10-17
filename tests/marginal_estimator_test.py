@@ -15,6 +15,7 @@ from torch.distributions import (
 )
 
 from sbi.inference.trainers.marginal import MarginalTrainer
+from sbi.neural_nets import MarginalConfigBase, MarginalNSFConfig
 from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
 from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import process_device
@@ -29,14 +30,18 @@ from sbi.utils.torchutils import process_device
         ),
         MixtureSameFamily(
             Categorical(torch.ones(2)),
-            Normal(torch.randn(2), torch.rand(2)),
+            Normal(torch.tensor([-1.5, 1.5]), torch.tensor([0.5, 0.75])),
         ),
     ],
 )
-@pytest.mark.parametrize("device", ["cpu", pytest.param("cuda", marks=pytest.mark.gpu)])
-@pytest.mark.parametrize("model", ["nsf", marginal_nn(model=ZukoFlowType.NSF)])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
+@pytest.mark.parametrize(
+    "model", [MarginalNSFConfig(), marginal_nn(model=ZukoFlowType.NSF)]
+)
 def test_marginal_estimator(
-    dist: torch.distributions.Distribution, device: str, model: Union[str, Callable]
+    dist: torch.distributions.Distribution,
+    device: str,
+    model: Union[MarginalConfigBase, Callable],
 ):
     """Test the marginal estimator with various distributions and devices."""
     num_training_samples = 2_000
@@ -62,3 +67,24 @@ def test_marginal_estimator(
         x_test = x_test.unsqueeze(1)
 
     check_c2st(x_test, samples.cpu(), f'MarginalEstimator-{model}')
+
+
+def test_marginal_trainer_exhausted_epoch_budget_returns_the_best_weights():
+    """A run that hits `max_num_epochs` must warn and end on its best weights.
+
+    The trainer has its own training loop, whose condition short-circuits like the
+    shared one in `NeuralInference`: `_converged` never scores the final epoch.
+    """
+    torch.manual_seed(0)
+    x = torch.randn(200, 2)
+
+    trainer = MarginalTrainer(show_progress_bars=False)
+    trainer.append_samples(x)
+    with pytest.warns(UserWarning, match="max_num_epochs"):
+        trainer.train(max_num_epochs=2, stop_after_epochs=50)
+
+    assert trainer.epoch > 2, "the budget must run out for this to test anything"
+    final = trainer._neural_net.state_dict()
+    assert all(
+        torch.equal(final[k], v) for k, v in trainer._best_model_state_dict.items()
+    )

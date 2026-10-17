@@ -201,10 +201,10 @@ class ActiveSubspace:
         def build_mlp(theta):
             classifier = nn.Sequential(
                 nn.Linear(theta.shape[1], hidden_features),
-                nn.BatchNorm1d(hidden_features),
+                nn.LayerNorm(hidden_features),
                 nn.ReLU(),
                 nn.Linear(hidden_features, hidden_features),
-                nn.BatchNorm1d(hidden_features),
+                nn.LayerNorm(hidden_features),
                 nn.ReLU(),
                 nn.Linear(hidden_features, 1),
             )
