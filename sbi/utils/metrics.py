@@ -360,8 +360,10 @@ def regularized_ot_dual(
         cost: Cost-matrix between the empirical samples of x and y.
         Either in batched form (B, m, n) or as a matrix (m, n).
         epsilon: The entropic regularization term
-        max_iter: Maximum number of iterations
-        tol: Tolerance required for Sinkhorn to converge
+        max_iter: Maximum number of iterations. A warning is raised if Sinkhorn
+        has not converged by then.
+        tol: Tolerance on the L1 error of the coupling's row marginals. It is
+        raised to ten times the machine epsilon of the cost's dtype.
 
     Return:
         Optimal transport coupling of shape (B, m, n) or (m, n)
@@ -387,25 +389,19 @@ def regularized_ot_dual(
     def s(f, g):
         return cost - f.unsqueeze(2) - g.unsqueeze(1)
 
-    err = torch.inf
-    iters = torch.zeros(a.shape[0])
-    terminated = torch.zeros(a.shape[0], dtype=torch.bool)
-    for _ in range(max_iter):
-        f_prev, g_prev = f, g
-        f_tmp = f + epsilon * (
-            torch.log(a) - torch.logsumexp(-s(f, g) / epsilon, dim=2)
-        )
-        g_tmp = g + epsilon * (
-            torch.log(b) - torch.logsumexp(-s(f_tmp, g) / epsilon, dim=1)
-        )
-        f = torch.where(terminated.unsqueeze(-1).repeat((1, na)), f, f_tmp)
-        g = torch.where(terminated.unsqueeze(-1).repeat((1, nb)), g, g_tmp)
-
-        err = torch.max((f_prev - f).abs().sum(dim=1), (g_prev - g).abs().sum(dim=1))
+    # The marginal error cannot get much below the dtype's precision.
+    tol = max(tol, 10 * torch.finfo(cost.dtype).eps)
+    terminated = torch.zeros(a.shape[0], dtype=torch.bool, device=a.device)
+    for i in range(max_iter + 1):
+        # After the g-update the column marginals of the coupling are exact, so
+        # convergence is measured on the row marginals, whose log is computed
+        # anyway for the next f-update.
+        log_row_marginal = torch.logsumexp(-s(f, g) / epsilon, dim=2)
+        err = (log_row_marginal.exp() - a).abs().sum(dim=1)
         terminated = torch.logical_or(terminated, err < tol)
         if torch.all(terminated):
             break
-        if iters.max() == max_iter:
+        if i == max_iter:
             warnings.warn(
                 f"Sinkhorn iterations did not converge within {max_iter} iterations. "
                 f"Consider a bigger regularization parameter 'epsilon' "
@@ -413,7 +409,12 @@ def regularized_ot_dual(
                 stacklevel=2,
             )
             break
-        iters = torch.where(terminated, iters, iters + 1)
+        f_tmp = f + epsilon * (torch.log(a) - log_row_marginal)
+        g_tmp = g + epsilon * (
+            torch.log(b) - torch.logsumexp(-s(f_tmp, g) / epsilon, dim=1)
+        )
+        f = torch.where(terminated.unsqueeze(-1).repeat((1, na)), f, f_tmp)
+        g = torch.where(terminated.unsqueeze(-1).repeat((1, nb)), g, g_tmp)
 
     coupling = torch.exp(-s(f, g) / epsilon)
 

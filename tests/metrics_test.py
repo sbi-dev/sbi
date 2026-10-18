@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 
 import numpy as np
 import pytest
@@ -20,6 +21,7 @@ from sbi.utils.metrics import (
     mse_distance,
     posterior_shrinkage,
     posterior_zscore,
+    regularized_ot_dual,
     unbiased_mmd_squared_hypothesis_test,
     wasserstein_2_squared,
     wasserstein_distance,
@@ -117,6 +119,34 @@ def test_wasserstein_2_distance(sigma):
     )
     exponent2 = 0 if estimate == 0 else int(math.floor(math.log10(abs(estimate))))
     assert exponent1 == exponent2
+
+
+def _ot_inputs(dtype, batch=False):
+    torch.manual_seed(0)
+    x, y = torch.randn(100, 2), torch.randn(100, 2) + 1.0
+    a = torch.ones(100, dtype=dtype) / 100
+    cost = torch.cdist(x, y).to(dtype) ** 2
+    if batch:
+        return a.repeat(2, 1), a.repeat(2, 1), torch.stack([cost, 4 * cost])
+    return a, a, cost
+
+
+@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
+@pytest.mark.parametrize("batch", (False, True))
+def test_regularized_ot_dual_converged_does_not_warn(dtype, batch):
+    a, b, cost = _ot_inputs(dtype, batch)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        coupling = regularized_ot_dual(a, b, cost, epsilon=1.0)
+    assert (coupling.sum(-1) - a).abs().sum(-1).max() < 1e-5
+    assert (coupling.sum(-2) - b).abs().sum(-1).max() < 1e-5
+
+
+@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
+def test_regularized_ot_dual_warns_when_not_converged(dtype):
+    a, b, cost = _ot_inputs(dtype)
+    with pytest.warns(UserWarning, match="did not converge"):
+        regularized_ot_dual(a, b, cost, epsilon=1e-3, max_iter=10)
 
 
 @pytest.mark.slow
