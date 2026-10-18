@@ -269,7 +269,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         oversampling_factor: int = 32,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = False,
     ):
         r"""Returns approximate samples from posterior $p(\theta|x)$ via SIR.
@@ -281,7 +281,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight.
             max_sampling_batch_size: The batch size of samples being drawn from
-                the proposal at every iteration.
+                the proposal at every iteration. If not provided, uses the value
+                specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:

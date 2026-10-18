@@ -202,6 +202,38 @@ def test_direct_posterior_multidimensional_sample_shape(snpe_method: type):
     )
 
 
+def test_direct_posterior_uses_constructor_max_sampling_batch_size(monkeypatch):
+    """Sampling without max_sampling_batch_size uses the value from the constructor."""
+    num_dim = 2
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    theta = prior.sample((100,))
+    inference = NPE_C(prior=prior)
+    estimator = inference.append_simulations(
+        theta, diagonal_linear_gaussian(theta)
+    ).train(max_num_epochs=1)
+    posterior = DirectPosterior(
+        posterior_estimator=estimator, prior=prior, max_sampling_batch_size=40_000
+    )
+
+    with pytest.warns(UserWarning, match="Capping max_sampling_batch_size from 40000"):
+        posterior.sample_batched((10,), ones(3, num_dim))
+
+    from sbi.samplers.rejection import rejection
+
+    batch_sizes = []
+    accept_reject_sample = rejection.accept_reject_sample
+
+    def spy(*args, **kwargs):
+        batch_sizes.append(kwargs["max_sampling_batch_size"])
+        return accept_reject_sample(*args, **kwargs)
+
+    monkeypatch.setattr(rejection, "accept_reject_sample", spy)
+    posterior.sample((10,), x=ones(num_dim))
+    posterior.sample((10,), x=ones(num_dim), max_sampling_batch_size=7)
+
+    assert batch_sizes == [40_000, 7]
+
+
 @pytest.mark.parametrize("reject_outside_prior", [True, False])
 def test_npe_a_batched_sample_log_prob_apply_proposal_correction(
     reject_outside_prior: bool,
