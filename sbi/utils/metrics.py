@@ -390,7 +390,7 @@ def regularized_ot_dual(
         return cost - f.unsqueeze(2) - g.unsqueeze(1)
 
     # The marginal error cannot get much below the dtype's precision.
-    tol = max(tol, 10 * torch.finfo(cost.dtype).eps)
+    tol = max(tol, 10 * torch.finfo(torch.promote_types(cost.dtype, a.dtype)).eps)
     terminated = torch.zeros(a.shape[0], dtype=torch.bool, device=a.device)
     for i in range(max_iter + 1):
         # After the g-update the column marginals of the coupling are exact, so

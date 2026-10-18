@@ -142,6 +142,12 @@ def test_regularized_ot_dual_converged_does_not_warn(dtype, batch):
     assert (coupling.sum(-2) - b).abs().sum(-1).max() < 1e-5
 
 
+def test_regularized_ot_dual_integer_cost():
+    a = torch.ones(2) / 2
+    coupling = regularized_ot_dual(a, a, torch.tensor([[0, 1], [1, 0]]), epsilon=1.0)
+    assert torch.allclose(coupling.sum(-1), a)
+
+
 @pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
 def test_regularized_ot_dual_warns_when_not_converged(dtype):
     a, b, cost = _ot_inputs(dtype)
