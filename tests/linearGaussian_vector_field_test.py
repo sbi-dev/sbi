@@ -1215,3 +1215,10 @@ def test_simformer_fixed_masks_and_single_latent_node():
     estimator = inference.build_posterior().vector_field_estimator
     score = estimator.score(torch.randn(6, 1), torch.zeros(3, 1), torch.tensor([0.5]))
     assert score.shape == (6, 1)
+
+
+def test_simformer_append_simulations_with_nan_in_every_row():
+    """Rows with invalid entries are kept, since they are made latent at train time."""
+    inputs = torch.randn(10, 3, 2)
+    inputs[:, 0, 0] = float("nan")
+    Simformer().append_simulations(inputs)

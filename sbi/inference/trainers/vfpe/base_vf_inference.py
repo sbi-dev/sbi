@@ -877,9 +877,7 @@ class MaskedVectorFieldTrainer(
             training_device=self._device,
         )
 
-        _, num_nans, num_infs = handle_invalid_x(
-            inputs, exclude_invalid_x=exclude_invalid_x
-        )
+        _, num_nans, num_infs = handle_invalid_x(inputs, exclude_invalid_x=False)
 
         # Check for problematic z-scoring
         warn_if_invalid_for_zscoring(inputs)

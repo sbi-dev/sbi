@@ -14,10 +14,7 @@ def simulator(theta, num_data=4, device=None):
     theta = theta.to(device) if device is not None else theta
     num_samples = theta.shape[0]
 
-    # Ensure all tensors are on the same device as theta
-    m = torch.stack((theta[:, [0]].squeeze(), theta[:, [1]].squeeze()), dim=1)
-    if m.dim() == 1:
-        m = m.unsqueeze(0)
+    m = theta[:, :2]
 
     s1 = theta[:, [2]].squeeze() ** 2
     s2 = theta[:, [3]].squeeze() ** 2
