@@ -190,7 +190,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         x: Optional[Tensor] = None,
         method: Optional[str] = None,
         oversampling_factor: int = 32,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         """Draw samples from the approximate posterior distribution $p(\theta|x)$.
@@ -207,7 +207,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight.
             max_sampling_batch_size: The batch size of samples being drawn from the
-                proposal at every iteration.
+                proposal at every iteration. If `None`, the value passed to the
+                constructor is used.
             show_progress_bars: Whether to show a progressbar during sampling.
         """
 
