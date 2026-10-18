@@ -98,13 +98,18 @@ def pytest_addoption(parser):
         default=None,
         help="Comma-separated estimators for the selected mini-benchmark mode",
     )
-
     parser.addoption(
         "--bm-num-simulations",
         action="store",
         default=2000,
         type=int,
         help="Run mini-benchmark tests with specified number of simulations",
+    )
+    parser.addoption(
+        "--bm-device",
+        action="store",
+        default=None,
+        help="Run mini-benchmark tests on specified device (e.g. cpu, cuda)",
     )
     parser.addoption(
         "--bm-num-iid-trials",
@@ -126,6 +131,12 @@ def benchmark_mode(request):
 def benchmark_num_simulations(request):
     """Fixture to access the --bm-num-simulations value in test files."""
     return int(request.config.getoption("--bm-num-simulations"))
+
+
+@pytest.fixture
+def benchmark_device(request):
+    """Fixture to access the --bm-device value in test files."""
+    return request.config.getoption("--bm-device")
 
 
 @pytest.fixture(scope="session", autouse=True)

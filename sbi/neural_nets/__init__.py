@@ -8,6 +8,8 @@ from sbi.neural_nets.factory import (
     posterior_flow_nn,
     posterior_nn,
     posterior_score_nn,
+    simformer_flow_nn,
+    simformer_score_nn,
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
     ClassifierConfigBase,
@@ -62,6 +64,8 @@ __all__ = [
     "posterior_nn",
     "posterior_score_nn",
     "posterior_flow_nn",
+    "simformer_score_nn",
+    "simformer_flow_nn",
     # Vector field estimators (FMPE / NPSE).
     "VectorFieldConfigBase",
     "FlowMatchingConfig",

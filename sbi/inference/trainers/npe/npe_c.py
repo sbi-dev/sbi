@@ -233,6 +233,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         3) Compute (Precision * mean) for the prior. This quantity is used at every
             training step if the prior is Gaussian.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         # Check if z-scoring is enabled on the MixtureDensityEstimator
         assert isinstance(self._neural_net, MixtureDensityEstimator)
         if getattr(self._neural_net, "_prior_transform", None) is not None:
@@ -271,6 +273,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
 
         if self.z_score_theta:
+            if self._neural_net is None:
+                raise RuntimeError("Neural net not initialized.")
             # Get z-score parameters from the MixtureDensityEstimator
             # The transform is: z = (theta - shift) / scale
             # where shift = mean (estimated from samples) and scale = std (estimated)
@@ -347,6 +351,8 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         Returns: Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
 
         if self.use_non_atomic_loss:
             return self._log_prob_proposal_posterior_mog(theta, x, proposal)
@@ -375,6 +381,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns:
             Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         batch_size = theta.shape[0]
 
         num_atoms = int(
@@ -467,6 +475,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns:
             Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         # Get the proposal MoG at the default_x
         assert isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
         assert proposal.default_x is not None, "Proposal must have default_x set"
@@ -653,6 +663,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
+            if self._neural_net is None:
+                raise RuntimeError("Neural net not initialized.")
             assert isinstance(self._neural_net, MixtureDensityEstimator)
             theta = self._neural_net._transform_input(theta)
 
