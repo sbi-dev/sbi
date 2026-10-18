@@ -1106,6 +1106,8 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
                     - `True` (or `1`): Attention from query index i to key index j is
                     allowed (i attends to j). See note below.
                     - `False` (or `0`): No edge exists between these variables.
+                    - Self-edges (the diagonal) are always added, so every node
+                    attends at least to itself.
                     - if None, it will be equivalent to a full attention
                     (i.e., full ones) mask, we suggest you to use None instead of ones
                     to save memory resources
@@ -1175,9 +1177,15 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         # - torch.nn.MultiheadAttention expects attn_mask with True = masked (no
         #   attention), False = allowed. Therefore we invert edge_mask before passing
         #   it to the blocks.
+        # - Self-edges are always added: a node with no allowed key would get a fully
+        #   masked attention row, which yields NaN.
+        attn_mask = None
+        if edge_mask is not None:
+            self_edges = torch.eye(T, dtype=torch.bool, device=device)
+            attn_mask = ~(edge_mask.bool() | self_edges)
         t_h = t_h.expand(B, t_h.shape[1])
         for block in self.blocks:
-            h = block(h, t_h, (~edge_mask.bool() if edge_mask is not None else None))
+            h = block(h, t_h, attn_mask)
 
         # Output projection
         out = self.out_linear(h)  # [B, T, F]

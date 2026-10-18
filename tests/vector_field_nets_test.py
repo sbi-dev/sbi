@@ -13,6 +13,7 @@ from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders.vector_field_nets import (
     AdaMLPConfig,
     FlowMatchingConfig,
+    VectorFieldSimformer,
     build_adamlp_network,
     build_simformer_network,
     build_standard_mlp_network,
@@ -201,3 +202,18 @@ def test_mlp_ratio_reaches_the_ada_mlp_global_mlp():
     ).build(torch.randn(10, 2), torch.randn(10, 3))
     expand = estimator.net.global_mlp.mlp_blocks[0][1]
     assert expand.out_features == 8 * expand.in_features
+
+
+@pytest.mark.parametrize("ada_time", [False, True])
+def test_simformer_edge_mask_without_self_edges_has_no_nan(ada_time):
+    """A DAG without self-edges leaves sink nodes with no key to attend to."""
+    net = VectorFieldSimformer(in_features=2, num_nodes=3, ada_time=ada_time)
+    # Chain 0 -> 1 -> 2: node 2 has an empty row.
+    edge_mask = torch.tensor([[0, 1, 0], [0, 0, 1], [0, 0, 0]], dtype=torch.bool)
+    out = net(
+        torch.randn(4, 3, 2),
+        torch.rand(4),
+        condition_mask=torch.zeros(3, dtype=torch.bool),
+        edge_mask=edge_mask.expand(4, 3, 3),
+    )
+    assert not out.isnan().any()
