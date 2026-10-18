@@ -1210,8 +1210,8 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
     # -------------------------- SDE METHODS --------------------------
 
     def score(self, input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
-        # Adjust input over condition num trials
-        if input.shape[1] == 1:
+        # Adjust input [b, 1, d] over condition num trials (iid case)
+        if input.ndim == 3 and input.shape[1] == 1:
             input = input.repeat(1, condition.shape[0], 1)
 
         # Assemble full input from give input and condition

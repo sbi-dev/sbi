@@ -1675,7 +1675,12 @@ class MaskedNeuralInference(
         if isinstance(condition_mask_generator, Callable):
             self._condition_mask_generator = condition_mask_generator
         elif isinstance(condition_mask_generator, Tensor):
-            self._condition_mask_generator = lambda inputs: condition_mask_generator
+            # A fixed mask is a single unbatched mask, expand it to the batch size.
+            self._condition_mask_generator = lambda inputs: (
+                condition_mask_generator.expand(
+                    inputs.shape[0], *condition_mask_generator.shape
+                )
+            )
         elif isinstance(condition_mask_generator, (list, tuple, set)):
             masks_list = list(condition_mask_generator)
 
@@ -1714,7 +1719,11 @@ class MaskedNeuralInference(
         if isinstance(edge_mask_generator, Callable):
             self._edge_mask_generator = edge_mask_generator
         elif isinstance(edge_mask_generator, Tensor):
-            self._edge_mask_generator = lambda condition_mask: edge_mask_generator
+            self._edge_mask_generator = lambda condition_mask: (
+                edge_mask_generator.expand(
+                    condition_mask.shape[0], *edge_mask_generator.shape
+                )
+            )
         elif isinstance(edge_mask_generator, (list, tuple, set)):
             masks_list = list(edge_mask_generator)
 

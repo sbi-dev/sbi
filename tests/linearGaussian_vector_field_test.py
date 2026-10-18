@@ -1200,3 +1200,18 @@ def test_estimate_posterior_precision_rejects_small_budget():
             precision_est_budget=num_dim,
             precision_est_only_diag=False,
         )
+
+
+def test_simformer_fixed_masks_and_single_latent_node():
+    """Fixed mask tensors train, and score keeps the shape of 2D (B, 1) inputs
+    when the condition has several rows."""
+    inputs = torch.randn(200, 2)
+    inference = Simformer(posterior_latent_idx=[0], posterior_observed_idx=[1])
+    inference.append_simulations(inputs)
+    inference.set_condition_masks_generator(torch.tensor([False, True]))
+    inference.set_edge_masks_generator(torch.ones(2, 2, dtype=torch.bool))
+    inference.train(max_num_epochs=2)
+
+    estimator = inference.build_posterior().vector_field_estimator
+    score = estimator.score(torch.randn(6, 1), torch.zeros(3, 1), torch.tensor([0.5]))
+    assert score.shape == (6, 1)
