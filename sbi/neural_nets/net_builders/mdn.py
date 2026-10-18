@@ -75,8 +75,10 @@ def build_mdn(
         prior_transform = mcmc_transform(x_dist, device=batch_x.device)
     elif z_score_x_bool:
         x_mean, x_std = z_standardization(batch_x, structured_x)
-        # Store as [shift, scale] tensor for the estimator
-        transform_input = torch.stack([x_mean, x_std], dim=0)
+        # Store as [shift, scale] tensor of shape (2, *input_shape) for the estimator
+        transform_input = torch.stack(
+            [x_mean.expand(batch_x[0].shape), x_std.expand(batch_x[0].shape)], dim=0
+        )
 
     # Handle z-scoring for y (condition) via embedding net
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
