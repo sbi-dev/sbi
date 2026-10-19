@@ -13,6 +13,7 @@ from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available
 
 from .mini_sbibm.results import (
+    METRIC_TITLES,
     RESULT_COLUMNS,
     benchmark_label,
     merge_results,
@@ -202,13 +203,20 @@ def pytest_sessionfinish(session):
         return
 
     results = get_session_results_df(session)
-    if "c2st" not in results.columns:
+    if "method" not in results.columns:
         return
-    results = results[(results["status"] == "passed") & results["c2st"].notna()]
+    # Failed cases keep empty metrics, so they replace earlier results of the label.
+    results = results[
+        results["status"].isin(["passed", "failed"]) & results["method"].notna()
+    ]
     if results.empty:
         return
     label = session.config.stash[BENCHMARK_LABEL]
-    results = results.assign(label=label)[RESULT_COLUMNS]
+    # The metric columns are missing when all cases failed.
+    results = results.assign(label=label).reindex(columns=[*RESULT_COLUMNS, "status"])
+    # A case can fail after its metrics are set, e.g. in a fixture teardown.
+    results.loc[results["status"] == "failed", list(METRIC_TITLES)] = float("nan")
+    results = results[RESULT_COLUMNS]
     merge_results(
         Path(session.config.getoption("--bm-results-dir")).expanduser(), results
     )

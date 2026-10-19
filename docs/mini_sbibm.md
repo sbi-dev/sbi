@@ -47,7 +47,8 @@ NPE_C-mdn [main]        0.893         0.807
   is about 0.03. A large std error means that the posterior is too wide or too narrow.
 
 Amortized methods are averaged over 10 observations. Sequential methods use one
-observation. Within each task, the best value is green and the worst is red.
+observation. Within each task, the best value is green and the worst is red. `N/A`
+means that the case did not run for this label, or that it failed in the last run.
 
 ## Common tasks
 

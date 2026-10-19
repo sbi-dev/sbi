@@ -411,6 +411,13 @@ def test_run_benchmark(
         request: The pytest request, to read the benchmark mode.
     """
     mode = _benchmark_mode(request.config)
+    # Set before training, so a crashed case replaces the stored result of its label.
+    results_bag.method = (
+        f"{_class_id(inference_class, mode)}-{_kwargs_id(extra_kwargs)}"
+    )
+    results_bag.task_name = task.name
+    results_bag.seed = benchmark_seed
+    results_bag.num_simulations = benchmark_num_simulations
     if mode in SEQUENTIAL_MODES:
         train_and_eval = train_and_eval_sequential_inference
     else:
@@ -425,9 +432,3 @@ def test_run_benchmark(
 
     for key, value in metrics.items():
         results_bag[key] = round(value, 3)
-    results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task.name
-    results_bag.seed = benchmark_seed
-    results_bag.method = (
-        f"{_class_id(inference_class, mode)}-{_kwargs_id(extra_kwargs)}"
-    )

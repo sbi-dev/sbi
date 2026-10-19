@@ -98,7 +98,8 @@ def write_results_tables(write: Callable[[str], None], results_dir: Path) -> Non
     """Write the stored results of all labels, one table per metric.
 
     Rows are methods with their run label, columns are tasks. Several seeds of a
-    case are shown as mean and standard deviation.
+    case are shown as mean and standard deviation. Cases that failed or did not run
+    are shown as N/A.
     """
     stored = [read_results(path) for path in sorted(results_dir.glob("results-*.csv"))]
     stored = [results for results in stored if results is not None]
@@ -113,7 +114,10 @@ def write_results_tables(write: Callable[[str], None], results_dir: Path) -> Non
     results = results.assign(row=rows + "]")
 
     for metric, title in METRIC_TITLES.items():
-        stats = results.groupby(["row", "task_name"])[metric].agg(["mean", "std"])
+        cases = [results["row"], results["task_name"]]
+        stats = results[metric].groupby(cases).agg(["mean", "std"])
+        # A case with a failed seed shows N/A, not the mean of the other seeds.
+        stats.loc[results[metric].isna().groupby(cases).any()] = float("nan")
         write("")
         write(f"== {title} ==")
         _write_metric_table(write, stats["mean"].unstack(), stats["std"].unstack())
