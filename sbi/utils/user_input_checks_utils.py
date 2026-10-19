@@ -20,6 +20,7 @@ from sbi.utils.torchutils import (
     move_all_tensor_to_device,
     process_device,
     set_validate_args,
+    unwrap_mixture_support,
 )
 
 
@@ -438,10 +439,11 @@ class MultipleIndependent(Distribution):
         # fails because the `independent` constraint returned only a 1D `[True]`.
         supports = []
         for d in self.dists:
-            if isinstance(d.support, constraints.independent):
-                supports.append(d.support.base_constraint)
+            support = unwrap_mixture_support(d)
+            if isinstance(support, constraints.independent):
+                supports.append(support.base_constraint)
             else:
-                supports.append(d.support)
+                supports.append(support)
         # Wrap as `independent` in order to have the correct shape of the
         # `log_abs_det`, i.e. summed over the parameter dimensions.
         return constraints.independent(

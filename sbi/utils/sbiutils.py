@@ -37,6 +37,7 @@ from torch.optim.adam import Adam
 
 from sbi import __version__
 from sbi.sbi_types import TorchTransform
+from sbi.utils.torchutils import unwrap_mixture_support
 
 _T = TypeVar("_T")
 
@@ -1005,7 +1006,14 @@ def mcmc_transform(
             )
         # Unbounded and discrete supports are z-scored, which `biject_to()` does not do.
         if support_is_bounded and not getattr(prior.support, "is_discrete", False):
-            transform = biject_to(prior.support)
+            support = unwrap_mixture_support(prior)
+            try:
+                transform = biject_to(support)
+            except NotImplementedError as e:
+                raise NotImplementedError(
+                    f"sbi cannot map the prior support {support} to unconstrained "
+                    "space: torch's `biject_to` has no transform for it."
+                ) from e
         else:
             transform = prior_mean_std_transform(prior, device)
     else:

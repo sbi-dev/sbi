@@ -10,10 +10,13 @@ import pytest
 import torch
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import (
+    Bernoulli,
     Beta,
+    Categorical,
     Distribution,
     Exponential,
     Gamma,
+    MixtureSameFamily,
     MultivariateNormal,
     Normal,
     Uniform,
@@ -803,6 +806,12 @@ def test_inference_with_user_sbi_problems(
             Beta(ones(1), 2 * ones(1)),
         ],
         [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
+        [
+            Gamma(ones(1), ones(1)),
+            MixtureSameFamily(
+                Categorical(ones(1, 2)), Bernoulli(probs=torch.tensor([[0.2, 0.7]]))
+            ),
+        ],
     ],
 )
 def test_independent_joint_shapes_and_samples(dists):
