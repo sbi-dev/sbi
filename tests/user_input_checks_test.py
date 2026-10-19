@@ -776,91 +776,9 @@ def test_inference_with_user_sbi_problems(
     inference.build_posterior().set_default_x(x_o)
 
 
-@pytest.mark.parametrize(
-    "dists",
-    [
-        pytest.param(
-            [Beta(ones(1), 2 * ones(1))], marks=pytest.mark.xfail
-        ),  # single dist.
-        pytest.param(
-            [Gamma(ones(2), ones(1))], marks=pytest.mark.xfail
-        ),  # single batched dist.
-        pytest.param(
-            [
-                Gamma(ones(2), ones(1)),
-                MultipleIndependent([
-                    Uniform(zeros(1), ones(1)),
-                    Uniform(zeros(1), ones(1)),
-                ]),
-            ],
-            marks=pytest.mark.xfail,
-        ),  # nested definition.
-        pytest.param(
-            [Uniform(0, 1), Beta(1, 2)], marks=pytest.mark.xfail
-        ),  # scalar dists.
-        [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
-        [
-            Gamma(ones(1), ones(1)),
-            Uniform(zeros(1), ones(1)),
-            Beta(ones(1), 2 * ones(1)),
-        ],
-        [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
-    ],
-)
-def test_independent_joint_shapes_and_samples(dists):
-    """Test return shapes and validity of samples by comparing to samples generated
-    from underlying distributions individually."""
-
-    # Fix the seed for reseeding within this test.
-    seed = 0
-
-    joint = MultipleIndependent(dists)
-
-    # Check shape of single sample and log prob
-    sample = joint.sample()
-    assert sample.shape == torch.Size([joint.ndims])
-    assert joint.log_prob(sample).shape == torch.Size([1])
-
-    num_samples = 10
-
-    # seed sampling for later comparison.
-    torch.manual_seed(seed)
-    samples = joint.sample((num_samples,))
-    log_probs = joint.log_prob(samples)
-
-    # Check sample and log_prob return shapes.
-    assert samples.shape == torch.Size([
-        num_samples,
-        joint.ndims,
-    ]) or samples.shape == torch.Size([num_samples])
-    assert log_probs.shape == torch.Size([num_samples])
-
-    # Seed again to get same samples by hand.
-    torch.manual_seed(seed)
-    true_samples = []
-    true_log_probs = []
-
-    # Get samples and log probs by hand.
-    for d in dists:
-        sample = d.sample((num_samples,))
-        true_samples.append(sample)
-        true_log_probs.append(d.log_prob(sample).reshape(num_samples, -1))
-
-    # collect in Tensor.
-    true_samples = torch.cat(true_samples, dim=-1)
-    true_log_probs = torch.cat(true_log_probs, dim=-1).sum(-1)
-
-    # Check whether independent joint sample equal individual samples.
-    assert (true_samples == samples).all()
-    assert (true_log_probs == log_probs).all()
-
-    # Check support attribute.
-    within_support = joint.support.check(true_samples)
-    assert within_support.all()
-
-
 JOINT_COMPONENTS = [
     [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
+    [Gamma(ones(1), ones(1)), Uniform(zeros(1), ones(1)), Beta(ones(1), 2 * ones(1))],
     [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
     [MultivariateNormal(zeros(1, 3), eye(3)), Beta(ones(1), 2 * ones(1))],
 ]
@@ -897,6 +815,7 @@ def test_independent_joint_sample_shape(dists, sample_shape):
         assert log_probs.shape == sample_shape
     assert torch.allclose(log_probs.reshape(sample_shape), expected_log_probs)
 
+    assert joint.support.check(samples).all()
     assert joint.mean.shape == joint.variance.shape == torch.Size([joint.ndims])
 
 
@@ -911,15 +830,31 @@ def test_independent_joint_empty_sample_shape(dists, sample_shape):
 
 
 @pytest.mark.parametrize(
-    "component, match",
+    "dists, match",
     [
-        (Normal(torch.empty(0), torch.empty(0)), "batch shape"),
-        (Independent(Uniform(zeros(2, 3), ones(2, 3)), 2), "event shape"),
+        ([Beta(ones(1), 2 * ones(1))], "at least 2"),
+        ([Gamma(ones(2), ones(1)), Gamma(ones(1), ones(1))], "batch shape"),
+        (
+            [Normal(torch.empty(0), torch.empty(0)), Gamma(ones(1), ones(1))],
+            "batch shape",
+        ),
+        (
+            [Independent(Uniform(zeros(2, 3), ones(2, 3)), 2), Gamma(ones(1), ones(1))],
+            "event shape",
+        ),
+        (
+            [
+                Gamma(ones(1), ones(1)),
+                MultipleIndependent([Uniform(zeros(1), ones(1))] * 2),
+            ],
+            "Nesting",
+        ),
+        ([Uniform(0, 1), Beta(1, 2)], "scalar only"),
     ],
 )
-def test_independent_joint_rejects_unsupported_component(component, match):
+def test_independent_joint_rejects_unsupported_components(dists, match):
     with pytest.raises(AssertionError, match=match):
-        MultipleIndependent([component, Gamma(ones(1), ones(1))])
+        MultipleIndependent(dists)
 
 
 @pytest.mark.parametrize(

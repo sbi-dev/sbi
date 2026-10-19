@@ -310,9 +310,10 @@ class MultipleIndependent(Distribution):
         self.dists = dists
         self.device = process_device(device or "cpu")
         self.to(self.device)
-        # numel() instead of event_shape because for all dists both is possible,
-        # event_shape=[1] or batch_shape=[1]
-        self.dims_per_dist = [d.sample().numel() for d in self.dists]
+        # A component can carry its dimensions in batch_shape [1] or in event_shape.
+        self.dims_per_dist = [
+            (d.batch_shape + d.event_shape).numel() for d in self.dists
+        ]
 
         self.ndims = int(torch.sum(torch.as_tensor(self.dims_per_dist)).item())
         self.custom_arg_constraints = arg_constraints or {}
@@ -373,7 +374,6 @@ class MultipleIndependent(Distribution):
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
         sample_shape = torch.Size(sample_shape)
-        # A component can carry its dimensions in batch_shape [1] or in event_shape.
         samples = [
             d.sample(sample_shape).reshape(*sample_shape, ndims)
             for d, ndims in zip(self.dists, self.dims_per_dist, strict=True)
@@ -388,7 +388,6 @@ class MultipleIndependent(Distribution):
         dims_covered = 0
         for d, ndims in zip(self.dists, self.dims_per_dist, strict=True):
             v = value[..., dims_covered : dims_covered + ndims]
-            v = v.reshape(*batch_shape, *d.batch_shape, *d.event_shape)
             log_probs.append(d.log_prob(v).reshape(batch_shape))
             dims_covered += ndims
 
