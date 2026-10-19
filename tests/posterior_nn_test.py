@@ -19,6 +19,7 @@ from sbi.inference import (
     NRE_B,
     NRE_C,
     DirectPosterior,
+    ImportanceSamplingPosterior,
 )
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -232,6 +233,28 @@ def test_direct_posterior_uses_constructor_max_sampling_batch_size(monkeypatch):
     posterior.sample((10,), x=ones(num_dim), max_sampling_batch_size=7)
 
     assert batch_sizes == [40_000, 7]
+
+
+def test_importance_posterior_rejects_zero_max_sampling_batch_size():
+    """A zero constructor batch size would make SIR sampling loop forever."""
+    num_dim = 2
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    theta = prior.sample((100,))
+    inference = NPE_C(prior=prior)
+    estimator = inference.append_simulations(
+        theta, diagonal_linear_gaussian(theta)
+    ).train(max_num_epochs=1)
+    potential_fn, theta_transform = posterior_estimator_based_potential(
+        estimator, prior, x_o=ones(num_dim)
+    )
+
+    with pytest.raises(ValueError, match="max_sampling_batch_size"):
+        ImportanceSamplingPosterior(
+            potential_fn,
+            proposal=prior,
+            theta_transform=theta_transform,
+            max_sampling_batch_size=0,
+        )
 
 
 @pytest.mark.parametrize("reject_outside_prior", [True, False])
