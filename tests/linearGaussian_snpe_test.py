@@ -843,6 +843,39 @@ def test_multiround_mog_training():
         proposal = posterior
 
 
+def test_npe_c_z_scored_gaussian_prior_keeps_covariance():
+    """The z-scored Gaussian prior in the MoG loss is the pushforward of the prior.
+
+    z-scoring theta maps N(m, C) to N((m - m_e) / s_e, C / (s_e s_e^T)). The prior must
+    keep its correlations and use variances, not standard deviations.
+    """
+    torch.manual_seed(0)
+    cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
+    prior = MultivariateNormal(torch.zeros(2), cov)
+    x_o = torch.zeros(1, 2)
+
+    def simulator(theta):
+        return theta + 0.3 * torch.randn_like(theta)
+
+    inference = NPE_C(prior, density_estimator="mdn", show_progress_bars=False)
+    theta = prior.sample((1000,))
+    inference.append_simulations(theta, simulator(theta)).train(max_num_epochs=30)
+    proposal = inference.build_posterior().set_default_x(x_o)
+
+    theta = proposal.sample((200,))
+    inference.append_simulations(theta, simulator(theta), proposal=proposal)
+    inference.train(max_num_epochs=1)
+    assert inference.use_non_atomic_loss and inference.z_score_theta
+
+    shift = inference._neural_net._transform_shift
+    scale = inference._neural_net._transform_scale
+    z_scored_prior = inference._maybe_z_scored_prior
+    assert torch.allclose(z_scored_prior.loc, (prior.mean - shift) / scale)
+    assert torch.allclose(
+        z_scored_prior.covariance_matrix, cov / torch.outer(scale, scale)
+    )
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "num_dim",
