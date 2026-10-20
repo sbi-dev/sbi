@@ -773,72 +773,20 @@ class UniformNormalConvolution(Distribution):
         return self.scale * x + noise_sample
 
     def log_prob(self, value: Tensor) -> Tensor:
-        # Compute p(value) using the convolution formula:
-        # p(value) = 1/(|scale|*(b-a)) * [Phi((value - u_min)/noise)
-        # - Phi((value - u_max)/noise)], where u_min = min(scale*a, scale*b)
-        # and u_max = max(scale*a, scale*b).
-        # In the degenerate limit u_max == u_min (e.g. scale == 0), the distribution
-        # converges to Normal(u_min, noise).
-        low = torch.as_tensor(self.low, device=value.device, dtype=value.dtype)
-        high = torch.as_tensor(self.high, device=value.device, dtype=value.dtype)
-        scale = torch.as_tensor(self.scale, device=value.device, dtype=value.dtype)
-        noise = torch.as_tensor(self.noise, device=value.device, dtype=value.dtype)
-
-        is_finite = torch.isfinite(value)
-        val_safe = torch.where(is_finite, value, torch.zeros_like(value))
-
-        u_min = torch.minimum(scale * low, scale * high)
-        u_max = torch.maximum(scale * low, scale * high)
-        diff = u_max - u_min
-        delta = diff / (2.0 * noise)
-
-        # For small delta, direct subtraction of normal CDFs suffers from
-        # catastrophic cancellation. Using a 4th-order Taylor expansion around the
-        # midpoint u_mid in dimensionless variable xi = z_mid * delta provides
-        # machine precision down to delta = 0 (exact Gaussian).
-        use_series = delta <= 1e-2
-
-        # Guard series inputs against out-of-domain branch evaluation and
-        # intermediate float32 overflow:
-        delta_series = torch.where(use_series, delta, torch.zeros_like(delta))
-        u_mid = (u_min + u_max) / 2.0
-        z_mid = (val_safe - u_mid) / noise
-        xi = torch.clamp(
-            torch.where(use_series, z_mid * delta_series, torch.zeros_like(delta)),
-            -10.0,
-            10.0,
-        )
-
-        term2 = (xi**2 - delta_series**2) / 6.0
-        term4 = (
-            xi**4 - 6.0 * (xi**2) * (delta_series**2) + 3.0 * (delta_series**4)
-        ) / 120.0
-        corr = (term2 + term4).clamp_min(-0.5)
-        log_prob_series = Normal(u_mid, noise, validate_args=False).log_prob(
-            val_safe
-        ) + torch.log1p(corr)
-
-        # Standard analytical convolution formula:
-        # Use complementary error functions with reflection symmetry to avoid
-        # catastrophic subtraction cancellation (1.0 - 1.0 = 0.0) in the tails:
-        # Phi(z1) - Phi(z2) = 0.5 * [erfc(x1 / sqrt(2)) - erfc(x2 / sqrt(2))]
-        z1 = (val_safe - u_min) / noise
-        z2 = (val_safe - u_max) / noise
-        flip = (z1 + z2) > 0
-        x1 = torch.where(flip, z2, -z1)
-        x2 = torch.where(flip, z1, -z2)
-
-        sqrt2 = math.sqrt(2)
-        tiny = torch.finfo(value.dtype).tiny
-        safe_diff = diff.clamp_min(tiny)
-        numerator = 0.5 * (torch.erfc(x1 / sqrt2) - torch.erfc(x2 / sqrt2))
-        pdf_direct = numerator / safe_diff
-        log_prob_direct = torch.log(pdf_direct.clamp_min(tiny))
-
-        lp = torch.where(use_series, log_prob_series, log_prob_direct)
-        return torch.where(
-            is_finite, lp, torch.where(torch.isnan(value), value, -torch.inf)
-        )
+        # p(value) = [Phi((value - u_lo)/noise) - Phi((value - u_hi)/noise)]
+        # / (u_hi - u_lo), where [u_lo, u_hi] is the box [low, high] times scale.
+        u_lo = torch.minimum(self.scale * self.low, self.scale * self.high)
+        u_hi = torch.maximum(self.scale * self.low, self.scale * self.high)
+        z_lo = (value - u_lo) / self.noise
+        z_hi = (value - u_hi) / self.noise
+        # Take the CDF difference from the small tail probabilities on value's side
+        # of the box, so it does not round to zero (and lose its gradient) there.
+        right = z_lo + z_hi > 0
+        near = torch.where(right, z_hi, -z_lo)
+        far = torch.where(right, z_lo, -z_hi)
+        mass = 0.5 * (torch.erfc(near / math.sqrt(2)) - torch.erfc(far / math.sqrt(2)))
+        tiny = torch.finfo(mass.dtype).tiny
+        return torch.log(mass.clamp_min(tiny)) - torch.log(u_hi - u_lo)
 
 
 # Utility functions --------------------------------------------------------
