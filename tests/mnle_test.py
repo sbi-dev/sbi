@@ -396,7 +396,7 @@ def test_log_likelihood_over_local_iid_theta(
     condition_o = proposal.sample((
         num_conditions,
         num_trials,
-    ))[:, idx_of_cond:].reshape(num_trials, 1)
+    ))[..., idx_of_cond:].reshape(num_trials, 1)
     for i in range(num_xs):
         # simulate with same iid theta but different conditions
         x_o[:, i, :] = mixed_simulator(theta_o[i].repeat(num_trials, 1), condition_o)

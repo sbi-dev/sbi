@@ -3,12 +3,11 @@
 
 from copy import deepcopy
 from dataclasses import asdict
-from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Self, Sequence, Tuple, Union
 
 from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import Self
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
