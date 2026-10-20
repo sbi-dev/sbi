@@ -10,11 +10,14 @@ import pytest
 import torch
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import (
+    Bernoulli,
     Beta,
+    Categorical,
     Distribution,
     Exponential,
     Gamma,
     Independent,
+    MixtureSameFamily,
     MultivariateNormal,
     Normal,
     Uniform,
@@ -785,7 +788,19 @@ JOINT_COMPONENTS = [
 
 
 @pytest.mark.parametrize("sample_shape", [(), (5,), (2, 3)])
-@pytest.mark.parametrize("dists", JOINT_COMPONENTS)
+@pytest.mark.parametrize(
+    "dists",
+    [
+        *JOINT_COMPONENTS,
+        # Not in JOINT_COMPONENTS: torch cannot sample an empty batch from a mixture.
+        [
+            Gamma(ones(1), ones(1)),
+            MixtureSameFamily(
+                Categorical(ones(1, 2)), Bernoulli(probs=torch.tensor([[0.2, 0.7]]))
+            ),
+        ],
+    ],
+)
 def test_independent_joint_sample_shape(dists, sample_shape):
     joint = MultipleIndependent(dists)
     sample_shape = torch.Size(sample_shape)
