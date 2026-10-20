@@ -173,7 +173,7 @@ def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_metho
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
-@pytest.mark.parametrize("predictor", ("euler_maruyama",))
+@pytest.mark.parametrize("predictor", ("euler_maruyama", "heun"))
 @pytest.mark.parametrize("corrector", (None, "gibbs", "langevin"))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("mu", (-1.0, 0.0, 1.0))
