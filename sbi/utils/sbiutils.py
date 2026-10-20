@@ -1270,7 +1270,7 @@ def gradient_ascent(
     # iteration.
     best_log_prob_iter = torch.max(init_probs)
     best_theta_iter = sorted_inits[-1]
-    best_theta_overall = best_theta_iter.detach().clone()
+    best_theta_overall = theta_transform(best_theta_iter.detach().clone())
     best_log_prob_overall = best_log_prob_iter.detach().clone()
 
     argmax_ = best_theta_overall

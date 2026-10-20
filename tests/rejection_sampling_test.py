@@ -182,3 +182,42 @@ def test_warn_if_outside_prior_support():
         warnings.simplefilter("always")
         warn_if_outside_prior_support(prior, samples_mixed, threshold=0.05)
         assert len(w) == 1
+
+
+def test_batched_rejection_sampling_preserves_event_shape():
+    from sbi.samplers.rejection import accept_reject_sample
+
+    num_simulations = 200
+    num_xos = 2
+    sampling_batch_size = 50
+    theta_dim = 2
+    event_shape = (3,)
+
+    proposal = torch.distributions.MultivariateNormal(
+        torch.zeros(theta_dim), torch.eye(theta_dim)
+    )
+    prior = proposal
+
+    theta = proposal.sample((num_simulations,))
+    x = torch.randn(num_simulations, *event_shape)
+
+    def simulator(theta):
+        return theta[:, :1].expand(-1, *event_shape) + 0.01 * torch.randn(
+            theta.shape[0], *event_shape
+        )
+
+    def potential_fn(theta, x):
+        return -((theta[:, :1] - x) ** 2).sum(dim=-1)
+
+    samples, _ = accept_reject_sample(
+        proposal,
+        potential_fn=potential_fn,
+        theta=theta,
+        x=x,
+        num_samples=10,
+        num_xos=num_xos,
+        sampling_batch_size=sampling_batch_size,
+        prior=prior,
+        show_progress_bars=False,
+    )
+    assert samples.shape[0] == 10
