@@ -189,7 +189,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         method: Optional[str] = None,
-        oversampling_factor: int = 32,
+        oversampling_factor: Optional[int] = None,
         max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
@@ -205,10 +205,11 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 `importance`, the `.sample()` method returns a tuple of samples and
                 corresponding importance weights.
             oversampling_factor: Number of proposed samples from which only one is
-                selected based on its importance weight.
+                selected based on its importance weight. If not provided, uses the
+                value specified at initialization.
             max_sampling_batch_size: The batch size of samples being drawn from the
-                proposal at every iteration. If `None`, the value passed to the
-                constructor is used.
+                proposal at every iteration. If not provided, uses the value
+                specified at initialization.
             show_progress_bars: Whether to show a progressbar during sampling.
         """
 
@@ -269,7 +270,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     def _sir_sample(
         self,
         sample_shape: Shape = torch.Size(),
-        oversampling_factor: int = 32,
+        oversampling_factor: Optional[int] = None,
         max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = False,
     ):
@@ -280,7 +281,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
             oversampling_factor: Number of proposed samples from which only one is
-                selected based on its importance weight.
+                selected based on its importance weight. If not provided, uses the
+                value specified at initialization.
             max_sampling_batch_size: The batch size of samples being drawn from
                 the proposal at every iteration. If not provided, uses the value
                 specified at initialization.
