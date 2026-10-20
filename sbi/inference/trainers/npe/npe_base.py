@@ -11,6 +11,7 @@ from typing import (
     Dict,
     Literal,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Union,
@@ -19,7 +20,6 @@ from typing import (
 from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import Self
 
 from sbi.inference.posteriors import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior

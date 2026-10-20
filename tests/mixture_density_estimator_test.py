@@ -162,11 +162,26 @@ class TestMultivariateGaussianMDNDevice:
                     not torch.cuda.is_available(), reason="CUDA not available"
                 ),
             ),
+            pytest.param(
+                "mps",
+                marks=pytest.mark.skipif(
+                    not (
+                        hasattr(torch.backends, "mps")
+                        and torch.backends.mps.is_available()
+                    ),
+                    reason="MPS not available",
+                ),
+            ),
         ],
     )
     def test_mdn_on_device(self, standard_mdn, device):
-        """Test MDN works on different devices."""
+        """Test MDN works on different devices and migrates internal buffers."""
         mdn = standard_mdn.to(device)
+        assert mdn._row_ix.device.type == device
+        assert mdn._column_ix.device.type == device
+        assert mdn._diag_ix.device.type == device
+        assert not {"_row_ix", "_column_ix", "_diag_ix"} & set(mdn.state_dict())
+
         context = torch.randn(8, 5, device=device)
         mog = mdn(context)
         assert mog.device.type == device

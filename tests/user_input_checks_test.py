@@ -10,11 +10,16 @@ import pytest
 import torch
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import (
+    Bernoulli,
     Beta,
+    Categorical,
     Distribution,
     Exponential,
     Gamma,
+    Independent,
+    MixtureSameFamily,
     MultivariateNormal,
+    Normal,
     Uniform,
 )
 
@@ -42,6 +47,7 @@ from sbi.neural_nets.net_builders import build_categoricalmassestimator
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
+from sbi.utils.conditional_density_utils import RestrictedPriorForConditional
 from sbi.utils.sbiutils import Standardize, nan_tolerant_input_net
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
@@ -250,6 +256,17 @@ def test_reinterpreted_batch_dim_prior():
             Uniform(zeros(1), ones(1)),
             Uniform(zeros(1), ones(1)),
         ],  # multiple independent prior
+        [
+            Gamma(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64)),
+            Gamma(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64)),
+        ],  # multiple independent prior with non-float32 dtype
+        [
+            Normal(zeros(1, dtype=torch.float16), ones(1, dtype=torch.float16)),
+            MultivariateNormal(
+                zeros(3, dtype=torch.float64), eye(3, dtype=torch.float64)
+            ),
+            Uniform(zeros(1), ones(1)),
+        ],  # multiple independent prior with mixed dtypes and event shapes
         pytest.param(
             [
                 UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
@@ -278,6 +295,18 @@ def test_process_prior(prior):
     assert prior.log_prob(theta).shape[0] == batch_size, (
         "Number of log probs must match number of input values."
     )
+
+
+def test_process_prior_warns_and_keeps_shapes_for_float64_prior():
+    prior = MultivariateNormal(
+        zeros(3, dtype=torch.float64), eye(3, dtype=torch.float64)
+    )
+    with pytest.warns(UserWarning, match="casts the samples and log probs"):
+        processed, parameter_dim, _ = process_prior(prior)
+
+    assert parameter_dim == 3
+    assert processed.event_shape == torch.Size([3])
+    assert processed.sample((2,)).dtype == torch.float32
 
 
 @pytest.mark.parametrize(
@@ -750,87 +779,117 @@ def test_inference_with_user_sbi_problems(
     inference.build_posterior().set_default_x(x_o)
 
 
+JOINT_COMPONENTS = [
+    [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
+    [Gamma(ones(1), ones(1)), Uniform(zeros(1), ones(1)), Beta(ones(1), 2 * ones(1))],
+    [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
+    [MultivariateNormal(zeros(1, 3), eye(3)), Beta(ones(1), 2 * ones(1))],
+]
+
+
+@pytest.mark.parametrize("sample_shape", [(), (5,), (2, 3)])
 @pytest.mark.parametrize(
     "dists",
     [
-        pytest.param(
-            [Beta(ones(1), 2 * ones(1))], marks=pytest.mark.xfail
-        ),  # single dist.
-        pytest.param(
-            [Gamma(ones(2), ones(1))], marks=pytest.mark.xfail
-        ),  # single batched dist.
-        pytest.param(
-            [
-                Gamma(ones(2), ones(1)),
-                MultipleIndependent([
-                    Uniform(zeros(1), ones(1)),
-                    Uniform(zeros(1), ones(1)),
-                ]),
-            ],
-            marks=pytest.mark.xfail,
-        ),  # nested definition.
-        pytest.param(
-            [Uniform(0, 1), Beta(1, 2)], marks=pytest.mark.xfail
-        ),  # scalar dists.
-        [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
+        *JOINT_COMPONENTS,
+        # Not in JOINT_COMPONENTS: torch cannot sample an empty batch from a mixture.
         [
             Gamma(ones(1), ones(1)),
-            Uniform(zeros(1), ones(1)),
-            Beta(ones(1), 2 * ones(1)),
+            MixtureSameFamily(
+                Categorical(ones(1, 2)), Bernoulli(probs=torch.tensor([[0.2, 0.7]]))
+            ),
         ],
-        [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
     ],
 )
-def test_independent_joint_shapes_and_samples(dists):
-    """Test return shapes and validity of samples by comparing to samples generated
-    from underlying distributions individually."""
-
-    # Fix the seed for reseeding within this test.
-    seed = 0
-
+def test_independent_joint_sample_shape(dists, sample_shape):
     joint = MultipleIndependent(dists)
+    sample_shape = torch.Size(sample_shape)
 
-    # Check shape of single sample and log prob
-    sample = joint.sample()
-    assert sample.shape == torch.Size([joint.ndims])
-    assert joint.log_prob(sample).shape == torch.Size([1])
+    torch.manual_seed(0)
+    samples = joint.sample(sample_shape)
+    torch.manual_seed(0)
+    component_samples = [d.sample(sample_shape) for d in dists]
+    expected = torch.cat(
+        [
+            s.reshape(*sample_shape, ndims)
+            for s, ndims in zip(component_samples, joint.dims_per_dist, strict=True)
+        ],
+        dim=-1,
+    )
+    assert samples.shape == sample_shape + (joint.ndims,)
+    assert torch.equal(samples, expected)
 
-    num_samples = 10
-
-    # seed sampling for later comparison.
-    torch.manual_seed(seed)
-    samples = joint.sample((num_samples,))
+    expected_log_probs = sum(
+        d.log_prob(s).reshape(sample_shape)
+        for d, s in zip(dists, component_samples, strict=True)
+    )
     log_probs = joint.log_prob(samples)
+    if sample_shape == torch.Size():
+        assert log_probs.shape == torch.Size([1])
+    else:
+        assert log_probs.shape == sample_shape
+    assert torch.allclose(log_probs.reshape(sample_shape), expected_log_probs)
 
-    # Check sample and log_prob return shapes.
-    assert samples.shape == torch.Size([
-        num_samples,
-        joint.ndims,
-    ]) or samples.shape == torch.Size([num_samples])
-    assert log_probs.shape == torch.Size([num_samples])
+    assert joint.support.check(samples).all()
+    assert joint.mean.shape == joint.variance.shape == torch.Size([joint.ndims])
 
-    # Seed again to get same samples by hand.
-    torch.manual_seed(seed)
-    true_samples = []
-    true_log_probs = []
 
-    # Get samples and log probs by hand.
-    for d in dists:
-        sample = d.sample((num_samples,))
-        true_samples.append(sample)
-        true_log_probs.append(d.log_prob(sample).reshape(num_samples, -1))
+@pytest.mark.parametrize("sample_shape", [(0,), (2, 0)])
+@pytest.mark.parametrize("dists", JOINT_COMPONENTS)
+def test_independent_joint_empty_sample_shape(dists, sample_shape):
+    # torch validates log_prob inputs and rejects empty batches for some
+    # distributions, so only sampling is checked here.
+    joint = MultipleIndependent(dists)
+    samples = joint.sample(sample_shape)
+    assert samples.shape == torch.Size(sample_shape) + (joint.ndims,)
 
-    # collect in Tensor.
-    true_samples = torch.cat(true_samples, dim=-1)
-    true_log_probs = torch.cat(true_log_probs, dim=-1).sum(-1)
 
-    # Check whether independent joint sample equal individual samples.
-    assert (true_samples == samples).all()
-    assert (true_log_probs == log_probs).all()
+@pytest.mark.parametrize(
+    "dists, match",
+    [
+        ([Beta(ones(1), 2 * ones(1))], "at least 2"),
+        ([Gamma(ones(2), ones(1)), Gamma(ones(1), ones(1))], "batch shape"),
+        (
+            [Normal(torch.empty(0), torch.empty(0)), Gamma(ones(1), ones(1))],
+            "batch shape",
+        ),
+        (
+            [Independent(Uniform(zeros(2, 3), ones(2, 3)), 2), Gamma(ones(1), ones(1))],
+            "event shape",
+        ),
+        (
+            [
+                Gamma(ones(1), ones(1)),
+                MultipleIndependent([Uniform(zeros(1), ones(1))] * 2),
+            ],
+            "Nesting",
+        ),
+        ([Uniform(0, 1), Beta(1, 2)], "scalar only"),
+    ],
+)
+def test_independent_joint_rejects_unsupported_components(dists, match):
+    with pytest.raises(AssertionError, match=match):
+        MultipleIndependent(dists)
 
-    # Check support attribute.
-    within_support = joint.support.check(true_samples)
-    assert within_support.all()
+
+@pytest.mark.parametrize(
+    "prior",
+    [
+        BoxUniform(zeros(3), ones(3)),
+        MultipleIndependent([Uniform(zeros(1), ones(1))] * 3),
+    ],
+)
+def test_restricted_prior_for_conditional_keeps_sample_shape(prior):
+    dims_to_sample = [0, 2]
+    restricted_prior = RestrictedPriorForConditional(prior, dims_to_sample)
+
+    torch.manual_seed(0)
+    samples = restricted_prior.sample((2, 3))
+    torch.manual_seed(0)
+    expected = prior.sample((2, 3))[..., dims_to_sample]
+
+    assert samples.shape == torch.Size([2, 3, 2])
+    assert torch.equal(samples, expected)
 
 
 def test_invalid_inputs():
