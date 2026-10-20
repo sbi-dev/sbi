@@ -71,3 +71,4 @@ expected coverage, TARP, L-C2ST).
 - [Importance Sampling](https://sbi.readthedocs.io/en/latest/how_to_guide/10_refine_posterior_with_importance_sampling.html): Refining posteriors
 - [Permutation-Invariant Embeddings](https://sbi.readthedocs.io/en/latest/how_to_guide/08_permutation_invariant_embeddings.html): i.i.d. data with NPE
 - [Contributing Guide](https://sbi.readthedocs.io/en/latest/contributing.html): How to contribute to sbi
+- [mini-sbibm](https://sbi.readthedocs.io/en/latest/mini_sbibm.html): Benchmark a change against main with `pytest --bm` before opening a PR

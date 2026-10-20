@@ -20,6 +20,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Union,
@@ -35,7 +36,6 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import Self
 
 if TYPE_CHECKING:
     from sbi.neural_nets.net_builders.estimator_configs import (
