@@ -235,6 +235,30 @@ def test_direct_posterior_uses_constructor_max_sampling_batch_size(monkeypatch):
     assert batch_sizes == [40_000, 7]
 
 
+def test_filtered_direct_posterior_defers_max_sampling_batch_size(monkeypatch):
+    """FilteredDirectPosterior.sample() leaves the batch size to the constructor."""
+    from sbi.inference.posteriors.filtered_direct_posterior import (
+        FilteredDirectPosterior,
+    )
+
+    received = []
+
+    def fake_sample(self, *args, **kwargs):
+        received.append(kwargs["max_sampling_batch_size"])
+
+    monkeypatch.setattr(DirectPosterior, "sample", fake_sample)
+    posterior = object.__new__(FilteredDirectPosterior)
+    monkeypatch.setattr(posterior, "_x_else_default_x", lambda x: x, raising=False)
+    monkeypatch.setattr(
+        posterior, "_set_context_for_x_o", lambda x: None, raising=False
+    )
+
+    posterior.sample((1,), x=ones(1, 2))
+    posterior.sample((1,), x=ones(1, 2), max_sampling_batch_size=7)
+
+    assert received == [None, 7]
+
+
 def test_importance_posterior_rejects_zero_max_sampling_batch_size():
     """A zero constructor batch size would make SIR sampling loop forever."""
     num_dim = 2
