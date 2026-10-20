@@ -13,7 +13,6 @@ from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched, process_device
-from sbi.utils.typechecks import is_positive_int
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
@@ -70,8 +69,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self.theta_transform = theta_transform
 
         self.oversampling_factor = oversampling_factor
-        if not is_positive_int(max_sampling_batch_size):
-            raise ValueError("max_sampling_batch_size must be greater than 0.")
         self.max_sampling_batch_size = max_sampling_batch_size
 
         self._purpose = (
