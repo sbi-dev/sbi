@@ -438,7 +438,7 @@ class DirectPosterior(NeuralPosterior):
 
         self._assert_finite_x(x)
         theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
-        x = torch.as_tensor(x, device=self._device)
+        x = x.to(self._device)
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
         # overwise, the leading is sample.
