@@ -803,7 +803,6 @@ def prior_support_is_bounded(prior: Any) -> Optional[bool]:
         support = prior.support
     except (NotImplementedError, AttributeError):
         return None
-    # Wrappers such as `independent` and the mixture support nest their constraint.
     while hasattr(support, "base_constraint"):
         support = support.base_constraint
     return not isinstance(support, constraints._Real)
@@ -1006,14 +1005,8 @@ def mcmc_transform(
             )
         # Unbounded and discrete supports are z-scored, which `biject_to()` does not do.
         if support_is_bounded and not getattr(prior.support, "is_discrete", False):
-            support = unwrap_mixture_support(prior)
-            try:
-                transform = biject_to(support)
-            except NotImplementedError as e:
-                raise NotImplementedError(
-                    f"sbi cannot map the prior support {support} to unconstrained "
-                    "space: torch's `biject_to` has no transform for it."
-                ) from e
+            support = unwrap_mixture_support(prior.support, prior.event_shape, device)
+            transform = biject_to(support)
         else:
             transform = prior_mean_std_transform(prior, device)
     else:

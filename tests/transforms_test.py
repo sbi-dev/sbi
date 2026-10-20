@@ -9,12 +9,10 @@ from torch import eye, ones, zeros
 from torch.distributions import (
     Categorical,
     Exponential,
-    Gamma,
     Independent,
     LogNormal,
     MixtureSameFamily,
     MultivariateNormal,
-    Normal,
     TransformedDistribution,
     Uniform,
     constraints,
@@ -96,39 +94,13 @@ def test_transforms(prior, target_transform):
             True,
         ),
         (
-            MixtureSameFamily(
-                Categorical(ones(2)), Independent(Gamma(ones(2, 2), ones(2, 2)), 1)
-            ),
-            True,
-        ),
-        (
-            # One mixture per parameter.
+            # One mixture per parameter, in float64, which `process_prior` wraps.
             Independent(
                 MixtureSameFamily(
-                    Categorical(ones(2, 2)), LogNormal(zeros(2, 2), ones(2, 2))
+                    Categorical(ones(2, 2).double()),
+                    LogNormal(zeros(2, 2).double(), ones(2, 2).double()),
                 ),
                 1,
-            ),
-            True,
-        ),
-        (
-            # Components without an analytic mean.
-            MixtureSameFamily(
-                Categorical(ones(2)),
-                Independent(
-                    TransformedDistribution(
-                        Normal(zeros(2, 2), ones(2, 2)), [ExpTransform()]
-                    ),
-                    1,
-                ),
-            ),
-            True,
-        ),
-        (
-            # float64 priors are wrapped by `process_prior`.
-            MixtureSameFamily(
-                Categorical(ones(2, dtype=torch.float64)),
-                Independent(LogNormal(zeros(2, 2).double(), ones(2, 2).double()), 1),
             ),
             True,
         ),

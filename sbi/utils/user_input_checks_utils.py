@@ -439,7 +439,7 @@ class MultipleIndependent(Distribution):
         # fails because the `independent` constraint returned only a 1D `[True]`.
         supports = []
         for d in self.dists:
-            support = unwrap_mixture_support(d)
+            support = unwrap_mixture_support(d.support, d.event_shape, self.device)
             if isinstance(support, constraints.independent):
                 supports.append(support.base_constraint)
             else:
