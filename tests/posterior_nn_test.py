@@ -19,6 +19,8 @@ from sbi.inference import (
     NRE_B,
     NRE_C,
     DirectPosterior,
+    ImportanceSamplingPosterior,
+    VectorFieldPosterior,
 )
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -202,36 +204,81 @@ def test_direct_posterior_multidimensional_sample_shape(snpe_method: type):
     )
 
 
-def test_direct_posterior_uses_constructor_max_sampling_batch_size(monkeypatch):
+class _SamplerCalled(Exception):
+    """Raised by a sampler spy to stop before any sampling happens."""
+
+
+def _spy_on_sampler(monkeypatch, target: str) -> list[dict]:
+    """Replace the sampler at `target` with a spy that records its kwargs."""
+    calls = []
+
+    def spy(*args, **kwargs):
+        calls.append(kwargs)
+        raise _SamplerCalled
+
+    monkeypatch.setattr(target, spy)
+    return calls
+
+
+@pytest.mark.parametrize(
+    "posterior_class, build_estimator",
+    [
+        (DirectPosterior, posterior_nn("mdn")),
+        (VectorFieldPosterior, posterior_flow_nn()),
+    ],
+)
+@pytest.mark.parametrize("batched", [False, True])
+def test_posterior_uses_constructor_max_sampling_batch_size(
+    monkeypatch, posterior_class, build_estimator, batched: bool
+):
     """Sampling without max_sampling_batch_size uses the value from the constructor."""
     num_dim = 2
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    theta = prior.sample((100,))
-    inference = NPE_C(prior=prior)
-    estimator = inference.append_simulations(
-        theta, diagonal_linear_gaussian(theta)
-    ).train(max_num_epochs=1)
-    posterior = DirectPosterior(
-        posterior_estimator=estimator, prior=prior, max_sampling_batch_size=40_000
+    theta = prior.sample((10,))
+    posterior = posterior_class(
+        build_estimator(theta, theta), prior, max_sampling_batch_size=40
+    )
+    calls = _spy_on_sampler(
+        monkeypatch, "sbi.samplers.rejection.rejection.accept_reject_sample"
+    )
+    sample = posterior.sample_batched if batched else posterior.sample
+    x = ones(3 if batched else 1, num_dim)
+
+    with pytest.raises(_SamplerCalled):
+        sample((10,), x=x)
+    with pytest.raises(_SamplerCalled):
+        sample((10,), x=x, max_sampling_batch_size=7)
+
+    assert [call["max_sampling_batch_size"] for call in calls] == [40, 7]
+
+
+def test_importance_posterior_uses_constructor_sampling_arguments(monkeypatch):
+    """SIR sampling without arguments uses the values from the constructor."""
+    num_dim = 2
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    theta = prior.sample((10,))
+    potential_fn, _ = posterior_estimator_based_potential(
+        posterior_nn("mdn")(theta, theta), prior, x_o=ones(1, num_dim)
+    )
+    posterior = ImportanceSamplingPosterior(
+        potential_fn, proposal=prior, oversampling_factor=5, max_sampling_batch_size=40
+    )
+    calls = _spy_on_sampler(
+        monkeypatch,
+        "sbi.inference.posteriors.importance_posterior.sampling_importance_resampling",
     )
 
-    with pytest.warns(UserWarning, match="Capping max_sampling_batch_size from 40000"):
-        posterior.sample_batched((10,), ones(3, num_dim))
+    with pytest.raises(_SamplerCalled):
+        posterior.sample((10,), x=ones(1, num_dim))
+    with pytest.raises(_SamplerCalled):
+        posterior.sample(
+            (10,), x=ones(1, num_dim), oversampling_factor=3, max_sampling_batch_size=7
+        )
 
-    from sbi.samplers.rejection import rejection
-
-    batch_sizes = []
-    accept_reject_sample = rejection.accept_reject_sample
-
-    def spy(*args, **kwargs):
-        batch_sizes.append(kwargs["max_sampling_batch_size"])
-        return accept_reject_sample(*args, **kwargs)
-
-    monkeypatch.setattr(rejection, "accept_reject_sample", spy)
-    posterior.sample((10,), x=ones(num_dim))
-    posterior.sample((10,), x=ones(num_dim), max_sampling_batch_size=7)
-
-    assert batch_sizes == [40_000, 7]
+    assert [
+        (call["num_candidate_samples"], call["max_sampling_batch_size"])
+        for call in calls
+    ] == [(5, 40), (3, 7)]
 
 
 def test_filtered_direct_posterior_defers_max_sampling_batch_size(monkeypatch):
