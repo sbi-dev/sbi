@@ -855,8 +855,7 @@ def prepare_for_plot(
 
     samples = convert_to_list_of_numpy(samples)
     if points is not None:
-        points = convert_to_list_of_numpy(points)
-        points = [np.atleast_2d(p) for p in points]
+        points = [np.atleast_2d(p) for p in convert_to_list_of_numpy(points)]
 
     samples = handle_nan_infs(samples)
 
@@ -867,16 +866,10 @@ def prepare_for_plot(
     if limits is None or len(limits) == 0:
         limits = infer_limits(samples, dim, points)
     else:
-        if isinstance(limits, torch.Tensor):
-            limits = ensure_numpy(limits)
-        elif isinstance(limits, list):
-            limits = [
-                ensure_numpy(lim) if isinstance(lim, torch.Tensor) else lim
-                for lim in limits
-            ]
+        limits = [ensure_numpy(lim) for lim in limits]
         limits = [limits[0] for _ in range(dim)] if len(limits) == 1 else limits
 
-    limits = torch.as_tensor(np.asarray(limits)).detach().to("cpu")
+    limits = torch.as_tensor(np.array(limits))
     return samples, dim, limits
 
 
@@ -930,18 +923,10 @@ def prepare_for_conditional_plot(condition, opts):
     dim = condition.shape[-1]
 
     # Prepare limits
-    if len(opts["limits"]) == 1:
-        limits = [opts["limits"][0] for _ in range(dim)]
-    else:
-        limits = opts["limits"]
-    if isinstance(limits, torch.Tensor):
-        limits = ensure_numpy(limits)
-    elif isinstance(limits, list):
-        limits = [
-            ensure_numpy(lim) if isinstance(lim, torch.Tensor) else lim
-            for lim in limits
-        ]
-    limits = torch.as_tensor(np.asarray(limits)).detach().to("cpu")
+    limits = [ensure_numpy(lim) for lim in opts["limits"]]
+    if len(limits) == 1:
+        limits = [limits[0] for _ in range(dim)]
+    limits = torch.as_tensor(np.array(limits), dtype=torch.get_default_dtype())
 
     # Infer the margin. This is to avoid that we evaluate the posterior **exactly**
     # at the boundary.
@@ -958,7 +943,7 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
     """
 
     def diag_func(row, **kwargs):
-        p_vector = ensure_numpy(
+        p_vector = (
             eval_conditional_density(
                 opts["density"],
                 opts["condition"],
@@ -969,6 +954,8 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[row],
             )
+            .to("cpu")
+            .numpy()
         )
         plt.plot(
             np.linspace(
@@ -1284,7 +1271,7 @@ def conditional_pairplot(
 
     Returns: figure and axis of posterior distribution plot
     """
-    device = density._device if hasattr(density, "_device") else "cpu"
+    device = density._device if hasattr(density, "_device") else condition.device
 
     # Setting these is required because _pairplot_scaffold will check if opts['diag'] is
     # `None`. This would break if opts has no key 'diag'. Same for 'upper'.
@@ -1302,7 +1289,7 @@ def conditional_pairplot(
     diag_func = get_conditional_diag_func(opts, limits, eps_margins, resolution)
 
     def offdiag_func(row, col, **kwargs):
-        p_image = ensure_numpy(
+        p_image = (
             eval_conditional_density(
                 opts["density"],
                 opts["condition"].to(device),
@@ -1313,6 +1300,8 @@ def conditional_pairplot(
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[col],
             )
+            .to("cpu")
+            .numpy()
         )
         plt.imshow(
             p_image.T,
@@ -1394,7 +1383,7 @@ def _arrange_grid(
     subset: Optional[List[int]],
     figsize: Optional[Tuple],
     labels: Optional[List[str]],
-    ticks: Optional[Union[List, torch.Tensor, np.ndarray]],
+    ticks: Optional[Union[List, torch.Tensor]],
     fig: Optional[FigureBase],
     axes: Optional[Axes],
     fig_kwargs: FigOptions,
@@ -1444,10 +1433,7 @@ def _arrange_grid(
     # Prepare points
     if points is None:
         points = []
-    elif not isinstance(points, list):
-        points = [np.atleast_2d(ensure_numpy(points))]
-    else:
-        points = [np.atleast_2d(ensure_numpy(p)) for p in points]
+    points = [np.atleast_2d(p) for p in convert_to_list_of_numpy(points)]
     # TODO: add asserts checking compatibility of dimensions
 
     # Prepare labels
@@ -1456,20 +1442,11 @@ def _arrange_grid(
 
     # Prepare ticks
     if ticks is not None:
-        ticks_list: Union[List, np.ndarray] = (
-            ensure_numpy(ticks) if isinstance(ticks, torch.Tensor) else ticks
-        )
-        if isinstance(ticks_list, list):
-            ticks_list = [
-                ensure_numpy(t) if isinstance(t, torch.Tensor) else t
-                for t in ticks_list
-            ]
-        if len(ticks_list) == 1:
-            ticks = [ticks_list[0] for _ in range(dim)]
-        elif len(ticks_list) == 0:
+        ticks = [ensure_numpy(t) for t in ticks]
+        if len(ticks) == 1:
+            ticks = [ticks[0] for _ in range(dim)]
+        elif ticks == []:
             ticks = None
-        else:
-            ticks = ticks_list
 
     # Figure out if we subset the plot
     if subset is None:
@@ -1837,12 +1814,13 @@ def _sbc_rank_plot(
     """
 
     if isinstance(ranks, (Tensor, np.ndarray)):
-        ranks_list = [ensure_numpy(ranks)]
+        ranks_list = [ranks]
     else:
         assert isinstance(ranks, List)
-        ranks_list = [ensure_numpy(rank) for rank in ranks]
-    for rank in ranks_list:
-        assert isinstance(rank, np.ndarray)
+        ranks_list = ranks
+    for idx, rank in enumerate(ranks_list):
+        assert isinstance(rank, (Tensor, np.ndarray))
+        ranks_list[idx] = ensure_numpy(rank)
 
     plot_types = ["hist", "cdf", "cdf-diff"]
     if plot_type not in plot_types:
@@ -2505,9 +2483,7 @@ def pp_plot_lc2st(
 
 
 def plot_tarp(
-    ecp: Union[Tensor, np.ndarray],
-    alpha: Union[Tensor, np.ndarray],
-    title: Optional[str] = None,
+    ecp: Tensor, alpha: Tensor, title: Optional[str] = None
 ) -> Tuple[Figure, Axes]:
     """
     Plots the expected coverage probability (ECP) against the credibility
@@ -2532,9 +2508,7 @@ def plot_tarp(
     fig = plt.figure(figsize=(6, 6))
     ax: Axes = plt.gca()
 
-    ecp_np = ensure_numpy(ecp)
-    alpha_np = ensure_numpy(alpha)
-
+    ecp_np, alpha_np = ensure_numpy(ecp), ensure_numpy(alpha)
     ax.plot(alpha_np, ecp_np, color="blue", label="TARP")
     ax.plot(alpha_np, alpha_np, color="black", linestyle="--", label="ideal")
     ax.set_xlabel(r"Credibility Level $\alpha$")
@@ -2876,10 +2850,7 @@ def _arrange_plots(
     # Prepare points
     if points is None:
         points = []
-    elif not isinstance(points, list):
-        points = [np.atleast_2d(ensure_numpy(points))]
-    else:
-        points = [np.atleast_2d(ensure_numpy(p)) for p in points]
+    points = [np.atleast_2d(p) for p in convert_to_list_of_numpy(points)]
 
     # TODO: add asserts checking compatibility of dimensions
 
@@ -2890,26 +2861,12 @@ def _arrange_plots(
         labels_dim = opts["labels"]
 
     # Prepare ticks
-    raw_ticks = opts["ticks"]
-    if raw_ticks is None or (isinstance(raw_ticks, list) and len(raw_ticks) == 0):
+    if opts["ticks"] == [] or opts["ticks"] is None:
         ticks = None
     else:
-        ticks_list: Union[List, np.ndarray] = (
-            ensure_numpy(raw_ticks)
-            if isinstance(raw_ticks, torch.Tensor)
-            else raw_ticks
-        )
-        if isinstance(ticks_list, list):
-            ticks_list = [
-                ensure_numpy(t) if isinstance(t, torch.Tensor) else t
-                for t in ticks_list
-            ]
-        if len(ticks_list) == 1:
-            ticks = [ticks_list[0] for _ in range(dim)]
-        elif len(ticks_list) == 0:
-            ticks = None
-        else:
-            ticks = ticks_list
+        ticks = [ensure_numpy(t) for t in opts["ticks"]]
+        if len(ticks) == 1:
+            ticks = [ticks[0] for _ in range(dim)]
 
     # Figure out if we subset the plot
     subset = opts["subset"]
