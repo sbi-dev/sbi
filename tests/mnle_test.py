@@ -315,8 +315,10 @@ def test_mnle_with_experimental_conditions(
     # test theta with sample shape.
     conditioned_potential_fn(prior.sample((10,)).unsqueeze(0))
 
+    # The conditioned potential is the likelihood only; add the prior of the reference.
     cond_samples = MCMCPosterior(
-        potential_fn=conditioned_potential_fn,
+        potential_fn=lambda theta, x_o: conditioned_potential_fn(theta, x_o)
+        + prior.log_prob(theta),
         theta_transform=prior_transform,
         proposal=prior,
         **asdict(mcmc_params_accurate),
