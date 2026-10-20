@@ -791,3 +791,19 @@ def test_callable_transform_preserves_orientation_and_dtype(orientation):
 
     wrapped.double()
     assert wrapped.transform(x.double()).dtype == torch.float64
+
+
+def test_gradient_ascent_uses_transform_space_for_best_init():
+    """Regression test for #2069: best init at optimum not double-transformed."""
+    from sbi.utils import gradient_ascent
+
+    transform = torch.distributions.transforms.AffineTransform(
+        loc=torch.tensor(10.0), scale=torch.tensor(2.0)
+    )
+
+    def potential_fn(theta):
+        return -((theta - 10.0) ** 2).sum(dim=1)
+
+    inits = torch.tensor([[10.0], [30.0]])
+    argmax, _ = gradient_ascent(potential_fn, inits, theta_transform=transform)
+    assert torch.allclose(argmax, torch.tensor([10.0]), atol=1e-5)

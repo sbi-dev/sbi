@@ -1273,7 +1273,7 @@ def gradient_ascent(
     best_theta_overall = theta_transform(best_theta_iter.detach().clone())
     best_log_prob_overall = best_log_prob_iter.detach().clone()
 
-    argmax_ = best_theta_overall
+    argmax_ = theta_transform.inv(best_theta_overall)
     max_val = best_log_prob_overall
 
     optimize_inits = theta_transform(optimize_inits)

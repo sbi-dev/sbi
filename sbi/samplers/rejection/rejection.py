@@ -378,7 +378,7 @@ def accept_reject_sample(
         # Reshape necessary in certain cases which do not follow the shape conventions
         # of the "DensityEstimator" class.
         are_accepted = are_accepted.reshape(sampling_batch_size, num_xos)
-        if num_xos > 1 and candidates.ndim >= 3:
+        if num_xos > 1:
             candidates_to_reject = candidates.reshape(
                 sampling_batch_size, num_xos, *candidates.shape[2:]
             )

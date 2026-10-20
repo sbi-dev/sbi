@@ -187,37 +187,40 @@ def test_warn_if_outside_prior_support():
 def test_batched_rejection_sampling_preserves_event_shape():
     from sbi.samplers.rejection import accept_reject_sample
 
-    num_simulations = 200
-    num_xos = 2
-    sampling_batch_size = 50
-    theta_dim = 2
-    event_shape = (3,)
+    class DummyProposal:
+        def __init__(self):
+            self.base = torch.distributions.MultivariateNormal(
+                torch.zeros(2), torch.eye(2)
+            )
 
-    proposal = torch.distributions.MultivariateNormal(
-        torch.zeros(theta_dim), torch.eye(theta_dim)
-    )
-    prior = proposal
+        def sample(self, sample_shape, **kwargs):
+            if isinstance(sample_shape, torch.Size):
+                n = sample_shape[0]
+            else:
+                n = int(sample_shape[0])
+            theta = self.base.sample((n,))
+            x = kwargs.get("x")
+            if x is not None and x.shape[0] == 2:
+                return torch.cat([theta, theta], dim=0)
+            return theta
 
-    theta = proposal.sample((num_simulations,))
-    x = torch.randn(num_simulations, *event_shape)
+        def __call__(self, sample_shape, **kwargs):
+            return self.sample(sample_shape, **kwargs)
 
-    def simulator(theta):
-        return theta[:, :1].expand(-1, *event_shape) + 0.01 * torch.randn(
-            theta.shape[0], *event_shape
-        )
+    proposal = DummyProposal()
 
-    def potential_fn(theta, x):
-        return -((theta[:, :1] - x) ** 2).sum(dim=-1)
+    def accept_reject_fn(candidates):
+        n = candidates.shape[0]
+        return torch.ones(n, dtype=torch.bool)
 
     samples, _ = accept_reject_sample(
-        proposal,
-        potential_fn=potential_fn,
-        theta=theta,
-        x=x,
+        proposal=proposal,
+        accept_reject_fn=accept_reject_fn,
         num_samples=10,
-        num_xos=num_xos,
-        sampling_batch_size=sampling_batch_size,
-        prior=prior,
+        num_xos=2,
+        proposal_sampling_kwargs={"x": torch.randn(2, 3)},
         show_progress_bars=False,
     )
     assert samples.shape[0] == 10
+    assert samples.shape[1] == 2
+    assert samples.shape[2] == 2
