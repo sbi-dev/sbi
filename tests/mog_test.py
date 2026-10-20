@@ -263,6 +263,14 @@ class TestMoGCondition:
         assert torch.allclose(
             cond_mog.log_weights, log_weights - log_weights.logsumexp(-1, True)
         )
+        assert (cond_factors.diagonal(dim1=-2, dim2=-1) > 0).all()
+        theta = torch.randn(batch_size, len(dims_to_sample)).double()
+        expected_log_prob = torch.logsumexp(
+            log_weights.log_softmax(-1)
+            + MultivariateNormal(expected_means, expected_cov).log_prob(theta[:, None]),
+            dim=-1,
+        )
+        assert torch.allclose(cond_mog.log_prob(theta), expected_log_prob)
 
 
 class TestMoGFromGaussian:

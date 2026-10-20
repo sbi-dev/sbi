@@ -380,7 +380,9 @@ class MoG:
         precfs_xy = precfs_perm[:, :, :num_free, num_free:]
         precfs_yy = precfs_perm[:, :, num_free:, num_free:]
 
-        # Compute precision matrices
+        # With R^T R = P in (free, fixed) order:
+        #   R_xx^T R_xx = P_xx (precision of x | y)
+        #   R_yy^T R_yy = P_yy - P_yx P_xx^{-1} P_xy (marginal precision of y)
         precs_xx = torch.matmul(precfs_xx.transpose(-2, -1), precfs_xx)
         precs_yy = torch.matmul(precfs_yy.transpose(-2, -1), precfs_yy)
 
