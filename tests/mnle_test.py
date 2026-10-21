@@ -8,7 +8,13 @@ import pytest
 import torch
 from pyro.distributions import InverseGamma
 from torch import Tensor
-from torch.distributions import Beta, Binomial, Distribution, Gamma
+from torch.distributions import (
+    Beta,
+    Binomial,
+    Distribution,
+    Gamma,
+    MultivariateNormal,
+)
 
 from sbi.inference import MNLE, MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
@@ -479,8 +485,19 @@ def test_conditioned_potential_adds_prior_of_global_theta():
         log_likelihood + prior.log_prob(global_theta),
     )
 
+    box_prior = BoxUniform(torch.zeros(3), 50 * torch.ones(3))
     box_potential_fn, _ = likelihood_estimator_based_potential(
-        estimator, BoxUniform(torch.zeros(3), torch.ones(3)), x_o
+        estimator, box_prior, x_o
+    )
+    conditioned_potential_fn = box_potential_fn.condition_on_theta(condition_o, [0, 1])
+    assert torch.allclose(
+        conditioned_potential_fn(global_theta),
+        log_likelihood
+        + BoxUniform(box_prior.low[:2], box_prior.high[:2]).log_prob(global_theta),
+    )
+
+    normal_potential_fn, _ = likelihood_estimator_based_potential(
+        estimator, MultivariateNormal(torch.zeros(3), torch.eye(3)), x_o
     )
     with pytest.raises(ValueError, match="Pass `prior`"):
-        box_potential_fn.condition_on_theta(condition_o, [0, 1])
+        normal_potential_fn.condition_on_theta(condition_o, [0, 1])

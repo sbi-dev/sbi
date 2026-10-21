@@ -19,6 +19,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 )
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
+from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import process_x
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 
@@ -164,22 +165,23 @@ class LikelihoodBasedPotential(BasePotential):
         r"""Returns a potential function conditioned on a subset of theta dimensions.
 
         The goal of this function is to divide the original `theta` into a
-        `global_theta` we do inference over, and a `local_theta` we condition on (in
-        addition to conditioning on `x_o`). Thus, the returned potential function will
-        calculate $\log(p(\global_theta) \prod_{i=1}^{N}p(x_i | local_theta_i,
-        \global_theta))$, where `x_i` and `local_theta_i` are fixed and
-        `global_theta` varies at inference time.
+        `global_theta` $\theta_g$ we do inference over, and a `local_theta`
+        $\theta_{l,i}$ per trial that we condition on (in addition to conditioning on
+        `x_o`). Thus, the returned potential function will calculate
+        $\log p(\theta_g) + \sum_{i=1}^{N} \log p(x_i \mid \theta_g, \theta_{l,i})$,
+        where `x_i` and $\theta_{l,i}$ are fixed and $\theta_g$ varies at inference
+        time.
 
         Args:
             local_theta: The condition values to be conditioned.
             dims_global_theta: The indices of the columns in `theta` that will be
                 sampled, i.e., that *not* conditioned. For example, if original theta
                 has shape `(batch_dim, 3)`, and `dims_global_theta=[0, 1]`, then the
-                potential will set `theta[:, 3] = local_theta` at inference time.
+                potential will set `theta[:, 2] = local_theta` at inference time.
             prior: Prior over the `global_theta`. If None, the marginal of the prior
                 of this potential over `dims_global_theta` is used. This requires a
-                `MultipleIndependent` prior whose components cover exactly these
-                dimensions.
+                `BoxUniform` prior or a `MultipleIndependent` prior whose components
+                cover exactly these dimensions.
 
         Returns:
             A potential function conditioned on the `local_theta`. It returns the log
@@ -226,16 +228,18 @@ class LikelihoodBasedPotential(BasePotential):
 
 
 def _marginal_prior(prior: Distribution, dims: List[int]) -> Distribution:
-    """Return the marginal of a `MultipleIndependent` prior over `dims`.
+    """Return the marginal of a `BoxUniform` or `MultipleIndependent` prior over `dims`.
 
     Args:
         prior: Prior over all dimensions of `theta`.
         dims: Dimensions of the marginal, in increasing order.
 
     Raises:
-        ValueError: If `prior` is not a `MultipleIndependent` whose components cover
-            exactly `dims`.
+        ValueError: If `prior` is neither a `BoxUniform` nor a `MultipleIndependent`
+            whose components cover exactly `dims`.
     """
+    if isinstance(prior, BoxUniform) and prior.low.dim() == 1:
+        return BoxUniform(prior.low[dims], prior.high[dims], device=prior.device)
     if isinstance(prior, MultipleIndependent):
         components, covered_dims, start = [], [], 0
         for dist, num_dims in zip(prior.dists, prior.dims_per_dist, strict=True):
@@ -254,9 +258,10 @@ def _marginal_prior(prior: Distribution, dims: List[int]) -> Distribution:
             return component
     raise ValueError(
         f"condition_on_theta needs the prior of the parameters {list(dims)}. It "
-        "derives it only from a MultipleIndependent prior whose components cover "
-        f"exactly these dimensions, but this potential has a {type(prior).__name__} "
-        "prior. Pass `prior` with the prior of these parameters."
+        "derives it only from a BoxUniform prior or a MultipleIndependent prior whose "
+        "components cover exactly these dimensions, but this potential has a "
+        f"{type(prior).__name__} prior. Pass `prior` with the prior of these "
+        "parameters."
     )
 
 

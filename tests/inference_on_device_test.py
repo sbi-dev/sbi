@@ -638,7 +638,7 @@ def test_conditioned_posterior_on_gpu(
         x_o.to(inference_device),
     )
     conditioned_potential_fn = potential_fn.condition_on_theta(
-        condition_o, dims_global_theta=[0, 1], prior=prior
+        condition_o, dims_global_theta=[0, 1]
     )
 
     prior_transform = utils.mcmc_transform(prior, device=inference_device)
