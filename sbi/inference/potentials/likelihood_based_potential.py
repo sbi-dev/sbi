@@ -134,6 +134,8 @@ class LikelihoodBasedPotential(BasePotential):
         Returns:
             The potential $\log(p(x_o|\theta)p(\theta))$.
         """
+        with torch.set_grad_enabled(track_gradients):
+            log_prior = self.prior.log_prob(theta)  # type: ignore
         if self.x_is_iid:
             # For each theta, calculate the likelihood sum over all x in batch.
             log_likelihood_trial_sum = _log_likelihoods_over_trials(
@@ -142,7 +144,7 @@ class LikelihoodBasedPotential(BasePotential):
                 estimator=self.likelihood_estimator,
                 track_gradients=track_gradients,
             )
-            return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
+            return log_likelihood_trial_sum + log_prior
         else:
             # Calculate likelihood for each (theta,x) pair separately
             theta_batch_size = theta.shape[0]
@@ -157,7 +159,7 @@ class LikelihoodBasedPotential(BasePotential):
                 log_likelihood_batches = self.likelihood_estimator.log_prob(
                     x, condition=theta
                 )
-            return log_likelihood_batches + self.prior.log_prob(theta)  # type: ignore
+            return log_likelihood_batches + log_prior
 
     def condition_on_theta(
         self,
@@ -234,7 +236,8 @@ class LikelihoodBasedPotential(BasePotential):
                 global_prior = move_distribution_to_device(global_prior, self.device)
                 global_prior_device = self.device
             # Priors with batch_shape [1] return one log prob per dimension.
-            log_prior = global_prior.log_prob(global_theta)
+            with torch.set_grad_enabled(track_gradients):
+                log_prior = global_prior.log_prob(global_theta)
             return log_likelihood + log_prior.reshape(len(global_theta), -1).sum(-1)
 
         return conditioned_potential
@@ -464,7 +467,8 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
         )
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
-        prior_log_prob = self.prior.log_prob(theta)  # type: ignore
+        with torch.set_grad_enabled(track_gradients):
+            prior_log_prob = self.prior.log_prob(theta)  # type: ignore
 
         # Shape of `x` is (iid_dim, *event_shape)
         theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
