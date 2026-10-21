@@ -621,7 +621,7 @@ class Distance:
             }
             distance_fn = distance_functions[distance]
             # partial only checks the keyword arguments when it is called.
-            inspect.signature(distance_fn).bind_partial(**self.distance_kwargs)
+            inspect.signature(distance_fn).bind(None, None, **self.distance_kwargs)
             self.distance_fn = partial(distance_fn, **self.distance_kwargs)
 
     def __call__(self, x_o: Tensor, x: Tensor) -> Tensor:
