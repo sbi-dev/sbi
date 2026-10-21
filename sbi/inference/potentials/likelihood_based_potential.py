@@ -238,8 +238,11 @@ def _marginal_prior(prior: Distribution, dims: List[int]) -> Distribution:
         ValueError: If `prior` is neither a `BoxUniform` nor a `MultipleIndependent`
             whose components cover exactly `dims`.
     """
-    if isinstance(prior, BoxUniform) and prior.low.dim() == 1:
-        return BoxUniform(prior.low[dims], prior.high[dims], device=prior.device)
+    if isinstance(prior, BoxUniform) and prior.base_dist.low.dim() == 1:
+        # `prior.low` and `prior.high` keep their input shapes; the base
+        # distribution holds the broadcast bounds.
+        low, high = prior.base_dist.low, prior.base_dist.high
+        return BoxUniform(low[dims], high[dims], device=prior.device)
     if isinstance(prior, MultipleIndependent):
         components, covered_dims, start = [], [], 0
         for dist, num_dims in zip(prior.dists, prior.dims_per_dist, strict=True):
