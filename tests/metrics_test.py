@@ -150,6 +150,23 @@ def test_regularized_ot_dual_warns_when_not_converged(dtype):
         regularized_ot_dual(a, b, cost, relative_epsilon=1e-3, max_iter=10)
 
 
+def test_regularized_ot_dual_warns_when_precision_is_unreachable():
+    x, y = torch.tensor([[0.0], [1.0]]), torch.tensor([[0.0], [10.0]])
+    with (
+        pytest.warns(UserWarning, match="can only be matched"),
+        pytest.warns(UserWarning, match="did not converge"),
+    ):
+        wasserstein_2_squared(x, y, relative_epsilon=1e-7)
+
+
+def test_wasserstein_distance_regularizes_each_pair_separately():
+    torch.manual_seed(0)
+    x_o = torch.randn(10, 2)
+    x = torch.randn(3, 10, 2) * torch.tensor([0.1, 1.0, 10.0]).view(3, 1, 1)
+    separately = torch.stack([wasserstein_2_squared(x_o, x_i) for x_i in x])
+    assert torch.allclose(wasserstein_distance(x_o, x), separately)
+
+
 @pytest.mark.parametrize("scale", (1e-2, 1e2))
 def test_wasserstein_2_squared_defaults_match_exact_ot(scale):
     torch.manual_seed(0)
