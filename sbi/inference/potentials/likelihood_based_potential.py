@@ -6,7 +6,7 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
-from torch.distributions import Distribution
+from torch.distributions import Distribution, Independent
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators import (
@@ -20,6 +20,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks_utils import MultipleIndependent
 
 
 def likelihood_estimator_based_potential(
@@ -155,15 +156,19 @@ class LikelihoodBasedPotential(BasePotential):
             return log_likelihood_batches + self.prior.log_prob(theta)  # type: ignore
 
     def condition_on_theta(
-        self, local_theta: Tensor, dims_global_theta: List[int]
+        self,
+        local_theta: Tensor,
+        dims_global_theta: List[int],
+        prior: Optional[Distribution] = None,
     ) -> Callable:
         r"""Returns a potential function conditioned on a subset of theta dimensions.
 
         The goal of this function is to divide the original `theta` into a
         `global_theta` we do inference over, and a `local_theta` we condition on (in
         addition to conditioning on `x_o`). Thus, the returned potential function will
-        calculate $\prod_{i=1}^{N}p(x_i | local_theta_i, \global_theta)$, where `x_i`
-        and `local_theta_i` are fixed and `global_theta` varies at inference time.
+        calculate $\log(p(\global_theta) \prod_{i=1}^{N}p(x_i | local_theta_i,
+        \global_theta))$, where `x_i` and `local_theta_i` are fixed and
+        `global_theta` varies at inference time.
 
         Args:
             local_theta: The condition values to be conditioned.
@@ -171,12 +176,23 @@ class LikelihoodBasedPotential(BasePotential):
                 sampled, i.e., that *not* conditioned. For example, if original theta
                 has shape `(batch_dim, 3)`, and `dims_global_theta=[0, 1]`, then the
                 potential will set `theta[:, 3] = local_theta` at inference time.
+            prior: Prior over the `global_theta`. If None, the marginal of the prior
+                of this potential over `dims_global_theta` is used. This requires a
+                `MultipleIndependent` prior whose components cover exactly these
+                dimensions.
 
         Returns:
-            A potential function conditioned on the `local_theta`.
+            A potential function conditioned on the `local_theta`. It returns the log
+            likelihood summed over the trials plus the log prior of `global_theta`.
+
+        Raises:
+            ValueError: If `prior` is None and the prior of this potential has no
+                marginal over `dims_global_theta`.
         """
 
         assert self.x_is_iid, "Conditioning is only supported for iid data."
+        if prior is None:
+            prior = _marginal_prior(self.prior, dims_global_theta)
 
         def conditioned_potential(
             theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
@@ -189,7 +205,7 @@ class LikelihoodBasedPotential(BasePotential):
                     "condition_on_theta does not support sample shape for theta."
                 )
                 theta = theta.squeeze(0)
-            global_theta = theta[:, dims_global_theta]
+            global_theta = theta[:, dims_global_theta].to(self.device)
             x_o = x_o if x_o is not None else self.x_o
             # x needs shape (sample_dim (iid), batch_dim (xs), *event_shape)
             if x_o.dim() < 3:
@@ -197,15 +213,51 @@ class LikelihoodBasedPotential(BasePotential):
                     x_o, event_shape=x_o.shape[1:], leading_is_sample=self.x_is_iid
                 )
 
-            return _log_likelihood_over_iid_trials_and_local_theta(
+            log_likelihood = _log_likelihood_over_iid_trials_and_local_theta(
                 x=x_o.to(self.device),
-                global_theta=global_theta.to(self.device),
+                global_theta=global_theta,
                 local_theta=local_theta.to(self.device),
                 estimator=self.likelihood_estimator,
                 track_gradients=track_gradients,
             )
+            return log_likelihood + prior.log_prob(global_theta)
 
         return conditioned_potential
+
+
+def _marginal_prior(prior: Distribution, dims: List[int]) -> Distribution:
+    """Return the marginal of a `MultipleIndependent` prior over `dims`.
+
+    Args:
+        prior: Prior over all dimensions of `theta`.
+        dims: Dimensions of the marginal, in increasing order.
+
+    Raises:
+        ValueError: If `prior` is not a `MultipleIndependent` whose components cover
+            exactly `dims`.
+    """
+    if isinstance(prior, MultipleIndependent):
+        components, covered_dims, start = [], [], 0
+        for dist, num_dims in zip(prior.dists, prior.dims_per_dist, strict=True):
+            component_dims = list(range(start, start + num_dims))
+            start += num_dims
+            if set(component_dims) <= set(dims):
+                components.append(dist)
+                covered_dims += component_dims
+        if covered_dims == list(dims):
+            if len(components) > 1:
+                return MultipleIndependent(components, device=prior.device)
+            (component,) = components
+            # A component with batch_shape [1] returns one log prob per dimension.
+            if component.batch_shape == torch.Size([1]):
+                return Independent(component, 1)
+            return component
+    raise ValueError(
+        f"condition_on_theta needs the prior of the parameters {list(dims)}. It "
+        "derives it only from a MultipleIndependent prior whose components cover "
+        f"exactly these dimensions, but this potential has a {type(prior).__name__} "
+        "prior. Pass `prior` with the prior of these parameters."
+    )
 
 
 def _log_likelihoods_over_trials(

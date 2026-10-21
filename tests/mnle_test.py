@@ -308,17 +308,18 @@ def test_mnle_with_experimental_conditions(
     estimator = trainer.append_simulations(theta, x).train()
 
     potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal, x_o)
+    # The reference prior differs from the proposal used for training.
     conditioned_potential_fn = potential_fn.condition_on_theta(
-        condition_o, dims_global_theta=[_ for _ in range(last_idx_parameters)]
+        condition_o,
+        dims_global_theta=[_ for _ in range(last_idx_parameters)],
+        prior=prior,
     )
 
     # test theta with sample shape.
     conditioned_potential_fn(prior.sample((10,)).unsqueeze(0))
 
-    # The conditioned potential is the likelihood only; add the prior of the reference.
     cond_samples = MCMCPosterior(
-        potential_fn=lambda theta, x_o: conditioned_potential_fn(theta, x_o)
-        + prior.log_prob(theta),
+        potential_fn=conditioned_potential_fn,
         theta_transform=prior_transform,
         proposal=prior,
         **asdict(mcmc_params_accurate),
@@ -426,3 +427,60 @@ def test_log_likelihood_over_local_iid_theta(
     assert ll_batched.shape == torch.Size([num_thetas])
     assert ll_batched.shape == ll_single.shape
     assert torch.allclose(ll_batched, ll_single, atol=1e-5)
+
+
+def test_conditioned_potential_adds_prior_of_global_theta():
+    """The conditioned potential adds the log prior of the sampled parameters."""
+    proposal = MultipleIndependent(
+        [
+            Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
+            Beta(torch.tensor([2.0]), torch.tensor([2.0])),
+            BoxUniform(torch.tensor([0.5]), torch.tensor([1.5])),
+        ],
+        validate_args=False,
+    )
+    theta = proposal.sample((100,))
+    x = mixed_simulator_with_conditions(theta, last_idx_parameters=2)
+    estimator = MNLE().append_simulations(theta, x).train(max_num_epochs=1)
+
+    num_trials = 5
+    condition_o = proposal.sample((num_trials,))[:, 2:]
+    theta_and_condition_o = torch.cat(
+        (theta[:1, :2].repeat(num_trials, 1), condition_o), dim=1
+    )
+    x_o = mixed_simulator_with_conditions(theta_and_condition_o, last_idx_parameters=2)
+    potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal, x_o)
+
+    global_theta = proposal.sample((10,))[:, :2]
+    log_likelihood = _log_likelihood_over_iid_trials_and_local_theta(
+        x_o.unsqueeze(1), global_theta, condition_o, estimator
+    )
+
+    # By default, the prior is the marginal of the potential's prior.
+    marginal = MultipleIndependent(proposal.dists[:2])
+    conditioned_potential_fn = potential_fn.condition_on_theta(condition_o, [0, 1])
+    assert torch.allclose(
+        conditioned_potential_fn(global_theta),
+        log_likelihood + marginal.log_prob(global_theta),
+    )
+
+    prior = MultipleIndependent(
+        [
+            Gamma(torch.tensor([1.0]), torch.tensor([1.0])),
+            Beta(torch.tensor([2.0]), torch.tensor([2.0])),
+        ],
+        validate_args=False,
+    )
+    conditioned_potential_fn = potential_fn.condition_on_theta(
+        condition_o, [0, 1], prior=prior
+    )
+    assert torch.allclose(
+        conditioned_potential_fn(global_theta),
+        log_likelihood + prior.log_prob(global_theta),
+    )
+
+    box_potential_fn, _ = likelihood_estimator_based_potential(
+        estimator, BoxUniform(torch.zeros(3), torch.ones(3)), x_o
+    )
+    with pytest.raises(ValueError, match="Pass `prior`"):
+        box_potential_fn.condition_on_theta(condition_o, [0, 1])
