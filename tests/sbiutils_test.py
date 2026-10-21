@@ -710,7 +710,6 @@ def test_mdn_z_scored_log_prob_is_normalized(z_score_x):
     """MDN log_prob integrates to one for every affine z-scoring of the input."""
     from sbi.neural_nets.net_builders.mdn import build_mdn
 
-    torch.manual_seed(0)
     bx, by = 10 * torch.randn(512, 2), torch.randn(512, 3)
     est = build_mdn(bx, by, z_score_x=z_score_x)
     grid = torch.linspace(-60, 60, 401)
