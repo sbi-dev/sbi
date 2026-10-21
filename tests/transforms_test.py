@@ -7,11 +7,15 @@ import pytest
 import torch
 from torch import eye, ones, zeros
 from torch.distributions import (
+    Categorical,
     Exponential,
+    Independent,
     LogNormal,
+    MixtureSameFamily,
     MultivariateNormal,
     TransformedDistribution,
     Uniform,
+    constraints,
 )
 from torch.distributions.transforms import (
     AffineTransform,
@@ -32,6 +36,20 @@ from tests.user_input_checks_test import UserNumpyUniform
         (UserNumpyUniform(torch.zeros(2), torch.ones(2)), SigmoidTransform),
         (MultivariateNormal(torch.zeros(2), torch.eye(2)), AffineTransform),
         (LogNormal(loc=torch.zeros(1), scale=torch.ones(1)), ExpTransform),
+        (
+            MixtureSameFamily(
+                Categorical(torch.ones(2)),
+                MultivariateNormal(torch.zeros(2, 2), eye(2).expand(2, 2, 2)),
+            ),
+            AffineTransform,
+        ),
+        (
+            MixtureSameFamily(
+                Categorical(torch.ones(2)),
+                Independent(LogNormal(zeros(2, 2), ones(2, 2)), 1),
+            ),
+            ExpTransform,
+        ),
     ),
 )
 def test_transforms(prior, target_transform):
@@ -75,6 +93,27 @@ def test_transforms(prior, target_transform):
             ]),
             True,
         ),
+        (
+            # One mixture per parameter, in float64, which `process_prior` wraps.
+            Independent(
+                MixtureSameFamily(
+                    Categorical(ones(2, 2).double()),
+                    LogNormal(zeros(2, 2).double(), ones(2, 2).double()),
+                ),
+                1,
+            ),
+            True,
+        ),
+        (
+            MultipleIndependent([
+                MixtureSameFamily(
+                    Categorical(ones(2)),
+                    MultivariateNormal(zeros(2, 2), eye(2).expand(2, 2, 2)),
+                ),
+                BoxUniform(zeros(1), ones(1)),
+            ]),
+            True,
+        ),
     ),
 )
 def test_mcmc_transform(prior, enable_transform):
@@ -92,6 +131,20 @@ def test_mcmc_transform(prior, enable_transform):
 
     log_abs_det = tf.log_abs_det_jacobian(samples_original, unconstrained_samples)
     assert log_abs_det.shape == torch.Size([num_samples])
+
+
+@pytest.mark.skipif(
+    not hasattr(constraints, "MixtureSameFamilyConstraint"),
+    reason="Torch < 2.8 returns the component support for a mixture.",
+)
+def test_mcmc_transform_rejects_mixture_with_per_component_bounds():
+    """Torch's mixture support is wrong when the bounds depend on the component."""
+    prior = MixtureSameFamily(
+        Categorical(ones(2)),
+        Independent(Uniform(zeros(2, 2), torch.tensor([[1.0, 1.0], [3.0, 3.0]])), 1),
+    )
+    with pytest.raises(ValueError, match="depends on the parameters"):
+        mcmc_transform(prior)
 
 
 @pytest.mark.xfail(

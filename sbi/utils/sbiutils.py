@@ -37,6 +37,7 @@ from torch.optim.adam import Adam
 
 from sbi import __version__
 from sbi.sbi_types import TorchTransform
+from sbi.utils.torchutils import unwrap_mixture_support
 
 _T = TypeVar("_T")
 
@@ -802,9 +803,9 @@ def prior_support_is_bounded(prior: Any) -> Optional[bool]:
         support = prior.support
     except (NotImplementedError, AttributeError):
         return None
-    return not isinstance(
-        getattr(support, "base_constraint", support), constraints._Real
-    )
+    while hasattr(support, "base_constraint"):
+        support = support.base_constraint
+    return not isinstance(support, constraints._Real)
 
 
 def within_support(distribution: Any, samples: Tensor) -> Tensor:
@@ -1004,7 +1005,8 @@ def mcmc_transform(
             )
         # Unbounded and discrete supports are z-scored, which `biject_to()` does not do.
         if support_is_bounded and not getattr(prior.support, "is_discrete", False):
-            transform = biject_to(prior.support)
+            support = unwrap_mixture_support(prior.support, prior.event_shape, device)
+            transform = biject_to(support)
         else:
             transform = prior_mean_std_transform(prior, device)
     else:
