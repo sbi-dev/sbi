@@ -6,7 +6,7 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
-from torch.distributions import Distribution, Independent
+from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators import (
@@ -21,7 +21,10 @@ from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import process_x
-from sbi.utils.user_input_checks_utils import MultipleIndependent
+from sbi.utils.user_input_checks_utils import (
+    MultipleIndependent,
+    move_distribution_to_device,
+)
 
 
 def likelihood_estimator_based_potential(
@@ -180,8 +183,9 @@ class LikelihoodBasedPotential(BasePotential):
                 potential will set `theta[:, 2] = local_theta` at inference time.
             prior: Prior over the `global_theta`. If None, the marginal of the prior
                 of this potential over `dims_global_theta` is used. This requires a
-                `BoxUniform` prior or a `MultipleIndependent` prior whose components
-                cover exactly these dimensions.
+                `BoxUniform` prior, or a `MultipleIndependent` prior whose components
+                cover exactly these dimensions, given in increasing order. The prior
+                is moved to the device of this potential.
 
         Returns:
             A potential function conditioned on the `local_theta`. It returns the log
@@ -193,12 +197,15 @@ class LikelihoodBasedPotential(BasePotential):
         """
 
         assert self.x_is_iid, "Conditioning is only supported for iid data."
-        if prior is None:
-            prior = _marginal_prior(self.prior, dims_global_theta)
+        global_prior = (
+            _marginal_prior(self.prior, dims_global_theta) if prior is None else prior
+        )
+        global_prior_device = None
 
         def conditioned_potential(
             theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
         ) -> Tensor:
+            nonlocal global_prior, global_prior_device
             assert len(dims_global_theta) == theta.shape[-1], (
                 "dims_global_theta must match the number of parameters to sample."
             )
@@ -222,7 +229,13 @@ class LikelihoodBasedPotential(BasePotential):
                 estimator=self.likelihood_estimator,
                 track_gradients=track_gradients,
             )
-            return log_likelihood + prior.log_prob(global_theta)
+            # Follow the device of this potential, also after `.to()`.
+            if global_prior_device != self.device:
+                global_prior = move_distribution_to_device(global_prior, self.device)
+                global_prior_device = self.device
+            # Priors with batch_shape [1] return one log prob per dimension.
+            log_prior = global_prior.log_prob(global_theta)
+            return log_likelihood + log_prior.reshape(len(global_theta), -1).sum(-1)
 
         return conditioned_potential
 
@@ -254,17 +267,13 @@ def _marginal_prior(prior: Distribution, dims: List[int]) -> Distribution:
         if covered_dims == list(dims):
             if len(components) > 1:
                 return MultipleIndependent(components, device=prior.device)
-            (component,) = components
-            # A component with batch_shape [1] returns one log prob per dimension.
-            if component.batch_shape == torch.Size([1]):
-                return Independent(component, 1)
-            return component
+            return components[0]
     raise ValueError(
         f"condition_on_theta needs the prior of the parameters {list(dims)}. It "
-        "derives it only from a BoxUniform prior or a MultipleIndependent prior whose "
-        "components cover exactly these dimensions, but this potential has a "
-        f"{type(prior).__name__} prior. Pass `prior` with the prior of these "
-        "parameters."
+        "derives it only from a BoxUniform prior, or a MultipleIndependent prior "
+        "whose components cover exactly these dimensions in increasing order. This "
+        f"potential has a {type(prior).__name__} prior. Pass `prior` with the prior "
+        "of these parameters."
     )
 
 
