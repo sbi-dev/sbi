@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 import numpy as np
 import torch
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import KFold
 from sklearn.neighbors import KernelDensity
 from torch import Tensor
 from torch.distributions.transforms import IndependentTransform, identity_transform
@@ -43,6 +43,31 @@ class KDEWrapper:
         return log_probs
 
 
+def _cv_log_likelihoods(
+    samples: np.ndarray,
+    weights: Optional[np.ndarray],
+    bandwidths: np.ndarray,
+    num_partitions: int,
+    **kde_kwargs,
+) -> np.ndarray:
+    """Return the weighted held-out log-likelihood per bandwidth, mean over folds."""
+    scores = np.zeros(len(bandwidths))
+    for train, test in KFold(num_partitions).split(samples):
+        # sklearn's weighted density evaluation is slower, so fit without weights
+        # if there are none.
+        train_weights = None if weights is None else weights[train]
+        test_weights = np.ones(len(test)) if weights is None else weights[test]
+        # Zero-weight samples can have log-density -inf, and 0 * -inf is nan.
+        test, test_weights = test[test_weights > 0], test_weights[test_weights > 0]
+        if len(test) == 0:
+            continue
+        for i, bandwidth in enumerate(bandwidths):
+            kde = KernelDensity(bandwidth=bandwidth, **kde_kwargs)
+            kde.fit(samples[train], sample_weight=train_weights)
+            scores[i] += np.sum(test_weights * kde.score_samples(samples[test]))
+    return scores / num_partitions
+
+
 # The implementation of KDE was adapted from
 # https://github.com/sbi-benchmark/sbibm/blob/main/sbibm/utils/kde.py
 def get_kde(
@@ -61,7 +86,7 @@ def get_kde(
             tailored cross validation to find the best bandwidth for passed samples.
         transform: Optional transform applied before running kde.
         sample_weights: Sample weights attached to the samples, used to perform weighted
-            KDE.
+            KDE. With `bandwidth="cv"`, the cross-validation is weighted as well.
         num_cv_partitions: number of partitions for cross validation
         num_cv_repetitions: how many times to repeat the cross validation to zoom into
             the hyperparameter grid.
@@ -81,14 +106,16 @@ def get_kde(
     transformed_samples = transform_(samples).numpy()  # type: ignore
     num_samples, dim_samples = transformed_samples.shape
 
-    algorithm = "auto"
-    kernel = "gaussian"
-    metric = "euclidean"
-    atol = 0
-    rtol = 0
-    breadth_first = True
-    leaf_size = 40
-    metric_params = None
+    kde_kwargs = dict(
+        kernel="gaussian",
+        algorithm="auto",
+        metric="euclidean",
+        atol=0,
+        rtol=0,
+        breadth_first=True,
+        leaf_size=40,
+        metric_params=None,
+    )
 
     if bandwidth == "scott":
         bandwidth_selected = num_samples ** (-1.0 / (dim_samples + 4))
@@ -97,72 +124,55 @@ def get_kde(
             -1.0 / (dim_samples + 4)
         )
     elif bandwidth == "cv":
-        _std = transformed_samples.std()
+        weights = None
+        if sample_weights is not None:
+            # Mean 1, so that the CV scores have the same scale as without weights.
+            weights = np.asarray(sample_weights, dtype=np.float64)
+            weights = weights * num_samples / weights.sum()
+        mean = np.average(transformed_samples, axis=0, weights=weights)
+        variance = np.average(
+            (transformed_samples - mean) ** 2, axis=0, weights=weights
+        )
+        scale = np.sqrt(variance).mean()
         steps = 10
-        lower = 0.1 * _std
-        upper = 0.5 * _std
-        current_best = -10000000
+        lower = 0.1 * scale
+        upper = 0.5 * scale
+        best_score = -np.inf
 
-        # Run cv multiple times and to "zoom in" to better bandwidths.
+        # Run cv multiple times and to "zoom in" to better bandwidths. Every new
+        # grid contains the previous best bandwidth, so the score cannot decrease.
         for _ in range(num_cv_repetitions):
             bandwidth_range = np.linspace(lower, upper, steps)
-            grid = GridSearchCV(
-                KernelDensity(
-                    kernel=kernel,
-                    algorithm=algorithm,
-                    metric=metric,
-                    atol=atol,
-                    rtol=rtol,
-                    breadth_first=breadth_first,
-                    leaf_size=leaf_size,
-                    metric_params=metric_params,
-                ),
-                {"bandwidth": bandwidth_range},
-                cv=num_cv_partitions,
+            scores = _cv_log_likelihoods(
+                transformed_samples,
+                weights,
+                bandwidth_range,
+                num_cv_partitions,
+                **kde_kwargs,
             )
-            grid.fit(transformed_samples)
+            best_index, second_best_index = np.argsort(-scores, kind="stable")[:2]
+            bandwidth_selected = bandwidth_range[best_index]
 
-            # If new best score, update and zoom in.
-            if abs(current_best - grid.best_score_) > 0.001:
-                current_best = grid.best_score_
-            else:
+            if scores[best_index] - best_score <= 0.001:
                 break
+            best_score = scores[best_index]
 
-            second_best_index = list(grid.cv_results_["rank_test_score"]).index(2)
-
-            if (grid.best_index_ == 0) or (grid.best_index_ == steps - 1):
-                # Best bandwidth is at the edge of the grid: shift the grid to be
-                # centered on it (in bandwidth units, not grid indices) and keep all
-                # bandwidths positive.
-                best_bandwidth = bandwidth_range[grid.best_index_]
-                half_width = (upper - lower) / 2
-                lower = max(best_bandwidth - half_width, 0.1 * best_bandwidth)
-                upper = best_bandwidth + half_width
+            if best_index == 0:
+                lower, upper = 0.1 * bandwidth_selected, bandwidth_selected
+            elif best_index == steps - 1:
+                lower, upper = bandwidth_selected, bandwidth_selected + (upper - lower)
             else:
-                upper = bandwidth_range[second_best_index]
-                lower = bandwidth_range[grid.best_index_]
-
-                if upper < lower:
-                    upper, lower = lower, upper
-
-        bandwidth_selected = grid.best_params_["bandwidth"]  # type: ignore
+                lower, upper = sorted((
+                    bandwidth_selected,
+                    bandwidth_range[second_best_index],
+                ))
     elif float(bandwidth) > 0:
         bandwidth_selected = float(bandwidth)
     else:
         raise ValueError("bandwidth must be positive, 'scott', 'silvermann' or 'cv'")
 
     # Run final fit with selected bandwidth.
-    kde = KernelDensity(
-        kernel=kernel,
-        algorithm=algorithm,
-        metric=metric,
-        atol=atol,
-        rtol=rtol,
-        breadth_first=breadth_first,
-        leaf_size=leaf_size,
-        metric_params=metric_params,
-        bandwidth=bandwidth_selected,
-    )
+    kde = KernelDensity(bandwidth=bandwidth_selected, **kde_kwargs)
     kde.fit(transformed_samples, sample_weight=sample_weights)
 
     return KDEWrapper(kde, transform_)

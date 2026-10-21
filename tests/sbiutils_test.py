@@ -5,8 +5,11 @@ import warnings
 from typing import Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 import torch
+from sklearn.model_selection import GridSearchCV
+from sklearn.neighbors import KernelDensity
 from torch import Tensor, ones, zeros
 from torch.distributions import MultivariateNormal
 from torch.distributions.transforms import IndependentTransform, identity_transform
@@ -366,24 +369,50 @@ def test_kde(bandwidth, transform, sample_weights):
     assert kde_vals.shape == torch.Size((num_draws,))
 
 
-def test_kde_cv_bandwidth_below_initial_grid():
-    """Cross-validation must find a bandwidth below the initial grid (0.1 * std).
+@pytest.mark.parametrize(
+    "cluster_offset, num_samples, num_dim",
+    [
+        (10.0, 400, 1),  # Best bandwidth below the first grid.
+        (100.0, 400, 1),  # Best bandwidth far below the first grid.
+        (0.0, 40, 5),  # Best bandwidth above the first grid.
+    ],
+)
+def test_kde_cv_bandwidth_matches_fine_grid(cluster_offset, num_samples, num_dim):
+    """The selected bandwidth must match a cross-validation over a fine grid."""
+    signs = torch.arange(num_samples).unsqueeze(1) % 2 * 2 - 1
+    samples = torch.randn(num_samples, num_dim) + cluster_offset * signs
 
-    Two well-separated unit-variance clusters have a large overall std, so the
-    best bandwidth lies at the lower edge of the first grid and the grid has to
-    be shifted. The best bandwidth for this data is around 0.4.
-    """
-    from sklearn.exceptions import FitFailedWarning
+    kde = get_kde(samples, bandwidth="cv")
 
-    torch.manual_seed(0)
-    samples = torch.cat([torch.randn(200, 1) - 10.0, torch.randn(200, 1) + 10.0])
+    reference = GridSearchCV(
+        KernelDensity(), {"bandwidth": np.geomspace(0.05, 2.0, 60)}, cv=20
+    ).fit(samples.numpy())
+    ratio = kde.kde.bandwidth / reference.best_params_["bandwidth"]
+    assert 0.8 < ratio < 1.25
 
-    with warnings.catch_warnings():
-        # Fails if the grid contains invalid (non-positive) bandwidths.
-        warnings.simplefilter("error", FitFailedWarning)
-        kde = get_kde(samples, bandwidth="cv")
 
-    assert 0.2 < kde.kde.bandwidth < 0.8
+def test_kde_cv_bandwidth_invariant_to_offsets_between_dims():
+    samples = torch.randn(400, 2)
+    offset = torch.tensor([0.0, 100.0])
+
+    bandwidth = get_kde(samples, bandwidth="cv").kde.bandwidth
+    bandwidth_offset = get_kde(samples + offset, bandwidth="cv").kde.bandwidth
+
+    assert bandwidth_offset == pytest.approx(bandwidth, rel=1e-3)
+
+
+# sklearn warns about log(0) for zero weights.
+@pytest.mark.filterwarnings("ignore:divide by zero:RuntimeWarning")
+def test_kde_cv_bandwidth_ignores_samples_with_zero_weight():
+    samples = torch.randn(200, 1)
+    outliers = 0.05 * torch.randn(200, 1) + 30.0
+    # Zero weights first, so that whole cross-validation folds have zero weight.
+    weights = torch.cat([torch.zeros(200), torch.ones(200)])
+
+    kde = get_kde(torch.cat([outliers, samples]), "cv", sample_weights=weights)
+
+    ratio = kde.kde.bandwidth / get_kde(samples, "cv").kde.bandwidth
+    assert 0.8 < ratio < 1.25
 
 
 @pytest.mark.parametrize(
