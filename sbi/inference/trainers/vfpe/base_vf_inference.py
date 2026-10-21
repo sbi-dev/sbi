@@ -4,14 +4,13 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict, replace
-from typing import Any, Callable, ClassVar, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, ClassVar, Dict, Optional, Self, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import Self
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
