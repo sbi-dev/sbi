@@ -379,10 +379,7 @@ def regularized_ot_dual(
         max_iter: Maximum number of iterations. A warning is raised if Sinkhorn
             has not converged by then.
         tol: Tolerance on the L1 error of the coupling's row marginals; the column
-            marginals are exact after each update. The tolerance is raised to the
-            precision the dtype can reach, the machine epsilon times
-            max(10, cost.max() / (relative_epsilon * cost.mean())), up to 1e-2.
-            A warning is raised if that precision is above 1e-2.
+            marginals are exact after each update.
 
     Return:
         Optimal transport coupling of shape (B, m, n) or (m, n)
@@ -415,17 +412,6 @@ def regularized_ot_dual(
     def s(f, g):
         return (cost - f.unsqueeze(2) - g.unsqueeze(1)) / epsilon
 
-    # The log-domain updates lose precision as cost / epsilon grows.
-    precision = finfo.eps * (cost.amax(dim=(1, 2)) / epsilon.flatten()).clamp(min=10)
-    max_precision = 1e-2
-    if (precision > max_precision).any():
-        warnings.warn(
-            f"In {dtype}, the coupling's marginals can only be matched up to "
-            f"{precision.max().item():.1e}. Consider a bigger 'relative_epsilon' "
-            "or double precision.",
-            stacklevel=2,
-        )
-    threshold = precision.clamp(max=max_precision).clamp(min=tol)
     terminated = torch.zeros(a.shape[0], dtype=torch.bool, device=a.device)
     for i in range(max_iter + 1):
         # The column marginals are exact after a g-update, so only the row
@@ -433,13 +419,14 @@ def regularized_ot_dual(
         log_row_marginal = torch.logsumexp(-s(f, g), dim=2)
         err = (log_row_marginal.exp() - a).abs().sum(dim=1)
         if i > 0:
-            terminated = torch.logical_or(terminated, err < threshold)
+            terminated = torch.logical_or(terminated, err < tol)
         if torch.all(terminated):
             break
         if i == max_iter:
             warnings.warn(
                 f"Sinkhorn iterations did not converge within {max_iter} iterations. "
-                "Consider a bigger 'relative_epsilon' or increasing 'max_iter'.",
+                "Consider a bigger 'relative_epsilon', increasing 'max_iter', "
+                "or float64.",
                 stacklevel=2,
             )
             break
@@ -593,7 +580,8 @@ class Distance:
                 Typically, this information is inferred by the choice of the distance,
                 but in case a custom distance is used, this information is pivotal.
             distance_kwargs: Configurations parameters for the distances. In particular
-                useful for the MMD and Wasserstein distance.
+                useful for the MMD and Wasserstein distance. Unknown keys raise a
+                TypeError when the distance is created.
             batch_size: Number of simulations that the distance function
                 evaluates against the reference observations at once. If -1, we evaluate
                 all simulations at the same time.
@@ -628,18 +616,13 @@ class Distance:
                 "mse": mse_distance,
                 "l2": l2,
                 "l1": l1,
-                "mmd": partial(mmd_distance, **self.distance_kwargs),
-                "wasserstein": partial(wasserstein_distance, **self.distance_kwargs),
+                "mmd": mmd_distance,
+                "wasserstein": wasserstein_distance,
             }
-            try:
-                self.distance_fn = distance_functions[distance]
-            except KeyError as exc:
-                raise KeyError(f"Distance {distance} not supported.") from exc
-            if isinstance(self.distance_fn, partial):
-                # partial only checks the keyword arguments when it is called.
-                inspect.signature(self.distance_fn.func).bind_partial(
-                    **self.distance_fn.keywords
-                )
+            distance_fn = distance_functions[distance]
+            # partial only checks the keyword arguments when it is called.
+            inspect.signature(distance_fn).bind_partial(**self.distance_kwargs)
+            self.distance_fn = partial(distance_fn, **self.distance_kwargs)
 
     def __call__(self, x_o: Tensor, x: Tensor) -> Tensor:
         """Distance evaluation between the reference data and the simulated data.
