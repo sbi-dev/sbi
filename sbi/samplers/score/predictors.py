@@ -155,5 +155,9 @@ class Heun(Predictor):
         dt = t1 - t0
         k1 = self._probability_flow_drift(theta, t1, dt.device)
         theta_predicted = theta - k1 * dt
+        if t0 == 0:
+            # The score diverges at t=0, so skip the correction and keep the Euler
+            # step, matching the Euler-Maruyama predictor at the final time point.
+            return theta_predicted
         k2 = self._probability_flow_drift(theta_predicted, t0, dt.device)
         return theta - 0.5 * (k1 + k2) * dt

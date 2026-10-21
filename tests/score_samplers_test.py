@@ -15,6 +15,7 @@ from sbi.inference.potentials.vector_field_potential import (
 )
 from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.score import Diffuser
+from sbi.samplers.score.predictors import Heun
 from sbi.utils import BoxUniform, MultipleIndependent
 from sbi.utils.vector_field_utils import VectorFieldNet
 
@@ -198,6 +199,28 @@ def test_gaussian_score_sampling(
 
     assert torch.allclose(mean_est, mean0, atol=1e-1)
     assert torch.allclose(std_est, std0, atol=1e-1)
+
+
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+def test_heun_predictor_falls_back_to_euler_at_zero_time(sde_type):
+    """The score diverges at t=0, so the last step must not evaluate it there."""
+
+    input_event_shape = (4,)
+    mean0 = torch.zeros(input_event_shape)
+    std0 = torch.ones(input_event_shape)
+    score_fn = _build_gaussian_score_estimator(sde_type, input_event_shape, mean0, std0)
+
+    predictor = Heun(score_fn)
+    theta = torch.zeros((1, *input_event_shape))
+    t1 = torch.tensor(1e-2)
+    t0 = torch.tensor(0.0)
+
+    k1 = predictor._probability_flow_drift(theta, t1, t1.device)
+    theta_predicted = theta - k1 * (t1 - t0)
+    output = predictor(theta, t1, t0)
+
+    assert torch.isfinite(output).all()
+    torch.testing.assert_close(output, theta_predicted)
 
 
 def _build_gaussian_score_estimator(
