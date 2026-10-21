@@ -291,18 +291,27 @@ def unbiased_mmd_squared_hypothesis_test(x: Tensor, y: Tensor, alpha=0.05):
 
 
 def wasserstein_2_squared(
-    x: Tensor, y: Tensor, epsilon: float = 1e-3, max_iter: int = 1000, tol: float = 1e-9
+    x: Tensor,
+    y: Tensor,
+    *,
+    relative_epsilon: float = 1e-2,
+    max_iter: int = 5000,
+    tol: float = 1e-3,
 ):
     """Approximate the squared 2-Wasserstein distance
-    using entropic regularized optimal transport [1]. In the limit,
-    'epsilon' to 0, we recover the squared Wasserstein-2 distance is recovered.
+    using entropic regularized optimal transport [1]. In the limit
+    'relative_epsilon' to 0, the squared Wasserstein-2 distance is recovered.
 
     Args:
         x: Data of shape (B, m, d) or (m, d)
         y: Data of shape (B, n, d) or (n, d)
-        epsilon: Entropic regularization term
-        max_iter: Maximum number of iteration for which the Sinkhorn iterations run
-        tol: Tolerance required for Sinkhorn to converge
+        relative_epsilon: Entropic regularization, relative to the mean squared
+            distance between the points of x and y. Smaller values bias the
+            estimate less but need more iterations.
+        max_iter: Maximum number of Sinkhorn iterations. A warning is raised if
+            Sinkhorn has not converged by then.
+        tol: Tolerance on the L1 error of the coupling's marginals. See
+            `regularized_ot_dual` for the floor set by the floating point precision.
 
     Return:
         The squared 2-Wasserstein distance of shape (B, ) or ()
@@ -316,13 +325,13 @@ def wasserstein_2_squared(
     )
     if x.ndim == 2:
         nx, ny = x.shape[0], y.shape[0]
-        a = torch.ones(nx) / nx
-        b = torch.ones(ny) / ny
+        a = torch.ones(nx, device=x.device) / nx
+        b = torch.ones(ny, device=x.device) / ny
     elif x.ndim == 3:
         batch_size = x.shape[0]
         nx, ny = x.shape[1], y.shape[1]
-        a = torch.ones((batch_size, nx)) / nx
-        b = torch.ones((batch_size, ny)) / ny
+        a = torch.ones((batch_size, nx), device=x.device) / nx
+        b = torch.ones((batch_size, ny), device=x.device) / ny
     else:
         raise ValueError(
             "This implementation of Wasserstein is only implemented, "
@@ -333,7 +342,12 @@ def wasserstein_2_squared(
     cost_matrix = torch.cdist(x, y, 2) ** 2
 
     coupling = regularized_ot_dual(
-        a, b, cost_matrix, epsilon, max_iter=max_iter, tol=tol
+        a,
+        b,
+        cost_matrix,
+        relative_epsilon=relative_epsilon,
+        max_iter=max_iter,
+        tol=tol,
     )
     if a.ndim == 1:
         return torch.sum(coupling * cost_matrix)
@@ -345,78 +359,88 @@ def regularized_ot_dual(
     a: Tensor,
     b: Tensor,
     cost: Tensor,
-    epsilon: float = 1e-3,
-    max_iter: int = 1000,
-    tol=1e-9,
+    *,
+    relative_epsilon: float = 1e-2,
+    max_iter: int = 5000,
+    tol: float = 1e-3,
 ):
     """Implementation of regularized optimal transport based on
     the dual formulation of the regularized optimal transport problem.
 
     Args:
         a: Probability vector of the empirical distribution x,
-        either in batched form (B, m) or as a single vector (m,).
+            either in batched form (B, m) or as a single vector (m,).
         b: Probability vector of the empirical distribution y,
-        either in batched form (B, n) or as a single vector (n,).
+            either in batched form (B, n) or as a single vector (n,).
         cost: Cost-matrix between the empirical samples of x and y.
-        Either in batched form (B, m, n) or as a matrix (m, n).
-        epsilon: The entropic regularization term
+            Either in batched form (B, m, n) or as a matrix (m, n).
+        relative_epsilon: Entropic regularization, relative to the mean of each
+            cost matrix, so the result does not depend on the scale of the cost.
         max_iter: Maximum number of iterations. A warning is raised if Sinkhorn
-        has not converged by then.
-        tol: Tolerance on the L1 error of the coupling's row marginals. It is
-        raised to ten times the machine epsilon of the cost's dtype.
+            has not converged by then.
+        tol: Tolerance on the L1 error of the coupling's row marginals. It has a
+            floor of the machine epsilon times max(10, cost.max() / epsilon),
+            below which the floating point precision cannot get.
 
     Return:
         Optimal transport coupling of shape (B, m, n) or (m, n)
     """
 
     assert a.ndim == b.ndim, (
-        "Please make sure that 'a' and 'b' are both either batched or not."
+        "Please make sure that 'a' and 'b' are both either batched or not, "
+        f"currently a.ndim={a.ndim} and b.ndim={b.ndim}"
     )
-    f"currently a.ndim={a.ndim} and b.ndim={b.ndim}"
 
     batched = True
     if a.ndim == 1 and b.ndim == 1:
         batched = False
-        na, nb = a.shape[0], b.shape[0]
         a = torch.atleast_2d(a)
         b = torch.atleast_2d(b)
         cost = cost.unsqueeze(0)
-    na, nb = a.shape[1], b.shape[1]
+
+    dtype = torch.promote_types(torch.promote_types(cost.dtype, a.dtype), b.dtype)
+    if not dtype.is_floating_point:
+        dtype = torch.get_default_dtype()
+    a, b, cost = a.to(dtype), b.to(dtype), cost.to(dtype)
+    finfo = torch.finfo(dtype)
+
+    epsilon = relative_epsilon * cost.mean(dim=(1, 2), keepdim=True)
+    epsilon = epsilon.clamp(min=finfo.tiny)
 
     # Define potentials
     f, g = torch.zeros_like(a), torch.zeros_like(b)
 
     def s(f, g):
-        return cost - f.unsqueeze(2) - g.unsqueeze(1)
+        return (cost - f.unsqueeze(2) - g.unsqueeze(1)) / epsilon
 
-    # The marginal error cannot get much below the dtype's precision.
-    tol = max(tol, 10 * torch.finfo(torch.promote_types(cost.dtype, a.dtype)).eps)
+    # The log-domain updates lose precision as cost / epsilon grows.
+    precision = finfo.eps * (cost.amax(dim=(1, 2)) / epsilon.flatten()).clamp(min=10)
+    threshold = precision.clamp(min=tol)
     terminated = torch.zeros(a.shape[0], dtype=torch.bool, device=a.device)
     for i in range(max_iter + 1):
-        # After the g-update the column marginals of the coupling are exact, so
-        # convergence is measured on the row marginals, whose log is computed
-        # anyway for the next f-update.
-        log_row_marginal = torch.logsumexp(-s(f, g) / epsilon, dim=2)
+        # The column marginals are exact after a g-update, so only the row
+        # marginals are checked, from the first update on.
+        log_row_marginal = torch.logsumexp(-s(f, g), dim=2)
         err = (log_row_marginal.exp() - a).abs().sum(dim=1)
-        terminated = torch.logical_or(terminated, err < tol)
+        if i > 0:
+            terminated = torch.logical_or(terminated, err < threshold)
         if torch.all(terminated):
             break
         if i == max_iter:
             warnings.warn(
                 f"Sinkhorn iterations did not converge within {max_iter} iterations. "
-                f"Consider a bigger regularization parameter 'epsilon' "
-                "or increasing 'max_iter'.",
+                "Consider a bigger 'relative_epsilon' or increasing 'max_iter'.",
                 stacklevel=2,
             )
             break
-        f_tmp = f + epsilon * (torch.log(a) - log_row_marginal)
-        g_tmp = g + epsilon * (
-            torch.log(b) - torch.logsumexp(-s(f_tmp, g) / epsilon, dim=1)
+        f_tmp = f + epsilon[..., 0] * (torch.log(a) - log_row_marginal)
+        g_tmp = g + epsilon[..., 0] * (
+            torch.log(b) - torch.logsumexp(-s(f_tmp, g), dim=1)
         )
-        f = torch.where(terminated.unsqueeze(-1).repeat((1, na)), f, f_tmp)
-        g = torch.where(terminated.unsqueeze(-1).repeat((1, nb)), g, g_tmp)
+        f = torch.where(terminated.unsqueeze(-1), f, f_tmp)
+        g = torch.where(terminated.unsqueeze(-1), g, g_tmp)
 
-    coupling = torch.exp(-s(f, g) / epsilon)
+    coupling = torch.exp(-s(f, g))
 
     if not batched:
         coupling = coupling.squeeze(0)
@@ -671,23 +695,25 @@ def mmd_distance(x_o: Tensor, x: Tensor, scale: Optional[float] = None) -> Tenso
 def wasserstein_distance(
     x_o: Tensor,
     x: Tensor,
-    epsilon: float = 1e-3,
-    max_iter: int = 1000,
-    tol: float = 1e-9,
+    *,
+    relative_epsilon: float = 1e-2,
+    max_iter: int = 5000,
+    tol: float = 1e-3,
 ) -> Tensor:
     """Calculates the Wasserstein-2 distance between two tensors.
 
     Args:
         x_o: The observed data tensor.
         x: The simulated data tensor.
-        epsilon: Regularization parameter for the Sinkhorn algorithm.
+        relative_epsilon: Entropic regularization, relative to the mean squared
+            distance between the points of x_o and each simulated dataset.
         max_iter: Maximum number of iterations for the Sinkhorn algorithm.
-        tol: Tolerance for the Sinkhorn algorithm.
+        tol: Tolerance on the L1 error of the coupling's marginals.
 
     Returns:
         The Wasserstein-2 distance.
     """
     batched_x_o = x_o.repeat((x.shape[0], *[1] * len(x_o.shape)))
     return wasserstein_2_squared(
-        batched_x_o, x, epsilon=epsilon, max_iter=max_iter, tol=tol
+        batched_x_o, x, relative_epsilon=relative_epsilon, max_iter=max_iter, tol=tol
     )

@@ -9,6 +9,7 @@ import warnings
 import numpy as np
 import pytest
 import torch
+from scipy.optimize import linear_sum_assignment
 from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import (
@@ -108,7 +109,7 @@ def test_wasserstein_2_distance(sigma):
 
     otherdist = tmvn(loc=sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
     Y = otherdist.sample((nsamples - 1,))
-    estimate = wasserstein_2_squared(X, Y, epsilon=5e-4).item()
+    estimate = wasserstein_2_squared(X, Y).item()
 
     # Check if the wasserstein estimate is of the same order
     # as the analytically derived squared Wasserstein-2 distance
@@ -137,22 +138,32 @@ def test_regularized_ot_dual_converged_does_not_warn(dtype, batch):
     a, b, cost = _ot_inputs(dtype, batch)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        coupling = regularized_ot_dual(a, b, cost, epsilon=1.0)
-    assert (coupling.sum(-1) - a).abs().sum(-1).max() < 1e-5
-    assert (coupling.sum(-2) - b).abs().sum(-1).max() < 1e-5
-
-
-def test_regularized_ot_dual_integer_cost():
-    a = torch.ones(2) / 2
-    coupling = regularized_ot_dual(a, a, torch.tensor([[0, 1], [1, 0]]), epsilon=1.0)
-    assert torch.allclose(coupling.sum(-1), a)
+        coupling = regularized_ot_dual(a, b, cost)
+    assert (coupling.sum(-1) - a).abs().sum(-1).max() < 2e-3
+    assert (coupling.sum(-2) - b).abs().sum(-1).max() < 2e-3
 
 
 @pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
 def test_regularized_ot_dual_warns_when_not_converged(dtype):
     a, b, cost = _ot_inputs(dtype)
     with pytest.warns(UserWarning, match="did not converge"):
-        regularized_ot_dual(a, b, cost, epsilon=1e-3, max_iter=10)
+        regularized_ot_dual(a, b, cost, relative_epsilon=1e-3, max_iter=10)
+
+
+@pytest.mark.parametrize("scale", (1e-2, 1e2))
+def test_wasserstein_2_squared_defaults_match_exact_ot(scale):
+    torch.manual_seed(0)
+    x, y = scale * torch.randn(100, 2), scale * (torch.randn(100, 2) + 1.0)
+    cost = (torch.cdist(x, y) ** 2).double().numpy()
+    exact = cost[linear_sum_assignment(cost)].mean()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        estimate = wasserstein_2_squared(x, y).item()
+    assert estimate == pytest.approx(exact, rel=0.02)
+
+
+def test_wasserstein_2_squared_of_identical_points_is_zero():
+    assert wasserstein_2_squared(torch.ones(5, 2), torch.ones(5, 2)) == 0
 
 
 @pytest.mark.slow

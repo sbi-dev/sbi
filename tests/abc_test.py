@@ -348,7 +348,7 @@ def test_mcabc_coverage(test_params):
             {
                 "distance": "wasserstein",
                 "num_iid_samples": 2,
-                "distance_kwargs": {"epsilon": 1.0, "tol": 1e-6, "max_iter": 100},
+                "distance_kwargs": {"relative_epsilon": 0.1, "max_iter": 100},
             },
             id="smcabc-iid-wasserstein",
         ),
