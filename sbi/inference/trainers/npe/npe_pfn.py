@@ -305,6 +305,8 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 device=device,
                 **asdict(resolved_params),
             )
+            if len(self._x_roundwise) > 0:
+                self._posterior.set_reference_data(full_context_condition)
             return self._posterior
 
         estimator.set_context(full_theta, full_x)

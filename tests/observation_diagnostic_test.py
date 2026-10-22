@@ -1,0 +1,523 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
+from __future__ import annotations
+
+import pickle
+import warnings
+
+import pytest
+import torch
+import torch.nn as nn
+
+from sbi.diagnostics.observation import (
+    ObservationDiagnostic,
+    ReferenceObservationStats,
+    diagnose_observation,
+)
+from sbi.inference import NPE
+from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
+from sbi.utils import BoxUniform
+from sbi.utils.sbiutils import seed_all_backends
+
+seed = 2026
+
+
+@pytest.fixture(autouse=True)
+def set_seed():
+    seed_all_backends(seed)
+
+
+def test_diagnostic_dataclass_and_dict_access():
+    """Verify ObservationDiagnostic structure, attribute and dict-like access."""
+    diag = ObservationDiagnostic(
+        is_in_distribution=True,
+        empirical_percentile=0.42,
+        mahalanobis_distance=1.23,
+        warning=None,
+        method="mahalanobis",
+        threshold=0.01,
+        space="observation",
+        details={"n_reference": 1000},
+    )
+
+    # Attribute access
+    assert diag.is_in_distribution is True
+    assert diag.empirical_percentile == 0.42
+    assert diag.mahalanobis_distance == 1.23
+    assert diag.warning is None
+    assert diag.method == "mahalanobis"
+    assert diag.threshold == 0.01
+    assert diag.space == "observation"
+    assert diag.details["n_reference"] == 1000
+
+    # Dict-like access
+    assert diag["is_in_distribution"] is True
+    assert diag["empirical_percentile"] == 0.42
+    assert diag["mahalanobis_distance"] == 1.23
+    assert diag["warning"] is None
+    assert diag.get("method") == "mahalanobis"
+    assert diag.get("nonexistent", "fallback") == "fallback"
+
+    d = diag.to_dict()
+    assert isinstance(d, dict)
+    assert d["is_in_distribution"] is True
+    assert "empirical_percentile" in d
+    assert "mahalanobis_distance" in d
+
+    # Iteration / keys / items
+    keys = list(diag.keys())
+    assert "is_in_distribution" in keys
+    assert "warning" in keys
+
+    # String representation
+    s = str(diag)
+    assert "is_in_distribution=True" in s
+    assert "empirical_percentile=0.4200" in s
+
+
+def test_reference_stats_computation_and_device():
+    """Verify ReferenceObservationStats creation, memory size, and device transfer."""
+    x = torch.randn(500, 4)
+    stats = ReferenceObservationStats.from_simulations(x)
+
+    assert stats.n_simulations == 500
+    assert stats.event_shape == torch.Size([4])
+    assert torch.allclose(stats.mean, x.mean(dim=0), atol=1e-5)
+    assert len(stats.reference_distances) == 500
+    # Distances must be sorted
+    assert torch.all(stats.reference_distances[:-1] <= stats.reference_distances[1:])
+
+    # Device transfer
+    stats_cpu = stats.to("cpu")
+    assert stats_cpu.mean.device.type == "cpu"
+    assert stats_cpu.reference_distances.device.type == "cpu"
+
+
+def test_typical_and_ood_observations():
+    """Verify that typical observation is accepted and extreme outlier flagged."""
+    # Reference: 1000 samples from standard Gaussian in 3D
+    x_ref = torch.randn(1000, 3)
+    stats = ReferenceObservationStats.from_simulations(x_ref)
+
+    # In-distribution observation: close to mean
+    x_in = torch.zeros(3)
+    diag_in = stats.diagnose(x_in, threshold=0.01)
+
+    assert diag_in.is_in_distribution is True
+    assert diag_in.warning is None
+    assert diag_in.empirical_percentile is not None
+    assert diag_in.empirical_percentile > 0.05
+    assert diag_in.mahalanobis_distance is not None
+    assert diag_in.mahalanobis_distance < 3.0
+
+    # Out-of-distribution observation: far outlier (10 standard deviations away)
+    x_out = torch.tensor([10.0, 10.0, 10.0])
+    diag_out = stats.diagnose(x_out, threshold=0.01)
+
+    assert diag_out.is_in_distribution is False
+    assert diag_out.warning is not None
+    assert "extreme tails" in diag_out.warning
+    assert diag_out.empirical_percentile == 0.0
+    assert diag_out.mahalanobis_distance is not None
+    assert diag_out.mahalanobis_distance > 10.0
+
+
+def test_statistical_correctness_known_distribution():
+    """Verify empirical percentiles on 2D standard Gaussian against chi-square theory.
+
+    For standard 2D Gaussian, d_M^2 ~ Chi^2(2) = Exponential(1/2).
+    Survival function: P(d_M >= r) = exp(-r^2 / 2).
+    """
+    n_sims = 5000
+    x_ref = torch.randn(n_sims, 2)
+    stats = ReferenceObservationStats.from_simulations(x_ref)
+
+    # Check median: r = sqrt(2 * ln(2)) ~= 1.1774 has theoretical survival prob 0.50
+    r_median = float((2.0 * torch.log(torch.tensor(2.0))).sqrt())
+    x_med = torch.tensor([r_median, 0.0])
+    diag_med = stats.diagnose(x_med, threshold=0.01)
+    assert diag_med.empirical_percentile is not None
+    assert abs(diag_med.empirical_percentile - 0.50) < 0.05
+
+    # Check 10th percentile: r = sqrt(2 * ln(10)) ~= 2.146 has theoretical survival 0.10
+    r_10 = float((2.0 * torch.log(torch.tensor(10.0))).sqrt())
+    x_10 = torch.tensor([r_10, 0.0])
+    diag_10 = stats.diagnose(x_10, threshold=0.01)
+    assert diag_10.empirical_percentile is not None
+    assert abs(diag_10.empirical_percentile - 0.10) < 0.03
+
+
+def test_opt_in_warning_set_default_x():
+    """Verify opt-in warning behavior in posterior.set_default_x()."""
+    prior = BoxUniform(low=-2.0 * torch.ones(2), high=2.0 * torch.ones(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    trainer = NPE(prior=prior)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior()
+
+    x_in = torch.zeros(2)
+    x_ood = torch.tensor([50.0, 50.0])
+
+    # 1. warn_if_ood=False (default): no warning even for OOD
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        posterior.set_default_x(x_ood, warn_if_ood=False)
+    ood_warnings = [
+        w
+        for w in record
+        if issubclass(w.category, UserWarning) and "extreme tails" in str(w.message)
+    ]
+    assert len(ood_warnings) == 0
+
+    # 2. warn_if_ood=True for in-distribution: no warning
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        posterior.set_default_x(x_in, warn_if_ood=True)
+    ood_warnings = [
+        w
+        for w in record
+        if issubclass(w.category, UserWarning) and "extreme tails" in str(w.message)
+    ]
+    assert len(ood_warnings) == 0
+
+    # 3. warn_if_ood=True for OOD: emits UserWarning
+    with pytest.warns(UserWarning, match="falls in the extreme tails"):
+        posterior.set_default_x(x_ood, warn_if_ood=True)
+
+    # 4. Method chaining works
+    post = posterior.set_default_x(x_in)
+    assert post is posterior
+    assert torch.allclose(posterior.default_x, x_in)
+
+
+def test_numerical_robustness_singular_and_d_gt_n():
+    """Verify spectral fallback when covariance is singular or D > N."""
+    # Case 1: Collinear features (feature 1 is exactly 2 * feature 0)
+    x_base = torch.randn(100, 1)
+    x_singular = torch.cat([x_base, 2.0 * x_base], dim=1)
+    stats_singular = ReferenceObservationStats.from_simulations(x_singular)
+
+    assert stats_singular.cholesky_factor is None
+    assert stats_singular.eigenvectors is not None
+
+    # Point consistent with subspace
+    x_consistent = torch.tensor([1.0, 2.0])
+    diag_c = stats_singular.diagnose(x_consistent, threshold=0.01)
+    assert diag_c.is_in_distribution is True
+
+    # Point orthogonal to subspace (violates collinearity)
+    x_orthogonal = torch.tensor([1.0, -2.0])
+    diag_ortho = stats_singular.diagnose(x_orthogonal, threshold=0.01)
+    # Detected via subspace residual
+    assert diag_ortho.details.get("out_of_subspace", False) is True
+
+    # Case 2: D > N (10 simulations in 20 dimensions)
+    x_highdim = torch.randn(10, 20)
+    stats_highdim = ReferenceObservationStats.from_simulations(x_highdim)
+    assert stats_highdim.eigenvectors is not None
+    diag_hd = stats_highdim.diagnose(torch.zeros(20))
+    assert diag_hd.is_in_distribution is True
+
+
+def test_constant_features():
+    """Verify strict OOD handling when simulator produces constant features."""
+    x = torch.randn(200, 3)
+    # Feature index 1 is constant across all simulations
+    x[:, 1] = 42.0
+
+    stats = ReferenceObservationStats.from_simulations(x)
+    assert 1 in stats.constant_indices.tolist()
+
+    # Observation with matching constant feature
+    x_match = torch.tensor([0.0, 42.0, 0.0])
+    diag_match = stats.diagnose(x_match)
+    assert diag_match.is_in_distribution is True
+    assert diag_match.warning is None
+
+    # Observation with deviating constant feature
+    x_violate = torch.tensor([0.0, 42.5, 0.0])
+    diag_violate = stats.diagnose(x_violate)
+    assert diag_violate.is_in_distribution is False
+    assert diag_violate.empirical_percentile == 0.0
+    assert diag_violate.mahalanobis_distance == float("inf")
+    assert "violates one or more constant features" in diag_violate.warning
+
+
+def test_invalid_inputs_and_edge_cases():
+    """Verify input validation for NaNs, Infs, shape mismatches, and N < 2."""
+    x_ref = torch.randn(50, 2)
+    stats = ReferenceObservationStats.from_simulations(x_ref)
+
+    # 1. NaN in observation
+    with pytest.raises(ValueError, match="NaN"):
+        stats.diagnose(torch.tensor([float("nan"), 1.0]))
+
+    # 2. Inf in observation
+    with pytest.raises(ValueError, match="Inf"):
+        stats.diagnose(torch.tensor([float("inf"), 1.0]))
+
+    # 3. Dimension mismatch
+    with pytest.raises(ValueError, match="Dimension mismatch"):
+        stats.diagnose(torch.tensor([1.0, 2.0, 3.0]))
+
+    # 4. Insufficient reference data (N = 1)
+    x_small = torch.randn(1, 2)
+    diag_small = diagnose_observation(x_o=torch.zeros(2), x_ref=x_small)
+    assert diag_small.is_in_distribution is None
+    assert diag_small.empirical_percentile is None
+    assert "insufficient" in diag_small.warning.lower()
+
+
+def test_batched_observations():
+    """Verify batched observation diagnostics."""
+    x_ref = torch.randn(500, 2)
+    stats = ReferenceObservationStats.from_simulations(x_ref)
+
+    # Batch of 3 observations: one central, one medium, one extreme
+    x_batch = torch.tensor([
+        [0.0, 0.0],
+        [2.0, 0.0],
+        [20.0, 20.0],
+    ])
+    diag = stats.diagnose(x_batch, threshold=0.01)
+
+    assert diag.is_in_distribution is False  # Batch has at least one OOD
+    assert diag.warning is not None
+    assert "batch" in diag.warning.lower()
+    assert "batch_percentiles" in diag.details
+    assert len(diag.details["batch_percentiles"]) == 3
+    assert diag.details["batch_percentiles"][0] > 0.05
+    assert diag.details["batch_percentiles"][2] == 0.0
+
+
+def test_multidimensional_and_image_observations():
+    """Verify multi-dimensional event shapes (e.g. image-like observations)."""
+    # 200 samples of 1x4x4 images
+    x_ref = torch.randn(200, 1, 4, 4)
+    stats = ReferenceObservationStats.from_simulations(x_ref)
+
+    assert stats.event_shape == torch.Size([1, 4, 4])
+
+    x_o = torch.zeros(1, 4, 4)
+    diag = stats.diagnose(x_o)
+    assert diag.is_in_distribution is True
+    assert diag.mahalanobis_distance is not None
+
+
+def test_embedding_network_space():
+    """Verify diagnostic evaluation in learned embedding space."""
+    x_ref = torch.randn(200, 6)
+    embedding_net = nn.Sequential(
+        nn.Linear(6, 3),
+        nn.Tanh(),
+    )
+
+    # Diagnose in embedded space
+    diag = diagnose_observation(
+        x_o=torch.zeros(6),
+        x_ref=x_ref,
+        embedding_net=embedding_net,
+        space="embedded",
+    )
+    assert diag.space == "embedded"
+    assert diag.is_in_distribution is True
+    assert diag.details["embedding_dim"] == 3
+
+
+def test_ensemble_posterior_diagnostics():
+    """Verify EnsemblePosterior diagnostic delegation and warning deduplication."""
+    prior = BoxUniform(low=-2.0 * torch.ones(2), high=2.0 * torch.ones(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    trainer1 = NPE(prior=prior)
+    trainer1.append_simulations(theta, x).train(max_num_epochs=1)
+    post1 = trainer1.build_posterior()
+
+    trainer2 = NPE(prior=prior)
+    trainer2.append_simulations(theta, x).train(max_num_epochs=1)
+    post2 = trainer2.build_posterior()
+
+    ensemble = EnsemblePosterior(posteriors=[post1, post2])
+
+    # Diagnose delegates to component posteriors
+    diag = ensemble.diagnose_observation(torch.zeros(2))
+    assert diag.is_in_distribution is True
+
+    # Check warning is issued at most ONCE (not twice for 2 ensemble members)
+    x_ood = torch.tensor([50.0, 50.0])
+    with pytest.warns(UserWarning) as record:
+        ensemble.set_default_x(x_ood, warn_if_ood=True)
+
+    ood_warnings = [
+        w
+        for w in record
+        if issubclass(w.category, UserWarning) and "extreme tails" in str(w.message)
+    ]
+    assert len(ood_warnings) == 1
+
+
+def test_posterior_save_load_preserves_diagnostics():
+    """Verify that reference statistics survive serialization (pickle)."""
+    prior = BoxUniform(low=-2.0 * torch.ones(2), high=2.0 * torch.ones(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    trainer = NPE(prior=prior)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = trainer.build_posterior()
+
+    diag_before = posterior.diagnose_observation(torch.zeros(2))
+
+    # Pickle dump and reload
+    serialized = pickle.dumps(posterior)
+    reloaded = pickle.loads(serialized)
+
+    diag_after = reloaded.diagnose_observation(torch.zeros(2))
+
+    assert diag_before.is_in_distribution == diag_after.is_in_distribution
+    assert (
+        abs(diag_before.mahalanobis_distance - diag_after.mahalanobis_distance) < 1e-5
+    )
+    assert (
+        abs(diag_before.empirical_percentile - diag_after.empirical_percentile) < 1e-5
+    )
+
+
+def test_unattached_reference_data_behavior():
+    """Verify that a posterior without reference data reports indeterminate cleanly."""
+    prior = BoxUniform(low=-2.0 * torch.ones(2), high=2.0 * torch.ones(2))
+    theta = prior.sample((50,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    trainer = NPE(prior=prior)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = trainer.build_posterior()
+
+    # Manually clear reference stats to simulate legacy / unattached posterior
+    posterior._reference_statistics = None
+
+    diag = posterior.diagnose_observation(torch.zeros(2))
+    assert diag.is_in_distribution is None
+    assert diag.empirical_percentile is None
+    assert diag.mahalanobis_distance is None
+    assert diag.warning is not None
+    assert "No reference simulations" in diag.warning
+
+
+def test_posterior_types_compatibility():
+    """Verify diagnostic on MCMC, Rejection, and VI posteriors."""
+    prior = BoxUniform(low=-2.0 * torch.ones(2), high=2.0 * torch.ones(2))
+    theta = prior.sample((60,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    trainer = NPE(prior=prior)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+
+    # Rejection
+    post_rej = trainer.build_posterior(sample_with="rejection")
+    diag_rej = post_rej.diagnose_observation(torch.zeros(2))
+    assert diag_rej.is_in_distribution is True
+
+    # MCMC
+    post_mcmc = trainer.build_posterior(sample_with="mcmc")
+    diag_mcmc = post_mcmc.diagnose_observation(torch.zeros(2))
+    assert diag_mcmc.is_in_distribution is True
+
+    # VI
+    post_vi = trainer.build_posterior(sample_with="vi")
+    diag_vi = post_vi.diagnose_observation(torch.zeros(2))
+    assert diag_vi.is_in_distribution is True
+
+
+def test_deterministic_reproducibility():
+    """Verify identical results across repeated calls for same inputs."""
+    x_ref = torch.randn(300, 3)
+    stats = ReferenceObservationStats.from_simulations(x_ref)
+
+    x_query = torch.tensor([1.2, -0.5, 0.8])
+    diag1 = stats.diagnose(x_query)
+    diag2 = stats.diagnose(x_query)
+
+    assert diag1.is_in_distribution == diag2.is_in_distribution
+    assert diag1.empirical_percentile == diag2.empirical_percentile
+    assert diag1.mahalanobis_distance == diag2.mahalanobis_distance
+    assert diag1.warning == diag2.warning
+
+
+def test_tied_scores_and_small_sample():
+    """Verify handling of tied scores and fractional ranking."""
+    # Several identical points to produce exact ties
+    x_ref = torch.cat(
+        [
+            torch.zeros(10, 2),
+            torch.ones(10, 2),
+        ],
+        dim=0,
+    )
+
+    stats = ReferenceObservationStats.from_simulations(x_ref)
+    diag = stats.diagnose(torch.zeros(2))
+    assert diag.empirical_percentile is not None
+    # 0.5 * (10 ties) / 20 points = at least 0.25
+    assert diag.empirical_percentile >= 0.25
+
+
+def test_exact_leave_one_out_formula():
+    """Verify that the analytical leave-one-out scaling matches brute force."""
+    torch.manual_seed(42)
+    n, d = 30, 3
+    x = torch.randn(n, d)
+
+    # Brute-force leave-one-out distances
+    brute_loo_dists = []
+    for i in range(n):
+        mask = torch.ones(n, dtype=torch.bool)
+        mask[i] = False
+        x_minus_i = x[mask]
+        mean_minus_i = x_minus_i.mean(dim=0)
+        cov_minus_i = ((x_minus_i - mean_minus_i).t() @ (x_minus_i - mean_minus_i)) / (
+            n - 2
+        )
+        inv_cov_minus_i = torch.linalg.inv(cov_minus_i)
+        diff = x[i] - mean_minus_i
+        dist_sq = diff @ inv_cov_minus_i @ diff
+        brute_loo_dists.append(torch.sqrt(dist_sq).item())
+
+    sorted_brute_loo = torch.tensor(sorted(brute_loo_dists))
+
+    # ReferenceObservationStats LOO calculation
+    stats = ReferenceObservationStats.from_simulations(x)
+    ref_dists = stats.reference_distances
+
+    assert torch.allclose(ref_dists, sorted_brute_loo, rtol=1e-4, atol=1e-4)
+
+
+def test_multiround_sequential_inference():
+    """Verify reference simulation tracking across multiple sequential rounds."""
+    prior = BoxUniform(low=-2.0 * torch.ones(2), high=2.0 * torch.ones(2))
+    trainer = NPE(prior=prior)
+
+    # Round 1
+    theta1 = prior.sample((40,))
+    x1 = theta1 + 0.1 * torch.randn_like(theta1)
+    trainer.append_simulations(theta1, x1).train(max_num_epochs=1)
+
+    # Round 2
+    theta2 = prior.sample((60,))
+    x2 = theta2 + 0.1 * torch.randn_like(theta2)
+    trainer.append_simulations(theta2, x2).train(
+        max_num_epochs=1, force_first_round_loss=True
+    )
+
+    posterior = trainer.build_posterior()
+
+    assert posterior.has_reference_statistics
+    assert posterior.reference_statistics.n_simulations == 100
+
+    diag = posterior.diagnose_observation(torch.zeros(2))
+    assert diag.is_in_distribution is True
+    assert diag.details["n_reference"] == 100

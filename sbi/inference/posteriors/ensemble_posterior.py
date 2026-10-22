@@ -1,13 +1,19 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+from __future__ import annotations
 
 import warnings
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
+if TYPE_CHECKING:
+    from sbi.diagnostics.observation import (
+        ObservationDiagnostic,
+        ReferenceObservationStats,
+    )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
@@ -289,7 +295,7 @@ class EnsemblePosterior(NeuralPosterior):
         else:
             return torch.logsumexp(log_weights.expand_as(log_probs) + log_probs, dim=0)
 
-    def set_default_x(self, x: Tensor) -> "NeuralPosterior":
+    def set_default_x(self, x: Tensor, warn_if_ood: bool = False) -> "NeuralPosterior":
         r"""Set new default x for `.sample(), .log_prob()` as conditioning context.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
@@ -306,19 +312,62 @@ class EnsemblePosterior(NeuralPosterior):
 
         Args:
             x: The default observation to set for every posterior $p_i(theta|x)$ in the
-            ensemble.
+                ensemble.
+            warn_if_ood: If True, evaluates whether `x` is out-of-distribution
+                relative to the reference simulations and issues a `UserWarning` if
+                it falls below the threshold. Default is False.
+
         Returns:
             `EnsemblePosterior` that will use a default `x` when not explicitly
             passed.
         """
         x = process_x(x, x_event_shape=None)
         self._assert_finite_x(x)
+        if warn_if_ood:
+            diag = self.diagnose_observation(x)
+            if diag.warning is not None:
+                warnings.warn(diag.warning, UserWarning, stacklevel=2)
+
         self._x = x.to(self._device)
 
         for posterior in self.posteriors:
-            posterior.set_default_x(x)
+            posterior.set_default_x(x, warn_if_ood=False)
 
         return self
+
+    @property
+    def reference_statistics(self) -> Optional["ReferenceObservationStats"]:
+        """Reference observation statistics attached to this ensemble or component."""
+        if self._reference_statistics is not None:
+            return self._reference_statistics
+        for p in self.posteriors:
+            if getattr(p, "reference_statistics", None) is not None:
+                return p.reference_statistics
+        return None
+
+    @property
+    def has_reference_statistics(self) -> bool:
+        """Whether reference statistics are attached to ensemble or any component."""
+        return self.reference_statistics is not None
+
+    def diagnose_observation(
+        self,
+        x: Optional[Tensor] = None,
+        *,
+        threshold: float = 0.01,
+        space: Literal["observation", "embedded"] = "observation",
+        x_ref: Optional[Tensor] = None,
+    ) -> ObservationDiagnostic:
+        r"""Diagnose observation against ensemble reference simulations."""
+        if self._reference_statistics is None and x_ref is None:
+            for p in self.posteriors:
+                if getattr(p, "_reference_statistics", None) is not None:
+                    return p.diagnose_observation(
+                        x, threshold=threshold, space=space, x_ref=x_ref
+                    )
+        return super().diagnose_observation(
+            x, threshold=threshold, space=space, x_ref=x_ref
+        )
 
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
