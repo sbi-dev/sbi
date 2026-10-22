@@ -11,6 +11,7 @@ from sbi.neural_nets.estimators.categorical_net import (
     CategoricalMassEstimator,
 )
 from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
+from sbi.neural_nets.estimators.mean_flow_estimator import MeanFlowEstimator
 from sbi.neural_nets.estimators.mixed_density_estimator import MixedDensityEstimator
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,

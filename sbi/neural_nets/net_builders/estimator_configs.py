@@ -76,6 +76,7 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unaf,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
+from sbi.neural_nets.net_builders.mean_flow import build_mean_flow
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 
 _BUILD_KWARG_ALIASES: dict = {
@@ -1006,6 +1007,25 @@ class MDNConfig(_UnconstrainedCapableConfigBase):
 
 
 @dataclass(frozen=True, eq=False, repr=False)
+class MeanFlowConfig(DensityConfigBase):
+    """Conditional mean flow with an exact few-step density (Arruda et al., 2026).
+
+    Args:
+        hidden_features: Width of every residual block.
+        num_blocks: Number of residual blocks on the path to each output, the last
+            two of which belong to each of the two heads alone.
+        num_steps: Default number of flow-map steps of `log_prob` and `sample`. It
+            can be changed after training via the estimator's `num_steps`.
+    """
+
+    hidden_features: int = 256
+    num_blocks: int = 5
+    num_steps: int = 2
+
+    _BUILD_FN: ClassVar[Callable] = staticmethod(build_mean_flow)
+
+
+@dataclass(frozen=True, eq=False, repr=False)
 class TabPFNConfig(PretrainedConfigBase):
     """TabPFN-based density estimator.
 
@@ -1045,6 +1065,7 @@ _DENSITY_CONFIGS: dict = {
     "zuko_unaf": ZukoUNAFConfig,
     "zuko_gf": ZukoGFConfig,
     "zuko_bpf": ZukoBPFConfig,
+    "mean_flow": MeanFlowConfig,
     "tabpfn": TabPFNConfig,
 }
 

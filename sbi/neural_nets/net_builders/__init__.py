@@ -26,6 +26,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MarginalNSFConfig,
     MarginalSOSPFConfig,
     MarginalUNAFConfig,
+    MeanFlowConfig,
     MixedConfig,
     NSFConfig,
     ResNetClassifierConfig,
@@ -57,6 +58,7 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unaf,
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
+from sbi.neural_nets.net_builders.mean_flow import build_mean_flow
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
 from sbi.neural_nets.net_builders.vector_field_nets import (
     AdaMLPConfig,
