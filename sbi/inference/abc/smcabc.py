@@ -291,8 +291,8 @@ class SMCABC(ABCBASE):
 
             # Resample population if effective sampling size is too small.
             if ess_min is not None:
-                particles, log_weights = self._resample_if_ess_too_small(
-                    particles, log_weights, ess_min, pop_idx
+                particles, log_weights, distances, x = self._resample_if_ess_too_small(
+                    particles, log_weights, distances, x, ess_min, pop_idx
                 )
 
             self.logger.info(
@@ -703,11 +703,17 @@ class SMCABC(ABCBASE):
         self,
         particles: Tensor,
         log_weights: Tensor,
+        distances: Tensor,
+        x: Tensor,
         ess_min: float,
         pop_idx: int,
-    ) -> Tuple[Tensor, Tensor]:
-        """Return resampled particles and uniform weights if effectice sampling size is
-        too small.
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Resample the population if the effective sampling size is too small.
+
+        Returns:
+            Particles, log weights (uniform after resampling), distances and
+            simulations, with distances and simulations kept paired with their
+            particles.
         """
 
         num_particles = particles.shape[0]
@@ -719,12 +725,14 @@ class SMCABC(ABCBASE):
         if ess < ess_min:
             self.logger.info("ESS=%s too low, resampling pop %s...", ess, pop_idx)
             # First resample, then set to uniform weights as in Sisson et al. 2007.
-            particles = self.sample_from_population_with_weights(
-                particles, torch.exp(log_weights), num_samples=num_particles
-            )
+            indices = torch.multinomial(weights, num_particles, replacement=True)
+            # Keep the population sorted by distance: the budget fill-up in
+            # _sample_next_population takes its first particles.
+            indices = indices[torch.argsort(distances[indices])]
+            particles, distances, x = particles[indices], distances[indices], x[indices]
             log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
-        return particles, log_weights
+        return particles, log_weights, distances, x
 
     def _run_lra_update_weights(
         self,

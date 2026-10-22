@@ -440,3 +440,27 @@ def test_sass_correctness():
     # Should be deterministic
     x_transformed_2 = sass_transform(x_test)
     assert torch.allclose(x_transformed, x_transformed_2)
+
+
+def test_smcabc_resampling_keeps_particles_paired_with_simulations():
+    """Resampling at low ESS must reorder distances and simulations with particles."""
+    torch.manual_seed(0)
+    prior = BoxUniform(-ones(2), ones(2))
+    smcabc = SMCABC(lambda theta: theta + 0.01 * torch.randn_like(theta), prior)
+    _, summary = smcabc(
+        zeros(1, 2),
+        num_particles=200,
+        num_initial_pop=500,
+        num_simulations=3000,
+        epsilon_decay=0.5,
+        distance_based_decay=True,
+        ess_min=0.99,
+        return_summary=True,
+    )
+
+    for particles, distances, xs in zip(
+        summary["particles"], summary["distances"], summary["xs"], strict=True
+    ):
+        assert (particles - xs).abs().max() < 0.1
+        assert torch.allclose(distances, smcabc.distance(zeros(1, 2), xs))
+        assert (distances[:-1] <= distances[1:]).all()
