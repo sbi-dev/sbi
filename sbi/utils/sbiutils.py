@@ -1267,9 +1267,10 @@ def gradient_ascent(
 
     # The `_overall` variables store data accross the iterations, whereas the
     # `_iter` variables contain data exclusively extracted from the current
-    # iteration.
-    best_log_prob_iter = torch.max(init_probs)
-    best_theta_iter = sorted_inits[-1]
+    # iteration. Slicing keeps the batch dim, so `argmax` is `(1, D)` and `max`
+    # is `(1,)` on every return path, as in the loop below.
+    best_log_prob_iter = init_probs[sort_indices[-1:]]
+    best_theta_iter = sorted_inits[-1:]
     best_theta_overall = theta_transform(best_theta_iter.detach().clone())
     best_log_prob_overall = best_log_prob_iter.detach().clone()
 

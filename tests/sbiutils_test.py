@@ -21,6 +21,8 @@ from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
+    gradient_ascent,
+    mcmc_transform,
     warn_if_invalid_for_zscoring,
     z_score_parser,
 )
@@ -793,17 +795,31 @@ def test_callable_transform_preserves_orientation_and_dtype(orientation):
     assert wrapped.transform(x.double()).dtype == torch.float64
 
 
-def test_gradient_ascent_uses_transform_space_for_best_init():
-    """Regression test for #2069: best init at optimum not double-transformed."""
-    from sbi.utils import gradient_ascent
-
-    transform = torch.distributions.transforms.AffineTransform(
-        loc=torch.tensor(10.0), scale=torch.tensor(2.0)
-    )
+@pytest.mark.parametrize(
+    "inits, atol",
+    [
+        # The best init sits at the optimum, so no step beats it (#2069).
+        ([[0.3, 0.7], [0.9, 0.1]], 1e-5),
+        # The optimizer moves away from the inits and improves on them.
+        ([[0.9, 0.1], [0.5, 0.5]], 1e-2),
+    ],
+)
+def test_gradient_ascent_returns_map_in_prior_space(inits, atol):
+    """`gradient_ascent` returns the MAP in prior space with the same shapes."""
+    prior = BoxUniform(zeros(2), ones(2))
+    optimum = torch.tensor([[0.3, 0.7]])
 
     def potential_fn(theta):
-        return -((theta - 10.0) ** 2).sum(dim=1)
+        return -100 * ((theta - optimum) ** 2).sum(dim=1)
 
-    inits = torch.tensor([[10.0], [30.0]])
-    argmax, _ = gradient_ascent(potential_fn, inits, theta_transform=transform)
-    assert torch.allclose(argmax, torch.tensor([10.0]), atol=1e-5)
+    argmax, max_val = gradient_ascent(
+        potential_fn,
+        torch.tensor(inits),
+        theta_transform=mcmc_transform(prior),
+        num_iter=200,
+        num_to_optimize=1,
+    )
+
+    assert argmax.shape == (1, 2)
+    assert max_val.shape == (1,)
+    assert torch.allclose(argmax, optimum, atol=atol)
