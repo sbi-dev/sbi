@@ -538,15 +538,16 @@ class MCMCPosterior(NeuralPosterior):
 
         Returns: Initialization function.
         """
+        # The candidate weights need no gradients, and sbi potentials track them
+        # by default even inside `torch.no_grad()`.
+        weight_fn = partial(potential_fn, track_gradients=False)
         if init_strategy == "proposal":
             return lambda: proposal_init(proposal, transform=transform, **kwargs)
         elif init_strategy == "sir":
-            return lambda: sir_init(
-                proposal, potential_fn, transform=transform, **kwargs
-            )
+            return lambda: sir_init(proposal, weight_fn, transform=transform, **kwargs)
         elif init_strategy == "resample":
             return lambda: resample_given_potential_fn(
-                proposal, potential_fn, transform=transform, **kwargs
+                proposal, weight_fn, transform=transform, **kwargs
             )
         elif init_strategy == "latest_sample":
             # `getattr`: posteriors unpickled from older sbi versions lack the
