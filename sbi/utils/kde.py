@@ -153,6 +153,9 @@ def get_kde(
             (transformed_samples - mean) ** 2, axis=0, weights=weights
         )
         scale = np.sqrt(variance).mean()
+        if scale == 0:
+            # All dimensions constant, or all weight on copies of one sample.
+            scale = transformed_samples.std()
         steps = 10
         lower = 0.1 * scale
         upper = 0.5 * scale
