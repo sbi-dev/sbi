@@ -407,7 +407,7 @@ def denoise_mixture(
     denoised_components = denoise(component_dist, m, s, x_t)
     mixture_logits = mixture_dist.logits
     # Update the logits to reflect the new likelihoods
-    component_loglikelihood = denoised_components.log_prob(x_t)
+    component_loglikelihood = marginalize(component_dist, m, s).log_prob(x_t)
     # Update the logits to reflect the new likelihoods
     denoised_logits = mixture_logits[None, ...] + component_loglikelihood
     # Normalize the logits
