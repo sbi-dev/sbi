@@ -225,6 +225,28 @@ def test_density_estimator_sample_shapes(
 
 
 @pytest.mark.parametrize("density_estimator_build_fn", model_builders)
+@pytest.mark.parametrize("sample_shape", ((), (3,), (2, 3)))
+@pytest.mark.parametrize("batch_dim", (1, 4))
+def test_density_estimator_sample_and_log_prob_shapes(
+    density_estimator_build_fn, sample_shape, batch_dim
+):
+    """`sample_and_log_prob` keeps every sample dimension, also for batched
+    conditions."""
+    density_estimator, _, conditions, input_event_shape = (
+        _build_density_estimator_and_tensors(
+            density_estimator_build_fn, (2,), (3,), batch_dim
+        )
+    )
+    samples, log_probs = density_estimator.sample_and_log_prob(
+        torch.Size(sample_shape), condition=conditions
+    )
+    if density_estimator_build_fn == build_categoricalmassestimator:
+        input_event_shape = ()
+    assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
+    assert log_probs.shape == (*sample_shape, batch_dim)
+
+
+@pytest.mark.parametrize("density_estimator_build_fn", model_builders)
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
