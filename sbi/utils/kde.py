@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Optional, Union
 
 import numpy as np
@@ -68,6 +69,14 @@ def _cv_log_likelihoods(
     return scores / num_partitions
 
 
+def _weighted_cv_is_possible(weights: np.ndarray, num_partitions: int) -> bool:
+    """Return whether a fold has positive weight in its training and held-out part."""
+    return any(
+        weights[train].sum() > 0 and weights[test].sum() > 0
+        for train, test in KFold(num_partitions).split(weights)
+    )
+
+
 # The implementation of KDE was adapted from
 # https://github.com/sbi-benchmark/sbibm/blob/main/sbibm/utils/kde.py
 def get_kde(
@@ -86,7 +95,8 @@ def get_kde(
             tailored cross validation to find the best bandwidth for passed samples.
         transform: Optional transform applied before running kde.
         sample_weights: Sample weights attached to the samples, used to perform weighted
-            KDE. With `bandwidth="cv"`, the cross-validation is weighted as well.
+            KDE. With `bandwidth="cv"`, the cross-validation is weighted as well,
+            unless the weights are concentrated on too few samples for it.
         num_cv_partitions: number of partitions for cross validation
         num_cv_repetitions: how many times to repeat the cross validation to zoom into
             the hyperparameter grid.
@@ -126,9 +136,18 @@ def get_kde(
     elif bandwidth == "cv":
         weights = None
         if sample_weights is not None:
-            # Mean 1, so that the CV scores have the same scale as without weights.
             weights = np.asarray(sample_weights, dtype=np.float64)
-            weights = weights * num_samples / weights.sum()
+            if _weighted_cv_is_possible(weights, num_cv_partitions):
+                # Mean 1, so that the CV scores have the same scale as without weights.
+                weights = weights * num_samples / weights.sum()
+            else:
+                warnings.warn(
+                    "The sample weights are concentrated on too few samples for a "
+                    "weighted cross-validation. The bandwidth is selected without "
+                    "the weights; the KDE itself still uses them.",
+                    stacklevel=2,
+                )
+                weights = None
         mean = np.average(transformed_samples, axis=0, weights=weights)
         variance = np.average(
             (transformed_samples - mean) ** 2, axis=0, weights=weights

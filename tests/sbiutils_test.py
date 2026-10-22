@@ -415,6 +415,19 @@ def test_kde_cv_bandwidth_ignores_samples_with_zero_weight():
     assert 0.8 < ratio < 1.25
 
 
+@pytest.mark.filterwarnings("ignore:divide by zero:RuntimeWarning")
+@pytest.mark.parametrize("num_positive", [1, 10])
+def test_kde_cv_bandwidth_falls_back_for_concentrated_weights(num_positive):
+    # With 200 samples and 20 folds, 10 positive weights fill only the first fold.
+    samples = torch.randn(200, 1)
+    weights = torch.cat([torch.ones(num_positive), torch.zeros(200 - num_positive)])
+
+    with pytest.warns(UserWarning, match="concentrated on too few samples"):
+        kde = get_kde(samples, "cv", sample_weights=weights)
+
+    assert kde.kde.bandwidth == get_kde(samples, "cv").kde.bandwidth
+
+
 @pytest.mark.parametrize(
     "z_x",
     [
