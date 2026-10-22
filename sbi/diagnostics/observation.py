@@ -270,15 +270,29 @@ class ReferenceObservationStats:
         if is_full_rank:
             try:
                 cholesky_factor = torch.linalg.cholesky(cov)
+                # Guard against near-singular matrices that Cholesky factorizes
+                # with tiny pivots due to roundoff
+                diag_ratio = cholesky_factor.diagonal().min() / torch.clamp(
+                    cholesky_factor.diagonal().max(), min=1e-12
+                )
+                if diag_ratio < 1e-3:
+                    cholesky_factor = None
             except torch.linalg.LinAlgError:
                 cholesky_factor = None
 
         if cholesky_factor is None:
             # Fall back to spectral decomposition (handles singular / D > N cases)
-            eigs, vecs = torch.linalg.eigh(cov)
-            # eigh returns ascending order; flip to descending
-            eigs = torch.flip(eigs, dims=(0,))
-            vecs = torch.flip(vecs, dims=(1,))
+            try:
+                eigs, vecs = torch.linalg.eigh(cov)
+                # eigh returns ascending order; flip to descending
+                eigs = torch.flip(eigs, dims=(0,))
+                vecs = torch.flip(vecs, dims=(1,))
+            except torch.linalg.LinAlgError:
+                # If eigh fails to converge due to ill-conditioning or repeated
+                # eigenvalues, compute the spectral decomposition via SVD of x_active
+                _, S, Vh = torch.linalg.svd(x_active, full_matrices=False)
+                eigs = (S**2) / (n_sims - 1)
+                vecs = Vh.t()
 
             max_eig = torch.clamp(eigs[0], min=1e-12)
             valid_eig_mask = eigs > (max_eig * subspace_tol)
