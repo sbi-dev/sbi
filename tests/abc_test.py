@@ -4,7 +4,7 @@
 import pytest
 import torch
 from torch import Tensor, eye, norm, ones, zeros
-from torch.distributions import MultivariateNormal, biject_to
+from torch.distributions import Independent, MultivariateNormal, Uniform, biject_to
 
 from sbi.inference import MCABC, SMCABC
 from sbi.inference.abc.abc_base import ABCBASE
@@ -15,6 +15,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils.kde import KDEWrapper
 from sbi.utils.metrics import check_c2st
+from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import BoxUniform
 
 
@@ -464,3 +465,38 @@ def test_smcabc_resampling_keeps_particles_paired_with_simulations():
         assert (particles - xs).abs().max() < 0.1
         assert torch.allclose(distances, smcabc.distance(zeros(1, 2), xs))
         assert (distances[:-1] <= distances[1:]).all()
+
+
+@pytest.mark.parametrize(
+    "method, call_kwargs, per_sample_key",
+    [
+        (MCABC, dict(num_simulations=2000, quantile=0.1), "distances"),
+        (
+            SMCABC,
+            dict(
+                num_particles=200,
+                num_initial_pop=500,
+                num_simulations=2000,
+                epsilon_decay=0.5,
+            ),
+            "final_weights",
+        ),
+    ],
+)
+def test_lra_removes_parameters_outside_bounded_prior(
+    method, call_kwargs, per_sample_key
+):
+    """LRA near the prior bound must neither return parameters outside nor raise."""
+    # Validation is set per instance: zuko and pyro flip torch's global default.
+    prior = Independent(
+        Uniform(-ones(2), ones(2), validate_args=True), 1, validate_args=True
+    )
+    inferer = method(lambda theta: theta + 0.1 * torch.randn_like(theta), prior)
+
+    with pytest.warns(UserWarning, match="outside the prior support"):
+        samples, summary = inferer(
+            0.95 * ones(1, 2), lra=True, return_summary=True, **call_kwargs
+        )
+
+    assert within_support(prior, samples).all()
+    assert len(summary[per_sample_key]) == len(samples)

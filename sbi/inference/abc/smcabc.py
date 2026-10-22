@@ -158,7 +158,9 @@ class SMCABC(ABCBASE):
                 samples from the previous population when the budget is used up. If
                 False, the current population is discarded and the previous population
                 is returned.
-            lra: Whether to run linear regression adjustment as in Beaumont et al. 2002
+            lra: Whether to run linear regression adjustment as in Beaumont et al. 2002.
+                Adjusted particles keep their SMC weights. Those outside the prior
+                support are removed, so fewer than `num_particles` can be returned.
             lra_with_weights: Whether to run lra as weighted linear regression with SMC
                 weights
             sass: Whether to determine semi-automatic summary statistics (sass) as in
@@ -190,7 +192,8 @@ class SMCABC(ABCBASE):
                 can .sample() and .log_prob().
             summary (if return_summary True): dictionary containing the accepted
                 paramters (if kde True), distances and simulated data x of all
-                populations.
+                populations, and under `final_weights` the log weights of the
+                returned parameters.
 
         Examples:
             >>> from sbi.inference import SMCABC
@@ -309,19 +312,22 @@ class SMCABC(ABCBASE):
             all_epsilons.append(epsilon)
             all_x.append(x)
 
-        # Maybe run LRA and adjust weights.
+        final_particles = all_particles[-1]
+        final_log_weights = all_log_weights[-1]
+        # Maybe run LRA. Adjusted particles keep their SMC weights, see Blum 2017,
+        # section 3.2: https://arxiv.org/abs/1707.01254
         if lra:
             self.logger.info("Running Linear regression adjustment.")
-            adjusted_particles, _ = self._run_lra_update_weights(
-                particles=all_particles[-1],
-                xs=all_x[-1],
+            adjusted_particles = self._run_lra(
+                theta=final_particles,
+                x=all_x[-1],
                 observation=process_x(x_o),
-                log_weights=all_log_weights[-1],
-                lra_with_weights=lra_with_weights,
+                sample_weight=final_log_weights.exp() if lra_with_weights else None,
             )
-            final_particles = adjusted_particles
-        else:
-            final_particles = all_particles[-1]
+            is_within = self._is_within_prior_after_lra(adjusted_particles)
+            final_particles = adjusted_particles[is_within]
+            final_log_weights = final_log_weights[is_within]
+            kde_kwargs = self._mask_kde_sample_weights(kde_kwargs, is_within)
 
         if kde:
             self.logger.info(
@@ -333,7 +339,7 @@ class SMCABC(ABCBASE):
             )
             # Maybe get particles weights from last population for weighted KDE.
             if kde_sample_weights:
-                kde_kwargs["sample_weights"] = all_log_weights[-1].exp()
+                kde_kwargs["sample_weights"] = final_log_weights.exp()
 
             kde_dist = get_kde(final_particles, **kde_kwargs)
 
@@ -346,6 +352,7 @@ class SMCABC(ABCBASE):
                         epsilons=all_epsilons,
                         distances=all_distances,
                         xs=all_x,
+                        final_weights=final_log_weights,
                     ),
                 )
             else:
@@ -360,6 +367,7 @@ class SMCABC(ABCBASE):
                     epsilons=all_epsilons,
                     distances=all_distances,
                     xs=all_x,
+                    final_weights=final_log_weights,
                 ),
             )
         else:
@@ -733,38 +741,6 @@ class SMCABC(ABCBASE):
             log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
         return particles, log_weights, distances, x
-
-    def _run_lra_update_weights(
-        self,
-        particles: Tensor,
-        xs: Tensor,
-        observation: Tensor,
-        log_weights: Tensor,
-        lra_with_weights: bool,
-    ) -> Tuple[Tensor, Tensor]:
-        """Return particles and weights adjusted with LRA.
-
-        Runs (weighted) linear regression from xs onto particles to adjust the
-        particles.
-
-        Updates the SMC weights according to the new particles.
-        """
-
-        adjusted_particels = super()._run_lra(
-            theta=particles,
-            x=xs,
-            observation=observation,
-            sample_weight=log_weights.exp() if lra_with_weights else None,
-        )
-
-        # Update SMC weights with LRA adjusted weights
-        adjusted_log_weights = self._calculate_new_log_weights(
-            new_particles=adjusted_particels,
-            old_particles=particles,
-            old_log_weights=log_weights,
-        )
-
-        return adjusted_particels, adjusted_log_weights
 
     def _run_sass_set_xo(
         self,

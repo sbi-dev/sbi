@@ -4,6 +4,7 @@
 """Base class for Approximate Bayesian Computation methods."""
 
 import logging
+import warnings
 from typing import Callable, Dict, Optional, Union
 
 import torch
@@ -13,6 +14,7 @@ from torch import Tensor
 
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils.metrics import Distance
+from sbi.utils.sbiutils import within_support
 
 
 class ABCBASE:
@@ -130,7 +132,8 @@ class ABCBASE:
     ) -> Tensor:
         """Return parameters adjusted with linear regression adjustment.
 
-        Implementation as in Beaumont et al. 2002: https://arxiv.org/abs/1707.01254
+        Implementation as in Beaumont et al. 2002, Genetics 162(4), see Blum 2017 for
+        an overview: https://arxiv.org/abs/1707.01254
         """
 
         # Fit a single multi-output regression model
@@ -149,3 +152,34 @@ class ABCBASE:
         theta_adjusted = theta + torch.from_numpy(pred_obs - pred_sim)
 
         return theta_adjusted
+
+    def _is_within_prior_after_lra(self, theta_adjusted: Tensor) -> Tensor:
+        """Return which adjusted parameters lie within the prior support.
+
+        Linear regression adjustment can move parameters outside the prior support,
+        where the posterior has no mass. Warns when that happens, and raises when no
+        parameter is left.
+        """
+        is_within = within_support(self.prior, theta_adjusted)
+        if not is_within.any():
+            raise ValueError(
+                "Linear regression adjustment moved all parameters outside the prior "
+                "support. Run without `lra`."
+            )
+        num_outside = int((~is_within).sum())
+        if num_outside > 0:
+            warnings.warn(
+                f"Linear regression adjustment moved {num_outside} of "
+                f"{theta_adjusted.shape[0]} parameters outside the prior support. "
+                "They are removed from the returned samples.",
+                stacklevel=3,
+            )
+        return is_within
+
+    @staticmethod
+    def _mask_kde_sample_weights(kde_kwargs: Dict, is_within: Tensor) -> Dict:
+        """Return a copy of `kde_kwargs` whose sample weights match the kept samples."""
+        if "sample_weights" not in kde_kwargs:
+            return kde_kwargs
+        sample_weights = kde_kwargs["sample_weights"][is_within.numpy()]
+        return dict(kde_kwargs, sample_weights=sample_weights)
