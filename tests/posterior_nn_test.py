@@ -37,7 +37,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils.diagnostics_utils import get_posterior_samples_on_batch
 from sbi.utils.metrics import check_c2st
-from sbi.utils.torchutils import BoxUniform
+from sbi.utils.torchutils import BoxUniform, process_device
 
 
 @pytest.mark.parametrize("snpe_method", [NPE_A, NPE_C])
@@ -638,6 +638,24 @@ def test_direct_posterior_raises_on_iid_x():
     x_o_iid = ones(3, num_dim)
     with pytest.raises(ValueError, match="batchsize == 1"):
         posterior.sample((10,), x=x_o_iid)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("method", ["log_prob", "log_prob_batched"])
+def test_direct_posterior_log_prob_with_theta_on_cpu(method: str):
+    """`theta` on the CPU is moved to the device of the posterior."""
+    device = process_device("gpu")
+    theta = torch.randn(100, 2)
+    estimator = posterior_nn("mdn")(theta, theta).to(device)
+    prior = BoxUniform(zeros(2, device=device), ones(2, device=device))
+    posterior = DirectPosterior(estimator, prior, device=device)
+    log_prob = getattr(posterior, method)
+    x_o = ones(1, 2, device=device)
+
+    log_prob_cpu_theta = log_prob(0.5 * ones(1, 2), x=x_o, norm_posterior=False)
+    expected = log_prob(0.5 * ones(1, 2, device=device), x=x_o, norm_posterior=False)
+
+    assert torch.equal(log_prob_cpu_theta, expected)
 
 
 @pytest.mark.slow
