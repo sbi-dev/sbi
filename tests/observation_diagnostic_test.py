@@ -17,6 +17,11 @@ from sbi.diagnostics.observation import (
 )
 from sbi.inference import NPE
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
+from sbi.neural_nets import posterior_nn
+from sbi.neural_nets.embedding_nets import (
+    FCEmbedding,
+    PermutationInvariantEmbedding,
+)
 from sbi.utils import BoxUniform
 from sbi.utils.sbiutils import seed_all_backends
 
@@ -521,3 +526,138 @@ def test_multiround_sequential_inference():
     diag = posterior.diagnose_observation(torch.zeros(2))
     assert diag.is_in_distribution is True
     assert diag.details["n_reference"] == 100
+
+
+def test_nan_padded_trials_ood_diagnostic_ensemble_and_direct():
+    """Verify OOD diagnostic with NaN-padded trials for direct and ensemble
+    posteriors.
+    """
+    num_dim, max_trials, num_sims = 2, 3, 30
+    prior = BoxUniform(torch.zeros(num_dim), torch.ones(num_dim))
+    theta = prior.sample((num_sims,))
+    num_trials = torch.randint(1, max_trials + 1, size=(num_sims,))
+    x = torch.full((num_sims, max_trials, num_dim), float("nan"))
+    for i in range(num_sims):
+        x[i, : num_trials[i]] = theta[i] + 0.1 * torch.randn(num_trials[i], num_dim)
+
+    embedding_net = PermutationInvariantEmbedding(
+        trial_net=FCEmbedding(input_dim=num_dim, output_dim=4),
+        trial_net_output_dim=4,
+        output_dim=4,
+    )
+    density_estimator = posterior_nn(
+        model="mdn", embedding_net=embedding_net, z_score_x="none"
+    )
+    inference = NPE(
+        prior=prior, density_estimator=density_estimator, show_progress_bars=False
+    )
+    inference.append_simulations(theta, x, exclude_invalid_x=False).train(
+        max_num_epochs=1, training_batch_size=30
+    )
+
+    # 1. Non-ensemble (direct) case
+    posterior = inference.build_posterior()
+    assert posterior.has_reference_statistics
+    assert posterior.reference_statistics is not None
+    assert getattr(posterior.reference_statistics, "is_embedded", False) is True
+    assert posterior.reference_statistics.n_simulations == num_sims
+
+    # Valid observation with 1 real trial and 2 NaN-padded trials
+    x_valid = torch.full((1, max_trials, num_dim), float("nan"))
+    x_valid[0, :1] = 0.5
+    diag = posterior.diagnose_observation(x_valid)
+    assert diag.is_in_distribution is not None
+    assert diag.space == "embedded"
+    assert diag.details["space"] == "embedded"
+    assert diag.details["n_reference"] == num_sims
+    assert "embedding_dim" in diag.details
+
+    # 2. Ensemble case
+    posterior2 = inference.build_posterior()
+    ensemble = EnsemblePosterior([posterior, posterior2])
+    assert ensemble.has_reference_statistics
+    diag_ens = ensemble.diagnose_observation(x_valid)
+    assert diag_ens.is_in_distribution is not None
+    assert diag_ens.space == "embedded"
+    assert diag_ens.details["space"] == "embedded"
+    assert diag_ens.details["n_reference"] == num_sims
+
+
+def test_nan_padded_trials_invalid_padding_rejected():
+    """Verify that invalid NaN padding and Inf values are strictly rejected."""
+    num_dim, max_trials = 2, 3
+    embedding_net = PermutationInvariantEmbedding(
+        trial_net=FCEmbedding(input_dim=num_dim, output_dim=4),
+        trial_net_output_dim=4,
+        output_dim=4,
+    )
+    x_sims = torch.full((20, max_trials, num_dim), float("nan"))
+    for i in range(20):
+        x_sims[i, :2] = torch.randn(2, num_dim)
+
+    stats = ReferenceObservationStats.from_simulations(
+        x_sims, embedding_net=embedding_net
+    )
+    assert stats.is_embedded is True
+
+    # Partially NaN trial (a trial has some NaN coordinates and some finite)
+    x_partial_nan = torch.full((1, max_trials, num_dim), float("nan"))
+    x_partial_nan[0, 0, 0] = 0.5
+    with pytest.raises(ValueError, match="NaN may only mark padded trials"):
+        diagnose_observation(x_partial_nan, reference_stats=stats)
+
+    with pytest.raises(ValueError, match="NaN may only mark padded trials"):
+        stats.diagnose(x_partial_nan)
+
+    # Fully padded (no real trials at all)
+    x_all_nan = torch.full((1, max_trials, num_dim), float("nan"))
+    with pytest.raises(ValueError, match="NaN may only mark padded trials"):
+        diagnose_observation(x_all_nan, reference_stats=stats)
+
+    with pytest.raises(ValueError, match="NaN may only mark padded trials"):
+        stats.diagnose(x_all_nan)
+
+    # Inf in observation
+    x_inf = torch.full((1, max_trials, num_dim), float("nan"))
+    x_inf[0, 0] = float("inf")
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        diagnose_observation(x_inf, reference_stats=stats)
+
+    with pytest.raises(ValueError, match="NaN/Inf"):
+        stats.diagnose(x_inf)
+
+
+def test_finite_reference_simulations_preserve_standard_behavior():
+    """Verify that standard finite simulations retain standard observation space
+    behavior.
+    """
+    x_finite = torch.randn(50, 4)
+    stats = ReferenceObservationStats.from_simulations(x_finite)
+    assert not getattr(stats, "is_embedded", False)
+    assert stats.n_simulations == 50
+    assert stats.event_shape == torch.Size([4])
+
+    x_obs = torch.randn(4)
+    diag = stats.diagnose(x_obs)
+    assert diag.space == "observation"
+    assert diag.details.get("space") != "embedded"
+
+    # NaN in observation without NaN-tolerant net must be rejected
+    x_nan = torch.tensor([1.0, float("nan"), 0.5, 0.2])
+    with pytest.raises(ValueError):
+        stats.diagnose(x_nan)
+
+    with pytest.raises(ValueError):
+        diagnose_observation(x_nan, reference_stats=stats)
+
+
+def test_parameterless_embedding_net():
+    """Verify that diagnose_observation works with parameterless embedding net."""
+    identity_net = nn.Identity()
+    x_ref = torch.randn(50, 4)
+    x_o = torch.randn(4)
+    diag = diagnose_observation(
+        x_o, x_ref=x_ref, space="embedded", embedding_net=identity_net
+    )
+    assert diag.is_in_distribution is not None
+    assert diag.space == "embedded"

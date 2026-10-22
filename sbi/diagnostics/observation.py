@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
+from sbi.utils.sbiutils import nan_tolerant_input_net
+from sbi.utils.torchutils import assert_all_finite
 from sbi.utils.user_input_checks import process_x
 
 
@@ -96,6 +98,17 @@ class ObservationDiagnostic:
         return f"ObservationDiagnostic({', '.join(fields)})"
 
 
+def _get_module_device(module: nn.Module, fallback: torch.device) -> torch.device:
+    """Safely obtain the device of a module, falling back if parameterless."""
+    param = next(module.parameters(), None)
+    if param is not None:
+        return param.device
+    buf = next(module.buffers(), None)
+    if buf is not None:
+        return buf.device
+    return fallback
+
+
 class ReferenceObservationStats:
     r"""Stores compact summary statistics from reference simulations for OOD checks.
 
@@ -117,6 +130,7 @@ class ReferenceObservationStats:
         eigenvectors: Optional[Tensor] = None,
         eigenvalues: Optional[Tensor] = None,
         embedding_net: Optional[nn.Module] = None,
+        is_embedded: bool = False,
     ):
         self.mean = mean
         self.active_indices = active_indices
@@ -129,6 +143,7 @@ class ReferenceObservationStats:
         self.eigenvectors = eigenvectors
         self.eigenvalues = eigenvalues
         self.embedding_net = embedding_net
+        self.is_embedded = is_embedded
 
     @classmethod
     def from_simulations(
@@ -159,6 +174,35 @@ class ReferenceObservationStats:
         n_sims = x_tensor.shape[0]
         event_shape = x_tensor.shape[1:]
 
+        is_embedded = False
+        nan_net = nan_tolerant_input_net(embedding_net)
+
+        if torch.isnan(x_tensor).any():
+            if nan_net is not None:
+                assert_all_finite(x_tensor, "Reference simulations x", allow_nan=True)
+                validate_nan_input = getattr(nan_net, "validate_nan_input", None)
+                if validate_nan_input is not None:
+                    validate_nan_input(x_tensor)
+
+                assert embedding_net is not None
+                target_device = _get_module_device(embedding_net, x_tensor.device)
+                orig_mode = embedding_net.training
+                try:
+                    embedding_net.eval()
+                    with torch.no_grad():
+                        x_tensor = embedding_net(x_tensor.to(target_device)).to(
+                            x_tensor.device
+                        )
+                finally:
+                    embedding_net.train(orig_mode)
+
+                is_embedded = True
+                event_shape = x_tensor.shape[1:]
+            else:
+                assert_all_finite(x_tensor, "Reference simulations x", allow_nan=False)
+        elif torch.isinf(x_tensor).any():
+            assert_all_finite(x_tensor, "Reference simulations x", allow_nan=False)
+
         # Flatten event dimensions: (N, D)
         x_flat = x_tensor.flatten(start_dim=1)
         d_dim = x_flat.shape[1]
@@ -179,6 +223,7 @@ class ReferenceObservationStats:
                 n_simulations=n_sims,
                 event_shape=event_shape,
                 embedding_net=embedding_net,
+                is_embedded=is_embedded,
             )
 
         mean = x_flat.mean(dim=0)
@@ -207,6 +252,7 @@ class ReferenceObservationStats:
                 n_simulations=n_sims,
                 event_shape=event_shape,
                 embedding_net=embedding_net,
+                is_embedded=is_embedded,
             )
 
         x_active = x_centered[:, active_indices]
@@ -281,6 +327,7 @@ class ReferenceObservationStats:
             eigenvectors=eigenvectors,
             eigenvalues=eigenvalues,
             embedding_net=embedding_net,
+            is_embedded=is_embedded,
         )
 
     @staticmethod
@@ -318,10 +365,37 @@ class ReferenceObservationStats:
         Returns:
             Tuple of (distances, details_dict).
         """
-        if torch.isnan(x).any():
-            raise ValueError("Observation x contains NaN values.")
-        if torch.isinf(x).any():
-            raise ValueError("Observation x contains Inf values.")
+        is_embedded = getattr(self, "is_embedded", False)
+        if is_embedded and self.embedding_net is not None:
+            nan_net = nan_tolerant_input_net(self.embedding_net)
+            if nan_net is not None:
+                assert_all_finite(x, "Observation x", allow_nan=True)
+                validate_nan_input = getattr(nan_net, "validate_nan_input", None)
+                if validate_nan_input is not None and torch.isnan(x).any():
+                    validate_nan_input(x)
+            else:
+                if torch.isnan(x).any():
+                    raise ValueError("Observation x contains NaN values.")
+            if torch.isinf(x).any():
+                raise ValueError("Observation x contains Inf values.")
+
+            needs_embedding = torch.isnan(x).any() or (
+                tuple(x.shape[-len(self.event_shape) :]) != tuple(self.event_shape)
+            )
+            if needs_embedding:
+                target_device = _get_module_device(self.embedding_net, x.device)
+                orig_mode = self.embedding_net.training
+                try:
+                    self.embedding_net.eval()
+                    with torch.no_grad():
+                        x = self.embedding_net(x.to(target_device)).to(x.device)
+                finally:
+                    self.embedding_net.train(orig_mode)
+        else:
+            if torch.isnan(x).any():
+                raise ValueError("Observation x contains NaN values.")
+            if torch.isinf(x).any():
+                raise ValueError("Observation x contains Inf values.")
 
         # Ensure batch dimension
         if x.dim() == len(self.event_shape):
@@ -359,6 +433,9 @@ class ReferenceObservationStats:
         x_centered = x_flat - mean
 
         details: Dict[str, Any] = {}
+        if is_embedded:
+            details["space"] = "embedded"
+            details["embedding_dim"] = self.event_shape[-1]
 
         # 1. Check constant features
         if len(self.constant_indices) > 0:
@@ -482,6 +559,8 @@ class ReferenceObservationStats:
                 "resolution."
             )
 
+        space_to_report = "embedded" if getattr(self, "is_embedded", False) else space
+
         if not is_batched:
             dist_val = float(dists[0].item())
             perc_val = float(percentiles[0])
@@ -522,7 +601,7 @@ class ReferenceObservationStats:
                 mahalanobis_distance=dist_val,
                 warning=warning,
                 threshold=threshold,
-                space=space,
+                space=space_to_report,
                 details=details,
             )
         else:
@@ -554,7 +633,7 @@ class ReferenceObservationStats:
                 mahalanobis_distance=max_dist,
                 warning=warning,
                 threshold=threshold,
-                space=space,
+                space=space_to_report,
                 details=details,
             )
 
@@ -610,8 +689,18 @@ def diagnose_observation(
     """
     x_proc = process_x(x_o, x_event_shape=None)
 
-    if torch.isnan(x_proc).any() or torch.isinf(x_proc).any():
-        raise ValueError("Observation x_o contains NaN or Inf values.")
+    effective_net = embedding_net or (
+        reference_stats.embedding_net if reference_stats is not None else None
+    )
+    nan_net = nan_tolerant_input_net(effective_net)
+
+    if nan_net is not None:
+        assert_all_finite(x_proc, "Observation x_o", allow_nan=True)
+        validate_nan_input = getattr(nan_net, "validate_nan_input", None)
+        if validate_nan_input is not None and torch.isnan(x_proc).any():
+            validate_nan_input(x_proc)
+    else:
+        assert_all_finite(x_proc, "Observation x_o", allow_nan=False)
 
     if reference_stats is None and x_ref is None:
         return ObservationDiagnostic(
@@ -628,15 +717,28 @@ def diagnose_observation(
 
     if reference_stats is None and x_ref is not None:
         x_ref_proc = process_x(x_ref, x_event_shape=None)
-        if torch.isnan(x_ref_proc).any() or torch.isinf(x_ref_proc).any():
-            raise ValueError("Reference simulations x_ref contain NaN or Inf values.")
+        if nan_net is not None:
+            assert_all_finite(x_ref_proc, "Reference simulations x_ref", allow_nan=True)
+            validate_nan_input = getattr(nan_net, "validate_nan_input", None)
+            if validate_nan_input is not None and torch.isnan(x_ref_proc).any():
+                validate_nan_input(x_ref_proc)
+        else:
+            assert_all_finite(
+                x_ref_proc, "Reference simulations x_ref", allow_nan=False
+            )
 
         if space == "embedded" and embedding_net is not None:
-            net_device = next(embedding_net.parameters()).device
-            with torch.no_grad():
+            net_device = _get_module_device(embedding_net, x_ref_proc.device)
+            orig_mode = embedding_net.training
+            try:
                 embedding_net.eval()
-                x_ref_eval = embedding_net(x_ref_proc.to(net_device))
-                x_o_eval = embedding_net(x_proc.to(net_device))
+                with torch.no_grad():
+                    x_ref_eval = embedding_net(x_ref_proc.to(net_device)).to(
+                        x_ref_proc.device
+                    )
+                    x_o_eval = embedding_net(x_proc.to(net_device)).to(x_proc.device)
+            finally:
+                embedding_net.train(orig_mode)
             reference_stats = ReferenceObservationStats.from_simulations(
                 x_ref_eval, embedding_net=embedding_net
             )
@@ -650,11 +752,20 @@ def diagnose_observation(
 
     assert reference_stats is not None
 
-    if space == "embedded" and reference_stats.embedding_net is not None:
+    if (
+        space == "embedded"
+        and reference_stats.embedding_net is not None
+        and not getattr(reference_stats, "is_embedded", False)
+    ):
         net = reference_stats.embedding_net
-        with torch.no_grad():
+        net_device = _get_module_device(net, x_proc.device)
+        orig_mode = net.training
+        try:
             net.eval()
-            x_proc_eval = net(x_proc.to(next(net.parameters()).device))
+            with torch.no_grad():
+                x_proc_eval = net(x_proc.to(net_device)).to(x_proc.device)
+        finally:
+            net.train(orig_mode)
         diag = reference_stats.diagnose(x_proc_eval, threshold=threshold, space=space)
         diag.details["embedding_dim"] = x_proc_eval.shape[-1]
         return diag
