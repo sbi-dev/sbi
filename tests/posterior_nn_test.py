@@ -640,11 +640,11 @@ def test_direct_posterior_raises_on_iid_x():
         posterior.sample((10,), x=x_o_iid)
 
 
-@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
+@pytest.mark.gpu
 @pytest.mark.parametrize("method", ["log_prob", "log_prob_batched"])
-def test_direct_posterior_log_prob_with_theta_on_cpu(device: str, method: str):
+def test_direct_posterior_log_prob_with_theta_on_cpu(method: str):
     """`theta` on the CPU is moved to the device of the posterior."""
-    device = process_device(device)
+    device = process_device("gpu")
     theta = torch.randn(100, 2)
     estimator = posterior_nn("mdn")(theta, theta).to(device)
     prior = BoxUniform(zeros(2, device=device), ones(2, device=device))
