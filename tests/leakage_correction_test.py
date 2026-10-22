@@ -50,16 +50,17 @@ def test_leakage_correction_caching(estimator_type, monkeypatch):
     prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
     posterior = _posterior(estimator_type, prior)
     is_vf = isinstance(posterior, VectorFieldPosterior)
-    sampler = "sample_via_ode" if is_vf else "_sample_estimator"
+    owner = posterior if is_vf else posterior.posterior_estimator
+    sampler = "sample_via_ode" if is_vf else "sample"
     calls = []
-    sample = getattr(posterior, sampler)
+    sample = getattr(owner, sampler)
 
     def spy(*args, **kwargs):
         x = posterior.potential_fn.x_o if is_vf else kwargs["condition"]
         calls.append((kwargs, x))
         return sample(*args, **kwargs)
 
-    monkeypatch.setattr(posterior, sampler, spy)
+    monkeypatch.setattr(owner, sampler, spy)
     theta = torch.ones(1, 2)
     params = {"num_rejection_samples": 100}
     x_a, x_b = torch.zeros(1, 2), torch.ones(1, 2)
