@@ -387,8 +387,9 @@ class VIPosteriorParameters(PosteriorParameters):
             flows may be unstable.
         vi_method: Variational method for fitting q to the posterior. Options:
             [rKL, fKL, IW, alpha]. Some are "mode seeking" (rKL, alpha > 1) and
-            some are "mass covering" (fKL, IW, alpha < 1). Currently only used
-            for single-x VI; amortized VI uses ELBO (rKL).
+            some are "mass covering" (fKL, IW, alpha < 1). Amortized VI
+            supports only rKL; `train_amortized` raises `NotImplementedError`
+            for the others.
         num_transforms: Number of transforms in the normalizing flow. Used for
             both single-x VI (via set_q/train) and amortized VI (via
             train_amortized).

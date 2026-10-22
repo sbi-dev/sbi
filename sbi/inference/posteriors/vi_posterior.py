@@ -990,8 +990,7 @@ class VIPosterior(NeuralPosterior):
 
         This allows sampling from q(θ|x) for any observation x without retraining.
         Uses the reverse-KL ELBO (Evidence Lower Bound) objective with early stopping
-        based on validation loss. Only the reverse KL divergence is supported; other
-        `vi_method` values raise `NotImplementedError`.
+        based on validation loss.
 
         Args:
             theta: Training θ values from simulations (num_sims, θ_dim).
@@ -1033,15 +1032,17 @@ class VIPosterior(NeuralPosterior):
             self for method chaining.
 
         Raises:
-            NotImplementedError: If `vi_method` is not `"rKL"`.
+            NotImplementedError: If the posterior's `vi_method` or `params.vi_method`
+                is not `"rKL"`.
         """
-        if self.vi_method != "rKL":
+        vi_method = self.vi_method
+        if params is not None and params.vi_method != "rKL":
+            vi_method = params.vi_method
+        if vi_method != "rKL":
             raise NotImplementedError(
-                "train_amortized() only supports the reverse KL divergence "
-                f"(vi_method='rKL'), but the posterior was created with "
-                f"vi_method='{self.vi_method}'. Use train() for single-observation "
-                "training with this method, or construct the posterior with "
-                "vi_method='rKL'."
+                "train_amortized() supports only vi_method='rKL', got "
+                f"vi_method='{vi_method}'. Use train() to fit a single observation "
+                "with this method, or switch to vi_method='rKL'."
             )
 
         # Resolve parameters: explicit args > params dataclass > instance attrs
