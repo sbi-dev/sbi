@@ -200,6 +200,20 @@ def test_gaussian_score_sampling(
     assert torch.allclose(std_est, std0, atol=1e-1)
 
 
+def test_fnpe_batched_observations_keep_base_distribution():
+    """fnpe only contracts the sampler when it composes iid observations, not for a
+    batch of independent observations as in `sample_batched`."""
+    score_fn = _build_gaussian_score_estimator("vp", (2,), torch.ones(2), torch.ones(2))
+    score_fn = score_fn.bind(torch.ones((100, 1)), x_is_iid=False, iid_method="fnpe")
+    diffuser = Diffuser(score_fn, "euler_maruyama")
+
+    init = diffuser.initialize(1_000)
+
+    assert torch.allclose(
+        init.std(), score_fn.vector_field_estimator.std_base.mean(), rtol=0.05
+    )
+
+
 def _build_gaussian_score_estimator(
     sde_type: str,
     input_event_shape: Tuple[int],
