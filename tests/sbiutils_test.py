@@ -5,8 +5,11 @@ import warnings
 from typing import Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 import torch
+from sklearn.model_selection import GridSearchCV
+from sklearn.neighbors import KernelDensity
 from torch import Tensor, ones, zeros
 from torch.distributions import MultivariateNormal
 from torch.distributions.transforms import IndependentTransform, identity_transform
@@ -366,6 +369,74 @@ def test_kde(bandwidth, transform, sample_weights):
 
     assert kde_samples.shape == torch.Size((num_draws, num_dim))
     assert kde_vals.shape == torch.Size((num_draws,))
+
+
+@pytest.mark.parametrize(
+    "cluster_offset, num_samples, num_dim",
+    [
+        (10.0, 400, 1),  # Best bandwidth below the first grid.
+        (100.0, 400, 1),  # Best bandwidth far below the first grid.
+        (0.0, 40, 5),  # Best bandwidth above the first grid.
+    ],
+)
+def test_kde_cv_bandwidth_matches_fine_grid(cluster_offset, num_samples, num_dim):
+    """The selected bandwidth must match a cross-validation over a fine grid."""
+    signs = torch.arange(num_samples).unsqueeze(1) % 2 * 2 - 1
+    samples = torch.randn(num_samples, num_dim) + cluster_offset * signs
+
+    kde = get_kde(samples, bandwidth="cv")
+
+    reference = GridSearchCV(
+        KernelDensity(), {"bandwidth": np.geomspace(0.05, 2.0, 60)}, cv=20
+    ).fit(samples.numpy())
+    ratio = kde.kde.bandwidth / reference.best_params_["bandwidth"]
+    assert 0.8 < ratio < 1.25
+
+
+def test_kde_cv_bandwidth_invariant_to_offsets_between_dims():
+    samples = torch.randn(400, 2)
+    offset = torch.tensor([0.0, 100.0])
+
+    bandwidth = get_kde(samples, bandwidth="cv").kde.bandwidth
+    bandwidth_offset = get_kde(samples + offset, bandwidth="cv").kde.bandwidth
+
+    assert bandwidth_offset == pytest.approx(bandwidth, rel=1e-3)
+
+
+# sklearn warns about log(0) for zero weights.
+@pytest.mark.filterwarnings("ignore:divide by zero:RuntimeWarning")
+def test_kde_cv_bandwidth_ignores_samples_with_zero_weight():
+    samples = torch.randn(200, 1)
+    outliers = 0.05 * torch.randn(200, 1) + 30.0
+    # Zero weights first, so that whole cross-validation folds have zero weight.
+    weights = torch.cat([torch.zeros(200), torch.ones(200)])
+
+    kde = get_kde(torch.cat([outliers, samples]), "cv", sample_weights=weights)
+
+    ratio = kde.kde.bandwidth / get_kde(samples, "cv").kde.bandwidth
+    assert 0.8 < ratio < 1.25
+
+
+def test_kde_cv_bandwidth_ignores_duplicated_samples():
+    # Resampled populations, as in SMCABC, contain exact copies of samples.
+    samples = torch.randn(100, 1)
+
+    bandwidth = get_kde(samples, "cv").kde.bandwidth
+    bandwidth_duplicated = get_kde(samples.repeat(2, 1), "cv").kde.bandwidth
+
+    assert bandwidth_duplicated == pytest.approx(bandwidth, rel=1e-6)
+
+
+@pytest.mark.filterwarnings("ignore:divide by zero:RuntimeWarning")
+def test_kde_cv_bandwidth_falls_back_for_concentrated_weights():
+    # With 200 samples and 20 folds, 10 positive weights fill only the first fold.
+    samples = torch.randn(200, 1)
+    weights = torch.cat([torch.ones(10), torch.zeros(190)])
+
+    with pytest.warns(UserWarning, match="concentrated on too few samples"):
+        kde = get_kde(samples, "cv", sample_weights=weights)
+
+    assert kde.kde.bandwidth == get_kde(samples, "cv").kde.bandwidth
 
 
 @pytest.mark.parametrize(
