@@ -58,8 +58,9 @@ _KDE_KWARGS = dict(
 
 def _unique_samples(
     samples: np.ndarray, weights: Optional[np.ndarray]
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Return the unique samples in their original order, weighted by their counts.
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return the unique samples in their original order, their counts, and their
+    total weights (the counts if there are no weights).
 
     A held-out sample with an exact copy in the training part makes the CV score grow
     without bound as the bandwidth shrinks.
@@ -68,8 +69,9 @@ def _unique_samples(
         samples, axis=0, return_index=True, return_inverse=True
     )
     order = np.argsort(first)
-    counts = np.bincount(inverse.ravel(), weights=weights)
-    return samples[first[order]], counts[order]
+    counts = np.bincount(inverse.ravel())[order]
+    totals = counts if weights is None else np.bincount(inverse.ravel(), weights)[order]
+    return samples[first[order]], counts, totals
 
 
 def _scale(samples: np.ndarray, weights: Optional[np.ndarray]) -> float:
@@ -112,14 +114,17 @@ def _weighted_cv_is_possible(weights: np.ndarray, num_partitions: int) -> bool:
 def _cv_bandwidth(
     samples: np.ndarray,
     weights: np.ndarray,
+    counts: np.ndarray,
     num_partitions: int,
     num_repetitions: int,
 ) -> float:
     """Return the bandwidth with the best weighted cross-validation score.
 
     Args:
-        samples: Unique samples with nonzero spread.
-        weights: Non-negative weight per sample, not all zero.
+        samples: Unique samples, at least two of them with positive weight.
+        weights: Non-negative total weight per sample.
+        counts: Number of copies per sample, used if the weights are too
+            concentrated for a weighted cross-validation.
         num_partitions: Number of cross-validation folds.
         num_repetitions: Maximal number of grids to search.
     """
@@ -138,7 +143,7 @@ def _cv_bandwidth(
             "KDE itself still uses them.",
             stacklevel=3,
         )
-        weights = np.ones(num_samples)
+        weights = counts
     # Mean 1, so that the CV scores have the same scale as without weights.
     weights = weights * num_samples / weights.sum()
     # sklearn's weighted density evaluation is slower, so drop unit weights.
@@ -248,8 +253,11 @@ def get_kde(
                 "num_cv_partitions must be at least 2 and num_cv_repetitions at "
                 "least 1 for bandwidth='cv'."
             )
-        unique_samples, counts = _unique_samples(transformed_samples, sample_weights)
-        if _scale(unique_samples, counts) == 0:
+        unique_samples, counts, totals = _unique_samples(
+            transformed_samples, sample_weights
+        )
+        # Count, not spread: a weighted spread of copies need not be exactly zero.
+        if np.count_nonzero(totals) < 2:
             warnings.warn(
                 "All samples are identical (ignoring samples with zero weight), so "
                 "the KDE is a point mass with a small bandwidth.",
@@ -258,7 +266,7 @@ def get_kde(
             bandwidth_selected = 1e-5
         else:
             bandwidth_selected = _cv_bandwidth(
-                unique_samples, counts, num_cv_partitions, num_cv_repetitions
+                unique_samples, totals, counts, num_cv_partitions, num_cv_repetitions
             )
     elif np.isfinite(float(bandwidth)) and float(bandwidth) > 0:
         bandwidth_selected = float(bandwidth)

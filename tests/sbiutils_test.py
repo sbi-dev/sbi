@@ -415,6 +415,16 @@ def test_kde_cv_bandwidth_ignores_samples_with_zero_weight():
     assert 0.8 < ratio < 1.25
 
 
+def test_kde_cv_bandwidth_ignores_duplicated_samples():
+    # Resampled populations, as in SMCABC, contain exact copies of samples.
+    samples = torch.randn(100, 1)
+
+    bandwidth = get_kde(samples, "cv").kde.bandwidth
+    bandwidth_duplicated = get_kde(samples.repeat(2, 1), "cv").kde.bandwidth
+
+    assert bandwidth_duplicated == pytest.approx(bandwidth, rel=1e-6)
+
+
 @pytest.mark.filterwarnings("ignore:divide by zero:RuntimeWarning")
 def test_kde_cv_bandwidth_falls_back_for_concentrated_weights():
     # With 200 samples and 20 folds, 10 positive weights fill only the first fold.
