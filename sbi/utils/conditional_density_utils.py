@@ -226,7 +226,7 @@ class ConditionedPotential(BasePotential):
         self.dims_to_sample = dims_to_sample
         self.device = self.potential_fn.device
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
         r"""
         Returns the conditional potential $\log(p(\theta_i|\theta_j, x))$.
 
@@ -234,7 +234,8 @@ class ConditionedPotential(BasePotential):
             theta: Free parameters $\theta_i$, batch dimension 1.
             x_o: Unused keyword argument. Only present to match the signature of the
                 `Potential` class.
-            track_gradients: Whether to track gradients.
+            track_gradients: Whether to track gradients. `None` keeps the caller's
+                grad mode.
 
         Returns:
             Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,

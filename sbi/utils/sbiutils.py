@@ -1256,7 +1256,8 @@ def gradient_ascent(
     else:
         theta_transform = theta_transform
 
-    init_probs = potential_fn(inits).detach()
+    with torch.no_grad():
+        init_probs = potential_fn(inits)
     inits = inits.to(init_probs.device)
 
     # Pick the `num_to_optimize` best init locations.
@@ -1287,9 +1288,11 @@ def gradient_ascent(
     try:
         while iter_ < num_iter:
             optimizer.zero_grad()
-            probs = potential_fn(theta_transform.inv(optimize_inits)).squeeze()
-            loss = -probs.sum()
-            loss.backward()
+            # Also when the caller runs inside `torch.no_grad()`.
+            with torch.enable_grad():
+                probs = potential_fn(theta_transform.inv(optimize_inits)).squeeze()
+                loss = -probs.sum()
+                loss.backward()
             optimizer.step()
 
             with torch.no_grad():

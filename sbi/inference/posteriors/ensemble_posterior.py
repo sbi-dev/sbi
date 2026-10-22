@@ -9,7 +9,10 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    resolve_track_gradients,
+)
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
@@ -560,12 +563,13 @@ class EnsemblePotential(BasePotential):
         bound._x_o = x_o
         return bound
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
         r"""Returns the potential for posterior-based methods.
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
-            track_gradients: Whether to track the gradients.
+            track_gradients: Whether to track the gradients. `None` keeps the
+                caller's grad mode.
 
         Returns:
             The potential.
@@ -573,12 +577,14 @@ class EnsemblePotential(BasePotential):
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta = theta.to(self.device)
 
-        log_probs = [
-            fn(theta, track_gradients=track_gradients) for fn in self.potential_fns
-        ]
-        log_probs = torch.vstack(log_probs)
-        ensemble_log_probs = torch.logsumexp(
-            torch.log(self._weights.reshape(-1, 1)).expand_as(log_probs) + log_probs,
-            dim=0,
-        )
-        return ensemble_log_probs
+        track_gradients = resolve_track_gradients(track_gradients)
+        with torch.set_grad_enabled(track_gradients):
+            log_probs = [
+                fn(theta, track_gradients=track_gradients) for fn in self.potential_fns
+            ]
+            log_probs = torch.vstack(log_probs)
+            return torch.logsumexp(
+                torch.log(self._weights.reshape(-1, 1)).expand_as(log_probs)
+                + log_probs,
+                dim=0,
+            )

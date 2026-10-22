@@ -9,7 +9,10 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    resolve_track_gradients,
+)
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -141,12 +144,13 @@ class PosteriorBasedPotential(BasePotential):
         self._x_o = bound._x_o
         self._x_is_iid = bound._x_is_iid
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
         r"""Returns the potential for posterior-based methods.
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
-            track_gradients: Whether to track the gradients.
+            track_gradients: Whether to track the gradients. `None` keeps the
+                caller's grad mode.
 
         Returns:
             The potential.
@@ -158,7 +162,7 @@ class PosteriorBasedPotential(BasePotential):
                 the potential or manually set self._x_o."
             )
 
-        with torch.set_grad_enabled(track_gradients):
+        with torch.set_grad_enabled(resolve_track_gradients(track_gradients)):
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
             theta = ensure_theta_batched(torch.as_tensor(theta)).to(self.device)

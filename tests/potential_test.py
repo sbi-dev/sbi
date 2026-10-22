@@ -19,13 +19,23 @@ from sbi.inference import (
 )
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePotential
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
+from sbi.inference.potentials import (
+    likelihood_estimator_based_potential,
+    posterior_estimator_based_potential,
+    ratio_estimator_based_potential,
+)
 from sbi.inference.potentials.base_potential import (
     BasePotential,
     CustomPotentialWrapper,
 )
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
-from sbi.neural_nets import posterior_nn, posterior_score_nn
+from sbi.neural_nets import (
+    classifier_nn,
+    likelihood_nn,
+    posterior_nn,
+    posterior_score_nn,
+)
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
 
@@ -153,6 +163,124 @@ def test_importance_posterior_pickled_before_log_space_cache():
 
     loaded = pickle.loads(pickle.dumps(posterior))
     assert torch.isfinite(loaded.log_prob(zeros(1, 2), x=zeros(1, 2))).all()
+
+
+@pytest.mark.parametrize("method", ("sir", "importance"))
+def test_importance_sampling_evaluates_potential_without_gradients(method: str):
+    """Importance weights are computed without an autograd graph."""
+    grad_enabled_in_calls = []
+
+    def potential(theta, x_o):
+        grad_enabled_in_calls.append(torch.is_grad_enabled())
+        return -0.5 * ((theta - x_o) ** 2).sum(-1)
+
+    proposal = MultivariateNormal(zeros(2), eye(2))
+    posterior = ImportanceSamplingPosterior(potential, proposal, method=method)
+    posterior.sample((10,), x=ones(2), show_progress_bars=False)
+
+    assert grad_enabled_in_calls
+    assert not any(grad_enabled_in_calls)
+
+
+def _potential_recording_grad_mode(kind: str):
+    """Return a potential of the given kind, its prior and a list that records the
+    grad mode inside each evaluation of its network."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((50,)), prior.sample((50,))
+    x_o = zeros(1, 2)
+    grad_enabled_in_calls = []
+
+    def record_grad_mode(*args):
+        grad_enabled_in_calls.append(torch.is_grad_enabled())
+
+    def custom_potential(theta, x_o):
+        record_grad_mode()
+        return _quadratic_potential(theta, x_o)
+
+    if kind == "custom":
+        return (
+            CustomPotentialWrapper(custom_potential, prior, x_o),
+            prior,
+            grad_enabled_in_calls,
+        )
+    if kind in ("posterior", "ensemble"):
+        estimator = posterior_nn("mdn")(theta, x)
+        build_potential = posterior_estimator_based_potential
+    elif kind == "likelihood":
+        estimator = likelihood_nn("mdn")(theta, x)
+        build_potential = likelihood_estimator_based_potential
+    else:
+        estimator = classifier_nn("mlp")(theta, x)
+        build_potential = ratio_estimator_based_potential
+    for module in estimator.modules():
+        module.register_forward_pre_hook(record_grad_mode)
+    potential, _ = build_potential(estimator, prior, x_o)
+    if kind == "ensemble":
+        potential = EnsemblePotential(
+            [potential, potential], torch.tensor([0.5, 0.5]), prior, x_o
+        )
+    return potential, prior, grad_enabled_in_calls
+
+
+POTENTIAL_KINDS = ("posterior", "likelihood", "ratio", "custom", "ensemble")
+
+
+@pytest.mark.parametrize("kind", POTENTIAL_KINDS)
+def test_potential_follows_grad_mode_by_default(kind: str):
+    """Without `track_gradients`, a potential tracks gradients as its caller does."""
+    potential, prior, grad_enabled_in_calls = _potential_recording_grad_mode(kind)
+    theta_o = prior.sample((3,))
+
+    potential(theta_o)
+    assert grad_enabled_in_calls and all(grad_enabled_in_calls)
+    grad_enabled_in_calls.clear()
+    with torch.no_grad():
+        potential(theta_o)
+    assert grad_enabled_in_calls and not any(grad_enabled_in_calls)
+
+
+@pytest.mark.parametrize("kind", POTENTIAL_KINDS)
+def test_potential_track_gradients_overrides_grad_mode(kind: str):
+    """An explicit `track_gradients` applies to the whole potential, including the
+    prior term, whatever the caller's grad mode."""
+    potential, prior, _ = _potential_recording_grad_mode(kind)
+    theta_o = prior.sample((3,)).requires_grad_()
+
+    with torch.no_grad():
+        assert potential(theta_o, track_gradients=True).requires_grad
+    assert not potential(theta_o, track_gradients=False).requires_grad
+
+
+def test_rejection_sampling_tracks_gradients_only_to_find_the_max():
+    """The gradient ascent for the max ratio needs gradients, the accept/reject
+    loop does not."""
+    grad_enabled_by_batch_size = []
+
+    def potential(theta, x_o):
+        grad_enabled_by_batch_size.append((theta.shape[0], torch.is_grad_enabled()))
+        return _quadratic_potential(theta, x_o)
+
+    proposal = MultivariateNormal(zeros(2), eye(2))
+    posterior = RejectionPosterior(
+        potential, proposal, num_samples_to_find_max=100, num_iter_to_find_max=5
+    )
+    posterior.sample((7,), x=ones(2), show_progress_bars=False)
+
+    # 10 points are optimized; the loop draws batches of 7 candidates.
+    assert any(enabled for size, enabled in grad_enabled_by_batch_size if size == 10)
+    assert not any(enabled for size, enabled in grad_enabled_by_batch_size if size == 7)
+
+
+def test_map_inside_no_grad():
+    """The MAP is found by gradient ascent also when called inside no_grad."""
+    torch.manual_seed(0)
+    proposal = MultivariateNormal(zeros(2), eye(2))
+    posterior = RejectionPosterior(_quadratic_potential, proposal)
+    posterior.set_default_x(ones(1, 2))
+
+    with torch.no_grad():
+        map_ = posterior.map(num_iter=200, init_method="proposal", learning_rate=0.05)
+    assert torch.allclose(map_, ones(1, 2), atol=0.05)
 
 
 @pytest.mark.parametrize(
