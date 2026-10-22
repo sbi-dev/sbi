@@ -131,6 +131,7 @@ class ReferenceObservationStats:
         eigenvalues: Optional[Tensor] = None,
         embedding_net: Optional[nn.Module] = None,
         is_embedded: bool = False,
+        feature_scale: Optional[Tensor] = None,
     ):
         self.mean = mean
         self.active_indices = active_indices
@@ -144,6 +145,7 @@ class ReferenceObservationStats:
         self.eigenvalues = eigenvalues
         self.embedding_net = embedding_net
         self.is_embedded = is_embedded
+        self.feature_scale = feature_scale
 
     @classmethod
     def from_simulations(
@@ -152,6 +154,7 @@ class ReferenceObservationStats:
         embedding_net: Optional[nn.Module] = None,
         max_reference_samples: int = 10_000,
         subspace_tol: float = 1e-6,
+        is_embedded: bool = False,
     ) -> "ReferenceObservationStats":
         r"""Compute compact reference statistics from training simulations.
 
@@ -163,6 +166,7 @@ class ReferenceObservationStats:
                 a deterministic linspace subset or subsample is used.
             subspace_tol: Relative eigenvalue cutoff below which dimensions are
                 treated as null space (for rank-deficient covariance).
+            is_embedded: Whether simulations are already in embedded space.
 
         Returns:
             A `ReferenceObservationStats` instance.
@@ -174,7 +178,6 @@ class ReferenceObservationStats:
         n_sims = x_tensor.shape[0]
         event_shape = x_tensor.shape[1:]
 
-        is_embedded = False
         nan_net = nan_tolerant_input_net(embedding_net)
 
         if torch.isnan(x_tensor).any():
@@ -224,6 +227,7 @@ class ReferenceObservationStats:
                 event_shape=event_shape,
                 embedding_net=embedding_net,
                 is_embedded=is_embedded,
+                feature_scale=None,
             )
 
         mean = x_flat.mean(dim=0)
@@ -253,15 +257,22 @@ class ReferenceObservationStats:
                 event_shape=event_shape,
                 embedding_net=embedding_net,
                 is_embedded=is_embedded,
+                feature_scale=None,
             )
 
         x_active = x_centered[:, active_indices]
         n_active = len(active_indices)
 
-        # Compute sample covariance for active dimensions
-        cov = (x_active.t() @ x_active) / (n_sims - 1)
+        # Standardize active features by sample standard deviations so decomposition
+        # operates on the correlation matrix R. This preserves valid low-variance
+        # physical dimensions and avoids conflating scales with rank deficiency.
+        feature_scale = torch.sqrt(torch.clamp(var[active_indices], min=1e-12))
+        x_scaled = x_active / feature_scale
 
-        # Attempt Cholesky factorization for stable, fast solves
+        # Sample correlation matrix for active dimensions
+        R = (x_scaled.t() @ x_scaled) / (n_sims - 1)
+
+        # Attempt Cholesky factorization on correlation matrix for stable, fast solves
         cholesky_factor = None
         eigenvectors = None
         eigenvalues = None
@@ -269,28 +280,26 @@ class ReferenceObservationStats:
         is_full_rank = n_sims > n_active
         if is_full_rank:
             try:
-                cholesky_factor = torch.linalg.cholesky(cov)
-                # Guard against near-singular matrices that Cholesky factorizes
-                # with tiny pivots due to roundoff
-                diag_ratio = cholesky_factor.diagonal().min() / torch.clamp(
-                    cholesky_factor.diagonal().max(), min=1e-12
-                )
-                if diag_ratio < 1e-3:
-                    cholesky_factor = None
+                L = torch.linalg.cholesky(R)
+                # In correlation matrix, diagonal elements are <= 1.0. A pivot
+                # < 1e-5 indicates true multicollinearity / rank deficiency.
+                min_pivot = L.diagonal().min()
+                if min_pivot > 1e-5:
+                    cholesky_factor = L
             except torch.linalg.LinAlgError:
                 cholesky_factor = None
 
         if cholesky_factor is None:
-            # Fall back to spectral decomposition (handles singular / D > N cases)
+            # Fall back to spectral decomposition on correlation matrix
             try:
-                eigs, vecs = torch.linalg.eigh(cov)
+                eigs, vecs = torch.linalg.eigh(R)
                 # eigh returns ascending order; flip to descending
                 eigs = torch.flip(eigs, dims=(0,))
                 vecs = torch.flip(vecs, dims=(1,))
             except torch.linalg.LinAlgError:
                 # If eigh fails to converge due to ill-conditioning or repeated
-                # eigenvalues, compute the spectral decomposition via SVD of x_active
-                _, S, Vh = torch.linalg.svd(x_active, full_matrices=False)
+                # eigenvalues, compute the spectral decomposition via SVD of x_scaled
+                _, S, Vh = torch.linalg.svd(x_scaled, full_matrices=False)
                 eigs = (S**2) / (n_sims - 1)
                 vecs = Vh.t()
 
@@ -307,9 +316,9 @@ class ReferenceObservationStats:
                 0, n_sims - 1, max_reference_samples, device=x_tensor.device
             ).long()
 
-        x_sub = x_active[subsample_idx]
+        x_sub_scaled = x_scaled[subsample_idx]
         ref_dists = cls._compute_distances_internal(
-            x_sub, cholesky_factor, eigenvectors, eigenvalues
+            x_sub_scaled, cholesky_factor, eigenvectors, eigenvalues
         )
 
         # Apply exact leave-one-out scaling for symmetric out-of-sample comparison
@@ -342,6 +351,7 @@ class ReferenceObservationStats:
             eigenvalues=eigenvalues,
             embedding_net=embedding_net,
             is_embedded=is_embedded,
+            feature_scale=feature_scale,
         )
 
     @staticmethod
@@ -477,6 +487,11 @@ class ReferenceObservationStats:
 
         active_idx = self.active_indices.to(x_flat.device)
         x_active = x_centered[:, active_idx]
+        if self.feature_scale is not None:
+            feature_scale = self.feature_scale.to(x_flat.device)
+            x_scaled = x_active / feature_scale
+        else:
+            x_scaled = x_active
 
         cholesky = (
             self.cholesky_factor.to(x_flat.device)
@@ -492,18 +507,19 @@ class ReferenceObservationStats:
             self.eigenvalues.to(x_flat.device) if self.eigenvalues is not None else None
         )
 
-        dists = self._compute_distances_internal(x_active, cholesky, evecs, evals)
+        dists = self._compute_distances_internal(x_scaled, cholesky, evecs, evals)
 
         # If spectral decomposition was used because of collinear features
         # (N > D, but rank < D), check for out-of-subspace residual. When N <= D,
         # rank deficiency is an artifact of sample size rather than a constraint.
         if evecs is not None and self.n_simulations > len(self.active_indices):
-            # Project onto subspace: y = evecs.t() @ x_active.t() -> (k, B)
-            y = evecs.t() @ x_active.t()
+            # Project onto subspace in standardized coordinates:
+            # y = evecs.t() @ x_scaled.t()
+            y = evecs.t() @ x_scaled.t()
             x_proj = (evecs @ y).t()  # (B, n_active)
-            residual = x_active - x_proj
+            residual = x_scaled - x_proj
             res_norm = torch.norm(residual, dim=1)
-            scale = torch.norm(x_active, dim=1) + 1e-8
+            scale = torch.norm(x_scaled, dim=1) + 1e-8
             rel_res = res_norm / scale
             details["subspace_residual"] = rel_res.cpu().tolist()
             if (rel_res > 0.05).any():
@@ -666,6 +682,8 @@ class ReferenceObservationStats:
             self.eigenvalues = self.eigenvalues.to(device)
         if self.embedding_net is not None:
             self.embedding_net.to(device)
+        if self.feature_scale is not None:
+            self.feature_scale = self.feature_scale.to(device)
         return self
 
 
@@ -741,47 +759,67 @@ def diagnose_observation(
                 x_ref_proc, "Reference simulations x_ref", allow_nan=False
             )
 
-        if space == "embedded" and embedding_net is not None:
-            net_device = _get_module_device(embedding_net, x_ref_proc.device)
-            orig_mode = embedding_net.training
+        if space == "embedded":
+            if effective_net is None:
+                raise ValueError(
+                    "Cannot evaluate diagnostic in 'embedded' space without an "
+                    "embedding_net."
+                )
+            net_device = _get_module_device(effective_net, x_ref_proc.device)
+            orig_mode = effective_net.training
             try:
-                embedding_net.eval()
+                effective_net.eval()
                 with torch.no_grad():
-                    x_ref_eval = embedding_net(x_ref_proc.to(net_device)).to(
+                    x_ref_eval = effective_net(x_ref_proc.to(net_device)).to(
                         x_ref_proc.device
                     )
-                    x_o_eval = embedding_net(x_proc.to(net_device)).to(x_proc.device)
+                    x_o_eval = effective_net(x_proc.to(net_device)).to(x_proc.device)
             finally:
-                embedding_net.train(orig_mode)
+                effective_net.train(orig_mode)
             reference_stats = ReferenceObservationStats.from_simulations(
-                x_ref_eval, embedding_net=embedding_net
+                x_ref_eval, embedding_net=effective_net, is_embedded=True
             )
             diag = reference_stats.diagnose(x_o_eval, threshold=threshold, space=space)
             diag.details["embedding_dim"] = x_ref_eval.shape[-1]
             return diag
         else:
             reference_stats = ReferenceObservationStats.from_simulations(
-                x_ref_proc, embedding_net=embedding_net
+                x_ref_proc, embedding_net=effective_net, is_embedded=False
             )
+            return reference_stats.diagnose(x_proc, threshold=threshold, space=space)
 
     assert reference_stats is not None
 
-    if (
-        space == "embedded"
-        and reference_stats.embedding_net is not None
-        and not getattr(reference_stats, "is_embedded", False)
-    ):
-        net = reference_stats.embedding_net
-        net_device = _get_module_device(net, x_proc.device)
-        orig_mode = net.training
-        try:
-            net.eval()
-            with torch.no_grad():
-                x_proc_eval = net(x_proc.to(net_device)).to(x_proc.device)
-        finally:
-            net.train(orig_mode)
-        diag = reference_stats.diagnose(x_proc_eval, threshold=threshold, space=space)
-        diag.details["embedding_dim"] = x_proc_eval.shape[-1]
+    if getattr(reference_stats, "is_embedded", False):
+        # When reference statistics are embedded (e.g. from NaN-tolerant net or
+        # embedded simulations), diagnosis is evaluated in embedded space.
+        if (
+            effective_net is not None
+            and x_proc.shape[1:] != reference_stats.event_shape
+        ):
+            net_device = _get_module_device(effective_net, x_proc.device)
+            orig_mode = effective_net.training
+            try:
+                effective_net.eval()
+                with torch.no_grad():
+                    x_proc_eval = effective_net(x_proc.to(net_device)).to(x_proc.device)
+            finally:
+                effective_net.train(orig_mode)
+        else:
+            x_proc_eval = x_proc
+
+        diag = reference_stats.diagnose(
+            x_proc_eval, threshold=threshold, space="embedded"
+        )
+        diag.details["embedding_dim"] = reference_stats.event_shape[-1]
         return diag
+
+    if space == "embedded":
+        raise ValueError(
+            "Cannot evaluate diagnostic in 'embedded' space using reference_stats "
+            "computed in observation space. Pass reference_stats computed from "
+            "embedded simulations, provide x_ref, or call "
+            "posterior.diagnose_observation(..., space='embedded')."
+        )
 
     return reference_stats.diagnose(x_proc, threshold=threshold, space=space)

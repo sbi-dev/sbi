@@ -340,6 +340,8 @@ class EnsemblePosterior(NeuralPosterior):
         """Reference observation statistics attached to this ensemble or component."""
         if self._reference_statistics is not None:
             return self._reference_statistics
+        if getattr(self, "_reference_statistics_embedded", None) is not None:
+            return self._reference_statistics_embedded
         for p in self.posteriors:
             if getattr(p, "reference_statistics", None) is not None:
                 return p.reference_statistics
@@ -348,7 +350,9 @@ class EnsemblePosterior(NeuralPosterior):
     @property
     def has_reference_statistics(self) -> bool:
         """Whether reference statistics are attached to ensemble or any component."""
-        return self.reference_statistics is not None
+        return super().has_reference_statistics or any(
+            getattr(p, "has_reference_statistics", False) for p in self.posteriors
+        )
 
     def diagnose_observation(
         self,
@@ -359,9 +363,9 @@ class EnsemblePosterior(NeuralPosterior):
         x_ref: Optional[Tensor] = None,
     ) -> ObservationDiagnostic:
         r"""Diagnose observation against ensemble reference simulations."""
-        if self._reference_statistics is None and x_ref is None:
+        if not super().has_reference_statistics and x_ref is None:
             for p in self.posteriors:
-                if getattr(p, "_reference_statistics", None) is not None:
+                if p.has_reference_statistics:
                     return p.diagnose_observation(
                         x, threshold=threshold, space=space, x_ref=x_ref
                     )

@@ -503,8 +503,7 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         if len(self._x_roundwise) > 0:
             _, x_sims, _ = self.get_simulations()
-            x_embedding_net = getattr(density_estimator, "embedding_net", None)
-            self._posterior.set_reference_data(x_sims, embedding_net=x_embedding_net)
+            self._posterior.set_reference_data(x_sims)
 
         return self._posterior
 

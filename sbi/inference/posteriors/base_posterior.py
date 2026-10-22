@@ -112,9 +112,28 @@ class NeuralPosterior:
         self._purpose = ""
 
         # Retain existing reference statistics if reinstantiating during .to(device)
+        self._reference_simulations: Optional[Tensor] = getattr(
+            self, "_reference_simulations", None
+        )
+        self._reference_embedding_net: Optional[nn.Module] = getattr(
+            self, "_reference_embedding_net", None
+        )
+        self._reference_max_samples: int = getattr(
+            self, "_reference_max_samples", 10_000
+        )
+        self._reference_statistics_embedded: Optional[ReferenceObservationStats] = (
+            getattr(self, "_reference_statistics_embedded", None)
+        )
+
         existing_ref = getattr(self, "_reference_statistics", None)
         if reference_statistics is not None:
-            self._reference_statistics = reference_statistics.to(self._device)
+            if getattr(reference_statistics, "is_embedded", False):
+                self._reference_statistics_embedded = reference_statistics.to(
+                    self._device
+                )
+                self._reference_statistics = None
+            else:
+                self._reference_statistics = reference_statistics.to(self._device)
         elif existing_ref is not None:
             self._reference_statistics = existing_ref.to(self._device)
         else:
@@ -263,25 +282,25 @@ class NeuralPosterior:
     ) -> Self:
         r"""Set reference simulation data to enable automated OOD diagnostics.
 
+        Reference statistics are constructed lazily upon first diagnostic query
+        or warning check to avoid unnecessary covariance and decomposition overhead
+        during model construction.
+
         Args:
             x: Reference simulations with shape `(N, *event_shape)`.
-            embedding_net: Optional neural embedding net. If None, tries to infer
-                from `self.potential_fn.x_embedding_net`.
+            embedding_net: Optional neural embedding net. If None, resolves from
+                `self.potential_fn.x_embedding_net`.
             max_reference_samples: Maximum number of reference samples to retain for
                 distance score ranking.
 
         Returns:
             `NeuralPosterior` (self) for method chaining.
         """
-        if embedding_net is None:
-            embedding_net = getattr(self.potential_fn, "x_embedding_net", None)
-        from sbi.diagnostics.observation import ReferenceObservationStats
-
-        self._reference_statistics = ReferenceObservationStats.from_simulations(
-            x,
-            embedding_net=embedding_net,
-            max_reference_samples=max_reference_samples,
-        ).to(self._device)
+        self._reference_simulations = x
+        self._reference_embedding_net = embedding_net
+        self._reference_max_samples = max_reference_samples
+        self._reference_statistics = None
+        self._reference_statistics_embedded = None
         return self
 
     def set_reference_statistics(self, stats: "ReferenceObservationStats") -> Self:
@@ -293,18 +312,92 @@ class NeuralPosterior:
         Returns:
             `NeuralPosterior` (self) for method chaining.
         """
-        self._reference_statistics = stats.to(self._device)
+        if getattr(stats, "is_embedded", False):
+            self._reference_statistics_embedded = stats.to(self._device)
+        else:
+            self._reference_statistics = stats.to(self._device)
         return self
+
+    def _build_reference_statistics(
+        self, space: Literal["observation", "embedded"] = "observation"
+    ) -> Optional["ReferenceObservationStats"]:
+        """Construct reference statistics for the requested space lazily."""
+        if self._reference_simulations is None:
+            return None
+
+        from sbi.diagnostics.observation import (
+            ReferenceObservationStats,
+            _get_module_device,
+        )
+
+        net = (
+            self._reference_embedding_net
+            if self._reference_embedding_net is not None
+            else getattr(self.potential_fn, "x_embedding_net", None)
+        )
+
+        try:
+            if space == "embedded":
+                if self._reference_statistics_embedded is None:
+                    if net is None:
+                        raise ValueError(
+                            "Cannot construct embedded reference statistics: no "
+                            "observation embedding network found on posterior."
+                        )
+                    target_device = _get_module_device(
+                        net, self._reference_simulations.device
+                    )
+                    orig_mode = net.training
+                    try:
+                        net.eval()
+                        with torch.no_grad():
+                            x_emb = net(
+                                self._reference_simulations.to(target_device)
+                            ).to(self._reference_simulations.device)
+                    finally:
+                        net.train(orig_mode)
+
+                    self._reference_statistics_embedded = (
+                        ReferenceObservationStats.from_simulations(
+                            x_emb,
+                            embedding_net=net,
+                            is_embedded=True,
+                            max_reference_samples=self._reference_max_samples,
+                        ).to(self._device)
+                    )
+                return self._reference_statistics_embedded
+            else:
+                if self._reference_statistics is None:
+                    self._reference_statistics = (
+                        ReferenceObservationStats.from_simulations(
+                            self._reference_simulations,
+                            embedding_net=net,
+                            is_embedded=False,
+                            max_reference_samples=self._reference_max_samples,
+                        ).to(self._device)
+                    )
+                return self._reference_statistics
+        except Exception:
+            return None
 
     @property
     def reference_statistics(self) -> Optional["ReferenceObservationStats"]:
         """Reference observation statistics attached to this posterior, if any."""
-        return self._reference_statistics
+        if (
+            self._reference_statistics is None
+            and self._reference_simulations is not None
+        ):
+            self._build_reference_statistics(space="observation")
+        return self._reference_statistics or self._reference_statistics_embedded
 
     @property
     def has_reference_statistics(self) -> bool:
-        """Whether reference observation statistics are attached to this posterior."""
-        return self._reference_statistics is not None
+        """Whether reference observation statistics or simulations are attached."""
+        return (
+            self._reference_statistics is not None
+            or self._reference_statistics_embedded is not None
+            or self._reference_simulations is not None
+        )
 
     def diagnose_observation(
         self,
@@ -348,12 +441,40 @@ class NeuralPosterior:
             else None
         )
 
-        from sbi.diagnostics.observation import diagnose_observation
+        from sbi.diagnostics.observation import (
+            ObservationDiagnostic,
+            diagnose_observation,
+        )
+
+        if x_ref is None:
+            if space == "embedded":
+                stats = self._reference_statistics_embedded
+                if stats is None and self._reference_simulations is not None:
+                    stats = self._build_reference_statistics(space="embedded")
+            else:
+                stats = self._reference_statistics
+                if stats is None and self._reference_simulations is not None:
+                    stats = self._build_reference_statistics(space="observation")
+
+            if stats is None and self._reference_simulations is not None:
+                return ObservationDiagnostic(
+                    is_in_distribution=None,
+                    empirical_percentile=None,
+                    mahalanobis_distance=None,
+                    warning=(
+                        "Reference observation statistics could not be computed from "
+                        "stored training simulations."
+                    ),
+                    threshold=threshold,
+                    space=space,
+                )
+        else:
+            stats = None
 
         return diagnose_observation(
             x_o=x_to_check,
             x_ref=x_ref,
-            reference_stats=self._reference_statistics if x_ref is None else None,
+            reference_stats=stats,
             threshold=threshold,
             space=space,
             embedding_net=embedding_net,
@@ -363,6 +484,12 @@ class NeuralPosterior:
         """Helper to move reference statistics to the specified device."""
         if self._reference_statistics is not None:
             self._reference_statistics = self._reference_statistics.to(device)
+        if self._reference_statistics_embedded is not None:
+            self._reference_statistics_embedded = (
+                self._reference_statistics_embedded.to(device)
+            )
+        if self._reference_simulations is not None:
+            self._reference_simulations = self._reference_simulations.to(device)
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:

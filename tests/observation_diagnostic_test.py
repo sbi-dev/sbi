@@ -404,6 +404,7 @@ def test_unattached_reference_data_behavior():
 
     # Manually clear reference stats to simulate legacy / unattached posterior
     posterior._reference_statistics = None
+    posterior._reference_simulations = None
 
     diag = posterior.diagnose_observation(torch.zeros(2))
     assert diag.is_in_distribution is None
@@ -661,3 +662,101 @@ def test_parameterless_embedding_net():
     )
     assert diag.is_in_distribution is not None
     assert diag.space == "embedded"
+
+
+def test_posterior_diagnose_embedded_space_with_dimension_reduction():
+    """Verify that posterior.diagnose_observation(space='embedded') computes
+    embedded reference statistics and does not fail with dimension mismatch.
+    """
+    prior = BoxUniform(low=-2.0 * torch.ones(2), high=2.0 * torch.ones(2))
+    theta = prior.sample((80,))
+    x = torch.randn(80, 6)
+
+    # Embedding network that reduces dimension 6 -> 3
+    emb = nn.Sequential(nn.Linear(6, 3), nn.Tanh())
+    de = posterior_nn("maf", embedding_net=emb)
+    trainer = NPE(prior=prior, density_estimator=de)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = trainer.build_posterior()
+
+    # Diagnosing with space="embedded" should project simulations and observation
+    # into dimension 3 and diagnose successfully without dimension mismatch.
+    x_o = torch.randn(6)
+    diag = posterior.diagnose_observation(x_o, space="embedded")
+    assert diag.space == "embedded"
+    assert diag.is_in_distribution is not None
+    assert diag.details["embedding_dim"] == 3
+
+
+def test_lazy_reference_statistics_construction():
+    """Verify that build_posterior() does not eagerly construct reference statistics,
+    and constructs them on demand when diagnose_observation is called.
+    """
+    prior = BoxUniform(low=-2.0 * torch.ones(2), high=2.0 * torch.ones(2))
+    theta = prior.sample((40,))
+    x = torch.randn(40, 4)
+
+    trainer = NPE(prior=prior)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = trainer.build_posterior()
+
+    # Before calling diagnose, _reference_statistics must be None (lazy evaluation)
+    assert posterior._reference_statistics is None
+    assert posterior.has_reference_statistics is True
+
+    # Upon calling diagnose_observation, reference statistics are built and cached
+    diag = posterior.diagnose_observation(torch.zeros(4))
+    assert diag.is_in_distribution is not None
+    assert posterior._reference_statistics is not None
+
+
+def test_likelihood_and_ratio_trainers_do_not_attach_theta_embedding():
+    """Verify that NLE and NRE do not pass theta embedding net to observation stats."""
+    from sbi.inference import NLE, NRE
+    from sbi.neural_nets import likelihood_nn
+
+    prior = BoxUniform(low=-2.0 * torch.ones(2), high=2.0 * torch.ones(2))
+    theta = prior.sample((40,))
+    x = torch.randn(40, 4)
+
+    # NLE: likelihood models p(x|theta), so embedding_net is on theta (dim 2)
+    theta_emb = nn.Sequential(nn.Linear(2, 5), nn.Tanh())
+    le = likelihood_nn("maf", embedding_net=theta_emb)
+    trainer_nle = NLE(prior=prior, density_estimator=le)
+    trainer_nle.append_simulations(theta, x).train(max_num_epochs=1)
+    post_nle = trainer_nle.build_posterior()
+
+    # Posterior's observation reference data must NOT use theta embedding net
+    assert post_nle._reference_embedding_net is None
+    diag = post_nle.diagnose_observation(torch.zeros(4))
+    assert diag.is_in_distribution is not None
+    assert diag.space == "observation"
+
+    # NRE: ratio estimator
+    trainer_nre = NRE(prior=prior)
+    trainer_nre.append_simulations(theta, x).train(max_num_epochs=1)
+    post_nre = trainer_nre.build_posterior()
+    diag_nre = post_nre.diagnose_observation(torch.zeros(4))
+    assert diag_nre.is_in_distribution is not None
+
+
+def test_low_variance_dimension_preservation():
+    """Verify that features with wide dynamic range of variances (e.g. 1.0 and 1e-8)
+    are preserved via standardized decomposition, and anomalies are reliably detected.
+    """
+    torch.manual_seed(42)
+    n = 5000
+    f0 = torch.randn(n, 1)
+    f1 = 1e-4 * torch.randn(n, 1)  # var = 1e-8
+    x_sims = torch.cat([f0, f1], dim=1)
+
+    stats = ReferenceObservationStats.from_simulations(x_sims)
+    # Correlation-based Cholesky should succeed and not be discarded
+    assert stats.cholesky_factor is not None
+
+    # Centered at (1, 0.01): 1-sigma on feature 0 and 100-sigma on feature 1
+    x_ood = torch.tensor([[1.0, 0.01]])
+    diag = stats.diagnose(x_ood)
+    assert diag.is_in_distribution is False
+    assert diag.empirical_percentile == 0.0
+    assert diag.mahalanobis_distance > 50.0
