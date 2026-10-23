@@ -12,8 +12,11 @@ Diagnostics
    sbi.diagnostics.calc_misspecification_mmd
    sbi.diagnostics.check_sbc
    sbi.diagnostics.check_tarp
+   sbi.diagnostics.diagnose_observation
    sbi.diagnostics.get_nltp
    sbi.diagnostics.kl_divergence_mc
    sbi.diagnostics.LC2ST
+   sbi.diagnostics.ObservationDiagnostic
+   sbi.diagnostics.ReferenceObservationStats
    sbi.diagnostics.run_sbc
    sbi.diagnostics.run_tarp

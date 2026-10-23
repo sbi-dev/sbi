@@ -634,6 +634,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             posterior_parameters,
         )
 
+        if len(self._x_roundwise) > 0:
+            _, x_sims, _ = self.get_simulations()
+            self._posterior.set_reference_data(x_sims)
+
         return self._posterior
 
     def _resolve_prior(

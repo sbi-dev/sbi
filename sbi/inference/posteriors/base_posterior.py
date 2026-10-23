@@ -1,15 +1,33 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+from __future__ import annotations
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Self, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Literal,
+    Optional,
+    Self,
+    Tuple,
+    Union,
+)
 from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
+import torch.nn as nn
 from torch import Tensor
 from torch.distributions import Distribution
+
+if TYPE_CHECKING:
+    from sbi.diagnostics.observation import (
+        ObservationDiagnostic,
+        ReferenceObservationStats,
+    )
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,
@@ -50,6 +68,7 @@ class NeuralPosterior:
         theta_transform: Optional[TorchTransform] = None,
         device: Optional[Union[str, torch.device]] = None,
         x_shape: Optional[torch.Size] = None,
+        reference_statistics: Optional[ReferenceObservationStats] = None,
     ):
         """
         Args:
@@ -60,6 +79,8 @@ class NeuralPosterior:
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Deprecated, should not be passed.
+            reference_statistics: Optional precomputed reference statistics for
+                automated out-of-distribution observation diagnostics.
         """
         if x_shape is not None:
             warn(
@@ -89,6 +110,34 @@ class NeuralPosterior:
         self._map = None
         self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
         self._purpose = ""
+
+        # Retain existing reference statistics if reinstantiating during .to(device)
+        self._reference_simulations: Optional[Tensor] = getattr(
+            self, "_reference_simulations", None
+        )
+        self._reference_embedding_net: Optional[nn.Module] = getattr(
+            self, "_reference_embedding_net", None
+        )
+        self._reference_max_samples: int = getattr(
+            self, "_reference_max_samples", 10_000
+        )
+        self._reference_statistics_embedded: Optional[ReferenceObservationStats] = (
+            getattr(self, "_reference_statistics_embedded", None)
+        )
+
+        existing_ref = getattr(self, "_reference_statistics", None)
+        if reference_statistics is not None:
+            if getattr(reference_statistics, "is_embedded", False):
+                self._reference_statistics_embedded = reference_statistics.to(
+                    self._device
+                )
+                self._reference_statistics = None
+            else:
+                self._reference_statistics = reference_statistics.to(self._device)
+        elif existing_ref is not None:
+            self._reference_statistics = existing_ref.to(self._device)
+        else:
+            self._reference_statistics = None
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
         # already to the potential function builder. If so, this `x_o` will be used
@@ -188,7 +237,7 @@ class NeuralPosterior:
         """See `set_default_x`."""
         self.set_default_x(x)
 
-    def set_default_x(self, x: Tensor) -> "NeuralPosterior":
+    def set_default_x(self, x: Tensor, warn_if_ood: bool = False) -> "NeuralPosterior":
         """Set new default x for `.sample(), .log_prob` to use as conditioning context.
 
         Reset the MAP stored for the old default x if applicable.
@@ -206,15 +255,241 @@ class NeuralPosterior:
 
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
+            warn_if_ood: If True, evaluates whether `x` is out-of-distribution
+                relative to the reference simulations and issues a `UserWarning` if
+                it falls below the threshold. Default is False.
+
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
         x = process_x(x, x_event_shape=None)
         self._assert_finite_x(x)
 
+        if warn_if_ood:
+            diag = self.diagnose_observation(x)
+            if diag.warning is not None:
+                warn(diag.warning, UserWarning, stacklevel=2)
+
         self._x = x.to(self._device)
         self._map = None
         return self
+
+    def set_reference_data(
+        self,
+        x: Tensor,
+        embedding_net: Optional[nn.Module] = None,
+        max_reference_samples: int = 10_000,
+    ) -> Self:
+        r"""Set reference simulation data to enable automated OOD diagnostics.
+
+        Reference statistics are constructed lazily upon first diagnostic query
+        or warning check to avoid unnecessary covariance and decomposition overhead
+        during model construction.
+
+        Args:
+            x: Reference simulations with shape `(N, *event_shape)`.
+            embedding_net: Optional neural embedding net. If None, resolves from
+                `self.potential_fn.x_embedding_net`.
+            max_reference_samples: Maximum number of reference samples to retain for
+                distance score ranking.
+
+        Returns:
+            `NeuralPosterior` (self) for method chaining.
+        """
+        self._reference_simulations = x
+        self._reference_embedding_net = embedding_net
+        self._reference_max_samples = max_reference_samples
+        self._reference_statistics = None
+        self._reference_statistics_embedded = None
+        return self
+
+    def set_reference_statistics(self, stats: "ReferenceObservationStats") -> Self:
+        """Directly set precomputed reference statistics on the posterior.
+
+        Args:
+            stats: Precomputed `ReferenceObservationStats` object.
+
+        Returns:
+            `NeuralPosterior` (self) for method chaining.
+        """
+        if getattr(stats, "is_embedded", False):
+            self._reference_statistics_embedded = stats.to(self._device)
+        else:
+            self._reference_statistics = stats.to(self._device)
+        return self
+
+    def _build_reference_statistics(
+        self, space: Literal["observation", "embedded"] = "observation"
+    ) -> Optional["ReferenceObservationStats"]:
+        """Construct reference statistics for the requested space lazily."""
+        if self._reference_simulations is None:
+            return None
+
+        from sbi.diagnostics.observation import (
+            ReferenceObservationStats,
+            _get_module_device,
+        )
+
+        net = (
+            self._reference_embedding_net
+            if self._reference_embedding_net is not None
+            else getattr(self.potential_fn, "x_embedding_net", None)
+        )
+
+        try:
+            if space == "embedded":
+                if self._reference_statistics_embedded is None:
+                    if net is None:
+                        raise ValueError(
+                            "Cannot construct embedded reference statistics: no "
+                            "observation embedding network found on posterior."
+                        )
+                    target_device = _get_module_device(
+                        net, self._reference_simulations.device
+                    )
+                    orig_mode = net.training
+                    try:
+                        net.eval()
+                        with torch.no_grad():
+                            x_emb = net(
+                                self._reference_simulations.to(target_device)
+                            ).to(self._reference_simulations.device)
+                    finally:
+                        net.train(orig_mode)
+
+                    self._reference_statistics_embedded = (
+                        ReferenceObservationStats.from_simulations(
+                            x_emb,
+                            embedding_net=net,
+                            is_embedded=True,
+                            max_reference_samples=self._reference_max_samples,
+                        ).to(self._device)
+                    )
+                return self._reference_statistics_embedded
+            else:
+                if self._reference_statistics is None:
+                    self._reference_statistics = (
+                        ReferenceObservationStats.from_simulations(
+                            self._reference_simulations,
+                            embedding_net=net,
+                            is_embedded=False,
+                            max_reference_samples=self._reference_max_samples,
+                        ).to(self._device)
+                    )
+                return self._reference_statistics
+        except Exception:
+            return None
+
+    @property
+    def reference_statistics(self) -> Optional["ReferenceObservationStats"]:
+        """Reference observation statistics attached to this posterior, if any."""
+        if (
+            self._reference_statistics is None
+            and self._reference_simulations is not None
+        ):
+            self._build_reference_statistics(space="observation")
+        return self._reference_statistics or self._reference_statistics_embedded
+
+    @property
+    def has_reference_statistics(self) -> bool:
+        """Whether reference observation statistics or simulations are attached."""
+        return (
+            self._reference_statistics is not None
+            or self._reference_statistics_embedded is not None
+            or self._reference_simulations is not None
+        )
+
+    def diagnose_observation(
+        self,
+        x: Optional[Tensor] = None,
+        *,
+        threshold: float = 0.01,
+        space: Literal["observation", "embedded"] = "observation",
+        x_ref: Optional[Tensor] = None,
+    ) -> "ObservationDiagnostic":
+        r"""Diagnose whether an observation is supported by the training distribution.
+
+        Args:
+            x: Observed data $x_o$. If None, default $x$ (set via `.set_default_x()`)
+                is used.
+            threshold: Empirical percentile threshold below which the observation is
+                flagged as out-of-distribution (default: 0.01, or bottom 1%).
+            space: Space in which to perform the diagnostic (`"observation"` or
+                `"embedded"`). When `"embedded"`, observations are projected through
+                the estimator's embedding net.
+            x_ref: Optional explicit reference simulations to compare against. If None,
+                uses the reference statistics stored during training or via
+                `.set_reference_data()`.
+
+        Returns:
+            `ObservationDiagnostic` containing `is_in_distribution`,
+            `empirical_percentile`, `mahalanobis_distance`, and `warning`.
+        """
+        if x is None:
+            if self.default_x is None:
+                raise ValueError(
+                    "Context `x` needed when a default has not been set. "
+                    "If you'd like to have a default, use `.set_default_x()`."
+                )
+            x_to_check = self.default_x
+        else:
+            x_to_check = x
+
+        embedding_net = (
+            getattr(self.potential_fn, "x_embedding_net", None)
+            if space == "embedded"
+            else None
+        )
+
+        from sbi.diagnostics.observation import (
+            ObservationDiagnostic,
+            diagnose_observation,
+        )
+
+        if x_ref is None:
+            if space == "embedded":
+                stats = self._reference_statistics_embedded
+                if stats is None and self._reference_simulations is not None:
+                    stats = self._build_reference_statistics(space="embedded")
+            else:
+                stats = self._reference_statistics
+                if stats is None and self._reference_simulations is not None:
+                    stats = self._build_reference_statistics(space="observation")
+
+            if stats is None and self._reference_simulations is not None:
+                return ObservationDiagnostic(
+                    is_in_distribution=None,
+                    empirical_percentile=None,
+                    mahalanobis_distance=None,
+                    warning=(
+                        "Reference observation statistics could not be computed from "
+                        "stored training simulations."
+                    ),
+                    threshold=threshold,
+                    space=space,
+                )
+        else:
+            stats = None
+
+        return diagnose_observation(
+            x_o=x_to_check,
+            x_ref=x_ref,
+            reference_stats=stats,
+            threshold=threshold,
+            space=space,
+            embedding_net=embedding_net,
+        )
+
+    def _move_reference_stats(self, device: Union[str, torch.device]) -> None:
+        """Helper to move reference statistics to the specified device."""
+        if self._reference_statistics is not None:
+            self._reference_statistics = self._reference_statistics.to(device)
+        if self._reference_statistics_embedded is not None:
+            self._reference_statistics_embedded = (
+                self._reference_statistics_embedded.to(device)
+            )
+        if self._reference_simulations is not None:
+            self._reference_simulations = self._reference_simulations.to(device)
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
@@ -426,6 +701,7 @@ class NeuralPosterior:
         """
         # Posteriors pickled by older sbi versions can miss this key.
         state_dict.setdefault("_leakage_cache", None)
+        state_dict.setdefault("_reference_statistics", None)
         self.__dict__ = state_dict
 
         actual_device = infer_tensor_device(self)
@@ -439,6 +715,8 @@ class NeuralPosterior:
         self._device = actual_device
         if hasattr(self, "device"):
             self.device = actual_device
+        if self._reference_statistics is not None:
+            self._reference_statistics = self._reference_statistics.to(actual_device)
         shared_prior = getattr(self.potential_fn, "prior", None)
         self.potential_fn.to(actual_device)  # type: ignore[union-attr]
         for attr in ("prior", "_prior", "proposal"):
