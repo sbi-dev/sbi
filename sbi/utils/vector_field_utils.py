@@ -773,8 +773,18 @@ class UniformNormalConvolution(Distribution):
         return self.scale * x + noise_sample
 
     def log_prob(self, value: Tensor) -> Tensor:
-        # p(value) = [Phi((value - u_lo)/noise) - Phi((value - u_hi)/noise)]
-        # / (u_hi - u_lo), where [u_lo, u_hi] is the box [low, high] times scale.
+        """Log density of the scaled box convolved with the Gaussian noise.
+
+        With [u_lo, u_hi] the box [low, high] times scale, the density is
+        p(value) = [Phi((value - u_lo)/noise) - Phi((value - u_hi)/noise)]
+        / (u_hi - u_lo).
+
+        Args:
+            value: Points at which to evaluate the density.
+
+        Returns:
+            Log density at each point of `value`.
+        """
         u_lo = torch.minimum(self.scale * self.low, self.scale * self.high)
         u_hi = torch.maximum(self.scale * self.low, self.scale * self.high)
         z_lo = (value - u_lo) / self.noise
