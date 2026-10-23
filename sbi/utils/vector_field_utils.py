@@ -786,7 +786,13 @@ class UniformNormalConvolution(Distribution):
         far = torch.where(right, z_lo, -z_hi)
         mass = 0.5 * (torch.erfc(near / math.sqrt(2)) - torch.erfc(far / math.sqrt(2)))
         tiny = torch.finfo(mass.dtype).tiny
-        return torch.log(mass.clamp_min(tiny)) - torch.log(u_hi - u_lo)
+        # A box much narrower than the noise is a Gaussian up to O(width^2 / noise^2),
+        # where the CDF difference above would cancel.
+        narrow = u_hi - u_lo < 1e-3 * self.noise
+        width = torch.where(narrow, 1.0, u_hi - u_lo)
+        box = torch.log(mass.clamp_min(tiny)) - torch.log(width)
+        point = Normal((u_lo + u_hi) / 2, self.noise, validate_args=False)
+        return torch.where(narrow, point.log_prob(value), box)
 
 
 # Utility functions --------------------------------------------------------

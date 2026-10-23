@@ -3,6 +3,7 @@
 
 import pytest
 import torch
+from torch.distributions import Normal
 from torch.special import log_ndtr
 
 from sbi.utils.vector_field_utils import UniformNormalConvolution
@@ -38,3 +39,16 @@ def test_uniform_normal_convolution_tail_score(value: float):
     expected = torch.autograd.grad(log_mass, theta64)[0] * (1 if value > 0 else -1)
 
     assert torch.isclose(score.double(), expected, rtol=1e-4)
+
+
+@pytest.mark.parametrize("scale", [0.0, 1e-7])
+def test_uniform_normal_convolution_narrow_box_is_gaussian(scale: float):
+    """A box much narrower than the noise reduces to a Gaussian at its center."""
+    dist = UniformNormalConvolution(-1.0, 1.0, scale, 1.0)
+    theta = torch.tensor([0.75, 2.5], requires_grad=True)
+    log_prob = dist.log_prob(theta)
+    score = torch.autograd.grad(log_prob.sum(), theta)[0]
+
+    expected = Normal(0.0, 1.0).log_prob(theta.detach())
+    assert torch.allclose(log_prob.detach(), expected, atol=1e-6)
+    assert torch.allclose(score, -theta.detach(), rtol=1e-5)
