@@ -1,0 +1,106 @@
+{
+  "trainer": "paper",
+  "train_kwargs": "{}",
+  "steps": [
+    1,
+    2,
+    4
+  ],
+  "npe_epochs": 357,
+  "npe_train_time": 170.8,
+  "npe_S1": {
+    "round_trip": {
+      "median": 0.0361,
+      "q99": 0.2131
+    },
+    "mass": {
+      "mean": 0.9539,
+      "std": 0.1652,
+      "min": 0.3668,
+      "max": 1.0273
+    },
+    "direct_vs_mcmc_c2st": [
+      0.658,
+      0.639,
+      0.704,
+      0.654,
+      0.626
+    ]
+  },
+  "npe_S2": {
+    "round_trip": {
+      "median": 0.0202,
+      "q99": 0.3999
+    },
+    "mass": {
+      "mean": 0.9585,
+      "std": 0.1841,
+      "min": 0.2978,
+      "max": 1.062
+    },
+    "direct_vs_mcmc_c2st": [
+      0.695,
+      0.697,
+      0.645,
+      0.652,
+      0.668
+    ]
+  },
+  "npe_S4": {
+    "round_trip": {
+      "median": 0.0159,
+      "q99": 0.5972
+    },
+    "mass": {
+      "mean": 0.9616,
+      "std": 0.1952,
+      "min": 0.2554,
+      "max": 1.1026
+    },
+    "direct_vs_mcmc_c2st": [
+      0.613,
+      0.599,
+      0.613,
+      0.617,
+      0.622
+    ]
+  },
+  "nle_epochs": 336,
+  "nle_train_time": 145.6,
+  "nle_S1": {
+    "round_trip": {
+      "median": 0.0313,
+      "q99": 0.0968
+    },
+    "mass": {
+      "mean": 0.9937,
+      "std": 0.0061,
+      "min": 0.9756,
+      "max": 0.9983
+    }
+  },
+  "nle_S2": {
+    "round_trip": {
+      "median": 0.0212,
+      "q99": 0.0643
+    },
+    "mass": {
+      "mean": 1.0355,
+      "std": 0.0134,
+      "min": 1.0048,
+      "max": 1.05
+    }
+  },
+  "nle_S4": {
+    "round_trip": {
+      "median": 0.0155,
+      "q99": 0.0883
+    },
+    "mass": {
+      "mean": 1.0029,
+      "std": 0.0021,
+      "min": 1.0,
+      "max": 1.0059
+    }
+  }
+}
