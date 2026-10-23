@@ -91,6 +91,18 @@ class VectorFieldBasedPotential(BasePotential):
         """Return the net embedding `x`: the estimator's condition is `x`."""
         return self.vector_field_estimator.embedding_net
 
+    @property
+    def num_iid_observations(self) -> int:
+        """Number of iid observations whose scores the potential combines.
+
+        Returns:
+            The batch size of `x_o` if it holds iid observations, else 1 (also for a
+            batch of independent observations or no `x_o`).
+        """
+        if self._x_o is None or not self.x_is_iid:
+            return 1
+        return self._x_o.shape[0]
+
     def to(self, device: Union[str, torch.device]) -> None:
         """
         Moves the vector field estimator, prior and x_o to the given device.
@@ -325,7 +337,7 @@ class VectorFieldBasedPotential(BasePotential):
             vf_estimator = self.vector_field_estimator
 
         with torch.set_grad_enabled(track_gradients):
-            if not self.x_is_iid or self._x_o.shape[0] == 1:
+            if self.num_iid_observations == 1:
                 score = vf_estimator.score(
                     input=theta, condition=self.x_o, t=time.to(device)
                 )

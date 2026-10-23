@@ -417,10 +417,20 @@ class VectorFieldPosterior(NeuralPosterior):
         samples = torch.cat(all_samples, dim=0)[:total_samples_needed]
 
         if torch.isnan(samples).all():
-            raise RuntimeError(
+            message = (
                 "All samples NaN after diffusion sampling. "
                 "This may indicate numerical instability in the vector field."
             )
+            num_iid = self.potential_fn.num_iid_observations
+            if self.potential_fn.iid_method == "fnpe" and num_iid > 1:
+                message += (
+                    " With iid_method='fnpe', the sampler steps become unstable for "
+                    f"many iid observations ({num_iid} here). Use "
+                    "iid_method='auto_gauss', or increase `steps` (or use a finer "
+                    "`ts`); the number of steps needed grows with the number of "
+                    "observations."
+                )
+            raise RuntimeError(message)
 
         if self.vector_field_estimator.compose_enabled:
             samples = self.vector_field_estimator.from_z(samples)

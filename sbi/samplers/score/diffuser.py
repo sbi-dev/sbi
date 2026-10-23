@@ -113,13 +113,10 @@ class Diffuser:
         # NOTE: This interface is not ideal, but for one method we need to adjust the
         # initial distirbution
         init_std = self.init_std
-        if (
-            hasattr(self.predictor.potential_fn, "iid_method")
-            and self.predictor.potential_fn.iid_method == "fnpe"
-        ):
-            x_o = self.predictor.potential_fn.x_o
-            N_iid = x_o.shape[0]
-            init_std = math.sqrt(1 / N_iid) * init_std
+        potential_fn = self.predictor.potential_fn
+        if potential_fn.iid_method == "fnpe":
+            num_iid = potential_fn.num_iid_observations
+            init_std = math.sqrt(1 / num_iid) * init_std
 
         eps = torch.randn(init_shape, device=self.device)
         mean, std, eps = torch.broadcast_tensors(self.init_mean, init_std, eps)
