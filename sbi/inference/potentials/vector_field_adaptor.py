@@ -1373,6 +1373,12 @@ def ensure_lam_positive_definite(
     r"""
     Ensure that the matrix is positive definite.
 
+    Corrects the posterior precisions so that
+    `Lam = (1 - N) * prior precision + sum of posterior precisions` is positive
+    definite: negative eigenvalues of `Lam` are flipped, the nugget is added, and for a
+    dense `Lam` eigenvalues below 100 machine epsilons times the largest one are raised
+    to that value.
+
     Args:
         denoising_prior_precision: The prior precision tensor.
         denoising_posterior_precision: The posterior precision tensor.
@@ -1389,32 +1395,36 @@ def ensure_lam_positive_definite(
     term2 = torch.sum(denoising_posterior_precision, axis=1, keepdim=True)  # type: ignore
     Lam = add_diag_or_dense(term1, term2, batch_dims=2)
 
+    def per_trial_correction(
+        eigenvalues: Tensor, floor: Union[Tensor, float]
+    ) -> Tensor:
+        negative_part = torch.where(
+            eigenvalues <= 0, -eigenvalues, torch.zeros_like(eigenvalues)
+        ) / (N - 1)
+        corrected = eigenvalues + N * (negative_part + precision_nugget)
+        lift = torch.clamp(floor - corrected, min=0) / N
+        return negative_part + lift + precision_nugget
+
     is_diag = Lam.ndim == 3
     if d > 1 and not is_diag:
         eigenvalues, eigenvectors = torch.linalg.eigh(Lam)
-        corrected_eigs = torch.where(
-            eigenvalues <= 0, -eigenvalues, torch.zeros_like(eigenvalues)
-        )
-        corrected_eigs = corrected_eigs / (N - 1)
-
+        # An absolute nugget vanishes in float32 next to large precisions, and a
+        # nearly rank-deficient Lam can then round to exactly singular.
+        floor = 100 * torch.finfo(Lam.dtype).eps
+        floor = floor * eigenvalues.abs().amax(-1, keepdim=True)
         Lam_corr = torch.einsum(
-            '...ij,...j,...kj->...ik', eigenvectors, corrected_eigs, eigenvectors
+            '...ij,...j,...kj->...ik',
+            eigenvectors,
+            per_trial_correction(eigenvalues, floor),
+            eigenvectors,
         )
-        Lam_corr += precision_nugget * torch.eye(
-            Lam.shape[-1], device=Lam.device, dtype=Lam.dtype
-        )
-
         denoising_posterior_precision = add_diag_or_dense(
             denoising_posterior_precision, Lam_corr, batch_dims=2
         )
     else:
         # For one-dimensional case, treat Lam as a vector by putting it on the diagonal.
-        Lam_diag = Lam
-        average_diff = (
-            torch.where(Lam_diag > 0, torch.zeros_like(Lam_diag), -Lam_diag) / (N - 1)
-            + precision_nugget
+        denoising_posterior_precision = (
+            denoising_posterior_precision + per_trial_correction(Lam, floor=0.0)
         )
-        Lam_corr = average_diff
-        denoising_posterior_precision = denoising_posterior_precision + Lam_corr
 
     return denoising_prior_precision, denoising_posterior_precision
