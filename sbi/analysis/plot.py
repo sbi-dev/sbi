@@ -49,6 +49,7 @@ from sbi.utils.plotting_helpers import (
     to_list_string,
     update,
 )
+from sbi.utils.torchutils import infer_tensor_device
 
 UpperLiteral = Literal["hist", "scatter", "contour", "kde"]
 LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
@@ -922,6 +923,11 @@ def prepare_for_conditional_plot(condition, opts):
     # Dimensions
     dim = condition.shape[-1]
 
+    # Both the diagonal and the off-diagonal evaluate on the density's device.
+    density = opts["density"]
+    device = getattr(density, "_device", None) or infer_tensor_device(density)
+    opts["condition"] = condition.to(device or condition.device)
+
     # Prepare limits
     limits = [ensure_numpy(lim) for lim in opts["limits"]]
     if len(limits) == 1:
@@ -1269,8 +1275,6 @@ def conditional_pairplot(
 
     Returns: figure and axis of posterior distribution plot
     """
-    device = density._device if hasattr(density, "_device") else condition.device
-
     # Setting these is required because _pairplot_scaffold will check if opts['diag'] is
     # `None`. This would break if opts has no key 'diag'. Same for 'upper'.
     diag = "cond"
@@ -1290,7 +1294,7 @@ def conditional_pairplot(
         p_image = ensure_numpy(
             eval_conditional_density(
                 opts["density"],
-                opts["condition"].to(device),
+                opts["condition"],
                 limits,
                 row,
                 col,

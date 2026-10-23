@@ -665,4 +665,8 @@ def test_plots_accept_device_and_grad_tensors(device):
     conditional_pairplot(
         density, condition, [[-3.0, 3.0]], points=[point], ticks=ticks, resolution=10
     )
+    cpu_density = torch.distributions.MultivariateNormal(
+        torch.zeros(2), scale_tril=torch.eye(2)
+    )
+    conditional_pairplot(cpu_density, condition, [[-3.0, 3.0]], resolution=10)
     close("all")
