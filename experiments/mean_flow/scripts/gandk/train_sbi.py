@@ -3,9 +3,12 @@
     python experiments/mean_flow/scripts/gandk/train_sbi.py --arm mf_sbi --seed 0 \
         --data ~/meanflow-runs/gandk-data --out ~/meanflow-runs/sbi-train --device cuda
 
-Arms (see `ARMS`): the sbi mean flow, its port of the paper's network, a coupling
-flow sized like the paper's under the paper's coupling-flow protocol and under the
-mean-flow protocol, and sbi's NSF and MAF defaults under `NLE.train()`.
+Arms (see `ARMS`): the sbi mean flow, its port of the paper's network, a wide sbi
+NSF under the paper's coupling-flow protocol and under the mean-flow protocol,
+and sbi's NSF and MAF defaults under `NLE.train()`.
+
+The sbi-default arms get the training and validation simulations together (101,024)
+and `train()` holds out its own 10%, so every arm uses the same simulation budget.
 
 The paper recipe is BayesFlow 2.0.14's offline default as their code uses it: AdamW
 (weight decay 5e-3, epsilon 1e-7), learning rate warmed up linearly from 5e-5 to
@@ -32,9 +35,11 @@ from sbi.inference import NLE
 from sbi.neural_nets import MAFConfig, MeanFlowConfig, NSFConfig
 from sbi.utils import BoxUniform
 
-# BayesFlow's coupling flow on g-and-k: depth 5 of dual couplings (10 single
-# couplings), 16-bin splines on [-3, 3], subnets of two 256-wide layers, dropout 0.05.
-NSF_PAPER = NSFConfig(
+# sbi's NSF with the paper's coupling count (10 single couplings), spline bins and
+# initial domain, width and dropout. Not the paper's coupling flow: its conditioners
+# are residual relu nets with one more layer (1.46M against 0.80M parameters), with
+# fixed tail bounds and LU-linear layers between couplings.
+NSF_WIDE = NSFConfig(
     hidden_features=256,
     num_transforms=10,
     num_bins=16,
@@ -47,8 +52,8 @@ NSF_PAPER = NSFConfig(
 ARMS = {
     "mf_sbi": (MeanFlowConfig(), 1000, None, "paper"),
     "mf_paper": (MeanFlowConfig(variant="paper"), 1000, None, "paper"),
-    "nsf_nfprotocol": (NSF_PAPER, 200, 10, "paper"),
-    "nsf_long": (NSF_PAPER, 1000, None, "paper"),
+    "nsf_nfprotocol": (NSF_WIDE, 200, 10, "paper"),
+    "nsf_long": (NSF_WIDE, 1000, None, "paper"),
     "nsf_default": (NSFConfig(), None, None, "sbi"),
     "maf_default": (MAFConfig(), None, None, "sbi"),
 }
@@ -98,6 +103,9 @@ def train_paper_recipe(estimator, x, theta, x_val, theta_val, epochs, patience, 
         started, running = time.perf_counter(), 0.0
         for idx in torch.randperm(len(x), device=x.device).split(256):
             loss = estimator.loss(x[idx], theta[idx]).mean()
+            if not torch.isfinite(loss):
+                # As the paper's StopOnNonFiniteLoss: a diverged fit is discarded.
+                raise RuntimeError(f"non-finite training loss in epoch {epoch}")
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             clip_each_(parameters, 1.5)
@@ -182,7 +190,11 @@ def main() -> None:
             device=args.device,
             show_progress_bars=False,
         )
-        estimator = inference.append_simulations(theta, x).train()
+        # The paper's arms see 100,000 training plus 1,024 validation simulations;
+        # train() gets all of them and holds out its own 10%.
+        estimator = inference.append_simulations(
+            torch.cat([theta, theta_val]), torch.cat([x, x_val])
+        ).train()
         summary = inference.summary
         history = {
             "train_loss": summary["training_loss"],

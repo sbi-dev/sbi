@@ -15,6 +15,9 @@ then all cells are scored together by their `score_sample_metrics` against their
 cached reference posteriors (C2ST, W1, MMD at one common draw count, cells below 500
 draws left unscored) and aggregated over datasets by `aggregate_over_datasets`.
 
+Run their `--aggregate` first, on the same device (CPU): this checks that pooling
+leaves the paper arms' C2ST draw count and values as their aggregate has them.
+
 Writes `cells.jsonl` (one row per arm and dataset) and `arms.json` (mean, sd and
 values over datasets per arm) to `--out`, and prints the table.
 """
@@ -39,9 +42,12 @@ sys.path[:0] = [str(paper), str(paper / "experiments")]
 
 import arviz as az  # noqa: E402
 from common import (  # noqa: E402  (sets KERAS_BACKEND)
+    ADAPTATION,
     aggregate_over_datasets,
     converged,
     mcmc_summary,
+    prior_truth_provenance,
+    provenance_matches,
     score_sample_metrics,
 )
 from sampling.nfe import nfe_per_evaluation  # noqa: E402
@@ -73,6 +79,15 @@ for index in range(N_DATASETS):
         print(f"no shard for dataset {index}")
         continue
     body = json.loads(shard.read_text())
+    # their _matches_run, as their --aggregate applies it
+    truth = prior_truth_provenance(datasets["truths"][index])
+    if not (
+        int(body.get("seed", -1)) == SEED
+        and int(body.get("n_datasets", -1)) == N_DATASETS
+        and not body.get("smoke")
+        and provenance_matches(body.get("provenance"), truth)
+    ):
+        raise SystemExit(f"{shard} is not a shard of this run")
     arrays = np.load(shard.with_suffix(".npz"))
     for label, row in body["payload"]["arms"].items():
         rows[(label, index)] = row | {"source": "paper"}
@@ -97,7 +112,9 @@ for run in sorted(p for p in args.sbi_mcmc.iterdir() if p.is_dir()):
         index = int(cell.stem[1:])
         r = np.load(cell)
         steps = int(r["nfe_per_density"])
-        kind = "mf" if run.name.startswith("mf") else "nf"
+        kind = str(r["kind"])
+        if (run.name, index) in rows:
+            raise SystemExit(f"label {run.name} collides with a paper arm")
         theta = r["theta"]
         posterior = {name: theta[..., j] for j, name in enumerate(names)}
         idata = az.from_dict(
@@ -116,7 +133,7 @@ for run in sorted(p for p in args.sbi_mcmc.iterdir() if p.is_dir()):
         nfe *= nfe_per_evaluation(kind, steps if kind == "mf" else None, n_obs=N_OBS)
         row = {
             "arm": run.name,
-            "source": "sbi",
+            "source": str(r["source"]),
             "kind": kind,
             "sampler": "nuts",
             "steps": steps,
@@ -125,7 +142,8 @@ for run in sorted(p for p in args.sbi_mcmc.iterdir() if p.is_dir()):
             "kept_draws_per_chain": int(theta.shape[1]),
             "budget_matched": True,
             "avg_leapfrogs": round(float(np.mean(r["n_steps"])), 2),
-            "tune_per_chain": int(r["tune"]),
+            "nuts_adaptation": ADAPTATION,
+            "tune_per_chain": int(r["warmup_n_steps"].shape[1]),
             "logp_calls": int(r["logp_calls"]),
         } | mcmc_summary(
             idata,
@@ -164,6 +182,24 @@ n_kernel = score_sample_metrics(
 )
 for row in rows.values():
     row["converged"] = converged(row)
+
+# Pooling must not change the draw count the paper's own arms are scored at, or their
+# C2ST would no longer be the one their --aggregate (and Table S6) reports.
+theirs = json.loads((results / "metrics.json").read_text())
+if n_kernel != theirs["scoring"]["n_kernel"]:
+    raise SystemExit(
+        f"pooled C2ST size {n_kernel} differs from their aggregate's "
+        f"{theirs['scoring']['n_kernel']}"
+    )
+# their c2st_values list the pooled datasets in order; all 10 are pooled
+for label, record in theirs["arms"].items():
+    for index, value in enumerate(record.get("c2st_values", [])):
+        ours = rows.get((label, index), {}).get("c2st")
+        if ours is not None and abs(ours - value) > 1e-6:
+            print(
+                f"warning: {label} d{index} C2ST {ours:.4f}, "
+                f"their aggregate {value:.4f}"
+            )
 
 args.out.mkdir(parents=True, exist_ok=True)
 with open(args.out / "cells.jsonl", "w") as f:

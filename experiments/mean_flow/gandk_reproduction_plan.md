@@ -36,7 +36,7 @@ TARP (Table S1, g-and-k likelihood): mean flow S=1 ATC −0.004 (0.012), S=8 −
 - **Training:** batch 256, AdamW (weight decay 5e-3), learning rate warmed up over 5% of steps from 5e-5 to 5e-4, cosine decay to zero, gradient clipping 1.5. Mean flow and flow matching 1,000 epochs; coupling flow 200 epochs with early stopping, patience 10, best weights kept.
 - **Sampling:** nutpie NUTS on PyMC with the JAX backend and JAX gradients, 4 chains in threads, diagonal mass matrix, max tree depth 10, nutpie's default target acceptance. An arm whose density costs K network evaluations requests 8,000 / K draws per chain (`draws_at_cost`); warmup is 25% of the request (`TUNE_SHARE`). Chain seeds: `SEED + steps + 10_000 * dataset`.
 - **Delayed acceptance:** subchain J = 5 random-walk Metropolis steps on the coarse level (mean flow at S_c), fine level = the same network's velocity head with 100 fixed Tsit5 steps and exact divergence; target coarse acceptance 0.3 (Robbins-Monro), adaptation 25% of iterations.
-- **Metrics:** C2ST on 1,024 draws per side with their MLP classifier (`helpers/metrics.py`, `c2st`), min bulk ESS, ESS per 1,000 network evaluations, draws kept, wall time; convergence gate max R̂ ≤ 1.05, min bulk ESS ≥ 100, ≥ 500 kept draws.
+- **Metrics:** C2ST with their MLP classifier at one common draw count per experiment, the smallest any scored cell kept (2,744 in their run, set by a delayed-acceptance arm; corrected 2026-10-23, the code does not use 1,024) (`helpers/metrics.py`, `c2st`), min bulk ESS, ESS per 1,000 network evaluations, draws kept, wall time; convergence gate max R̂ ≤ 1.05, min bulk ESS ≥ 100, ≥ 500 kept draws.
 
 ## Phase 0: environments and hardware checks (about 1 hour)
 

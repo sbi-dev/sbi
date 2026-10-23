@@ -28,6 +28,8 @@ import numpy as np
 import nutpie
 import torch
 
+from sbi.neural_nets.estimators import MeanFlowEstimator
+
 SEED = 42
 BASE_DRAWS = 8_000
 TUNE_SHARE = 0.25
@@ -54,9 +56,15 @@ def main() -> None:
     torch.set_num_threads(args.threads)
 
     estimator = torch.load(args.model, weights_only=False).eval()
-    if args.steps is not None:
+    if isinstance(estimator, MeanFlowEstimator):
+        if args.steps is None:
+            raise SystemExit("a mean flow needs --steps (its cost per density is S)")
         estimator.num_steps = args.steps
-    nfe_per_density = args.steps or 1
+        kind, nfe_per_density = "mf", args.steps
+    else:
+        if args.steps is not None:
+            raise SystemExit(f"--steps given for a one-pass {type(estimator).__name__}")
+        kind, nfe_per_density = "nf", 1
 
     train = np.load(args.data / "train.npz")
     lower = torch.as_tensor(train["lower"], dtype=torch.float64)
@@ -102,7 +110,8 @@ def main() -> None:
         ["theta"],
         make_initial_point_fn=initial_point,
     )
-    draws = args.draws or max(1, BASE_DRAWS // nfe_per_density)
+    # exp2's draws_at_cost
+    draws = args.draws or max(1, round(BASE_DRAWS / nfe_per_density))
     tune = max(1, round(TUNE_SHARE * draws))
     seed = SEED + (args.steps or 0) + 10_000 * args.dataset
 
@@ -137,6 +146,8 @@ def main() -> None:
         tune=tune,
         seed=seed,
         nfe_per_density=nfe_per_density,
+        kind=kind,
+        source="sbi",
         model=str(args.model),
     )
     print(
