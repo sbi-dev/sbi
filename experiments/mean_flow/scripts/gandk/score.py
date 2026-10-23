@@ -185,7 +185,7 @@ for row in rows.values():
 
 # Pooling must not change the draw count the paper's own arms are scored at, or their
 # C2ST would no longer be the one their --aggregate (and Table S6) reports.
-theirs = json.loads((results / "metrics.json").read_text())
+theirs = json.loads((results / "metrics.json").read_text())["metrics"]
 if n_kernel != theirs["scoring"]["n_kernel"]:
     raise SystemExit(
         f"pooled C2ST size {n_kernel} differs from their aggregate's "
