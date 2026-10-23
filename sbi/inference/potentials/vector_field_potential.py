@@ -105,15 +105,11 @@ class VectorFieldBasedPotential(BasePotential):
 
     @property
     def init_std_scale(self) -> float:
-        """Factor on the std of the base distribution where diffusion sampling starts.
-
-        With `iid_method="fnpe"`, the score at `t_max` is the sum of N
-        single-observation scores, because the default prior score weight is zero
-        there. That distribution has 1/N of the base variance. A custom
-        `prior_score_weight` that is not zero at `t_max` breaks this assumption.
+        """Factor on the base std where diffusion sampling starts.
 
         Returns:
-            1/sqrt(N) for fnpe with N iid observations, else 1.
+            1/sqrt(N) for fnpe with N iid observations, else 1. This assumes the
+            default fnpe prior score weight, which is zero at `t_max`.
         """
         if self.iid_method == "fnpe":
             return self.num_iid_observations**-0.5
