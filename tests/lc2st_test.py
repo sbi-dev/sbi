@@ -11,7 +11,13 @@ from scipy.stats import binomtest
 from sklearn.neural_network import MLPClassifier
 from torch import Tensor
 
-from sbi.diagnostics.lc2st import LC2ST, LC2ST_NF, LC2STScores, LC2STState
+from sbi.diagnostics.lc2st import (
+    LC2ST,
+    LC2ST_NF,
+    LC2STScores,
+    LC2STState,
+    permute_data,
+)
 from sbi.inference import NPE
 from sbi.simulators.gaussian_mixture import (
     gaussian_mixture,
@@ -391,6 +397,17 @@ def test_lc2st_normalization_runs_once_per_null_trial(cal_data):
     )
 
 
+def test_permute_data_swaps_only_within_pairs():
+    """Each permuted row must hold the same P/Q pair, possibly swapped."""
+    theta_p, theta_q = torch.randn(500, 3), torch.randn(500, 3)
+    theta_p_perm, theta_q_perm = permute_data(theta_p, theta_q, seed=0)
+
+    kept = (theta_p_perm == theta_p).all(-1) & (theta_q_perm == theta_q).all(-1)
+    swapped = (theta_p_perm == theta_q).all(-1) & (theta_q_perm == theta_p).all(-1)
+    assert (kept ^ swapped).all()
+    assert 0 < swapped.sum() < len(swapped)
+
+
 def test_lc2st_null_training_does_not_reseed_global_rng(cal_data):
     """Permutation null training must leave the caller's torch RNG stream alone."""
     draws_after_training = []
@@ -403,6 +420,33 @@ def test_lc2st_null_training_does_not_reseed_global_rng(cal_data):
         draws_after_training.append(torch.rand(3))
 
     assert not torch.equal(*draws_after_training)
+
+
+ACCELERATORS = [
+    pytest.param(
+        "cuda",
+        marks=pytest.mark.skipif(
+            not torch.cuda.is_available(), reason="cuda is not available"
+        ),
+    ),
+    pytest.param(
+        "mps",
+        marks=pytest.mark.skipif(
+            not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()),
+            reason="mps is not available",
+        ),
+    ),
+]
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device", ACCELERATORS)
+def test_permute_data_under_accelerator_default_device(device):
+    """The CPU generator must work when an accelerator is the default device."""
+    with torch.device(device):
+        theta_p, theta_q = torch.randn(10, 2), torch.randn(10, 2)
+        theta_p_perm, _ = permute_data(theta_p, theta_q, seed=0)
+    assert theta_p_perm.device.type == device
 
 
 def test_lc2st_normalization_handles_constant_dimensions(cal_data):
@@ -574,26 +618,7 @@ def test_lc2st_both_thetas_and_prior_samples_error(cal_data):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize(
-    "device",
-    [
-        pytest.param(
-            "cuda",
-            marks=pytest.mark.skipif(
-                not torch.cuda.is_available(), reason="cuda is not available"
-            ),
-        ),
-        pytest.param(
-            "mps",
-            marks=pytest.mark.skipif(
-                not (
-                    hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-                ),
-                reason="mps is not available",
-            ),
-        ),
-    ],
-)
+@pytest.mark.parametrize("device", ACCELERATORS)
 def test_lc2st_runs_on_requested_device(cal_data, device):
     """Test that LC2ST runs on cuda/mps (if available)."""
     lc2st = LC2ST(
