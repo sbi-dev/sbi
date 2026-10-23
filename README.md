@@ -60,7 +60,7 @@ posterior = inference.build_posterior()
 
 ### Installation
 
-`sbi` requires Python 3.10 or higher. While a GPU isn't necessary, it can
+`sbi` requires Python 3.11 or higher. While a GPU isn't necessary, it can
 improve performance in some cases. We recommend using
 [`uv`](https://docs.astral.sh/uv/) for package management:
 

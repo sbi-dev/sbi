@@ -243,7 +243,13 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     check_prior_batch_behavior(prior)
     check_prior_batch_dims(prior)
 
-    if prior.sample().dtype != float32:
+    prior_dtype = prior.sample().dtype
+    if prior_dtype != float32:
+        warnings.warn(
+            f"Prior has dtype {prior_dtype}. sbi casts the samples and log probs of "
+            "the prior to float32.",
+            stacklevel=2,
+        )
         prior = PytorchReturnTypeWrapper(
             prior, return_type=float32, validate_args=False
         )

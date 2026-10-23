@@ -162,11 +162,26 @@ class TestMultivariateGaussianMDNDevice:
                     not torch.cuda.is_available(), reason="CUDA not available"
                 ),
             ),
+            pytest.param(
+                "mps",
+                marks=pytest.mark.skipif(
+                    not (
+                        hasattr(torch.backends, "mps")
+                        and torch.backends.mps.is_available()
+                    ),
+                    reason="MPS not available",
+                ),
+            ),
         ],
     )
     def test_mdn_on_device(self, standard_mdn, device):
-        """Test MDN works on different devices."""
+        """Test MDN works on different devices and migrates internal buffers."""
         mdn = standard_mdn.to(device)
+        assert mdn._row_ix.device.type == device
+        assert mdn._column_ix.device.type == device
+        assert mdn._diag_ix.device.type == device
+        assert not {"_row_ix", "_column_ix", "_diag_ix"} & set(mdn.state_dict())
+
         context = torch.randn(8, 5, device=device)
         mog = mdn(context)
         assert mog.device.type == device
@@ -415,6 +430,35 @@ class TestMixtureDensityEstimatorCreation:
                 input_shape=torch.Size([3]),
                 condition_shape=torch.Size([10]),
                 embedding_net=embedding_net,
+            )
+
+    def test_shared_z_score_scale_counts_every_dimension(
+        self, standard_mdn, standard_estimator, standard_inputs, standard_condition
+    ):
+        """A z-score scale shared by all dimensions enters the log-det per dimension.
+
+        Also covers the 0-dim buffers of estimators pickled with sbi <= 0.27.
+        """
+        estimator = MixtureDensityEstimator(
+            net=standard_mdn,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+            transform_input=torch.tensor([1.0, 10.0]),
+        )
+        assert estimator._transform_scale.shape == torch.Size([3])
+        inputs = standard_inputs.unsqueeze(0)
+        with torch.no_grad():
+            # Same net without z-scoring, plus the log-det of z = (x - 1) / 10.
+            expected = standard_estimator.log_prob(
+                (inputs - 1.0) / 10.0, standard_condition
+            ) - 3 * torch.log(torch.tensor(10.0))
+            assert torch.allclose(
+                estimator.log_prob(inputs, standard_condition), expected
+            )
+            estimator._transform_shift = torch.tensor(1.0)
+            estimator._transform_scale = torch.tensor(10.0)
+            assert torch.allclose(
+                estimator.log_prob(inputs, standard_condition), expected
             )
 
 

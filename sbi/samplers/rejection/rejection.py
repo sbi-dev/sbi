@@ -332,6 +332,9 @@ def accept_reject_sample(
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
     num_sampled_total = torch.zeros(num_xos)
     num_samples_possible = 0
+    # Shape of one draw without the sample dim: `(*event_shape)` for flat proposals,
+    # `(num_xos, *event_shape)` for batched ones. Set at each draw.
+    draw_shape = torch.Size()
 
     start_time = time.time()
     while num_remaining > 0:
@@ -356,6 +359,7 @@ def accept_reject_sample(
                     for i in range(num_xos)
                 ]
                 samples = torch.stack(samples, dim=1)
+                samples = samples.reshape(num_collected, *draw_shape)
                 return samples, as_tensor(acceptance_rate, device=samples.device)
             raise RuntimeError(
                 "Sampling aborted early because rejection sampling exceeded "
@@ -372,6 +376,7 @@ def accept_reject_sample(
                 torch.Size((sampling_batch_size,)),
                 **proposal_sampling_kwargs,
             )
+        draw_shape = candidates.shape[1:]
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
 
@@ -451,7 +456,7 @@ def accept_reject_sample(
     # When in case of leakage a batch size was used there could be too many samples.
     samples = [torch.cat(accepted[i], dim=0)[:num_samples] for i in range(num_xos)]
     samples = torch.stack(samples, dim=1)
-    samples = samples.reshape(num_samples, *candidates.shape[1:])
+    samples = samples.reshape(num_samples, *draw_shape)
     assert samples.shape[0] == num_samples, (
         "Number of accepted samples must match required samples."
     )

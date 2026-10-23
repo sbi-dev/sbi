@@ -20,7 +20,7 @@ from typing import (
 import numpy as np
 import torch
 from torch import Tensor, float32
-from torch.distributions import Independent, Uniform
+from torch.distributions import Independent, Uniform, biject_to, constraints
 from torch.nn import Module
 
 from sbi.sbi_types import Array, OneOrMore, Shape
@@ -924,3 +924,56 @@ def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> 
 
     with torch.no_grad():
         _base_recursor(obj, check=check, action=action)
+
+
+# Torch >= 2.8 wraps the support of a mixture; older versions return the support of
+# the components.
+_MixtureSupport = getattr(constraints, "MixtureSameFamilyConstraint", None)
+
+
+def unwrap_mixture_support(
+    support: constraints.Constraint,
+    event_shape: torch.Size,
+    device: Union[str, torch.device],
+) -> constraints.Constraint:
+    """Return the support with each mixture support replaced by the component one.
+
+    Torch defines the support of a mixture as the intersection of the component
+    supports. This is only correct when the support does not depend on the component
+    parameters. Supports without a bijection, e.g. discrete ones, stay unchanged.
+
+    Args:
+        support: The prior support, e.g. of a mixture or an `Independent` mixture.
+        event_shape: The event shape of the prior.
+        device: The device of the prior.
+
+    Raises:
+        ValueError: If the support of a mixture depends on the component parameters.
+    """
+    if isinstance(support, constraints.independent):
+        return constraints.independent(
+            unwrap_mixture_support(support.base_constraint, event_shape, device),
+            support.reinterpreted_batch_ndims,
+        )
+    if _MixtureSupport is None or not isinstance(support, _MixtureSupport):
+        return support
+    component_support = support.base_constraint
+    # Bounds set per component broadcast the size-1 component axis; a fixed support
+    # keeps it.
+    component_event_shape = event_shape[
+        len(event_shape) - component_support.event_dim :
+    ]
+    probe = torch.zeros(1, 1, *component_event_shape, device=device)
+    try:
+        probe_shape = biject_to(component_support).inv(probe).shape
+    except NotImplementedError:
+        return support
+    if probe_shape != probe.shape:
+        raise ValueError(
+            "The support of this mixture prior depends on the parameters of its "
+            "components, e.g. the bounds of uniform components or the scale of "
+            "Pareto components. sbi supports mixture priors only when the support "
+            "of the components is fixed, e.g. Gaussian, LogNormal or Gamma "
+            "components."
+        )
+    return component_support
