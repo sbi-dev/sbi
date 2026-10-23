@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import pytest
-from torch import allclose, device, exp, eye, ones, zeros
+from torch import allclose, device, exp, eye, ones, tensor, zeros
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
@@ -229,6 +229,24 @@ def test_run_tarp_detect_bias(distance, biased_samples):
     # hence we test for not allclose
     assert not allclose((ecp - alpha).abs().max(), zeros((1,)), atol=1e-1)
     assert (ecp - alpha).abs().sum() > 3.0  # integral is nonzero, fig.2 in paper
+
+
+def test_run_tarp_alpha_grid_spans_unit_interval():
+    """The alpha grid must span [0, 1] even if the coverage values do not."""
+    num_posterior_samples, num_tarp_samples = 10, 100
+    thetas = ones((num_tarp_samples, 1))
+    references = zeros((num_tarp_samples, 1))
+
+    # k of the 10 samples lie closer to the reference than theta, so the coverage
+    # values are k / 10 for k in (3, 4, 6, 7), all inside [0.3, 0.7].
+    samples = 2.0 * ones((num_posterior_samples, num_tarp_samples, 1))
+    for idx, k in enumerate((3, 4, 6, 7) * (num_tarp_samples // 4)):
+        samples[:k, idx] = 0.5
+
+    ecp, alpha = _run_tarp(samples, thetas, references, num_bins=4)
+
+    assert allclose(alpha, tensor([0.0, 0.25, 0.5, 0.75, 1.0]))
+    assert allclose(ecp, tensor([0.0, 0.0, 0.5, 1.0, 1.0]))
 
 
 def test_check_tarp_correct(accurate_samples):
