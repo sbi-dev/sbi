@@ -10,6 +10,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, Uniform
 
+from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
@@ -212,6 +213,19 @@ def test_fnpe_batched_observations_keep_base_distribution():
     assert torch.allclose(
         init.std(), score_fn.vector_field_estimator.std_base.mean(), rtol=0.05
     )
+
+
+def test_fnpe_divergence_error_names_cause():
+    """Diverged fnpe sampling for many iid observations raises an error that names
+    the cause and the fixes."""
+    estimator = _build_gaussian_score_estimator(
+        "vp", (2,), torch.ones(2), torch.ones(2)
+    ).vector_field_estimator
+    prior = Independent(Normal(torch.zeros(2), 10 * torch.ones(2)), 1)
+    posterior = VectorFieldPosterior(estimator, prior, iid_method="fnpe")
+
+    with pytest.raises(RuntimeError, match=r"iid_method='fnpe'.*\(1000 here\)"):
+        posterior.sample((100,), x=torch.ones((1000, 1)), steps=100)
 
 
 def _build_gaussian_score_estimator(
