@@ -162,7 +162,7 @@ class VectorFieldPosterior(NeuralPosterior):
         iid_params: Optional[Dict] = None,
         guidance_method: Optional[str] = None,
         guidance_params: Optional[Dict] = None,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
@@ -212,6 +212,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 the specific `ScoreAdaptation` child class for details, specifically
                 `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
             max_sampling_batch_size: Maximum batch size for sampling.
+                If not provided, uses the value specified at initialization.
             sample_with: Deprecated, set it at construction instead; will be removed
                 in v0.28.0. Sampling method to use - 'ode' or 'sde'. Note that in
                 order to use the 'sde' sampling method, the vector field estimator
@@ -266,6 +267,11 @@ class VectorFieldPosterior(NeuralPosterior):
         )
 
         num_samples = torch.Size(sample_shape).numel()
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
+        )
 
         if sample_with == "ode":
             if reject_outside_prior:
@@ -331,7 +337,7 @@ class VectorFieldPosterior(NeuralPosterior):
         corrector_params: Optional[Dict] = None,
         steps: int = 500,
         ts: Optional[Tensor] = None,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
         save_intermediate: bool = False,
         **kwargs,
@@ -353,6 +359,7 @@ class VectorFieldPosterior(NeuralPosterior):
             ts: Time points at which to evaluate the diffusion process. If None,
                 uses the solve_schedule() specific to the estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
+                If not provided, uses the value specified at initialization.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
             show_progress_bars: Whether to show a progress bar during sampling.
@@ -580,7 +587,7 @@ class VectorFieldPosterior(NeuralPosterior):
         corrector_params: Optional[Dict] = None,
         steps: int = 500,
         ts: Optional[Tensor] = None,
-        max_sampling_batch_size: int = 10000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -606,6 +613,7 @@ class VectorFieldPosterior(NeuralPosterior):
             ts: Time points at which to evaluate the diffusion process. If None, a
                 linear grid between t_max and t_min is used.
             max_sampling_batch_size: Maximum batch size for sampling.
+                If not provided, uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
