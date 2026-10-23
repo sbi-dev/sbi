@@ -20,7 +20,7 @@ Differences to the paper's code (`mean_flow/mean_flow.py` in their repository):
 
 ## Training regime: the deciding factor
 
-With sbi's trainer defaults (constant learning rate, early stopping after 20 epochs without improvement) the mean flow stops after about 41 to 77 epochs and is far behind. The paper's recipe (AdamW with weight decay 5e-3, learning rate warmed up over 5% of the steps to 5e-4, then cosine decay to zero, gradient clipping at 1.5) fixes that. Two moons NPE, 2,000 simulations, C2ST on 5 observations (`results/training_variant_*.log`):
+With sbi's trainer defaults (constant learning rate, early stopping after 20 epochs without improvement) the mean flow stops after about 41 to 77 epochs and is far behind. The paper's recipe (AdamW with weight decay 5e-3, learning rate warmed up over 5% of the steps to 5e-4, then cosine decay to zero, gradient clipping at 1.5) fixes that. Two moons NPE, 2,000 simulations, C2ST on 5 observations (`results/training_variant_*.txt`):
 
 | Variant | S=1 | S=2 | S=4 | velocity head, 200 Euler steps |
 |---|---|---|---|---|

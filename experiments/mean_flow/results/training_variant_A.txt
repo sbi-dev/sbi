@@ -1,0 +1,1 @@
+A n=2000 fmpe default: c2st mean 0.781 per-obs [0.788, 0.789, 0.755, 0.763, 0.81]

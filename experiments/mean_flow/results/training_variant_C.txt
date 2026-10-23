@@ -1,0 +1,9 @@
+C ep 100 val 1.698 (129s)
+C ep 200 val 1.590 (262s)
+C ep 300 val 1.481 (399s)
+C ep 400 val 1.417 (531s)
+C ep 500 val 1.418 (644s)
+C n=2000 mean flow direct S=1: c2st mean 0.798 per-obs [0.773, 0.769, 0.8, 0.786, 0.861]
+C n=2000 mean flow direct S=2: c2st mean 0.716 per-obs [0.681, 0.667, 0.727, 0.721, 0.782]
+C n=2000 mean flow direct S=4: c2st mean 0.637 per-obs [0.607, 0.631, 0.629, 0.609, 0.711]
+C n=2000 velocity head Euler200: c2st mean 0.549 per-obs [0.499, 0.556, 0.538, 0.497, 0.657]
