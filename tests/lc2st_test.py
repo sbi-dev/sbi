@@ -395,6 +395,21 @@ def test_permute_data_swaps_only_within_pairs():
     assert 0 < swapped.sum() < len(swapped)
 
 
+def test_lc2st_p_value_counts_ties_as_extreme(cal_data, theta_o, x_o):
+    """Null statistics equal to the observed one must count towards the p-value."""
+    # Identical P and Q and a fixed classifier seed make every null statistic tie.
+    lc2st = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.thetas.clone(),
+        num_trials_null=5,
+        classifier_kwargs={"random_state": 0},
+    )
+    lc2st.train_under_null_hypothesis(verbosity=0).train_on_observed_data()
+
+    assert lc2st.p_value(theta_o=theta_o, x_o=x_o) == 1.0
+
+
 def test_lc2st_null_training_does_not_reseed_global_rng(cal_data):
     """Permutation null training must leave the caller's torch RNG stream alone."""
     draws_after_training = []
