@@ -73,19 +73,6 @@ def badly_trained_npe(sim_setup):
 
 
 @pytest.fixture(scope="session")
-def well_trained_npe(sim_setup):
-    """A well-trained NPE for testing LC2ST false positive rate."""
-    # seed explicitly to keep session scope deterministic.
-    seed_all_backends(1)
-    theta_train = sim_setup.prior.sample((5_000,))
-    x_train = sim_setup.simulator(theta_train)
-
-    inference = NPE(sim_setup.prior, density_estimator="maf")
-    inference = inference.append_simulations(theta=theta_train, x=x_train)
-    return inference.train(max_num_epochs=2**31 - 1)
-
-
-@pytest.fixture(scope="session")
 def cal_data(sim_setup, badly_trained_npe) -> CalibrationData:
     """Calibration data for LC2ST tests."""
     # seed explicitly to keep session scope deterministic.
@@ -687,55 +674,66 @@ def test_lc2st_true_positive_rate(method, sim_setup, badly_trained_npe):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", [LC2ST, LC2ST_NF])
-def test_lc2st_false_positive_rate(method, sim_setup, well_trained_npe, set_seed):
-    """For a good estimator, LC2ST should not reject the null hypothesis."""
-    num_runs, num_cal, num_eval = 100, 1_000, 10_000
-    confidence_level = 0.95
-    expected_rate = 1 - confidence_level
+def test_lc2st_false_positive_rate(method):
+    """For the exact posterior, LC2ST should reject at most at its level alpha."""
+    # All observations evaluated by one LC2ST share its classifiers, so their
+    # decisions are strongly correlated. Each independent trial is therefore a new
+    # LC2ST on fresh calibration data, evaluated at one observation.
+    num_trials, num_cal, num_trials_null, num_eval = 50, 200, 50, 10_000
+    alpha = 0.05
+    dim, noise_std = 2, 0.5
 
-    thetas = sim_setup.prior.sample((num_cal,))
-    xs = sim_setup.simulator(thetas)
-    posterior_samples = (
-        well_trained_npe.sample((1,), xs).reshape(-1, thetas.shape[-1]).detach()
-    )
+    # x = theta + noise_std * eps with theta ~ N(0, I) has the posterior
+    # N(x / (1 + noise_std^2), noise_std^2 / (1 + noise_std^2) * I).
+    prior = torch.distributions.MultivariateNormal(torch.zeros(dim), torch.eye(dim))
+    posterior_std = noise_std / (1 + noise_std**2) ** 0.5
 
-    if method == LC2ST:
-        kwargs_init, get_eval_kwargs = (
-            {},
-            lambda x: {
-                "theta_o": well_trained_npe.sample((num_eval,), condition=x)
-                .reshape(-1, thetas.shape[-1])
-                .detach()
-            },
-        )
-    else:
-        npe = well_trained_npe
-        kwargs_init = {
-            "flow_inverse_transform": npe.inverse_transform,
-            "flow_base_dist": torch.distributions.MultivariateNormal(
-                torch.zeros(2), torch.eye(2)
-            ),
-            "num_eval": num_eval,
-        }
-        get_eval_kwargs = lambda x: {}
+    def simulator(theta: Tensor) -> Tensor:
+        return theta + noise_std * torch.randn_like(theta)
 
-    lc2st = method(thetas, xs, posterior_samples, **kwargs_init)
-    lc2st.train_under_null_hypothesis().train_on_observed_data()
+    def posterior_mean(x: Tensor) -> Tensor:
+        return x / (1 + noise_std**2)
 
-    results = []
-    for _ in range(num_runs):
-        x = sim_setup.simulator(sim_setup.prior.sample((1,)))
-        results.append(
-            lc2st.reject_test(x_o=x, alpha=1 - confidence_level, **get_eval_kwargs(x))
-        )
+    def sample_posterior(num_samples: int, x: Tensor) -> Tensor:
+        return posterior_mean(x) + posterior_std * torch.randn(num_samples, *x.shape)
 
-    num_rejections = sum(results)
-    result = binomtest(num_rejections, num_runs, expected_rate, alternative="greater")
+    def inverse_transform(theta: Tensor, x: Tensor) -> Tensor:
+        return (theta - posterior_mean(x)) / posterior_std
 
+    num_rejections = 0
+    for _ in range(num_trials):
+        thetas = prior.sample((num_cal,))
+        xs = simulator(thetas)
+        posterior_samples = sample_posterior(1, xs).squeeze(0)
+        x_o = simulator(prior.sample((1,)))
+
+        if method == LC2ST:
+            lc2st = LC2ST(
+                thetas, xs, posterior_samples, num_trials_null=num_trials_null
+            )
+            eval_kwargs = {"theta_o": sample_posterior(num_eval, x_o).squeeze(1)}
+        else:
+            lc2st = LC2ST_NF(
+                thetas,
+                xs,
+                posterior_samples,
+                flow_inverse_transform=inverse_transform,
+                flow_base_dist=torch.distributions.MultivariateNormal(
+                    torch.zeros(dim), torch.eye(dim)
+                ),
+                num_eval=num_eval,
+                num_trials_null=num_trials_null,
+            )
+            eval_kwargs = {}
+
+        lc2st.train_under_null_hypothesis(verbosity=0).train_on_observed_data()
+        num_rejections += int(lc2st.reject_test(x_o=x_o, alpha=alpha, **eval_kwargs))
+
+    result = binomtest(num_rejections, num_trials, alpha, alternative="greater")
     assert result.pvalue > 0.01, (
-        f"LC2ST rejection rate significantly higher than expected. "
-        f"Expected: {expected_rate * 100:.1f}%, Observed: {num_rejections}%, "
-        f"p-value: {result.pvalue:.4f}"
+        f"LC2ST rejected the exact posterior in {num_rejections} of {num_trials} "
+        f"independent trials, expected about {alpha * num_trials:.1f} "
+        f"(p-value: {result.pvalue:.4f})."
     )
 
 
