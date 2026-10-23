@@ -22,6 +22,7 @@ from sbi.inference import (
     ImportanceSamplingPosterior,
     VectorFieldPosterior,
 )
+from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
@@ -269,11 +270,9 @@ def test_importance_posterior_uses_constructor_sampling_arguments(monkeypatch):
     )
 
     with pytest.raises(_SamplerCalled):
-        posterior.sample((10,), x=ones(1, num_dim))
+        posterior.sample((10,))
     with pytest.raises(_SamplerCalled):
-        posterior.sample(
-            (10,), x=ones(1, num_dim), oversampling_factor=3, max_sampling_batch_size=7
-        )
+        posterior.sample((10,), oversampling_factor=3, max_sampling_batch_size=7)
 
     assert [
         (call["num_candidate_samples"], call["max_sampling_batch_size"])
@@ -283,10 +282,6 @@ def test_importance_posterior_uses_constructor_sampling_arguments(monkeypatch):
 
 def test_filtered_direct_posterior_defers_max_sampling_batch_size(monkeypatch):
     """FilteredDirectPosterior.sample() leaves the batch size to the constructor."""
-    from sbi.inference.posteriors.filtered_direct_posterior import (
-        FilteredDirectPosterior,
-    )
-
     received = []
 
     def fake_sample(self, *args, **kwargs):
