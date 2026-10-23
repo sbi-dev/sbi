@@ -80,7 +80,7 @@ def update(d: Dict, u: Optional[Dict]) -> Dict:
 
 
 def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
-    """Returns np.ndarray if torch.Tensor was provided.
+    """Returns np.ndarray; a torch.Tensor is detached and moved to CPU first.
 
     Used because samples_nd() can only handle np.ndarray.
     """
@@ -99,8 +99,8 @@ def handle_nan_infs(samples: List[np.ndarray]) -> List[np.ndarray]:
         if np.isinf(samples[i]).any():
             logging.warning("Infs found in samples, omitting datapoints.")
             # cast inf to nan, so they are omitted in the next step
-            np.nan_to_num(
-                samples[i], copy=False, nan=np.nan, posinf=np.nan, neginf=np.nan
+            samples[i] = np.nan_to_num(
+                samples[i], nan=np.nan, posinf=np.nan, neginf=np.nan
             )
         samples[i] = samples[i][~np.isnan(samples[i]).any(axis=1)]
     return samples

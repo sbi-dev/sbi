@@ -637,15 +637,21 @@ def test_pairplot_kde_percentile_levels_are_known_keys():
 
 @pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 def test_plots_accept_device_and_grad_tensors(device):
-    """Plot inputs may live on any device and require grad; a 1-D point is valid."""
+    """Plot inputs may live on any device and require grad; a 1-D point is valid.
+
+    Plotting omits infinite samples without modifying the caller's tensor.
+    """
     device = process_device(device)
-    samples = torch.randn(50, 2, device=device, requires_grad=True)
+    samples = torch.randn(50, 2, device=device)
+    samples[0, 0] = float("inf")
+    samples.requires_grad_(True)
     point = torch.zeros(2, device=device, requires_grad=True)
     limits = torch.tensor([[-3.0, 3.0]], device=device, requires_grad=True)
     ticks = [torch.tensor([-2.0, 2.0], device=device, requires_grad=True)]
     alpha = torch.linspace(0, 1, 10, device=device, requires_grad=True)
 
     pairplot(samples, points=point)
+    assert torch.isinf(samples[0, 0])
     pairplot(samples, points=[point], limits=limits, ticks=ticks)
     marginal_plot(samples, points=point, limits=limits, ticks=ticks)
     sbc_rank_plot(torch.randint(0, 50, (20, 2), device=device), 50)
@@ -654,7 +660,7 @@ def test_plots_accept_device_and_grad_tensors(device):
     density = torch.distributions.MultivariateNormal(
         torch.zeros(2, device=device), scale_tril=torch.eye(2, device=device)
     )
-    condition = torch.zeros(1, 2, device=device)
+    condition = torch.zeros(1, 2, device=device, requires_grad=True)
     conditional_marginal_plot(density, condition, limits=limits, resolution=10)
     conditional_pairplot(
         density, condition, [[-3.0, 3.0]], points=[point], ticks=ticks, resolution=10

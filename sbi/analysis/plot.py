@@ -926,7 +926,7 @@ def prepare_for_conditional_plot(condition, opts):
     limits = [ensure_numpy(lim) for lim in opts["limits"]]
     if len(limits) == 1:
         limits = [limits[0] for _ in range(dim)]
-    limits = torch.as_tensor(np.array(limits), dtype=torch.get_default_dtype())
+    limits = torch.as_tensor(np.array(limits))
 
     # Infer the margin. This is to avoid that we evaluate the posterior **exactly**
     # at the boundary.
@@ -943,7 +943,7 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
     """
 
     def diag_func(row, **kwargs):
-        p_vector = (
+        p_vector = ensure_numpy(
             eval_conditional_density(
                 opts["density"],
                 opts["condition"],
@@ -954,8 +954,6 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[row],
             )
-            .to("cpu")
-            .numpy()
         )
         plt.plot(
             np.linspace(
@@ -1289,19 +1287,17 @@ def conditional_pairplot(
     diag_func = get_conditional_diag_func(opts, limits, eps_margins, resolution)
 
     def offdiag_func(row, col, **kwargs):
-        p_image = (
+        p_image = ensure_numpy(
             eval_conditional_density(
                 opts["density"],
                 opts["condition"].to(device),
-                limits.to(device),
+                limits,
                 row,
                 col,
                 resolution=resolution,
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[col],
             )
-            .to("cpu")
-            .numpy()
         )
         plt.imshow(
             p_image.T,
