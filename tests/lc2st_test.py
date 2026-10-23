@@ -656,14 +656,12 @@ def test_lc2st_true_positive_rate(method, sim_setup, badly_trained_npe):
     lc2st = method(thetas, xs, posterior_samples, **kwargs_init)
     lc2st.train_under_null_hypothesis().train_on_observed_data()
 
-    results = [
-        lc2st.reject_test(
-            x_o=sim_setup.simulator(sim_setup.prior.sample((1,))),
-            alpha=1 - confidence_level,
-            **get_eval_kwargs(sim_setup.simulator(sim_setup.prior.sample((1,)))),
+    results = []
+    for _ in range(num_runs):
+        x = sim_setup.simulator(sim_setup.prior.sample((1,)))
+        results.append(
+            lc2st.reject_test(x_o=x, alpha=1 - confidence_level, **get_eval_kwargs(x))
         )
-        for _ in range(num_runs)
-    ]
 
     proportion_rejected = torch.tensor(results).float().mean()
     assert proportion_rejected > confidence_level, (
