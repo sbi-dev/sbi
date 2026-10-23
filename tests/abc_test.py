@@ -445,7 +445,6 @@ def test_sass_correctness():
 
 def test_smcabc_resampling_keeps_particles_paired_with_simulations():
     """Resampling at low ESS must reorder distances and simulations with particles."""
-    torch.manual_seed(0)
     prior = BoxUniform(-ones(2), ones(2))
     smcabc = SMCABC(lambda theta: theta + 0.01 * torch.randn_like(theta), prior)
     _, summary = smcabc(
@@ -487,9 +486,7 @@ def test_lra_removes_parameters_outside_bounded_prior(
 ):
     """LRA near the prior bound must neither return parameters outside nor raise."""
     # Validation is set per instance: zuko and pyro flip torch's global default.
-    prior = Independent(
-        Uniform(-ones(2), ones(2), validate_args=True), 1, validate_args=True
-    )
+    prior = Independent(Uniform(-ones(2), ones(2), validate_args=True), 1)
     inferer = method(lambda theta: theta + 0.1 * torch.randn_like(theta), prior)
 
     with pytest.warns(UserWarning, match="outside the prior support"):

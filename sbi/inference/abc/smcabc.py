@@ -209,8 +209,8 @@ class SMCABC(ABCBASE):
 
         pop_idx = 0
         self.num_simulations = num_simulations * num_iid_samples
-        # Copy, since the weighted KDE writes sample weights into it.
-        kde_kwargs = {} if kde_kwargs is None else dict(kde_kwargs)
+        if kde_kwargs is None:
+            kde_kwargs = {}
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
         assert not (self.distance.requires_iid_data and lra), (
             "Currently there is no support to run inference "
@@ -340,7 +340,7 @@ class SMCABC(ABCBASE):
             )
             # Maybe get particles weights from last population for weighted KDE.
             if kde_sample_weights:
-                kde_kwargs["sample_weights"] = final_log_weights.exp()
+                kde_kwargs = dict(kde_kwargs, sample_weights=final_log_weights.exp())
 
             kde_dist = get_kde(final_particles, **kde_kwargs)
 
