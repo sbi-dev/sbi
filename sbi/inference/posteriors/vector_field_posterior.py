@@ -175,7 +175,7 @@ class VectorFieldPosterior(NeuralPosterior):
             sample_shape: Shape of the samples to be drawn.
             predictor: The predictor for the vector field sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-                Currently, only `euler_maruyama` is implemented.
+                Currently, `euler_maruyama` and `heun` are implemented.
             corrector: The corrector for the vector field sampler. Either of
                 [None].
             predictor_params: Additional parameters passed to predictor.
@@ -352,7 +352,7 @@ class VectorFieldPosterior(NeuralPosterior):
             sample_shape: Shape of the samples to be drawn.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-                Currently, only `euler_maruyama` is implemented.
+                Currently, `euler_maruyama` and `heun` are implemented.
             corrector: The corrector for the diffusion-based sampler. Either of
                 [None].
             steps: Number of steps to take for the Euler-Maruyama method.
@@ -605,7 +605,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 drawn.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-                Currently, only `euler_maruyama` is implemented.
+                Currently, `euler_maruyama` and `heun` are implemented.
             corrector: The corrector for the diffusion-based sampler.
             predictor_params: Additional parameters passed to predictor.
             corrector_params: Additional parameters passed to corrector.
