@@ -87,10 +87,10 @@ class LC2ST:
 
     To evaluate the test, steps 1 and 2 are performed over multiple trials under the
     null hypothesis (H0). If the null distribution is not known, it is estimated
-    using the permutation method, i.e. by training the classifier on the permuted
-    data. The statistics obtained under (H0) is then compared to the one obtained
-    on observed data to compute the p-value, used to decide whether to reject (H0)
-    or not.
+    using the permutation method, i.e. by training the classifier on data whose P
+    and Q labels are randomly swapped within each pair sharing an observation. The
+    statistics obtained under (H0) is then compared to the one obtained on observed
+    data to compute the p-value, used to decide whether to reject (H0) or not.
 
     Example:
         >>> lc2st = LC2ST(prior_samples, xs, posterior_samples, num_folds=5)
@@ -773,7 +773,6 @@ class LC2ST:
             if self.permutation:
                 joint_p = torch.cat([self.theta_p, self.x_p], dim=1)
                 joint_q = torch.cat([self.theta_q, self.x_q], dim=1)
-                # Permute data (same as permuting the labels)
                 joint_p_perm, joint_q_perm = permute_data(joint_p, joint_q, seed=t)
                 # Extract the permuted P and Q and x
                 theta_p_t, x_p_t = (
@@ -1210,26 +1209,30 @@ def eval_lc2st(
 def permute_data(
     theta_p: Tensor, theta_q: Tensor, seed: int = 1
 ) -> Tuple[Tensor, Tensor]:
-    """Permutes the concatenated data [P,Q] to create null samples.
+    """Swaps the P and Q labels within each pair to create null samples.
 
-    The permutation depends only on `seed`; the global torch RNG is left untouched.
+    Row `i` of P and row `i` of Q must share the observation `x_i`. Each pair is
+    swapped with probability 1/2.
+
+    The swaps depend only on `seed`; the global torch RNG is left untouched.
 
     Args:
         theta_p: samples from P, of shape (sample_size, dim).
-        theta_q: samples from Q, of shape (sample_size, dim).
+        theta_q: samples from Q, of shape (sample_size, dim), row-aligned with
+            `theta_p`.
         seed: random seed, defaults to 1.
 
     Returns:
         Tuple of (theta_p_permuted, theta_q_permuted), each of shape (sample_size, dim).
     """
     # check inputs
-    assert theta_p.shape[0] == theta_q.shape[0]
+    assert theta_p.shape == theta_q.shape
 
-    sample_size = theta_p.shape[0]
-    X = torch.cat([theta_p, theta_q], dim=0)
     generator = torch.Generator().manual_seed(seed)
-    x_perm = X[torch.randperm(sample_size * 2, generator=generator)]
-    return x_perm[:sample_size], x_perm[sample_size:]
+    # The generator lives on the CPU, whatever the default device is.
+    swap = torch.rand(theta_p.shape[0], generator=generator, device="cpu") < 0.5
+    swap = swap.to(theta_p.device).unsqueeze(-1)
+    return torch.where(swap, theta_q, theta_p), torch.where(swap, theta_p, theta_q)
 
 
 class EnsembleClassifier(BaseEstimator):
