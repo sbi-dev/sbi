@@ -1377,7 +1377,9 @@ def ensure_lam_positive_definite(
         denoising_prior_precision: The prior precision tensor.
         denoising_posterior_precision: The posterior precision tensor.
         N: The scaling factor used in the correction.
-        precision_nugget: The nugget value to ensure positive definiteness.
+        precision_nugget: The nugget value to ensure positive definiteness. For a
+            dense `Lam`, the total nugget is at least 100 machine epsilons times
+            the largest absolute eigenvalue of `Lam`.
 
     Returns:
         A tuple of (denoising_prior_precision, denoising_posterior_precision) where the
@@ -1400,7 +1402,10 @@ def ensure_lam_positive_definite(
         Lam_corr = torch.einsum(
             '...ij,...j,...kj->...ik', eigenvectors, corrected_eigs, eigenvectors
         )
-        Lam_corr += precision_nugget * torch.eye(
+        # A smaller nugget is lost to float32 rounding.
+        nugget = 100 * torch.finfo(Lam.dtype).eps * eigenvalues.abs().amax(-1) / N
+        nugget = torch.clamp(nugget, min=precision_nugget)[..., None, None]
+        Lam_corr += nugget * torch.eye(
             Lam.shape[-1], device=Lam.device, dtype=Lam.dtype
         )
 

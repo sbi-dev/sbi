@@ -10,13 +10,18 @@ import torch
 from torch import Tensor
 from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, Uniform
 
+from sbi.inference.potentials.vector_field_adaptor import ensure_lam_positive_definite
 from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.utils import BoxUniform, MultipleIndependent
-from sbi.utils.vector_field_utils import VectorFieldNet
+from sbi.utils.vector_field_utils import (
+    VectorFieldNet,
+    add_diag_or_dense,
+    solve_diag_or_dense,
+)
 
 
 def build_random_priors(num_dim: int):
@@ -170,6 +175,51 @@ def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_metho
             f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
         )
         assert torch.isfinite(output).all(), "Output contains non-finite values"
+
+
+def test_ensure_lam_positive_definite_survives_float32_cancellation():
+    """`Lam` must stay invertible when the precision sum cancels to rank one.
+
+    At a magnitude of 1e7, float32 cannot represent an absolute nugget of 0.01.
+    """
+    num_trials, magnitude = 5, 1e7
+    ones = torch.ones(2)
+    prior_precision = torch.eye(2).expand(1, 1, 2, 2)
+    # Chosen such that (1 - N) * prior + sum(posterior) = magnitude * ones ones^T.
+    posterior_precision = (
+        (magnitude * torch.outer(ones, ones) + (num_trials - 1) * torch.eye(2))
+        / num_trials
+    ).expand(1, num_trials, 2, 2)
+
+    prior_precision, posterior_precision = ensure_lam_positive_definite(
+        prior_precision, posterior_precision, num_trials, precision_nugget=0.01
+    )
+    lam = add_diag_or_dense(
+        (1 - num_trials) * prior_precision,
+        posterior_precision.sum(1, keepdim=True),
+        batch_dims=2,
+    ).squeeze(1)
+
+    eigenvalues = torch.linalg.eigvalsh(lam)
+    assert (eigenvalues[:, 0] / eigenvalues[:, -1] > 5e-6).all()
+    assert torch.isfinite(solve_diag_or_dense(lam, torch.ones(1, 2), 1)).all()
+
+
+def test_ensure_lam_positive_definite_keeps_well_conditioned_tall_data():
+    """Many trials must not inflate the nugget while `Lam` itself stays moderate.
+
+    The summed precisions are huge, `Lam` is not. Values are exact in float32.
+    """
+    num_trials, prior_precision_value = 2048, 2.0**20
+    prior_precision = prior_precision_value * torch.eye(2).expand(1, 1, 2, 2)
+    posterior_precision = (prior_precision_value + 1) * torch.eye(2)
+    posterior_precision = posterior_precision.expand(1, num_trials, 2, 2)
+
+    _, corrected = ensure_lam_positive_definite(
+        prior_precision, posterior_precision, num_trials, precision_nugget=0.01
+    )
+
+    assert torch.allclose(corrected, posterior_precision, rtol=1e-6)
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
