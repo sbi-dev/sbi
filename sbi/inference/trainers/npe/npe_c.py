@@ -292,11 +292,18 @@ class NPE_C(PosteriorEstimatorTrainer):
             almost_one_std = torch.sqrt(self._prior.variance) / estim_prior_std
 
             if isinstance(self._prior, MultivariateNormal):
+                # z-scoring is an affine map with diagonal scale S = diag(s_e), so the
+                # covariance becomes S^-1 C S^-1. Keep the off-diagonal terms.
+                scale_vec = estim_prior_std.expand_as(self._prior.mean)
+                z_scored_cov = self._prior.covariance_matrix / torch.outer(
+                    scale_vec, scale_vec
+                )
                 self._maybe_z_scored_prior = MultivariateNormal(
-                    almost_zero_mean, torch.diag(almost_one_std)
+                    almost_zero_mean, covariance_matrix=z_scored_cov
                 )
             else:
-                range_ = torch.sqrt(almost_one_std * 3.0)
+                # A uniform with std s has half-width sqrt(3) * s.
+                range_ = almost_one_std * torch.sqrt(torch.tensor(3.0))
                 self._maybe_z_scored_prior = BoxUniform(
                     almost_zero_mean - range_, almost_zero_mean + range_
                 )
