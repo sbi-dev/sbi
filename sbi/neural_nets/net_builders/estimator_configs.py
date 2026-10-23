@@ -1016,11 +1016,14 @@ class MeanFlowConfig(DensityConfigBase):
             two of which belong to each of the two heads alone.
         num_steps: Default number of flow-map steps of `log_prob` and `sample`. It
             can be changed after training via the estimator's `num_steps`.
+        variant: `"sbi"` for sbi's network, `"paper"` for a port of the network and
+            cycle-loss condition swap of the paper's code (`PaperMeanFlowNet`).
     """
 
     hidden_features: int = 256
     num_blocks: int = 5
     num_steps: int = 2
+    variant: Literal["sbi", "paper"] = "sbi"
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_mean_flow)
 

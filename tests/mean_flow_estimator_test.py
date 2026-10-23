@@ -200,6 +200,31 @@ def test_cycle_loss_is_active_when_all_mean_flow_pairs_have_equal_times(monkeypa
     assert cycle_part.sum() > 1e-3
 
 
+def test_paper_variant_has_the_parameter_count_of_the_paper_network():
+    """Arruda et al.'s g-and-k mean flow (2-D observation, 3 parameters) has
+    1,755,940 trainable weights, as their training log reports."""
+    estimator = MeanFlowConfig(variant="paper").build(
+        torch.randn(100, 2), torch.randn(100, 3)
+    )
+
+    assert sum(p.numel() for p in estimator.net.parameters()) == 1_755_940
+
+
+def test_paper_variant_trains_and_evaluates():
+    condition, input = torch.randn(64, 3), torch.randn(64, 2)
+    estimator = MeanFlowConfig(hidden_features=32, variant="paper").build(
+        input, condition
+    )
+
+    estimator.loss(input, condition).mean().backward()
+    log_prob = estimator.log_prob(input[:4], condition[:4], num_steps=2)
+
+    for head in ("mean", "velocity"):
+        assert estimator.net.outputs[head].weight.grad.abs().sum() > 0
+    assert estimator.net.frequencies.grad.abs().sum() > 0
+    assert torch.isfinite(log_prob).all()
+
+
 @pytest.mark.parametrize("num_steps", (0, 1.5, True))
 def test_invalid_num_steps_raises(num_steps):
     estimator, _, _ = _build()

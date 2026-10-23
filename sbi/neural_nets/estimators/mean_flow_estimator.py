@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import torch
 from torch import Tensor, nn
@@ -58,6 +58,7 @@ class MeanFlowEstimator(ConditionalDensityEstimator):
         mean_input: Union[Tensor, float] = 0.0,
         std_input: Union[Tensor, float] = 1.0,
         num_steps: int = 2,
+        cycle_swap: Literal["permute", "roll"] = "permute",
     ) -> None:
         r"""Initialize the mean flow.
 
@@ -72,6 +73,9 @@ class MeanFlowEstimator(ConditionalDensityEstimator):
             std_input: Standard deviation for z-scoring the modeled variable.
             num_steps: Default number of flow-map steps for `log_prob` and
                 `sample`.
+            cycle_swap: Where the cycle loss takes another sample's condition
+                from: a random permutation of the batch, or the previous row as in
+                the paper's code.
         """
         if len(input_shape) != 1:
             raise ValueError(
@@ -83,6 +87,11 @@ class MeanFlowEstimator(ConditionalDensityEstimator):
         self.register_buffer("_mean_input", _as_float_vector(mean_input, dim))
         self.register_buffer("_std_input", _as_float_vector(std_input, dim))
         self.num_steps = num_steps
+        if cycle_swap not in ("permute", "roll"):
+            raise ValueError(
+                f"cycle_swap must be 'permute' or 'roll', got {cycle_swap!r}."
+            )
+        self._cycle_swap = cycle_swap
 
     @property
     def embedding_net(self) -> nn.Module:
@@ -149,10 +158,11 @@ class MeanFlowEstimator(ConditionalDensityEstimator):
         t_cycle = uniform(batch_size) ** (1 + TIME_EXPONENT)
         z_cycle = (1 - s_cycle[:, None]) * z_0 + s_cycle[:, None] * noise
         swap = uniform(batch_size) < CYCLE_SWAP_PROBABILITY
-        permutation = torch.randperm(batch_size, device=z_0.device)
-        cycle_emb = torch.where(
-            swap[:, None], condition_emb[permutation], condition_emb
-        )
+        if self._cycle_swap == "roll":
+            partner_emb = condition_emb.roll(1, dims=0)
+        else:
+            partner_emb = condition_emb[torch.randperm(batch_size, device=z_0.device)]
+        cycle_emb = torch.where(swap[:, None], partner_emb, condition_emb)
         z_t = self._flow_map(z_cycle, cycle_emb, s_cycle, t_cycle)
         z_back = self._flow_map(z_t, cycle_emb, t_cycle, s_cycle)
         cycle_loss = ((z_back - z_cycle) ** 2).sum(-1) / dim
