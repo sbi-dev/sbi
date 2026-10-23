@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import math
+import warnings
 
 import numpy as np
 import pytest
 import torch
+from scipy.optimize import linear_sum_assignment
 from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import (
@@ -20,6 +22,7 @@ from sbi.utils.metrics import (
     mse_distance,
     posterior_shrinkage,
     posterior_zscore,
+    regularized_ot_dual,
     unbiased_mmd_squared_hypothesis_test,
     wasserstein_2_squared,
     wasserstein_distance,
@@ -106,7 +109,7 @@ def test_wasserstein_2_distance(sigma):
 
     otherdist = tmvn(loc=sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
     Y = otherdist.sample((nsamples - 1,))
-    estimate = wasserstein_2_squared(X, Y, epsilon=5e-4).item()
+    estimate = wasserstein_2_squared(X, Y).item()
 
     # Check if the wasserstein estimate is of the same order
     # as the analytically derived squared Wasserstein-2 distance
@@ -117,6 +120,58 @@ def test_wasserstein_2_distance(sigma):
     )
     exponent2 = 0 if estimate == 0 else int(math.floor(math.log10(abs(estimate))))
     assert exponent1 == exponent2
+
+
+def _ot_inputs(dtype, batch=False):
+    torch.manual_seed(0)
+    x, y = torch.randn(100, 2), torch.randn(100, 2) + 1.0
+    a = torch.ones(100, dtype=dtype) / 100
+    cost = torch.cdist(x, y).to(dtype) ** 2
+    if batch:
+        return a.repeat(2, 1), a.repeat(2, 1), torch.stack([cost, 4 * cost])
+    return a, a, cost
+
+
+@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
+@pytest.mark.parametrize("batch", (False, True))
+def test_regularized_ot_dual_converged_does_not_warn(dtype, batch):
+    a, b, cost = _ot_inputs(dtype, batch)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        coupling = regularized_ot_dual(a, b, cost)
+    assert (coupling.sum(-1) - a).abs().sum(-1).max() < 2e-3
+    assert (coupling.sum(-2) - b).abs().sum(-1).max() < 2e-3
+
+
+@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
+def test_regularized_ot_dual_warns_when_not_converged(dtype):
+    a, b, cost = _ot_inputs(dtype)
+    with pytest.warns(UserWarning, match="did not converge"):
+        regularized_ot_dual(a, b, cost, relative_epsilon=1e-3, max_iter=10)
+
+
+def test_wasserstein_distance_regularizes_each_pair_separately():
+    torch.manual_seed(0)
+    x_o = torch.randn(10, 2)
+    x = torch.randn(3, 10, 2) * torch.tensor([0.1, 1.0, 10.0]).view(3, 1, 1)
+    separately = torch.stack([wasserstein_2_squared(x_o, x_i) for x_i in x])
+    assert torch.allclose(wasserstein_distance(x_o, x), separately)
+
+
+@pytest.mark.parametrize("scale", (1e-2, 1e2))
+def test_wasserstein_2_squared_defaults_match_exact_ot(scale):
+    torch.manual_seed(0)
+    x, y = scale * torch.randn(100, 2), scale * (torch.randn(100, 2) + 1.0)
+    cost = (torch.cdist(x, y) ** 2).double().numpy()
+    exact = cost[linear_sum_assignment(cost)].mean()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        estimate = wasserstein_2_squared(x, y).item()
+    assert estimate == pytest.approx(exact, rel=0.02)
+
+
+def test_wasserstein_2_squared_of_identical_points_is_zero():
+    assert wasserstein_2_squared(torch.ones(5, 2), torch.ones(5, 2)) == 0
 
 
 @pytest.mark.slow

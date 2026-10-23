@@ -155,6 +155,7 @@ class VIPosterior(NeuralPosterior):
                 variance and collapse on multimodal targets (`rKL`, `alpha` for alpha >
                 1) and some are `mass covering` i.e. they overestimate variance but
                 typically cover all modes (`fKL`, `IW`, `alpha` for alpha < 1).
+                Amortized training (train_amortized) supports only `rKL`.
             device: Training device, e.g., `cpu`, `cuda` or `cuda:0`. We will ensure
                 that all other objects are also on this device.
             x_shape: Deprecated, should not be passed.
@@ -988,8 +989,8 @@ class VIPosterior(NeuralPosterior):
         """Train a conditional flow q(θ|x) for amortized variational inference.
 
         This allows sampling from q(θ|x) for any observation x without retraining.
-        Uses the ELBO (Evidence Lower Bound) objective with early stopping based on
-        validation loss.
+        Uses the reverse-KL ELBO (Evidence Lower Bound) objective with early stopping
+        based on validation loss.
 
         Args:
             theta: Training θ values from simulations (num_sims, θ_dim).
@@ -1029,7 +1030,21 @@ class VIPosterior(NeuralPosterior):
 
         Returns:
             self for method chaining.
+
+        Raises:
+            NotImplementedError: If the posterior's `vi_method` or `params.vi_method`
+                is not `"rKL"`.
         """
+        vi_method = self.vi_method
+        if params is not None and params.vi_method != "rKL":
+            vi_method = params.vi_method
+        if vi_method != "rKL":
+            raise NotImplementedError(
+                "train_amortized() supports only vi_method='rKL', got "
+                f"vi_method='{vi_method}'. Use train() to fit a single observation "
+                "with this method, or switch to vi_method='rKL'."
+            )
+
         # Resolve parameters: explicit args > params dataclass > instance attrs
         if params is not None:
             # Amortized VI only supports string flow types (not VIPosterior or Callable)

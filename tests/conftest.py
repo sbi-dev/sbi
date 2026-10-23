@@ -1,26 +1,30 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import re
 import shutil
 from pathlib import Path
-from shutil import rmtree
 
-import pandas as pd
 import pytest
 import torch
-from pytest_harvest import get_session_results_df, get_xdist_worker_id, is_main_process
+from pytest_harvest import get_session_results_df, is_main_process
 
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available
 
+from .mini_sbibm.results import (
+    METRIC_TITLES,
+    RESULT_COLUMNS,
+    benchmark_label,
+    merge_results,
+    write_results_tables,
+)
+
 # Seed for `set_seed` fixture. Change to random state of all seeded tests.
 seed = 1
 harvested_fixture_data = None
 
-# Whether to keep benchmark results in a .csv or delete them
-KEEP_BM_RESULTS = True
+BENCHMARK_LABEL = pytest.StashKey[str]()
 
 
 # Use seed automatically for every test function.
@@ -100,6 +104,27 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
+        "--bm-label",
+        action="store",
+        default=None,
+        help="Name of this mini-benchmark run in the results table "
+        "(default: the current git branch)",
+    )
+    parser.addoption(
+        "--bm-results-dir",
+        action="store",
+        default=".bm_results",
+        help="Folder of the mini-benchmark results files (default: .bm_results). "
+        "Use the same folder to compare runs from different checkouts",
+    )
+    parser.addoption(
+        "--bm-seeds",
+        action="store",
+        default=1,
+        type=int,
+        help="Number of training seeds per mini-benchmark case",
+    )
+    parser.addoption(
         "--bm-num-simulations",
         action="store",
         default=2000,
@@ -115,11 +140,15 @@ def pytest_addoption(parser):
     )
 
 
-@pytest.fixture
-def benchmark_mode(request):
-    """Fixture to access the --bm value in test files."""
-    mode = request.config.getoption("--bm-mode")
-    return None if mode is None else str(mode).lower()
+def pytest_configure(config):
+    if not config.getoption("--bm"):
+        return
+    # Parallel benchmark workers would otherwise each start one torch thread per core.
+    if hasattr(config, "workerinput"):
+        torch.set_num_threads(1)
+    # Resolve the label at the start, so switching branches during a run does not
+    # change where its results go.
+    config.stash[BENCHMARK_LABEL] = benchmark_label(config.getoption("--bm-label"))
 
 
 @pytest.fixture
@@ -138,121 +167,19 @@ def finalize_fixture_store(request, fixture_store):
     harvested_fixture_data = dict(fixture_store)
 
 
-def strip_ansi_escape_codes(text):
-    ansi_escape = re.compile(r'\x1b\[.*?m')
-    return ansi_escape.sub('', text)
-
-
-# Function to center text with ANSI colors, adjusting for escape codes
-def center_colored_text(text, width):
-    visible_length = len(strip_ansi_escape_codes(text))
-    padding = max(0, (width - visible_length) // 2)
-    return " " * padding + text + " " * (width - visible_length - padding)
-
-
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
-    """
-    Custom pytest terminal summary to display mini SBIBM results with relative coloring
-    per task.
-
-    This function is called after the test session ends and generates a summary
-    of the results if the `--bm` option is specified. It displays the results
-    in a formatted table with methods as rows and tasks as columns, applying
-    relative coloring to metrics based on their performance within each task.
-    """
-    if config.getoption("--bm"):
-        terminal_width = shutil.get_terminal_size().columns
-        summary_text = " mini SBIBM results "
-        centered_line = summary_text.center(terminal_width, '=')
-        colored_line = f"\033[96m{centered_line}\033[0m"
-        terminalreporter.write_line(colored_line)
-
-        terminalreporter.write_line("Amortized inference:")
-
-        try:
-            # Load results from CSV
-            results = pd.read_csv('./.bm_results/results_all.csv')
-
-            # Extract relevant data (method, task, metric)
-            methods = set(results['method'])
-            tasks = set(results['task_name'])
-            data = {}  # (method, task) -> metric
-
-            for _, row in results.iterrows():
-                method = row['method']
-                task = row['task_name']
-                metric = row['metric']
-                data[(method, task)] = metric
-
-            methods = sorted(methods)
-            tasks = sorted(tasks)
-
-            if not methods or not tasks:
-                terminalreporter.write_line("No methods or tasks found.")
-                return
-
-            # Determine column widths
-            method_col_width = max(len(str(m)) for m in methods)
-            task_col_widths = {t: max(len(str(t)), 10) for t in tasks}
-
-            # Print the header row
-            header = " " * (method_col_width + 2)
-            for t in tasks:
-                header += str(t).center(task_col_widths[t] + 2)
-            terminalreporter.write_line(header)
-
-            # Print separator line
-            sep_line = "-" * len(header)
-            terminalreporter.write_line(sep_line)
-
-            # Calculate min and max for each task
-            min_max_per_task = {}
-            for t in tasks:
-                task_metrics = [data.get((m, t), float('inf')) for m in methods]
-                task_metrics = [m for m in task_metrics if m != float('inf')]
-                if task_metrics:
-                    min_max_per_task[t] = (min(task_metrics), max(task_metrics))
-                else:
-                    min_max_per_task[t] = (0, 1)  # Default if no metrics
-
-            # Print each row with colored values
-            for m in methods:
-                row = str(m).ljust(method_col_width + 2)
-                for t in tasks:
-                    val = data.get((m, t), "N/A")
-                    if val == "N/A":
-                        val_str = "N/A"
-                        row += val_str.center(task_col_widths[t] + 2)
-                    else:
-                        val = float(val)
-                        min_val, max_val = min_max_per_task[t]
-                        normalized_val = (
-                            (val - min_val) / (max_val - min_val)
-                            if max_val > min_val
-                            else 0.5
-                        )
-
-                        # Determine color based on normalized value
-                        if normalized_val == 0.0:
-                            color = "\033[92m"  # Green for best
-                        elif normalized_val == 1.0:
-                            color = "\033[91m"  # Red for worst
-                        else:
-                            color = f"\033[9{int(2 + normalized_val * 3)}m"
-
-                        val_str = format(val, ".3f")
-                        colored_val_str = f"{color}{val_str}\033[0m"
-
-                        row += center_colored_text(
-                            colored_val_str, task_col_widths[t] + 2
-                        )
-
-                terminalreporter.write_line(row)
-
-        except Exception as e:
-            terminalreporter.write_line(f"Error processing results: {e}")
-    else:
-        terminalreporter.write_line("Run with --bm flag to see benchmark results.")
+    """Print the stored mini SBIBM results of all run labels."""
+    if not config.getoption("--bm"):
+        return
+    write = terminalreporter.write_line
+    terminal_width = shutil.get_terminal_size().columns
+    write(f"\033[96m{' mini SBIBM results '.center(terminal_width, '=')}\033[0m")
+    try:
+        write_results_tables(
+            write, Path(config.getoption("--bm-results-dir")).expanduser()
+        )
+    except Exception as e:
+        write(f"Error processing results: {e}")
 
 
 @pytest.fixture(scope="function")
@@ -267,33 +194,29 @@ def mcmc_params_fast() -> MCMCPosteriorParameters:
     return MCMCPosteriorParameters(num_chains=1, thin=1, warmup_steps=1)
 
 
-# Pytest harvest xdist support.
-# Saves results now as human-readable .csv! Which can be inspected by the user in
-# the .bm_results folder.
-
-
 def pytest_sessionfinish(session):
-    """Gather all results and save them to a csv.
-    Works both on worker and master nodes, and also with xdist disabled"""
+    """Merge the results of this run into the results file of its label.
 
-    # Only run this if the --bm flag is provided
-    if not session.config.getoption("--bm"):
+    With xdist, the main process receives the results of all workers.
+    """
+    if not session.config.getoption("--bm") or not is_main_process(session):
         return
 
-    session_results_df = get_session_results_df(session)
-    suffix = 'all' if is_main_process(session) else get_xdist_worker_id(session)
-    RESULTS_PATH = Path('./.bm_results/')
-    if RESULTS_PATH.exists() and not KEEP_BM_RESULTS:
-        rmtree(RESULTS_PATH)
-    RESULTS_PATH.mkdir(exist_ok=True)
-
-    if suffix == 'all':
-        results_file = './.bm_results/results_all.csv'
-        if Path(results_file).exists():
-            # Append without writing header
-            session_results_df.to_csv(results_file, mode='a', header=False)
-        else:
-            # Write with header if file does not exist
-            session_results_df.to_csv(results_file)
-    else:
-        session_results_df.to_csv('./.bm_results/results_%s.csv' % suffix)
+    results = get_session_results_df(session)
+    if "method" not in results.columns:
+        return
+    # Failed cases keep empty metrics, so they replace earlier results of the label.
+    results = results[
+        results["status"].isin(["passed", "failed"]) & results["method"].notna()
+    ]
+    if results.empty:
+        return
+    label = session.config.stash[BENCHMARK_LABEL]
+    # The metric columns are missing when all cases failed.
+    results = results.assign(label=label).reindex(columns=[*RESULT_COLUMNS, "status"])
+    # A case can fail after its metrics are set, e.g. in a fixture teardown.
+    results.loc[results["status"] == "failed", list(METRIC_TITLES)] = float("nan")
+    results = results[RESULT_COLUMNS]
+    merge_results(
+        Path(session.config.getoption("--bm-results-dir")).expanduser(), results
+    )

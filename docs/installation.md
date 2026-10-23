@@ -1,7 +1,7 @@
 (installation)=
 # Installation
 
-`sbi` requires Python 3.10 or higher. We recommend using Python 3.12 for the best
+`sbi` requires Python 3.11 or higher. We recommend using Python 3.12 for the best
 experience. A GPU is not required, but can lead to speed-up in some cases.
 
 ## Recommended: Installation with uv
@@ -57,7 +57,7 @@ python -m pip install "sbi[pyro]"   # or "sbi[pymc]", or "sbi[all]"
 To install into a conda environment:
 
 ```bash
-# Create an environment for sbi (Python 3.10 or higher)
+# Create an environment for sbi (Python 3.11 or higher)
 conda create -n sbi_env python=3.12 && conda activate sbi_env
 
 # Install sbi from conda-forge

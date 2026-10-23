@@ -10,7 +10,12 @@ import pytest
 import torch
 from scipy.stats import gaussian_kde
 from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import (
+    Categorical,
+    MixtureSameFamily,
+    MultivariateNormal,
+    Normal,
+)
 
 from sbi import analysis as analysis
 from sbi import utils as utils
@@ -25,6 +30,8 @@ from sbi.inference import (
 )
 from sbi.inference.posteriors import MCMCPosteriorParameters
 from sbi.inference.posteriors.posterior_parameters import VectorFieldPosteriorParameters
+from sbi.inference.potentials.vector_field_adaptor import AutoGaussCorrectedScoreFn
+from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.neural_nets.factory import posterior_flow_nn
 from sbi.simulators import linear_gaussian
 from sbi.simulators.linear_gaussian import (
@@ -36,6 +43,7 @@ from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.user_input_checks import process_simulator
+from sbi.utils.vector_field_utils import denoise
 
 from .test_utils import get_dkl_gaussian_prior
 
@@ -874,14 +882,23 @@ def test_fmpe_shifted_data_c2st(z_score_theta, gaussian_baseline):
     assert c2st_value < 0.55, f"C2ST={c2st_value:.3f} should be < 0.55"
 
 
+class _ZeroNet(torch.nn.Module):
+    """Vector field network that always outputs zero (a Gaussian baseline sampler)."""
+
+    def __init__(self):
+        super().__init__()
+        self.dummy = torch.nn.Parameter(torch.zeros(1))
+
+    def forward(self, input, condition, time):
+        return torch.zeros_like(input) * self.dummy
+
+
 @pytest.mark.slow
 def test_fmpe_untrained_gaussian_baseline_samples_prior():
     """
     Test that an untrained network with gaussian_baseline=True samples from
     the data distribution (not N(0,1)).
     """
-    from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
-
     torch.manual_seed(42)
 
     num_dim = 2
@@ -894,17 +911,8 @@ def test_fmpe_untrained_gaussian_baseline_samples_prior():
     theta_mean = theta_train.mean(dim=0)
     theta_std = theta_train.std(dim=0)
 
-    # Network that outputs zeros (simulating untrained network)
-    class ZeroNet(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.dummy = torch.nn.Parameter(torch.zeros(1))
-
-        def forward(self, input, condition, time):
-            return torch.zeros_like(input) * self.dummy
-
     estimator = FlowMatchingEstimator(
-        net=ZeroNet(),
+        net=_ZeroNet(),
         input_shape=torch.Size([num_dim]),
         condition_shape=torch.Size([num_dim]),
         mean_0=theta_mean,
@@ -922,3 +930,60 @@ def test_fmpe_untrained_gaussian_baseline_samples_prior():
     assert torch.all(sample_mean > 80) and torch.all(sample_mean < 120), (
         f"Untrained gaussian_baseline must sample near mean ~100, got {sample_mean}"
     )
+
+
+def test_estimate_posterior_precision_centeredness():
+    """The full-covariance precision of an off-center Gaussian posterior is exact."""
+    torch.manual_seed(0)
+    mean, std = torch.full((2,), 100.0), torch.full((2,), 5.0)
+    # A zero vector field samples N(mean, std^2); the wide prior does not truncate it.
+    estimator = FlowMatchingEstimator(
+        net=_ZeroNet(),
+        input_shape=torch.Size([2]),
+        condition_shape=torch.Size([2]),
+        mean_0=mean,
+        std_0=std,
+        gaussian_baseline=True,
+    )
+    precision = AutoGaussCorrectedScoreFn.estimate_posterior_precision(
+        estimator,
+        BoxUniform(mean - 10 * std, mean + 10 * std),
+        torch.zeros(1, 2),
+        precision_initial_sampler_steps=50,
+    )
+    torch.testing.assert_close(
+        precision[0, 0], torch.diag(1 / std**2), atol=5e-3, rtol=0
+    )
+
+
+def test_denoise_mixture_weights_equal_posterior():
+    """`denoise` weights mixture components by p(x_t | k) of x_t = m * x0 + s * eps."""
+    m, s, x_t = torch.tensor(0.8), torch.tensor(0.3), torch.tensor(0.6)
+    weights = torch.tensor([0.3, 0.7])
+    loc, scale = torch.tensor([-1.5, 1.0]), torch.tensor([0.5, 1.2])
+    prior = MixtureSameFamily(Categorical(probs=weights), Normal(loc, scale))
+
+    denoised = denoise(prior, m, s, x_t)
+
+    marginals = Normal(m * loc, (m**2 * scale**2 + s**2).sqrt())
+    expected = torch.softmax(weights.log() + marginals.log_prob(x_t), dim=-1)
+    torch.testing.assert_close(denoised.mixture_distribution.probs[0], expected)
+
+
+def test_estimate_posterior_precision_rejects_small_budget():
+    """A full-covariance estimate needs more samples than parameter dimensions."""
+    num_dim = 2
+    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
+    estimator = FlowMatchingEstimator(
+        net=_ZeroNet(),
+        input_shape=torch.Size([num_dim]),
+        condition_shape=torch.Size([num_dim]),
+    )
+    with pytest.raises(ValueError, match="precision_est_budget"):
+        AutoGaussCorrectedScoreFn.estimate_posterior_precision(
+            estimator,
+            prior,
+            torch.zeros(1, num_dim),
+            precision_est_budget=num_dim,
+            precision_est_only_diag=False,
+        )
