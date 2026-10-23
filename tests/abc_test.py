@@ -464,7 +464,6 @@ def test_smcabc_resampling_keeps_particles_paired_with_simulations():
     ):
         assert (particles - xs).abs().max() < 0.1
         assert torch.allclose(distances, smcabc.distance(zeros(1, 2), xs))
-        assert (distances[:-1] <= distances[1:]).all()
 
 
 @pytest.mark.parametrize(
@@ -500,3 +499,5 @@ def test_lra_removes_parameters_outside_bounded_prior(
 
     assert within_support(prior, samples).all()
     assert len(summary[per_sample_key]) == len(samples)
+    if method is SMCABC:
+        assert torch.isclose(summary["final_weights"].exp().sum(), torch.tensor(1.0))

@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from numpy import ndarray
 from torch import Tensor
-from torch.distributions import Distribution, Multinomial, MultivariateNormal
+from torch.distributions import Distribution, MultivariateNormal
 
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.sbi_types import Array
@@ -192,8 +192,8 @@ class SMCABC(ABCBASE):
                 can .sample() and .log_prob().
             summary (if return_summary True): dictionary containing the accepted
                 paramters (if kde True), distances and simulated data x of all
-                populations, and under `final_weights` the log weights of the
-                returned parameters.
+                populations, and under `final_particles` and `final_weights` the
+                returned parameters (after LRA, if used) and their log weights.
 
         Examples:
             >>> from sbi.inference import SMCABC
@@ -209,8 +209,8 @@ class SMCABC(ABCBASE):
 
         pop_idx = 0
         self.num_simulations = num_simulations * num_iid_samples
-        if kde_kwargs is None:
-            kde_kwargs = {}
+        # Copy, since the weighted KDE writes sample weights into it.
+        kde_kwargs = {} if kde_kwargs is None else dict(kde_kwargs)
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
         assert not (self.distance.requires_iid_data and lra), (
             "Currently there is no support to run inference "
@@ -327,6 +327,7 @@ class SMCABC(ABCBASE):
             is_within = self._is_within_prior_after_lra(adjusted_particles)
             final_particles = adjusted_particles[is_within]
             final_log_weights = final_log_weights[is_within]
+            final_log_weights -= torch.logsumexp(final_log_weights, dim=0)
             kde_kwargs = self._mask_kde_sample_weights(kde_kwargs, is_within)
 
         if kde:
@@ -352,6 +353,7 @@ class SMCABC(ABCBASE):
                         epsilons=all_epsilons,
                         distances=all_distances,
                         xs=all_x,
+                        final_particles=final_particles,
                         final_weights=final_log_weights,
                     ),
                 )
@@ -367,6 +369,7 @@ class SMCABC(ABCBASE):
                     epsilons=all_epsilons,
                     distances=all_distances,
                     xs=all_x,
+                    final_particles=final_particles,
                     final_weights=final_log_weights,
                 ),
             )
@@ -502,8 +505,9 @@ class SMCABC(ABCBASE):
                         num_remaining,
                     )
                     # Some new particles have been accepted already, therefore
-                    # fill up the remaining once with old particles and weights.
-                    new_particles.append(particles[:num_remaining, :])
+                    # fill up with the closest old particles and their weights.
+                    closest = torch.argsort(distances)[:num_remaining]
+                    new_particles.append(particles[closest])
                     # Recalculate weights with new particles.
                     new_log_weights = [
                         self._calculate_new_log_weights(
@@ -512,8 +516,8 @@ class SMCABC(ABCBASE):
                             log_weights,
                         )
                     ]
-                    new_distances.append(distances[:num_remaining])
-                    new_x.append(x[:num_remaining])
+                    new_distances.append(distances[closest])
+                    new_x.append(x[closest])
                 else:
                     self.logger.info(
                         "Simulation Budget exceeded, returning previous population."
@@ -609,15 +613,12 @@ class SMCABC(ABCBASE):
         particles: Tensor, weights: Tensor, num_samples: int = 1
     ) -> Tensor:
         """Return samples from particles sampled with weights."""
+        return particles[SMCABC._sample_indices_with_weights(weights, num_samples)]
 
-        # define multinomial with weights as probs
-        multi = Multinomial(probs=weights)
-        # sample num samples, with replacement
-        samples = multi.sample(sample_shape=torch.Size((num_samples,)))
-        # get indices of success trials
-        indices = torch.where(samples)[1]
-        # return those indices from trace
-        return particles[indices]
+    @staticmethod
+    def _sample_indices_with_weights(weights: Tensor, num_samples: int) -> Tensor:
+        """Return indices drawn with replacement, with probabilities from weights."""
+        return torch.multinomial(weights, num_samples, replacement=True)
 
     def _sample_and_perturb(
         self, particles: Tensor, weights: Tensor, num_samples: int = 1
@@ -733,10 +734,7 @@ class SMCABC(ABCBASE):
         if ess < ess_min:
             self.logger.info("ESS=%s too low, resampling pop %s...", ess, pop_idx)
             # First resample, then set to uniform weights as in Sisson et al. 2007.
-            indices = torch.multinomial(weights, num_particles, replacement=True)
-            # Keep the population sorted by distance: the budget fill-up in
-            # _sample_next_population takes its first particles.
-            indices = indices[torch.argsort(distances[indices])]
+            indices = self._sample_indices_with_weights(weights, num_particles)
             particles, distances, x = particles[indices], distances[indices], x[indices]
             log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
