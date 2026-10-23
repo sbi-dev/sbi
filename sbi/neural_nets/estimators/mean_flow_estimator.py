@@ -143,15 +143,19 @@ class MeanFlowEstimator(ConditionalDensityEstimator):
         mean_flow_loss = weight * squared_error + velocity_error
 
         # Map s -> t and back, partly under another sample's condition, so that
-        # the maps stay invertible away from the training pairs.
+        # the maps stay invertible away from the training pairs. The cycle gets its
+        # own times without the t = s pairs, which would make the round trip exact.
+        s_cycle = uniform(batch_size) ** (1 + TIME_EXPONENT)
+        t_cycle = uniform(batch_size) ** (1 + TIME_EXPONENT)
+        z_cycle = (1 - s_cycle[:, None]) * z_0 + s_cycle[:, None] * noise
         swap = uniform(batch_size) < CYCLE_SWAP_PROBABILITY
         permutation = torch.randperm(batch_size, device=z_0.device)
         cycle_emb = torch.where(
             swap[:, None], condition_emb[permutation], condition_emb
         )
-        z_t = self._flow_map(z_s, cycle_emb, s, t)
-        z_back = self._flow_map(z_t, cycle_emb, t, s)
-        cycle_loss = ((z_back - z_s) ** 2).sum(-1) / dim
+        z_t = self._flow_map(z_cycle, cycle_emb, s_cycle, t_cycle)
+        z_back = self._flow_map(z_t, cycle_emb, t_cycle, s_cycle)
+        cycle_loss = ((z_back - z_cycle) ** 2).sum(-1) / dim
 
         return mean_flow_loss + CYCLE_WEIGHT * cycle_loss
 

@@ -8,7 +8,7 @@ import sys
 
 import pytest
 import torch
-from torch import eye, ones, zeros
+from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal, Normal
 
 from sbi.inference import NLE
@@ -181,6 +181,23 @@ def test_loss_trains_every_head():
     for head in ("mean", "velocity"):
         gradient = estimator.net.outputs[head].weight.grad
         assert gradient is not None and gradient.abs().sum() > 0
+
+
+def test_cycle_loss_is_active_when_all_mean_flow_pairs_have_equal_times(monkeypatch):
+    """The cycle draws its own time pairs, so it trains the maps even when every
+    mean-flow pair sits on t = s, where a round trip would be trivially exact."""
+    estimator, input, condition = _build()
+    _randomize_outputs(estimator)
+    monkeypatch.setattr(mean_flow_estimator, "EQUAL_TIMES_FRACTION", 1.0)
+
+    def loss_with_cycle_weight(weight: float) -> Tensor:
+        monkeypatch.setattr(mean_flow_estimator, "CYCLE_WEIGHT", weight)
+        torch.manual_seed(0)
+        return estimator.loss(input[:32], condition[:32])
+
+    cycle_part = loss_with_cycle_weight(1.0) - loss_with_cycle_weight(0.0)
+
+    assert cycle_part.sum() > 1e-3
 
 
 @pytest.mark.parametrize("num_steps", (0, 1.5, True))
