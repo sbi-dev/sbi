@@ -1212,6 +1212,8 @@ def permute_data(
 ) -> Tuple[Tensor, Tensor]:
     """Permutes the concatenated data [P,Q] to create null samples.
 
+    The permutation depends only on `seed`; the global torch RNG is left untouched.
+
     Args:
         theta_p: samples from P, of shape (sample_size, dim).
         theta_q: samples from Q, of shape (sample_size, dim).
@@ -1220,14 +1222,13 @@ def permute_data(
     Returns:
         Tuple of (theta_p_permuted, theta_q_permuted), each of shape (sample_size, dim).
     """
-    # set seed
-    torch.manual_seed(seed)
     # check inputs
     assert theta_p.shape[0] == theta_q.shape[0]
 
     sample_size = theta_p.shape[0]
     X = torch.cat([theta_p, theta_q], dim=0)
-    x_perm = X[torch.randperm(sample_size * 2)]
+    generator = torch.Generator().manual_seed(seed)
+    x_perm = X[torch.randperm(sample_size * 2, generator=generator)]
     return x_perm[:sample_size], x_perm[sample_size:]
 
 
