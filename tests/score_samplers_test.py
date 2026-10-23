@@ -11,6 +11,7 @@ from torch import Tensor
 from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, Uniform
 
 from sbi.inference.posteriors import VectorFieldPosterior
+from sbi.inference.potentials.vector_field_adaptor import FactorizedNPEScoreFunction
 from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
@@ -226,6 +227,32 @@ def test_fnpe_divergence_error_names_cause():
 
     with pytest.raises(RuntimeError, match=r"iid_method='fnpe'.*\(1000 here\)"):
         posterior.sample((100,), x=torch.ones((1000, 1)), steps=100)
+
+
+def test_fnpe_uses_custom_prior_score_weight():
+    """A custom prior score weight replaces the default linear one."""
+    estimator = _build_gaussian_score_estimator(
+        "vp", (2,), torch.ones(2), torch.ones(2)
+    ).vector_field_estimator
+    prior = Independent(Normal(torch.zeros(2), torch.ones(2)), 1)
+    inputs, conditions, time = (
+        torch.randn(4, 1, 2),
+        torch.ones(5, 1),
+        torch.tensor([0.5]),
+    )
+    t_max = estimator.t_max
+
+    default = FactorizedNPEScoreFunction(estimator, prior)
+    same_as_default = FactorizedNPEScoreFunction(
+        estimator, prior, prior_score_weight=lambda t: (t_max - t) / t_max
+    )
+    without_prior = FactorizedNPEScoreFunction(
+        estimator, prior, prior_score_weight=torch.zeros_like
+    )
+
+    default_score = default(inputs, conditions, time)
+    assert torch.allclose(same_as_default(inputs, conditions, time), default_score)
+    assert not torch.allclose(without_prior(inputs, conditions, time), default_score)
 
 
 def _build_gaussian_score_estimator(
