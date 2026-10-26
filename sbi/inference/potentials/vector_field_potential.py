@@ -102,7 +102,8 @@ class VectorFieldBasedPotential(BasePotential):
     def init_std_scale(self) -> float:
         """Initial noise scale: 1/sqrt(N) for fnpe with N iid observations, else 1.
 
-        Assumes the default fnpe prior weight, which is zero at `t_max`."""
+        Assumes the default fnpe prior weight, which is zero at `t_max`.
+        """
         if self.iid_method == "fnpe":
             return self.num_iid_observations**-0.5
         return 1.0
