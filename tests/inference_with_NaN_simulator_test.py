@@ -358,3 +358,20 @@ def test_restricted_prior_log_prob(prior):
     assert torch.all(restricted_prior_probs[torch.logical_not(valid_thetas)] == 0.0), (
         "Rejected theta has non-zero probablity."
     )
+
+
+def test_restricted_prior_sir_uses_oversampling_factor():
+    """SIR sampling evaluates `oversampling_factor` candidates per returned sample."""
+    prior = utils.BoxUniform(-ones(2), ones(2))
+    num_candidates = []
+
+    def accept_reject_fn(theta):
+        num_candidates.append(theta.shape[0])
+        return ones(theta.shape[0], dtype=torch.bool)
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=prior, sample_with="sir"
+    )
+    restricted_prior.sample((10,), oversampling_factor=4)
+
+    assert sum(num_candidates) == 40

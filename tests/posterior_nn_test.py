@@ -19,7 +19,10 @@ from sbi.inference import (
     NRE_B,
     NRE_C,
     DirectPosterior,
+    ImportanceSamplingPosterior,
+    VectorFieldPosterior,
 )
+from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
@@ -200,6 +203,101 @@ def test_direct_posterior_multidimensional_sample_shape(snpe_method: type):
         num_xs,
         num_dim,
     )
+
+
+class _SamplerCalled(Exception):
+    """Raised by a sampler spy to stop before any sampling happens."""
+
+
+def _spy_on_sampler(monkeypatch, target: str) -> list[dict]:
+    """Replace the sampler at `target` with a spy that records its kwargs."""
+    calls = []
+
+    def spy(*args, **kwargs):
+        calls.append(kwargs)
+        raise _SamplerCalled
+
+    monkeypatch.setattr(target, spy)
+    return calls
+
+
+@pytest.mark.parametrize(
+    "posterior_class, build_estimator",
+    [
+        (DirectPosterior, posterior_nn("mdn")),
+        (VectorFieldPosterior, posterior_flow_nn()),
+    ],
+)
+@pytest.mark.parametrize("batched", [False, True])
+def test_posterior_uses_constructor_max_sampling_batch_size(
+    monkeypatch, posterior_class, build_estimator, batched: bool
+):
+    """Sampling without max_sampling_batch_size uses the value from the constructor."""
+    num_dim = 2
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    theta = prior.sample((10,))
+    posterior = posterior_class(
+        build_estimator(theta, theta), prior, max_sampling_batch_size=40
+    )
+    calls = _spy_on_sampler(
+        monkeypatch, "sbi.samplers.rejection.rejection.accept_reject_sample"
+    )
+    sample = posterior.sample_batched if batched else posterior.sample
+    x = ones(3 if batched else 1, num_dim)
+
+    with pytest.raises(_SamplerCalled):
+        sample((10,), x=x)
+    with pytest.raises(_SamplerCalled):
+        sample((10,), x=x, max_sampling_batch_size=7)
+
+    assert [call["max_sampling_batch_size"] for call in calls] == [40, 7]
+
+
+def test_importance_posterior_uses_constructor_sampling_arguments(monkeypatch):
+    """SIR sampling without arguments uses the values from the constructor."""
+    num_dim = 2
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    theta = prior.sample((10,))
+    potential_fn, _ = posterior_estimator_based_potential(
+        posterior_nn("mdn")(theta, theta), prior, x_o=ones(1, num_dim)
+    )
+    posterior = ImportanceSamplingPosterior(
+        potential_fn, proposal=prior, oversampling_factor=5, max_sampling_batch_size=40
+    )
+    calls = _spy_on_sampler(
+        monkeypatch,
+        "sbi.inference.posteriors.importance_posterior.sampling_importance_resampling",
+    )
+
+    with pytest.raises(_SamplerCalled):
+        posterior.sample((10,))
+    with pytest.raises(_SamplerCalled):
+        posterior.sample((10,), oversampling_factor=3, max_sampling_batch_size=7)
+
+    assert [
+        (call["num_candidate_samples"], call["max_sampling_batch_size"])
+        for call in calls
+    ] == [(5, 40), (3, 7)]
+
+
+def test_filtered_direct_posterior_defers_max_sampling_batch_size(monkeypatch):
+    """FilteredDirectPosterior.sample() leaves the batch size to the constructor."""
+    received = []
+
+    def fake_sample(self, *args, **kwargs):
+        received.append(kwargs["max_sampling_batch_size"])
+
+    monkeypatch.setattr(DirectPosterior, "sample", fake_sample)
+    posterior = object.__new__(FilteredDirectPosterior)
+    monkeypatch.setattr(posterior, "_x_else_default_x", lambda x: x, raising=False)
+    monkeypatch.setattr(
+        posterior, "_set_context_for_x_o", lambda x: None, raising=False
+    )
+
+    posterior.sample((1,), x=ones(1, 2))
+    posterior.sample((1,), x=ones(1, 2), max_sampling_batch_size=7)
+
+    assert received == [None, 7]
 
 
 @pytest.mark.parametrize("reject_outside_prior", [True, False])

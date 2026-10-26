@@ -143,7 +143,7 @@ class DirectPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -158,6 +158,7 @@ class DirectPosterior(NeuralPosterior):
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
                 set via `.set_default_x()`.
             max_sampling_batch_size: Maximum batch size for rejection sampling.
+                If not provided, uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
@@ -230,7 +231,7 @@ class DirectPosterior(NeuralPosterior):
         self,
         sample_shape: Shape,
         x: Tensor,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -247,6 +248,7 @@ class DirectPosterior(NeuralPosterior):
             x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
                 `batch_dim` corresponds to the number of observations to be drawn.
             max_sampling_batch_size: Maximum batch size for rejection sampling.
+                If not provided, uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
