@@ -180,8 +180,7 @@ def _run_tarp(
 
     # enforce execution on the CPU due to
     # https://github.com/pytorch/pytorch/issues/69519
-    # bin over [0, 1] so that alpha_grid spans all credibility levels, not just the
-    # range of the observed coverage values
+    # fixed range: the bin edges are the alpha grid and must span [0, 1]
     hist, alpha_grid = torch.histogram(
         coverage_values.cpu(), density=True, bins=num_bins, range=(0.0, 1.0)
     )
