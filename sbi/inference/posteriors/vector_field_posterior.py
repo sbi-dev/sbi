@@ -750,9 +750,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 for the optimization.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `proposal`], which
-                samples the respective distribution `num_init_samples` times. If it
-                is a tensor, the tensor will be used as init locations.
+                it is the string `posterior`, the posterior is sampled
+                `num_init_samples` times. If it is a tensor, the tensor will be used
+                as init locations.
             num_init_samples: Draw this number of samples from the chosen
                 `init_method` distribution and evaluate the log-probability of all
                 of them. Ignored if `init_method` is a tensor.
@@ -797,14 +797,12 @@ class VectorFieldPosterior(NeuralPosterior):
             )
             if init_method == "posterior":
                 inits = self.sample((num_init_samples,))
-            elif init_method == "proposal":
-                inits = self.proposal.sample((num_init_samples,))  # type: ignore
             elif isinstance(init_method, Tensor):
                 inits = init_method
             else:
                 raise ValueError(
-                    f"Unknown init_method {init_method!r}. Use 'posterior', "
-                    "'proposal' or a Tensor of initial locations."
+                    f"Unknown init_method {init_method!r}. Use 'posterior' or a "
+                    "Tensor of initial locations."
                 )
 
             self._map = gradient_ascent(
