@@ -22,7 +22,7 @@ from torch import eye, ones, zeros
 from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
 from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
-from sbi.inference.posteriors import VIPosterior
+from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
@@ -823,6 +823,25 @@ def test_amortized_vi_accuracy(linear_gaussian_setup_trainers):
             f"C2ST too high for {setup['trainer_type']}, "
             f"x_o={x_o.squeeze().tolist()}: {c2st_score:.3f}"
         )
+
+
+@pytest.mark.parametrize("vi_method", ["fKL", "IW", "alpha"])
+@pytest.mark.parametrize("via_params", [False, True])
+def test_train_amortized_rejects_methods_other_than_rkl(
+    vi_method: str, via_params: bool
+):
+    """Amortized VI fits only rKL, so other methods must raise, not run as rKL."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((8,))
+    if via_params:
+        posterior = VIPosterior(FakePotential(prior=prior), prior)
+        kwargs = {"params": VIPosteriorParameters(vi_method=vi_method)}
+    else:
+        posterior = VIPosterior(FakePotential(prior=prior), prior, vi_method=vi_method)
+        kwargs = {}
+
+    with pytest.raises(NotImplementedError, match="rKL"):
+        posterior.train_amortized(theta, theta, **kwargs)
 
 
 @pytest.mark.slow
