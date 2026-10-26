@@ -119,6 +119,12 @@ class MeanFlowNet(nn.Module):
         return torch.cat([torch.sin(projection), torch.cos(projection)], dim=-1)
 
 
+def _mish(x: Tensor) -> Tensor:
+    """Mish written out: `F.mish`'s second derivative under `torch.func` is NaN for
+    large inputs, and the NUTS gradient of the density needs it."""
+    return x * torch.tanh(nn.functional.softplus(x))
+
+
 def _he_normal_(linear: nn.Linear) -> nn.Linear:
     """Keras' `he_normal`: normal truncated at two standard deviations, zero bias."""
     std = math.sqrt(2.0 / linear.in_features) / 0.87962566103423978
@@ -140,7 +146,7 @@ class _FiLMBlock(nn.Module):
         self.norm = nn.LayerNorm(width, eps=1e-3)
 
     def forward(self, h: Tensor, context: Tensor) -> Tensor:
-        update = nn.functional.mish(self.dense(h))
+        update = _mish(self.dense(h))
         update = (1 + self.to_gamma(context)) * update + self.to_beta(context)
         return self.norm(h + update)
 
@@ -243,7 +249,7 @@ class PaperMeanFlowNet(nn.Module):
 
         condition_proj = self.c_proj(condition_emb)
         merged = torch.cat([self.x_proj(z), condition_proj], dim=-1)
-        h = nn.functional.mish(self.merge_proj(nn.functional.mish(merged)))
+        h = _mish(self.merge_proj(_mish(merged)))
         context = torch.cat([time_emb, condition_proj], dim=-1)
         for block in [*self.trunk, *self.heads[head]]:
             h = block(h, context)

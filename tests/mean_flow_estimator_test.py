@@ -255,3 +255,21 @@ def test_c2st_nle_mean_flow_on_linear_gaussian(
         x_o[0], likelihood_shift, likelihood_cov, zeros(num_dim), eye(num_dim)
     ).sample((1000,))
     check_c2st(samples, target, alg="nle-mean_flow")
+
+
+def test_paper_variant_density_gradient_is_finite_for_large_activations():
+    """NUTS differentiates the density, which holds Jacobians of the network, so the
+    network's second derivatives must stay finite where activations are large."""
+    condition, input = torch.randn(64, 3), torch.randn(64, 2)
+    estimator = MeanFlowConfig(hidden_features=32, variant="paper").build(
+        input, condition
+    )
+    with torch.no_grad():
+        for parameter in estimator.net.parameters():
+            parameter.mul_(40.0)
+    theta = condition[:1].clone().requires_grad_(True)
+
+    log_prob = estimator.log_prob(input[:5, None], theta, num_steps=1).sum()
+    (gradient,) = torch.autograd.grad(log_prob, theta)
+
+    assert torch.isfinite(gradient).all()
