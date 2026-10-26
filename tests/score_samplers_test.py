@@ -229,9 +229,16 @@ def test_fnpe_divergence_error_names_cause():
         posterior.sample((100,), x=torch.ones((1000, 1)), steps=100)
 
 
-def test_sample_batched_raises_when_one_observation_diverges(monkeypatch):
-    """Sampling raises when every sample of one observation is NaN, even if the
-    samples of the other observations are fine."""
+@pytest.mark.parametrize(
+    "diverged, value",
+    (
+        pytest.param((slice(None), 0), float("nan"), id="one-observation-all-nan"),
+        pytest.param((..., 0), float("inf"), id="every-sample-partly-inf"),
+    ),
+)
+def test_sample_batched_raises_when_samples_diverge(monkeypatch, diverged, value):
+    """Sampling raises when one observation has no finite sample, also if the
+    other observations are fine or each sample is only partly non-finite."""
     estimator = _build_gaussian_score_estimator(
         "vp", (2,), torch.ones(2), torch.ones(2)
     ).vector_field_estimator
@@ -239,12 +246,12 @@ def test_sample_batched_raises_when_one_observation_diverges(monkeypatch):
     posterior = VectorFieldPosterior(estimator, prior)
     run = Diffuser.run
 
-    def run_with_first_observation_diverged(self, *args, **kwargs):
+    def run_with_diverged_entries(self, *args, **kwargs):
         samples = run(self, *args, **kwargs)
-        samples[:, 0] = float("nan")
+        samples[diverged] = value
         return samples
 
-    monkeypatch.setattr(Diffuser, "run", run_with_first_observation_diverged)
+    monkeypatch.setattr(Diffuser, "run", run_with_diverged_entries)
 
     with pytest.raises(RuntimeError, match="No finite sample"):
         posterior.sample_batched(
