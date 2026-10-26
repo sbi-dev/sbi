@@ -105,7 +105,7 @@ class VectorFieldBasedPotential(BasePotential):
 
     @property
     def init_std_scale(self) -> float:
-        """Factor on the base std where diffusion sampling starts.
+        """Scale of the initial diffusion noise relative to the base std.
 
         Returns:
             1/sqrt(N) for fnpe with N iid observations, else 1. This assumes the

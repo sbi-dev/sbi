@@ -225,7 +225,7 @@ def test_fnpe_divergence_error_names_cause():
     prior = Independent(Normal(torch.zeros(2), 10 * torch.ones(2)), 1)
     posterior = VectorFieldPosterior(estimator, prior, iid_method="fnpe")
 
-    with pytest.raises(RuntimeError, match=r"iid_method='fnpe'.*\(1000 here\)"):
+    with pytest.raises(RuntimeError, match=r"No finite sample.*\(1000 here\)"):
         posterior.sample((100,), x=torch.ones((1000, 1)), steps=100)
 
 
