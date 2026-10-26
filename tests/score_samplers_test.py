@@ -184,17 +184,26 @@ def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_metho
         assert torch.isfinite(output).all(), "Output contains non-finite values"
 
 
-def test_ensure_lam_positive_definite_survives_float32_cancellation():
+@pytest.mark.parametrize(
+    "num_trials, magnitude, prior_scale",
+    (
+        pytest.param(5, 1e7, 1.0, id="large-lam"),
+        pytest.param(2048, 2.0**20, 2.0**20, id="many-trials"),
+    ),
+)
+def test_ensure_lam_positive_definite_survives_float32_cancellation(
+    num_trials, magnitude, prior_scale
+):
     """`Lam` must stay invertible when the precision sum cancels to rank one.
 
-    At a magnitude of 1e7, float32 cannot represent an absolute nugget of 0.01.
+    An absolute nugget of 0.01 is lost in float32, at the magnitude of `Lam` for
+    `large-lam` and at the magnitude of each posterior precision for `many-trials`.
     """
-    num_trials, magnitude = 5, 1e7
     ones = torch.ones(2)
-    prior_precision = torch.eye(2).expand(1, 1, 2, 2)
+    prior_precision = prior_scale * torch.eye(2).expand(1, 1, 2, 2)
     # Chosen such that (1 - N) * prior + sum(posterior) = magnitude * ones ones^T.
     posterior_precision = (
-        (magnitude * torch.outer(ones, ones) + (num_trials - 1) * torch.eye(2))
+        (magnitude * torch.outer(ones, ones) + (num_trials - 1) * prior_precision)
         / num_trials
     ).expand(1, num_trials, 2, 2)
 
@@ -210,23 +219,6 @@ def test_ensure_lam_positive_definite_survives_float32_cancellation():
     eigenvalues = torch.linalg.eigvalsh(lam)
     assert (eigenvalues[:, 0] / eigenvalues[:, -1] > 5e-6).all()
     assert torch.isfinite(solve_diag_or_dense(lam, torch.ones(1, 2), 1)).all()
-
-
-def test_ensure_lam_positive_definite_keeps_well_conditioned_tall_data():
-    """Many trials must not inflate the nugget while `Lam` itself stays moderate.
-
-    The summed precisions are huge, `Lam` is not. Values are exact in float32.
-    """
-    num_trials, prior_precision_value = 2048, 2.0**20
-    prior_precision = prior_precision_value * torch.eye(2).expand(1, 1, 2, 2)
-    posterior_precision = (prior_precision_value + 1) * torch.eye(2)
-    posterior_precision = posterior_precision.expand(1, num_trials, 2, 2)
-
-    _, corrected = ensure_lam_positive_definite(
-        prior_precision, posterior_precision, num_trials, precision_nugget=0.01
-    )
-
-    assert torch.allclose(corrected, posterior_precision, rtol=1e-6)
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])

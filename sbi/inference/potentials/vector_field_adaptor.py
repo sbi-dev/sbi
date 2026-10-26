@@ -1374,7 +1374,8 @@ def ensure_lam_positive_definite(
         N: The scaling factor used in the correction.
         precision_nugget: The nugget value to ensure positive definiteness. For a
             dense `Lam`, the total nugget is at least 100 machine epsilons times
-            the largest absolute eigenvalue of `Lam`.
+            the largest absolute eigenvalue of `Lam`, and the nugget per trial is
+            at least one machine epsilon times the largest posterior precision.
 
     Returns:
         A tuple of (denoising_prior_precision, denoising_posterior_precision) where the
@@ -1397,8 +1398,12 @@ def ensure_lam_positive_definite(
         Lam_corr = torch.einsum(
             '...ij,...j,...kj->...ik', eigenvectors, corrected_eigs, eigenvectors
         )
-        # A smaller nugget is lost to float32 rounding.
-        nugget = 100 * torch.finfo(Lam.dtype).eps * eigenvalues.abs().amax(-1) / N
+        # The nugget must survive rounding in `Lam` and in each posterior precision.
+        eps = torch.finfo(Lam.dtype).eps
+        nugget = torch.maximum(
+            100 * eps * eigenvalues.abs().amax(-1) / N,
+            eps * denoising_posterior_precision.flatten(1).abs().amax(-1)[..., None],
+        )
         nugget = torch.clamp(nugget, min=precision_nugget)[..., None, None]
         Lam_corr += nugget * torch.eye(
             Lam.shape[-1], device=Lam.device, dtype=Lam.dtype
