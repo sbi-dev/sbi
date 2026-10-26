@@ -373,12 +373,12 @@ class EnsemblePosterior(NeuralPosterior):
                 `num_to_optimize` with highest log-probability as the initial points
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can only be `posterior`, which samples the
-                posterior `num_init_samples` times. If it is a tensor, the tensor
-                will be used as init locations.
-            num_init_samples: Draw this number of samples from the posterior and
-                evaluate the log-probability of all of them. Ignored if
-                `init_method` is a tensor.
+                it is a string, it can be one of [`posterior`, `prior`], which samples
+                the respective distribution `num_init_samples` times. If it is a
+                tensor, the tensor will be used as init locations.
+            num_init_samples: Draw this number of samples from the chosen
+                `init_method` distribution and evaluate the log-probability of all
+                of them. Ignored if `init_method` is a tensor.
             save_best_every: The best log-probability is computed, saved in the
                 `map`-attribute, and printed every `save_best_every`-th iteration.
                 Computing the best log-probability creates a significant overhead
@@ -417,12 +417,21 @@ class EnsemblePosterior(NeuralPosterior):
 
             if init_method == "posterior":
                 inits = self.sample((num_init_samples,), self._x_else_default_x(x))
+            elif init_method == "prior":
+                prior = getattr(self.potential_fn, "prior", None)
+                if prior is None:
+                    raise ValueError(
+                        "init_method='prior' requires a potential with a prior, but "
+                        "`potential_fn.prior` is None. Use 'posterior' or a Tensor "
+                        "of initial locations instead."
+                    )
+                inits = prior.sample((num_init_samples,))
             elif isinstance(init_method, Tensor):
                 inits = init_method
             else:
                 raise ValueError(
-                    f"Unknown init_method {init_method!r}. Use 'posterior' or a "
-                    "Tensor of initial locations."
+                    f"Unknown init_method {init_method!r}. Use 'posterior', 'prior' "
+                    "or a Tensor of initial locations."
                 )
 
             return gradient_ascent(

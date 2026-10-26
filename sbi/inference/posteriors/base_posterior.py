@@ -319,8 +319,9 @@ class NeuralPosterior:
         r"""Returns the maximum-a-posteriori estimate (MAP).
 
         The MAP is obtained by running gradient
-        ascent from a given number of starting positions (samples from the posterior
-        with the highest log-probability). After the optimization is done, we select the
+        ascent from a given number of starting positions (the samples with the highest
+        log-probability, drawn from the distribution chosen with `init_method`).
+        After the optimization is done, we select the
         parameter set that has the highest log-probability after the optimization.
 
         Warning: The default values used by this function are not well-tested. They
@@ -340,7 +341,8 @@ class NeuralPosterior:
             init_method: How to select the starting parameters for the optimization. If
                 it is a string, it can be one of [`posterior`, `proposal`, `prior`],
                 which samples the respective distribution `num_init_samples` times.
-                If it is a tensor, the tensor will be used as init locations.
+                `prior` requires a posterior with a prior. If it is a tensor, the
+                tensor will be used as init locations.
             num_init_samples: Draw this number of samples from the chosen
                 `init_method` distribution and evaluate the log-probability of all
                 of them. Ignored if `init_method` is a tensor.

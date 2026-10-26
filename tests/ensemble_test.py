@@ -163,3 +163,30 @@ def test_ensemble_posterior_weights(weights, expected_exception):
         posterior = EnsemblePosterior(posteriors, weights=weights)
         posterior.set_default_x(x_o)
         _ = posterior.sample((2,))
+
+
+def test_ensemble_posterior_map_init_method():
+    """Test `EnsemblePosterior.map` with prior initialization and an invalid method."""
+    num_dim = 2
+    num_simulations = 50
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+
+    posteriors = []
+    for _ in range(2):
+        theta = prior.sample((num_simulations,))
+        x = theta + 0.1 * randn_like(theta)
+        inferer = NPE_C(prior)
+        inferer.append_simulations(theta, x).train(max_num_epochs=1)
+        posteriors.append(inferer.build_posterior())
+
+    posterior = EnsemblePosterior(posteriors)
+    posterior.set_default_x(zeros(1, num_dim))
+
+    map_ = posterior.map(
+        init_method="prior", num_init_samples=20, num_iter=5, show_progress_bars=False
+    )
+    assert map_.shape[-1] == num_dim
+
+    with pytest.raises(ValueError, match="Unknown init_method"):
+        posterior.map(init_method="invalid")
