@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
+import math
 import warnings
 
 import pytest
@@ -375,3 +376,23 @@ def test_restricted_prior_sir_uses_oversampling_factor():
     restricted_prior.sample((10,), oversampling_factor=4)
 
     assert sum(num_candidates) == 40
+
+
+def test_restricted_prior_sir_samples_truncated_prior():
+    """SIR samples follow the prior truncated to the restriction."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+    # A shifted proposal, like a posterior, needs reweighting by the prior.
+    proposal = MultivariateNormal(torch.tensor([0.5, 0.0]), eye(2))
+
+    def accept_reject_fn(theta):
+        return theta[:, 0] > 0.0
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=proposal, sample_with="sir"
+    )
+    samples = restricted_prior.sample((5_000,), oversampling_factor=64)
+
+    assert torch.all(samples[:, 0] > 0.0)
+    # theta_0 follows a standard half-normal distribution, with mean sqrt(2 / pi).
+    assert abs(samples[:, 0].mean().item() - math.sqrt(2 / math.pi)) < 0.05
