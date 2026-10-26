@@ -775,9 +775,9 @@ class RestrictedPrior(Distribution):
 
         with torch.set_grad_enabled(track_gradients):
             # A univariate prior or an `accept_reject_fn` can return shape (N, 1).
-            num_thetas = theta.shape[0]
-            prior_log_prob = self._prior.log_prob(theta).reshape(num_thetas)
-            accepted = self._accept_reject_fn(theta).bool().reshape(num_thetas)
+            batch_shape = theta.shape[:-1]
+            prior_log_prob = self._prior.log_prob(theta).reshape(batch_shape)
+            accepted = self._accept_reject_fn(theta).bool().reshape(batch_shape)
             masked_log_prob = prior_log_prob.masked_fill(~accepted, float("-inf"))
 
             if prior_acceptance_params is None:
