@@ -410,18 +410,15 @@ def test_lc2st_p_value_counts_ties_as_extreme(cal_data, theta_o, x_o):
     assert lc2st.p_value(theta_o=theta_o, x_o=x_o) == 1.0
 
 
-def test_lc2st_null_training_does_not_reseed_global_rng(cal_data):
-    """Permutation null training must leave the caller's torch RNG stream alone."""
-    draws_after_training = []
-    for seed in (0, 1):
-        lc2st = LC2ST(
-            cal_data.thetas, cal_data.xs, cal_data.posterior_samples, num_trials_null=3
-        )
-        torch.manual_seed(seed)
-        lc2st.train_under_null_hypothesis(verbosity=0)
-        draws_after_training.append(torch.rand(3))
+def test_lc2st_null_training_leaves_global_rng_untouched(cal_data):
+    """Permutation null training must neither reseed nor draw from the torch RNG."""
+    lc2st = LC2ST(
+        cal_data.thetas, cal_data.xs, cal_data.posterior_samples, num_trials_null=3
+    )
+    rng_state = torch.get_rng_state()
+    lc2st.train_under_null_hypothesis(verbosity=0)
 
-    assert not torch.equal(*draws_after_training)
+    assert torch.equal(rng_state, torch.get_rng_state())
 
 
 def test_lc2st_normalization_handles_constant_dimensions(cal_data):
