@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from copy import copy
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -184,10 +183,8 @@ class EnsemblePosterior(NeuralPosterior):
         else:
             raise TypeError
 
+        # `__init__` sets the weights before it builds the potential.
         if hasattr(self, "potential_fn"):
-            # Keep bound observations and leave existing potential snapshots intact.
-            self.potential_fn = copy(self.potential_fn)
-            self._weights = self._weights.to(self.potential_fn.device)
             self.potential_fn._weights = self._weights
 
     def sample(
