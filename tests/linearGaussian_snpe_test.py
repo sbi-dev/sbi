@@ -847,16 +847,21 @@ def test_multiround_mog_training():
         proposal = posterior
 
 
-def test_npe_c_prior_as_proposal_gives_density_estimator():
+@pytest.mark.parametrize("wrap_prior", (False, True))
+def test_npe_c_prior_as_proposal_gives_density_estimator(wrap_prior: bool):
     """With the prior as proposal, the proposal posterior is the density estimator.
 
     pp(theta|x) is proportional to q(theta|x) * proposal(theta) / prior(theta), so it
     equals q when the proposal is the prior. The MoG loss evaluates the prior in
     z-scored space, so this needs the exact pushforward of a correlated prior.
     """
-    torch.manual_seed(0)
+    prior_mean = torch.tensor([1.0, -1.0])
     prior_cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
-    prior = MultivariateNormal(torch.tensor([1.0, -1.0]), prior_cov)
+    prior = MultivariateNormal(prior_mean, prior_cov)
+    if wrap_prior:
+        # `process_prior` wraps a float64 prior, which NPE-C must still see as Gaussian.
+        prior = MultivariateNormal(prior_mean.double(), prior_cov.double())
+        prior = process_prior(prior)[0]
     shift = torch.tensor([0.5, -1.5])
     scale = torch.tensor([1.5, 2.5])
     estimator = MixtureDensityEstimator(
@@ -874,7 +879,7 @@ def test_npe_c_prior_as_proposal_gives_density_estimator():
     inference._set_state_for_mog_proposal()
 
     # The prior in the z-scored coordinates (theta - shift) / scale.
-    prior_mean_z = (prior.mean - shift) / scale
+    prior_mean_z = (prior_mean - shift) / scale
     prior_prec_z = torch.inverse(prior_cov / torch.outer(scale, scale))
     mog_d = estimator.get_uncorrected_mog(torch.zeros(1, 2))
     logits_pp, means_pp, precs_pp, _ = inference._automatic_posterior_transformation(

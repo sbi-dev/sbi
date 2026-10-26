@@ -270,6 +270,10 @@ class NPE_C(PosteriorEstimatorTrainer):
         prior will not exactly have mean=0 and std=1.
         """
 
+        # `process_prior` wraps some Gaussian priors, e.g. float64 ones.
+        is_gaussian, gaussian_prior = check_dist_class(
+            self._prior, class_to_check=MultivariateNormal
+        )
         if self.z_score_theta:
             # The MixtureDensityEstimator z-scores theta as a = (theta - shift) / scale,
             # with shift and scale estimated from the training samples. This maps
@@ -277,22 +281,25 @@ class NPE_C(PosteriorEstimatorTrainer):
             assert isinstance(self._neural_net, MixtureDensityEstimator)
             shift = self._neural_net._transform_shift
             scale = self._neural_net._transform_scale
-            almost_zero_mean = (self._prior.mean - shift) / scale
 
-            if isinstance(self._prior, MultivariateNormal):
-                z_scored_cov = self._prior.covariance_matrix / torch.outer(scale, scale)
+            if is_gaussian:
+                assert isinstance(gaussian_prior, MultivariateNormal)
+                mean = gaussian_prior.mean.to(scale)
+                cov = gaussian_prior.covariance_matrix.to(scale)
                 self._maybe_z_scored_prior = MultivariateNormal(
-                    almost_zero_mean, covariance_matrix=z_scored_cov
+                    (mean - shift) / scale,
+                    covariance_matrix=cov / torch.outer(scale, scale),
                 )
             else:
                 # A uniform with std s has half-width sqrt(3) * s.
+                almost_zero_mean = (self._prior.mean - shift) / scale
                 almost_one_std = torch.sqrt(self._prior.variance) / scale
                 range_ = almost_one_std * 3**0.5
                 self._maybe_z_scored_prior = BoxUniform(
                     almost_zero_mean - range_, almost_zero_mean + range_
                 )
         else:
-            self._maybe_z_scored_prior = self._prior
+            self._maybe_z_scored_prior = gaussian_prior if is_gaussian else self._prior
 
     def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
         """Return whether the MoG closed-form correction applies to `proposal`.
