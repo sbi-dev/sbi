@@ -93,24 +93,16 @@ class VectorFieldBasedPotential(BasePotential):
 
     @property
     def num_iid_observations(self) -> int:
-        """Number of iid observations whose scores the potential combines.
-
-        Returns:
-            The batch size of `x_o` if it holds iid observations, else 1 (also for a
-            batch of independent observations or no `x_o`).
-        """
+        """Number of iid observations combined: batch size of `x_o` if iid, else 1."""
         if self._x_o is None or not self.x_is_iid:
             return 1
         return self._x_o.shape[0]
 
     @property
     def init_std_scale(self) -> float:
-        """Scale of the initial diffusion noise relative to the base std.
+        """Initial noise scale: 1/sqrt(N) for fnpe with N iid observations, else 1.
 
-        Returns:
-            1/sqrt(N) for fnpe with N iid observations, else 1. This assumes the
-            default fnpe prior score weight, which is zero at `t_max`.
-        """
+        Assumes the default fnpe prior weight, which is zero at `t_max`."""
         if self.iid_method == "fnpe":
             return self.num_iid_observations**-0.5
         return 1.0

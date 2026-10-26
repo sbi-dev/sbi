@@ -765,15 +765,8 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
                 linear interpolation between one (at t=0) and zero (at t=t_max).
         """
         super().__init__(vector_field_estimator, prior, device)
-        if prior_score_weight is None:
-            t_max = vector_field_estimator.t_max
-
-            def linear_weight(t: Tensor) -> Tensor:
-                return (t_max - t) / t_max
-
-            prior_score_weight = linear_weight
-
-        self.prior_score_weight_fn = prior_score_weight
+        t_max = vector_field_estimator.t_max
+        self.prior_score_weight_fn = prior_score_weight or (lambda t: 1 - t / t_max)
 
     def __call__(
         self,
