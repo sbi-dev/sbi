@@ -17,7 +17,6 @@ from sbi.inference.potentials.vector_field_potential import (
 )
 from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.score import Diffuser
-from sbi.samplers.score.predictors import Heun
 from sbi.utils import BoxUniform, MultipleIndependent
 from sbi.utils.vector_field_utils import VectorFieldNet
 
@@ -204,25 +203,37 @@ def test_gaussian_score_sampling(
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
-def test_heun_predictor_falls_back_to_euler_at_zero_time(sde_type):
-    """The score diverges at t=0, so the last step must not evaluate it there."""
+def test_heun_sampling_on_time_grid_ending_at_zero(sde_type):
+    """The VP and sub-VP scores diverge at t=0, where Heun's last step ends."""
+    score_fn = _build_gaussian_score_estimator(
+        sde_type, (2,), torch.ones(2), torch.ones(2)
+    )
+    ts = torch.linspace(score_fn.vector_field_estimator.t_max, 0.0, 50)
 
-    input_event_shape = (4,)
-    mean0 = torch.zeros(input_event_shape)
-    std0 = torch.ones(input_event_shape)
-    score_fn = _build_gaussian_score_estimator(sde_type, input_event_shape, mean0, std0)
+    samples = Diffuser(score_fn, "heun").run(100, ts, show_progress_bars=False)
 
-    predictor = Heun(score_fn)
-    theta = torch.zeros((1, *input_event_shape))
-    t1 = torch.tensor(1e-2)
-    t0 = torch.tensor(0.0)
+    assert torch.isfinite(samples).all()
 
-    k1 = predictor._probability_flow_drift(theta, t1, t1.device)
-    theta_predicted = theta - k1 * (t1 - t0)
-    output = predictor(theta, t1, t0)
 
-    assert torch.isfinite(output).all()
-    torch.testing.assert_close(output, theta_predicted)
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+def test_heun_predictor_is_second_order(sde_type):
+    """With the exact score, halving the step size cuts Heun's error about fourfold
+    (twofold for first-order Euler)."""
+    score_fn = _build_gaussian_score_estimator(
+        sde_type, (2,), torch.ones(2), 0.5 * torch.ones(2)
+    )
+    estimator = score_fn.vector_field_estimator
+
+    def sample(steps: int) -> Tensor:
+        torch.manual_seed(0)
+        ts = torch.linspace(estimator.t_max, estimator.t_min, steps)
+        return Diffuser(score_fn, "heun").run(100, ts, show_progress_bars=False)
+
+    reference = sample(2049)
+    error_coarse = (sample(65) - reference).abs().max()
+    error_fine = (sample(129) - reference).abs().max()
+
+    assert error_coarse / error_fine > 3.0
 
 
 def test_fnpe_batched_observations_keep_base_distribution():
