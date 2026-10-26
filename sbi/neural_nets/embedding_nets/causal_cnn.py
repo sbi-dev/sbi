@@ -152,10 +152,10 @@ class CausalCNNEmbedding(nn.Module):
         aggregator: Optional[nn.Module] = None,
         output_dim: int = 20,
     ):
-        """Intitialize embedding network that uses 1D causal convolutions.
+        """Initialize embedding network that uses 1D causal convolutions.
 
         This is a simplified version of the architecture introduced for
-        the speech recognition task in the WaveNet paper (van den Oord, et al. (2016))
+        the speech recognition task in the WaveNet paper (van den Oord, et al. (2016)).
 
         After several dilated causal convolutions (that maintain the dimensionality
         of the input), an aggregator network is used to bring down the dimensionality.
@@ -163,7 +163,7 @@ class CausalCNNEmbedding(nn.Module):
         If you do not provide an aggregator network yourself, a default aggregator
         is used. This default aggregator is based on the WaveNet paper's description
         of their Speech Recognition Task, and uses non-causal convolutions and pooling
-        layers, and global average poolingg to obtain a final low dimensional embedding.
+        layers, and global average pooling to obtain a final low dimensional embedding.
 
         Args:
             input_shape: Spatial input shape without batch or channel dimensions,
@@ -216,8 +216,8 @@ class CausalCNNEmbedding(nn.Module):
                     dilation_per_layer = [1] * num_conv_layers
                 case _:
                     raise ValueError(
-                        f"{dilation} is not a valid option, please use \"none\","
-                        "\"exponential\",or \"exponential_cyclic\", or pass a list "
+                        f"{dilation} is not a valid option, please use \"none\", "
+                        "\"exponential\", or \"exponential_cyclic\", or pass a list "
                         "of dilation sizes."
                     )
         else:
@@ -227,8 +227,8 @@ class CausalCNNEmbedding(nn.Module):
             dilation_per_layer = dilation
 
         assert max(dilation_per_layer) < total_timepoints, (
-            "Your maximal dilations size used is larger than the number of "
-            "timepoints in your input, please provide a list with smaller dilations."
+            "The largest dilation is not smaller than the number of timepoints "
+            "in your input. Please provide a list with smaller dilations."
         )
         if out_channels_per_layer is None:
             out_channels_per_layer = [16] * num_conv_layers
@@ -256,7 +256,7 @@ class CausalCNNEmbedding(nn.Module):
                 int(total_timepoints / pool_kernel_size),
             )
             assert aggregator_out_shape[-1] > 1, (
-                "Your dimensionality is already small,"
+                "Your dimensionality is already small. "
                 "Please ensure a larger input size or use a custom aggregator."
             )
             aggregator = WaveNetSRLikeAggregator(
