@@ -229,6 +229,29 @@ def test_fnpe_divergence_error_names_cause():
         posterior.sample((100,), x=torch.ones((1000, 1)), steps=100)
 
 
+def test_sample_batched_raises_when_one_observation_diverges(monkeypatch):
+    """Sampling raises when every sample of one observation is NaN, even if the
+    samples of the other observations are fine."""
+    estimator = _build_gaussian_score_estimator(
+        "vp", (2,), torch.ones(2), torch.ones(2)
+    ).vector_field_estimator
+    prior = Independent(Normal(torch.zeros(2), torch.ones(2)), 1)
+    posterior = VectorFieldPosterior(estimator, prior)
+    run = Diffuser.run
+
+    def run_with_first_observation_diverged(self, *args, **kwargs):
+        samples = run(self, *args, **kwargs)
+        samples[:, 0] = float("nan")
+        return samples
+
+    monkeypatch.setattr(Diffuser, "run", run_with_first_observation_diverged)
+
+    with pytest.raises(RuntimeError, match="No finite sample"):
+        posterior.sample_batched(
+            (10,), x=torch.ones((3, 1)), steps=5, reject_outside_prior=False
+        )
+
+
 def test_fnpe_uses_custom_prior_score_weight():
     """A custom prior score weight replaces the default one."""
     estimator = _build_gaussian_score_estimator(

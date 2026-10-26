@@ -416,13 +416,14 @@ class VectorFieldPosterior(NeuralPosterior):
         # Concatenate all batches and ensure we return exactly the requested number
         samples = torch.cat(all_samples, dim=0)[:total_samples_needed]
 
-        event_dims = len(self.vector_field_estimator.input_shape)
-        finite_samples = torch.isfinite(samples).flatten(-event_dims).all(-1)
-        if not finite_samples.any():
+        # The final step is in the last `num_xos` entries, also with save_intermediate.
+        final_samples = samples[:, -diffuser.num_xos :]
+        finite_samples = torch.isfinite(final_samples).flatten(2).all(-1)
+        if not finite_samples.any(0).all():
             message = (
-                "No finite sample after diffusion sampling: every sample has NaN or "
-                "infinite entries. This may indicate numerical instability in the "
-                "vector field."
+                "No finite sample after diffusion sampling: for at least one "
+                "observation, every sample has NaN or infinite entries. This may "
+                "indicate numerical instability in the vector field."
             )
             num_iid = self.potential_fn.num_iid_observations
             if self.potential_fn.iid_method == "fnpe" and num_iid > 1:
