@@ -32,6 +32,10 @@ from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
 )
 from sbi.neural_nets import posterior_nn
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+    MultivariateGaussianMDN,
+)
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -843,37 +847,48 @@ def test_multiround_mog_training():
         proposal = posterior
 
 
-def test_npe_c_z_scored_gaussian_prior_keeps_covariance():
-    """The z-scored Gaussian prior in the MoG loss is the pushforward of the prior.
+def test_npe_c_prior_as_proposal_gives_density_estimator():
+    """With the prior as proposal, the proposal posterior is the density estimator.
 
-    z-scoring theta maps N(m, C) to N((m - m_e) / s_e, C / (s_e s_e^T)). The prior must
-    keep its correlations and use variances, not standard deviations.
+    pp(theta|x) is proportional to q(theta|x) * proposal(theta) / prior(theta), so it
+    equals q when the proposal is the prior. The MoG loss evaluates the prior in
+    z-scored space, so this needs the exact pushforward of a correlated prior.
     """
     torch.manual_seed(0)
-    cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
-    prior = MultivariateNormal(torch.zeros(2), cov)
-    x_o = torch.zeros(1, 2)
-
-    def simulator(theta):
-        return theta + 0.3 * torch.randn_like(theta)
-
-    inference = NPE_C(prior, density_estimator="mdn", show_progress_bars=False)
-    theta = prior.sample((1000,))
-    inference.append_simulations(theta, simulator(theta)).train(max_num_epochs=30)
-    proposal = inference.build_posterior().set_default_x(x_o)
-
-    theta = proposal.sample((200,))
-    inference.append_simulations(theta, simulator(theta), proposal=proposal)
-    inference.train(max_num_epochs=1)
-    assert inference.use_non_atomic_loss and inference.z_score_theta
-
-    shift = inference._neural_net._transform_shift
-    scale = inference._neural_net._transform_scale
-    z_scored_prior = inference._maybe_z_scored_prior
-    assert torch.allclose(z_scored_prior.loc, (prior.mean - shift) / scale)
-    assert torch.allclose(
-        z_scored_prior.covariance_matrix, cov / torch.outer(scale, scale)
+    prior_cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
+    prior = MultivariateNormal(torch.tensor([1.0, -1.0]), prior_cov)
+    shift = torch.tensor([0.5, -1.5])
+    scale = torch.tensor([1.5, 2.5])
+    estimator = MixtureDensityEstimator(
+        MultivariateGaussianMDN(
+            features=2, context_features=2, hidden_features=10, num_components=3
+        ),
+        input_shape=torch.Size([2]),
+        condition_shape=torch.Size([2]),
+        transform_input=torch.stack([shift, scale]),
     )
+    inference = NPE_C(prior, density_estimator=lambda theta, x: estimator)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta + torch.randn_like(theta))
+    inference.train(max_num_epochs=1)
+    inference._set_state_for_mog_proposal()
+
+    # The prior in the z-scored coordinates (theta - shift) / scale.
+    prior_mean_z = (prior.mean - shift) / scale
+    prior_prec_z = torch.inverse(prior_cov / torch.outer(scale, scale))
+    mog_d = estimator.get_uncorrected_mog(torch.zeros(1, 2))
+    logits_pp, means_pp, precs_pp, _ = inference._automatic_posterior_transformation(
+        torch.zeros(1, 1),
+        prior_mean_z.reshape(1, 1, 2),
+        prior_prec_z.reshape(1, 1, 2, 2),
+        mog_d.log_weights,
+        mog_d.means,
+        mog_d.precisions,
+    )
+
+    assert torch.allclose(precs_pp, mog_d.precisions, atol=1e-4)
+    assert torch.allclose(means_pp, mog_d.means, atol=1e-4)
+    assert torch.allclose(logits_pp.log_softmax(-1), mog_d.log_weights, atol=1e-4)
 
 
 @pytest.mark.slow
