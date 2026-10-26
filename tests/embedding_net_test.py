@@ -200,6 +200,19 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
         embedding_net(channel_last_input)
 
 
+@pytest.mark.parametrize(
+    ("input_shape", "kwargs", "match"),
+    [
+        ((32, 32, 3), {}, "in_channels"),
+        ((32,), {"num_conv_layers": 3}, "num_conv_layers is 3"),
+    ],
+)
+def test_cnn_embedding_errors_name_arguments(input_shape, kwargs, match):
+    """CNNEmbedding errors name the constructor arguments that fix them."""
+    with pytest.raises(AssertionError, match=match):
+        CNNEmbedding(input_shape, **kwargs)
+
+
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
 @pytest.mark.parametrize("num_layers", [2, 4])
 @pytest.mark.parametrize("num_hiddens", [32, 64])
