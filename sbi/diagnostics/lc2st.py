@@ -684,11 +684,10 @@ class LC2ST:
     ) -> float:
         r"""Computes the p-value for L-C2ST.
 
-        The p-value is the proportion of times the L-C2ST statistic under the null
-        hypothesis is at least as large as the L-C2ST statistic at the observation
-        `x_o`. It is computed by taking the empirical mean over statistics computed
-        on several trials under the null hypothesis:
-        $1/H \sum_{h=1}^{H} I(T_h \geq T_o)$.
+        The p-value is the proportion of the L-C2ST statistics under the null
+        hypothesis that are at least as large as the L-C2ST statistic at the
+        observation `x_o`, counting the observed statistic as one of them:
+        $(1 + \sum_{h=1}^{H} I(T_h \geq T_o)) / (H + 1)$.
 
         Args:
             theta_o: Samples from the posterior conditioned on the observation `x_o`,
@@ -718,7 +717,8 @@ class LC2ST:
             theta_o=theta_o, x_o=x_o, verbosity=0
         )
         assert isinstance(stats_null, LC2STScores)
-        return float((stat_data <= stats_null.scores).mean())
+        num_extreme = (stat_data <= stats_null.scores).sum()
+        return float((1 + num_extreme) / (1 + len(stats_null.scores)))
 
     def reject_test(
         self,
@@ -1054,11 +1054,10 @@ class LC2ST_NF(LC2ST):
     ) -> float:
         r"""Computes the p-value for L-C2ST.
 
-        The p-value is the proportion of times the L-C2ST statistic under the null
-        hypothesis is at least as large as the L-C2ST statistic at the observation
-        `x_o`. It is computed by taking the empirical mean over statistics computed
-        on several trials under the null hypothesis:
-        $1/H \sum_{h=1}^{H} I(T_h \geq T_o)$.
+        The p-value is the proportion of the L-C2ST statistics under the null
+        hypothesis that are at least as large as the L-C2ST statistic at the
+        observation `x_o`, counting the observed statistic as one of them:
+        $(1 + \sum_{h=1}^{H} I(T_h \geq T_o)) / (H + 1)$.
 
         Args:
             x_o: The observation, of shape (, dim_x).
