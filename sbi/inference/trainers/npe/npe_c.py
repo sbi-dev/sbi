@@ -267,43 +267,27 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         The standardize transform that is applied to the samples theta does not use
         the exact prior mean and std (due to implementation issues). Hence, the z-scored
-        prior will not be exactly have mean=0 and std=1.
+        prior will not exactly have mean=0 and std=1.
         """
 
         if self.z_score_theta:
-            # Get z-score parameters from the MixtureDensityEstimator
-            # The transform is: z = (theta - shift) / scale
-            # where shift = mean (estimated from samples) and scale = std (estimated)
+            # The MixtureDensityEstimator z-scores theta as a = (theta - shift) / scale,
+            # with shift and scale estimated from the training samples. This maps
+            # N(m, C) to N((m - shift) / scale, C / (scale scale^T)).
             assert isinstance(self._neural_net, MixtureDensityEstimator)
             shift = self._neural_net._transform_shift
             scale = self._neural_net._transform_scale
-
-            # The MixtureDensityEstimator uses: z = (theta - shift) / scale
-            # where shift = mean and scale = std (estimated from training data)
-            estim_prior_mean = shift
-            estim_prior_std = scale
-
-            # Compute the discrepancy of the true prior mean and std and the mean and
-            # std that was empirically estimated from samples.
-            # N(theta|m,s) = N((theta-m_e)/s_e|(m-m_e)/s_e, s/s_e)
-            # Above: m,s are true prior mean and std. m_e,s_e are estimated prior mean
-            # and std (estimated from samples and used to build standardize transform).
-            almost_zero_mean = (self._prior.mean - estim_prior_mean) / estim_prior_std
-            almost_one_std = torch.sqrt(self._prior.variance) / estim_prior_std
+            almost_zero_mean = (self._prior.mean - shift) / scale
 
             if isinstance(self._prior, MultivariateNormal):
-                # z-scoring is an affine map with diagonal scale S = diag(s_e), so the
-                # covariance becomes S^-1 C S^-1. Keep the off-diagonal terms.
-                scale_vec = estim_prior_std.expand_as(self._prior.mean)
-                z_scored_cov = self._prior.covariance_matrix / torch.outer(
-                    scale_vec, scale_vec
-                )
+                z_scored_cov = self._prior.covariance_matrix / torch.outer(scale, scale)
                 self._maybe_z_scored_prior = MultivariateNormal(
                     almost_zero_mean, covariance_matrix=z_scored_cov
                 )
             else:
                 # A uniform with std s has half-width sqrt(3) * s.
-                range_ = almost_one_std * torch.sqrt(torch.tensor(3.0))
+                almost_one_std = torch.sqrt(self._prior.variance) / scale
+                range_ = almost_one_std * 3**0.5
                 self._maybe_z_scored_prior = BoxUniform(
                     almost_zero_mean - range_, almost_zero_mean + range_
                 )
