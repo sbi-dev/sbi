@@ -396,3 +396,17 @@ def test_restricted_prior_sir_samples_truncated_prior():
     assert torch.all(samples[:, 0] > 0.0)
     # theta_0 follows a standard half-normal distribution, with mean sqrt(2 / pi).
     assert abs(samples[:, 0].mean().item() - math.sqrt(2 / math.pi)) < 0.05
+
+
+def test_restricted_prior_sir_raises_without_accepted_candidates():
+    """SIR sampling raises instead of looping forever when no candidate is accepted."""
+    prior = utils.BoxUniform(-ones(2), ones(2))
+
+    def reject_all(theta):
+        return zeros(theta.shape[0], dtype=torch.bool)
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, reject_all, posterior=prior, sample_with="sir"
+    )
+    with pytest.raises(RuntimeError, match="finite importance weight"):
+        restricted_prior.sample((10,), oversampling_factor=16)

@@ -37,6 +37,10 @@ def sampling_importance_resampling(
 
     Returns:
         Tensor: Samples of shape (num_samples, event_shape).
+
+    Raises:
+        RuntimeError: If no candidate of the first batch has a finite importance
+            weight.
     """
 
     selected_samples = []
@@ -65,6 +69,18 @@ def sampling_importance_resampling(
             mask = torch.cumsum(weights >= uniform_decision, -1) == 1
             samples = thetas.reshape(batch_size, num_candidate_samples, -1)[mask]
             selected_samples.append(samples)
+
+        # A group whose candidates all have weight zero yields no sample. If no
+        # group of the first batch yields one, the loop would likely never end.
+        if samples.shape[0] == 0 and num_remaining == num_samples:
+            pbar.close()
+            raise RuntimeError(
+                f"None of the {batch_size * num_candidate_samples} candidates drawn "
+                "from the proposal has a finite importance weight, i.e., the "
+                "potential is -inf for all of them. Check that the proposal "
+                "overlaps with the support of the target, or increase "
+                "`oversampling_factor`."
+            )
 
         num_remaining -= samples.shape[0]
         pbar.update(samples.shape[0])
