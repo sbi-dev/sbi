@@ -682,6 +682,10 @@ class RestrictedPrior(Distribution):
 
         Returns:
             Samples from the `RestrictedPrior`.
+
+        Raises:
+            RuntimeError: If `sample_with="sir"` and the restriction rejects every
+                one of the first 10_000 or more posterior samples.
         """
         # The samplers import `sbi.utils`, so importing them at module level would
         # make every `sbi.utils` import inside `sbi.samplers` a circular import.

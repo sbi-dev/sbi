@@ -410,3 +410,20 @@ def test_restricted_prior_sir_raises_without_accepted_candidates():
     )
     with pytest.raises(RuntimeError, match="finite importance weight"):
         restricted_prior.sample((10,), oversampling_factor=16)
+
+
+def test_restricted_prior_sir_ignores_rejected_candidates_at_zero_draw(monkeypatch):
+    """A uniform draw of exactly 0 in SIR does not select a rejected candidate."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def accept_reject_fn(theta):
+        return theta[:, 0] > 0.0
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=prior, sample_with="sir"
+    )
+    monkeypatch.setattr(torch, "rand", lambda *args, **kwargs: zeros(args[0], 1))
+    samples = restricted_prior.sample((100,), oversampling_factor=8)
+
+    assert torch.all(samples[:, 0] > 0.0)
