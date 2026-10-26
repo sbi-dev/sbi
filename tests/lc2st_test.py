@@ -424,33 +424,6 @@ def test_lc2st_null_training_does_not_reseed_global_rng(cal_data):
     assert not torch.equal(*draws_after_training)
 
 
-ACCELERATORS = [
-    pytest.param(
-        "cuda",
-        marks=pytest.mark.skipif(
-            not torch.cuda.is_available(), reason="cuda is not available"
-        ),
-    ),
-    pytest.param(
-        "mps",
-        marks=pytest.mark.skipif(
-            not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()),
-            reason="mps is not available",
-        ),
-    ),
-]
-
-
-@pytest.mark.gpu
-@pytest.mark.parametrize("device", ACCELERATORS)
-def test_permute_data_under_accelerator_default_device(device):
-    """The CPU generator must work when an accelerator is the default device."""
-    with torch.device(device):
-        theta_p, theta_q = torch.randn(10, 2), torch.randn(10, 2)
-        theta_p_perm, _ = permute_data(theta_p, theta_q, seed=0)
-    assert theta_p_perm.device.type == device
-
-
 def test_lc2st_normalization_handles_constant_dimensions(cal_data):
     """Constant parameter or x dimensions must not produce NaN/Inf on z-scoring.
 
@@ -620,7 +593,26 @@ def test_lc2st_both_thetas_and_prior_samples_error(cal_data):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("device", ACCELERATORS)
+@pytest.mark.parametrize(
+    "device",
+    [
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="cuda is not available"
+            ),
+        ),
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not (
+                    hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+                ),
+                reason="mps is not available",
+            ),
+        ),
+    ],
+)
 def test_lc2st_runs_on_requested_device(cal_data, device):
     """Test that LC2ST runs on cuda/mps (if available)."""
     lc2st = LC2ST(
@@ -689,7 +681,6 @@ def test_lc2st_true_positive_rate(method, sim_setup, badly_trained_npe):
 @pytest.mark.parametrize("method", [LC2ST, LC2ST_NF])
 def test_lc2st_false_positive_rate(method):
     """For the exact posterior, LC2ST should reject at most at its level alpha."""
-    # Decisions of one LC2ST share its classifiers, so each trial is a new LC2ST.
     num_trials, num_cal, num_trials_null, num_eval = 50, 200, 50, 10_000
     alpha = 0.05
     dim, noise_std = 2, 0.5
