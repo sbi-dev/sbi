@@ -127,11 +127,14 @@ class Heun(Predictor):
         potential_fn: 'VectorFieldBasedPotential ',  # noqa: F821 # type: ignore
     ):
         """Heun's method, a second-order Runge-Kutta integrator for the
-        probability flow ODE (the deterministic sampler of EDM [1]).
+        probability flow ODE (the deterministic sampler of EDM [1]). It solves the
+        same ODE as `sample_with="ode"`, but on the fixed time grid of `steps` or
+        `ts`.
 
-        Each step evaluates the vector field twice, so at equal network
-        evaluations it is slightly worse than the first-order Euler ODE solver
-        below about 64 evaluations and better from there on.
+        Each step evaluates the network twice, so a grid of `steps` points costs
+        `2 * (steps - 1)` evaluations. At equal evaluations, it is slightly worse
+        than first-order Euler on the same ODE (`euler_maruyama` with a small
+        `eta`) below about 64 evaluations and better from there on.
 
         [1] Karras et al., Elucidating the Design Space of Diffusion-Based
         Generative Models, NeurIPS 2022.
@@ -156,8 +159,8 @@ class Heun(Predictor):
         k1 = self._probability_flow_drift(theta, t1, dt.device)
         theta_predicted = theta - k1 * dt
         if t0 == 0:
-            # The score diverges at t=0, so skip the correction and keep the Euler
-            # step, matching the Euler-Maruyama predictor at the final time point.
+            # The VP and sub-VP scores diverge at t=0, so skip the correction and
+            # keep the Euler step, which evaluates only at t1.
             return theta_predicted
         k2 = self._probability_flow_drift(theta_predicted, t0, dt.device)
         return theta - 0.5 * (k1 + k2) * dt
