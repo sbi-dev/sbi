@@ -723,12 +723,23 @@ class RestrictedPrior(Distribution):
 
             num_samples = torch.Size(sample_shape).numel()
 
-            accept_reject_fn = lambda theta: self._accept_reject_fn(theta).type(
-                torch.float32
-            )
+            def potential_fn(theta: Tensor) -> Tensor:
+                prior_log_prob = self._prior.log_prob(theta)
+                accepted = (
+                    self._accept_reject_fn(theta).bool().reshape_as(prior_log_prob)
+                )
+                return torch.where(
+                    accepted,
+                    prior_log_prob,
+                    torch.tensor(
+                        float("-inf"),
+                        dtype=prior_log_prob.dtype,
+                        device=prior_log_prob.device,
+                    ),
+                )
 
             samples = sampling_importance_resampling(
-                accept_reject_fn,
+                potential_fn,
                 proposal=self._posterior,
                 num_samples=num_samples,
                 num_candidate_samples=oversampling_factor,
