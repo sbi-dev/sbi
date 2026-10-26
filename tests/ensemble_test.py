@@ -6,8 +6,9 @@ from __future__ import annotations
 from dataclasses import asdict
 
 import pytest
+import torch
 from torch import eye, ones, randn_like, tensor, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import Categorical, MixtureSameFamily, MultivariateNormal
 
 from sbi.inference import NLE_A, NPE_C, NRE_A
 from sbi.inference.posteriors import EnsemblePosterior
@@ -17,7 +18,41 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.metrics import check_c2st
-from tests.test_utils import get_dkl_gaussian_prior
+from tests.test_utils import (
+    PosteriorPotential,
+    TractablePosterior,
+    get_dkl_gaussian_prior,
+)
+
+
+@pytest.mark.parametrize("weights", [None, [1.0, 3.0], tensor([1.0, 3.0])])
+@pytest.mark.parametrize("bind_first", [False, True])
+def test_ensemble_potential_after_changing_weights(weights, bind_first):
+    """Changing ensemble weights must also update the density used for MAP."""
+    prior = MultivariateNormal(zeros(1), 10 * eye(1))
+    components = MultivariateNormal(tensor([[-2.0], [2.0]]), eye(1))
+    posteriors = [
+        TractablePosterior(PosteriorPotential(MultivariateNormal(mean, eye(1)), prior))
+        for mean in components.mean
+    ]
+    ensemble = EnsemblePosterior(posteriors, weights=[3.0, 1.0])
+    x_o = zeros(1, 1)
+    ensemble.set_default_x(x_o)
+    theta = tensor([[-2.0], [0.0], [2.0]])
+    if bind_first:
+        ensemble.potential(theta)
+    old_potential = ensemble.potential_fn.bind(x_o)
+    old_log_prob = old_potential(theta)
+
+    ensemble.weights = weights
+
+    probs = ones(2) if weights is None else torch.as_tensor(weights)
+    expected = MixtureSameFamily(Categorical(probs), components).log_prob(theta)
+    torch.testing.assert_close(ensemble.potential(theta), expected)
+    torch.testing.assert_close(ensemble.default_x, x_o)
+    torch.testing.assert_close(ensemble.potential_fn.x_o, x_o)
+    # A previously bound potential remains a snapshot of the previous mixture.
+    torch.testing.assert_close(old_potential(theta), old_log_prob)
 
 
 @pytest.mark.slow

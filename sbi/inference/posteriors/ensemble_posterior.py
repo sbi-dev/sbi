@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
+from copy import copy
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -182,6 +183,11 @@ class EnsemblePosterior(NeuralPosterior):
             self._weights = torch.tensor(weights) / sum(weights)
         else:
             raise TypeError
+
+        if hasattr(self, "potential_fn"):
+            # Keep bound observations and leave existing potential snapshots intact.
+            self.potential_fn = copy(self.potential_fn)
+            self.potential_fn._weights = self._weights
 
     def sample(
         self, sample_shape: Shape = torch.Size(), x: Optional[Tensor] = None, **kwargs
