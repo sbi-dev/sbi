@@ -239,6 +239,23 @@ def test_ensure_lam_positive_definite_survives_float32_cancellation_diagonal():
     assert (lam > 0).all()
 
 
+def test_ensure_lam_positive_definite_keeps_well_conditioned_tall_data():
+    """The guard changes a well-conditioned `Lam` by about one rounding unit per trial.
+
+    The summed precisions are huge, `Lam` is not. Values are exact in float32.
+    """
+    num_trials, prior_precision_value = 2048, 2.0**20
+    prior_precision = prior_precision_value * torch.eye(2).expand(1, 1, 2, 2)
+    posterior_precision = (prior_precision_value + 1) * torch.eye(2)
+    posterior_precision = posterior_precision.expand(1, num_trials, 2, 2)
+
+    _, corrected = ensure_lam_positive_definite(
+        prior_precision, posterior_precision, num_trials, precision_nugget=0.01
+    )
+
+    assert torch.allclose(corrected, posterior_precision, rtol=1e-6)
+
+
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("iid_method", ["gauss", "jac_gauss"])
 def test_iid_score_is_exact_for_linear_gaussian(sde_type, iid_method):
