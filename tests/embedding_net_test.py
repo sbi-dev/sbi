@@ -205,6 +205,9 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
     [
         ((32, 32, 3), {}, "in_channels"),
         ((32,), {"num_conv_layers": 3}, "num_conv_layers is 3"),
+        # Kernel larger than the padded input: both sizes are negative, and
+        # their product is positive.
+        ((4, 4), {"kernel_size": 9}, "num_conv_layers"),
     ],
 )
 def test_cnn_embedding_errors_name_arguments(input_shape, kwargs, match):
