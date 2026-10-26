@@ -221,6 +221,24 @@ def test_ensure_lam_positive_definite_survives_float32_cancellation(
     assert torch.isfinite(solve_diag_or_dense(lam, torch.ones(1, 2), 1)).all()
 
 
+def test_ensure_lam_positive_definite_survives_float32_cancellation_diagonal():
+    """A diagonal `Lam` that cancels to zero must become positive.
+
+    At a precision of 1e7, float32 cannot represent an absolute nugget of 0.01.
+    """
+    num_trials = 4
+    prior_precision = torch.full((1, 1, 2), 2.0**24)
+    # Chosen such that (1 - N) * prior + sum(posterior) = 0.
+    posterior_precision = torch.full((1, num_trials, 2), 3 * 2.0**22)
+
+    _, posterior_precision = ensure_lam_positive_definite(
+        prior_precision, posterior_precision, num_trials, precision_nugget=0.01
+    )
+    lam = (1 - num_trials) * prior_precision + posterior_precision.sum(1, keepdim=True)
+
+    assert (lam > 0).all()
+
+
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("iid_method", ["gauss", "jac_gauss"])
 def test_iid_score_is_exact_for_linear_gaussian(sde_type, iid_method):
