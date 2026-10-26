@@ -774,15 +774,11 @@ class RestrictedPrior(Distribution):
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
         with torch.set_grad_enabled(track_gradients):
-            # Evaluate on device, move back to cpu for comparison with prior.
-            prior_log_prob = self._prior.log_prob(theta)
-            accepted = self._accept_reject_fn(theta).bool()
-
-            masked_log_prob = torch.where(
-                accepted,
-                prior_log_prob,
-                torch.tensor(float("-inf"), dtype=torch.float32),
-            )
+            # A univariate prior or an `accept_reject_fn` can return shape (N, 1).
+            num_thetas = theta.shape[0]
+            prior_log_prob = self._prior.log_prob(theta).reshape(num_thetas)
+            accepted = self._accept_reject_fn(theta).bool().reshape(num_thetas)
+            masked_log_prob = prior_log_prob.masked_fill(~accepted, float("-inf"))
 
             if prior_acceptance_params is None:
                 prior_acceptance_params = dict()  # use defaults

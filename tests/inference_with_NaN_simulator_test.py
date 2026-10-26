@@ -378,6 +378,23 @@ def test_restricted_prior_sir_uses_oversampling_factor():
     assert sum(num_candidates) == 40
 
 
+def test_restricted_prior_log_prob_one_value_per_theta():
+    """log_prob returns shape (N,) when prior and restriction return shape (N, 1)."""
+    # A univariate prior without `Independent` returns log probs of shape (N, 1).
+    prior = torch.distributions.Normal(zeros(1), ones(1))
+
+    def accept_reject_fn(theta):
+        return theta > 0.0
+
+    restricted_prior = utils.RestrictedPrior(prior, accept_reject_fn)
+    theta = torch.tensor([[0.5], [-0.5], [1.0]])
+    log_prob = restricted_prior.log_prob(theta, norm_restricted_prior=False)
+
+    expected = prior.log_prob(theta).squeeze(1)
+    expected[1] = float("-inf")
+    assert torch.equal(log_prob, expected)
+
+
 def test_restricted_prior_sir_samples_truncated_prior():
     """SIR samples follow the prior truncated to the restriction."""
     torch.manual_seed(0)
