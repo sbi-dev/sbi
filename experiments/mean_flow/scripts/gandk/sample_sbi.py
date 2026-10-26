@@ -55,7 +55,9 @@ def main() -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(args.threads)
 
-    estimator = torch.load(args.model, weights_only=False).eval()
+    # Estimators trained on the GPU keep CUDA copies of the condition z-scoring
+    # statistics as plain attributes of sbi's Standardize, which .cpu() does not move.
+    estimator = torch.load(args.model, weights_only=False, map_location="cpu").eval()
     if isinstance(estimator, MeanFlowEstimator):
         if args.steps is None:
             raise SystemExit("a mean flow needs --steps (its cost per density is S)")
