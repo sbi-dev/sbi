@@ -154,7 +154,7 @@ class Heun(Predictor):
         score = self.potential_fn.gradient(theta, t).to(device)
         return f - 0.5 * g**2 * score
 
-    def predict(self, theta: Tensor, t1: Tensor, t0: Tensor):
+    def predict(self, theta: Tensor, t1: Tensor, t0: Tensor) -> Tensor:
         dt = t1 - t0
         k1 = self._probability_flow_drift(theta, t1, dt.device)
         theta_predicted = theta - k1 * dt
