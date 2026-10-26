@@ -187,6 +187,7 @@ class EnsemblePosterior(NeuralPosterior):
         if hasattr(self, "potential_fn"):
             # Keep bound observations and leave existing potential snapshots intact.
             self.potential_fn = copy(self.potential_fn)
+            self._weights = self._weights.to(self.potential_fn.device)
             self.potential_fn._weights = self._weights
 
     def sample(

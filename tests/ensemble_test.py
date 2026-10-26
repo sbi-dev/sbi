@@ -27,15 +27,47 @@ from tests.test_utils import (
 
 @pytest.mark.parametrize("weights", [None, [1.0, 3.0], tensor([1.0, 3.0])])
 @pytest.mark.parametrize("bind_first", [False, True])
-def test_ensemble_potential_after_changing_weights(weights, bind_first):
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        pytest.param(
+            "cuda:0",
+            marks=[
+                pytest.mark.gpu,
+                pytest.mark.skipif(
+                    not torch.cuda.is_available(), reason="CUDA is unavailable"
+                ),
+            ],
+        ),
+        pytest.param(
+            "mps:0",
+            marks=[
+                pytest.mark.gpu,
+                pytest.mark.skipif(
+                    not torch.backends.mps.is_available(), reason="MPS is unavailable"
+                ),
+            ],
+        ),
+    ],
+)
+def test_ensemble_potential_after_changing_weights(weights, bind_first, device):
     """Changing ensemble weights must also update the density used for MAP."""
     prior = MultivariateNormal(zeros(1), 10 * eye(1))
     components = MultivariateNormal(tensor([[-2.0], [2.0]]), eye(1))
     posteriors = [
-        TractablePosterior(PosteriorPotential(MultivariateNormal(mean, eye(1)), prior))
+        TractablePosterior(
+            PosteriorPotential(
+                MultivariateNormal(mean.to(device), scale_tril=eye(1).to(device)),
+                prior,
+            )
+        )
         for mean in components.mean
     ]
     ensemble = EnsemblePosterior(posteriors, weights=[3.0, 1.0])
+    # The potential can move independently of the ensemble's device.
+    ensemble.potential_fn.to(device)
+    assert ensemble.device == "cpu"
     x_o = zeros(1, 1)
     ensemble.set_default_x(x_o)
     theta = tensor([[-2.0], [0.0], [2.0]])
@@ -43,16 +75,25 @@ def test_ensemble_potential_after_changing_weights(weights, bind_first):
         ensemble.potential(theta)
     old_potential = ensemble.potential_fn.bind(x_o)
     old_log_prob = old_potential(theta)
+    old_current = ensemble.potential_fn
+    old_weights = old_current._weights.clone()
+    old_x = old_current.return_x_o()
 
     ensemble.weights = weights
 
     probs = ones(2) if weights is None else torch.as_tensor(weights)
     expected = MixtureSameFamily(Categorical(probs), components).log_prob(theta)
-    torch.testing.assert_close(ensemble.potential(theta), expected)
+    actual = ensemble.potential(theta)
+    assert actual.device == torch.device(device)
+    torch.testing.assert_close(actual.cpu(), expected)
+    assert ensemble.weights.device == torch.device(device)
+    assert ensemble.potential_fn._weights is ensemble.weights
     torch.testing.assert_close(ensemble.default_x, x_o)
-    torch.testing.assert_close(ensemble.potential_fn.x_o, x_o)
+    torch.testing.assert_close(ensemble.potential_fn.x_o, x_o.to(device))
     # A previously bound potential remains a snapshot of the previous mixture.
     torch.testing.assert_close(old_potential(theta), old_log_prob)
+    torch.testing.assert_close(old_current._weights, old_weights)
+    assert old_current.return_x_o() is old_x
 
 
 @pytest.mark.slow
