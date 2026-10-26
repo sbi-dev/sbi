@@ -66,7 +66,8 @@ def run_tarp(
 
     Returns:
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
-        alpha: credibility values, see equation 2 of the paper
+        alpha: credibility values, ``num_bins + 1`` points evenly spaced over
+            ``[0, 1]``, see equation 2 of the paper
     """
 
     thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
@@ -145,7 +146,8 @@ def _run_tarp(
 
     Returns:
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
-        alpha: grid of credibility values, see equation 2 of the paper
+        alpha: grid of credibility values, ``num_bins + 1`` points evenly spaced over
+            ``[0, 1]``, see equation 2 of the paper
 
     """
     num_posterior_samples, num_tarp_samples, _ = posterior_samples.shape
