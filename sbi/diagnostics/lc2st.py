@@ -772,18 +772,12 @@ class LC2ST:
         ):
             # Prepare data
             if self.permutation:
-                joint_p = torch.cat([self.theta_p, self.x_p], dim=1)
-                joint_q = torch.cat([self.theta_q, self.x_q], dim=1)
-                joint_p_perm, joint_q_perm = permute_data(joint_p, joint_q, seed=t)
-                # Extract the permuted P and Q and x
-                theta_p_t, x_p_t = (
-                    joint_p_perm[:, : self.theta_p.shape[-1]],
-                    joint_p_perm[:, self.theta_p.shape[1] :],
+                theta_p_t, theta_q_t = permute_data(
+                    self.theta_p,
+                    self.theta_q,
+                    seed=self.seed * self.num_trials_null + t,
                 )
-                theta_q_t, x_q_t = (
-                    joint_q_perm[:, : self.theta_q.shape[-1]],
-                    joint_q_perm[:, self.theta_q.shape[1] :],
-                )
+                x_p_t, x_q_t = self.x_p, self.x_q
             else:
                 if self.null_distribution is None:
                     raise ValueError(
