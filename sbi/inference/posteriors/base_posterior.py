@@ -276,10 +276,15 @@ class NeuralPosterior:
             inits = self.sample((num_init_samples,))
         elif init_method == "proposal":
             inits = self.proposal.sample((num_init_samples,))  # type: ignore
+        elif init_method == "prior":
+            inits = self.potential_fn.prior.sample((num_init_samples,))  # type: ignore
         elif isinstance(init_method, Tensor):
             inits = init_method
         else:
-            raise ValueError
+            raise ValueError(
+                f"Unknown init_method {init_method!r}. Use 'posterior', 'proposal', "
+                "'prior' or a Tensor of initial locations."
+            )
 
         return gradient_ascent(
             potential_fn=self.potential_fn,
