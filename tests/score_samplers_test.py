@@ -10,7 +10,9 @@ import torch
 from torch import Tensor
 from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, Uniform
 
+from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_adaptor import (
+    FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
     JacCorrectedScoreFn,
     ensure_lam_positive_definite,
@@ -315,6 +317,74 @@ def test_gaussian_score_sampling(
 
     assert torch.allclose(mean_est, mean0, atol=1e-1)
     assert torch.allclose(std_est, std0, atol=1e-1)
+
+
+def test_fnpe_batched_observations_keep_base_distribution():
+    """fnpe only contracts the sampler when it composes iid observations, not for a
+    batch of independent observations as in `sample_batched`."""
+    score_fn = _build_gaussian_score_estimator("vp", (2,), torch.ones(2), torch.ones(2))
+    score_fn = score_fn.bind(torch.ones((100, 1)), x_is_iid=False, iid_method="fnpe")
+
+    assert score_fn.init_std_scale == 1.0
+
+
+def test_fnpe_divergence_error_names_cause():
+    """Diverged fnpe sampling for many iid observations raises an error that names
+    the cause and the fixes."""
+    estimator = _build_gaussian_score_estimator(
+        "vp", (2,), torch.ones(2), torch.ones(2)
+    ).vector_field_estimator
+    prior = Independent(Normal(torch.zeros(2), 10 * torch.ones(2)), 1)
+    posterior = VectorFieldPosterior(estimator, prior, iid_method="fnpe")
+
+    with pytest.raises(RuntimeError, match=r"No finite sample.*\(1000 here\)"):
+        posterior.sample((100,), x=torch.ones((1000, 1)), steps=100)
+
+
+@pytest.mark.parametrize(
+    "diverged, value",
+    (
+        pytest.param((slice(None), 0), float("nan"), id="one-observation-all-nan"),
+        pytest.param((..., 0), float("inf"), id="every-sample-partly-inf"),
+    ),
+)
+def test_sample_batched_raises_when_samples_diverge(monkeypatch, diverged, value):
+    """Sampling raises when one observation has no finite sample, also if the
+    other observations are fine or each sample is only partly non-finite."""
+    estimator = _build_gaussian_score_estimator(
+        "vp", (2,), torch.ones(2), torch.ones(2)
+    ).vector_field_estimator
+    prior = Independent(Normal(torch.zeros(2), torch.ones(2)), 1)
+    posterior = VectorFieldPosterior(estimator, prior)
+    run = Diffuser.run
+
+    def run_with_diverged_entries(self, *args, **kwargs):
+        samples = run(self, *args, **kwargs)
+        samples[diverged] = value
+        return samples
+
+    monkeypatch.setattr(Diffuser, "run", run_with_diverged_entries)
+
+    with pytest.raises(RuntimeError, match="No finite sample"):
+        posterior.sample_batched(
+            (10,), x=torch.ones((3, 1)), steps=5, reject_outside_prior=False
+        )
+
+
+def test_fnpe_uses_custom_prior_score_weight():
+    """A custom prior score weight replaces the default one."""
+    estimator = _build_gaussian_score_estimator(
+        "vp", (2,), torch.ones(2), torch.ones(2)
+    ).vector_field_estimator
+    prior = Independent(Normal(torch.zeros(2), torch.ones(2)), 1)
+    args = (torch.randn(4, 1, 2), torch.ones(5, 1), torch.tensor([0.5]))
+
+    default = FactorizedNPEScoreFunction(estimator, prior)
+    no_prior = FactorizedNPEScoreFunction(
+        estimator, prior, prior_score_weight=torch.zeros_like
+    )
+
+    assert not torch.allclose(no_prior(*args), default(*args))
 
 
 class _ZeroNet(VectorFieldNet):
