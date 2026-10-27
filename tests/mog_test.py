@@ -526,6 +526,15 @@ class TestProposalCorrectionStability:
         )
         assert _width_ratio_to_proposal(posterior, proposal) == pytest.approx(10.0)
 
+    def test_width_ratio_keeps_precision_far_from_zero(self):
+        """Without z-scoring, means can be large; float32 must not cancel the width."""
+        mean = torch.full((1, 2), 1000.0)
+        posterior = MoG.from_gaussian(mean, 0.01 * torch.eye(2).unsqueeze(0))
+        proposal = MoG.from_gaussian(mean, 0.001 * torch.eye(2).unsqueeze(0))
+        assert _width_ratio_to_proposal(posterior, proposal) == pytest.approx(
+            10.0, rel=1e-3
+        )
+
     def test_correction_explains_a_density_wider_than_the_proposal(self):
         """Appendix C: dividing by a narrower proposal leaves no valid precision."""
         density = MoG.from_gaussian(torch.zeros(1, 2), 4 * torch.eye(2).unsqueeze(0))

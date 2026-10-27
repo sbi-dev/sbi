@@ -649,12 +649,13 @@ def _width_ratio_to_proposal(posterior_mog: MoG, proposal_mog: MoG) -> float:
         weights = posterior_mog.weights.unsqueeze(-1)
         means = posterior_mog.means
         covariances = torch.linalg.inv(posterior_mog.precisions)
-        mean = (weights * means).sum(1)
-        second_moment = (
+        # Centered means: a raw second moment minus the squared mean loses the
+        # covariance in float32 when the means are large.
+        centered = means - (weights * means).sum(1, keepdim=True)
+        covariance = (
             weights.unsqueeze(-1)
-            * (covariances + means.unsqueeze(-1) * means.unsqueeze(-2))
+            * (covariances + centered.unsqueeze(-1) * centered.unsqueeze(-2))
         ).sum(1)
-        covariance = second_moment - mean.unsqueeze(-1) * mean.unsqueeze(-2)
         # Eigenvalues of P_proposal @ covariance, in the symmetric form L^T C L.
         factor = torch.linalg.cholesky(proposal_mog.precisions[:, 0])
         return torch.linalg.eigvalsh(factor.mT @ covariance @ factor).max().item()
