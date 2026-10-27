@@ -81,14 +81,6 @@ class NPE_A_Posterior(DirectPosterior):
         self._apply_correction = proposal_mog is not None
 
     def to(self, device: Union[str, torch.device]) -> Self:
-        """Move the posterior and its proposal and prior mixtures to `device`.
-
-        Args:
-            device: Device to move the posterior to.
-
-        Returns:
-            The posterior itself.
-        """
         super().to(device)
         if self._proposal_mog is not None:
             self._proposal_mog = self._proposal_mog.to(self._device).detach()

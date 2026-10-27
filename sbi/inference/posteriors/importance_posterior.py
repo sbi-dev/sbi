@@ -77,14 +77,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self.x_shape = x_shape
 
     def to(self, device: Union[str, torch.device]) -> Self:
-        """Move the posterior to `device` in place, see `NeuralPosterior.to()`.
-
-        Args:
-            device: Device to move the posterior to.
-
-        Returns:
-            The posterior itself.
-        """
         super().to(device)
         if self._normalization_constant is not None:
             self._normalization_constant = self._normalization_constant.to(self._device)
