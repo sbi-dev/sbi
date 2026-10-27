@@ -28,7 +28,10 @@ from sbi.inference import (
     posterior_estimator_based_potential,
 )
 from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
-from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
+from sbi.inference.posteriors.npe_a_posterior import (
+    GaussianProposal,
+    NPE_A_Posterior,
+)
 from sbi.inference.posteriors.posterior_parameters import (
     FilteredDirectPosteriorParameters,
     MCMCPosteriorParameters,
@@ -505,8 +508,10 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
 
 @pytest.mark.slow
-def test_multi_round_npe_a_matches_true_posterior_moments():
-    """Two NPE-A rounds with a final round recover the true mean and std.
+@pytest.mark.parametrize("widen", [False, True], ids=["posterior", "as_proposal"])
+def test_multi_round_npe_a_matches_true_posterior_moments(widen):
+    """Two NPE-A rounds with a final round recover the true mean and std, with the
+    posterior or its widened Gaussian as the second proposal.
 
     c2st misses moment errors of this size, so the moments are checked directly.
     The bounds are about twice the spread over seeds 0 to 5.
@@ -527,9 +532,11 @@ def test_multi_round_npe_a_matches_true_posterior_moments():
         inference.append_simulations(theta, x, proposal=proposal).train(
             final_round=(r == 1)
         )
-        proposal = inference.build_posterior().set_default_x(x_o)
+        posterior = inference.build_posterior().set_default_x(x_o)
+        if r == 0:
+            proposal = posterior.as_proposal() if widen else posterior
 
-    samples = proposal.sample((10_000,))
+    samples = posterior.sample((10_000,))
     mean_error = (samples.mean(0) - true_posterior.mean) / true_std
     std_ratio = samples.std(0) / true_std
     assert mean_error.abs().max() < 0.3, f"mean error {mean_error} posterior stds"
@@ -1254,3 +1261,68 @@ def test_npe_a_final_round_cannot_resume_the_optimizer():
 
     with pytest.raises(ValueError, match="resume"):
         inference.train(final_round=True, resume_training=True)
+
+
+def _npe_a_first_round_posterior(prior):
+    """A trained one-Gaussian NPE-A posterior, with its trainer."""
+    inference = NPE_A(prior, num_components=3, show_progress_bars=False)
+    theta = prior.sample((300,))
+    x = theta + 0.3 * torch.randn_like(theta)
+    inference.append_simulations(theta, x).train(max_num_epochs=5)
+    return inference, inference.build_posterior().set_default_x(0.5 * ones(1, 2))
+
+
+def test_npe_a_as_proposal_widens_the_round_gaussian():
+    """The proposal is the posterior's Gaussian with a widened covariance."""
+    _, posterior = _npe_a_first_round_posterior(MultivariateNormal(zeros(2), eye(2)))
+    samples = posterior.sample((20_000,))
+
+    proposal = posterior.as_proposal(widening=2.0)
+
+    assert isinstance(proposal, GaussianProposal)
+    assert torch.allclose(proposal.mean, samples.mean(0), atol=0.05)
+    assert torch.allclose(
+        proposal.covariance_matrix, 2 * torch.cov(samples.T), rtol=0.1, atol=0.02
+    )
+
+
+def test_npe_a_as_proposal_stays_in_the_prior_box():
+    """For a bounded prior, the proposal only draws parameters inside its support."""
+    prior = utils.BoxUniform(-ones(2), ones(2))
+    _, posterior = _npe_a_first_round_posterior(prior)
+    proposal = posterior.as_proposal(widening=3.0)
+
+    samples = proposal.sample((2000,))
+
+    assert samples.shape == (2000, 2)
+    assert (samples.abs() <= 1).all()
+    assert proposal.log_prob(torch.tensor([[2.0, 0.0]])).item() == float("-inf")
+
+
+def test_npe_a_as_proposal_rejects_invalid_requests():
+    """A final-round mixture cannot be a proposal, and narrowing defeats the point."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference, posterior = _npe_a_first_round_posterior(prior)
+    with pytest.raises(ValueError, match="at least 1"):
+        posterior.as_proposal(widening=0.5)
+
+    inference.train(max_num_epochs=2, final_round=True)
+    final_posterior = inference.build_posterior().set_default_x(0.5 * ones(1, 2))
+    with pytest.raises(ValueError, match="final_round"):
+        final_posterior.as_proposal()
+
+
+def test_npe_a_trains_on_its_gaussian_proposal_without_warning():
+    """NPE-A's own proposal is not an unknown proposal, so it must not warn."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference, posterior = _npe_a_first_round_posterior(prior)
+    proposal = posterior.as_proposal()
+    theta = proposal.sample((300,))
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("error", message="The proposal you passed")
+        inference.append_simulations(
+            theta, theta + 0.3 * torch.randn_like(theta), proposal=proposal
+        ).train(max_num_epochs=2, final_round=True)
+    posterior = inference.build_posterior().set_default_x(0.5 * ones(1, 2))
+    assert posterior.get_mog_params(0.5 * ones(1, 2)).num_components == 3

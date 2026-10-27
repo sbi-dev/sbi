@@ -9,6 +9,7 @@ for evaluation (log_prob), sampling, and conditioning.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Union
 
@@ -627,6 +628,48 @@ def _check_single_gaussian_proposal(proposal_mog: MoG) -> None:
         )
 
 
+# A corrected posterior this much wider (in variance) than its proposal in some
+# direction is a sign of an unstable correction.
+_UNSTABLE_WIDTH_RATIO: float = 5.0
+
+
+def _warn_if_much_wider_than_proposal(posterior_mog: MoG, proposal_mog: MoG) -> None:
+    """Warn if the corrected posterior is much wider than its proposal.
+
+    A density component that is barely narrower than the proposal keeps almost no
+    precision after the correction, so the corrected component becomes very wide
+    and can get most of the weight. The signal is meaningful for Gaussian priors;
+    a bounded prior cuts off wide directions.
+
+    Args:
+        posterior_mog: Corrected MoG.
+        proposal_mog: MoG of the proposal, with a single component.
+    """
+    with torch.no_grad():
+        weights = posterior_mog.weights.unsqueeze(-1)
+        means = posterior_mog.means
+        covariances = torch.linalg.inv(posterior_mog.precisions)
+        mean = (weights * means).sum(1)
+        second_moment = (
+            weights.unsqueeze(-1)
+            * (covariances + means.unsqueeze(-1) * means.unsqueeze(-2))
+        ).sum(1)
+        covariance = second_moment - mean.unsqueeze(-1) * mean.unsqueeze(-2)
+        # Eigenvalues of P_proposal @ covariance, in the symmetric form L^T C L.
+        factor = torch.linalg.cholesky(proposal_mog.precisions[:, 0])
+        ratio = torch.linalg.eigvalsh(factor.mT @ covariance @ factor).max().item()
+    if ratio > _UNSTABLE_WIDTH_RATIO:
+        warnings.warn(
+            f"The NPE-A posterior is {ratio:.1f} times wider (in variance) than its "
+            "proposal in some direction, which usually means the closed-form "
+            "correction is unstable (Papamakarios & Murray 2016, Appendix C). Draw "
+            "the simulations from `posterior.as_proposal()`, which widens the "
+            "proposal, simulate more per round, or use fewer `num_components`.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+
 def correct_for_proposal(
     density_mog: MoG,
     proposal_mog: MoG,
@@ -682,9 +725,11 @@ def correct_for_proposal(
         precf_post = torch.linalg.cholesky(prec_post_stabilized, upper=True)
     except torch.linalg.LinAlgError as e:
         raise ValueError(
-            "Posterior precision matrix is not positive definite. "
-            "This is a known issue with NPE-A when the proposal and density "
-            "estimator don't align well. Try different hyperparameters. "
+            "The NPE-A posterior precision is not positive definite: a component "
+            "of the density estimator is wider than the proposal in some direction "
+            "(Papamakarios & Murray 2016, Appendix C). Draw the simulations from "
+            "`posterior.as_proposal()`, which widens the proposal, simulate more "
+            "per round, use fewer `num_components`, or use NPE_C. "
             f"Original error: {e}"
         ) from e
 

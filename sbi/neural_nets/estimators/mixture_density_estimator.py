@@ -22,6 +22,7 @@ from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import (
     MoG,
     _check_single_gaussian_proposal,
+    _warn_if_much_wider_than_proposal,
     correct_for_proposal,
 )
 from sbi.sbi_types import TorchTransform
@@ -804,7 +805,10 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
             Corrected MoG in the estimator's transformed space.
         """
         density_mog = self.net.get_uncorrected_mog(condition)
-        return correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
+        mog = correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
+        if self._prior_mog is not None:
+            _warn_if_much_wider_than_proposal(mog, self._proposal_mog)
+        return mog
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Log probability under the corrected MoG; shapes as in the wrapped MDN."""

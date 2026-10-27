@@ -372,6 +372,9 @@ def train_and_eval_sequential_inference(
 
     for r in range(1, NUM_ROUNDS_SEQUENTIAL):
         proposal = inference.build_posterior().set_default_x(x_o)
+        if inference_class is NPE_A:
+            # As documented: a widened Gaussian keeps the correction stable.
+            proposal = proposal.as_proposal()
         thetas_i = proposal.sample((num_simulations,))
         xs_i = simulator(thetas_i)
         if "npe" in inference_class.__name__.lower():
