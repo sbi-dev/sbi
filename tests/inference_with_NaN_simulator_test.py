@@ -304,14 +304,14 @@ def test_inference_with_restriction_estimator():
     check_c2st(samples, target_samples, alg=f"{NPE_C}")
 
 
-def _restricted_box_prior():
+def _restricted_box_prior(num_simulations: int = 300, max_num_epochs: int = 2):
     prior = utils.BoxUniform(-2 * ones(2), 2 * ones(2))
-    theta = prior.sample((300,))
+    theta = prior.sample((num_simulations,))
     x = theta.clone()
     x[theta[:, 0] > 1.0] = float("nan")
     restriction_estimator = RestrictionEstimator(prior=prior)
     classifier = restriction_estimator.append_simulations(theta, x).train(
-        max_num_epochs=2
+        max_num_epochs=max_num_epochs
     )
     return prior, theta, x, restriction_estimator, classifier
 
@@ -350,6 +350,22 @@ def test_restrict_prior_uses_the_passed_classifier():
     restricted_prior.sample((10,), print_rejected_frac=False)
 
     assert counting_classifier.num_calls > 0
+
+
+def test_restrict_prior_with_reweigh_factor():
+    """With `reweigh_factor`, samples lie where simulations are valid (theta_0 <= 1),
+    and a larger factor accepts fewer parameter sets."""
+    *_, restriction_estimator, _ = _restricted_box_prior(1000, max_num_epochs=20)
+
+    restricted_prior = restriction_estimator.restrict_prior(reweigh_factor=0.5)
+    samples = restricted_prior.sample((500,), print_rejected_frac=False)
+    assert (samples[:, 0] > 1.0).float().mean() < 0.05
+
+    acceptance = [
+        restriction_estimator.restrict_prior(reweigh_factor=factor).prior_acceptance()
+        for factor in (0.1, 0.9)
+    ]
+    assert acceptance[1] < acceptance[0]
 
 
 @pytest.mark.parametrize("prior", ("uniform", "gaussian"))

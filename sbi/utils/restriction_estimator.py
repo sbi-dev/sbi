@@ -397,7 +397,7 @@ class RestrictionEstimator:
     def restrict_prior(
         self,
         classifier: Optional[nn.Module] = None,
-        allowed_false_negatives: float = 0.0,
+        allowed_false_negatives: Optional[float] = None,
         reweigh_factor: Optional[float] = None,
     ) -> "RestrictedPrior":
         r"""
@@ -425,10 +425,12 @@ class RestrictionEstimator:
                 potentially `valid` parameter sets will be missed. Inference is only
                 **exact** for `allowed_false_negatives=0.0`. The value specified here
                 corresponds approximately to the fraction of parameter sets that will
-                be systematically missed by the inference procedure.
-            reweigh_factor: Post-hoc correction factor. Should be in [0, 1]. A large
-                reweigh factor will increase the probability of predicting a `invalid`
-                simulation.
+                be systematically missed by the inference procedure. If None, 0.0
+                unless `reweigh_factor` is given.
+            reweigh_factor: Post-hoc correction factor, used instead of
+                `allowed_false_negatives`. Should be in [0, 1]. A parameter set is
+                accepted if the classifier predicts `valid` with a probability above
+                `reweigh_factor`, so a large factor rejects more parameter sets.
 
         Returns:
             Restricted prior with `.sample()` and `.predict()` methods.
@@ -538,6 +540,8 @@ class AcceptRejectFunction:
         print_fp_rate: bool = False,
         safety_margin: Optional[Union[str, float]] = "frequentist",
     ) -> None:
+        if allowed_false_negatives is None and reweigh_factor is None:
+            allowed_false_negatives = 0.0
         self._classifier = classifier
         self._validation_theta = validation_theta
         self._validation_label = validation_label
@@ -556,7 +560,9 @@ class AcceptRejectFunction:
         with torch.no_grad():
             clf_probs = F.softmax(classifier.forward(valid_val_theta), dim=1)[:, 1]
 
-        if allowed_false_negatives == 0.0:
+        if reweigh_factor is not None:
+            self._classifier_thr = None
+        elif allowed_false_negatives == 0.0:
             if safety_margin is None:
                 self._classifier_thr = torch.min(clf_probs)
             elif isinstance(safety_margin, float):
@@ -571,9 +577,7 @@ class AcceptRejectFunction:
             else:
                 raise NameError(f"`safety_margin` {safety_margin} not supported.")
         else:
-            assert allowed_false_negatives is not None, (
-                "`allowed_false_negatives` must be set."
-            )
+            assert allowed_false_negatives is not None
             quantile_index = floor(num_valid * allowed_false_negatives)
             self._classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
 
@@ -590,8 +594,9 @@ class AcceptRejectFunction:
             threshold = self._classifier_thr
             predictions = pred > threshold
         else:
-            probs_invalid = pred * self._reweigh_factor
-            probs_valid = (1 - pred) * (1 - self._reweigh_factor)
+            # `pred` is the probability of a valid simulation.
+            probs_valid = pred * (1 - self._reweigh_factor)
+            probs_invalid = (1 - pred) * self._reweigh_factor
             predictions = probs_valid > probs_invalid
         return predictions.bool().to(theta.device)
 
