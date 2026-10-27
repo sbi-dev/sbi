@@ -555,7 +555,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             raise NotImplementedError(
                 "This needs an affine z-score of the inputs, so "
                 "z_score_theta='transform_to_unconstrained' is not supported. Use "
-                "'independent' or 'structured'."
+                "'independent' or 'structured', or a different method."
             )
         if self._transform_shift is None:
             return None
@@ -622,11 +622,11 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         ones = torch.ones_like(zeros)
         source_shift, source_scale = source._affine_transform() or (zeros, ones)
         shift, scale = self._affine_transform() or (zeros, ones)
-        # Map relative to this shift: adding a large shift and subtracting it again
-        # would lose small offsets in float32.
+        # Map with the relative shift and scale: a way through inputs would lose
+        # small offsets at a large shift and overflow at a large scale in float32.
         return mog.unstandardize(
-            source_shift.to(param) - shift, source_scale.to(param)
-        ).standardize(zeros, scale)
+            (source_shift.to(param) - shift) / scale, source_scale.to(param) / scale
+        )
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Compute log probability of inputs given conditions.
@@ -768,12 +768,7 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
             NotImplementedError: If the estimator's input transform is not affine.
             ValueError: If the proposal has more than one component.
         """
-        if estimator._prior_transform is not None:
-            raise NotImplementedError(
-                "The NPE-A proposal correction needs an affine z-score, so "
-                "z_score_theta='transform_to_unconstrained' is not supported. Use "
-                "'independent' or 'structured', or a different method."
-            )
+        estimator._affine_transform()  # Raises for a non-affine z-score.
         _check_single_gaussian_proposal(proposal_mog)
         super().__init__(estimator, estimator.input_shape, estimator.condition_shape)
         device = infer_module_device(estimator, fallback="cpu")

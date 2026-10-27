@@ -571,7 +571,8 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
 
     def test_mog_maps_keep_small_offsets_at_a_large_shift(self, standard_mdn):
         """With a shift far above the scale, a MoG is z-scored like the inputs, and
-        the map between two equal z-scored spaces keeps its small offsets."""
+        the map between two equal z-scored spaces keeps its small offsets. At a
+        scale whose square overflows float32, that map keeps the precisions."""
         shift, scale = torch.full((3,), 1e4), torch.full((3,), 3e-3)
         estimator = MixtureDensityEstimator(
             net=standard_mdn,
@@ -588,6 +589,15 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
         z_mog = MoG.from_gaussian(torch.full((3,), 0.13), torch.eye(3))
         mapped = estimator.transform_mog_from(estimator, z_mog)
         assert torch.allclose(mapped.means, z_mog.means, atol=1e-5)
+
+        estimator = MixtureDensityEstimator(
+            net=standard_mdn,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+            transform_input=torch.stack([torch.zeros(3), torch.full((3,), 1e20)]),
+        )
+        mapped = estimator.transform_mog_from(estimator, z_mog)
+        assert torch.allclose(mapped.precisions, z_mog.precisions)
 
     def test_transform_mog_from_another_estimator(self, make_mdn):
         """The direct map between two z-scored spaces equals the way through inputs."""
