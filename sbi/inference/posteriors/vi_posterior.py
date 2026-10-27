@@ -1345,10 +1345,10 @@ class VIPosterior(NeuralPosterior):
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
                 it is a string, it can be either `posterior` or `proposal`, which
-                samples the respective distribution `num_init_samples` times (the
-                proposal defaults to the prior). If it is a tensor, the tensor is
-                used as the initial locations, so prior-based initialization can be
-                done by passing prior samples.
+                samples the respective distribution `num_init_samples` times. For
+                `VIPosterior` the proposal is the variational distribution, not the
+                prior. If it is a tensor, the tensor is used as the initial locations,
+                so prior-based initialization can be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the

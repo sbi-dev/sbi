@@ -372,11 +372,13 @@ class EnsemblePosterior(NeuralPosterior):
             num_to_optimize: From the drawn `num_init_samples`, use the
                 `num_to_optimize` with highest log-probability as the initial points
             learning_rate: Learning rate of the optimizer.
-            init_method: How to select the starting parameters for the optimization. If
-                it is a string, it must be `posterior`, which samples the
-                posterior `num_init_samples` times. If it is a tensor, the tensor is
-                used as the initial locations, so prior-based initialization can be
-                done by passing prior samples.
+            init_method: How to select the starting parameters for the optimization.
+                For the joint ensemble MAP it must be `posterior`, which samples the
+                posterior `num_init_samples` times. With `individually=True` it is
+                passed to each component, so the supported strings depend on the
+                component (for example `MCMCPosterior` also accepts `proposal`). If it
+                is a tensor, the tensor is used as the initial locations, so
+                prior-based initialization can be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
                 for the optimization.
