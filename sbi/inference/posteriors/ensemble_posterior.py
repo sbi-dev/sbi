@@ -373,9 +373,10 @@ class EnsemblePosterior(NeuralPosterior):
                 `num_to_optimize` with highest log-probability as the initial points
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it must be `posterior`, which samples the
+                posterior `num_init_samples` times. If it is a tensor, the tensor is
+                used as the initial locations, so prior-based initialization can be
+                done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
                 for the optimization.
@@ -417,10 +418,20 @@ class EnsemblePosterior(NeuralPosterior):
 
             if init_method == "posterior":
                 inits = self.sample((num_init_samples,), self._x_else_default_x(x))
+            elif init_method == "proposal":
+                raise ValueError(
+                    "init_method='proposal' is not available for the ensemble "
+                    "posterior, which has no proposal distribution. Use 'posterior', "
+                    "or pass initial locations as a tensor (for example prior "
+                    "samples)."
+                )
             elif isinstance(init_method, Tensor):
                 inits = init_method
             else:
-                raise ValueError
+                raise ValueError(
+                    f"Invalid init_method '{init_method}'. Use 'posterior', or pass "
+                    "initial locations as a tensor (for example prior samples)."
+                )
 
             return gradient_ascent(
                 potential_fn=self.potential_fn,

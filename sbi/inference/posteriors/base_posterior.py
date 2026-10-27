@@ -273,14 +273,26 @@ class NeuralPosterior:
         See `map()` method of child classes for docstring.
         """
 
+        has_proposal = getattr(self, "proposal", None) is not None
         if init_method == "posterior":
             inits = self.sample((num_init_samples,))
         elif init_method == "proposal":
-            inits = self.proposal.sample((num_init_samples,))  # type: ignore
+            if not has_proposal:
+                raise ValueError(
+                    f"init_method='proposal' is not available for "
+                    f"{type(self).__name__}, which has no proposal distribution. "
+                    "Use 'posterior', or pass initial locations as a tensor "
+                    "(for example prior samples)."
+                )
+            inits = self.proposal.sample((num_init_samples,))
         elif isinstance(init_method, Tensor):
             inits = init_method
         else:
-            raise ValueError
+            valid = "'posterior', 'proposal'" if has_proposal else "'posterior'"
+            raise ValueError(
+                f"Invalid init_method '{init_method}'. Use {valid}, or pass "
+                "initial locations as a tensor (for example prior samples)."
+            )
 
         return gradient_ascent(
             potential_fn=self.potential_fn,
@@ -327,9 +339,11 @@ class NeuralPosterior:
                 for the optimization.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be `posterior` or, for posteriors that
+                have a proposal, `proposal`, which samples the respective
+                distribution `num_init_samples` times. If it is a tensor, the tensor
+                is used as the initial locations, so prior-based initialization can
+                be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             save_best_every: The best log-probability is computed, saved in the
