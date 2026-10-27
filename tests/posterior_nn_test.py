@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import pickle
+
 import pytest
 import torch
 from torch import eye, nn, ones, zeros
@@ -414,6 +416,34 @@ def test_npe_a_map_potential_and_conditional_apply_proposal_correction():
     )
     difference = conditioned.log_prob(theta_0) - joint
     assert torch.allclose(difference, difference[0], atol=1e-4)
+
+
+def test_npe_a_posterior_pickled_before_wrapper_applies_correction():
+    """Posteriors pickled by sbi 0.27 keep the correction MoGs on the posterior and an
+    unwrapped estimator. Loading must restore the corrected density."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((200,))
+    estimator = posterior_nn("mdn")(theta, theta + 0.1 * torch.randn_like(theta))
+    proposal_mog = MoG.from_gaussian(ones(2), 2 * eye(2))
+    prior_mog = MoG.from_gaussian(zeros(2), eye(2))
+    corrected = NPE_A_Posterior(estimator, prior, proposal_mog, prior_mog)
+    legacy = NPE_A_Posterior(estimator, prior)
+    legacy._proposal_mog = proposal_mog
+    legacy._prior_mog = prior_mog
+    legacy._apply_correction = True
+
+    loaded = pickle.loads(pickle.dumps(legacy))
+
+    x_o = torch.tensor([[0.5, -0.5]])
+    theta = prior.sample((10,))
+    assert torch.allclose(
+        loaded.log_prob(theta, x=x_o, norm_posterior=False),
+        corrected.log_prob(theta, x=x_o, norm_posterior=False),
+    )
+    assert torch.allclose(
+        loaded.potential(theta, x=x_o), corrected.potential(theta, x=x_o)
+    )
 
 
 @pytest.mark.mcmc

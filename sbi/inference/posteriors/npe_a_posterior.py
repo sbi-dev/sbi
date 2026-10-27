@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 import torch
 from torch import Tensor
@@ -77,6 +77,27 @@ class NPE_A_Posterior(DirectPosterior):
             device=device,
             enable_transform=enable_transform,
         )
+
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
+
+        Posteriors pickled by sbi 0.27 keep the correction MoGs on the posterior and
+        an unwrapped estimator. Without re-wrapping, they would silently skip the
+        correction.
+
+        Args:
+            state_dict: State to be restored.
+        """
+        proposal_mog = state_dict.pop("_proposal_mog", None)
+        prior_mog = state_dict.pop("_prior_mog", None)
+        state_dict.pop("_apply_correction", None)
+        if proposal_mog is not None:
+            estimator = ProposalCorrectedMDN(
+                state_dict["posterior_estimator"], proposal_mog, prior_mog
+            )
+            state_dict["posterior_estimator"] = estimator
+            state_dict["potential_fn"].posterior_estimator = estimator
+        super().__setstate__(state_dict)
 
     def get_mog_params(self, x: Tensor) -> MoG:
         """Get the (possibly corrected) MoG parameters for given observation.
