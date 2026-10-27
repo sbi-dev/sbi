@@ -121,11 +121,12 @@ class VectorFieldBasedPotential(BasePotential):
         self.vector_field_estimator.to(self.device)
         self.neural_ode.to(self.device)
         # Cached flows hold x_o and the ODE's base distribution of the old device.
+        flow_kwargs = getattr(self, "_flow_kwargs", {})
         if self._x_o is not None:
             if getattr(self, "flow", None) is not None:
-                self.flow = self.rebuild_flow()
+                self.flow = self.rebuild_flow(**flow_kwargs)
             if getattr(self, "flows", None) is not None:
-                self.flows = self.rebuild_flows_for_batch()
+                self.flows = self.rebuild_flows_for_batch(**flow_kwargs)
         return self
 
     def set_x(
@@ -176,6 +177,7 @@ class VectorFieldBasedPotential(BasePotential):
         self.iid_params = bound.iid_params
         self.guidance_method = bound.guidance_method
         self.guidance_params = bound.guidance_params
+        self._flow_kwargs = bound._flow_kwargs
         if not x_is_iid and (bound._x_o is not None):
             self.flow = bound.flow
         elif bound._x_o is not None:
@@ -221,6 +223,8 @@ class VectorFieldBasedPotential(BasePotential):
         bound._x_is_iid = x_is_iid
         bound.guidance_method = guidance_method
         bound.guidance_params = guidance_params
+        # Kept so that `to()` rebuilds the flows with the same ODE options.
+        bound._flow_kwargs = ode_kwargs
         if not x_is_iid and (bound._x_o is not None):
             bound.flow = bound.rebuild_flow(**ode_kwargs)
         elif bound._x_o is not None:

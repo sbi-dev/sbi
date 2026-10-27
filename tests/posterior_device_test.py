@@ -248,3 +248,19 @@ def test_map_with_module_backed_theta_transform(device: str):
     init = torch.zeros(1, NUM_DIM, device=device)
     map_ = posterior.map(init_method=init, num_iter=2, num_to_optimize=1)
     assert map_.device.type == torch.device(device).type
+
+
+def test_to_keeps_ode_options_of_bound_vector_field_potential():
+    """A bound vector field potential keeps the ODE options given to `bind()`."""
+    _, _, fmpe = _train("box")
+    potential = fmpe.build_posterior().potential_fn.bind(
+        torch.zeros(1, NUM_DIM), atol=1e-3, rtol=1e-3, exact=False
+    )
+    theta = torch.zeros(3, NUM_DIM)
+    torch.manual_seed(0)
+    before = potential(theta)
+
+    potential.to("cpu")
+
+    torch.manual_seed(0)
+    assert torch.equal(potential(theta), before)
