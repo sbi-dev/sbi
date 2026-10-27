@@ -85,7 +85,6 @@ class EnsemblePosterior(NeuralPosterior):
         """
         self.posteriors = posteriors
         self.num_components = len(posteriors)
-        self.weights = weights
         self.theta_transform = theta_transform
         # Take first prior as reference
         self.prior = posteriors[0].potential_fn.prior
@@ -94,6 +93,7 @@ class EnsemblePosterior(NeuralPosterior):
         if self.device is None:
             self.device = self.ensure_same_device(posteriors)
 
+        self.weights = weights
         self._build_potential_fns()
 
     def to(self, device: Union[str, torch.device]) -> None:
@@ -112,7 +112,7 @@ class EnsemblePosterior(NeuralPosterior):
             self.posteriors[i].to(device)
         self.prior.to(device)
         self.theta_transform = mcmc_transform(self.prior, device=device)
-        self._weights.to(device)
+        self._weights = self._weights.to(device)
         self._build_potential_fns()
 
     def _build_potential_fns(self):
@@ -126,7 +126,9 @@ class EnsemblePosterior(NeuralPosterior):
                 f"{potential.prior} {self.prior}"
             )
 
-        potential_fn = EnsemblePotential(potential_fns, self._weights, self.prior, None)
+        potential_fn = EnsemblePotential(
+            potential_fns, self._weights, self.prior, None, device=self.device
+        )
 
         super().__init__(
             potential_fn=potential_fn,
@@ -182,6 +184,7 @@ class EnsemblePosterior(NeuralPosterior):
             self._weights = torch.tensor(weights) / sum(weights)
         else:
             raise TypeError
+        self._weights = self._weights.to(self.device)
 
         # `__init__` sets the weights before it builds the potential.
         if hasattr(self, "potential_fn"):
