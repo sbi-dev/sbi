@@ -1369,11 +1369,10 @@ def build_zuko_unconditional_flow(
 
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x_bool:
-        # TODO: Check whether first base transform, then z-score is correct (it's the
-        # other way around in the conditional flows).
+        # z-score first, so that the flow transforms see standardized data.
         transforms = (
-            *base_transforms,
             standardizing_transform_zuko(batch_x, structured_x),
+            *base_transforms,
         )
     else:
         transforms = base_transforms

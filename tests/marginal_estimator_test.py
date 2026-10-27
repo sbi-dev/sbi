@@ -17,6 +17,7 @@ from torch.distributions import (
 from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.neural_nets import MarginalConfigBase, MarginalNSFConfig
 from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
+from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
 from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import process_device
 
@@ -67,6 +68,29 @@ def test_marginal_estimator(
         x_test = x_test.unsqueeze(1)
 
     check_c2st(x_test, samples.cpu(), f'MarginalEstimator-{model}')
+
+
+@pytest.mark.parametrize("which_nf", ["MAF", "NSF"])
+def test_unconditional_flow_is_equivariant_to_affine_data_changes(which_nf: str):
+    """With z-scoring, an affine change of the data only adds its log-determinant.
+
+    This holds only if the flow transforms see z-scored data, i.e., the z-score is
+    applied before them.
+    """
+    x = torch.randn(500, 2) * torch.tensor([1.0, 3.0])
+    shift, scale = 1000.0, 10.0
+    y = shift + scale * x
+
+    torch.manual_seed(0)
+    flow_x = build_zuko_unconditional_flow(which_nf, x, z_score_x="independent")
+    torch.manual_seed(0)
+    flow_y = build_zuko_unconditional_flow(which_nf, y, z_score_x="independent")
+
+    with torch.no_grad():
+        log_prob_x = flow_x.log_prob(x.unsqueeze(0))
+        log_prob_y = flow_y.log_prob(y.unsqueeze(0))
+    log_det = x.shape[1] * torch.log(torch.tensor(scale))
+    assert torch.allclose(log_prob_y, log_prob_x - log_det, atol=1e-3)
 
 
 def test_marginal_trainer_exhausted_epoch_budget_returns_the_best_weights():
