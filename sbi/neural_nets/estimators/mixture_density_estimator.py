@@ -635,18 +635,9 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
     def _apply(self, fn, *args, **kwargs):
         """Also apply `fn` to the proposal and prior MoGs, which are not buffers."""
         super()._apply(fn, *args, **kwargs)
-
-        def apply(mog: MoG) -> MoG:
-            return MoG(
-                fn(mog.logits),
-                fn(mog.means),
-                fn(mog.precisions),
-                fn(mog.precision_factors),
-            )
-
-        self._proposal_mog = apply(self._proposal_mog)
+        self._proposal_mog = self._proposal_mog.apply(fn)
         if self._prior_mog is not None:
-            self._prior_mog = apply(self._prior_mog)
+            self._prior_mog = self._prior_mog.apply(fn)
         return self
 
     @property

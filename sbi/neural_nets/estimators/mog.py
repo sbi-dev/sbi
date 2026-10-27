@@ -10,7 +10,7 @@ for evaluation (log_prob), sampling, and conditioning.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import numpy as np
 import torch
@@ -468,6 +468,27 @@ class MoG:
 
         return log_component_probs  # (batch_size, num_components)
 
+    def apply(self, fn: Callable[[Tensor], Tensor]) -> MoG:
+        """Apply `fn` to every tensor of the MoG.
+
+        Args:
+            fn: Function applied to the logits, means, precisions and precision
+                factors, e.g. a device move or a dtype cast.
+
+        Returns:
+            New MoG with the transformed tensors.
+        """
+        return MoG(
+            logits=fn(self.logits),
+            means=fn(self.means),
+            precisions=fn(self.precisions),
+            precision_factors=(
+                fn(self.precision_factors)
+                if self.precision_factors is not None
+                else None
+            ),
+        )
+
     def to(self, device: Union[str, torch.device]) -> MoG:
         """Move all tensors to the specified device.
 
@@ -477,16 +498,7 @@ class MoG:
         Returns:
             New MoG with tensors on the specified device.
         """
-        return MoG(
-            logits=self.logits.to(device),
-            means=self.means.to(device),
-            precisions=self.precisions.to(device),
-            precision_factors=(
-                self.precision_factors.to(device)
-                if self.precision_factors is not None
-                else None
-            ),
-        )
+        return self.apply(lambda tensor: tensor.to(device))
 
     def detach(self) -> MoG:
         """Detach all tensors from the computation graph.
@@ -494,16 +506,7 @@ class MoG:
         Returns:
             New MoG with detached tensors.
         """
-        return MoG(
-            logits=self.logits.detach(),
-            means=self.means.detach(),
-            precisions=self.precisions.detach(),
-            precision_factors=(
-                self.precision_factors.detach()
-                if self.precision_factors is not None
-                else None
-            ),
-        )
+        return self.apply(Tensor.detach)
 
     @classmethod
     def from_gaussian(
