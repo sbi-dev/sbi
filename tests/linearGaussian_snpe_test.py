@@ -847,36 +847,46 @@ def test_multiround_mog_training():
         proposal = posterior
 
 
-@pytest.mark.parametrize("wrap_prior", (False, True))
-def test_npe_c_prior_as_proposal_gives_density_estimator(wrap_prior: bool):
-    """With the prior as proposal, the proposal posterior is the density estimator.
-
-    pp(theta|x) is proportional to q(theta|x) * proposal(theta) / prior(theta), so it
-    equals q when the proposal is the prior. The MoG loss evaluates the prior in
-    z-scored space, so this needs the exact pushforward of a correlated prior.
-    """
-    prior_mean = torch.tensor([1.0, -1.0])
-    prior_cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
-    prior = MultivariateNormal(prior_mean, prior_cov)
-    if wrap_prior:
-        # `process_prior` wraps a float64 prior, which NPE-C must still see as Gaussian.
-        prior = MultivariateNormal(prior_mean.double(), prior_cov.double())
-        prior = process_prior(prior)[0]
-    shift = torch.tensor([0.5, -1.5])
-    scale = torch.tensor([1.5, 2.5])
+def _npe_c_with_mog_loss_state(prior, num_components=3, transform_input=None):
+    """Return NPE-C with an MDN, ready to evaluate the closed-form MoG loss."""
     estimator = MixtureDensityEstimator(
         MultivariateGaussianMDN(
-            features=2, context_features=2, hidden_features=10, num_components=3
+            features=2,
+            context_features=2,
+            hidden_features=10,
+            num_components=num_components,
         ),
         input_shape=torch.Size([2]),
         condition_shape=torch.Size([2]),
-        transform_input=torch.stack([shift, scale]),
+        transform_input=transform_input,
     )
     inference = NPE_C(prior, density_estimator=lambda theta, x: estimator)
     theta = prior.sample((100,))
     inference.append_simulations(theta, theta + torch.randn_like(theta))
     inference.train(max_num_epochs=1)
     inference._set_state_for_mog_proposal()
+    return inference, estimator
+
+
+@pytest.mark.parametrize("wrap_prior", (False, True))
+def test_npe_c_prior_as_proposal_gives_density_estimator(wrap_prior: bool):
+    """With the prior as proposal, the proposal posterior is the density estimator.
+
+    pp(theta|x) is proportional to q(theta|x) * proposal(theta) / prior(theta), so it
+    equals q when the proposal is the prior. Uses a correlated prior and a z-score
+    that differs from the prior's moments.
+    """
+    prior_mean = torch.tensor([1.0, -1.0])
+    prior_cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
+    prior = MultivariateNormal(prior_mean, prior_cov)
+    if wrap_prior:
+        prior = MultivariateNormal(prior_mean.double(), prior_cov.double())
+        prior = process_prior(prior)[0]
+    shift = torch.tensor([0.5, -1.5])
+    scale = torch.tensor([1.5, 2.5])
+    inference, estimator = _npe_c_with_mog_loss_state(
+        prior, transform_input=torch.stack([shift, scale])
+    )
 
     # The prior in the z-scored coordinates (theta - shift) / scale.
     prior_mean_z = (prior_mean - shift) / scale
@@ -900,53 +910,36 @@ def test_npe_c_drops_non_normalizable_component_pairs():
     """A component pair wider than the prior gets zero weight in the MoG loss.
 
     With prior precision I and proposal precision 0.5 I, an estimator component with
-    precision 0.2 I gives the pair precision -0.3 I, which has infinite mass.
+    precision diag(0.2, 4) gives the indefinite pair precision diag(-0.3, 3.5).
     """
-    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
-    estimator = MixtureDensityEstimator(
-        MultivariateGaussianMDN(
-            features=2, context_features=2, hidden_features=10, num_components=2
-        ),
-        input_shape=torch.Size([2]),
-        condition_shape=torch.Size([2]),
+    inference, _ = _npe_c_with_mog_loss_state(
+        MultivariateNormal(torch.zeros(2), torch.eye(2)), num_components=2
     )
-    inference = NPE_C(prior, density_estimator=lambda theta, x: estimator)
-    theta = prior.sample((100,))
-    inference.append_simulations(theta, theta + torch.randn_like(theta))
-    inference.train(max_num_epochs=1)
-    inference._set_state_for_mog_proposal()
-
-    proposal = (
-        torch.zeros(1, 1),
-        torch.zeros(1, 1, 2),
-        0.5 * torch.eye(2).expand(1, 1, 2, 2),
+    proposal = (torch.zeros(1, 1), torch.zeros(1, 1, 2), 0.5 * torch.eye(2)[None, None])
+    narrow = (torch.ones(1, 1, 2), 4.0 * torch.eye(2)[None, None])
+    wide = (-torch.ones(1, 1, 2), torch.diag(torch.tensor([0.2, 4.0]))[None, None])
+    both = (
+        torch.log(torch.tensor([[0.7, 0.3]])),
+        torch.cat([narrow[0], wide[0]], dim=1),
+        torch.cat([narrow[1], wide[1]], dim=1),
     )
-    narrow = (
-        torch.zeros(1, 1),
-        torch.ones(1, 1, 2),
-        4.0 * torch.eye(2).expand(1, 1, 2, 2),
-    )
-    wide = (
-        torch.zeros(1, 1),
-        -torch.ones(1, 1, 2),
-        0.2 * torch.eye(2).expand(1, 1, 2, 2),
-    )
-    both = [torch.cat(pair, dim=1) for pair in zip(narrow, wide, strict=True)]
-    both[0] = torch.log(torch.tensor([[0.7, 0.3]]))
 
     logits_pp, means_pp, precs_pp, _ = inference._automatic_posterior_transformation(
         *proposal, *both
     )
     _, means_narrow, precs_narrow, _ = inference._automatic_posterior_transformation(
-        *proposal, *narrow
+        *proposal, torch.zeros(1, 1), *narrow
     )
 
-    weights_pp = logits_pp.softmax(-1)
-    assert torch.allclose(weights_pp, torch.tensor([[1.0, 0.0]]))
+    assert torch.allclose(logits_pp.softmax(-1), torch.tensor([[1.0, 0.0]]))
     assert torch.allclose(means_pp[:, :1], means_narrow)
     assert torch.allclose(precs_pp[:, :1], precs_narrow)
+    # The MoG loss factorizes every returned precision.
+    assert torch.linalg.cholesky_ex(precs_pp).info.eq(0).all()
     with pytest.raises(ValueError, match="normalizable"):
-        inference._automatic_posterior_transformation(*proposal, *wide)
+        inference._automatic_posterior_transformation(
+            *proposal, torch.zeros(1, 1), *wide
+        )
 
 
 @pytest.mark.slow

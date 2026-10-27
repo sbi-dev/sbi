@@ -279,14 +279,14 @@ class NPE_C(PosteriorEstimatorTrainer):
         assert isinstance(gaussian_prior, MultivariateNormal)
 
         if self.z_score_theta:
-            # The MixtureDensityEstimator z-scores theta as a = (theta - shift) / scale,
-            # with shift and scale estimated from the training samples. This maps
-            # N(m, C) to N((m - shift) / scale, C / (scale scale^T)).
+            # a = (theta - shift) / scale maps N(m, C) to
+            # N((m - shift) / scale, C / (scale scale^T)).
             assert isinstance(self._neural_net, MixtureDensityEstimator)
             shift = self._neural_net._transform_shift
-            scale = self._neural_net._transform_scale
-            mean = gaussian_prior.mean.to(scale)
-            cov = gaussian_prior.covariance_matrix.to(scale)
+            mean = gaussian_prior.mean.to(shift)
+            cov = gaussian_prior.covariance_matrix.to(shift)
+            # The scale is 0-dim in estimators pickled with sbi <= 0.27.
+            scale = self._neural_net._transform_scale.expand_as(mean)
             self._maybe_z_scored_prior = MultivariateNormal(
                 (mean - shift) / scale,
                 covariance_matrix=cov / torch.outer(scale, scale),
@@ -548,6 +548,9 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns: (Component weight, mean, precision matrix, covariance matrix) of each
             Gaussian of the proposal posterior. Has L*K terms (proposal has L terms,
             density estimator has K terms).
+
+        Raises:
+            ValueError: If no term of a row has a positive definite precision.
         """
 
         precisions_pp, covariances_pp, normalizable = (
@@ -570,15 +573,13 @@ class NPE_C(PosteriorEstimatorTrainer):
             precisions_d,
         )
 
-        # A pair whose precision is not positive definite has infinite mass. This
-        # happens when both components are wider than the prior in some direction,
-        # e.g. low-weight components handed over from the previous round. Such pairs
-        # get zero weight; training makes them normalizable within a few epochs.
+        # A pair whose precision is not positive definite has infinite mass; it gets
+        # zero weight (MoG rejects -inf logits).
         if not normalizable.any(dim=1).all():
             raise ValueError(
                 "No component of the MoG proposal posterior is normalizable for some "
                 "rows: the proposal and the density estimator are both wider than the "
-                "prior. Use more simulations per round or a flow density estimator."
+                "prior. A flow density estimator does not use this closed-form loss."
             )
         logits_pp = logits_pp.masked_fill(
             ~normalizable, torch.finfo(logits_pp.dtype).min / 2
