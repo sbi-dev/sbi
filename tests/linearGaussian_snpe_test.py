@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from copy import deepcopy
 from dataclasses import asdict
 
@@ -32,6 +33,10 @@ from sbi.inference.posteriors.posterior_parameters import (
     MCMCPosteriorParameters,
 )
 from sbi.neural_nets import posterior_nn
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+    MultivariateGaussianMDN,
+)
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -841,6 +846,141 @@ def test_multiround_mog_training():
         _ = inference.append_simulations(theta, x, proposal=proposal).train()
         posterior = inference.build_posterior().set_default_x(x_o)
         proposal = posterior
+
+
+def _npe_c_with_mog_loss_state(prior, num_components=3, transform_input=None):
+    """Return NPE-C with an MDN, ready to evaluate the closed-form MoG loss."""
+    estimator = MixtureDensityEstimator(
+        MultivariateGaussianMDN(
+            features=2,
+            context_features=2,
+            hidden_features=10,
+            num_components=num_components,
+        ),
+        input_shape=torch.Size([2]),
+        condition_shape=torch.Size([2]),
+        transform_input=transform_input,
+    )
+    inference = NPE_C(prior, density_estimator=lambda theta, x: estimator)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta + torch.randn_like(theta))
+    inference.train(max_num_epochs=1)
+    inference._set_state_for_mog_proposal()
+    return inference, estimator
+
+
+@pytest.mark.parametrize("wrap_prior", (False, True))
+def test_npe_c_prior_as_proposal_gives_density_estimator(wrap_prior: bool):
+    """With the prior as proposal, the proposal posterior is the density estimator.
+
+    pp(theta|x) is proportional to q(theta|x) * proposal(theta) / prior(theta), so it
+    equals q when the proposal is the prior. Uses a correlated prior and a z-score
+    that differs from the prior's moments.
+    """
+    prior_mean = torch.tensor([1.0, -1.0])
+    prior_cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
+    prior = MultivariateNormal(prior_mean, prior_cov)
+    if wrap_prior:
+        prior = MultivariateNormal(prior_mean.double(), prior_cov.double())
+        prior = process_prior(prior)[0]
+    shift = torch.tensor([0.5, -1.5])
+    scale = torch.tensor([1.5, 2.5])
+    inference, estimator = _npe_c_with_mog_loss_state(
+        prior, transform_input=torch.stack([shift, scale])
+    )
+
+    prior_mean_z = (prior_mean - shift) / scale
+    prior_prec_z = torch.inverse(prior_cov / torch.outer(scale, scale))
+    mog_d = estimator.get_uncorrected_mog(torch.zeros(1, 2))
+    logits_pp, means_pp, precs_pp, _ = inference._automatic_posterior_transformation(
+        torch.zeros(1, 1),
+        prior_mean_z.reshape(1, 1, 2),
+        prior_prec_z.reshape(1, 1, 2, 2),
+        mog_d.log_weights,
+        mog_d.means,
+        mog_d.precisions,
+    )
+
+    assert torch.allclose(precs_pp, mog_d.precisions, atol=1e-4)
+    assert torch.allclose(means_pp, mog_d.means, atol=1e-4)
+    assert torch.allclose(logits_pp.log_softmax(-1), mog_d.log_weights, atol=1e-4)
+
+
+def test_npe_c_drops_non_normalizable_component_pairs():
+    """A component pair wider than the prior gets zero weight in the MoG loss.
+
+    With prior precision I and proposal precision 0.5 I, an estimator component with
+    precision diag(0.2, 4) gives the indefinite pair precision diag(-0.3, 3.5).
+    """
+    inference, _ = _npe_c_with_mog_loss_state(
+        MultivariateNormal(torch.zeros(2), torch.eye(2)), num_components=2
+    )
+    proposal = (torch.zeros(1, 1), torch.zeros(1, 1, 2), 0.5 * torch.eye(2)[None, None])
+    narrow = (torch.ones(1, 1, 2), 4.0 * torch.eye(2)[None, None])
+    wide = (-torch.ones(1, 1, 2), torch.diag(torch.tensor([0.2, 4.0]))[None, None])
+    both = (
+        torch.log(torch.tensor([[0.7, 0.3]])),
+        torch.cat([narrow[0], wide[0]], dim=1),
+        torch.cat([narrow[1], wide[1]], dim=1),
+    )
+
+    logits_pp, means_pp, precs_pp, _ = inference._automatic_posterior_transformation(
+        *proposal, *both
+    )
+    _, means_narrow, precs_narrow, _ = inference._automatic_posterior_transformation(
+        *proposal, torch.zeros(1, 1), *narrow
+    )
+
+    assert torch.allclose(logits_pp.softmax(-1), torch.tensor([[1.0, 0.0]]))
+    assert torch.allclose(means_pp[:, :1], means_narrow)
+    assert torch.allclose(precs_pp[:, :1], precs_narrow)
+    # The MoG loss factorizes every returned precision.
+    assert torch.linalg.cholesky_ex(precs_pp).info.eq(0).all()
+    with pytest.raises(ValueError, match="normalizable"):
+        inference._automatic_posterior_transformation(
+            *proposal, torch.zeros(1, 1), *wide
+        )
+
+
+@pytest.mark.parametrize("prior_var, warns", ((1e-4, True), (1e4, False)))
+def test_npe_c_warns_if_trained_estimator_has_non_normalizable_pairs(
+    prior_var: float, warns: bool
+):
+    """Pairs that are left out of the MoG loss after training raise a warning.
+
+    A prior much narrower than the untrained estimator makes every pair wider than
+    the prior; a much wider prior makes every pair normalizable.
+    """
+    prior = MultivariateNormal(torch.zeros(2), prior_var * torch.eye(2))
+    inference, estimator = _npe_c_with_mog_loss_state(prior)
+    proposal = DirectPosterior(estimator, prior).set_default_x(torch.zeros(1, 2))
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        inference._warn_if_pairs_not_normalizable(proposal, batch_size=50)
+
+    assert any("infinite mass" in str(w.message) for w in caught) == warns
+
+
+@pytest.mark.parametrize("force_first_round_loss", (False, True))
+def test_npe_c_checks_pairs_after_a_round_with_the_mog_loss(
+    force_first_round_loss: bool, monkeypatch
+):
+    """NPE-C checks the trained estimator only if the round used the MoG loss."""
+    calls = []
+    monkeypatch.setattr(
+        NPE_C, "_warn_if_pairs_not_normalizable", lambda *args: calls.append(args)
+    )
+    prior = MultivariateNormal(torch.zeros(2), 4 * torch.eye(2))
+    inference, _ = _npe_c_with_mog_loss_state(prior)
+    proposal = inference.build_posterior().set_default_x(torch.zeros(1, 2))
+    theta = proposal.sample((100,), show_progress_bars=False)
+    inference.append_simulations(
+        theta, theta + torch.randn_like(theta), proposal=proposal
+    )
+    inference.train(max_num_epochs=1, force_first_round_loss=force_first_round_loss)
+
+    assert len(calls) == int(not force_first_round_loss)
 
 
 @pytest.mark.slow
