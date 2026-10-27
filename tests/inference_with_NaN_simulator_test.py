@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import copy
 import logging
 import warnings
 
@@ -301,6 +302,28 @@ def test_inference_with_restriction_estimator():
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"{NPE_C}")
+
+
+def _restricted_box_prior():
+    prior = utils.BoxUniform(-2 * ones(2), 2 * ones(2))
+    theta = prior.sample((300,))
+    x = theta.clone()
+    x[theta[:, 0] > 1.0] = float("nan")
+    restriction_estimator = RestrictionEstimator(prior=prior)
+    restriction_estimator.append_simulations(theta, x).train(max_num_epochs=2)
+    return prior, theta, x, restriction_estimator
+
+
+def test_npe_trains_with_restricted_prior_as_proposal():
+    """NPE-C trains with a `RestrictedPrior` proposal, and the prior can be copied."""
+    prior, theta, x, restriction_estimator = _restricted_box_prior()
+    restricted_prior = restriction_estimator.restrict_prior()
+    copy.deepcopy(restricted_prior)
+
+    valid = ~torch.isnan(x).any(dim=1)
+    inference = NPE_C(prior=prior, show_progress_bars=False)
+    inference.append_simulations(theta[valid], x[valid], proposal=restricted_prior)
+    inference.train(max_num_epochs=1)
 
 
 @pytest.mark.parametrize("prior", ("uniform", "gaussian"))

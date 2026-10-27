@@ -553,7 +553,8 @@ class AcceptRejectFunction:
 
         valid_val_theta = validation_theta[validation_label.bool()]
         num_valid = valid_val_theta.shape[0]
-        clf_probs = F.softmax(classifier.forward(valid_val_theta), dim=1)[:, 1]
+        with torch.no_grad():
+            clf_probs = F.softmax(classifier.forward(valid_val_theta), dim=1)[:, 1]
 
         if allowed_false_negatives == 0.0:
             if safety_margin is None:
