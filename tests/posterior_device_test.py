@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import pytest
 import torch
+import torch.distributions.transforms as torch_tf
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import FMPE, NPE, NPE_A, MCMCPosterior
+from sbi.inference import FMPE, NPE, NPE_A, EnsemblePosterior, MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
@@ -152,3 +153,35 @@ def test_to_keeps_posterior_state(trained, kind: str):
         assert (getattr(posterior, attr) is posterior.potential_fn.prior) == shared
     samples = posterior.sample((2,), show_progress_bars=False)
     assert posterior.potential(samples).shape == (2,)
+
+
+@pytest.mark.parametrize("theta_transform", ["default", "user"])
+def test_ensemble_to_keeps_default_x_and_transform(trained, theta_transform: str):
+    """`.to()` keeps the ensemble's default x and the transform it was built with."""
+    _, npe, _ = trained
+    user_transform = (
+        torch_tf.IndependentTransform(
+            torch_tf.AffineTransform(torch.zeros(NUM_DIM), torch.ones(NUM_DIM)), 1
+        )
+        if theta_transform == "user"
+        else None
+    )
+    ensemble = EnsemblePosterior(
+        [npe.build_posterior(), npe.build_posterior()],
+        weights=[3.0, 1.0],
+        theta_transform=user_transform,
+    )
+    x_o = torch.zeros(1, NUM_DIM)
+    ensemble.set_default_x(x_o)
+    transform = ensemble.theta_transform
+    if user_transform is not None:
+        assert transform is user_transform
+
+    assert ensemble.to("cpu") is ensemble
+
+    assert torch.equal(ensemble.default_x, x_o)
+    assert ensemble.theta_transform is transform
+    theta = torch.zeros(3, NUM_DIM)
+    assert ensemble.potential(theta).shape == (3,)
+    map_ = ensemble.map(init_method=theta, num_iter=2, num_to_optimize=1)
+    assert map_.shape == (1, NUM_DIM)
