@@ -182,7 +182,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         )
         if force_update or self._log_normalization_constant is None or not is_cached_x:
             _, log_importance_weights = importance_sample(
-                self.potential_fn,
+                self.potential_fn.bind(x),
                 proposal=self.proposal,
                 num_samples=num_samples,
             )
