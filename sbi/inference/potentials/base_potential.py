@@ -134,9 +134,10 @@ class BasePotential(metaclass=ABCMeta):
         """
 
         device = process_device(device)
-        self.device = device
+        # The prior moves first: if it cannot, the potential keeps its old device.
         if self.prior is not None:
             self.prior = move_distribution_to_device(self.prior, device)
+        self.device = device
         if self._x_o is not None:
             self._x_o = self._x_o.to(device)
         return self

@@ -683,7 +683,8 @@ class RestrictedPrior(Distribution):
 
         Moves the prior and the posterior used for `sir`. The classifier of an
         `AcceptRejectFunction` stays on its device and evaluates parameters from any
-        device.
+        device. A user's own accept/reject callable, e.g. from
+        `get_density_thresholder()`, is not moved.
 
         Args:
             device: Device to move the restricted prior to.

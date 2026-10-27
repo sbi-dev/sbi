@@ -231,6 +231,10 @@ def test_posterior_with_custom_prior_moves_to_cpu():
     posterior = trainer.build_posterior(trainer.train(max_num_epochs=1))
 
     assert posterior.to("cpu") is posterior
+    # A failed move leaves the potential on its device.
+    with pytest.raises(NotImplementedError):
+        posterior.to("meta")
+    assert posterior.potential_fn.device == "cpu"
 
 
 def test_reinterpreted_batch_dim_prior():
