@@ -7,7 +7,13 @@ import torch
 
 
 def train_paper_recipe(
-    estimator, input, condition, epochs, batch_size=256, validation_fraction=0.1
+    estimator,
+    input,
+    condition,
+    epochs,
+    batch_size=256,
+    validation_fraction=0.1,
+    states=None,
 ):
     """AdamW (weight decay 5e-3), learning rate warmed up linearly over the first 5%
     of steps to 5e-4, then cosine decay to zero, gradient clipping at 1.5.
@@ -16,6 +22,8 @@ def train_paper_recipe(
     held-out split is kept: at 2,000 simulations the full schedule overfits (on
     gaussian_linear the held-out loss rises from 7.4 to 36.6 by epoch 400).
     The held-out loss uses the same noise every epoch, so epochs are comparable.
+
+    If `states` is a dict, it receives the `"best"` and the `"last"` state dicts.
 
     Returns:
         The estimator with the best weights, in eval mode, and the best epoch.
@@ -57,6 +65,9 @@ def train_paper_recipe(
         if current < best_loss:
             best_loss, best_epoch = current, epoch
             best_state = copy.deepcopy(estimator.state_dict())
+    if states is not None:
+        states["best"] = best_state
+        states["last"] = copy.deepcopy(estimator.state_dict())
     estimator.load_state_dict(best_state)
     estimator.eval()
     return estimator, best_epoch

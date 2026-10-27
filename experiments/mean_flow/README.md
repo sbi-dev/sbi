@@ -8,6 +8,7 @@ Evaluation of conditional mean flows (Arruda, Hasenauer, Radev 2026, arXiv:2610.
 | `results.md` | Our results: training regime, mini-sbibm at 2,000 simulations, consistency diagnostics, two moons at the paper's scale, bugs found, verdict |
 | `gandk_reproduction_plan.md` | Plan for reproducing the paper's g-and-k comparison on a GPU machine, with a fair baseline |
 | `scripts/bm_timing.py` | mini-sbibm runs with separate training and MCMC timing, NSF or mean flow, sbi trainer or paper recipe |
+| `scripts/nle_bench.py` | NLE on mini-sbibm: paper and sbi mean-flow networks, single-difference variants between them, NSF; last and best epoch |
 | `scripts/diagnostics.py` | Round trip, normalization across conditions, direct samples against MCMC on `log_prob` (two moons) |
 | `scripts/mean_flow_paper_trainer.py` | The paper's training recipe with best-epoch selection on a held-out split |
 | `scripts/training_variants.py` | Two moons NPE under different training regimes |
