@@ -446,22 +446,48 @@ def test_npe_a_string_warns():
         NPE_A(prior, density_estimator="mdn_snpe_a")
 
 
-@pytest.mark.parametrize("num_components", [3, 7], ids=["three", "seven"])
-def test_npe_a_binds_num_components_at_initialization(num_components):
-    """The trainer's component count is bound once during initialization."""
+@pytest.mark.filterwarnings("ignore:Passing a string:FutureWarning")
+@pytest.mark.parametrize(
+    "density_estimator",
+    [MDNConfig(hidden_features=16), "mdn_snpe_a", posterior_nn("mdn_snpe_a")],
+    ids=["config", "string", "factory"],
+)
+@pytest.mark.parametrize("final_round", [False, True], ids=["round", "final"])
+def test_npe_a_builds_one_gaussian_before_the_final_round(
+    density_estimator, final_round
+):
+    """Every builder gets one component, or `num_components` in a final round."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((20,))
+    theta = prior.sample((50,))
     x = theta + 0.1 * torch.randn_like(theta)
 
     trainer = NPE_A(
         prior,
-        density_estimator=MDNConfig(hidden_features=16),
-        num_components=num_components,
+        density_estimator=density_estimator,
+        num_components=3,
         show_progress_bars=False,
     )
-    estimator = trainer._build_neural_net(theta, x)
+    estimator = trainer.append_simulations(theta, x).train(
+        max_num_epochs=1, final_round=final_round
+    )
 
-    assert estimator.net._num_components == num_components
+    assert estimator.net.num_components == (3 if final_round else 1)
+
+
+def test_npe_a_rejects_a_builder_that_ignores_num_components():
+    """A builder with a fixed component count would break the correction later."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((50,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    def builder(batch_theta, batch_x, num_components):
+        return MDNConfig(num_components=4).build(
+            batch_input=batch_theta, batch_condition=batch_x
+        )
+
+    trainer = NPE_A(prior, density_estimator=builder, show_progress_bars=False)
+    with pytest.raises(ValueError, match="num_components"):
+        trainer.append_simulations(theta, x).train(max_num_epochs=1)
 
 
 def test_npe_a_rejects_a_conflicting_num_components():

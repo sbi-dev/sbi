@@ -580,8 +580,11 @@ def test_multiround_mdn_training_on_device(method: Union[NPE_A, NPE_C]):
     x = simulator(theta)
 
     proposal = prior
-    for _ in range(num_rounds):
-        trainer.append_simulations(theta, x, proposal=proposal).train(max_num_epochs=20)
+    for r in range(num_rounds):
+        final_round = dict(final_round=r == num_rounds - 1) if method == NPE_A else {}
+        trainer.append_simulations(theta, x, proposal=proposal).train(
+            max_num_epochs=20, **final_round
+        )
         proposal = trainer.build_posterior().set_default_x(torch.zeros(num_dim))
         theta = proposal.sample((num_simulations,))
         x = simulator(theta)

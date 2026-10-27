@@ -22,6 +22,7 @@ from sbi.neural_nets.estimators.base import (
 )
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
+    MultivariateGaussianMDN,
     ProposalCorrectedMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
@@ -50,11 +51,12 @@ class NPE_A(PosteriorEstimatorTrainer):
     and requires Mixture of Gaussians (MoG) density estimators.
 
     Note:
-        In multi-round SNPE-A, the number of MoG components grows multiplicatively
-        with each round: if the proposal has L components and the density estimator
-        has K components, the corrected posterior has L×K components. For many
-        rounds, consider using SNPE-C (APT) instead, which handles multi-round
-        inference more efficiently.
+        The correction divides by the proposal in closed form, which needs a
+        proposal with a single Gaussian (Appendix C of [1]). As in [1], NPE-A
+        therefore trains a single Gaussian in every round, and a mixture of
+        `num_components` Gaussians only in the round trained with
+        `train(final_round=True)`. The posterior of that round cannot be the
+        proposal of another round.
 
     Example:
     --------
@@ -67,22 +69,24 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         # 1. Setup simulator, prior, and observation
         prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
-        x_o = torch.randn(1, 3)  # Observed data
 
         def simulator(theta):
             return theta + torch.randn_like(theta) * 0.1
 
+        x_o = simulator(prior.sample((1,)))  # Observed data
+
         # 2. Multi-round inference
         inference = NPE_A(prior=prior, num_components=5)
         proposal = prior
+        num_rounds = 5
 
-        for round_idx in range(5):
+        for r in range(num_rounds):
             theta = proposal.sample((100,))
             x = simulator(theta)
-            density_estimator = inference.append_simulations(
-                theta, x, proposal=proposal
-            ).train()
-            posterior = inference.build_posterior(density_estimator)
+            inference.append_simulations(theta, x, proposal=proposal).train(
+                final_round=(r == num_rounds - 1)
+            )
+            posterior = inference.build_posterior()
             proposal = posterior.set_default_x(x_o)
 
         # 3. Sample from final posterior
@@ -122,12 +126,12 @@ class NPE_A(PosteriorEstimatorTrainer):
                 will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
-            num_components: Number of components of the mixture of Gaussians.
-                Note: In multi-round SNPE-A, the number of components grows
-                multiplicatively with each round due to the analytical correction
-                (L components in proposal × K components in density = L*K posterior
-                components).
+                `.sample()` and must return a `MixtureDensityEstimator`. It is also
+                called with the keyword `num_components`, and has to build that many
+                mixture components.
+            num_components: Number of components of the mixture of Gaussians in the
+                round trained with `train(final_round=True)`. All other rounds train
+                a single Gaussian.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -179,10 +183,20 @@ class NPE_A(PosteriorEstimatorTrainer):
         )
         super().__init__(**kwargs)
 
-        if not isinstance(density_estimator, MDNConfig):
-            self._build_neural_net = partial(
-                self._build_neural_net, num_components=num_components
-            )
+        self._num_components = num_components
+        # `train()` binds the number of components when the network is built.
+        builder: Callable[..., ConditionalDensityEstimator]
+        if isinstance(density_estimator, MDNConfig):
+            config, wrap_builder = density_estimator, self._wrap_builder
+
+            def build_from_config(batch_theta, batch_x, num_components):
+                config_k = replace(config, num_components=num_components)
+                return wrap_builder(config_k)(batch_theta, batch_x)
+
+            builder = build_from_config
+        else:
+            builder = density_estimator
+        self._build_neural_net = partial(_build_mdn, builder=builder)
 
     def train(
         self,
@@ -197,6 +211,8 @@ class NPE_A(PosteriorEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        final_round: bool = False,
+        component_perturbation: float = 5e-3,
     ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the proposal posterior.
 
@@ -206,6 +222,12 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         Training is performed with maximum likelihood on samples from the latest round,
         which leads the algorithm to converge to the proposal posterior.
+
+        As in [1], the density estimator is a single Gaussian in every round but the
+        final one, so that its posterior can be the proposal of the next round
+        (Algorithm 1). A round trained with `final_round=True` copies that Gaussian
+        `num_components` times with small noise and trains the mixture (Algorithm 2).
+        Its posterior cannot be a proposal anymore.
 
         Args:
             training_batch_size: Training batch size.
@@ -231,9 +253,19 @@ class NPE_A(PosteriorEstimatorTrainer):
                 loss and leakage after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
+            final_round: Whether this is the last round. Set it in the last iteration
+                of the loop over rounds, or call `train(final_round=True)` once more
+                after the loop, which retrains on the data of the last round.
+            component_perturbation: Standard deviation of the noise added to the
+                copies of the Gaussian in the final round. It breaks the symmetry
+                between the copies.
 
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
+
+        Raises:
+            ValueError: If `final_round=True` would expand the network while
+                `resume_training=True`.
         """
 
         assert not retrain_from_scratch, """Retraining from scratch is not supported in
@@ -246,6 +278,8 @@ class NPE_A(PosteriorEstimatorTrainer):
             entries=(
                 "self",
                 "__class__",
+                "final_round",
+                "component_perturbation",
             ),
         )
 
@@ -260,6 +294,23 @@ class NPE_A(PosteriorEstimatorTrainer):
             )
 
         self._round = max(self._data_round_index)
+
+        num_components = self._num_components if final_round else 1
+        if self._neural_net is None:
+            self._build_neural_net = partial(
+                self._build_neural_net, num_components=num_components
+            )
+        elif num_components > 1:
+            mdn = self._neural_net.net
+            assert isinstance(mdn, MultivariateGaussianMDN)
+            if mdn.num_components == 1:
+                if resume_training:
+                    raise ValueError(
+                        "`final_round=True` replaces the output layers of the "
+                        "network, so the optimizer cannot be resumed. Call "
+                        "`train(final_round=True)` without `resume_training`."
+                    )
+                mdn.expand_components(num_components, component_perturbation)
 
         density_estimator = super().train(**kwargs)
 
@@ -382,7 +433,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             raise TypeError(
                 "NPE_A requires MixtureDensityEstimator, "
                 f"got {type(density_estimator).__name__}. "
-                "Use density_estimator='mdn_snpe_a' when initializing NPE_A."
+                "Use density_estimator=MDNConfig() when initializing NPE_A."
             )
 
         # Compute correction parameters
@@ -443,3 +494,39 @@ class NPE_A(PosteriorEstimatorTrainer):
         Returns: Log-probability of the proposal posterior.
         """
         return self._neural_net.log_prob(theta, x)
+
+
+def _build_mdn(
+    batch_theta: Tensor, batch_x: Tensor, builder: Callable, num_components: int
+) -> MixtureDensityEstimator:
+    """Build the NPE-A network and check that it has `num_components` components.
+
+    Args:
+        batch_theta: Parameters, used for shape inference and z-scoring.
+        batch_x: Simulation outputs, used for shape inference and z-scoring.
+        builder: Function that builds the network from `batch_theta`, `batch_x` and
+            the keyword `num_components`.
+        num_components: Number of mixture components to build.
+
+    Returns:
+        The mixture density estimator.
+
+    Raises:
+        TypeError: If the builder does not return a `MixtureDensityEstimator`.
+        ValueError: If the builder ignores `num_components`.
+    """
+    estimator = builder(batch_theta, batch_x, num_components=num_components)
+    if not isinstance(estimator, MixtureDensityEstimator):
+        raise TypeError(
+            "NPE_A requires a MixtureDensityEstimator, the density estimator "
+            f"builder returned {type(estimator).__name__}. Use MDNConfig."
+        )
+    if estimator.net.num_components != num_components:
+        raise ValueError(
+            f"NPE-A asked the density estimator builder for {num_components} "
+            f"mixture components and got {estimator.net.num_components}. A builder "
+            "passed to NPE_A has to build its MDN with the `num_components` keyword "
+            "it is called with: NPE-A trains one Gaussian in every round but the "
+            "final one."
+        )
+    return estimator

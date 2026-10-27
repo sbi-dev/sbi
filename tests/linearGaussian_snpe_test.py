@@ -465,17 +465,15 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         _ = inference.append_simulations(theta, x, proposal=posterior1).train()
         posterior = inference.build_posterior().set_default_x(x_o)
     elif method_str == "snpe_a":
-        # Use 3 components with 2 rounds to test multi-component MDN.
-        # Component growth: round 1 = 3, round 2 = 3×3 = 9 components.
         snpe_a_args = {**creation_args, "num_components": 3}
         inference = NPE_A(**snpe_a_args)
         proposal = prior
         num_rounds = 2
-        for _ in range(num_rounds):
+        for r in range(num_rounds):
             theta = proposal.sample((1000,))
             x = simulator(theta)
             inference = inference.append_simulations(theta, x, proposal=proposal)
-            _ = inference.train()
+            _ = inference.train(final_round=(r == num_rounds - 1))
             posterior = inference.build_posterior().set_default_x(x_o)
             proposal = posterior
     elif method_str.startswith("tsnpe"):
@@ -503,6 +501,38 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=method_str)
+
+
+@pytest.mark.slow
+def test_multi_round_npe_a_matches_true_posterior_moments():
+    """Two NPE-A rounds with a final round recover the true mean and std.
+
+    c2st misses moment errors of this size, so the moments are checked directly.
+    The bounds are about twice the spread over seeds 0 to 5.
+    """
+    prior = MultivariateNormal(zeros(2), eye(2))
+    likelihood_shift, likelihood_cov = -1.0 * ones(2), 0.3 * eye(2)
+    x_o = zeros(1, 2)
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o[0], likelihood_shift, likelihood_cov, zeros(2), eye(2)
+    )
+    true_std = true_posterior.covariance_matrix.diagonal().sqrt()
+
+    inference = NPE_A(prior, num_components=5, show_progress_bars=False)
+    proposal = prior
+    for r in range(2):
+        theta = proposal.sample((3000,))
+        x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+        inference.append_simulations(theta, x, proposal=proposal).train(
+            final_round=(r == 1)
+        )
+        proposal = inference.build_posterior().set_default_x(x_o)
+
+    samples = proposal.sample((10_000,))
+    mean_error = (samples.mean(0) - true_posterior.mean) / true_std
+    std_ratio = samples.std(0) / true_std
+    assert mean_error.abs().max() < 0.3, f"mean error {mean_error} posterior stds"
+    assert ((std_ratio > 0.8) & (std_ratio < 1.25)).all(), f"std ratio {std_ratio}"
 
 
 # Testing rejection and mcmc sampling methods.
@@ -1140,3 +1170,37 @@ def test_npe_a_gaussian_proposal_equal_to_prior_keeps_the_density():
         assert torch.allclose(
             estimator.log_prob(theta, x), estimator.net.log_prob(theta, x), atol=1e-3
         )
+
+
+@pytest.mark.parametrize("form", ["in_loop", "after_loop"])
+def test_npe_a_final_round_expands_the_gaussian(form):
+    """Both documented loops end with a mixture whose proposal is one Gaussian:
+    the flag in the last round, or one more `train(final_round=True)` after it."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference = NPE_A(prior, num_components=3, show_progress_bars=False)
+    proposal = prior
+    for r in range(2):
+        theta = proposal.sample((100,))
+        inference.append_simulations(theta, theta, proposal=proposal).train(
+            max_num_epochs=2, final_round=(form == "in_loop" and r == 1)
+        )
+        proposal = inference.build_posterior().set_default_x(zeros(1, 2))
+    if form == "after_loop":
+        assert proposal.get_mog_params(zeros(1, 2)).num_components == 1
+        inference.train(max_num_epochs=2, final_round=True)
+    # Retraining the final round must not copy the components again.
+    inference.train(max_num_epochs=2, final_round=True)
+
+    posterior = inference.build_posterior().set_default_x(zeros(1, 2))
+    assert posterior.get_mog_params(zeros(1, 2)).num_components == 3
+
+
+def test_npe_a_final_round_cannot_resume_the_optimizer():
+    """The expansion replaces parameters that a resumed optimizer still holds."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference = NPE_A(prior, num_components=3, show_progress_bars=False)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=2)
+
+    with pytest.raises(ValueError, match="resume"):
+        inference.train(final_round=True, resume_training=True)

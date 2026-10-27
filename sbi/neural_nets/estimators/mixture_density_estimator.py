@@ -258,6 +258,57 @@ class MultivariateGaussianMDN(nn.Module):
         mog = self.get_mixture_components(context)
         return mog.sample(sample_shape)
 
+    def expand_components(self, num_components: int, perturbation: float) -> None:
+        """Replace the single mixture component by `num_components` copies of it.
+
+        Every output layer is repeated per component, and equal logits give each copy
+        the weight `1 / num_components`, so without noise the mixture has the density
+        of the single component. Gaussian noise on the copied weights and biases breaks
+        the symmetry, so that training can move the copies apart. NPE-A uses this for
+        its final round (Papamakarios & Murray 2016, Algorithm 2).
+
+        Args:
+            num_components: Number of components after the expansion.
+            perturbation: Standard deviation of the noise added to the copied weights
+                and biases.
+
+        Raises:
+            ValueError: If the MDN has more than one component, or if
+                `num_components` is smaller than one.
+        """
+        if self._num_components != 1:
+            raise ValueError(
+                "Only an MDN with a single component can be expanded, this one has "
+                f"{self._num_components}."
+            )
+        if num_components < 1:
+            raise ValueError(f"num_components must be >= 1, got {num_components}")
+
+        for name in (
+            "_logits_layer",
+            "_means_layer",
+            "_unconstrained_diagonal_layer",
+            "_upper_layer",
+        ):
+            layer = getattr(self, name)
+            if layer is None:
+                continue
+            expanded = nn.Linear(
+                layer.in_features,
+                layer.out_features * num_components,
+                device=layer.weight.device,
+                dtype=layer.weight.dtype,
+            )
+            # Outputs are ordered by component, so repeating the rows copies whole
+            # components.
+            with torch.no_grad():
+                expanded.weight.copy_(layer.weight.repeat(num_components, 1))
+                expanded.bias.copy_(layer.bias.repeat(num_components))
+                expanded.weight.add_(torch.randn_like(expanded.weight) * perturbation)
+                expanded.bias.add_(torch.randn_like(expanded.bias) * perturbation)
+            setattr(self, name, expanded)
+        self._num_components = num_components
+
     def _initialize(self) -> None:
         """Initialize MDN for approximately uniform mixture and identity covariance.
 
