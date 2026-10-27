@@ -22,6 +22,7 @@ from sbi.neural_nets.estimators.base import (
 )
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
+    ProposalCorrectedMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
@@ -272,14 +273,14 @@ class NPE_A(PosteriorEstimatorTrainer):
         """Extract MoG parameters from a proposal distribution.
 
         Supports multiple proposal types:
-        - NPE_A_Posterior: extracts corrected MoG via get_mog_params()
+        - NPE_A_Posterior: its corrected MoG, from get_mog_params()
         - MultivariateNormal: converts to single-component MoG over parameters
         - MoG: a MoG over parameters
 
         Args:
             proposal: The proposal distribution from the previous round.
-            density_estimator: The estimator whose z-scored space the
-                MultivariateNormal and MoG proposals are mapped into.
+            density_estimator: The estimator whose z-scored space the proposal is
+                mapped into.
 
         Returns:
             MoG parameters from the proposal, in the z-scored space.
@@ -302,7 +303,14 @@ class NPE_A(PosteriorEstimatorTrainer):
                     f"{default_x.shape[0]}. NPE-A only supports single "
                     "observations for correction."
                 )
-            return proposal.get_mog_params(default_x)
+            # The proposal's MoG is in the z-scored space of its own estimator.
+            proposal_estimator = proposal.posterior_estimator
+            if isinstance(proposal_estimator, ProposalCorrectedMDN):
+                proposal_estimator = proposal_estimator.net
+            assert isinstance(proposal_estimator, MixtureDensityEstimator)
+            return density_estimator.transform_mog_from(
+                proposal_estimator, proposal.get_mog_params(default_x)
+            )
 
         if isinstance(proposal, MultivariateNormal):
             return density_estimator.transform_mog(
