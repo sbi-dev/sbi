@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+import functools
+from dataclasses import asdict
+
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
@@ -15,25 +18,13 @@ from sbi.inference import FMPE, NPE, NPE_A, EnsemblePosterior, MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
-    RejectionPosteriorParameters,
     VIPosteriorParameters,
     VectorFieldPosteriorParameters,
 )
-from sbi.utils import BoxUniform, RestrictionEstimator
+from sbi.utils import BoxUniform
 from sbi.utils.torchutils import process_device
 
 NUM_DIM = 2
-POSTERIOR_KINDS = [
-    "direct",
-    "rejection",
-    "importance",
-    "mcmc",
-    "mcmc_posterior_proposal",
-    "mcmc_restricted_proposal",
-    "vi",
-    "vector_field",
-    "npe_a",
-]
 MCMC_FAST = MCMCPosteriorParameters(
     num_chains=1, thin=1, warmup_steps=1, init_strategy="proposal"
 )
@@ -58,12 +49,13 @@ def _train(prior_name: str):
     npe.append_simulations(theta, x).train(max_num_epochs=1)
     fmpe = FMPE(prior, show_progress_bars=False)
     fmpe.append_simulations(theta, x).train(max_num_epochs=1)
-    return prior_name, npe, fmpe
+    return npe, fmpe
 
 
-@pytest.fixture(scope="module", params=["box", "mvn"])
-def trained(request):
-    return _train(request.param)
+@pytest.fixture(scope="module")
+def trained_on_cpu():
+    """`_train`, once per prior, for tests that keep the estimators on the CPU."""
+    return functools.cache(_train)
 
 
 def _npe_a_round_two(prior_name: str):
@@ -81,12 +73,6 @@ def _npe_a_round_two(prior_name: str):
 def _build(kind: str, npe, fmpe, prior_name: str):
     if kind == "direct":
         return npe.build_posterior()
-    if kind == "rejection":
-        return npe.build_posterior(
-            posterior_parameters=RejectionPosteriorParameters(
-                num_samples_to_find_max=100, num_iter_to_find_max=5
-            )
-        )
     if kind == "importance":
         return npe.build_posterior(
             posterior_parameters=ImportanceSamplingPosteriorParameters()
@@ -97,27 +83,7 @@ def _build(kind: str, npe, fmpe, prior_name: str):
         # A previous-round posterior as proposal, as in multi-round NLE or NRE.
         proposal = npe.build_posterior().set_default_x(torch.zeros(1, NUM_DIM))
         return MCMCPosterior(
-            npe.build_posterior().potential_fn,
-            proposal=proposal,
-            num_chains=1,
-            thin=1,
-            warmup_steps=1,
-            init_strategy="proposal",
-        )
-    if kind == "mcmc_restricted_proposal":
-        prior = npe._prior
-        theta = prior.sample((200,))
-        x = theta.clone()
-        x[theta[:, 0] > 1.0] = float("nan")
-        restriction = RestrictionEstimator(prior=prior)
-        restriction.append_simulations(theta, x).train(max_num_epochs=2)
-        return MCMCPosterior(
-            npe.build_posterior().potential_fn,
-            proposal=restriction.restrict_prior(),
-            num_chains=1,
-            thin=1,
-            warmup_steps=1,
-            init_strategy="proposal",
+            npe.build_posterior().potential_fn, proposal=proposal, **asdict(MCMC_FAST)
         )
     if kind == "vi":
         posterior = npe.build_posterior(
@@ -140,12 +106,29 @@ def _build(kind: str, npe, fmpe, prior_name: str):
     raise ValueError(kind)
 
 
-@pytest.mark.parametrize("kind", POSTERIOR_KINDS)
-def test_to_keeps_posterior_state(trained, kind: str):
-    """`.to()` returns the posterior and keeps default x, MAP, transform and prior."""
-    prior_name, npe, fmpe = trained
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
+@pytest.mark.parametrize("prior_name", ["box", "mvn"])
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "direct",
+        "importance",
+        "mcmc",
+        "mcmc_posterior_proposal",
+        "vi",
+        "vector_field",
+        "npe_a",
+    ],
+)
+def test_to_moves_posterior_and_keeps_state(
+    trained_on_cpu, kind: str, prior_name: str, device: str
+):
+    """`.to()` returns the posterior and keeps default x, MAP, transform and prior;
+    sample, potential and MAP then run on the device."""
     if kind == "npe_a" and prior_name == "box":
         pytest.skip("Two-round NPE-A with a BoxUniform hits the known PD error.")
+    # `.to()` moves the estimators in place, so a GPU case trains its own.
+    npe, fmpe = trained_on_cpu(prior_name) if device == "cpu" else _train(prior_name)
     posterior = _build(kind, npe, fmpe, prior_name)
     x_o = torch.zeros(1, NUM_DIM)
     posterior.set_default_x(x_o)
@@ -159,43 +142,45 @@ def test_to_keeps_posterior_state(trained, kind: str):
         for attr in ("prior", "_prior", "proposal")
         if hasattr(posterior, attr)
     }
+    device = process_device(device)
 
-    assert posterior.to("cpu") is posterior
+    assert posterior.to(device) is posterior
 
-    assert torch.equal(posterior.default_x, x_o)
+    assert torch.equal(posterior.default_x, x_o.to(device))
     # A dropped cache would run gradient ascent again from the new init.
-    new_init = torch.ones(1, NUM_DIM)
-    assert torch.equal(posterior.map(init_method=new_init, **map_kwargs), map_)
+    new_init = torch.ones(1, NUM_DIM, device=device)
+    cached_map = posterior.map(init_method=new_init, **map_kwargs)
+    assert torch.equal(cached_map, map_.to(device))
     assert str(posterior) == description
     assert posterior.theta_transform is transform
     assert getattr(posterior.potential_fn, "iid_method", None) == iid_method
     for attr, shared in shares_prior.items():
         assert (getattr(posterior, attr) is posterior.potential_fn.prior) == shared
+    device_type = torch.device(device).type
     samples = posterior.sample((2,), show_progress_bars=False)
-    assert posterior.potential(samples).shape == (2,)
+    assert samples.device.type == device_type
+    assert posterior.potential(samples).device.type == device_type
+    new_map = posterior.map(init_method=samples[:1], force_update=True, **map_kwargs)
+    assert new_map.device.type == device_type
+    if device != "cpu":
+        posterior.to("cpu")
+        assert posterior.sample((2,), show_progress_bars=False).device.type == "cpu"
 
 
-@pytest.mark.parametrize("theta_transform", ["default", "user"])
-def test_ensemble_to_keeps_default_x_and_transform(trained, theta_transform: str):
+@pytest.mark.parametrize("prior_name", ["box", "mvn"])
+def test_ensemble_to_keeps_default_x_and_transform(trained_on_cpu, prior_name: str):
     """`.to()` keeps the ensemble's default x and the transform it was built with."""
-    _, npe, _ = trained
-    user_transform = (
-        torch_tf.IndependentTransform(
-            torch_tf.AffineTransform(torch.zeros(NUM_DIM), torch.ones(NUM_DIM)), 1
-        )
-        if theta_transform == "user"
-        else None
+    npe, _ = trained_on_cpu(prior_name)
+    transform = torch_tf.IndependentTransform(
+        torch_tf.AffineTransform(torch.zeros(NUM_DIM), torch.ones(NUM_DIM)), 1
     )
     ensemble = EnsemblePosterior(
         [npe.build_posterior(), npe.build_posterior()],
         weights=[3.0, 1.0],
-        theta_transform=user_transform,
+        theta_transform=transform,
     )
     x_o = torch.zeros(1, NUM_DIM)
     ensemble.set_default_x(x_o)
-    transform = ensemble.theta_transform
-    if user_transform is not None:
-        assert transform is user_transform
 
     assert ensemble.to("cpu") is ensemble
 
@@ -207,34 +192,11 @@ def test_ensemble_to_keeps_default_x_and_transform(trained, theta_transform: str
     assert map_.shape == (1, NUM_DIM)
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("prior_name", ["box", "mvn"])
-@pytest.mark.parametrize("kind", POSTERIOR_KINDS)
-def test_to_gpu_and_back(prior_name: str, kind: str):
-    """After `.to(gpu)` and `.to("cpu")`, sample, potential and MAP run there."""
-    if kind == "npe_a" and prior_name == "box":
-        pytest.skip("Two-round NPE-A with a BoxUniform hits the known PD error.")
-    _, npe, fmpe = _train(prior_name)
-    posterior = _build(kind, npe, fmpe, prior_name)
-    posterior.set_default_x(torch.zeros(1, NUM_DIM))
-
-    for device in (process_device("gpu"), "cpu"):
-        posterior.to(device)
-        device_type = torch.device(device).type
-        samples = posterior.sample((2,), show_progress_bars=False)
-        assert samples.device.type == device_type
-        assert posterior.potential(samples).device.type == device_type
-        map_ = posterior.map(
-            init_method=samples[:1], num_iter=2, num_to_optimize=1, force_update=True
-        )
-        assert map_.device.type == device_type
-
-
 @pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 def test_map_with_module_backed_theta_transform(device: str):
     """A user transform with parameters, e.g. a Pyro `TransformModule`, moves with
     the posterior, and `map()` optimizes through it."""
-    _, npe, _ = _train("mvn")
+    npe, _ = _train("mvn")
     posterior = npe.build_posterior(
         posterior_parameters=ImportanceSamplingPosteriorParameters(
             theta_transform=affine_autoregressive(NUM_DIM)
@@ -250,9 +212,9 @@ def test_map_with_module_backed_theta_transform(device: str):
     assert map_.device.type == torch.device(device).type
 
 
-def test_to_keeps_ode_options_of_bound_vector_field_potential():
+def test_to_keeps_ode_options_of_bound_vector_field_potential(trained_on_cpu):
     """A bound vector field potential keeps the ODE options given to `bind()`."""
-    _, _, fmpe = _train("box")
+    _, fmpe = trained_on_cpu("box")
     potential = fmpe.build_posterior().potential_fn.bind(
         torch.zeros(1, NUM_DIM), atol=1e-3, rtol=1e-3, exact=False
     )

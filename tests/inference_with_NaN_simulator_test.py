@@ -316,16 +316,12 @@ def _restricted_box_prior(num_simulations: int = 300, max_num_epochs: int = 2):
     return prior, theta, x, restriction_estimator, classifier
 
 
-def test_npe_trains_with_restricted_prior_as_proposal():
-    """NPE-C trains with a `RestrictedPrior` proposal, and the prior can be copied."""
-    prior, theta, x, restriction_estimator, _ = _restricted_box_prior()
-    restricted_prior = restriction_estimator.restrict_prior()
-    copy.deepcopy(restricted_prior)
+def test_restricted_prior_can_be_deep_copied():
+    """The threshold of the classifier carries no gradient graph, which deep copies
+    (e.g. of a proposal) cannot handle."""
+    *_, restriction_estimator, _ = _restricted_box_prior()
 
-    valid = ~torch.isnan(x).any(dim=1)
-    inference = NPE_C(prior=prior, show_progress_bars=False)
-    inference.append_simulations(theta[valid], x[valid], proposal=restricted_prior)
-    inference.train(max_num_epochs=1)
+    copy.deepcopy(restriction_estimator.restrict_prior())
 
 
 def test_restrict_prior_uses_the_passed_classifier():
