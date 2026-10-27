@@ -1108,3 +1108,24 @@ def test_npe_a_round_two_with_float64_gaussian_prior(wrap):
     posterior = inference.build_posterior()
     samples = posterior.sample((10,), x=zeros(1, 2), show_progress_bars=False)
     assert samples.dtype == torch.float32
+
+
+def test_npe_a_gaussian_proposal_equal_to_prior_keeps_the_density():
+    """The correction maps a Gaussian proposal into the z-scored space. With the
+    proposal equal to the prior, it leaves the network's density unchanged."""
+    prior = MultivariateNormal(torch.tensor([1.0, -1.0]), 4 * eye(2))
+    inference = NPE_A(prior, num_components=1, show_progress_bars=False)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=1)
+
+    proposal = MultivariateNormal(torch.tensor([1.0, -1.0]), 4 * eye(2))
+    theta = proposal.sample((100,))
+    inference.append_simulations(theta, theta, proposal=proposal).train(
+        max_num_epochs=1
+    )
+    estimator = inference.build_posterior().posterior_estimator
+    theta, x = prior.sample((5,)), zeros(5, 2)
+    with torch.no_grad():
+        assert torch.allclose(
+            estimator.log_prob(theta, x), estimator.net.log_prob(theta, x), atol=1e-3
+        )

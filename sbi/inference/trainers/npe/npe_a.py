@@ -266,20 +266,23 @@ class NPE_A(PosteriorEstimatorTrainer):
     def _get_proposal_mog(
         self,
         proposal: Union["NPE_A_Posterior", MultivariateNormal, MoG, Any],
+        density_estimator: MixtureDensityEstimator,
     ) -> MoG:
         """Extract MoG parameters from a proposal distribution.
 
         Supports multiple proposal types:
         - NPE_A_Posterior: extracts corrected MoG via get_mog_params()
-        - MultivariateNormal: converts to single-component MoG
-        - MoG: uses directly
+        - MultivariateNormal: converts to single-component MoG over parameters
+        - MoG: a MoG over parameters
         - Any object with get_mog_params(x) method
 
         Args:
             proposal: The proposal distribution from the previous round.
+            density_estimator: The estimator whose z-scored space the
+                MultivariateNormal and MoG proposals are mapped into.
 
         Returns:
-            MoG parameters from the proposal.
+            MoG parameters from the proposal, in the z-scored space.
 
         Raises:
             ValueError: If NPE_A_Posterior proposal doesn't have default_x set.
@@ -302,14 +305,12 @@ class NPE_A(PosteriorEstimatorTrainer):
             return proposal.get_mog_params(default_x)
 
         if isinstance(proposal, MultivariateNormal):
-            mean: Tensor = proposal.mean.to(self._device)  # type: ignore[assignment]
-            cov: Tensor = proposal.covariance_matrix.to(  # type: ignore[assignment]
-                self._device
+            return density_estimator.transform_mog(
+                MoG.from_gaussian(proposal.mean, proposal.covariance_matrix)
             )
-            return MoG.from_gaussian(mean.unsqueeze(0), cov.unsqueeze(0))
 
         if isinstance(proposal, MoG):
-            return proposal.to(self._device)
+            return density_estimator.transform_mog(proposal)
 
         # Case 4: Any object with get_mog_params method
         if hasattr(proposal, "get_mog_params"):
@@ -439,7 +440,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             proposal_mog = None
             prior_mog = None
         else:
-            proposal_mog = self._get_proposal_mog(proposal)
+            proposal_mog = self._get_proposal_mog(proposal, density_estimator)
             prior_mog = self._compute_z_scored_prior_mog(density_estimator)
 
         # Build the posterior
