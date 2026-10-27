@@ -1085,3 +1085,26 @@ def test_npe_a_rejects_unconstrained_transform_after_first_round(prior):
     )
     with pytest.raises(NotImplementedError, match="affine z-score"):
         inference.build_posterior()
+
+
+@pytest.mark.parametrize("wrap", [False, True], ids=["raw", "process_prior"])
+def test_npe_a_round_two_with_float64_gaussian_prior(wrap):
+    """A float64 Gaussian prior, also wrapped by `process_prior`, gives a float32
+    round-2 posterior."""
+    prior = MultivariateNormal(
+        zeros(2, dtype=torch.float64), eye(2, dtype=torch.float64)
+    )
+    if wrap:
+        prior = process_prior(prior)[0]
+    inference = NPE_A(prior, num_components=1, show_progress_bars=False)
+    theta = prior.sample((100,)).float()
+    inference.append_simulations(theta, theta).train(max_num_epochs=1)
+    proposal = inference.build_posterior().set_default_x(zeros(1, 2))
+
+    theta = proposal.sample((100,), show_progress_bars=False)
+    inference.append_simulations(theta, theta, proposal=proposal).train(
+        max_num_epochs=1
+    )
+    posterior = inference.build_posterior()
+    samples = posterior.sample((10,), x=zeros(1, 2), show_progress_bars=False)
+    assert samples.dtype == torch.float32

@@ -8,7 +8,7 @@ from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
 from torch import Tensor
-from torch.distributions import Distribution, MultivariateNormal
+from torch.distributions import Distribution, MultivariateNormal, Uniform
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
@@ -25,8 +25,7 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.sbi_types import Tracker
-from sbi.utils.sbiutils import del_entries
-from sbi.utils.torchutils import BoxUniform
+from sbi.utils.sbiutils import check_dist_class, del_entries
 
 _MDN_DEFAULT_COMPONENTS = MDNConfig().num_components
 
@@ -357,16 +356,21 @@ class NPE_A(PosteriorEstimatorTrainer):
         Returns:
             MoG of the z-scored prior for Gaussian priors, or None for uniform priors.
         """
-        if isinstance(self._prior, BoxUniform):
+        # `process_prior` wraps some priors, e.g. float64 ones.
+        if check_dist_class(self._prior, class_to_check=Uniform)[0]:
             return None
 
-        if not isinstance(self._prior, MultivariateNormal):
+        is_gaussian, prior = check_dist_class(
+            self._prior, class_to_check=MultivariateNormal
+        )
+        if not is_gaussian:
             raise TypeError(
-                f"Prior must be MultivariateNormal or BoxUniform, "
+                f"Prior must be MultivariateNormal or uniform, "
                 f"got {type(self._prior).__name__}"
             )
+        assert isinstance(prior, MultivariateNormal)
 
-        prior_mog = MoG.from_gaussian(self._prior.mean, self._prior.covariance_matrix)
+        prior_mog = MoG.from_gaussian(prior.mean, prior.covariance_matrix)
         return density_estimator.transform_mog(prior_mog)
 
     def build_posterior(
