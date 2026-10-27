@@ -24,6 +24,7 @@ from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPost
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+    FilteredDirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
@@ -961,7 +962,10 @@ def test_npe_pfn_on_device(prior_device):
 
     inferer = NPE_PFN(prior=prior, device=prior_device)
     inferer.append_simulations(theta, x)
-    posterior = inferer.build_posterior(sample_with="filtered_direct")
+    # A filter smaller than the simulation budget runs the k-NN context filter.
+    posterior = inferer.build_posterior(
+        posterior_parameters=FilteredDirectPosteriorParameters(filter_size=10)
+    )
     posterior.set_default_x(x_o)
 
     expected_device = prior_device.split(":")[0]
@@ -981,6 +985,12 @@ def test_npe_pfn_on_device(prior_device):
     assert posterior.posterior_estimator._context_input.device.type == "cpu", (
         "TabPFN context must always remain on CPU."
     )
+
+    other_device = process_device("gpu") if expected_device == "cpu" else "cpu"
+    posterior.to(other_device)
+    samples = posterior.sample((5,))
+    assert samples.device.type == torch.device(other_device).type
+    assert posterior.posterior_estimator._context_input.device.type == "cpu"
 
 
 @pytest.mark.gpu

@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Callable, Literal, Optional, Self, Union
+from typing import Callable, Literal, Optional, Union
 
 import torch
 from torch import Tensor
@@ -72,23 +72,6 @@ class FilteredDirectPosterior(DirectPosterior):
         self._full_context_input = full_context_input
         self._full_context_condition = full_context_condition
         self._full_context_condition_embedded = estimator.embed(full_context_condition)
-
-    def to(self, device: Union[str, torch.device]) -> Self:
-        """Move the posterior and its context simulations to `device` in place.
-
-        Args:
-            device: Device to move the posterior to.
-
-        Returns:
-            The posterior itself.
-        """
-        super().to(device)
-        self._full_context_input = self._full_context_input.to(self._device)
-        self._full_context_condition = self._full_context_condition.to(self._device)
-        self._full_context_condition_embedded = (
-            self._full_context_condition_embedded.to(self._device)
-        )
-        return self
 
     def _validate_filter_indices(self, indices: Tensor, num_context: int) -> Tensor:
         """Validate and normalize context indices returned by a filter."""
