@@ -748,15 +748,8 @@ def _z_scored_prior_mog(
     """Return a Gaussian prior as a MoG in the estimator's z-scored space.
 
     The closed-form MoG corrections of NPE-A and NPE-C combine the prior with the
-    estimator's MoG. A uniform prior is constant on its support and drops out of them.
-
-    Args:
-        prior: The prior, possibly wrapped by `process_prior`, e.g. if it is float64.
-        estimator: The estimator whose z-scored space the prior is mapped into.
-
-    Returns:
-        Single-component MoG of the z-scored Gaussian prior, or None for a uniform
-        prior.
+    estimator's MoG. A uniform prior is constant on its support and drops out of
+    them, so it gives None. The prior can be wrapped by `process_prior`.
 
     Raises:
         TypeError: If the prior is neither Gaussian nor uniform.

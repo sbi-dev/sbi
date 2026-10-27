@@ -490,11 +490,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         return -torch.log(self._transform_scale).expand(self.input_shape).sum()
 
     def _affine_transform(self) -> Optional[Tuple[Tensor, Tensor]]:
-        """Return (shift, scale) of the z-score z = (x - shift) / scale, if any.
-
-        Returns:
-            The shift and the scale, each of shape input_shape, or None without a
-            z-score.
+        """Return (shift, scale) of the z-score z = (x - shift) / scale, or None.
 
         Raises:
             NotImplementedError: If the input transform is not affine.

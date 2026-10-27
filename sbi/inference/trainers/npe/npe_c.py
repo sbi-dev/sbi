@@ -233,11 +233,6 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         The state of the MoG loss depends on the network's z-score, so it is set
         after the network is (re)built.
-
-        Args:
-            retrain_from_scratch: Whether to rebuild the network.
-            start_idx: The index of the first round whose simulations build the
-                network.
         """
         super()._initialize_neural_network(retrain_from_scratch, start_idx)
         if self._round > 0 and self.use_non_atomic_loss:

@@ -531,17 +531,10 @@ class MoG:
         return self._rescaled(self.means * scale + shift, scale)
 
     def _rescaled(self, means: Tensor, factor: Tensor) -> MoG:
-        """Return the MoG with new means whose variables are multiplied by `factor`.
+        """Return the MoG with `means` whose variables are multiplied by `factor`.
 
         The precision P maps to P / (f f^T). Dividing the columns of an upper
         triangular precision factor by f keeps it upper triangular.
-
-        Args:
-            means: The new means, shape (batch_size, num_components, dim).
-            factor: Elementwise factor, strictly positive, shape (dim,).
-
-        Returns:
-            New MoG with the same logits.
         """
         assert self.precision_factors is not None
         return MoG(
