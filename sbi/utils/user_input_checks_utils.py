@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Optional, Self, Sequence, Union
 
 import torch
 from torch import Tensor, float32
@@ -158,13 +158,20 @@ class CustomPriorWrapper(Distribution):
                 stacklevel=2,
             )
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move the distribution to the specified device. Not implemented for this class.
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Keep the distribution on the CPU, the only device it supports.
+
+        Args:
+            device: Target device.
+
+        Returns:
+            The distribution itself, for the CPU.
 
         Raises:
-            NotImplementedError.
+            NotImplementedError: For any other device.
         """
+        if canonical_device(device) == "cpu":
+            return self
         raise NotImplementedError(
             "This class is not supported on the GPU. Use on cpu or use "
             "any of `PytorchReturnTypeWrapper`, `BoxUniform`, or `MultipleIndependent`."
