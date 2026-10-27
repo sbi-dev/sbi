@@ -97,6 +97,8 @@ class NPE_A_Posterior(DirectPosterior):
             )
             state_dict["posterior_estimator"] = estimator
             state_dict["potential_fn"].posterior_estimator = estimator
+            # A cached MAP was computed from the uncorrected density.
+            state_dict["_map"] = None
         super().__setstate__(state_dict)
 
     def get_mog_params(self, x: Tensor) -> MoG:

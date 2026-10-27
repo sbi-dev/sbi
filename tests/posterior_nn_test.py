@@ -432,10 +432,12 @@ def test_npe_a_posterior_pickled_before_wrapper_applies_correction():
     legacy._proposal_mog = proposal_mog
     legacy._prior_mog = prior_mog
     legacy._apply_correction = True
+    x_o = torch.tensor([[0.5, -0.5]])
+    legacy.set_default_x(x_o)
+    uncorrected_map = legacy.map(num_iter=10, show_progress_bars=False)
 
     loaded = pickle.loads(pickle.dumps(legacy))
 
-    x_o = torch.tensor([[0.5, -0.5]])
     theta = prior.sample((10,))
     assert torch.allclose(
         loaded.log_prob(theta, x=x_o, norm_posterior=False),
@@ -443,6 +445,9 @@ def test_npe_a_posterior_pickled_before_wrapper_applies_correction():
     )
     assert torch.allclose(
         loaded.potential(theta, x=x_o), corrected.potential(theta, x=x_o)
+    )
+    assert not torch.allclose(
+        loaded.map(num_iter=10, show_progress_bars=False), uncorrected_map
     )
 
 
