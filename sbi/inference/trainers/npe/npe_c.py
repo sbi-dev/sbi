@@ -231,8 +231,6 @@ class NPE_C(PosteriorEstimatorTrainer):
     ) -> None:
         """Warn if the trained estimator has pairs that the MoG loss gives zero weight.
 
-        Such pairs get no gradient, so the posterior estimate may be biased.
-
         Args:
             proposal: The proposal of the latest round.
             batch_size: Number of simulations to evaluate at once.
@@ -651,12 +649,10 @@ class NPE_C(PosteriorEstimatorTrainer):
             precisions_pp -= self._maybe_z_scored_prior.precision_matrix
 
         normalizable = torch.linalg.cholesky_ex(precisions_pp).info == 0
-        eye = torch.eye(
-            precisions_pp.shape[-1],
-            dtype=precisions_pp.dtype,
-            device=precisions_pp.device,
+        identity = eye(precisions_pp.shape[-1]).to(precisions_pp)
+        precisions_pp = torch.where(
+            normalizable[..., None, None], precisions_pp, identity
         )
-        precisions_pp = torch.where(normalizable[..., None, None], precisions_pp, eye)
         covariances_pp = torch.inverse(precisions_pp)
 
         return precisions_pp, covariances_pp, normalizable

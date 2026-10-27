@@ -889,7 +889,6 @@ def test_npe_c_prior_as_proposal_gives_density_estimator(wrap_prior: bool):
         prior, transform_input=torch.stack([shift, scale])
     )
 
-    # The prior in the z-scored coordinates (theta - shift) / scale.
     prior_mean_z = (prior_mean - shift) / scale
     prior_prec_z = torch.inverse(prior_cov / torch.outer(scale, scale))
     mog_d = estimator.get_uncorrected_mog(torch.zeros(1, 2))
