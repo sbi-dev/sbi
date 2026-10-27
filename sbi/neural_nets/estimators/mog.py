@@ -563,7 +563,7 @@ class MoG:
 _CORRECTION_EPSILON: float = 1e-6
 
 
-def _correct_for_proposal(
+def correct_for_proposal(
     density_mog: MoG,
     proposal_mog: MoG,
     prior_mog: Optional[MoG] = None,

@@ -19,7 +19,7 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
-from sbi.neural_nets.estimators.mog import MoG, _correct_for_proposal
+from sbi.neural_nets.estimators.mog import MoG, correct_for_proposal
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import CallableTransform
 from sbi.utils.torchutils import infer_module_device
@@ -655,7 +655,7 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
             Corrected MoG in the estimator's transformed space.
         """
         density_mog = self.net.get_uncorrected_mog(condition)
-        return _correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
+        return correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Log probability under the corrected MoG; shapes as in the wrapped MDN."""
