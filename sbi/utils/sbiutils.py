@@ -931,6 +931,15 @@ def _apply_to_transform(
     """
     seen = set()
 
+    def _apply_to_tensor(val: Tensor) -> Tensor:
+        moved = fn(val)
+        if not (val.is_leaf and val.requires_grad) or moved.is_leaf:
+            return moved
+        # A moved parameter stays a leaf; a non-leaf breaks `copy.deepcopy`.
+        if isinstance(val, nn.Parameter):
+            return nn.Parameter(moved.detach())
+        return moved.detach().requires_grad_(True)
+
     def _walk(t):
         if id(t) in seen:
             return
@@ -939,7 +948,7 @@ def _apply_to_transform(
             t._apply(fn)
         for key, val in list(t.__dict__.items()):
             if isinstance(val, Tensor):
-                object.__setattr__(t, key, fn(val))
+                object.__setattr__(t, key, _apply_to_tensor(val))
             elif isinstance(val, (list, tuple)):
                 for item in val:
                     if isinstance(item, TorchTransform):
@@ -1275,10 +1284,12 @@ def gradient_ascent(
     # is `(1,)` on every return path, as in the loop below.
     best_log_prob_iter = init_probs[sort_indices[-1:]]
     best_theta_iter = sorted_inits[-1:]
-    best_theta_overall = theta_transform(best_theta_iter.detach().clone())
+    # Without gradients: a transform with parameters would attach its graph to the
+    # returned MAP, which the posterior caches.
+    with torch.no_grad():
+        best_theta_overall = theta_transform(best_theta_iter.detach().clone())
+        argmax_ = theta_transform.inv(best_theta_overall)
     best_log_prob_overall = best_log_prob_iter.detach().clone()
-
-    argmax_ = theta_transform.inv(best_theta_overall)
     max_val = best_log_prob_overall
 
     # Detached: a transform with parameters would make the inits non-leaf tensors.
@@ -1334,7 +1345,9 @@ def gradient_ascent(
         print(interruption + interruption_note)
         return argmax_, max_val  # type: ignore
 
-    return theta_transform.inv(best_theta_overall), max_val  # type: ignore
+    with torch.no_grad():
+        argmax_ = theta_transform.inv(best_theta_overall)
+    return argmax_, max_val  # type: ignore
 
 
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:

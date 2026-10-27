@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import copy
 import functools
 from dataclasses import asdict
 
@@ -192,14 +193,30 @@ def test_ensemble_to_keeps_default_x_and_transform(trained_on_cpu, prior_name: s
     assert map_.shape == (1, NUM_DIM)
 
 
+def _affine_with_parameters():
+    affine = torch_tf.AffineTransform(
+        torch.nn.Parameter(torch.zeros(NUM_DIM)),
+        torch.nn.Parameter(torch.ones(NUM_DIM)),
+    )
+    return torch_tf.IndependentTransform(affine, 1)
+
+
 @pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
-def test_map_with_module_backed_theta_transform(device: str):
+@pytest.mark.parametrize(
+    "make_transform", [affine_autoregressive, _affine_with_parameters]
+)
+def test_map_with_theta_transform_with_parameters(make_transform, device: str):
     """A user transform with parameters, e.g. a Pyro `TransformModule`, moves with
-    the posterior, and `map()` optimizes through it."""
+    the posterior, `map()` optimizes through it, and the cached MAP holds no graph."""
     npe, _ = _train("mvn")
+    transform = (
+        make_transform(NUM_DIM)
+        if make_transform is affine_autoregressive
+        else make_transform()
+    )
     posterior = npe.build_posterior(
         posterior_parameters=ImportanceSamplingPosteriorParameters(
-            theta_transform=affine_autoregressive(NUM_DIM)
+            theta_transform=transform
         )
     )
     posterior.set_default_x(torch.zeros(1, NUM_DIM))
@@ -210,6 +227,7 @@ def test_map_with_module_backed_theta_transform(device: str):
     init = torch.zeros(1, NUM_DIM, device=device)
     map_ = posterior.map(init_method=init, num_iter=2, num_to_optimize=1)
     assert map_.device.type == torch.device(device).type
+    copy.deepcopy(posterior)
 
 
 def test_to_keeps_ode_options_of_bound_vector_field_potential(trained_on_cpu):
