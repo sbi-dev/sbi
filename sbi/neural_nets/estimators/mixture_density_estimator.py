@@ -19,7 +19,11 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
-from sbi.neural_nets.estimators.mog import MoG, correct_for_proposal
+from sbi.neural_nets.estimators.mog import (
+    MoG,
+    _check_single_gaussian_proposal,
+    correct_for_proposal,
+)
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import CallableTransform
 from sbi.utils.torchutils import infer_module_device
@@ -761,6 +765,7 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
 
         Raises:
             NotImplementedError: If the estimator's input transform is not affine.
+            ValueError: If the proposal has more than one component.
         """
         if estimator._prior_transform is not None:
             raise NotImplementedError(
@@ -768,6 +773,7 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
                 "z_score_theta='transform_to_unconstrained' is not supported. Use "
                 "'independent' or 'structured', or a different method."
             )
+        _check_single_gaussian_proposal(proposal_mog)
         super().__init__(estimator, estimator.input_shape, estimator.condition_shape)
         device = infer_module_device(estimator, fallback="cpu")
         self._proposal_mog = proposal_mog.to(device).detach()

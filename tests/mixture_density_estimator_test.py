@@ -13,8 +13,9 @@ from torch.distributions.transforms import ExpTransform
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
     MultivariateGaussianMDN,
+    ProposalCorrectedMDN,
 )
-from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.mog import MoG, correct_for_proposal
 
 # =============================================================================
 # Fixtures
@@ -626,3 +627,21 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
         args = (estimator, mog) if map_name == "transform_mog_from" else (mog,)
         with pytest.raises(NotImplementedError, match="affine z-score"):
             getattr(estimator, map_name)(*args)
+
+
+class TestProposalCorrectedMDN:
+    """Test the NPE-A proposal correction around a MixtureDensityEstimator."""
+
+    def test_correction_rejects_a_mixture_proposal(self, standard_estimator):
+        """Dividing by a mixture gives no MoG, so both entry points raise."""
+        proposal = MoG(
+            logits=torch.zeros(1, 2),
+            means=torch.stack([torch.zeros(3), torch.ones(3)]).unsqueeze(0),
+            precisions=torch.eye(3).expand(1, 2, 3, 3).clone(),
+        )
+        with pytest.raises(ValueError, match="final_round"):
+            ProposalCorrectedMDN(standard_estimator, proposal)
+        with torch.no_grad():
+            density = standard_estimator.get_uncorrected_mog(torch.randn(4, 5))
+        with pytest.raises(ValueError, match="final_round"):
+            correct_for_proposal(density, proposal)

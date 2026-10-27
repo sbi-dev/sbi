@@ -7,6 +7,7 @@ from dataclasses import replace
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
+import torch
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -25,7 +26,7 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     MultivariateGaussianMDN,
     ProposalCorrectedMDN,
 )
-from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.mog import MoG, _check_single_gaussian_proposal
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
@@ -264,7 +265,8 @@ class NPE_A(PosteriorEstimatorTrainer):
             Density estimator that approximates the distribution $p(\theta|x)$.
 
         Raises:
-            ValueError: If `final_round=True` would expand the network while
+            ValueError: If the proposal is a mixture, e.g. the posterior of a final
+                round, or if `final_round=True` would expand the network while
                 `resume_training=True`.
         """
 
@@ -294,6 +296,18 @@ class NPE_A(PosteriorEstimatorTrainer):
             )
 
         self._round = max(self._data_round_index)
+
+        # Fail before training if the correction would fail after it. The count does
+        # not need the network, which is not built yet if the first round already
+        # came from a proposal.
+        proposal = self._proposal_roundwise[-1]
+        if isinstance(proposal, NPE_A_Posterior) and proposal.default_x is not None:
+            with torch.no_grad():
+                _check_single_gaussian_proposal(
+                    proposal.get_mog_params(proposal.default_x)
+                )
+        elif isinstance(proposal, MoG):
+            _check_single_gaussian_proposal(proposal)
 
         num_components = self._num_components if final_round else 1
         if self._neural_net is None:

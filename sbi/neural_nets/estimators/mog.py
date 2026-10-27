@@ -607,6 +607,26 @@ class MoG:
 _CORRECTION_EPSILON: float = 1e-6
 
 
+def _check_single_gaussian_proposal(proposal_mog: MoG) -> None:
+    """Raise if the NPE-A proposal is a mixture.
+
+    Args:
+        proposal_mog: MoG of the proposal.
+
+    Raises:
+        ValueError: If the proposal has more than one component.
+    """
+    if proposal_mog.num_components > 1:
+        raise ValueError(
+            "NPE-A divides by the proposal in closed form, which needs a proposal "
+            "with a single Gaussian (Papamakarios & Murray 2016, Appendix C), but "
+            f"this proposal has {proposal_mog.num_components}. NPE-A trains one "
+            "Gaussian in every round but the final one, so the posterior of a round "
+            "trained with `train(final_round=True)` cannot be the proposal of "
+            "another round. For more rounds with a mixture, use NPE_C."
+        )
+
+
 def correct_for_proposal(
     density_mog: MoG,
     proposal_mog: MoG,
@@ -619,24 +639,17 @@ def correct_for_proposal(
     The true posterior is computed as:
         posterior = density_estimator * prior / proposal
 
-    Since all distributions are MoGs, this can be done analytically.
-    If the proposal has L components and the density has K components,
-    the posterior has L*K components.
+    With a single Gaussian as proposal, this is a MoG with the components of the
+    density estimator, computed in closed form. A mixture proposal would put a sum
+    of Gaussians in the denominator, which is no MoG, so it raises. The correction
+    also fails if the proposal is narrower than a component of the density.
 
     For uniform priors, pass `prior_mog=None`. The prior term is then omitted
     from the correction (uniform has zero precision).
 
-    Warning:
-        Component count grows multiplicatively across rounds. In multi-round
-        SNPE-A, if round N has L components, round N+1 will have L*K components
-        (where K is the density estimator's component count). This can lead to
-        memory issues for many rounds. However, the original SNPE-A algorithm
-        uses a single Gaussian (K=1) in intermediate rounds, expanding to
-        multiple components only in the final round, which avoids this issue.
-
     Args:
         density_mog: MoG from the density estimator for current observation.
-        proposal_mog: MoG from previous round's proposal distribution.
+        proposal_mog: MoG of the proposal, with a single component.
         prior_mog: MoG representation of the prior. Use `MoG.from_gaussian()`
             for Gaussian priors. Pass None for uniform priors.
 
@@ -644,8 +657,10 @@ def correct_for_proposal(
         Corrected MoG representing the true posterior.
 
     Raises:
-        ValueError: If posterior precision is not positive definite.
+        ValueError: If the proposal has more than one component, or if the
+            posterior precision is not positive definite.
     """
+    _check_single_gaussian_proposal(proposal_mog)
     num_comps_proposal = proposal_mog.num_components
     num_comps_density = density_mog.num_components
     dim = density_mog.dim

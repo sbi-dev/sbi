@@ -37,6 +37,7 @@ from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
     MultivariateGaussianMDN,
+    ProposalCorrectedMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
@@ -1193,6 +1194,55 @@ def test_npe_a_final_round_expands_the_gaussian(form):
 
     posterior = inference.build_posterior().set_default_x(zeros(1, 2))
     assert posterior.get_mog_params(zeros(1, 2)).num_components == 3
+
+
+def test_npe_a_rejects_a_final_round_posterior_as_proposal_before_training():
+    """A final-round posterior is a mixture, which cannot be divided out in closed
+    form. The trainer raises before it spends time on the round."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference = NPE_A(prior, num_components=3, show_progress_bars=False)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=2, final_round=True)
+    proposal = inference.build_posterior().set_default_x(zeros(1, 2))
+    theta = proposal.sample((100,))
+    inference.append_simulations(theta, theta, proposal=proposal)
+    rounds_trained = len(inference._summary["epochs_trained"])
+
+    with pytest.raises(ValueError, match="final_round"):
+        inference.train(max_num_epochs=2)
+    assert len(inference._summary["epochs_trained"]) == rounds_trained
+
+
+@pytest.mark.parametrize(
+    "proposal, error",
+    [
+        (MultivariateNormal(ones(2), 0.5 * eye(2)), None),
+        (
+            MoG(
+                logits=zeros(1, 2),
+                means=torch.stack([zeros(2), ones(2)]).unsqueeze(0),
+                precisions=eye(2).expand(1, 2, 2, 2).clone(),
+            ),
+            ValueError,
+        ),
+    ],
+    ids=["gaussian", "mixture"],
+)
+def test_npe_a_first_round_from_a_proposal(proposal, error):
+    """The first data can come from a proposal, before any network exists. A
+    Gaussian proposal works, a mixture raises."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference = NPE_A(prior, num_components=3, show_progress_bars=False)
+    theta = MultivariateNormal(ones(2), 0.5 * eye(2)).sample((100,))
+    inference.append_simulations(theta, theta, proposal=proposal)
+
+    if error is not None:
+        with pytest.raises(error, match="single Gaussian"):
+            inference.train(max_num_epochs=2)
+    else:
+        inference.train(max_num_epochs=2)
+        estimator = inference.build_posterior().posterior_estimator
+        assert isinstance(estimator, ProposalCorrectedMDN)
 
 
 def test_npe_a_final_round_cannot_resume_the_optimizer():
