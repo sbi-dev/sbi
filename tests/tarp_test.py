@@ -185,6 +185,10 @@ def test_run_tarp_correct_on_gpu_device(accurate_samples):
         ecp - alpha
     ).abs().sum() < 1.05  # integral of residuals should vanish, fig.2 in paper
 
+    atc, kspvals = check_tarp(ecp, alpha)
+    assert -0.75 < atc < 0.75, "TARP should not detect bias"
+    assert kspvals > 0.5
+
 
 @pytest.mark.parametrize("distance", (l1, l2))
 def test_run_tarp_detect_overdispersed(distance, overdispersed_samples):

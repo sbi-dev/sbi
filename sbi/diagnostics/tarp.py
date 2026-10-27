@@ -244,6 +244,6 @@ def check_tarp(
     atc = ((ecp[midindex:] - alpha[midindex:]) * dalpha).sum().item()
 
     # Kolmogorov-Smirnov test between ecp and alpha
-    kstest_pvals: float = kstest(ecp.numpy(), alpha.numpy())[1]  # type: ignore
+    kstest_pvals: float = kstest(ecp.cpu().numpy(), alpha.cpu().numpy())[1]  # type: ignore
 
     return atc, kstest_pvals
