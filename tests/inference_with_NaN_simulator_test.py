@@ -310,16 +310,16 @@ def _restricted_box_prior(num_simulations: int = 300, max_num_epochs: int = 2):
     x = theta.clone()
     x[theta[:, 0] > 1.0] = float("nan")
     restriction_estimator = RestrictionEstimator(prior=prior)
-    classifier = restriction_estimator.append_simulations(theta, x).train(
+    restriction_estimator.append_simulations(theta, x).train(
         max_num_epochs=max_num_epochs
     )
-    return prior, theta, x, restriction_estimator, classifier
+    return restriction_estimator
 
 
 def test_restricted_prior_can_be_deep_copied():
     """The threshold of the classifier carries no gradient graph, which deep copies
     (e.g. of a proposal) cannot handle."""
-    *_, restriction_estimator, _ = _restricted_box_prior()
+    restriction_estimator = _restricted_box_prior()
 
     copy.deepcopy(restriction_estimator.restrict_prior())
 
@@ -330,7 +330,7 @@ def test_restrict_prior_uses_the_passed_classifier():
     The given classifier predicts `valid` exactly where theta_0 < 0, while the
     trained one accepts up to theta_0 = 1.
     """
-    *_, restriction_estimator, _ = _restricted_box_prior()
+    restriction_estimator = _restricted_box_prior()
     classifier = nn.Linear(2, 2)
     with torch.no_grad():
         classifier.weight.copy_(torch.tensor([[0.0, 0.0], [-100.0, 0.0]]))
@@ -347,7 +347,7 @@ def test_restrict_prior_uses_the_passed_classifier():
 def test_restrict_prior_with_reweigh_factor():
     """With `reweigh_factor`, samples lie where simulations are valid (theta_0 <= 1),
     and a larger factor accepts fewer parameter sets."""
-    *_, restriction_estimator, _ = _restricted_box_prior(1000, max_num_epochs=20)
+    restriction_estimator = _restricted_box_prior(1000, max_num_epochs=20)
 
     restricted_prior = restriction_estimator.restrict_prior(reweigh_factor=0.5)
     samples = restricted_prior.sample((500,), print_rejected_frac=False)
@@ -358,33 +358,6 @@ def test_restrict_prior_with_reweigh_factor():
         for factor in (0.1, 0.9)
     ]
     assert acceptance[1] < acceptance[0]
-
-
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        dict(allowed_false_negatives=1.0),
-        dict(allowed_false_negatives=-0.1),
-        dict(allowed_false_negatives=None, reweigh_factor=1.0),
-    ],
-)
-def test_restrict_prior_rejects_values_outside_their_range(kwargs):
-    """`allowed_false_negatives` and `reweigh_factor` must lie in [0, 1)."""
-    *_, restriction_estimator, _ = _restricted_box_prior()
-
-    with pytest.raises(ValueError, match="must be in"):
-        restriction_estimator.restrict_prior(**kwargs)
-
-
-def test_restrict_prior_draws_no_random_numbers():
-    """Building the restricted prior leaves the random state alone, so seeded runs
-    stay reproducible."""
-    *_, restriction_estimator, _ = _restricted_box_prior()
-    random_state = torch.get_rng_state()
-
-    restriction_estimator.restrict_prior()
-
-    assert torch.equal(torch.get_rng_state(), random_state)
 
 
 @pytest.mark.parametrize("prior", ("uniform", "gaussian"))

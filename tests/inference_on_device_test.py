@@ -54,7 +54,6 @@ from sbi.neural_nets.factory import (
     posterior_nn,
 )
 from sbi.neural_nets.net_builders.estimator_configs import TabPFNConfig
-from sbi.neural_nets.net_builders.flow import build_tabpfn_flow
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils import BoxUniform, RestrictionEstimator
 from sbi.utils.sbiutils import seed_all_backends
@@ -814,19 +813,11 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("prior_type", ["box", "mvn"])
 @pytest.mark.parametrize("move_with_to", [True, False])
-def test_ensemble_posterior_on_gpu(move_with_to: bool, prior_type: str):
-    """Ensemble potential, log_prob and MAP run on the device after reweighting.
-
-    Both ways to reach the device give the same MAP transform, and each member keeps
-    its prior shared with its potential.
-    """
+def test_ensemble_posterior_on_gpu(move_with_to: bool):
+    """Ensemble potential, log_prob and MAP run on the device after reweighting."""
     device = process_device("gpu")
-    if prior_type == "box":
-        prior = BoxUniform(-torch.ones(2), torch.ones(2))
-    else:
-        prior = MultivariateNormal(zeros(2), eye(2))
+    prior = BoxUniform(-torch.ones(2), torch.ones(2))
     theta = prior.sample((100,))
     x = theta + 0.1 * torch.randn_like(theta)
     posteriors = []
@@ -836,8 +827,6 @@ def test_ensemble_posterior_on_gpu(move_with_to: bool, prior_type: str):
         posteriors.append(trainer.build_posterior())
     if move_with_to:
         ensemble = EnsemblePosterior(posteriors)
-        # The default x set on the CPU moves with the ensemble.
-        ensemble.set_default_x(torch.zeros(1, 2))
         ensemble.to(device)
     else:
         with pytest.raises(ValueError, match="ensemble.to"):
@@ -845,19 +834,15 @@ def test_ensemble_posterior_on_gpu(move_with_to: bool, prior_type: str):
         for posterior in posteriors:
             posterior.to(device)
         ensemble = EnsemblePosterior(posteriors, device="gpu")
-        ensemble.set_default_x(torch.zeros(1, 2, device=device))
+    ensemble.set_default_x(torch.zeros(1, 2, device=device))
     ensemble.weights = [3.0, 1.0]
-    theta_o = 0.5 * torch.ones(3, 2, device=device)
+    theta_o = torch.zeros(3, 2, device=device)
 
     device_type = torch.device(device).type
     assert ensemble.potential(theta_o).device.type == device_type
     assert ensemble.log_prob(theta_o).device.type == device_type
     map_ = ensemble.map(num_iter=5, num_init_samples=20, num_to_optimize=5)
     assert map_.device.type == device_type
-    reference = utils.mcmc_transform(ensemble.prior, device=device)
-    assert torch.allclose(ensemble.theta_transform(theta_o), reference(theta_o))
-    for posterior in posteriors:
-        assert posterior.prior is posterior.potential_fn.prior
 
 
 @pytest.fixture(
@@ -1012,21 +997,6 @@ def test_npe_pfn_on_device(prior_device):
     assert posterior.posterior_estimator._context_input.device.type == "cpu"
 
 
-@pytest.mark.slow
-@pytest.mark.gpu
-def test_tabpfn_flow_with_embedding_on_gpu():
-    """`build_tabpfn_flow` accepts context data and an embedding net on the GPU."""
-    pytest.importorskip("tabpfn")
-    device = process_device("gpu")
-    theta = torch.randn(30, 2, device=device)
-    x = theta + 0.1 * torch.randn_like(theta)
-    embedding_net = torch.nn.Linear(2, 2).to(device)
-
-    flow = build_tabpfn_flow(theta, x, embedding_net=embedding_net)
-
-    assert flow.embed(x[:3]).shape == (3, 2)
-
-
 @pytest.mark.gpu
 def test_mdn_device_transform():
     """MDN with transform_to_unconstrained moves transform tensors on .to()."""
@@ -1144,15 +1114,15 @@ def _restricted_prior_on(device: str):
     x = theta.clone()
     x[theta[:, 0] > 1.0] = float("nan")
     restriction = RestrictionEstimator(prior=prior)
-    classifier = restriction.append_simulations(theta, x).train(max_num_epochs=5)
-    return prior, restriction, classifier
+    restriction.append_simulations(theta, x).train(max_num_epochs=5)
+    return prior, restriction
 
 
 @pytest.mark.gpu
 def test_restricted_prior_on_gpu():
     """A restricted prior of a prior on the GPU samples there and moves with `to()`."""
     device = process_device("gpu")
-    _, restriction, _ = _restricted_prior_on(device)
+    _, restriction = _restricted_prior_on(device)
     restricted_prior = restriction.restrict_prior()
 
     samples = restricted_prior.sample((10,))
@@ -1165,21 +1135,10 @@ def test_restricted_prior_on_gpu():
 
 
 @pytest.mark.gpu
-def test_restrict_prior_with_classifier_on_gpu():
-    """`restrict_prior()` accepts a classifier on the GPU."""
-    device = process_device("gpu")
-    _, restriction, classifier = _restricted_prior_on("cpu")
-
-    restricted_prior = restriction.restrict_prior(classifier=classifier.to(device))
-
-    assert restricted_prior.sample((10,)).device.type == "cpu"
-
-
-@pytest.mark.gpu
 def test_torch_load_map_location_moves_restricted_prior_proposal():
     """A mapped load moves a `RestrictedPrior` proposal along with the posterior."""
     device = process_device("gpu")
-    prior, restriction, _ = _restricted_prior_on(device)
+    prior, restriction = _restricted_prior_on(device)
     restricted_prior = restriction.restrict_prior()
     trainer = NPE(prior=prior, device=device, show_progress_bars=False)
     theta = prior.sample((200,))

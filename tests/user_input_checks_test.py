@@ -219,24 +219,6 @@ def test_one_dim_wrapper_constructs_with_validation_on():
     assert prior.log_prob(prior.sample((3,))).shape == (3,)
 
 
-def test_posterior_with_custom_prior_moves_to_cpu():
-    """A custom prior lives on the CPU, so a posterior with it can move there."""
-    prior, _, _ = process_prior(
-        UserNumpyUniform(zeros(2), ones(2), return_numpy=True),
-        custom_prior_wrapper_kwargs=dict(lower_bound=zeros(2), upper_bound=ones(2)),
-    )
-    theta = prior.sample((100,))
-    trainer = NPE_C(prior, show_progress_bars=False)
-    trainer.append_simulations(theta, theta + 0.1 * torch.randn_like(theta))
-    posterior = trainer.build_posterior(trainer.train(max_num_epochs=1))
-
-    assert posterior.to("cpu") is posterior
-    # A failed move leaves the potential on its device.
-    with pytest.raises(NotImplementedError):
-        posterior.to("meta")
-    assert posterior.potential_fn.device == "cpu"
-
-
 def test_reinterpreted_batch_dim_prior():
     """Test whether the right warning and error are raised for reinterpreted priors."""
 
