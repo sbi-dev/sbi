@@ -11,7 +11,7 @@ from torch.distributions import Categorical, MixtureSameFamily, MultivariateNorm
 from torch.testing import assert_close
 
 from sbi.inference import NLE_A, NPE_C, NRE_A
-from sbi.inference.posteriors import EnsemblePosterior
+from sbi.inference.posteriors import EnsemblePosterior, MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -188,3 +188,22 @@ def test_ensemble_potential_follows_weight_change():
 
     expected = MixtureSameFamily(Categorical(tensor([1.0, 3.0])), components)
     assert_close(ensemble.potential(theta), expected.log_prob(theta))
+
+
+def test_ensemble_of_posteriors_without_prior():
+    """Components built from a plain potential function have no prior; the ensemble
+    then optimizes the MAP without a transform."""
+    proposal = MultivariateNormal(zeros(2), eye(2))
+
+    def potential(theta, x_o):
+        return -((theta - x_o) ** 2).sum(-1)
+
+    components = [
+        MCMCPosterior(potential, proposal=proposal, num_chains=1, warmup_steps=1)
+        for _ in range(2)
+    ]
+    ensemble = EnsemblePosterior(components).set_default_x(ones(1, 2))
+
+    theta = zeros(1, 2)
+    assert_close(ensemble.theta_transform(theta), theta)
+    assert_close(ensemble.potential(theta), tensor([-2.0]))

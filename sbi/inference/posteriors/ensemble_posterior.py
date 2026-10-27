@@ -81,7 +81,8 @@ class EnsemblePosterior(NeuralPosterior):
                 weighted with 1/N.
             theta_transform: Transformation applied during the optimization performed
                 when obtaining the map. If None, the map is optimized in the
-                unconstrained space of the prior. It does not affect the `.sample()`
+                unconstrained space of the prior, or without a transform when the
+                components have no prior. It does not affect the `.sample()`
                 and `.log_prob()` methods.
             device: Device of the component posteriors. If None, infer it from them.
                 To move an ensemble, construct it on its components' device and then
@@ -103,7 +104,7 @@ class EnsemblePosterior(NeuralPosterior):
                 f"{component_device}. Construct the ensemble without device, then "
                 "call ensemble.to(device) to move it."
             )
-        if theta_transform is None:
+        if theta_transform is None and self.prior is not None:
             theta_transform = mcmc_transform(self.prior, device=self.device)
         self.theta_transform = theta_transform
 
