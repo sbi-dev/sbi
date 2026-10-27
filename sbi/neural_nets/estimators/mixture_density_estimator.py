@@ -566,11 +566,11 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         ones = torch.ones_like(zeros)
         source_shift, source_scale = source._affine_transform() or (zeros, ones)
         shift, scale = self._affine_transform() or (zeros, ones)
-        # Map relative to this shift: adding a large shift and subtracting it again
-        # would lose small offsets in float32.
+        # Map with the relative shift and scale: a way through inputs would lose
+        # small offsets at a large shift and overflow at a large scale in float32.
         return mog.unstandardize(
-            source_shift.to(param) - shift, source_scale.to(param)
-        ).standardize(zeros, scale)
+            (source_shift.to(param) - shift) / scale, source_scale.to(param) / scale
+        )
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Compute log probability of inputs given conditions.
