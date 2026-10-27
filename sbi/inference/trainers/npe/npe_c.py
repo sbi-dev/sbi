@@ -222,7 +222,7 @@ class NPE_C(PosteriorEstimatorTrainer):
                 self._set_state_for_mog_proposal()
 
         density_estimator = super().train(**kwargs)
-        if self._round > 0 and self.use_non_atomic_loss:
+        if self._round > 0 and self.use_non_atomic_loss and not force_first_round_loss:
             self._warn_if_pairs_not_normalizable(proposal, training_batch_size)
         return density_estimator
 
@@ -242,8 +242,10 @@ class NPE_C(PosteriorEstimatorTrainer):
             precisions_p = proposal.posterior_estimator.get_uncorrected_mog(
                 proposal.default_x
             ).precisions
-            for x_batch in torch.split(x.to(self._device), batch_size):
-                precisions_d = self._neural_net.get_uncorrected_mog(x_batch).precisions
+            for x_batch in torch.split(x, batch_size):
+                precisions_d = self._neural_net.get_uncorrected_mog(
+                    x_batch.to(self._device)
+                ).precisions
                 _, _, normalizable = self._precisions_proposal_posterior(
                     precisions_p, precisions_d
                 )
@@ -649,7 +651,11 @@ class NPE_C(PosteriorEstimatorTrainer):
             precisions_pp -= self._maybe_z_scored_prior.precision_matrix
 
         normalizable = torch.linalg.cholesky_ex(precisions_pp).info == 0
-        identity = eye(precisions_pp.shape[-1]).to(precisions_pp)
+        identity = eye(
+            precisions_pp.shape[-1],
+            dtype=precisions_pp.dtype,
+            device=precisions_pp.device,
+        )
         precisions_pp = torch.where(
             normalizable[..., None, None], precisions_pp, identity
         )

@@ -962,6 +962,27 @@ def test_npe_c_warns_if_trained_estimator_has_non_normalizable_pairs(
     assert any("infinite mass" in str(w.message) for w in caught) == warns
 
 
+@pytest.mark.parametrize("force_first_round_loss", (False, True))
+def test_npe_c_checks_pairs_after_a_round_with_the_mog_loss(
+    force_first_round_loss: bool, monkeypatch
+):
+    """NPE-C checks the trained estimator only if the round used the MoG loss."""
+    calls = []
+    monkeypatch.setattr(
+        NPE_C, "_warn_if_pairs_not_normalizable", lambda *args: calls.append(args)
+    )
+    prior = MultivariateNormal(torch.zeros(2), 4 * torch.eye(2))
+    inference, _ = _npe_c_with_mog_loss_state(prior)
+    proposal = inference.build_posterior().set_default_x(torch.zeros(1, 2))
+    theta = proposal.sample((100,), show_progress_bars=False)
+    inference.append_simulations(
+        theta, theta + torch.randn_like(theta), proposal=proposal
+    )
+    inference.train(max_num_epochs=1, force_first_round_loss=force_first_round_loss)
+
+    assert len(calls) == int(not force_first_round_loss)
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "num_dim",
