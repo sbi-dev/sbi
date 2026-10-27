@@ -22,7 +22,6 @@ from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
 from sbi.utils.torchutils import (
     ensure_theta_batched,
-    process_device,
     split_leading_dim,
 )
 from sbi.utils.user_input_checks import check_prior
@@ -98,46 +97,6 @@ class DirectPosterior(NeuralPosterior):
 
         self._purpose = """It samples the posterior network and rejects samples that
             lie outside of the prior bounds."""
-
-    def to(self, device: Union[str, torch.device]) -> None:
-        """Move posterior_estimator, prior and x_o to device.
-
-        Changes the device attribute, reinstanciates the
-        posterior, and resets the default x.
-
-        Args:
-            device: device where to move the posterior to.
-        """
-        device = process_device(device)
-        self.device = device
-        if hasattr(self.prior, "to"):
-            self.prior.to(device)  # type: ignore
-        else:
-            raise ValueError("""Prior has no attribute to(device).""")
-        if hasattr(self.posterior_estimator, "to"):
-            self.posterior_estimator.to(device)
-        else:
-            raise ValueError("""Posterior estimator has no attribute to(device).""")
-
-        potential_fn, theta_transform = posterior_estimator_based_potential(
-            self.posterior_estimator,
-            self.prior,
-            x_o=None,
-            enable_transform=self.enable_transform,
-        )
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-
-        super().__init__(
-            potential_fn=potential_fn,
-            theta_transform=theta_transform,
-            device=device,
-            x_shape=self.x_shape,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
 
     def sample(
         self,

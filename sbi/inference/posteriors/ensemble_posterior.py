@@ -488,19 +488,20 @@ class EnsemblePotential(BasePotential):
         if self._x_o is not None:
             self.potential_fns = [p.bind(self._x_o) for p in self.potential_fns]
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Moves the ensemble potentials, the prior, the weights and x_o to
-
-        the specified device.
+    def to(self, device: Union[str, torch.device]) -> "EnsemblePotential":
+        """Move the component potentials, the prior, the weights and x_o to `device`.
 
         Args:
             device: The device to move the ensemble potential to.
+
+        Returns:
+            Self for method chaining.
         """
         super().to(device)
         for potential_fn in self.potential_fns:
             potential_fn.to(self.device)
         self._weights = self._weights.to(self.device)
+        return self
 
     def allow_iid_x(self) -> bool:
         # in case there is different kinds of posteriors, this will produce an error

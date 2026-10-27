@@ -108,17 +108,25 @@ class VectorFieldBasedPotential(BasePotential):
             return self.num_iid_observations**-0.5
         return 1.0
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Moves the vector field estimator, prior and x_o to the given device.
-
-        It also sets the device attribute to the given device.
+    def to(self, device: Union[str, torch.device]) -> "VectorFieldBasedPotential":
+        """Move the vector field estimator, its ODE, the prior and x_o to `device`.
 
         Args:
-            device: Device to move the vector field estimator, prior and x_o to.
+            device: Device to move the potential to.
+
+        Returns:
+            Self for method chaining.
         """
         super().to(device)
         self.vector_field_estimator.to(self.device)
+        self.neural_ode.to(self.device)
+        # Cached flows hold x_o and the ODE's base distribution of the old device.
+        if self._x_o is not None:
+            if getattr(self, "flow", None) is not None:
+                self.flow = self.rebuild_flow()
+            if getattr(self, "flows", None) is not None:
+                self.flows = self.rebuild_flows_for_batch()
+        return self
 
     def set_x(
         self,

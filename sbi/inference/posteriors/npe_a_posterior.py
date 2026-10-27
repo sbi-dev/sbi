@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Optional, Union
+from typing import Optional, Self, Union
 
 import torch
 from torch import Tensor
@@ -79,6 +79,22 @@ class NPE_A_Posterior(DirectPosterior):
             prior_mog.to(self._device).detach() if prior_mog is not None else None
         )
         self._apply_correction = proposal_mog is not None
+
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the posterior and its proposal and prior mixtures to `device`.
+
+        Args:
+            device: Device to move the posterior to.
+
+        Returns:
+            The posterior itself.
+        """
+        super().to(device)
+        if self._proposal_mog is not None:
+            self._proposal_mog = self._proposal_mog.to(self._device).detach()
+        if self._prior_mog is not None:
+            self._prior_mog = self._prior_mog.to(self._device).detach()
+        return self
 
     def get_mog_params(self, x: Tensor) -> MoG:
         """Get the (possibly corrected) MoG parameters for given observation.
