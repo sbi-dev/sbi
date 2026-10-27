@@ -867,7 +867,7 @@ def _npe_c_with_mog_loss_state(prior, num_components=3, transform_input=None):
     theta = prior.sample((100,))
     inference.append_simulations(theta, theta + torch.randn_like(theta))
     inference.train(max_num_epochs=1)
-    inference._set_state_for_mog_proposal()
+    inference._set_prior_state()
     return inference, estimator
 
 
@@ -1028,7 +1028,8 @@ def test_npe_c_mog_loss_with_retrain_from_scratch():
 
     # Loose bounds: the spread of the retrained posterior varies between seeds.
     assert ((samples.mean(0) - post_mean).abs() / post_std).max() < 0.5
-    assert (samples.std(0) / post_std).max() < 1.75
+    std_ratio = samples.std(0) / post_std
+    assert std_ratio.min() > 0.7 and std_ratio.max() < 1.75
     assert (torch.cov(samples.T)[0, 1] - post_cov[0, 1]).abs() < 0.6
 
 

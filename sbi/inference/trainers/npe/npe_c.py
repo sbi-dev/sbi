@@ -236,7 +236,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
         super()._initialize_neural_network(retrain_from_scratch, start_idx)
         if self._round > 0 and self.use_non_atomic_loss:
-            self._set_state_for_mog_proposal()
+            self._set_prior_state()
             self._proposal_mog = self._proposal_mog_in_z_space(
                 self._proposal_roundwise[-1]
             )
@@ -293,7 +293,7 @@ class NPE_C(PosteriorEstimatorTrainer):
                     )
                     return
 
-    def _set_state_for_mog_proposal(self) -> None:
+    def _set_prior_state(self) -> None:
         r"""Set the prior state that is used at each training step of the MoG loss.
 
         The proposal posterior is
