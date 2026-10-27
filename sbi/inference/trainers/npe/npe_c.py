@@ -316,22 +316,14 @@ class NPE_C(PosteriorEstimatorTrainer):
             self._maybe_z_scored_prior = None
             return
         assert isinstance(gaussian_prior, MultivariateNormal)
+        assert isinstance(self._neural_net, MixtureDensityEstimator)
 
-        if self.z_score_theta:
-            # a = (theta - shift) / scale maps N(m, C) to
-            # N((m - shift) / scale, C / (scale scale^T)).
-            assert isinstance(self._neural_net, MixtureDensityEstimator)
-            shift = self._neural_net._transform_shift
-            mean = gaussian_prior.mean.to(shift)
-            cov = gaussian_prior.covariance_matrix.to(shift)
-            # The scale is 0-dim in estimators pickled with sbi <= 0.27.
-            scale = self._neural_net._transform_scale.expand_as(mean)
-            self._maybe_z_scored_prior = MultivariateNormal(
-                (mean - shift) / scale,
-                covariance_matrix=cov / torch.outer(scale, scale),
-            )
-        else:
-            self._maybe_z_scored_prior = gaussian_prior
+        prior_mog = self._neural_net.transform_mog(
+            MoG.from_gaussian(gaussian_prior.mean, gaussian_prior.covariance_matrix)
+        )
+        self._maybe_z_scored_prior = MultivariateNormal(
+            prior_mog.means[0, 0], precision_matrix=prior_mog.precisions[0, 0]
+        )
 
     def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
         """Return whether the MoG closed-form correction applies to `proposal`.
