@@ -903,7 +903,10 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
     # Repeat iid trials as AABBCC.
     x_repeated = x.repeat_interleave(theta_batch_size, dim=0)
     # Repeat theta as ABCABC.
-    theta_repeated = theta.repeat(x_batch_size, 1)
+    if theta.ndim == 1:
+        theta_repeated = theta.repeat(x_batch_size)
+    else:
+        theta_repeated = theta.repeat(x_batch_size, *([1] * (theta.ndim - 1)))
 
     # Double check: batch size for log prob evaluation must match.
     assert x_repeated.shape == torch.Size([theta_batch_size * x_batch_size, *x_shape])
