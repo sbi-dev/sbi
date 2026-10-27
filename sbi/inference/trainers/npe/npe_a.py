@@ -267,7 +267,7 @@ class NPE_A(PosteriorEstimatorTrainer):
 
     def _get_proposal_mog(
         self,
-        proposal: Union["NPE_A_Posterior", MultivariateNormal, MoG, Any],
+        proposal: Union["NPE_A_Posterior", MultivariateNormal, MoG],
         density_estimator: MixtureDensityEstimator,
     ) -> MoG:
         """Extract MoG parameters from a proposal distribution.

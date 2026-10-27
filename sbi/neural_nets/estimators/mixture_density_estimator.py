@@ -499,7 +499,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             raise NotImplementedError(
                 "This needs an affine z-score of the inputs, so "
                 "z_score_theta='transform_to_unconstrained' is not supported. Use "
-                "'independent' or 'structured'."
+                "'independent' or 'structured', or a different method."
             )
         if self._transform_shift is None:
             return None
@@ -711,12 +711,7 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
         Raises:
             NotImplementedError: If the estimator's input transform is not affine.
         """
-        if estimator._prior_transform is not None:
-            raise NotImplementedError(
-                "The NPE-A proposal correction needs an affine z-score, so "
-                "z_score_theta='transform_to_unconstrained' is not supported. Use "
-                "'independent' or 'structured', or a different method."
-            )
+        estimator._affine_transform()  # Raises for a non-affine z-score.
         super().__init__(estimator, estimator.input_shape, estimator.condition_shape)
         device = infer_module_device(estimator, fallback="cpu")
         self._proposal_mog = proposal_mog.to(device).detach()
