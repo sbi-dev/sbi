@@ -34,7 +34,7 @@ from sbi.utils import (
     del_entries,
     repeat_rows,
 )
-from sbi.utils.torchutils import BoxUniform, assert_all_finite
+from sbi.utils.torchutils import assert_all_finite
 
 
 class NPE_C(PosteriorEstimatorTrainer):
@@ -265,15 +265,19 @@ class NPE_C(PosteriorEstimatorTrainer):
         From the above equation, we see that we need to evaluate the prior **in
         standardized space**. We build the standardized prior in this function.
 
-        The standardize transform that is applied to the samples theta does not use
-        the exact prior mean and std (due to implementation issues). Hence, the z-scored
-        prior will not exactly have mean=0 and std=1.
+        A uniform prior is constant on its support and drops out of the loss, so only
+        a Gaussian prior is stored; otherwise the stored prior is None.
         """
 
         # `process_prior` wraps some Gaussian priors, e.g. float64 ones.
         is_gaussian, gaussian_prior = check_dist_class(
             self._prior, class_to_check=MultivariateNormal
         )
+        if not is_gaussian:
+            self._maybe_z_scored_prior = None
+            return
+        assert isinstance(gaussian_prior, MultivariateNormal)
+
         if self.z_score_theta:
             # The MixtureDensityEstimator z-scores theta as a = (theta - shift) / scale,
             # with shift and scale estimated from the training samples. This maps
@@ -281,25 +285,14 @@ class NPE_C(PosteriorEstimatorTrainer):
             assert isinstance(self._neural_net, MixtureDensityEstimator)
             shift = self._neural_net._transform_shift
             scale = self._neural_net._transform_scale
-
-            if is_gaussian:
-                assert isinstance(gaussian_prior, MultivariateNormal)
-                mean = gaussian_prior.mean.to(scale)
-                cov = gaussian_prior.covariance_matrix.to(scale)
-                self._maybe_z_scored_prior = MultivariateNormal(
-                    (mean - shift) / scale,
-                    covariance_matrix=cov / torch.outer(scale, scale),
-                )
-            else:
-                # A uniform with std s has half-width sqrt(3) * s.
-                almost_zero_mean = (self._prior.mean - shift) / scale
-                almost_one_std = torch.sqrt(self._prior.variance) / scale
-                range_ = almost_one_std * 3**0.5
-                self._maybe_z_scored_prior = BoxUniform(
-                    almost_zero_mean - range_, almost_zero_mean + range_
-                )
+            mean = gaussian_prior.mean.to(scale)
+            cov = gaussian_prior.covariance_matrix.to(scale)
+            self._maybe_z_scored_prior = MultivariateNormal(
+                (mean - shift) / scale,
+                covariance_matrix=cov / torch.outer(scale, scale),
+            )
         else:
-            self._maybe_z_scored_prior = gaussian_prior if is_gaussian else self._prior
+            self._maybe_z_scored_prior = gaussian_prior
 
     def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
         """Return whether the MoG closed-form correction applies to `proposal`.
