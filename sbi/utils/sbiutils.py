@@ -1282,7 +1282,7 @@ def gradient_ascent(
     max_val = best_log_prob_overall
 
     # Detached: a transform with parameters would make the inits non-leaf tensors.
-    optimize_inits = theta_transform(optimize_inits).detach()
+    optimize_inits = theta_transform(optimize_inits).detach()  # type: ignore
     optimize_inits.requires_grad_(True)  # type: ignore
     optimizer = Adam([optimize_inits], lr=learning_rate)  # type: ignore
 
