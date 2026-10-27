@@ -540,7 +540,8 @@ class MoG:
         return MoG(
             logits=self.logits,
             means=means,
-            precisions=self.precisions / torch.outer(factor, factor),
+            # Divide rows and columns separately: f f^T can overflow in float32.
+            precisions=self.precisions / factor.unsqueeze(-1) / factor,
             precision_factors=self.precision_factors / factor,
         )
 
