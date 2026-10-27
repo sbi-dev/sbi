@@ -236,3 +236,21 @@ def test_ve_lognormal_no_nan_with_extreme_params():
     )
     assert torch.all(times >= estimator.t_min), "Times below t_min"
     assert torch.all(times <= estimator.t_max), "Times above t_max"
+
+
+@pytest.mark.parametrize("num_dim", [1, 2])
+def test_flow_matching_score_broadcasts_one_time_per_sample(num_dim):
+    """One time per sample gives the same scores as one call per sample."""
+    estimator = FlowMatchingConfig().build(
+        torch.randn(100, num_dim), torch.randn(100, 3)
+    )
+    inputs, condition, times = torch.randn(4, num_dim), torch.randn(4, 3), torch.rand(4)
+
+    scores = estimator.score(inputs, condition, times)
+
+    expected = torch.cat([
+        estimator.score(inputs[i : i + 1], condition[i : i + 1], times[i : i + 1])
+        for i in range(4)
+    ])
+    assert scores.shape == (4, num_dim)
+    torch.testing.assert_close(scores, expected)

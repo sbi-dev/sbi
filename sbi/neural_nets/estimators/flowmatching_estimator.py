@@ -405,6 +405,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             Score function of the vector field estimator.
         """
         v = self(input, condition, t)
+        # Broadcast the time over the batch and event dims of v, as `forward` does.
+        event_dims = len(self.input_shape)
+        batch_shape = v.shape[: v.dim() - event_dims]
+        t = torch.broadcast_to(t, batch_shape).reshape(*batch_shape, *[1] * event_dims)
         score = (-(1 - t) * v - input) / (t + self.noise_scale)
         return score
 
