@@ -9,7 +9,7 @@ from pytest_harvest import ResultsBag
 
 from sbi.inference import FMPE, MNLE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.trainers.npe import NPE_C
+from sbi.inference.trainers.npe import NPE_A, NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
 from sbi.neural_nets import DensityConfigBase, FlowMatchingConfig, MixedConfig
 from sbi.neural_nets.net_builders.estimator_configs import (
@@ -46,7 +46,7 @@ METHOD_GROUPS = {
     "fmpe": [FMPE],
     "npse": [NPSE],
     "vfpe": [FMPE, NPSE],
-    "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
+    "snpe": [NPE_C, NPE_A],  # NPE_B not implemented
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
     "mnle": [MNLE],
@@ -370,14 +370,19 @@ def train_and_eval_sequential_inference(
     )
     _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
-    for _ in range(NUM_ROUNDS_SEQUENTIAL - 1):
+    for r in range(1, NUM_ROUNDS_SEQUENTIAL):
         proposal = inference.build_posterior().set_default_x(x_o)
         thetas_i = proposal.sample((num_simulations,))
         xs_i = simulator(thetas_i)
         if "npe" in inference_class.__name__.lower():
-            # NPE_C requires a Gaussian prior
+            # NPE-A trains its mixture only in the final round.
+            final_round = (
+                dict(final_round=r == NUM_ROUNDS_SEQUENTIAL - 1)
+                if inference_class is NPE_A
+                else {}
+            )
             _ = inference.append_simulations(thetas_i, xs_i, proposal=proposal).train(
-                **TRAIN_KWARGS
+                **TRAIN_KWARGS, **final_round
             )
         else:
             inference.append_simulations(thetas_i, xs_i).train(**TRAIN_KWARGS)
