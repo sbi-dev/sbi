@@ -232,6 +232,33 @@ def test_vector_field_posterior_sample_with_warns():
 
 
 @pytest.mark.parametrize(
+    "x_o, sample_kwargs, reason",
+    [
+        (torch.zeros(3, 2), {}, "x has 3 rows"),
+        (
+            torch.zeros(1, 2),
+            {"guidance_method": "interval", "guidance_params": {}},
+            "Guidance",
+        ),
+    ],
+    ids=["iid", "guidance"],
+)
+def test_vector_field_posterior_ode_rejects_iid_and_guidance(
+    x_o, sample_kwargs, reason
+):
+    """iid methods and guidance adjust the score, which ODE sampling does not use."""
+    theta, x = torch.randn(20, 2), torch.randn(20, 2)
+    posterior = VectorFieldPosterior(
+        vector_field_estimator=FlowMatchingConfig().build(theta, x),
+        prior=utils.BoxUniform(-torch.ones(2), torch.ones(2)),
+        sample_with="ode",
+    )
+
+    with pytest.raises(ValueError, match=f"{reason}.*sample_with='sde'"):
+        posterior.sample((1,), x=x_o, show_progress_bars=False, **sample_kwargs)
+
+
+@pytest.mark.parametrize(
     "losses",
     (
         [10.0, 9.0, 8.0, 7.0, 6.0, 5.0],

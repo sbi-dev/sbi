@@ -198,6 +198,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 "auto_gauss" for these reasons. Note that in order to use the iid
                 method, the vector field estimator must support it and have
                 SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.
+                iid methods need `sample_with="sde"`.
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
             guidance_method: Method to guide the diffusion process. If None, no guidance
@@ -207,7 +208,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 likelihood. `Universal` can be used to guide the diffusion process with
                 a general guidance function. `Interval` is an instance of that where
                 the guidance function constraints the diffusion process to a given
-                interval.
+                interval. Guidance needs `sample_with="sde"`.
             guidance_params: Additional parameters passed to the guidance method. See
                 the specific `ScoreAdaptation` child class for details, specifically
                 `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
@@ -248,20 +249,25 @@ class VectorFieldPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
+        adjusts_score = is_iid or guidance_method is not None
         # IID and guidance require transforming the prior to standardized space.
-        if self.vector_field_estimator.compose_enabled and (
-            is_iid or guidance_method is not None
-        ):
+        if self.vector_field_estimator.compose_enabled and adjusts_score:
             raise NotImplementedError(
                 "compose_standardization does not yet support iid (x with batch>1) or "
                 "guided sampling. Use a single observation, or disable "
                 "compose_standardization."
             )
-        if sample_with == "ode" and (is_iid or guidance_method is not None):
+        if sample_with == "ode" and adjusts_score:
+            if is_iid:
+                reason = (
+                    f"x has {x.shape[0]} rows, which are used as iid observations. "
+                    "For independent posteriors of several x, use `sample_batched`. "
+                )
+            else:
+                reason = f"Guidance ('{guidance_method}') is requested. "
             raise ValueError(
-                "iid observations (x with batch size > 1) and guidance change the "
-                "score, which only SDE sampling uses. Build the posterior with "
-                "sample_with='sde'."
+                reason + "iid observations and guidance adjust the score, which "
+                "only SDE sampling uses. Build the posterior with sample_with='sde'."
             )
         self.potential_fn = self.potential_fn.bind(
             x,
