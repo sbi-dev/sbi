@@ -7,7 +7,6 @@ from dataclasses import replace
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
-import torch
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -346,38 +345,18 @@ class NPE_A(PosteriorEstimatorTrainer):
     def _compute_z_scored_prior_mog(
         self, density_estimator: MixtureDensityEstimator
     ) -> Optional[MoG]:
-        """Compute the prior as a MoG in z-scored space (if applicable).
+        """Return the prior as a MoG in the density estimator's z-scored space.
 
-        For SNPE-A correction, the prior needs to be in the same coordinate system
-        as the density estimator's output. When z-scoring is applied to inputs,
-        the density estimator outputs MoG parameters in z-scored space, so the
-        prior must also be transformed to z-scored space.
-
-        For uniform priors (BoxUniform), returns None since uniform priors have
-        zero precision (infinite covariance) and are handled specially in the
-        correction formula.
-
-        Mathematical background:
-            For z-score transform: z = (theta - shift) / scale
-            If theta ~ N(mu, Sigma), then:
-            z ~ N((mu - shift) / scale, Sigma / (scale ⊗ scale))
-            where (scale ⊗ scale)_ij = scale_i * scale_j
+        The correction combines the prior with the estimator's MoG, so both must be
+        in the same space. Uniform priors have zero precision and drop out of the
+        correction, so they give None.
 
         Args:
-            density_estimator: The MixtureDensityEstimator (to get z-score parameters).
+            density_estimator: The MixtureDensityEstimator that maps the prior.
 
         Returns:
-            MoG representation of the z-scored prior for Gaussian priors,
-            or None for uniform priors.
+            MoG of the z-scored prior for Gaussian priors, or None for uniform priors.
         """
-        if getattr(density_estimator, "_prior_transform", None) is not None:
-            raise NotImplementedError(
-                "NPE-A's analytic leakage correction does not support "
-                "z_score_theta='transform_to_unconstrained' (it assumes an affine "
-                "z-score). Use 'independent'/'structured', or a different method."
-            )
-
-        # Uniform priors have zero precision, return None
         if isinstance(self._prior, BoxUniform):
             return None
 
@@ -387,37 +366,8 @@ class NPE_A(PosteriorEstimatorTrainer):
                 f"got {type(self._prior).__name__}"
             )
 
-        # Get prior parameters
-        prior_mean = self._prior.mean
-        prior_cov = self._prior.covariance_matrix
-
-        # Apply z-score transform if enabled
-        if density_estimator.has_input_transform:
-            shift = density_estimator._transform_shift
-            scale = density_estimator._transform_scale
-
-            # Z-scored mean: (mu - shift) / scale
-            z_mean = (prior_mean - shift) / scale
-
-            # Z-scored covariance: Sigma_z[i,j] = Sigma[i,j] / (scale_i * scale_j)
-            scale_outer = scale.unsqueeze(-1) * scale.unsqueeze(-2)
-            z_cov = prior_cov / scale_outer
-        else:
-            z_mean = prior_mean
-            z_cov = prior_cov
-
-        # Validate covariance is positive definite
-        try:
-            torch.linalg.cholesky(z_cov)
-        except RuntimeError as e:
-            raise ValueError(
-                "Z-scored prior covariance is not positive definite. "
-                "This may indicate numerical issues with the z-score transform. "
-                f"Original error: {e}"
-            ) from e
-
-        # Convert to MoG
-        return MoG.from_gaussian(z_mean, z_cov)
+        prior_mog = MoG.from_gaussian(self._prior.mean, self._prior.covariance_matrix)
+        return density_estimator.transform_mog(prior_mog)
 
     def build_posterior(
         self,
