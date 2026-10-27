@@ -9,7 +9,6 @@ for evaluation (log_prob), sampling, and conditioning.
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Union
 
@@ -629,22 +628,22 @@ def _check_single_gaussian_proposal(proposal_mog: MoG) -> None:
         )
 
 
-# A corrected posterior this much wider (in variance) than its proposal in some
-# direction is a sign of an unstable correction.
-_UNSTABLE_WIDTH_RATIO: float = 5.0
+def _width_ratio_to_proposal(posterior_mog: MoG, proposal_mog: MoG) -> float:
+    """How much wider the corrected posterior is than its proposal, in variance.
 
-
-def _warn_if_much_wider_than_proposal(posterior_mog: MoG, proposal_mog: MoG) -> None:
-    """Warn if the corrected posterior is much wider than its proposal.
-
+    Returns the largest eigenvalue of `P_proposal @ Cov(posterior)`, over the batch.
     A density component that is barely narrower than the proposal keeps almost no
-    precision after the correction, so the corrected component becomes very wide
-    and can get most of the weight. The signal is meaningful for Gaussian priors;
-    a bounded prior cuts off wide directions.
+    precision after the correction, so the corrected component becomes very wide and
+    can get most of the weight. A large ratio is therefore a sign of an unstable
+    correction (Papamakarios & Murray 2016, Appendix C). It is meaningful for
+    Gaussian priors; a bounded prior cuts off wide directions.
 
     Args:
         posterior_mog: Corrected MoG.
         proposal_mog: MoG of the proposal, with a single component.
+
+    Returns:
+        The largest variance ratio.
     """
     with torch.no_grad():
         weights = posterior_mog.weights.unsqueeze(-1)
@@ -658,17 +657,7 @@ def _warn_if_much_wider_than_proposal(posterior_mog: MoG, proposal_mog: MoG) -> 
         covariance = second_moment - mean.unsqueeze(-1) * mean.unsqueeze(-2)
         # Eigenvalues of P_proposal @ covariance, in the symmetric form L^T C L.
         factor = torch.linalg.cholesky(proposal_mog.precisions[:, 0])
-        ratio = torch.linalg.eigvalsh(factor.mT @ covariance @ factor).max().item()
-    if ratio > _UNSTABLE_WIDTH_RATIO:
-        warnings.warn(
-            f"The NPE-A posterior is {ratio:.1f} times wider (in variance) than its "
-            "proposal in some direction, which usually means the closed-form "
-            "correction is unstable (Papamakarios & Murray 2016, Appendix C). Draw "
-            "the simulations from `posterior.as_proposal()`, which widens the "
-            "proposal, simulate more per round, or use fewer `num_components`.",
-            UserWarning,
-            stacklevel=2,
-        )
+        return torch.linalg.eigvalsh(factor.mT @ covariance @ factor).max().item()
 
 
 def correct_for_proposal(
@@ -728,9 +717,10 @@ def correct_for_proposal(
         raise ValueError(
             "The NPE-A posterior precision is not positive definite: a component "
             "of the density estimator is wider than the proposal in some direction "
-            "(Papamakarios & Murray 2016, Appendix C). Draw the simulations from "
-            "`posterior.as_proposal()`, which widens the proposal, simulate more "
-            "per round, use fewer `num_components`, or use NPE_C. "
+            "(Papamakarios & Murray 2016, Appendix C). Draw the next round from a "
+            "wider Gaussian, simulate more per round, use fewer `num_components`, "
+            "or use NPE_C. See the NPE-A section of the how-to guide 'How to run "
+            "sequential methods'. "
             f"Original error: {e}"
         ) from e
 

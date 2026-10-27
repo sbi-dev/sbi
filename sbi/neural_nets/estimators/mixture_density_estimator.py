@@ -22,7 +22,7 @@ from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import (
     MoG,
     _check_single_gaussian_proposal,
-    _warn_if_much_wider_than_proposal,
+    _width_ratio_to_proposal,
     correct_for_proposal,
 )
 from sbi.sbi_types import TorchTransform
@@ -800,10 +800,22 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
             Corrected MoG in the estimator's transformed space.
         """
         density_mog = self.net.get_uncorrected_mog(condition)
-        mog = correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
-        if self._prior_mog is not None:
-            _warn_if_much_wider_than_proposal(mog, self._proposal_mog)
-        return mog
+        return correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
+
+    def width_ratio_to_proposal(self, condition: Tensor) -> Optional[float]:
+        """How much wider the corrected posterior is than its proposal, in variance.
+
+        Args:
+            condition: Conditions, shape (batch_dim, *condition_shape).
+
+        Returns:
+            The largest variance ratio over the batch, or None for a uniform prior,
+            whose bounds make the ratio meaningless.
+        """
+        if self._prior_mog is None:
+            return None
+        mog = self.get_corrected_mog(condition)
+        return _width_ratio_to_proposal(mog, self._proposal_mog)
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Log probability under the corrected MoG; shapes as in the wrapped MDN."""

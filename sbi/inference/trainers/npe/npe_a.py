@@ -12,7 +12,7 @@ from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference.posteriors.npe_a_posterior import GaussianProposal, NPE_A_Posterior
+from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
     _z_scored_prior_mog,
@@ -61,10 +61,10 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         The correction also becomes unstable when a component of the density is
         about as wide as the proposal, which a mixture of many components trained
-        on few simulations often is. Drawing each round from
-        `posterior.as_proposal()`, which widens the posterior's Gaussian, keeps a
-        margin and leaves the correction exact. For Gaussian priors, NPE-A warns
-        when the corrected posterior looks unstable.
+        on few simulations often is. For Gaussian priors, NPE-A warns when the
+        corrected posterior looks unstable. The how-to guide "How to run sequential
+        methods" shows how to draw a round from a wider Gaussian. For most
+        multi-round problems, NPE_C is the better choice.
 
     Example:
     --------
@@ -85,16 +85,17 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         # 2. Multi-round inference
         inference = NPE_A(prior=prior, num_components=5)
+        proposal = prior
         num_rounds = 5
 
         for r in range(num_rounds):
-            proposal = prior if r == 0 else posterior.as_proposal()
             theta = proposal.sample((100,))
             x = simulator(theta)
             inference.append_simulations(theta, x, proposal=proposal).train(
                 final_round=(r == num_rounds - 1)
             )
             posterior = inference.build_posterior().set_default_x(x_o)
+            proposal = posterior
 
         # 3. Sample from final posterior
         samples = posterior.sample((1000,), x=x_o)
@@ -139,8 +140,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             num_components: Number of components of the mixture of Gaussians in the
                 round trained with `train(final_round=True)`. All other rounds train
                 a single Gaussian. Many components trained on few simulations can
-                make the correction unstable; see the note on
-                `posterior.as_proposal()` above.
+                make the correction unstable; see the note above.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -340,16 +340,14 @@ class NPE_A(PosteriorEstimatorTrainer):
 
     def _get_proposal_mog(
         self,
-        proposal: Union[NPE_A_Posterior, GaussianProposal, MultivariateNormal, MoG],
+        proposal: Union[NPE_A_Posterior, MultivariateNormal, MoG],
         density_estimator: MixtureDensityEstimator,
     ) -> MoG:
         """Extract MoG parameters from a proposal distribution.
 
         Supports multiple proposal types:
         - NPE_A_Posterior: its corrected MoG, from get_mog_params()
-        - MultivariateNormal or GaussianProposal (from
-          `NPE_A_Posterior.as_proposal()`): converts to single-component MoG over
-          parameters
+        - MultivariateNormal: converts to single-component MoG over parameters
         - MoG: a MoG over parameters
 
         Args:
@@ -387,7 +385,7 @@ class NPE_A(PosteriorEstimatorTrainer):
                 proposal_estimator, proposal.get_mog_params(default_x)
             )
 
-        if isinstance(proposal, (MultivariateNormal, GaussianProposal)):
+        if isinstance(proposal, MultivariateNormal):
             return density_estimator.transform_mog(
                 MoG.from_gaussian(proposal.mean, proposal.covariance_matrix)
             )
@@ -397,8 +395,7 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         raise TypeError(
             f"For multi-round NPE-A, proposal must be one of: NPE_A_Posterior, "
-            f"GaussianProposal, MultivariateNormal or MoG. Got "
-            f"{type(proposal).__name__}. For custom "
+            f"MultivariateNormal or MoG. Got {type(proposal).__name__}. For custom "
             f"proposals, construct NPE_A_Posterior directly with your proposal_mog "
             f"parameter, in the estimator's z-scored space."
         )
@@ -484,13 +481,32 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         return self._posterior
 
-    def _check_proposal(self, proposal):
-        """Check the proposal, accepting NPE-A's own Gaussian proposal silently.
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
+
+        Trainers pickled by sbi 0.26 and 0.27 have no `_num_components`. Their
+        network was built with its final number of components, so it is read there.
+
+        Args:
+            state_dict: State to be restored.
+        """
+        if "_num_components" not in state_dict:
+            net = state_dict.get("_neural_net")
+            state_dict["_num_components"] = (
+                net.net.num_components if net is not None else _MDN_DEFAULT_COMPONENTS
+            )
+        super().__setstate__(state_dict)
+
+    def _check_proposal(self, proposal: Any) -> None:
+        """Check the proposal, accepting a Gaussian proposal without a warning.
+
+        The correction divides by a single Gaussian in closed form, so a Gaussian
+        proposal is a supported use of NPE-A, not an expert-only one.
 
         Args:
             proposal: The proposal passed to `append_simulations()`.
         """
-        if not isinstance(proposal, GaussianProposal):
+        if not isinstance(proposal, MultivariateNormal):
             super()._check_proposal(proposal)
 
     def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
@@ -531,7 +547,10 @@ class NPE_A(PosteriorEstimatorTrainer):
 
 
 def _build_mdn(
-    batch_theta: Tensor, batch_x: Tensor, builder: Callable, num_components: int
+    batch_theta: Tensor,
+    batch_x: Tensor,
+    builder: Callable[..., ConditionalDensityEstimator],
+    num_components: int,
 ) -> MixtureDensityEstimator:
     """Build the NPE-A network and check that it has `num_components` components.
 

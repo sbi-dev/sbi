@@ -6,6 +6,7 @@ from functools import partial
 import pytest
 import torch
 from pytest_harvest import ResultsBag
+from torch.distributions import MultivariateNormal
 
 from sbi.inference import FMPE, MNLE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -372,9 +373,10 @@ def train_and_eval_sequential_inference(
 
     for r in range(1, NUM_ROUNDS_SEQUENTIAL):
         proposal = inference.build_posterior().set_default_x(x_o)
-        if inference_class is NPE_A:
-            # As documented: a widened Gaussian keeps the correction stable.
-            proposal = proposal.as_proposal()
+        if inference_class is NPE_A and isinstance(prior, MultivariateNormal):
+            # As in the how-to guide: a widened Gaussian keeps the correction stable.
+            samples = proposal.sample((10_000,))
+            proposal = MultivariateNormal(samples.mean(0), 2 * torch.cov(samples.T))
         thetas_i = proposal.sample((num_simulations,))
         xs_i = simulator(thetas_i)
         if "npe" in inference_class.__name__.lower():

@@ -5,15 +5,13 @@
 
 from __future__ import annotations
 
-import warnings
-
 import pytest
 import torch
 from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.estimators.mog import (
     MoG,
-    _warn_if_much_wider_than_proposal,
+    _width_ratio_to_proposal,
     correct_for_proposal,
 )
 
@@ -520,17 +518,13 @@ class TestMoGNumericalStability:
 class TestProposalCorrectionStability:
     """Errors and warnings of the NPE-A proposal correction."""
 
-    def test_correction_warns_when_much_wider_than_proposal(self):
-        """A corrected posterior far wider than its proposal signals instability."""
+    def test_width_ratio_measures_the_widest_direction(self):
+        """The ratio is the largest variance of the posterior in proposal units."""
         proposal = MoG.from_gaussian(torch.zeros(1, 2), torch.eye(2).unsqueeze(0))
-        wide = MoG.from_gaussian(torch.zeros(1, 2), 10 * torch.eye(2).unsqueeze(0))
-        narrow = MoG.from_gaussian(torch.zeros(1, 2), 0.5 * torch.eye(2).unsqueeze(0))
-
-        with pytest.warns(UserWarning, match="as_proposal"):
-            _warn_if_much_wider_than_proposal(wide, proposal)
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            _warn_if_much_wider_than_proposal(narrow, proposal)
+        posterior = MoG.from_gaussian(
+            torch.zeros(1, 2), torch.diag(torch.tensor([10.0, 0.5])).unsqueeze(0)
+        )
+        assert _width_ratio_to_proposal(posterior, proposal) == pytest.approx(10.0)
 
     def test_correction_explains_a_density_wider_than_the_proposal(self):
         """Appendix C: dividing by a narrower proposal leaves no valid precision."""

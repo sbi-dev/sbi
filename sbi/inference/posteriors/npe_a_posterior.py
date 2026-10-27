@@ -1,12 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import math
+import warnings
 from typing import Dict, Optional, Union
 
 import torch
 from torch import Tensor
-from torch.distributions import Distribution, MultivariateNormal
+from torch.distributions import Distribution
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.mixture_density_estimator import (
@@ -14,6 +14,11 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     ProposalCorrectedMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
+
+# A corrected posterior this much wider (in variance) than its proposal in some
+# direction is a sign of an unstable correction.
+_UNSTABLE_WIDTH_RATIO: float = 5.0
 
 
 class NPE_A_Posterior(DirectPosterior):
@@ -102,6 +107,39 @@ class NPE_A_Posterior(DirectPosterior):
             state_dict["_map"] = None
         super().__setstate__(state_dict)
 
+    def set_default_x(self, x: Tensor) -> "NPE_A_Posterior":
+        """Set the default x, and warn if the correction looks unstable for it.
+
+        With a Gaussian prior, a corrected posterior much wider than its proposal
+        means that a component of the density estimator was barely narrower than
+        the proposal, which makes the closed-form correction unstable (Papamakarios
+        & Murray 2016, Appendix C).
+
+        Args:
+            x: The default observation.
+
+        Returns:
+            The posterior, with `x` as its default.
+        """
+        super().set_default_x(x)
+        estimator = self.posterior_estimator
+        if isinstance(estimator, ProposalCorrectedMDN):
+            condition = reshape_to_batch_event(
+                self.default_x, estimator.condition_shape
+            )
+            ratio = estimator.width_ratio_to_proposal(condition)
+            if ratio is not None and ratio > _UNSTABLE_WIDTH_RATIO:
+                warnings.warn(
+                    f"The NPE-A posterior is {ratio:.1f} times wider (in variance) "
+                    "than its proposal in some direction, which usually means the "
+                    "closed-form correction is unstable (Papamakarios & Murray "
+                    "2016, Appendix C). See the NPE-A section of the how-to guide "
+                    "'How to run sequential methods', or use NPE_C.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+        return self
+
     def get_mog_params(self, x: Tensor) -> MoG:
         """Get the (possibly corrected) MoG parameters for given observation.
 
@@ -117,121 +155,3 @@ class NPE_A_Posterior(DirectPosterior):
         if isinstance(self.posterior_estimator, ProposalCorrectedMDN):
             return self.posterior_estimator.get_corrected_mog(x)
         return self.posterior_estimator.get_uncorrected_mog(x)
-
-    def as_proposal(
-        self, x: Optional[Tensor] = None, widening: float = 2.0
-    ) -> "GaussianProposal":
-        """Return this posterior as the proposal of the next NPE-A round.
-
-        The proposal is the posterior's Gaussian with its covariance multiplied by
-        `widening`, restricted to the support of the prior. The correction divides by
-        the proposal in closed form and fails, or becomes unstable, when a component
-        of the next density estimator is about as wide as the proposal (Papamakarios
-        & Murray 2016, Appendix C). A wider proposal keeps a margin, and the
-        correction stays exact because it divides by the proposal that was used.
-
-        Args:
-            x: Observation. If None, the default x is used.
-            widening: Factor on the covariance, at least 1.
-
-        Returns:
-            The Gaussian proposal.
-
-        Raises:
-            ValueError: If `widening` is smaller than 1, if `x` has more than one
-                observation, or if the posterior has more than one component, i.e.
-                it comes from a round trained with `final_round=True`.
-        """
-        if widening < 1:
-            raise ValueError(f"widening must be at least 1, got {widening}.")
-        x = self._x_else_default_x(x)
-        if x.shape[0] != 1:
-            raise ValueError(f"as_proposal() needs one observation, got {x.shape[0]}.")
-        with torch.no_grad():
-            mog = self.get_mog_params(x)
-            if mog.num_components != 1:
-                raise ValueError(
-                    f"This posterior has {mog.num_components} components, so it "
-                    "comes from a round trained with `final_round=True` and cannot "
-                    "be the proposal of another round."
-                )
-            estimator = self.posterior_estimator
-            if isinstance(estimator, ProposalCorrectedMDN):
-                estimator = estimator.net
-            gaussian = estimator.inverse_transform_mog(mog)
-            covariance = torch.linalg.inv(gaussian.precisions[0, 0])
-        return GaussianProposal(
-            gaussian.means[0, 0], widening * covariance, support=self.prior.support
-        )
-
-
-class GaussianProposal(Distribution):
-    """Gaussian proposal for NPE-A, restricted to the support of the prior.
-
-    `NPE_A_Posterior.as_proposal()` builds it. Samples outside the support are
-    rejected. `log_prob()` is the Gaussian's log density and -inf outside the
-    support, so it lacks the normalization of the restriction; NPE-A's correction
-    only uses the mean and covariance.
-    """
-
-    arg_constraints: Dict = {}
-
-    def __init__(self, mean: Tensor, covariance_matrix: Tensor, support) -> None:
-        """Initialize the proposal.
-
-        Args:
-            mean: Mean, shape (dim,).
-            covariance_matrix: Covariance, shape (dim, dim).
-            support: Support of the prior; samples outside it are rejected.
-        """
-        self._gaussian = MultivariateNormal(mean, covariance_matrix)
-        self._support = support
-        super().__init__(event_shape=mean.shape, validate_args=False)
-
-    @property
-    def mean(self) -> Tensor:
-        """Mean of the untruncated Gaussian."""
-        return self._gaussian.mean
-
-    @property
-    def covariance_matrix(self) -> Tensor:
-        """Covariance of the untruncated Gaussian."""
-        return self._gaussian.covariance_matrix
-
-    @property
-    def support(self):
-        """Support of the prior."""
-        return self._support
-
-    def _in_support(self, theta: Tensor) -> Tensor:
-        within = self._support.check(theta)
-        return within.all(-1) if within.dim() > theta.dim() - 1 else within
-
-    def sample(self, sample_shape: torch.Size = torch.Size()) -> Tensor:
-        """Draw samples, rejecting those outside the support.
-
-        Raises:
-            RuntimeError: If fewer than one in 10,000 samples lies in the support.
-        """
-        num_samples = math.prod(sample_shape)
-        accepted, num_accepted, num_drawn = [], 0, 0
-        while num_accepted < num_samples:
-            batch = self._gaussian.sample((max(num_samples, 1000),))
-            batch = batch[self._in_support(batch)]
-            accepted.append(batch)
-            num_accepted += batch.shape[0]
-            num_drawn += max(num_samples, 1000)
-            if num_drawn >= 100_000 and num_accepted < 1e-4 * num_drawn:
-                raise RuntimeError(
-                    "Almost no samples of the Gaussian proposal lie in the support "
-                    "of the prior. Use a smaller `widening`."
-                )
-        samples = torch.cat(accepted)[:num_samples]
-        return samples.reshape(*sample_shape, *self.event_shape)
-
-    def log_prob(self, value: Tensor) -> Tensor:
-        """Gaussian log density, -inf outside the support (not renormalized)."""
-        log_prob = self._gaussian.log_prob(value)
-        return torch.where(
-            self._in_support(value), log_prob, torch.full_like(log_prob, -math.inf)
-        )
