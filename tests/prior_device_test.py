@@ -8,6 +8,7 @@ from torch.distributions import (
     Binomial,
     Gamma,
     Independent,
+    Multinomial,
     MultivariateNormal,
     Normal,
     TransformedDistribution,
@@ -19,6 +20,7 @@ from sbi.utils.torchutils import BoxUniform, process_device
 from sbi.utils.user_input_checks_utils import (
     MultipleIndependent,
     PytorchReturnTypeWrapper,
+    get_distribution_parameters,
     move_distribution_to_device,
 )
 from tests.test_utils import skip_if_mps_op_unsupported
@@ -165,3 +167,13 @@ def test_move_distribution_with_tensors_on_two_devices():
     samples = moved.sample((3,))
     assert samples.device.type == "cpu"
     assert moved.log_prob(samples).device.type == "cpu"
+
+
+def test_rebuilt_multinomial_keeps_total_count():
+    """A `Multinomial` rebuilt for a move keeps its `total_count`."""
+    dist = Multinomial(total_count=10, probs=torch.tensor([0.2, 0.3, 0.5]))
+
+    rebuilt = Multinomial(**get_distribution_parameters(dist, "cpu"))
+
+    assert rebuilt.total_count == 10
+    assert rebuilt.sample().sum() == 10

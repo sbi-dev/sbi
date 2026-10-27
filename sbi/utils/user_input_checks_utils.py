@@ -43,6 +43,9 @@ def get_distribution_parameters(
     # arg_constraints. When reinstantiating, we must provide only one of them.
     elif isinstance(dist, (Binomial, Bernoulli, Categorical, Multinomial)):
         params["logits"] = None
+    # Unlike Binomial, Multinomial keeps `total_count` outside `arg_constraints`.
+    if isinstance(dist, Multinomial):
+        params["total_count"] = dist.total_count
     return params
 
 
