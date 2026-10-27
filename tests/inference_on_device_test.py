@@ -1122,15 +1122,16 @@ def _restricted_prior_on(device: str):
     x = theta.clone()
     x[theta[:, 0] > 1.0] = float("nan")
     restriction = RestrictionEstimator(prior=prior)
-    restriction.append_simulations(theta, x).train(max_num_epochs=5)
-    return prior, restriction.restrict_prior()
+    classifier = restriction.append_simulations(theta, x).train(max_num_epochs=5)
+    return prior, restriction, classifier
 
 
 @pytest.mark.gpu
 def test_restricted_prior_on_gpu():
     """A restricted prior of a prior on the GPU samples there and moves with `to()`."""
     device = process_device("gpu")
-    _, restricted_prior = _restricted_prior_on(device)
+    _, restriction, _ = _restricted_prior_on(device)
+    restricted_prior = restriction.restrict_prior()
 
     samples = restricted_prior.sample((10,))
     assert samples.device.type == torch.device(device).type
@@ -1142,10 +1143,22 @@ def test_restricted_prior_on_gpu():
 
 
 @pytest.mark.gpu
+def test_restrict_prior_with_classifier_on_gpu():
+    """`restrict_prior()` accepts a classifier on the GPU."""
+    device = process_device("gpu")
+    _, restriction, classifier = _restricted_prior_on("cpu")
+
+    restricted_prior = restriction.restrict_prior(classifier=classifier.to(device))
+
+    assert restricted_prior.sample((10,)).device.type == "cpu"
+
+
+@pytest.mark.gpu
 def test_torch_load_map_location_moves_restricted_prior_proposal():
     """A mapped load moves a `RestrictedPrior` proposal along with the posterior."""
     device = process_device("gpu")
-    prior, restricted_prior = _restricted_prior_on(device)
+    prior, restriction, _ = _restricted_prior_on(device)
+    restricted_prior = restriction.restrict_prior()
     trainer = NPE(prior=prior, device=device, show_progress_bars=False)
     theta = prior.sample((200,))
     trainer.append_simulations(theta, theta + 0.1 * torch.randn_like(theta))

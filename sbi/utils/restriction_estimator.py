@@ -557,8 +557,10 @@ class AcceptRejectFunction:
 
         valid_val_theta = validation_theta[validation_label.bool()]
         num_valid = valid_val_theta.shape[0]
+        classifier_device = infer_module_device(classifier, str(valid_val_theta.device))
         with torch.no_grad():
-            clf_probs = F.softmax(classifier.forward(valid_val_theta), dim=1)[:, 1]
+            logits = classifier.forward(valid_val_theta.to(classifier_device))
+            clf_probs = F.softmax(logits, dim=1)[:, 1]
 
         if reweigh_factor is not None:
             self._classifier_thr = None
