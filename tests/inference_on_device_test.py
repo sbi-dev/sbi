@@ -811,7 +811,8 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
 
 
 @pytest.mark.gpu
-def test_ensemble_posterior_on_gpu():
+@pytest.mark.parametrize("move_with_to", [True, False])
+def test_ensemble_posterior_on_gpu(move_with_to: bool):
     """Ensemble potential, log_prob and MAP run on the device after reweighting."""
     device = process_device("gpu")
     prior = BoxUniform(-torch.ones(2), torch.ones(2))
@@ -822,8 +823,15 @@ def test_ensemble_posterior_on_gpu():
         trainer = NPE(prior)
         trainer.append_simulations(theta, x).train(max_num_epochs=1)
         posteriors.append(trainer.build_posterior())
-    ensemble = EnsemblePosterior(posteriors)
-    ensemble.to(device)
+    if move_with_to:
+        ensemble = EnsemblePosterior(posteriors)
+        ensemble.to(device)
+    else:
+        with pytest.raises(ValueError, match="ensemble.to"):
+            EnsemblePosterior(posteriors, device="gpu")
+        for posterior in posteriors:
+            posterior.to(device)
+        ensemble = EnsemblePosterior(posteriors, device="gpu")
     ensemble.set_default_x(torch.zeros(1, 2, device=device))
     ensemble.weights = [3.0, 1.0]
     theta_o = torch.zeros(3, 2, device=device)
