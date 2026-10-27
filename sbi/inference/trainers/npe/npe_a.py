@@ -275,7 +275,6 @@ class NPE_A(PosteriorEstimatorTrainer):
         - NPE_A_Posterior: extracts corrected MoG via get_mog_params()
         - MultivariateNormal: converts to single-component MoG over parameters
         - MoG: a MoG over parameters
-        - Any object with get_mog_params(x) method
 
         Args:
             proposal: The proposal distribution from the previous round.
@@ -313,34 +312,11 @@ class NPE_A(PosteriorEstimatorTrainer):
         if isinstance(proposal, MoG):
             return density_estimator.transform_mog(proposal)
 
-        # Case 4: Any object with get_mog_params method
-        if hasattr(proposal, "get_mog_params"):
-            # Try to get default_x if available
-            default_x = getattr(proposal, "default_x", None)
-            if default_x is None:
-                raise ValueError(
-                    "Proposal has get_mog_params() but no default_x set. "
-                    "Call proposal.set_default_x(x_o) before using as proposal."
-                )
-            if default_x.shape[0] != 1:
-                raise ValueError(
-                    f"NPE-A requires default_x batch size of 1, got "
-                    f"{default_x.shape[0]}."
-                )
-            mog = proposal.get_mog_params(default_x)
-            if not isinstance(mog, MoG):
-                raise TypeError(
-                    f"Proposal's get_mog_params() must return MoG, "
-                    f"got {type(mog).__name__}."
-                )
-            return mog.to(self._device)
-
-        # Unsupported type
         raise TypeError(
             f"For multi-round NPE-A, proposal must be one of: NPE_A_Posterior, "
-            f"MultivariateNormal, MoG, or an object with get_mog_params() method. "
-            f"Got {type(proposal).__name__}. For custom proposals, construct "
-            f"NPE_A_Posterior directly with your proposal_mog parameter."
+            f"MultivariateNormal or MoG. Got {type(proposal).__name__}. For custom "
+            f"proposals, construct NPE_A_Posterior directly with your proposal_mog "
+            f"parameter, in the estimator's z-scored space."
         )
 
     def build_posterior(
