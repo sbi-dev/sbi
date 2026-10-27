@@ -4,13 +4,12 @@
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import asdict, replace
-from typing import Any, ClassVar, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Self, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor, eye, ones
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import Self
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (

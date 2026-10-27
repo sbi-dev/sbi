@@ -762,16 +762,11 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
             prior: The prior distribution.
             device: The device on which to evaluate the potential. Defaults to "cpu".
             prior_score_weight: A function to weight the prior score. Defaults to the
-                linear interpolation between zero (at t=0) and one (at t=t_max).
+                linear interpolation between one (at t=0) and zero (at t=t_max).
         """
         super().__init__(vector_field_estimator, prior, device)
-        if prior_score_weight is None:
-            t_max = vector_field_estimator.t_max
-
-            def prior_score_weight_fn(t: Tensor) -> Tensor:
-                return (t_max - t) / t_max
-
-        self.prior_score_weight_fn = prior_score_weight_fn
+        t_max = vector_field_estimator.t_max
+        self.prior_score_weight_fn = prior_score_weight or (lambda t: 1 - t / t_max)
 
     def __call__(
         self,
@@ -1253,6 +1248,13 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             else:
                 precision_est_budget = min(int(prior.event_shape[0] * 1000), 5000)
 
+        if not precision_est_only_diag and precision_est_budget <= prior.event_shape[0]:
+            raise ValueError(
+                f"precision_est_budget must be larger than the parameter dimension "
+                f"{prior.event_shape[0]} for full-covariance precision estimation, "
+                f"got {precision_est_budget}."
+            )
+
         thetas = posterior.sample_batched(
             sample_shape=torch.Size([precision_est_budget]),
             x=conditions,
@@ -1264,7 +1266,8 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             variances = torch.var(thetas, dim=0)
             precisions = 1 / variances
         else:
-            cov = torch.einsum("bnd,bne->nde", thetas, thetas) / (
+            thetas_centered = thetas - thetas.mean(dim=0, keepdim=True)
+            cov = torch.einsum("bnd,bne->nde", thetas_centered, thetas_centered) / (
                 precision_est_budget - 1
             )
             precisions = torch.inverse(cov)

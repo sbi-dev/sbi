@@ -7,7 +7,8 @@ from dataclasses import asdict
 
 import pytest
 from torch import eye, ones, randn_like, tensor, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import Categorical, MixtureSameFamily, MultivariateNormal
+from torch.testing import assert_close
 
 from sbi.inference import NLE_A, NPE_C, NRE_A
 from sbi.inference.posteriors import EnsemblePosterior
@@ -17,7 +18,11 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.metrics import check_c2st
-from tests.test_utils import get_dkl_gaussian_prior
+from tests.test_utils import (
+    PosteriorPotential,
+    TractablePosterior,
+    get_dkl_gaussian_prior,
+)
 
 
 @pytest.mark.slow
@@ -163,3 +168,23 @@ def test_ensemble_posterior_weights(weights, expected_exception):
         posterior = EnsemblePosterior(posteriors, weights=weights)
         posterior.set_default_x(x_o)
         _ = posterior.sample((2,))
+
+
+def test_ensemble_potential_follows_weight_change():
+    """`potential()` must use the weights set after construction."""
+    prior = MultivariateNormal(zeros(1), 10 * eye(1))
+    components = MultivariateNormal(tensor([[-2.0], [2.0]]), eye(1))
+    posteriors = [
+        TractablePosterior(PosteriorPotential(MultivariateNormal(mean, eye(1)), prior))
+        for mean in components.mean
+    ]
+    ensemble = EnsemblePosterior(posteriors, weights=[3.0, 1.0])
+    ensemble.set_default_x(zeros(1, 1))
+    theta = tensor([[-2.0], [2.0]])
+    # Replaces `potential_fn` with a bound copy, which must follow the change too.
+    ensemble.potential(theta)
+
+    ensemble.weights = [1.0, 3.0]
+
+    expected = MixtureSameFamily(Categorical(tensor([1.0, 3.0])), components)
+    assert_close(ensemble.potential(theta), expected.log_prob(theta))

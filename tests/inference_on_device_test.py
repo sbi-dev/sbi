@@ -17,6 +17,7 @@ from torch.distributions import MultivariateNormal
 from sbi import utils as utils
 from sbi.inference.abc import MCABC as ABC
 from sbi.inference.posteriors.ensemble_posterior import (
+    EnsemblePosterior,
     EnsemblePotential,
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
@@ -105,8 +106,8 @@ def _collect_transform_tensors(transform):
     "training_device, prior_device",
     [
         ("gpu", "gpu"),
-        pytest.param("cpu", "gpu", marks=pytest.mark.xfail),
-        pytest.param("gpu", "cpu", marks=pytest.mark.xfail),
+        pytest.param("cpu", "gpu", marks=pytest.mark.xfail(raises=AssertionError)),
+        pytest.param("gpu", "cpu", marks=pytest.mark.xfail(raises=AssertionError)),
     ],
 )
 @pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
@@ -155,19 +156,15 @@ def test_training_and_mcmc_on_device(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
+    # MDN takes neither argument, and the builder rejects unused arguments.
+    flow_kwargs = (
+        dict() if model == "mdn" else dict(num_transforms=2, dtype=torch.float32)
+    )
     if method in [NPE_A, NPE_C]:
-        kwargs = dict(
-            density_estimator=posterior_nn(
-                model=model, num_transforms=2, dtype=torch.float32
-            )
-        )
+        kwargs = dict(density_estimator=posterior_nn(model=model, **flow_kwargs))
         train_kwargs = dict()
     elif method == NLE:
-        kwargs = dict(
-            density_estimator=likelihood_nn(
-                model=model, num_transforms=2, dtype=torch.float32
-            )
-        )
+        kwargs = dict(density_estimator=likelihood_nn(model=model, **flow_kwargs))
         train_kwargs = dict()
     elif method in (NRE_A, NRE_B, NRE_C):
         kwargs = dict(classifier=classifier_nn(model=model))
@@ -839,6 +836,39 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
             transform(torch.tensor([0.0], device=device)).device.type
             == device.split(":")[0]
         ), "Prior transform is on the correct device."
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("move_with_to", [True, False])
+def test_ensemble_posterior_on_gpu(move_with_to: bool):
+    """Ensemble potential, log_prob and MAP run on the device after reweighting."""
+    device = process_device("gpu")
+    prior = BoxUniform(-torch.ones(2), torch.ones(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    posteriors = []
+    for _ in range(2):
+        trainer = NPE(prior)
+        trainer.append_simulations(theta, x).train(max_num_epochs=1)
+        posteriors.append(trainer.build_posterior())
+    if move_with_to:
+        ensemble = EnsemblePosterior(posteriors)
+        ensemble.to(device)
+    else:
+        with pytest.raises(ValueError, match="ensemble.to"):
+            EnsemblePosterior(posteriors, device="gpu")
+        for posterior in posteriors:
+            posterior.to(device)
+        ensemble = EnsemblePosterior(posteriors, device="gpu")
+    ensemble.set_default_x(torch.zeros(1, 2, device=device))
+    ensemble.weights = [3.0, 1.0]
+    theta_o = torch.zeros(3, 2, device=device)
+
+    device_type = torch.device(device).type
+    assert ensemble.potential(theta_o).device.type == device_type
+    assert ensemble.log_prob(theta_o).device.type == device_type
+    map_ = ensemble.map(num_iter=5, num_init_samples=20, num_to_optimize=5)
+    assert map_.device.type == device_type
 
 
 @pytest.fixture(

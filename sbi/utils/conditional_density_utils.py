@@ -377,7 +377,7 @@ class RestrictedPriorForConditional:
         Sample only from the relevant dimension. Other dimensions are filled in
         by the `ConditionalPotentialFunctionProvider()` during MCMC.
         """
-        return self.full_prior.sample(*args, **kwargs)[:, self.dims_to_sample]
+        return self.full_prior.sample(*args, **kwargs)[..., self.dims_to_sample]
 
     def log_prob(self, *args, **kwargs):
         r"""
