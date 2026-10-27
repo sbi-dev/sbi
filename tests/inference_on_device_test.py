@@ -53,6 +53,8 @@ from sbi.neural_nets.factory import (
     likelihood_nn,
     posterior_nn,
 )
+from sbi.neural_nets.net_builders.estimator_configs import TabPFNConfig
+from sbi.neural_nets.net_builders.flow import build_tabpfn_flow
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils import BoxUniform, RestrictionEstimator
 from sbi.utils.sbiutils import seed_all_backends
@@ -972,7 +974,12 @@ def test_npe_pfn_on_device(prior_device):
     x = theta + torch.randn_like(theta)
     x_o = torch.zeros(1, num_dim)
 
-    inferer = NPE_PFN(prior=prior, device=prior_device)
+    # A z-scoring embedding holds buffers that move with the posterior.
+    inferer = NPE_PFN(
+        prior=prior,
+        density_estimator=TabPFNConfig(z_score_condition="independent"),
+        device=prior_device,
+    )
     inferer.append_simulations(theta, x)
     # A filter smaller than the simulation budget runs the k-NN context filter.
     posterior = inferer.build_posterior(
@@ -1003,6 +1010,21 @@ def test_npe_pfn_on_device(prior_device):
     samples = posterior.sample((5,))
     assert samples.device.type == torch.device(other_device).type
     assert posterior.posterior_estimator._context_input.device.type == "cpu"
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+def test_tabpfn_flow_with_embedding_on_gpu():
+    """`build_tabpfn_flow` accepts context data and an embedding net on the GPU."""
+    pytest.importorskip("tabpfn")
+    device = process_device("gpu")
+    theta = torch.randn(30, 2, device=device)
+    x = theta + 0.1 * torch.randn_like(theta)
+    embedding_net = torch.nn.Linear(2, 2).to(device)
+
+    flow = build_tabpfn_flow(theta, x, embedding_net=embedding_net)
+
+    assert flow.embed(x[:3]).shape == (3, 2)
 
 
 @pytest.mark.gpu
