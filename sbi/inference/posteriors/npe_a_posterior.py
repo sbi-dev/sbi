@@ -36,7 +36,7 @@ class NPE_A_Posterior(DirectPosterior):
         normalization), all MoG parameters (means, precisions) are in z-scored
         coordinates. The prior_mog must also be transformed to z-scored space
         for the correction to be valid. The NPE_A trainer handles this
-        transformation automatically via ``_compute_z_scored_prior_mog()``.
+        transformation automatically in ``build_posterior()``.
     """
 
     # NPE-A does not support `sample_with='mcmc'`.

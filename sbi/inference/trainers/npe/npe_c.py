@@ -12,6 +12,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
+    _z_scored_prior_mog,
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
@@ -127,6 +128,9 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
+        # State of the MoG loss, set in `_initialize_neural_network()`.
+        self._proposal_mog: Optional[MoG] = None
+        self._z_scored_prior_mog: Optional[MoG] = None
 
     def train(
         self,
@@ -219,7 +223,7 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         density_estimator = super().train(**kwargs)
         if self._round > 0 and self.use_non_atomic_loss and not force_first_round_loss:
-            self._warn_if_pairs_not_normalizable(proposal, training_batch_size)
+            self._warn_if_pairs_not_normalizable(training_batch_size)
         return density_estimator
 
     def _initialize_neural_network(
@@ -264,18 +268,16 @@ class NPE_C(PosteriorEstimatorTrainer):
             mog = proposal_estimator.inverse_transform_mog(mog)
             return self._neural_net.transform_mog(mog).to(self._device)
 
-    def _warn_if_pairs_not_normalizable(
-        self, proposal: DirectPosterior, batch_size: int
-    ) -> None:
+    def _warn_if_pairs_not_normalizable(self, batch_size: int) -> None:
         """Warn if the trained estimator has pairs that the MoG loss gives zero weight.
 
         Args:
-            proposal: The proposal of the latest round.
             batch_size: Number of simulations to evaluate at once.
         """
         assert isinstance(self._neural_net, MixtureDensityEstimator)
+        assert self._proposal_mog is not None
         _, x, _ = self.get_simulations(starting_round=self._round)
-        precisions_p = self._proposal_mog_in_z_space(proposal).precisions
+        precisions_p = self._proposal_mog.precisions
         with torch.no_grad():
             for x_batch in torch.split(x, batch_size):
                 precisions_d = self._neural_net.get_uncorrected_mog(
@@ -297,62 +299,27 @@ class NPE_C(PosteriorEstimatorTrainer):
                     return
 
     def _set_state_for_mog_proposal(self) -> None:
-        """Set state variables that are used at each training step of non-atomic SNPE-C.
+        r"""Set the prior state that is used at each training step of the MoG loss.
 
-        Three things are computed:
-        1) Check if z-scoring was requested. We check if the MixtureDensityEstimator
-            has an input transform enabled via the has_input_transform property.
-        2) Define a (potentially standardized) prior. It's standardized if z-scoring
-            had been requested.
-        3) Compute (Precision * mean) for the prior. This quantity is used at every
-            training step if the prior is Gaussian.
+        The proposal posterior is
+        $pp(\theta|x) = 1/Z * q(\theta|x) * prop(\theta) / p(\theta)$.
+        The MoG loss evaluates it in the network's z-scored space, so the prior is
+        mapped into that space too. A uniform prior is constant on its support and
+        drops out of the loss, so only a Gaussian prior is stored, with its
+        (precision * mean) product.
         """
-        # Check if z-scoring is enabled on the MixtureDensityEstimator
         assert isinstance(self._neural_net, MixtureDensityEstimator)
         self.z_score_theta = self._neural_net.has_input_transform
 
-        self._set_maybe_z_scored_prior()
-
-        if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
+        prior_mog = _z_scored_prior_mog(self._prior, self._neural_net)
+        self._z_scored_prior_mog = (
+            prior_mog.to(self._device) if prior_mog is not None else None
+        )
+        if self._z_scored_prior_mog is not None:
             self.prec_m_prod_prior = torch.mv(
-                self._maybe_z_scored_prior.precision_matrix,  # type: ignore
-                self._maybe_z_scored_prior.loc,  # type: ignore
+                self._z_scored_prior_mog.precisions[0, 0],
+                self._z_scored_prior_mog.means[0, 0],
             )
-
-    def _set_maybe_z_scored_prior(self) -> None:
-        r"""Compute and store potentially standardized prior (if z-scoring was done).
-
-        The proposal posterior is:
-        $pp(\theta|x) = 1/Z * q(\theta|x) * prop(\theta) / p(\theta)$
-
-        Let's denote z-scored theta by `a`: a = (theta - mean) / std
-        Then pp'(a|x) = 1/Z_2 * q'(a|x) * prop'(a) / p'(a)$
-
-        The ' indicates that the evaluation occurs in standardized space. The constant
-        scaling factor has been absorbed into Z_2.
-        From the above equation, we see that we need to evaluate the prior **in
-        standardized space**. We build the standardized prior in this function.
-
-        A uniform prior is constant on its support and drops out of the loss, so only
-        a Gaussian prior is stored; otherwise the stored prior is None.
-        """
-
-        # `process_prior` wraps some Gaussian priors, e.g. float64 ones.
-        is_gaussian, gaussian_prior = check_dist_class(
-            self._prior, class_to_check=MultivariateNormal
-        )
-        if not is_gaussian:
-            self._maybe_z_scored_prior = None
-            return
-        assert isinstance(gaussian_prior, MultivariateNormal)
-        assert isinstance(self._neural_net, MixtureDensityEstimator)
-
-        prior_mog = self._neural_net.transform_mog(
-            MoG.from_gaussian(gaussian_prior.mean, gaussian_prior.covariance_matrix)
-        ).to(self._device)
-        self._maybe_z_scored_prior = MultivariateNormal(
-            prior_mog.means[0, 0], precision_matrix=prior_mog.precisions[0, 0]
-        )
 
     def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
         """Return whether the MoG closed-form correction applies to `proposal`.
@@ -519,6 +486,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
         # The proposal MoG at its default_x, in the network's z-scored space.
         mog_p = self._proposal_mog
+        assert mog_p is not None
         norm_logits_p = mog_p.log_weights  # Already normalized
         m_p = mog_p.means
         prec_p = mog_p.precisions
@@ -665,8 +633,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         precisions_d_rep = precisions_d.repeat(1, num_comps_p, 1, 1)
 
         precisions_pp = precisions_p_rep + precisions_d_rep
-        if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
-            precisions_pp -= self._maybe_z_scored_prior.precision_matrix
+        if self._z_scored_prior_mog is not None:
+            precisions_pp -= self._z_scored_prior_mog.precisions[0, 0]
 
         normalizable = torch.linalg.cholesky_ex(precisions_pp).info == 0
         identity = eye(
@@ -716,7 +684,7 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         # Means = C_ij * (P_i * m_i + P_x * m_x - P_o * m_o).
         summed_cov_m_prod_rep = prec_m_prod_p_rep + prec_m_prod_d_rep
-        if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
+        if self._z_scored_prior_mog is not None:
             summed_cov_m_prod_rep -= self.prec_m_prod_prior
 
         means_pp = batched_mixture_mv(covariances_pp, summed_cov_m_prod_rep)

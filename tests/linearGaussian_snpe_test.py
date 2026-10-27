@@ -956,10 +956,11 @@ def test_npe_c_warns_if_trained_estimator_has_non_normalizable_pairs(
     prior = MultivariateNormal(torch.zeros(2), prior_var * torch.eye(2))
     inference, estimator = _npe_c_with_mog_loss_state(prior)
     proposal = DirectPosterior(estimator, prior).set_default_x(torch.zeros(1, 2))
+    inference._proposal_mog = inference._proposal_mog_in_z_space(proposal)
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        inference._warn_if_pairs_not_normalizable(proposal, batch_size=50)
+        inference._warn_if_pairs_not_normalizable(batch_size=50)
 
     assert any("infinite mass" in str(w.message) for w in caught) == warns
 

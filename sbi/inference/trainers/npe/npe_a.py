@@ -8,12 +8,13 @@ from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
 from torch import Tensor
-from torch.distributions import Distribution, MultivariateNormal, Uniform
+from torch.distributions import Distribution, MultivariateNormal
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
+    _z_scored_prior_mog,
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
@@ -25,7 +26,7 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.sbi_types import Tracker
-from sbi.utils.sbiutils import check_dist_class, del_entries
+from sbi.utils.sbiutils import del_entries
 
 _MDN_DEFAULT_COMPONENTS = MDNConfig().num_components
 
@@ -342,38 +343,6 @@ class NPE_A(PosteriorEstimatorTrainer):
             f"NPE_A_Posterior directly with your proposal_mog parameter."
         )
 
-    def _compute_z_scored_prior_mog(
-        self, density_estimator: MixtureDensityEstimator
-    ) -> Optional[MoG]:
-        """Return the prior as a MoG in the density estimator's z-scored space.
-
-        The correction combines the prior with the estimator's MoG, so both must be
-        in the same space. Uniform priors have zero precision and drop out of the
-        correction, so they give None.
-
-        Args:
-            density_estimator: The MixtureDensityEstimator that maps the prior.
-
-        Returns:
-            MoG of the z-scored prior for Gaussian priors, or None for uniform priors.
-        """
-        # `process_prior` wraps some priors, e.g. float64 ones.
-        if check_dist_class(self._prior, class_to_check=Uniform)[0]:
-            return None
-
-        is_gaussian, prior = check_dist_class(
-            self._prior, class_to_check=MultivariateNormal
-        )
-        if not is_gaussian:
-            raise TypeError(
-                f"Prior must be MultivariateNormal or uniform, "
-                f"got {type(self._prior).__name__}"
-            )
-        assert isinstance(prior, MultivariateNormal)
-
-        prior_mog = MoG.from_gaussian(prior.mean, prior.covariance_matrix)
-        return density_estimator.transform_mog(prior_mog)
-
     def build_posterior(
         self,
         density_estimator: Optional[ConditionalDensityEstimator] = None,
@@ -441,7 +410,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             prior_mog = None
         else:
             proposal_mog = self._get_proposal_mog(proposal, density_estimator)
-            prior_mog = self._compute_z_scored_prior_mog(density_estimator)
+            prior_mog = _z_scored_prior_mog(self._prior, density_estimator)
 
         # Build the posterior
         self._posterior = NPE_A_Posterior(
