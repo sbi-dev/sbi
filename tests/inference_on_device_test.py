@@ -53,7 +53,7 @@ from sbi.neural_nets.factory import (
     posterior_nn,
 )
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
-from sbi.utils import BoxUniform
+from sbi.utils import BoxUniform, RestrictionEstimator
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
 from sbi.utils.user_input_checks import process_x, validate_theta_and_x
@@ -1090,3 +1090,56 @@ def test_torch_load_map_location_reconciles_device(posterior_parameters):
     assert samples.device.type == "cpu", f"samples on {samples.device}"
     potential = loaded.potential(samples)
     assert potential.device.type == "cpu", f"potential on {potential.device}"
+
+
+def _restricted_prior_on(device: str):
+    prior = BoxUniform(-2 * ones(2, device=device), 2 * ones(2, device=device))
+    theta = prior.sample((300,))
+    x = theta.clone()
+    x[theta[:, 0] > 1.0] = float("nan")
+    restriction = RestrictionEstimator(prior=prior)
+    restriction.append_simulations(theta, x).train(max_num_epochs=5)
+    return prior, restriction.restrict_prior()
+
+
+@pytest.mark.gpu
+def test_restricted_prior_on_gpu():
+    """A restricted prior of a prior on the GPU samples there and moves with `to()`."""
+    device = process_device("gpu")
+    _, restricted_prior = _restricted_prior_on(device)
+
+    samples = restricted_prior.sample((10,))
+    assert samples.device.type == torch.device(device).type
+    log_prob = restricted_prior.log_prob(samples, norm_restricted_prior=False)
+    assert log_prob.device.type == torch.device(device).type
+
+    restricted_prior.to("cpu")
+    assert restricted_prior.sample((10,)).device.type == "cpu"
+
+
+@pytest.mark.gpu
+def test_torch_load_map_location_moves_restricted_prior_proposal():
+    """A mapped load moves a `RestrictedPrior` proposal along with the posterior."""
+    device = process_device("gpu")
+    prior, restricted_prior = _restricted_prior_on(device)
+    trainer = NPE(prior=prior, device=device, show_progress_bars=False)
+    theta = prior.sample((200,))
+    trainer.append_simulations(theta, theta + 0.1 * torch.randn_like(theta))
+    trainer.train(max_num_epochs=1)
+    posterior = MCMCPosterior(
+        trainer.build_posterior().potential_fn,
+        proposal=restricted_prior,
+        num_chains=1,
+        thin=1,
+        warmup_steps=1,
+        init_strategy="proposal",
+    )
+
+    buffer = io.BytesIO()
+    torch.save(posterior, buffer)
+    buffer.seek(0)
+    loaded = torch.load(buffer, weights_only=False, map_location="cpu")
+
+    assert loaded.proposal.sample((10,)).device.type == "cpu"
+    samples = loaded.sample((2,), x=zeros(1, 2), show_progress_bars=False)
+    assert samples.device.type == "cpu"

@@ -18,7 +18,7 @@ from sbi.inference.posteriors.posterior_parameters import (
     VIPosteriorParameters,
     VectorFieldPosteriorParameters,
 )
-from sbi.utils import BoxUniform
+from sbi.utils import BoxUniform, RestrictionEstimator
 
 NUM_DIM = 2
 MCMC_FAST = MCMCPosteriorParameters(
@@ -87,6 +87,21 @@ def _build(kind: str, npe, fmpe, prior_name: str):
             warmup_steps=1,
             init_strategy="proposal",
         )
+    if kind == "mcmc_restricted_proposal":
+        prior = npe._prior
+        theta = prior.sample((200,))
+        x = theta.clone()
+        x[theta[:, 0] > 1.0] = float("nan")
+        restriction = RestrictionEstimator(prior=prior)
+        restriction.append_simulations(theta, x).train(max_num_epochs=2)
+        return MCMCPosterior(
+            npe.build_posterior().potential_fn,
+            proposal=restriction.restrict_prior(),
+            num_chains=1,
+            thin=1,
+            warmup_steps=1,
+            init_strategy="proposal",
+        )
     if kind == "vi":
         posterior = npe.build_posterior(
             posterior_parameters=VIPosteriorParameters(q="gaussian")
@@ -116,6 +131,7 @@ def _build(kind: str, npe, fmpe, prior_name: str):
         "importance",
         "mcmc",
         "mcmc_posterior_proposal",
+        "mcmc_restricted_proposal",
         "vi",
         "vector_field",
         "npe_a",

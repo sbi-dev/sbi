@@ -22,8 +22,13 @@ from sbi.utils.sbiutils import (
     standardizing_net,
     z_score_parser,
 )
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import (
+    ensure_theta_batched,
+    infer_module_device,
+    process_device,
+)
 from sbi.utils.user_input_checks import validate_theta_and_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 def build_input_layer(
@@ -114,7 +119,9 @@ class RestrictionEstimator:
         self._prior = prior
         self._classifier = None
 
-        self._device = "cpu"  # TODO hot fix to prevent the tests from crashing
+        # The classifier trains on the CPU. `AcceptRejectFunction` evaluates it there
+        # for parameters on any device.
+        self._device = "cpu"
 
         if isinstance(model, str):
             self._model = model
@@ -443,7 +450,8 @@ class RestrictionEstimator:
             reweigh_factor=reweigh_factor,
         )
 
-        return RestrictedPrior(self._prior, accept_reject_fn)
+        prior_device = str(self._prior.sample((1,)).device)
+        return RestrictedPrior(self._prior, accept_reject_fn, device=prior_device)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         r"""
@@ -573,8 +581,10 @@ class AcceptRejectFunction:
                 self.__call__, self._validation_theta, self._validation_label
             )
 
-    def __call__(self, theta):
-        pred = F.softmax(self._classifier.forward(theta), dim=1)[:, 1]
+    def __call__(self, theta: Tensor) -> Tensor:
+        classifier_device = infer_module_device(self._classifier, str(theta.device))
+        logits = self._classifier.forward(theta.to(classifier_device))
+        pred = F.softmax(logits, dim=1)[:, 1]
         if self._reweigh_factor is None:
             threshold = self._classifier_thr
             predictions = pred > threshold
@@ -582,7 +592,7 @@ class AcceptRejectFunction:
             probs_invalid = pred * self._reweigh_factor
             probs_valid = (1 - pred) * (1 - self._reweigh_factor)
             predictions = probs_valid > probs_invalid
-        return predictions.bool()
+        return predictions.bool().to(theta.device)
 
     def print_false_positive_rate(
         self,
@@ -645,6 +655,27 @@ class RestrictedPrior(Distribution):
         self._sample_with = sample_with
         self._device = process_device(device)
         self.acceptance_rate = None  # Only defined for rejection sampling.
+
+    def to(self, device: Union[str, torch.device]) -> "RestrictedPrior":
+        """Move the restricted prior to `device` in place.
+
+        Moves the prior and the posterior used for `sir`. The classifier of an
+        `AcceptRejectFunction` stays on its device and evaluates parameters from any
+        device.
+
+        Args:
+            device: Device to move the restricted prior to.
+
+        Returns:
+            The restricted prior itself.
+        """
+        self._device = process_device(device)
+        self._prior = move_distribution_to_device(self._prior, self._device)
+        if isinstance(self._posterior, Distribution):
+            self._posterior = move_distribution_to_device(self._posterior, self._device)
+        elif self._posterior is not None:
+            self._posterior.to(self._device)
+        return self
 
     def sample(
         self,
