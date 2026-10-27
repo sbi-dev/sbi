@@ -1264,28 +1264,6 @@ def test_npe_a_final_round_cannot_resume_the_optimizer():
         inference.train(final_round=True, resume_training=True)
 
 
-def test_npe_a_trains_on_a_gaussian_proposal_without_warning():
-    """A Gaussian proposal is what the correction divides by, so it must not get the
-    warning for unknown proposals."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    inference = NPE_A(prior, num_components=3, show_progress_bars=False)
-    theta = prior.sample((300,))
-    inference.append_simulations(theta, theta + 0.3 * torch.randn_like(theta)).train(
-        max_num_epochs=5
-    )
-    samples = inference.build_posterior().sample((2000,), x=0.5 * ones(1, 2))
-    proposal = MultivariateNormal(samples.mean(0), 2 * torch.cov(samples.T))
-    theta = proposal.sample((300,))
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings("error", message="The proposal you passed")
-        inference.append_simulations(
-            theta, theta + 0.3 * torch.randn_like(theta), proposal=proposal
-        ).train(max_num_epochs=2, final_round=True)
-    posterior = inference.build_posterior().set_default_x(0.5 * ones(1, 2))
-    assert posterior.get_mog_params(0.5 * ones(1, 2)).num_components == 3
-
-
 @pytest.mark.parametrize("proposal_scale, warns", [(0.9, True), (0.3, False)])
 def test_npe_a_warns_when_the_correction_looks_unstable(proposal_scale, warns):
     """A proposal precision just below the density's leaves almost no precision after

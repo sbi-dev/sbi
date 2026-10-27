@@ -113,7 +113,8 @@ class NPE_A_Posterior(DirectPosterior):
         With a Gaussian prior, a corrected posterior much wider than its proposal
         means that a component of the density estimator was barely narrower than
         the proposal, which makes the closed-form correction unstable (Papamakarios
-        & Murray 2016, Appendix C).
+        & Murray 2016, Appendix C). The check runs here, once per observation, and
+        not in `sample()` or `log_prob()` with an explicit `x`.
 
         Args:
             x: The default observation.
