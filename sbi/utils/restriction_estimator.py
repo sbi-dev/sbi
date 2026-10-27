@@ -692,12 +692,14 @@ class RestrictedPrior(Distribution):
         Returns:
             The restricted prior itself.
         """
-        self._device = process_device(device)
-        self._prior = move_distribution_to_device(self._prior, self._device)
+        device = process_device(device)
+        self._prior = move_distribution_to_device(self._prior, device)
         if isinstance(self._posterior, Distribution):
-            self._posterior = move_distribution_to_device(self._posterior, self._device)
+            self._posterior = move_distribution_to_device(self._posterior, device)
         elif self._posterior is not None:
-            self._posterior.to(self._device)
+            self._posterior.to(device)
+        # Set last: if the prior cannot move, the restricted prior keeps its device.
+        self._device = device
         return self
 
     def sample(

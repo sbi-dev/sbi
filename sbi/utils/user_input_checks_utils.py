@@ -465,8 +465,16 @@ class MultipleIndependent(Distribution):
             device: device to move the distribution to.
         """
         device = process_device(device)
-        for i in range(len(self.dists)):
-            self.dists[i] = move_distribution_to_device(self.dists[i], device)
+        originals = list(self.dists)
+        try:
+            for i in range(len(self.dists)):
+                self.dists[i] = move_distribution_to_device(self.dists[i], device)
+        except Exception:
+            # A component that cannot move (e.g. a custom prior) must not leave the
+            # others on `device`: move them back, so that the prior stays usable.
+            for i, dist in enumerate(originals):
+                self.dists[i] = move_distribution_to_device(dist, self.device)
+            raise
         self.device = device
 
 
