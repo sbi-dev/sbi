@@ -19,8 +19,20 @@ from sbi.inference.posteriors.posterior_parameters import (
     VectorFieldPosteriorParameters,
 )
 from sbi.utils import BoxUniform, RestrictionEstimator
+from sbi.utils.torchutils import process_device
 
 NUM_DIM = 2
+POSTERIOR_KINDS = [
+    "direct",
+    "rejection",
+    "importance",
+    "mcmc",
+    "mcmc_posterior_proposal",
+    "mcmc_restricted_proposal",
+    "vi",
+    "vector_field",
+    "npe_a",
+]
 MCMC_FAST = MCMCPosteriorParameters(
     num_chains=1, thin=1, warmup_steps=1, init_strategy="proposal"
 )
@@ -37,16 +49,20 @@ def _simulate(prior, num_simulations: int = 100):
     return theta, theta + 0.1 * torch.randn_like(theta)
 
 
-@pytest.fixture(scope="module", params=["box", "mvn"])
-def trained(request):
+def _train(prior_name: str):
     """NPE and FMPE trained for one epoch on a `BoxUniform` or a torch prior."""
-    prior = _prior(request.param)
+    prior = _prior(prior_name)
     theta, x = _simulate(prior)
     npe = NPE(prior, show_progress_bars=False)
     npe.append_simulations(theta, x).train(max_num_epochs=1)
     fmpe = FMPE(prior, show_progress_bars=False)
     fmpe.append_simulations(theta, x).train(max_num_epochs=1)
-    return request.param, npe, fmpe
+    return prior_name, npe, fmpe
+
+
+@pytest.fixture(scope="module", params=["box", "mvn"])
+def trained(request):
+    return _train(request.param)
 
 
 def _npe_a_round_two(prior_name: str):
@@ -123,20 +139,7 @@ def _build(kind: str, npe, fmpe, prior_name: str):
     raise ValueError(kind)
 
 
-@pytest.mark.parametrize(
-    "kind",
-    [
-        "direct",
-        "rejection",
-        "importance",
-        "mcmc",
-        "mcmc_posterior_proposal",
-        "mcmc_restricted_proposal",
-        "vi",
-        "vector_field",
-        "npe_a",
-    ],
-)
+@pytest.mark.parametrize("kind", POSTERIOR_KINDS)
 def test_to_keeps_posterior_state(trained, kind: str):
     """`.to()` returns the posterior and keeps default x, MAP, transform and prior."""
     prior_name, npe, fmpe = trained
@@ -201,3 +204,26 @@ def test_ensemble_to_keeps_default_x_and_transform(trained, theta_transform: str
     assert ensemble.potential(theta).shape == (3,)
     map_ = ensemble.map(init_method=theta, num_iter=2, num_to_optimize=1)
     assert map_.shape == (1, NUM_DIM)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("prior_name", ["box", "mvn"])
+@pytest.mark.parametrize("kind", POSTERIOR_KINDS)
+def test_to_gpu_and_back(prior_name: str, kind: str):
+    """After `.to(gpu)` and `.to("cpu")`, sample, potential and MAP run there."""
+    if kind == "npe_a" and prior_name == "box":
+        pytest.skip("Two-round NPE-A with a BoxUniform hits the known PD error.")
+    _, npe, fmpe = _train(prior_name)
+    posterior = _build(kind, npe, fmpe, prior_name)
+    posterior.set_default_x(torch.zeros(1, NUM_DIM))
+
+    for device in (process_device("gpu"), "cpu"):
+        posterior.to(device)
+        device_type = torch.device(device).type
+        samples = posterior.sample((2,), show_progress_bars=False)
+        assert samples.device.type == device_type
+        assert posterior.potential(samples).device.type == device_type
+        map_ = posterior.map(
+            init_method=samples[:1], num_iter=2, num_to_optimize=1, force_update=True
+        )
+        assert map_.device.type == device_type

@@ -825,6 +825,8 @@ def test_ensemble_posterior_on_gpu(move_with_to: bool):
         posteriors.append(trainer.build_posterior())
     if move_with_to:
         ensemble = EnsemblePosterior(posteriors)
+        # The default x set on the CPU moves with the ensemble.
+        ensemble.set_default_x(torch.zeros(1, 2))
         ensemble.to(device)
     else:
         with pytest.raises(ValueError, match="ensemble.to"):
@@ -832,7 +834,7 @@ def test_ensemble_posterior_on_gpu(move_with_to: bool):
         for posterior in posteriors:
             posterior.to(device)
         ensemble = EnsemblePosterior(posteriors, device="gpu")
-    ensemble.set_default_x(torch.zeros(1, 2, device=device))
+        ensemble.set_default_x(torch.zeros(1, 2, device=device))
     ensemble.weights = [3.0, 1.0]
     theta_o = torch.zeros(3, 2, device=device)
 
