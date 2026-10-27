@@ -505,12 +505,8 @@ class MoG:
         """
         return self.apply(lambda tensor: tensor.to(device, dtype))
 
-    def affine(self, shift: Tensor, scale: Tensor) -> MoG:
-        """Return the MoG of y = x * scale + shift for x from this MoG.
-
-        Each component N(m, P^-1) maps to N(m * scale + shift, (P / (s s^T))^-1),
-        where s is the scale. Dividing the columns of an upper triangular precision
-        factor by the scale keeps it upper triangular.
+    def standardize(self, shift: Tensor, scale: Tensor) -> MoG:
+        """Return the MoG of z = (x - shift) / scale for x from this MoG.
 
         Args:
             shift: Elementwise shift, shape (dim,).
@@ -519,12 +515,40 @@ class MoG:
         Returns:
             New MoG with the same logits.
         """
+        # Subtract before dividing: m / scale - shift / scale cancels for large m.
+        return self._rescaled((self.means - shift) / scale, 1 / scale)
+
+    def unstandardize(self, shift: Tensor, scale: Tensor) -> MoG:
+        """Return the MoG of x = z * scale + shift for z from this MoG.
+
+        Args:
+            shift: Elementwise shift, shape (dim,).
+            scale: Elementwise scale, strictly positive, shape (dim,).
+
+        Returns:
+            New MoG with the same logits.
+        """
+        return self._rescaled(self.means * scale + shift, scale)
+
+    def _rescaled(self, means: Tensor, factor: Tensor) -> MoG:
+        """Return the MoG with new means whose variables are multiplied by `factor`.
+
+        The precision P maps to P / (f f^T). Dividing the columns of an upper
+        triangular precision factor by f keeps it upper triangular.
+
+        Args:
+            means: The new means, shape (batch_size, num_components, dim).
+            factor: Elementwise factor, strictly positive, shape (dim,).
+
+        Returns:
+            New MoG with the same logits.
+        """
         assert self.precision_factors is not None
         return MoG(
             logits=self.logits,
-            means=self.means * scale + shift,
-            precisions=self.precisions / torch.outer(scale, scale),
-            precision_factors=self.precision_factors / scale,
+            means=means,
+            precisions=self.precisions / torch.outer(factor, factor),
+            precision_factors=self.precision_factors / factor,
         )
 
     def detach(self) -> MoG:

@@ -492,6 +492,10 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
     def _affine_transform(self) -> Optional[Tuple[Tensor, Tensor]]:
         """Return (shift, scale) of the z-score z = (x - shift) / scale, if any.
 
+        Returns:
+            The shift and the scale, each of shape input_shape, or None without a
+            z-score.
+
         Raises:
             NotImplementedError: If the input transform is not affine.
         """
@@ -527,7 +531,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         if affine is None:
             return mog
         shift, scale = affine
-        return mog.affine(-shift / scale, 1 / scale)
+        return mog.standardize(shift, scale)
 
     def inverse_transform_mog(self, mog: MoG) -> MoG:
         """Map a MoG in transformed space, e.g. from `get_uncorrected_mog()`, to inputs.
@@ -545,7 +549,7 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         if affine is None:
             return mog
         shift, scale = affine
-        return mog.affine(shift, scale)
+        return mog.unstandardize(shift, scale)
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Compute log probability of inputs given conditions.

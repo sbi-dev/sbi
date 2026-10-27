@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 import torch
 from torch import nn
+from torch.distributions.transforms import ExpTransform
 
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
@@ -524,3 +525,35 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
                 assert torch.allclose(
                     getattr(mapped, name), getattr(mog, name), atol=1e-5
                 )
+
+    def test_transform_mog_matches_transform_input_for_large_offsets(
+        self, standard_mdn
+    ):
+        """A MoG is z-scored like the inputs, also for an offset far above the scale."""
+        shift, scale = torch.full((3,), 1e4), torch.full((3,), 3e-3)
+        estimator = MixtureDensityEstimator(
+            net=standard_mdn,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+            transform_input=torch.stack([shift, scale]),
+        )
+        mog = MoG.from_gaussian(shift, torch.diag(scale**2))
+        assert torch.allclose(
+            estimator.transform_mog(mog).means[0, 0],
+            estimator._transform_input(shift.unsqueeze(0))[0],
+            atol=1e-3,
+        )
+
+    def test_mog_maps_raise_for_non_affine_transform(self, standard_mdn):
+        """The MoG maps need an affine z-score, so they raise for an unconstraining
+        transform."""
+        estimator = MixtureDensityEstimator(
+            net=standard_mdn,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+            prior_transform=ExpTransform(),
+        )
+        mog = MoG.from_gaussian(torch.zeros(3), torch.eye(3))
+        for map_mog in (estimator.transform_mog, estimator.inverse_transform_mog):
+            with pytest.raises(NotImplementedError, match="affine z-score"):
+                map_mog(mog)
