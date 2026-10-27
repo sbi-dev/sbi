@@ -2,7 +2,7 @@
 
 Question: is a conditional mean flow (see `paper_summary.md`) a useful density estimator in sbi, above all as an NLE likelihood compared with sbi's NSF?
 
-Short answer: at the paper's data scale it **ties NSF in NLE** when both get the same training recipe, is **1.8x slower per new observation** in MCMC, trains 9x longer, and is **worse in NPE**. At 2,000 simulations it beats NSF in NLE on 3 of 4 mini-sbibm tasks. The paper's g-and-k result (mean flow 0.577 vs coupling flow 0.679) is the one claim left to reproduce with a fair baseline; see `gandk_reproduction_plan.md`.
+Short answer: at the paper's data scale it **ties NSF in NLE** when both get the same training recipe, is **1.8x slower per new observation** in MCMC, trains 9x longer, and is **worse in NPE**. At 2,000 simulations it beats NSF in NLE on 3 of 4 mini-sbibm tasks. The paper's g-and-k result (mean flow 0.577 vs coupling flow 0.679) reproduces with the paper's code; with the coupling flow trained as long as the mean flow the gap halves (0.584 to 0.600 against 0.630) but holds, and sbi's port of the paper's network matches the paper's mean flow while sbi's own network does not (`results_gandk.md`).
 
 ## Implementation
 
@@ -32,6 +32,8 @@ With sbi's trainer defaults (constant learning rate, early stopping after 20 epo
 References at 2,000 simulations: NSF 0.57 to 0.63, sbi FMPE with defaults 0.781.
 
 At 2,000 simulations the paper's fixed epoch count overfits without model selection: on gaussian_linear the held-out loss goes 7.46 (epoch 25), 7.36 (100), 10.78 (200), 36.64 (400) while the training loss falls to 2.6, and the NPE C2ST ends at 0.995. All runs below therefore keep the best epoch on a 10% held-out split (fixed noise per evaluation), for NSF and the mean flow alike (`scripts/mean_flow_paper_trainer.py`).
+
+This rule does not carry over to the data-rich regime. On g-and-k (100,000 simulations, `results_gandk.md`) the mean flow's held-out loss bottoms out at epochs 233 to 373 and then rises slightly (3.29 to 3.30 to 3.32) while the training loss keeps falling, yet the last epoch gives clearly better posteriors: C2ST 0.573 against 0.649 at S=2 for the paper network, with best-epoch failures at 0.76 to 0.84 on 3 of 10 datasets. The mean-flow objective on held-out data is a poor proxy for density quality. Keep the best epoch only where the held-out loss runs away (small data, as above); otherwise keep the last epoch of the decaying schedule, as the paper does. For the flows, where the loss is the negative log-likelihood, best-epoch selection stays right: the wide NSF trained 1,000 epochs on g-and-k overfits and its last epoch does not sample (C2ST 0.958, no chain converged). A better criterion for the mean flow would be the held-out exact S-step log-likelihood (not tried).
 
 ## mini-sbibm at 2,000 simulations
 
@@ -102,8 +104,8 @@ Both are fixed on branch `fix/sample-shapes-and-mcmc-init-grad` (PR pending) and
 ## Mistakes in our own benchmark (fixed, recorded so they are not repeated)
 
 - `build_posterior` deep-copies the estimator (`sbi/inference/trainers/base.py:623`). Setting `num_steps` on the trained estimator afterwards does not reach the posterior. The first grid ran every mean flow at S=2; set `num_steps` before `build_posterior`.
-- The paper recipe without model selection overfits at 2,000 simulations (above).
+- The paper recipe without model selection overfits at 2,000 simulations (above); with plenty of data, best-epoch selection on the mean-flow loss picks worse weights than the last epoch (above and `results_gandk.md`).
 
 ## Verdict
 
-Park the mean flow in sbi unless the g-and-k reproduction shows a clear NLE gain over a fairly trained flow. With equal training it gives no accuracy gain over NSF on two moons at the paper's scale, costs 1.8x more MCMC time per new observation, and needs a cosine learning-rate schedule that sbi's `train()` does not offer.
+Before g-and-k: park the mean flow in sbi unless the g-and-k reproduction shows a clear NLE gain over a fairly trained flow. The g-and-k outcome is in `results_gandk.md`: a gain of 0.03 to 0.05 C2ST over the paper's coupling flow trained equally long and over sbi's best flow, with the paper's network only. The rest of this paragraph is the pre-g-and-k assessment. With equal training it gives no accuracy gain over NSF on two moons at the paper's scale, costs 1.8x more MCMC time per new observation, and needs a cosine learning-rate schedule that sbi's `train()` does not offer.
