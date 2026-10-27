@@ -6,8 +6,7 @@ from typing import Callable, Dict, List, Tuple, Union
 
 import torch
 from scipy.stats import kstest, uniform
-from torch import Tensor, ones, zeros
-from torch.distributions import Uniform
+from torch import Tensor
 from tqdm.auto import tqdm
 
 from sbi.inference import DirectPosterior, VectorFieldPosterior
@@ -370,7 +369,10 @@ def check_uniformity_c2st(
 ) -> Tensor:
     """Return C2ST scores for uniformity of the ranks.
 
-    Run a C2ST between ranks and uniform samples.
+    Run a C2ST between ranks and samples from the discrete uniform distribution
+    on the integers ``0, ..., num_posterior_samples``. Ranks are integer counts,
+    so comparing them against a continuous uniform distribution would make them
+    trivially distinguishable and produce inflated C2ST scores.
 
     Args:
         ranks: Ranks for each SBC run and for each model parameter,
@@ -379,17 +381,20 @@ def check_uniformity_c2st(
         num_repetitions: Repetitions of C2ST tests to estimate classifier variance.
 
     Returns:
-        c2st_ranks: C2ST accuracy between ranks and uniform baseline,
+        c2st_ranks: C2ST accuracy between ranks and the discrete uniform baseline,
             one for each dim_parameters.
     """
-    # Run C2ST multiple times to estimate stability
+    # Run C2ST multiple times to estimate stability.
     c2st_scores = torch.tensor([
         [
             c2st(
                 rks.unsqueeze(1),
-                Uniform(zeros(1), num_posterior_samples * ones(1)).sample(
-                    torch.Size((ranks.shape[0],))
-                ),
+                torch.randint(
+                    0,
+                    num_posterior_samples + 1,
+                    (ranks.shape[0], 1),
+                    device=ranks.device,
+                ).to(rks),
             )
             for rks in ranks.T
         ]

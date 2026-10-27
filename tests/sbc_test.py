@@ -12,6 +12,7 @@ from torch.distributions import MultivariateNormal, Uniform
 
 from sbi.analysis import sbc_rank_plot
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
+from sbi.diagnostics.sbc import check_uniformity_c2st
 from sbi.inference import NLE, NPE, NPSE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -238,6 +239,24 @@ def test_sbc_accuracy():
     assert (pvals > 0.05).all(), "posterior ranks uniformity test p-values too small."
 
 
+def test_check_uniformity_c2st_discrete_ranks():
+    """Test that C2ST uses the correct discrete null for integer ranks."""
+    num_ranks = 1000
+    num_posterior_samples = 100
+    num_dim = 2
+
+    torch.manual_seed(0)
+    ranks = torch.randint(0, num_posterior_samples + 1, (num_ranks, num_dim)).float()
+
+    c2st_ranks = check_uniformity_c2st(ranks, num_posterior_samples)
+
+    assert c2st_ranks.shape == (num_dim,)
+    assert ((c2st_ranks > 0.45) & (c2st_ranks < 0.55)).all(), (
+        "C2ST should be close to 0.5 for calibrated integer ranks, "
+        f"but got {c2st_ranks}."
+    )
+
+
 @pytest.mark.slow
 def test_sbc_checks():
     """Test the uniformity checks for SBC with artificial uniform ranks."""
@@ -248,10 +267,11 @@ def test_sbc_checks():
     # Data averaged posterior samples should be distributed as prior
     daps = prior.sample((num_posterior_samples,))
 
-    # Create perfectly uniform ranks for testing
-    ranks = torch.distributions.Uniform(
-        zeros(num_dim), num_posterior_samples * ones(num_dim)
-    ).sample((num_posterior_samples,))
+    # Create perfectly uniform integer ranks in {0, ..., num_posterior_samples},
+    # as returned by run_sbc for a calibrated posterior.
+    ranks = torch.randint(
+        0, num_posterior_samples + 1, (num_posterior_samples, num_dim)
+    ).float()
 
     # Run checks
     checks = check_sbc(
