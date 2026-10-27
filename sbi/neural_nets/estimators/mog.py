@@ -489,16 +489,43 @@ class MoG:
             ),
         )
 
-    def to(self, device: Union[str, torch.device]) -> MoG:
-        """Move all tensors to the specified device.
+    def to(
+        self,
+        device: Optional[Union[str, torch.device]] = None,
+        dtype: Optional[torch.dtype] = None,
+    ) -> MoG:
+        """Move all tensors to the specified device and dtype.
 
         Args:
-            device: Target device.
+            device: Target device. None keeps the device.
+            dtype: Target dtype. None keeps the dtype.
 
         Returns:
-            New MoG with tensors on the specified device.
+            New MoG with tensors on the specified device and dtype.
         """
-        return self.apply(lambda tensor: tensor.to(device))
+        return self.apply(lambda tensor: tensor.to(device, dtype))
+
+    def affine(self, shift: Tensor, scale: Tensor) -> MoG:
+        """Return the MoG of y = x * scale + shift for x from this MoG.
+
+        Each component N(m, P^-1) maps to N(m * scale + shift, (P / (s s^T))^-1),
+        where s is the scale. Dividing the columns of an upper triangular precision
+        factor by the scale keeps it upper triangular.
+
+        Args:
+            shift: Elementwise shift, shape (dim,).
+            scale: Elementwise scale, strictly positive, shape (dim,).
+
+        Returns:
+            New MoG with the same logits.
+        """
+        assert self.precision_factors is not None
+        return MoG(
+            logits=self.logits,
+            means=self.means * scale + shift,
+            precisions=self.precisions / torch.outer(scale, scale),
+            precision_factors=self.precision_factors / scale,
+        )
 
     def detach(self) -> MoG:
         """Detach all tensors from the computation graph.

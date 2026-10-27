@@ -12,7 +12,7 @@ with code originally developed by Conor M. Durkan et al.
 Based on: C. M. Bishop, "Mixture Density Networks", NCRG Report (1994)
 """
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 from torch import Tensor, nn
@@ -488,6 +488,64 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             return torch.zeros(1, device=input.device, dtype=input.dtype).squeeze()
         # The scale is 0-dim in estimators pickled with sbi <= 0.27.
         return -torch.log(self._transform_scale).expand(self.input_shape).sum()
+
+    def _affine_transform(self) -> Optional[Tuple[Tensor, Tensor]]:
+        """Return (shift, scale) of the z-score z = (x - shift) / scale, if any.
+
+        Raises:
+            NotImplementedError: If the input transform is not affine.
+        """
+        if self._prior_transform is not None:
+            raise NotImplementedError(
+                "This needs an affine z-score of the inputs, so "
+                "z_score_theta='transform_to_unconstrained' is not supported. Use "
+                "'independent' or 'structured'."
+            )
+        if self._transform_shift is None:
+            return None
+        # The scale is 0-dim in estimators pickled with sbi <= 0.27.
+        return self._transform_shift, self._transform_scale.expand(self.input_shape)
+
+    def transform_mog(self, mog: MoG) -> MoG:
+        """Map a MoG over inputs into the transformed space of the estimator's MoGs.
+
+        The MoG is cast to the estimator's device and dtype first, so a float64
+        prior matches a float32 estimator.
+
+        Args:
+            mog: MoG over inputs, e.g. a Gaussian prior or proposal.
+
+        Returns:
+            MoG in transformed space.
+
+        Raises:
+            NotImplementedError: If the input transform is not affine.
+        """
+        param = next(self.parameters())
+        mog = mog.to(param.device, param.dtype)
+        affine = self._affine_transform()
+        if affine is None:
+            return mog
+        shift, scale = affine
+        return mog.affine(-shift / scale, 1 / scale)
+
+    def inverse_transform_mog(self, mog: MoG) -> MoG:
+        """Map a MoG in transformed space, e.g. from `get_uncorrected_mog()`, to inputs.
+
+        Args:
+            mog: MoG in transformed space.
+
+        Returns:
+            MoG over inputs.
+
+        Raises:
+            NotImplementedError: If the input transform is not affine.
+        """
+        affine = self._affine_transform()
+        if affine is None:
+            return mog
+        shift, scale = affine
+        return mog.affine(shift, scale)
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Compute log probability of inputs given conditions.

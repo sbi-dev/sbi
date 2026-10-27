@@ -498,3 +498,29 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
 
         assert isinstance(mog, MoG)
         assert mog.batch_shape == torch.Size([8])
+
+    def test_transform_mog_maps_between_input_and_transformed_space(
+        self, standard_mdn, standard_condition, standard_inputs
+    ):
+        """The MoG mapped to inputs has the estimator's density; the maps invert."""
+        estimator = MixtureDensityEstimator(
+            net=standard_mdn,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+            transform_input=torch.tensor([[1.0, -2.0, 0.5], [10.0, 0.5, 2.0]]),
+        )
+        with torch.no_grad():
+            mog = estimator.get_uncorrected_mog(standard_condition)
+            input_mog = estimator.inverse_transform_mog(mog)
+            assert torch.allclose(
+                input_mog.log_prob(standard_inputs),
+                estimator.log_prob(standard_inputs, standard_condition),
+                atol=1e-5,
+            )
+            # A float64 MoG, e.g. from a float64 prior, comes back as float32.
+            mapped = estimator.transform_mog(input_mog.to(dtype=torch.float64))
+            assert mapped.dtype == torch.float32
+            for name in ("means", "precisions", "precision_factors"):
+                assert torch.allclose(
+                    getattr(mapped, name), getattr(mog, name), atol=1e-5
+                )
