@@ -17,8 +17,8 @@ from torch.distributions import (
 )
 
 from sbi.utils.torchutils import (
+    all_tensors_on_device,
     canonical_device,
-    infer_tensor_device,
     move_all_tensor_to_device,
     process_device,
     set_validate_args,
@@ -68,10 +68,7 @@ def move_distribution_to_device(
     if hasattr(dist, "to"):
         dist.to(device)  # type: ignore
         return dist
-    current_device = infer_tensor_device(dist)
-    if current_device is not None and canonical_device(
-        current_device
-    ) == canonical_device(device):
+    if all_tensors_on_device(dist, device):
         return dist
     try:
         params = get_distribution_parameters(dist, device)

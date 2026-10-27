@@ -3,13 +3,23 @@
 
 import pytest
 import torch
-from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal, Normal
+from torch.distributions import (
+    Beta,
+    Binomial,
+    Gamma,
+    Independent,
+    MultivariateNormal,
+    Normal,
+    TransformedDistribution,
+)
+from torch.distributions.transforms import AffineTransform
 
 from sbi.utils import RestrictedPrior
 from sbi.utils.torchutils import BoxUniform, process_device
 from sbi.utils.user_input_checks_utils import (
     MultipleIndependent,
     PytorchReturnTypeWrapper,
+    move_distribution_to_device,
 )
 from tests.test_utils import skip_if_mps_op_unsupported
 
@@ -137,3 +147,21 @@ def test_restricted_prior_stores_resolved_device():
 
     restricted = RestrictedPrior(prior, accept_all, device="cpu:0")
     assert restricted._device == "cpu"
+
+
+@pytest.mark.gpu
+def test_move_distribution_with_tensors_on_two_devices():
+    """A distribution with tensors on two devices is moved completely, also when the
+    first tensor found is already on the target device."""
+    device = process_device("gpu")
+    base = Independent(
+        Normal(torch.zeros(2, device=device), torch.ones(2, device=device)), 1
+    )
+    transform = AffineTransform(torch.ones(2), 2 * torch.ones(2), event_dim=1)
+    dist = TransformedDistribution(base, [transform])
+
+    moved = move_distribution_to_device(dist, "cpu")
+
+    samples = moved.sample((3,))
+    assert samples.device.type == "cpu"
+    assert moved.log_prob(samples).device.type == "cpu"
