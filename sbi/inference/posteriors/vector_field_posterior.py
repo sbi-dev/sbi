@@ -257,6 +257,12 @@ class VectorFieldPosterior(NeuralPosterior):
                 "guided sampling. Use a single observation, or disable "
                 "compose_standardization."
             )
+        if sample_with == "ode" and (is_iid or guidance_method is not None):
+            raise ValueError(
+                "iid observations (x with batch size > 1) and guidance change the "
+                "score, which only SDE sampling uses. Build the posterior with "
+                "sample_with='sde'."
+            )
         self.potential_fn = self.potential_fn.bind(
             x,
             x_is_iid=is_iid,

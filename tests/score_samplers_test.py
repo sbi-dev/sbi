@@ -498,3 +498,22 @@ def _build_gaussian_score_estimator(
     )
 
     return score_fn
+
+
+@pytest.mark.parametrize(
+    "x_o, sample_kwargs",
+    [
+        (torch.zeros(3, 2), {}),
+        (torch.zeros(1, 2), {"guidance_method": "interval", "guidance_params": {}}),
+    ],
+    ids=["iid", "guidance"],
+)
+def test_ode_sampling_rejects_score_only_features(x_o, sample_kwargs):
+    """iid methods and guidance change the score, which the ODE does not use."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    theta = prior.sample((100,))
+    estimator = posterior_flow_nn()(theta, theta)
+    posterior = VectorFieldPosterior(estimator, prior, sample_with="ode")
+
+    with pytest.raises(ValueError, match="sample_with='sde'"):
+        posterior.sample((10,), x=x_o, show_progress_bars=False, **sample_kwargs)
