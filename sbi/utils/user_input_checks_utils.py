@@ -17,6 +17,8 @@ from torch.distributions import (
 )
 
 from sbi.utils.torchutils import (
+    canonical_device,
+    infer_tensor_device,
     move_all_tensor_to_device,
     process_device,
     set_validate_args,
@@ -59,22 +61,27 @@ def move_distribution_to_device(
         device: The target device.
 
     Returns:
-        The distribution on the target device. If `.to()` was used, this is the
-        same object; otherwise it is a newly constructed instance.
+        The distribution on the target device. If `.to()` was used or the
+        distribution is already on `device`, this is the same object; otherwise it
+        is a newly constructed instance.
     """
     if hasattr(dist, "to"):
         dist.to(device)  # type: ignore
         return dist
-    else:
-        try:
-            params = get_distribution_parameters(dist, device)
-            rebuilt = type(dist)(**params)
-        except Exception:
-            move_all_tensor_to_device(dist, device)
-            return dist
-        # Not a constructor argument: a user subclass need not accept `validate_args`.
-        set_validate_args(rebuilt, dist._validate_args)
-        return rebuilt
+    current_device = infer_tensor_device(dist)
+    if current_device is not None and canonical_device(
+        current_device
+    ) == canonical_device(device):
+        return dist
+    try:
+        params = get_distribution_parameters(dist, device)
+        rebuilt = type(dist)(**params)
+    except Exception:
+        move_all_tensor_to_device(dist, device)
+        return dist
+    # Not a constructor argument: a user subclass need not accept `validate_args`.
+    set_validate_args(rebuilt, dist._validate_args)
+    return rebuilt
 
 
 class CustomPriorWrapper(Distribution):

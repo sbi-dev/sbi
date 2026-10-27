@@ -812,11 +812,19 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
 
 
 @pytest.mark.gpu
+@pytest.mark.parametrize("prior_type", ["box", "mvn"])
 @pytest.mark.parametrize("move_with_to", [True, False])
-def test_ensemble_posterior_on_gpu(move_with_to: bool):
-    """Ensemble potential, log_prob and MAP run on the device after reweighting."""
+def test_ensemble_posterior_on_gpu(move_with_to: bool, prior_type: str):
+    """Ensemble potential, log_prob and MAP run on the device after reweighting.
+
+    Both ways to reach the device give the same MAP transform, and each member keeps
+    its prior shared with its potential.
+    """
     device = process_device("gpu")
-    prior = BoxUniform(-torch.ones(2), torch.ones(2))
+    if prior_type == "box":
+        prior = BoxUniform(-torch.ones(2), torch.ones(2))
+    else:
+        prior = MultivariateNormal(zeros(2), eye(2))
     theta = prior.sample((100,))
     x = theta + 0.1 * torch.randn_like(theta)
     posteriors = []
@@ -837,13 +845,17 @@ def test_ensemble_posterior_on_gpu(move_with_to: bool):
         ensemble = EnsemblePosterior(posteriors, device="gpu")
         ensemble.set_default_x(torch.zeros(1, 2, device=device))
     ensemble.weights = [3.0, 1.0]
-    theta_o = torch.zeros(3, 2, device=device)
+    theta_o = 0.5 * torch.ones(3, 2, device=device)
 
     device_type = torch.device(device).type
     assert ensemble.potential(theta_o).device.type == device_type
     assert ensemble.log_prob(theta_o).device.type == device_type
     map_ = ensemble.map(num_iter=5, num_init_samples=20, num_to_optimize=5)
     assert map_.device.type == device_type
+    reference = utils.mcmc_transform(ensemble.prior, device=device)
+    assert torch.allclose(ensemble.theta_transform(theta_o), reference(theta_o))
+    for posterior in posteriors:
+        assert posterior.prior is posterior.potential_fn.prior
 
 
 @pytest.fixture(

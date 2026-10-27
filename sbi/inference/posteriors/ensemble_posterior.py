@@ -119,9 +119,11 @@ class EnsemblePosterior(NeuralPosterior):
         Returns:
             The ensemble posterior itself.
         """
-        super().to(device)
+        # The members move first: they keep their prior shared with their
+        # potential, and the ensemble potential then finds them on `device`.
         for posterior in self.posteriors:
-            posterior.to(self._device)
+            posterior.to(device)
+        super().to(device)
         self._weights = self.potential_fn._weights
         return self
 
