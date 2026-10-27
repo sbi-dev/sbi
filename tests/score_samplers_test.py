@@ -12,15 +12,19 @@ from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, 
 
 from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_adaptor import (
+    AffineClassifierFreeGuidance,
+    AffineClassifierFreeGuidanceConfig,
     FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
     JacCorrectedScoreFn,
+    UniversalGuidance,
+    UniversalGuidanceConfig,
     ensure_lam_positive_definite,
 )
 from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
-from sbi.neural_nets import posterior_score_nn
+from sbi.neural_nets import posterior_flow_nn, posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, MultipleIndependent
@@ -144,6 +148,48 @@ def test_score_fn_guidance_general(sde_type, guidance_method, num_dim):
         f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
     )
     assert torch.isfinite(output).all(), "Output contains non-finite values"
+
+
+@pytest.mark.parametrize("estimator_type", ["vp", "ve", "subvp", "fmpe"])
+@pytest.mark.parametrize("guidance", ["affine_classifier_free", "universal"])
+def test_neutral_guidance_returns_the_score(estimator_type, guidance):
+    """Guidance that changes nothing returns the estimator's score.
+
+    For flow matching, the estimator's `forward` returns the velocity, not the score.
+    """
+    num_dim = 2
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    if estimator_type == "fmpe":
+        estimator = posterior_flow_nn()(theta, x)
+    else:
+        estimator = posterior_score_nn(sde_type=estimator_type)(theta, x)
+    # The output layer is zero-initialized, so random weights make the net count.
+    for parameter in estimator.net.parameters():
+        torch.nn.init.normal_(parameter, std=0.1)
+
+    if guidance == "affine_classifier_free":
+        guided = AffineClassifierFreeGuidance(
+            estimator, prior, AffineClassifierFreeGuidanceConfig()
+        )
+    else:
+        guided = UniversalGuidance(
+            estimator,
+            prior,
+            UniversalGuidanceConfig(
+                guidance_fn=lambda input, condition, m, std: input.sum(-1) * 0.0,
+                guidance_fn_score=lambda input, condition, m, std: input * 0.0,
+            ),
+        )
+
+    inputs, conditions = torch.randn(4, num_dim), torch.randn(4, num_dim)
+    time = torch.tensor([0.5])
+    with torch.no_grad():
+        torch.testing.assert_close(
+            guided.score(inputs, conditions, time),
+            estimator.score(inputs, conditions, time),
+        )
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve"])

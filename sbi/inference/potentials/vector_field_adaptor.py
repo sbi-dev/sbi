@@ -256,7 +256,7 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
 
-        posterior_score = self.vf_estimator(input=input, condition=condition, time=time)
+        posterior_score = self.vf_estimator.score(input, condition, time)
         prior_score = self.marginal_prior_score(input, time)
         ll_score = posterior_score - prior_score
         ll_score_mod = ll_score * self.likelihood_scale + self.likelihood_shift
@@ -351,7 +351,7 @@ class UniversalGuidance(ScoreAdaptation):
     ) -> Tensor:
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
-        score = self.vf_estimator(input, condition, time)
+        score = self.vf_estimator.score(input, condition, time)
         m = self.vf_estimator.mean_t_fn(time)
         std = self.vf_estimator.std_fn(time)
 
@@ -583,7 +583,7 @@ class PriorGuide(ScoreAdaptation):
             time = torch.tensor([self.vf_estimator.t_min])
 
         input_ = input.detach()
-        score = self.vf_estimator(input=input_, condition=condition, time=time)
+        score = self.vf_estimator.score(input_, condition, time)
         m = self.vf_estimator.mean_t_fn(time)
         std = self.vf_estimator.std_fn(time)
         # Standard Tweedie's formula for denoising
