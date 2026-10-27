@@ -500,7 +500,9 @@ class NPE_C(PosteriorEstimatorTrainer):
         # Get the proposal MoG at the default_x
         assert isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
         assert proposal.default_x is not None, "Proposal must have default_x set"
-        mog_p = proposal.posterior_estimator.get_uncorrected_mog(proposal.default_x)
+        # The proposal is fixed: no gradients into the previous round's posterior.
+        with torch.no_grad():
+            mog_p = proposal.posterior_estimator.get_uncorrected_mog(proposal.default_x)
         norm_logits_p = mog_p.log_weights  # Already normalized
         m_p = mog_p.means
         prec_p = mog_p.precisions

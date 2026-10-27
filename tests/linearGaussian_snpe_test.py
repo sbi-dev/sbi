@@ -848,6 +848,23 @@ def test_multiround_mog_training():
         proposal = posterior
 
 
+def test_npe_c_mog_training_leaves_the_proposal_without_gradients():
+    """Training with a previous-round MDN posterior as proposal writes no gradients
+    into that posterior's network."""
+    prior = utils.BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    inference = NPE_C(prior, density_estimator="mdn", show_progress_bars=False)
+    theta = prior.sample((200,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    inference.append_simulations(theta, x).train(max_num_epochs=1)
+    proposal = inference.build_posterior().set_default_x(torch.zeros(1, 2))
+    theta = proposal.sample((200,), show_progress_bars=False)
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference.append_simulations(theta, x, proposal=proposal).train(max_num_epochs=1)
+
+    assert all(p.grad is None for p in proposal.posterior_estimator.parameters())
+
+
 def _npe_c_with_mog_loss_state(prior, num_components=3, transform_input=None):
     """Return NPE-C with an MDN, ready to evaluate the closed-form MoG loss."""
     estimator = MixtureDensityEstimator(
