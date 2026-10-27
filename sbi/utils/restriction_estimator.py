@@ -443,7 +443,7 @@ class RestrictionEstimator:
         classifier_.zero_grad(set_to_none=True)
 
         accept_reject_fn = AcceptRejectFunction(
-            self._classifier,
+            classifier_,
             self._first_round_validation_theta,
             self._first_round_validation_label,
             allowed_false_negatives=allowed_false_negatives,

@@ -7,7 +7,7 @@ import warnings
 
 import pytest
 import torch
-from torch import eye, ones, zeros
+from torch import eye, nn, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
@@ -310,13 +310,15 @@ def _restricted_box_prior():
     x = theta.clone()
     x[theta[:, 0] > 1.0] = float("nan")
     restriction_estimator = RestrictionEstimator(prior=prior)
-    restriction_estimator.append_simulations(theta, x).train(max_num_epochs=2)
-    return prior, theta, x, restriction_estimator
+    classifier = restriction_estimator.append_simulations(theta, x).train(
+        max_num_epochs=2
+    )
+    return prior, theta, x, restriction_estimator, classifier
 
 
 def test_npe_trains_with_restricted_prior_as_proposal():
     """NPE-C trains with a `RestrictedPrior` proposal, and the prior can be copied."""
-    prior, theta, x, restriction_estimator = _restricted_box_prior()
+    prior, theta, x, restriction_estimator, _ = _restricted_box_prior()
     restricted_prior = restriction_estimator.restrict_prior()
     copy.deepcopy(restricted_prior)
 
@@ -324,6 +326,30 @@ def test_npe_trains_with_restricted_prior_as_proposal():
     inference = NPE_C(prior=prior, show_progress_bars=False)
     inference.append_simulations(theta[valid], x[valid], proposal=restricted_prior)
     inference.train(max_num_epochs=1)
+
+
+class _CountingClassifier(nn.Module):
+    def __init__(self, net: nn.Module):
+        super().__init__()
+        self.net = net
+        self.num_calls = 0
+
+    def forward(self, theta):
+        self.num_calls += 1
+        return self.net(theta)
+
+
+def test_restrict_prior_uses_the_passed_classifier():
+    """`restrict_prior(classifier=...)` decides with the classifier it is given."""
+    *_, restriction_estimator, classifier = _restricted_box_prior()
+    counting_classifier = _CountingClassifier(classifier)
+
+    restricted_prior = restriction_estimator.restrict_prior(
+        classifier=counting_classifier
+    )
+    restricted_prior.sample((10,), print_rejected_frac=False)
+
+    assert counting_classifier.num_calls > 0
 
 
 @pytest.mark.parametrize("prior", ("uniform", "gaussian"))
