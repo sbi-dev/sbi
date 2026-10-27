@@ -28,6 +28,7 @@ from sbi.inference import (
     posterior_estimator_based_potential,
 )
 from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
+from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     FilteredDirectPosteriorParameters,
     MCMCPosteriorParameters,
@@ -37,6 +38,7 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
     MultivariateGaussianMDN,
 )
+from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -981,6 +983,20 @@ def test_npe_c_checks_pairs_after_a_round_with_the_mog_loss(
     inference.train(max_num_epochs=1, force_first_round_loss=force_first_round_loss)
 
     assert len(calls) == int(not force_first_round_loss)
+
+
+def test_npe_c_uses_atomic_loss_for_corrected_npe_a_proposal():
+    """From round 2 on, an NPE-A proposal needs the atomic loss, because the MoG loss
+    would read the uncorrected density of its wrapped estimator."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    inference, estimator = _npe_c_with_mog_loss_state(prior)
+    round_1 = NPE_A_Posterior(estimator, prior)
+    round_2 = NPE_A_Posterior(
+        estimator, prior, proposal_mog=MoG.from_gaussian(ones(2), 2 * eye(2))
+    )
+
+    assert inference._multiround_loss_is_per_row(round_1)
+    assert not inference._multiround_loss_is_per_row(round_2)
 
 
 @pytest.mark.slow

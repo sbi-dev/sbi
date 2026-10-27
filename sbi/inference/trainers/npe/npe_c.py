@@ -348,6 +348,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
         return (
             isinstance(proposal, DirectPosterior)
+            # A round-2+ NPE-A proposal holds a `ProposalCorrectedMDN`, which must not
+            # pass: the MoG loss would read the uncorrected density of its wrapped MDN.
             and isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
             and isinstance(self._neural_net, MixtureDensityEstimator)
             and check_dist_class(
