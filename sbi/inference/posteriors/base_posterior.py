@@ -273,7 +273,9 @@ class NeuralPosterior:
         """
 
         if init_method == "posterior":
-            inits = self.sample((num_init_samples,))
+            inits = self.sample(
+                (num_init_samples,), show_progress_bars=show_progress_bars
+            )
         elif init_method == "proposal":
             inits = self.proposal.sample((num_init_samples,))  # type: ignore
         elif isinstance(init_method, Tensor):
