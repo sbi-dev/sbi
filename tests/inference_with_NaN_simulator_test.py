@@ -328,28 +328,24 @@ def test_npe_trains_with_restricted_prior_as_proposal():
     inference.train(max_num_epochs=1)
 
 
-class _CountingClassifier(nn.Module):
-    def __init__(self, net: nn.Module):
-        super().__init__()
-        self.net = net
-        self.num_calls = 0
-
-    def forward(self, theta):
-        self.num_calls += 1
-        return self.net(theta)
-
-
 def test_restrict_prior_uses_the_passed_classifier():
-    """`restrict_prior(classifier=...)` decides with the classifier it is given."""
-    *_, restriction_estimator, classifier = _restricted_box_prior()
-    counting_classifier = _CountingClassifier(classifier)
+    """`restrict_prior(classifier=...)` decides with the classifier it is given.
+
+    The given classifier predicts `valid` exactly where theta_0 < 0, while the
+    trained one accepts up to theta_0 = 1.
+    """
+    *_, restriction_estimator, _ = _restricted_box_prior()
+    classifier = nn.Linear(2, 2)
+    with torch.no_grad():
+        classifier.weight.copy_(torch.tensor([[0.0, 0.0], [-100.0, 0.0]]))
+        classifier.bias.zero_()
 
     restricted_prior = restriction_estimator.restrict_prior(
-        classifier=counting_classifier
+        classifier=classifier, reweigh_factor=0.5
     )
-    restricted_prior.sample((10,), print_rejected_frac=False)
+    samples = restricted_prior.sample((200,), print_rejected_frac=False)
 
-    assert counting_classifier.num_calls > 0
+    assert (samples[:, 0] < 0.0).all()
 
 
 def test_restrict_prior_with_reweigh_factor():
