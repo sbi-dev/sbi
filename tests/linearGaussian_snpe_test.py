@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from copy import deepcopy
 from dataclasses import asdict
 
@@ -940,6 +941,26 @@ def test_npe_c_drops_non_normalizable_component_pairs():
         inference._automatic_posterior_transformation(
             *proposal, torch.zeros(1, 1), *wide
         )
+
+
+@pytest.mark.parametrize("prior_var, warns", ((1e-4, True), (1e4, False)))
+def test_npe_c_warns_if_trained_estimator_has_non_normalizable_pairs(
+    prior_var: float, warns: bool
+):
+    """Pairs that are left out of the MoG loss after training raise a warning.
+
+    A prior much narrower than the untrained estimator makes every pair wider than
+    the prior; a much wider prior makes every pair normalizable.
+    """
+    prior = MultivariateNormal(torch.zeros(2), prior_var * torch.eye(2))
+    inference, estimator = _npe_c_with_mog_loss_state(prior)
+    proposal = DirectPosterior(estimator, prior).set_default_x(torch.zeros(1, 2))
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        inference._warn_if_pairs_not_normalizable(proposal, batch_size=50)
+
+    assert any("infinite mass" in str(w.message) for w in caught) == warns
 
 
 @pytest.mark.slow

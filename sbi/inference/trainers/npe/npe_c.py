@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
 import torch
@@ -220,7 +221,45 @@ class NPE_C(PosteriorEstimatorTrainer):
                 # Take care of z-scoring, pre-compute and store prior terms.
                 self._set_state_for_mog_proposal()
 
-        return super().train(**kwargs)
+        density_estimator = super().train(**kwargs)
+        if self._round > 0 and self.use_non_atomic_loss:
+            self._warn_if_pairs_not_normalizable(proposal, training_batch_size)
+        return density_estimator
+
+    def _warn_if_pairs_not_normalizable(
+        self, proposal: DirectPosterior, batch_size: int
+    ) -> None:
+        """Warn if the trained estimator has pairs that the MoG loss gives zero weight.
+
+        Such pairs get no gradient, so the posterior estimate may be biased.
+
+        Args:
+            proposal: The proposal of the latest round.
+            batch_size: Number of simulations to evaluate at once.
+        """
+        assert isinstance(self._neural_net, MixtureDensityEstimator)
+        assert isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
+        _, x, _ = self.get_simulations(starting_round=self._round)
+        with torch.no_grad():
+            precisions_p = proposal.posterior_estimator.get_uncorrected_mog(
+                proposal.default_x
+            ).precisions
+            for x_batch in torch.split(x.to(self._device), batch_size):
+                precisions_d = self._neural_net.get_uncorrected_mog(x_batch).precisions
+                _, _, normalizable = self._precisions_proposal_posterior(
+                    precisions_p, precisions_d
+                )
+                if not normalizable.all():
+                    warnings.warn(
+                        "After training, some components of the MoG proposal "
+                        "posterior still have infinite mass: the proposal and the "
+                        "density estimator are both wider than the prior. The loss "
+                        "gives them zero weight, so the posterior estimate may be "
+                        "biased. A flow density estimator does not use this "
+                        "closed-form loss.",
+                        stacklevel=3,
+                    )
+                    return
 
     def _set_state_for_mog_proposal(self) -> None:
         """Set state variables that are used at each training step of non-atomic SNPE-C.
