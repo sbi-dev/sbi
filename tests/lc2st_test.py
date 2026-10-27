@@ -11,7 +11,13 @@ from scipy.stats import binomtest
 from sklearn.neural_network import MLPClassifier
 from torch import Tensor
 
-from sbi.diagnostics.lc2st import LC2ST, LC2ST_NF, LC2STScores, LC2STState
+from sbi.diagnostics.lc2st import (
+    LC2ST,
+    LC2ST_NF,
+    LC2STScores,
+    LC2STState,
+    permute_data,
+)
 from sbi.inference import NPE
 from sbi.simulators.gaussian_mixture import (
     gaussian_mixture,
@@ -64,19 +70,6 @@ def badly_trained_npe(sim_setup):
     inference = NPE(sim_setup.prior, density_estimator="maf")
     inference = inference.append_simulations(theta=theta_train, x=x_train)
     return inference.train(max_num_epochs=1)
-
-
-@pytest.fixture(scope="session")
-def well_trained_npe(sim_setup):
-    """A well-trained NPE for testing LC2ST false positive rate."""
-    # seed explicitly to keep session scope deterministic.
-    seed_all_backends(1)
-    theta_train = sim_setup.prior.sample((5_000,))
-    x_train = sim_setup.simulator(theta_train)
-
-    inference = NPE(sim_setup.prior, density_estimator="maf")
-    inference = inference.append_simulations(theta=theta_train, x=x_train)
-    return inference.train(max_num_epochs=2**31 - 1)
 
 
 @pytest.fixture(scope="session")
@@ -391,6 +384,43 @@ def test_lc2st_normalization_runs_once_per_null_trial(cal_data):
     )
 
 
+def test_permute_data_swaps_only_within_pairs():
+    """Each permuted row must hold the same P/Q pair, possibly swapped."""
+    theta_p, theta_q = torch.randn(500, 3), torch.randn(500, 3)
+    theta_p_perm, theta_q_perm = permute_data(theta_p, theta_q, seed=0)
+
+    kept = (theta_p_perm == theta_p).all(-1) & (theta_q_perm == theta_q).all(-1)
+    swapped = (theta_p_perm == theta_q).all(-1) & (theta_q_perm == theta_p).all(-1)
+    assert (kept ^ swapped).all()
+    assert 0 < swapped.sum() < len(swapped)
+
+
+def test_lc2st_p_value_counts_ties_as_extreme(cal_data, theta_o, x_o):
+    """Null statistics equal to the observed one must count towards the p-value."""
+    # Identical P and Q and a fixed classifier seed make every null statistic tie.
+    lc2st = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.thetas.clone(),
+        num_trials_null=5,
+        classifier_kwargs={"random_state": 0},
+    )
+    lc2st.train_under_null_hypothesis(verbosity=0).train_on_observed_data()
+
+    assert lc2st.p_value(theta_o=theta_o, x_o=x_o) == 1.0
+
+
+def test_lc2st_null_training_leaves_global_rng_untouched(cal_data):
+    """Permutation null training must neither reseed nor draw from the torch RNG."""
+    lc2st = LC2ST(
+        cal_data.thetas, cal_data.xs, cal_data.posterior_samples, num_trials_null=3
+    )
+    rng_state = torch.get_rng_state()
+    lc2st.train_under_null_hypothesis(verbosity=0)
+
+    assert torch.equal(rng_state, torch.get_rng_state())
+
+
 def test_lc2st_normalization_handles_constant_dimensions(cal_data):
     """Constant parameter or x dimensions must not produce NaN/Inf on z-scoring.
 
@@ -630,14 +660,12 @@ def test_lc2st_true_positive_rate(method, sim_setup, badly_trained_npe):
     lc2st = method(thetas, xs, posterior_samples, **kwargs_init)
     lc2st.train_under_null_hypothesis().train_on_observed_data()
 
-    results = [
-        lc2st.reject_test(
-            x_o=sim_setup.simulator(sim_setup.prior.sample((1,))),
-            alpha=1 - confidence_level,
-            **get_eval_kwargs(sim_setup.simulator(sim_setup.prior.sample((1,)))),
+    results = []
+    for _ in range(num_runs):
+        x = sim_setup.simulator(sim_setup.prior.sample((1,)))
+        results.append(
+            lc2st.reject_test(x_o=x, alpha=1 - confidence_level, **get_eval_kwargs(x))
         )
-        for _ in range(num_runs)
-    ]
 
     proportion_rejected = torch.tensor(results).float().mean()
     assert proportion_rejected > confidence_level, (
@@ -648,55 +676,63 @@ def test_lc2st_true_positive_rate(method, sim_setup, badly_trained_npe):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("method", [LC2ST, LC2ST_NF])
-def test_lc2st_false_positive_rate(method, sim_setup, well_trained_npe, set_seed):
-    """For a good estimator, LC2ST should not reject the null hypothesis."""
-    num_runs, num_cal, num_eval = 100, 1_000, 10_000
-    confidence_level = 0.95
-    expected_rate = 1 - confidence_level
+def test_lc2st_false_positive_rate(method):
+    """For the exact posterior, LC2ST should reject at most at its level alpha."""
+    num_trials, num_cal, num_trials_null, num_eval = 50, 200, 50, 10_000
+    alpha = 0.05
+    dim, noise_std = 2, 0.5
 
-    thetas = sim_setup.prior.sample((num_cal,))
-    xs = sim_setup.simulator(thetas)
-    posterior_samples = (
-        well_trained_npe.sample((1,), xs).reshape(-1, thetas.shape[-1]).detach()
-    )
+    # x = theta + noise_std * eps with theta ~ N(0, I) has the posterior
+    # N(x / (1 + noise_std^2), noise_std^2 / (1 + noise_std^2) * I).
+    prior = torch.distributions.MultivariateNormal(torch.zeros(dim), torch.eye(dim))
+    posterior_std = noise_std / (1 + noise_std**2) ** 0.5
 
-    if method == LC2ST:
-        kwargs_init, get_eval_kwargs = (
-            {},
-            lambda x: {
-                "theta_o": well_trained_npe.sample((num_eval,), condition=x)
-                .reshape(-1, thetas.shape[-1])
-                .detach()
-            },
-        )
-    else:
-        npe = well_trained_npe
-        kwargs_init = {
-            "flow_inverse_transform": npe.inverse_transform,
-            "flow_base_dist": torch.distributions.MultivariateNormal(
-                torch.zeros(2), torch.eye(2)
-            ),
-            "num_eval": num_eval,
-        }
-        get_eval_kwargs = lambda x: {}
+    def simulator(theta: Tensor) -> Tensor:
+        return theta + noise_std * torch.randn_like(theta)
 
-    lc2st = method(thetas, xs, posterior_samples, **kwargs_init)
-    lc2st.train_under_null_hypothesis().train_on_observed_data()
+    def posterior_mean(x: Tensor) -> Tensor:
+        return x / (1 + noise_std**2)
 
-    results = []
-    for _ in range(num_runs):
-        x = sim_setup.simulator(sim_setup.prior.sample((1,)))
-        results.append(
-            lc2st.reject_test(x_o=x, alpha=1 - confidence_level, **get_eval_kwargs(x))
-        )
+    def sample_posterior(num_samples: int, x: Tensor) -> Tensor:
+        return posterior_mean(x) + posterior_std * torch.randn(num_samples, *x.shape)
 
-    num_rejections = sum(results)
-    result = binomtest(num_rejections, num_runs, expected_rate, alternative="greater")
+    def inverse_transform(theta: Tensor, x: Tensor) -> Tensor:
+        return (theta - posterior_mean(x)) / posterior_std
 
+    num_rejections = 0
+    for _ in range(num_trials):
+        thetas = prior.sample((num_cal,))
+        xs = simulator(thetas)
+        posterior_samples = sample_posterior(1, xs).squeeze(0)
+        x_o = simulator(prior.sample((1,)))
+
+        if method == LC2ST:
+            lc2st = LC2ST(
+                thetas, xs, posterior_samples, num_trials_null=num_trials_null
+            )
+            eval_kwargs = {"theta_o": sample_posterior(num_eval, x_o).squeeze(1)}
+        else:
+            lc2st = LC2ST_NF(
+                thetas,
+                xs,
+                posterior_samples,
+                flow_inverse_transform=inverse_transform,
+                flow_base_dist=torch.distributions.MultivariateNormal(
+                    torch.zeros(dim), torch.eye(dim)
+                ),
+                num_eval=num_eval,
+                num_trials_null=num_trials_null,
+            )
+            eval_kwargs = {}
+
+        lc2st.train_under_null_hypothesis(verbosity=0).train_on_observed_data()
+        num_rejections += int(lc2st.reject_test(x_o=x_o, alpha=alpha, **eval_kwargs))
+
+    result = binomtest(num_rejections, num_trials, alpha, alternative="greater")
     assert result.pvalue > 0.01, (
-        f"LC2ST rejection rate significantly higher than expected. "
-        f"Expected: {expected_rate * 100:.1f}%, Observed: {num_rejections}%, "
-        f"p-value: {result.pvalue:.4f}"
+        f"LC2ST rejected the exact posterior in {num_rejections} of {num_trials} "
+        f"independent trials, expected about {alpha * num_trials:.1f} "
+        f"(p-value: {result.pvalue:.4f})."
     )
 
 
