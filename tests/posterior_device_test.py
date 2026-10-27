@@ -230,6 +230,17 @@ def test_map_with_theta_transform_with_parameters(make_transform, device: str):
     copy.deepcopy(posterior)
 
 
+def test_mcmc_to_keeps_the_sampler_of_the_last_run(trained_on_cpu):
+    """The diagnostics of the last MCMC run stay available after a move."""
+    npe, _ = trained_on_cpu("box")
+    posterior = npe.build_posterior(posterior_parameters=MCMC_FAST)
+    posterior.sample((2,), x=torch.zeros(1, NUM_DIM), show_progress_bars=False)
+
+    posterior.to("cpu")
+
+    assert posterior.posterior_sampler is not None
+
+
 def test_to_keeps_ode_options_of_bound_vector_field_potential(trained_on_cpu):
     """A bound vector field potential keeps the ODE options given to `bind()`."""
     _, fmpe = trained_on_cpu("box")

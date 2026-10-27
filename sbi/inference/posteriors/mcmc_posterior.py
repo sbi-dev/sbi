@@ -151,8 +151,8 @@ class MCMCPosterior(NeuralPosterior):
     def to(self, device: Union[str, torch.device]) -> Self:
         """Move the posterior to `device` in place, see `NeuralPosterior.to()`.
 
-        The chain states stored for `init_strategy="latest_sample"` move as well, the
-        sampler is built again at the next `sample()` call.
+        The chain states stored for `init_strategy="latest_sample"` move as well. The
+        sampler of the last run stays for its diagnostics; `sample()` builds a new one.
 
         Args:
             device: Device to move the posterior to.
@@ -161,7 +161,6 @@ class MCMCPosterior(NeuralPosterior):
             The posterior itself.
         """
         super().to(device)
-        self._posterior_sampler = None
         init_params = getattr(self, "_mcmc_init_params", None)
         if init_params is not None:
             self._mcmc_init_params = init_params.to(self._device)
