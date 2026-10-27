@@ -17,6 +17,8 @@ from sbi.inference.potentials.vector_field_adaptor import (
     FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
     JacCorrectedScoreFn,
+    PriorGuide,
+    PriorGuideConfig,
     UniversalGuidance,
     UniversalGuidanceConfig,
     ensure_lam_positive_definite,
@@ -189,6 +191,34 @@ def test_neutral_guidance_returns_the_score(estimator_type, guidance):
         torch.testing.assert_close(
             guided.score(inputs, conditions, time),
             estimator.score(inputs, conditions, time),
+        )
+
+
+@pytest.mark.parametrize("covariance_type", ["diag", "full"])
+def test_prior_guide_score_does_not_depend_on_the_batch_layout(covariance_type):
+    """The sampler passes inputs of shape (samples, 1, dim) to the guidance."""
+    train_prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    test_prior = MultivariateNormal(torch.ones(2), 0.5 * torch.eye(2))
+    theta = train_prior.sample((100,))
+    estimator = posterior_score_nn(sde_type="ve")(theta, theta)
+    guidance = PriorGuide(
+        estimator,
+        train_prior,
+        PriorGuideConfig(
+            train_prior=train_prior,
+            test_prior=test_prior,
+            K=2,
+            covariance_type=covariance_type,
+            num_steps=50,
+        ),
+    )
+    inputs, conditions = torch.randn(5, 2), torch.randn(5, 2)
+    time = torch.tensor([0.5])
+
+    with torch.no_grad():
+        torch.testing.assert_close(
+            guidance(inputs[:, None], conditions[:, None], time)[:, 0],
+            guidance(inputs, conditions, time),
         )
 
 

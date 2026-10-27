@@ -620,7 +620,8 @@ class PriorGuide(ScoreAdaptation):
             log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
 
         numerator = self.weights[None, :] * torch.exp(log_comp)
-        denom = numerator.sum(dim=1, keepdim=True)
+        # Normalize over the mixture components, the last dimension.
+        denom = numerator.sum(dim=-1, keepdim=True)
         denom = torch.clamp(denom, min=nugget)
         w_tilde = numerator / denom
 
