@@ -1000,6 +1000,37 @@ def test_npe_c_uses_atomic_loss_for_corrected_npe_a_proposal():
 
 
 @pytest.mark.slow
+def test_npe_c_mog_loss_with_retrain_from_scratch():
+    """With `retrain_from_scratch=True`, the round-2 posterior has the true moments.
+
+    The retrained network has its own z-score, so the MoG loss must map the proposal
+    and the prior into it.
+    """
+    prior_cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
+    prior = MultivariateNormal(torch.tensor([1.0, -1.0]), prior_cov)
+    x_o = zeros(1, 2)
+    # x = theta + N(0, I), so the posterior precision is the prior precision + I.
+    post_cov = torch.inverse(torch.inverse(prior_cov) + eye(2))
+    post_mean = post_cov @ torch.linalg.solve(prior_cov, prior.mean)
+    post_std = post_cov.diag().sqrt()
+
+    inference = NPE_C(prior, density_estimator="mdn", show_progress_bars=False)
+    proposal = prior
+    for round_ in range(2):
+        theta = proposal.sample((1000,))
+        inference.append_simulations(
+            theta, theta + torch.randn_like(theta), proposal=proposal
+        )
+        inference.train(retrain_from_scratch=round_ > 0)
+        proposal = inference.build_posterior().set_default_x(x_o)
+    samples = proposal.sample((5000,), show_progress_bars=False)
+
+    assert ((samples.mean(0) - post_mean).abs() / post_std).max() < 0.5
+    assert torch.allclose(samples.std(0) / post_std, ones(2), atol=0.25)
+    assert (torch.cov(samples.T)[0, 1] - post_cov[0, 1]).abs() < 0.15
+
+
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "num_dim",
     ((2), (1)),

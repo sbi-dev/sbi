@@ -217,14 +217,52 @@ class NPE_C(PosteriorEstimatorTrainer):
             algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
             print(f"Using {type(self).__name__} with {algorithm} loss")
 
-            if self.use_non_atomic_loss:
-                # Take care of z-scoring, pre-compute and store prior terms.
-                self._set_state_for_mog_proposal()
-
         density_estimator = super().train(**kwargs)
         if self._round > 0 and self.use_non_atomic_loss and not force_first_round_loss:
             self._warn_if_pairs_not_normalizable(proposal, training_batch_size)
         return density_estimator
+
+    def _initialize_neural_network(
+        self, retrain_from_scratch: bool, start_idx: int
+    ) -> None:
+        """Initialize the network, then the state of the MoG loss.
+
+        The state of the MoG loss depends on the network's z-score, so it is set
+        after the network is (re)built.
+
+        Args:
+            retrain_from_scratch: Whether to rebuild the network.
+            start_idx: The index of the first round whose simulations build the
+                network.
+        """
+        super()._initialize_neural_network(retrain_from_scratch, start_idx)
+        if self._round > 0 and self.use_non_atomic_loss:
+            self._set_state_for_mog_proposal()
+            self._proposal_mog = self._proposal_mog_in_z_space(
+                self._proposal_roundwise[-1]
+            )
+
+    def _proposal_mog_in_z_space(self, proposal: DirectPosterior) -> MoG:
+        """Return the proposal's MoG at its default_x in the network's z-scored space.
+
+        The proposal's estimator can have another z-score than the network, e.g.
+        after `retrain_from_scratch=True`, so its MoG is mapped through parameter
+        space.
+
+        Args:
+            proposal: The proposal of the latest round.
+
+        Returns:
+            MoG of the proposal on the training device.
+        """
+        assert isinstance(self._neural_net, MixtureDensityEstimator)
+        proposal_estimator = proposal.posterior_estimator
+        assert isinstance(proposal_estimator, MixtureDensityEstimator)
+        assert proposal.default_x is not None, "Proposal must have default_x set"
+        with torch.no_grad():
+            mog = proposal_estimator.get_uncorrected_mog(proposal.default_x)
+            mog = proposal_estimator.inverse_transform_mog(mog)
+            return self._neural_net.transform_mog(mog).to(self._device)
 
     def _warn_if_pairs_not_normalizable(
         self, proposal: DirectPosterior, batch_size: int
@@ -236,12 +274,9 @@ class NPE_C(PosteriorEstimatorTrainer):
             batch_size: Number of simulations to evaluate at once.
         """
         assert isinstance(self._neural_net, MixtureDensityEstimator)
-        assert isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
         _, x, _ = self.get_simulations(starting_round=self._round)
+        precisions_p = self._proposal_mog_in_z_space(proposal).precisions
         with torch.no_grad():
-            precisions_p = proposal.posterior_estimator.get_uncorrected_mog(
-                proposal.default_x
-            ).precisions
             for x_batch in torch.split(x, batch_size):
                 precisions_d = self._neural_net.get_uncorrected_mog(
                     x_batch.to(self._device)
@@ -274,12 +309,6 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
         # Check if z-scoring is enabled on the MixtureDensityEstimator
         assert isinstance(self._neural_net, MixtureDensityEstimator)
-        if getattr(self._neural_net, "_prior_transform", None) is not None:
-            raise NotImplementedError(
-                "NPE-C's analytic proposal correction does not support "
-                "z_score_theta='transform_to_unconstrained' (it assumes an affine "
-                "z-score). Use 'independent'/'structured', or single-round NPE."
-            )
         self.z_score_theta = self._neural_net.has_input_transform
 
         self._set_maybe_z_scored_prior()
@@ -320,7 +349,7 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         prior_mog = self._neural_net.transform_mog(
             MoG.from_gaussian(gaussian_prior.mean, gaussian_prior.covariance_matrix)
-        )
+        ).to(self._device)
         self._maybe_z_scored_prior = MultivariateNormal(
             prior_mog.means[0, 0], precision_matrix=prior_mog.precisions[0, 0]
         )
@@ -373,7 +402,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         """
 
         if self.use_non_atomic_loss:
-            return self._log_prob_proposal_posterior_mog(theta, x, proposal)
+            return self._log_prob_proposal_posterior_mog(theta, x)
         else:
             return self._log_prob_proposal_posterior_atomic(theta, x, masks)
 
@@ -463,9 +492,7 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         return log_prob_proposal_posterior
 
-    def _log_prob_proposal_posterior_mog(
-        self, theta: Tensor, x: Tensor, proposal: DirectPosterior
-    ) -> Tensor:
+    def _log_prob_proposal_posterior_mog(self, theta: Tensor, x: Tensor) -> Tensor:
         """Return log-probability of the proposal posterior for MoG proposal.
 
         For MoG proposals and MoG density estimators, this can be done in closed form
@@ -486,15 +513,12 @@ class NPE_C(PosteriorEstimatorTrainer):
         Args:
             theta: Batch of parameters θ.
             x: Batch of data.
-            proposal: Proposal distribution.
 
         Returns:
             Log-probability of the proposal posterior.
         """
-        # Get the proposal MoG at the default_x
-        assert isinstance(proposal.posterior_estimator, MixtureDensityEstimator)
-        assert proposal.default_x is not None, "Proposal must have default_x set"
-        mog_p = proposal.posterior_estimator.get_uncorrected_mog(proposal.default_x)
+        # The proposal MoG at its default_x, in the network's z-scored space.
+        mog_p = self._proposal_mog
         norm_logits_p = mog_p.log_weights  # Already normalized
         m_p = mog_p.means
         prec_p = mog_p.precisions
