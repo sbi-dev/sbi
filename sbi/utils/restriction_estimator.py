@@ -429,7 +429,7 @@ class RestrictionEstimator:
                 be systematically missed by the inference procedure. If None, 0.0
                 unless `reweigh_factor` is given.
             reweigh_factor: Post-hoc correction factor, used instead of
-                `allowed_false_negatives`. Should be in [0, 1]. A parameter set is
+                `allowed_false_negatives`. Must be in [0, 1). A parameter set is
                 accepted if the classifier predicts `valid` with a probability above
                 `reweigh_factor`, so a large factor rejects more parameter sets.
 
@@ -555,6 +555,11 @@ class AcceptRejectFunction:
             allowed_false_negatives is None or reweigh_factor is None
         ), """Both the `allowed_false_negatives` and the `reweigh_factor` are set. You
             can only set one of them."""
+        if reweigh_factor is not None and not 0.0 <= reweigh_factor < 1.0:
+            raise ValueError(
+                f"`reweigh_factor` must be in [0, 1), got {reweigh_factor}. At 1, "
+                "every parameter set is rejected."
+            )
 
         valid_val_theta = validation_theta[validation_label.bool()]
         num_valid = valid_val_theta.shape[0]
