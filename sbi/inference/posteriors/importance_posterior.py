@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import math
 from typing import Callable, Literal, Optional, Tuple, Union
 
 import torch
@@ -64,7 +65,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         )
 
         self.proposal = proposal
-        self._normalization_constant = None
+        # Log normalization constant and the x at which it was estimated.
+        self._log_normalization_constant: Optional[Tensor] = None
+        self._normalization_x: Optional[Tensor] = None
         self.method = method
         self.theta_transform = theta_transform
 
@@ -140,13 +143,11 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
             if normalization_constant_params is None:
                 normalization_constant_params = dict()  # use defaults
-            normalization_constant = self.estimate_normalization_constant(
+            log_normalization_constant = self._estimate_log_normalization_constant(
                 x, **normalization_constant_params
             )
 
-            return (potential_values - torch.log(normalization_constant)).to(
-                self._device
-            )
+            return (potential_values - log_normalization_constant).to(self._device)
 
     @torch.no_grad()
     def estimate_normalization_constant(
@@ -155,34 +156,42 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         """Returns the normalization constant via importance sampling.
 
         Args:
+            x: Observation at which to estimate the normalization constant.
             num_samples: Number of importance samples used for the estimate.
-            force_update: Whether to re-calculate the normlization constant when x is
+            force_update: Whether to re-calculate the normalization constant when x is
                 unchanged and have a cached value.
         """
-        # Check if the provided x matches the default x (short-circuit on identity).
-        is_new_x = self.default_x is None or (
-            x is not self.default_x and (x != self.default_x).any()
+        return torch.exp(
+            self._estimate_log_normalization_constant(x, num_samples, force_update)
         )
 
-        not_saved_at_default_x = self._normalization_constant is None
+    @torch.no_grad()
+    def _estimate_log_normalization_constant(
+        self, x: Tensor, num_samples: int = 10_000, force_update: bool = False
+    ) -> Tensor:
+        """Returns the log normalization constant, cached for the last x.
 
-        if is_new_x:  # Calculate at x; don't save.
+        The estimate is computed in log space, because the importance weights of
+        e.g. many iid observations underflow when exponentiated.
+        """
+        cached_x = self._normalization_x
+        is_cached_x = (
+            cached_x is not None
+            and cached_x.shape == x.shape
+            and torch.equal(cached_x, x)
+        )
+        if force_update or self._log_normalization_constant is None or not is_cached_x:
             _, log_importance_weights = importance_sample(
                 self.potential_fn,
                 proposal=self.proposal,
                 num_samples=num_samples,
             )
-            return torch.mean(torch.exp(log_importance_weights))
-        elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
-            assert self.default_x is not None
-            _, log_importance_weights = importance_sample(
-                self.potential_fn,
-                proposal=self.proposal,
-                num_samples=num_samples,
-            )
-            self._normalization_constant = torch.mean(torch.exp(log_importance_weights))
+            self._log_normalization_constant = torch.logsumexp(
+                log_importance_weights, dim=0
+            ) - math.log(log_importance_weights.shape[0])
+            self._normalization_x = x.clone()
 
-        return self._normalization_constant.to(self._device)  # type: ignore
+        return self._log_normalization_constant.to(self._device)  # type: ignore
 
     def sample(
         self,

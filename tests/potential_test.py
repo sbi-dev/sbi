@@ -81,6 +81,48 @@ def test_callable_potential(
     assert torch.allclose(sample_std, torch.sqrt(torch.as_tensor(cov)), atol=0.1)
 
 
+def _gaussian_iid_potential_and_posterior():
+    """Return the potential of x_i ~ N(theta, I), theta ~ N(0, I) and its posterior."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def potential(theta, x_o):
+        likelihood = MultivariateNormal(theta.unsqueeze(1), eye(2))
+        return likelihood.log_prob(x_o.unsqueeze(0)).sum(-1) + prior.log_prob(theta)
+
+    def true_posterior(x_o):
+        num_trials = x_o.shape[0]
+        return MultivariateNormal(
+            x_o.sum(0) / (num_trials + 1), eye(2) / (num_trials + 1)
+        )
+
+    return prior, potential, true_posterior
+
+
+def test_importance_posterior_log_prob_after_changing_default_x():
+    """The normalization constant must not be reused for another default x."""
+    torch.manual_seed(0)
+    prior, potential, true_posterior = _gaussian_iid_potential_and_posterior()
+    posterior = ImportanceSamplingPosterior(potential, proposal=prior)
+    theta = zeros(1, 2)
+
+    for x_o in [zeros(1, 2), 3 * ones(1, 2)]:
+        log_prob = posterior.set_default_x(x_o).log_prob(theta)
+        assert torch.allclose(log_prob, true_posterior(x_o).log_prob(theta), atol=0.2)
+
+
+def test_importance_posterior_log_prob_with_many_iid_trials():
+    """The normalization constant must not underflow for a sharp potential."""
+    torch.manual_seed(0)
+    prior, potential, true_posterior = _gaussian_iid_potential_and_posterior()
+    x_o = torch.randn(500, 2) + 0.5
+    posterior = ImportanceSamplingPosterior(potential, proposal=prior)
+    theta = x_o.mean(0, keepdim=True)
+
+    log_prob = posterior.set_default_x(x_o).log_prob(theta)
+    assert torch.isfinite(log_prob).all()
+    assert torch.allclose(log_prob, true_posterior(x_o).log_prob(theta), atol=0.5)
+
+
 @pytest.mark.parametrize(
     "condition",
     [
