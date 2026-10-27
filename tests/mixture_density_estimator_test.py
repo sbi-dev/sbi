@@ -526,10 +526,9 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
                     getattr(mapped, name), getattr(mog, name), atol=1e-5
                 )
 
-    def test_transform_mog_matches_transform_input_for_large_offsets(
-        self, standard_mdn
-    ):
-        """A MoG is z-scored like the inputs, also for an offset far above the scale."""
+    def test_mog_maps_keep_small_offsets_at_a_large_shift(self, standard_mdn):
+        """With a shift far above the scale, a MoG is z-scored like the inputs, and
+        the map between two equal z-scored spaces keeps its small offsets."""
         shift, scale = torch.full((3,), 1e4), torch.full((3,), 3e-3)
         estimator = MixtureDensityEstimator(
             net=standard_mdn,
@@ -543,10 +542,12 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
             estimator._transform_input(shift.unsqueeze(0))[0],
             atol=1e-3,
         )
+        z_mog = MoG.from_gaussian(torch.full((3,), 0.13), torch.eye(3))
+        mapped = estimator.transform_mog_from(estimator, z_mog)
+        assert torch.allclose(mapped.means, z_mog.means, atol=1e-5)
 
     def test_transform_mog_from_another_estimator(self, make_mdn):
-        """The direct map between two z-scored spaces equals the way through inputs,
-        and keeps small offsets when both spaces share a large shift."""
+        """The direct map between two z-scored spaces equals the way through inputs."""
 
         def estimator(shift, scale):
             return MixtureDensityEstimator(
@@ -566,13 +567,6 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
             assert torch.allclose(
                 getattr(direct, name), getattr(via_inputs, name), atol=1e-4
             )
-
-        shift, scale = torch.full((3,), 1e4), torch.full((3,), 3e-3)
-        mog = MoG.from_gaussian(torch.full((3,), 0.13), torch.eye(3))
-        mapped = estimator(shift, scale).transform_mog_from(
-            estimator(shift, scale), mog
-        )
-        assert torch.allclose(mapped.means, mog.means, atol=1e-5)
 
     @pytest.mark.parametrize(
         "map_name", ["transform_mog", "inverse_transform_mog", "transform_mog_from"]
