@@ -465,7 +465,8 @@ class NeuralPosterior:
 
         `torch.load(..., map_location=...)` remaps the tensors but not the stored device
         strings. If the restored tensors live on another device than `_device` claims,
-        the device strings of the posterior, its potential and its prior are updated.
+        the posterior is moved there with `to()`, which updates the device strings of
+        the posterior, its potential and its prior.
 
         Args:
             state_dict: State to be restored.
@@ -479,18 +480,4 @@ class NeuralPosterior:
             self._device
         ):
             return
-
-        # The tensors already live on `actual_device`. Only the device strings, and the
-        # distributions that cache one, must follow.
-        self._device = actual_device
-        if hasattr(self, "device"):
-            self.device = actual_device
-        shared_prior = getattr(self.potential_fn, "prior", None)
-        self.potential_fn.to(actual_device)  # type: ignore[union-attr]
-        for attr in ("prior", "_prior", "proposal"):
-            value = getattr(self, attr, None)
-            if value is shared_prior and value is not None:
-                # The potential moved this object already. Keep sharing it.
-                setattr(self, attr, self.potential_fn.prior)  # type: ignore[union-attr]
-            elif isinstance(value, Distribution):
-                setattr(self, attr, move_distribution_to_device(value, actual_device))
+        self.to(actual_device)
