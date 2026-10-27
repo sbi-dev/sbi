@@ -282,8 +282,6 @@ def test_sbc_checks():
     # Data averaged posterior samples should be distributed as prior
     daps = prior.sample((num_posterior_samples,))
 
-    # Create perfectly uniform integer ranks in {0, ..., num_posterior_samples},
-    # as returned by run_sbc for a calibrated posterior.
     ranks = torch.randint(
         0, num_posterior_samples + 1, (num_posterior_samples, num_dim)
     ).float()
