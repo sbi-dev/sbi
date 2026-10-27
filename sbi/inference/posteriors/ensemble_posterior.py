@@ -82,16 +82,27 @@ class EnsemblePosterior(NeuralPosterior):
             theta_transform: If passed, this transformation will be applied during the
                 optimization performed when obtaining the map. It does not affect the
                 `.sample()` and `.log_prob()` methods.
+            device: Device of the component posteriors. If None, infer it from them.
+                To move an ensemble, construct it on its components' device and then
+                call `.to(device)`.
+
+        Raises:
+            ValueError: If device differs from the component posteriors' device.
+            AssertionError: If component posteriors are on different devices.
         """
         self.posteriors = posteriors
         self.num_components = len(posteriors)
         self.theta_transform = theta_transform
         # Take first prior as reference
         self.prior = posteriors[0].potential_fn.prior
-        self.device = device
-
-        if self.device is None:
-            self.device = self.ensure_same_device(posteriors)
+        component_device = self.ensure_same_device(posteriors)
+        self.device = process_device(component_device if device is None else device)
+        if self.device != component_device:
+            raise ValueError(
+                f"Ensemble device {self.device} does not match component device "
+                f"{component_device}. Construct the ensemble without device, then "
+                "call ensemble.to(device) to move it."
+            )
 
         self.weights = weights
         self._build_potential_fns()
