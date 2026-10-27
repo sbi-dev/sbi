@@ -426,8 +426,8 @@ class RestrictionEstimator:
                 potentially `valid` parameter sets will be missed. Inference is only
                 **exact** for `allowed_false_negatives=0.0`. The value specified here
                 corresponds approximately to the fraction of parameter sets that will
-                be systematically missed by the inference procedure. If None, 0.0
-                unless `reweigh_factor` is given.
+                be systematically missed by the inference procedure. Must be in
+                [0, 1). If None, 0.0 unless `reweigh_factor` is given.
             reweigh_factor: Post-hoc correction factor, used instead of
                 `allowed_false_negatives`. Must be in [0, 1). A parameter set is
                 accepted if the classifier predicts `valid` with a probability above
@@ -543,6 +543,14 @@ class AcceptRejectFunction:
     ) -> None:
         if allowed_false_negatives is None and reweigh_factor is None:
             allowed_false_negatives = 0.0
+        if (
+            allowed_false_negatives is not None
+            and not 0.0 <= allowed_false_negatives < 1.0
+        ):
+            raise ValueError(
+                "`allowed_false_negatives` must be in [0, 1), got "
+                f"{allowed_false_negatives}."
+            )
         self._classifier = classifier
         self._validation_theta = validation_theta
         self._validation_label = validation_label

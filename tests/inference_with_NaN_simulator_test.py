@@ -358,8 +358,22 @@ def test_restrict_prior_with_reweigh_factor():
         for factor in (0.1, 0.9)
     ]
     assert acceptance[1] < acceptance[0]
-    with pytest.raises(ValueError, match="reweigh_factor"):
-        restriction_estimator.restrict_prior(reweigh_factor=1.0)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        dict(allowed_false_negatives=1.0),
+        dict(allowed_false_negatives=-0.1),
+        dict(allowed_false_negatives=None, reweigh_factor=1.0),
+    ],
+)
+def test_restrict_prior_rejects_values_outside_their_range(kwargs):
+    """`allowed_false_negatives` and `reweigh_factor` must lie in [0, 1)."""
+    *_, restriction_estimator, _ = _restricted_box_prior()
+
+    with pytest.raises(ValueError, match="must be in"):
+        restriction_estimator.restrict_prior(**kwargs)
 
 
 def test_restrict_prior_draws_no_random_numbers():
