@@ -250,8 +250,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return the proposal's MoG at its default_x in the network's z-scored space.
 
         The proposal's estimator can have another z-score than the network, e.g.
-        after `retrain_from_scratch=True`, so its MoG is mapped through parameter
-        space.
+        after `retrain_from_scratch=True`, so its MoG is mapped from that z-scored
+        space into the network's.
 
         Args:
             proposal: The proposal of the latest round.
@@ -265,8 +265,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         assert proposal.default_x is not None, "Proposal must have default_x set"
         with torch.no_grad():
             mog = proposal_estimator.get_uncorrected_mog(proposal.default_x)
-            mog = proposal_estimator.inverse_transform_mog(mog)
-            return self._neural_net.transform_mog(mog).to(self._device)
+            mog = self._neural_net.transform_mog_from(proposal_estimator, mog)
+            return mog.to(self._device)
 
     def _warn_if_pairs_not_normalizable(self, batch_size: int) -> None:
         """Warn if the trained estimator has pairs that the MoG loss gives zero weight.

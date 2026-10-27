@@ -544,7 +544,40 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
             atol=1e-3,
         )
 
-    def test_mog_maps_raise_for_non_affine_transform(self, standard_mdn):
+    def test_transform_mog_from_another_estimator(self, make_mdn):
+        """The direct map between two z-scored spaces equals the way through inputs,
+        and keeps small offsets when both spaces share a large shift."""
+
+        def estimator(shift, scale):
+            return MixtureDensityEstimator(
+                net=make_mdn(),
+                input_shape=torch.Size([3]),
+                condition_shape=torch.Size([5]),
+                transform_input=torch.stack([shift, scale]),
+            )
+
+        source = estimator(torch.tensor([1.0, -2.0, 0.5]), torch.tensor([3.0, 0.5, 2]))
+        target = estimator(torch.tensor([0.0, 1.0, -1.0]), torch.tensor([1.0, 2.0, 4]))
+        with torch.no_grad():
+            mog = source.get_uncorrected_mog(torch.randn(4, 5))
+            direct = target.transform_mog_from(source, mog)
+            via_inputs = target.transform_mog(source.inverse_transform_mog(mog))
+        for name in ("means", "precisions", "precision_factors"):
+            assert torch.allclose(
+                getattr(direct, name), getattr(via_inputs, name), atol=1e-4
+            )
+
+        shift, scale = torch.full((3,), 1e4), torch.full((3,), 3e-3)
+        mog = MoG.from_gaussian(torch.full((3,), 0.13), torch.eye(3))
+        mapped = estimator(shift, scale).transform_mog_from(
+            estimator(shift, scale), mog
+        )
+        assert torch.allclose(mapped.means, mog.means, atol=1e-5)
+
+    @pytest.mark.parametrize(
+        "map_name", ["transform_mog", "inverse_transform_mog", "transform_mog_from"]
+    )
+    def test_mog_maps_raise_for_non_affine_transform(self, standard_mdn, map_name):
         """The MoG maps need an affine z-score, so they raise for an unconstraining
         transform."""
         estimator = MixtureDensityEstimator(
@@ -554,6 +587,6 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
             prior_transform=ExpTransform(),
         )
         mog = MoG.from_gaussian(torch.zeros(3), torch.eye(3))
-        for map_mog in (estimator.transform_mog, estimator.inverse_transform_mog):
-            with pytest.raises(NotImplementedError, match="affine z-score"):
-                map_mog(mog)
+        args = (estimator, mog) if map_name == "transform_mog_from" else (mog,)
+        with pytest.raises(NotImplementedError, match="affine z-score"):
+            getattr(estimator, map_name)(*args)

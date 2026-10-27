@@ -551,6 +551,31 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         shift, scale = affine
         return mog.unstandardize(shift, scale)
 
+    def transform_mog_from(self, source: "MixtureDensityEstimator", mog: MoG) -> MoG:
+        """Map a MoG from the transformed space of `source` into this estimator's.
+
+        Args:
+            source: The estimator whose transformed space `mog` is in.
+            mog: MoG in the transformed space of `source`.
+
+        Returns:
+            MoG in this estimator's transformed space, on its device and dtype.
+
+        Raises:
+            NotImplementedError: If either input transform is not affine.
+        """
+        param = next(self.parameters())
+        mog = mog.to(param.device, param.dtype)
+        zeros = torch.zeros(self.input_shape, device=param.device, dtype=param.dtype)
+        ones = torch.ones_like(zeros)
+        source_shift, source_scale = source._affine_transform() or (zeros, ones)
+        shift, scale = self._affine_transform() or (zeros, ones)
+        # Map relative to this shift: adding a large shift and subtracting it again
+        # would lose small offsets in float32.
+        return mog.unstandardize(
+            source_shift.to(param) - shift, source_scale.to(param)
+        ).standardize(zeros, scale)
+
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Compute log probability of inputs given conditions.
 
