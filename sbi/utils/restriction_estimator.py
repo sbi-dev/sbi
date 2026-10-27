@@ -655,6 +655,8 @@ class RestrictedPrior(Distribution):
         save_acceptance_rate: bool = False,
         show_progress_bars: bool = False,
         print_rejected_frac: bool = True,
+        max_retries: int = 100,
+        max_sampling_time: Optional[float] = None,
     ) -> Tensor:
         """
         Return samples from the `RestrictedPrior`.
@@ -679,6 +681,11 @@ class RestrictedPrior(Distribution):
             show_progress_bars: Whether to show a progressbar during sampling.
             print_rejected_frac: Whether to print the rejection rate of the restriction
                 estimator during sampling.
+            max_retries: Maximum number of consecutive retry attempts without collecting
+                any valid samples in SIR before raising a RuntimeError. Default is 100.
+            max_sampling_time: Optional maximum allowed sampling time (in seconds).
+                If exceeded, sampling is aborted and a RuntimeError is raised.
+                Supported for both rejection and SIR sampling. Default is None.
 
         Returns:
             Samples from the `RestrictedPrior`.
@@ -700,6 +707,7 @@ class RestrictedPrior(Distribution):
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
+                max_sampling_time=max_sampling_time,
                 alternative_method="sample_with='sir'",
             )
             # NOTE: This currently requires a float acceptance rate. A previous version
@@ -746,6 +754,8 @@ class RestrictedPrior(Distribution):
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
                 device=self._device,
+                max_retries=max_retries,
+                max_sampling_time=max_sampling_time,
             )
         else:
             raise ValueError("Only [rejection | sir] implemented as `method`")
