@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
+from pyro.distributions.transforms import affine_autoregressive
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import FMPE, NPE, NPE_A, EnsemblePosterior, MCMCPosterior
@@ -227,3 +228,23 @@ def test_to_gpu_and_back(prior_name: str, kind: str):
             init_method=samples[:1], num_iter=2, num_to_optimize=1, force_update=True
         )
         assert map_.device.type == device_type
+
+
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
+def test_map_with_module_backed_theta_transform(device: str):
+    """A user transform with parameters, e.g. a Pyro `TransformModule`, moves with
+    the posterior, and `map()` optimizes through it."""
+    _, npe, _ = _train("mvn")
+    posterior = npe.build_posterior(
+        posterior_parameters=ImportanceSamplingPosteriorParameters(
+            theta_transform=affine_autoregressive(NUM_DIM)
+        )
+    )
+    posterior.set_default_x(torch.zeros(1, NUM_DIM))
+    device = process_device(device)
+
+    posterior.to(device)
+
+    init = torch.zeros(1, NUM_DIM, device=device)
+    map_ = posterior.map(init_method=init, num_iter=2, num_to_optimize=1)
+    assert map_.device.type == torch.device(device).type

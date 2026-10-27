@@ -921,7 +921,9 @@ def _apply_to_transform(
     """Apply fn to all tensors in a transform tree.
 
     Walks ComposeTransform.parts, IndependentTransform.base_transform,
-    etc., so .to() calls propagate into the transform.
+    etc., so .to() calls propagate into the transform. A transform that is also
+    an `nn.Module` (e.g. a Pyro `TransformModule`) gets `fn` applied to its
+    parameters and buffers as well.
 
     Args:
         transform: Root of the transform tree.
@@ -933,6 +935,8 @@ def _apply_to_transform(
         if id(t) in seen:
             return
         seen.add(id(t))
+        if isinstance(t, nn.Module):
+            t._apply(fn)
         for key, val in list(t.__dict__.items()):
             if isinstance(val, Tensor):
                 object.__setattr__(t, key, fn(val))
@@ -1277,7 +1281,8 @@ def gradient_ascent(
     argmax_ = theta_transform.inv(best_theta_overall)
     max_val = best_log_prob_overall
 
-    optimize_inits = theta_transform(optimize_inits)
+    # Detached: a transform with parameters would make the inits non-leaf tensors.
+    optimize_inits = theta_transform(optimize_inits).detach()
     optimize_inits.requires_grad_(True)  # type: ignore
     optimizer = Adam([optimize_inits], lr=learning_rate)  # type: ignore
 
