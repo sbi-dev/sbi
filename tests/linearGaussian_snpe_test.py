@@ -1026,8 +1026,7 @@ def test_npe_c_mog_loss_with_retrain_from_scratch():
         proposal = inference.build_posterior().set_default_x(x_o)
     samples = proposal.sample((5000,), show_progress_bars=False)
 
-    # Loose bounds: the retrained spread varies between seeds (std ratio up to 1.5),
-    # while the bug gave mean errors above 1 sd and std ratios above 1.8.
+    # Loose bounds: the spread of the retrained posterior varies between seeds.
     assert ((samples.mean(0) - post_mean).abs() / post_std).max() < 0.5
     assert (samples.std(0) / post_std).max() < 1.75
     assert (torch.cov(samples.T)[0, 1] - post_cov[0, 1]).abs() < 0.6

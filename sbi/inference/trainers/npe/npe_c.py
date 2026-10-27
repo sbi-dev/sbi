@@ -130,7 +130,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         super().__init__(**kwargs)
         # State of the MoG loss, set in `_initialize_neural_network()`.
         self._proposal_mog: Optional[MoG] = None
-        self._z_scored_prior_mog: Optional[MoG] = None
+        self._prior_mog: Optional[MoG] = None
 
     def train(
         self,
@@ -312,13 +312,11 @@ class NPE_C(PosteriorEstimatorTrainer):
         self.z_score_theta = self._neural_net.has_input_transform
 
         prior_mog = _z_scored_prior_mog(self._prior, self._neural_net)
-        self._z_scored_prior_mog = (
-            prior_mog.to(self._device) if prior_mog is not None else None
-        )
-        if self._z_scored_prior_mog is not None:
+        self._prior_mog = prior_mog.to(self._device) if prior_mog is not None else None
+        if self._prior_mog is not None:
             self.prec_m_prod_prior = torch.mv(
-                self._z_scored_prior_mog.precisions[0, 0],
-                self._z_scored_prior_mog.means[0, 0],
+                self._prior_mog.precisions[0, 0],
+                self._prior_mog.means[0, 0],
             )
 
     def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
@@ -633,8 +631,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         precisions_d_rep = precisions_d.repeat(1, num_comps_p, 1, 1)
 
         precisions_pp = precisions_p_rep + precisions_d_rep
-        if self._z_scored_prior_mog is not None:
-            precisions_pp -= self._z_scored_prior_mog.precisions[0, 0]
+        if self._prior_mog is not None:
+            precisions_pp -= self._prior_mog.precisions[0, 0]
 
         normalizable = torch.linalg.cholesky_ex(precisions_pp).info == 0
         identity = eye(
@@ -684,7 +682,7 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         # Means = C_ij * (P_i * m_i + P_x * m_x - P_o * m_o).
         summed_cov_m_prod_rep = prec_m_prod_p_rep + prec_m_prod_d_rep
-        if self._z_scored_prior_mog is not None:
+        if self._prior_mog is not None:
             summed_cov_m_prod_rep -= self.prec_m_prod_prior
 
         means_pp = batched_mixture_mv(covariances_pp, summed_cov_m_prod_rep)
