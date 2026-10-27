@@ -25,6 +25,7 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import (
     ensure_theta_batched,
     infer_module_device,
+    infer_tensor_device,
     process_device,
 )
 from sbi.utils.user_input_checks import validate_theta_and_x
@@ -452,7 +453,7 @@ class RestrictionEstimator:
             reweigh_factor=reweigh_factor,
         )
 
-        prior_device = str(self._prior.sample((1,)).device)
+        prior_device = infer_tensor_device(self._prior) or "cpu"
         return RestrictedPrior(self._prior, accept_reject_fn, device=prior_device)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:

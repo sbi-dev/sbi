@@ -368,6 +368,17 @@ def test_restrict_prior_with_reweigh_factor():
     assert acceptance[1] < acceptance[0]
 
 
+def test_restrict_prior_draws_no_random_numbers():
+    """Building the restricted prior leaves the random state alone, so seeded runs
+    stay reproducible."""
+    *_, restriction_estimator, _ = _restricted_box_prior()
+    random_state = torch.get_rng_state()
+
+    restriction_estimator.restrict_prior()
+
+    assert torch.equal(torch.get_rng_state(), random_state)
+
+
 @pytest.mark.parametrize("prior", ("uniform", "gaussian"))
 def test_restricted_prior_log_prob(prior):
     """Test whether the log-prob method of the restricted prior works appropriately."""
