@@ -490,7 +490,7 @@ class EnsemblePotential(BasePotential):
         if self._x_o is not None:
             self.potential_fns = [p.bind(self._x_o) for p in self.potential_fns]
 
-    def to(self, device: Union[str, torch.device]) -> "EnsemblePotential":
+    def to(self, device: Union[str, torch.device]) -> Self:
         """Move the component potentials, the prior, the weights and x_o to `device`.
 
         Args:

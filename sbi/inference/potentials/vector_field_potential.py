@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor, nn
@@ -108,7 +108,7 @@ class VectorFieldBasedPotential(BasePotential):
             return self.num_iid_observations**-0.5
         return 1.0
 
-    def to(self, device: Union[str, torch.device]) -> "VectorFieldBasedPotential":
+    def to(self, device: Union[str, torch.device]) -> Self:
         """Move the vector field estimator, its ODE, the prior and x_o to `device`.
 
         Args:

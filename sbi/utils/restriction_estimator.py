@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from math import floor
-from typing import Any, Callable, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Self, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -665,7 +665,7 @@ class RestrictedPrior(Distribution):
         self._device = process_device(device)
         self.acceptance_rate = None  # Only defined for rejection sampling.
 
-    def to(self, device: Union[str, torch.device]) -> "RestrictedPrior":
+    def to(self, device: Union[str, torch.device]) -> Self:
         """Move the restricted prior to `device` in place.
 
         Moves the prior and the posterior used for `sir`. The classifier of an
