@@ -550,8 +550,8 @@ class NPE_C(PosteriorEstimatorTrainer):
             density estimator has K terms).
         """
 
-        precisions_pp, covariances_pp = self._precisions_proposal_posterior(
-            precisions_p, precisions_d
+        precisions_pp, covariances_pp, normalizable = (
+            self._precisions_proposal_posterior(precisions_p, precisions_d)
         )
 
         means_pp = self._means_proposal_posterior(
@@ -570,6 +570,20 @@ class NPE_C(PosteriorEstimatorTrainer):
             precisions_d,
         )
 
+        # A pair whose precision is not positive definite has infinite mass. This
+        # happens when both components are wider than the prior in some direction,
+        # e.g. low-weight components handed over from the previous round. Such pairs
+        # get zero weight; training makes them normalizable within a few epochs.
+        if not normalizable.any(dim=1).all():
+            raise ValueError(
+                "No component of the MoG proposal posterior is normalizable for some "
+                "rows: the proposal and the density estimator are both wider than the "
+                "prior. Use more simulations per round or a flow density estimator."
+            )
+        logits_pp = logits_pp.masked_fill(
+            ~normalizable, torch.finfo(logits_pp.dtype).min / 2
+        )
+
         return logits_pp, means_pp, precisions_pp, covariances_pp
 
     def _precisions_proposal_posterior(
@@ -581,7 +595,9 @@ class NPE_C(PosteriorEstimatorTrainer):
             precisions_p: Precision matrices of the proposal distribution.
             precisions_d: Precision matrices of the density estimator.
 
-        Returns: (Precisions, Covariances) of the proposal posterior. L*K terms.
+        Returns: (Precisions, Covariances, Normalizable) of the proposal posterior.
+            L*K terms. Normalizable marks the terms whose precision is positive
+            definite; the others get the identity as precision and covariance.
         """
 
         num_comps_p = precisions_p.shape[1]
@@ -594,9 +610,16 @@ class NPE_C(PosteriorEstimatorTrainer):
         if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
             precisions_pp -= self._maybe_z_scored_prior.precision_matrix
 
+        normalizable = torch.linalg.cholesky_ex(precisions_pp).info == 0
+        eye = torch.eye(
+            precisions_pp.shape[-1],
+            dtype=precisions_pp.dtype,
+            device=precisions_pp.device,
+        )
+        precisions_pp = torch.where(normalizable[..., None, None], precisions_pp, eye)
         covariances_pp = torch.inverse(precisions_pp)
 
-        return precisions_pp, covariances_pp
+        return precisions_pp, covariances_pp, normalizable
 
     def _means_proposal_posterior(
         self,

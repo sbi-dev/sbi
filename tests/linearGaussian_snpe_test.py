@@ -896,6 +896,59 @@ def test_npe_c_prior_as_proposal_gives_density_estimator(wrap_prior: bool):
     assert torch.allclose(logits_pp.log_softmax(-1), mog_d.log_weights, atol=1e-4)
 
 
+def test_npe_c_drops_non_normalizable_component_pairs():
+    """A component pair wider than the prior gets zero weight in the MoG loss.
+
+    With prior precision I and proposal precision 0.5 I, an estimator component with
+    precision 0.2 I gives the pair precision -0.3 I, which has infinite mass.
+    """
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    estimator = MixtureDensityEstimator(
+        MultivariateGaussianMDN(
+            features=2, context_features=2, hidden_features=10, num_components=2
+        ),
+        input_shape=torch.Size([2]),
+        condition_shape=torch.Size([2]),
+    )
+    inference = NPE_C(prior, density_estimator=lambda theta, x: estimator)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta + torch.randn_like(theta))
+    inference.train(max_num_epochs=1)
+    inference._set_state_for_mog_proposal()
+
+    proposal = (
+        torch.zeros(1, 1),
+        torch.zeros(1, 1, 2),
+        0.5 * torch.eye(2).expand(1, 1, 2, 2),
+    )
+    narrow = (
+        torch.zeros(1, 1),
+        torch.ones(1, 1, 2),
+        4.0 * torch.eye(2).expand(1, 1, 2, 2),
+    )
+    wide = (
+        torch.zeros(1, 1),
+        -torch.ones(1, 1, 2),
+        0.2 * torch.eye(2).expand(1, 1, 2, 2),
+    )
+    both = [torch.cat(pair, dim=1) for pair in zip(narrow, wide, strict=True)]
+    both[0] = torch.log(torch.tensor([[0.7, 0.3]]))
+
+    logits_pp, means_pp, precs_pp, _ = inference._automatic_posterior_transformation(
+        *proposal, *both
+    )
+    _, means_narrow, precs_narrow, _ = inference._automatic_posterior_transformation(
+        *proposal, *narrow
+    )
+
+    weights_pp = logits_pp.softmax(-1)
+    assert torch.allclose(weights_pp, torch.tensor([[1.0, 0.0]]))
+    assert torch.allclose(means_pp[:, :1], means_narrow)
+    assert torch.allclose(precs_pp[:, :1], precs_narrow)
+    with pytest.raises(ValueError, match="normalizable"):
+        inference._automatic_posterior_transformation(*proposal, *wide)
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "num_dim",
