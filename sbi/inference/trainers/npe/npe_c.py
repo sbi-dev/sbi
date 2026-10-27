@@ -305,19 +305,13 @@ class NPE_C(PosteriorEstimatorTrainer):
         $pp(\theta|x) = 1/Z * q(\theta|x) * prop(\theta) / p(\theta)$.
         The MoG loss evaluates it in the network's z-scored space, so the prior is
         mapped into that space too. A uniform prior is constant on its support and
-        drops out of the loss, so only a Gaussian prior is stored, with its
-        (precision * mean) product.
+        drops out of the loss, so only a Gaussian prior is stored.
         """
         assert isinstance(self._neural_net, MixtureDensityEstimator)
         self.z_score_theta = self._neural_net.has_input_transform
 
         prior_mog = _z_scored_prior_mog(self._prior, self._neural_net)
         self._prior_mog = prior_mog.to(self._device) if prior_mog is not None else None
-        if self._prior_mog is not None:
-            self.prec_m_prod_prior = torch.mv(
-                self._prior_mog.precisions[0, 0],
-                self._prior_mog.means[0, 0],
-            )
 
     def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
         """Return whether the MoG closed-form correction applies to `proposal`.
@@ -683,7 +677,9 @@ class NPE_C(PosteriorEstimatorTrainer):
         # Means = C_ij * (P_i * m_i + P_x * m_x - P_o * m_o).
         summed_cov_m_prod_rep = prec_m_prod_p_rep + prec_m_prod_d_rep
         if self._prior_mog is not None:
-            summed_cov_m_prod_rep -= self.prec_m_prod_prior
+            summed_cov_m_prod_rep -= batched_mixture_mv(
+                self._prior_mog.precisions, self._prior_mog.means
+            )
 
         means_pp = batched_mixture_mv(covariances_pp, summed_cov_m_prod_rep)
 
