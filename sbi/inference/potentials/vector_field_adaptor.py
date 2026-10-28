@@ -1336,7 +1336,14 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         std = self.vector_field_estimator.std_fn(time)
         cov0 = std**2 * jac + torch.eye(d, device=self.device)[None, None, :, :]
 
-        denoising_posterior_precision = m**2 / std**2 * torch.inverse(cov0)
+        # For posteriors much narrower than the noise, I + s^2 J cancels below the
+        # rounding error of its unit diagonal. Eigenvalues there are set to that floor.
+        eigenvalues, eigenvectors = torch.linalg.eigh(cov0)
+        floor = 10 * torch.finfo(cov0.dtype).eps
+        eigenvalues = torch.where(eigenvalues.abs() < floor, floor, eigenvalues)
+        inverse_cov0 = (eigenvectors / eigenvalues[..., None, :]) @ eigenvectors.mT
+
+        denoising_posterior_precision = m**2 / std**2 * inverse_cov0
 
         return denoising_posterior_precision
 

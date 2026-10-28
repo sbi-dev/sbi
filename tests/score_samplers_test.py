@@ -497,6 +497,25 @@ def test_iid_score_is_exact_for_linear_gaussian(sde_type, iid_method):
         assert torch.allclose(score_fn(theta, x_o, time), expected, rtol=1e-8), t
 
 
+def test_jac_gauss_survives_float32_cancellation():
+    """For a posterior much narrower than the noise, I + s^2 J rounds to zero."""
+    num_dim, posterior_var = 2, 1e-4
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    estimator = posterior_flow_nn()(prior.sample((100,)), torch.randn(100, num_dim))
+
+    def exact_score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        m, s = estimator.mean_t_fn(t), estimator.std_fn(t)
+        return -input / (m**2 * posterior_var + s**2)
+
+    estimator.score = exact_score
+    score_fn = JacCorrectedScoreFn(estimator, prior)
+    inputs, x_o = torch.randn(4, 1, num_dim), torch.zeros(3, num_dim)
+
+    scores = score_fn(inputs, x_o, torch.tensor([estimator.effective_t_max]))
+
+    assert torch.isfinite(scores).all()
+
+
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("predictor", ("euler_maruyama",))
 @pytest.mark.parametrize("corrector", (None, "gibbs", "langevin"))
