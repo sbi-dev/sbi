@@ -7,7 +7,6 @@ from dataclasses import replace
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
-import torch
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -15,6 +14,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
+    _z_scored_prior_mog,
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
@@ -22,12 +22,12 @@ from sbi.neural_nets.estimators.base import (
 )
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
+    ProposalCorrectedMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
-from sbi.utils.torchutils import BoxUniform
 
 _MDN_DEFAULT_COMPONENTS = MDNConfig().num_components
 
@@ -267,21 +267,23 @@ class NPE_A(PosteriorEstimatorTrainer):
 
     def _get_proposal_mog(
         self,
-        proposal: Union["NPE_A_Posterior", MultivariateNormal, MoG, Any],
+        proposal: Union["NPE_A_Posterior", MultivariateNormal, MoG],
+        density_estimator: MixtureDensityEstimator,
     ) -> MoG:
         """Extract MoG parameters from a proposal distribution.
 
         Supports multiple proposal types:
-        - NPE_A_Posterior: extracts corrected MoG via get_mog_params()
-        - MultivariateNormal: converts to single-component MoG
-        - MoG: uses directly
-        - Any object with get_mog_params(x) method
+        - NPE_A_Posterior: its corrected MoG, from get_mog_params()
+        - MultivariateNormal: converts to single-component MoG over parameters
+        - MoG: a MoG over parameters
 
         Args:
             proposal: The proposal distribution from the previous round.
+            density_estimator: The estimator whose z-scored space the proposal is
+                mapped into.
 
         Returns:
-            MoG parameters from the proposal.
+            MoG parameters from the proposal, in the z-scored space.
 
         Raises:
             ValueError: If NPE_A_Posterior proposal doesn't have default_x set.
@@ -301,123 +303,29 @@ class NPE_A(PosteriorEstimatorTrainer):
                     f"{default_x.shape[0]}. NPE-A only supports single "
                     "observations for correction."
                 )
-            return proposal.get_mog_params(default_x)
+            # The proposal's MoG is in the z-scored space of its own estimator.
+            proposal_estimator = proposal.posterior_estimator
+            if isinstance(proposal_estimator, ProposalCorrectedMDN):
+                proposal_estimator = proposal_estimator.net
+            assert isinstance(proposal_estimator, MixtureDensityEstimator)
+            return density_estimator.transform_mog_from(
+                proposal_estimator, proposal.get_mog_params(default_x)
+            )
 
         if isinstance(proposal, MultivariateNormal):
-            mean: Tensor = proposal.mean.to(self._device)  # type: ignore[assignment]
-            cov: Tensor = proposal.covariance_matrix.to(  # type: ignore[assignment]
-                self._device
+            return density_estimator.transform_mog(
+                MoG.from_gaussian(proposal.mean, proposal.covariance_matrix)
             )
-            return MoG.from_gaussian(mean.unsqueeze(0), cov.unsqueeze(0))
 
         if isinstance(proposal, MoG):
-            return proposal.to(self._device)
+            return density_estimator.transform_mog(proposal)
 
-        # Case 4: Any object with get_mog_params method
-        if hasattr(proposal, "get_mog_params"):
-            # Try to get default_x if available
-            default_x = getattr(proposal, "default_x", None)
-            if default_x is None:
-                raise ValueError(
-                    "Proposal has get_mog_params() but no default_x set. "
-                    "Call proposal.set_default_x(x_o) before using as proposal."
-                )
-            if default_x.shape[0] != 1:
-                raise ValueError(
-                    f"NPE-A requires default_x batch size of 1, got "
-                    f"{default_x.shape[0]}."
-                )
-            mog = proposal.get_mog_params(default_x)
-            if not isinstance(mog, MoG):
-                raise TypeError(
-                    f"Proposal's get_mog_params() must return MoG, "
-                    f"got {type(mog).__name__}."
-                )
-            return mog.to(self._device)
-
-        # Unsupported type
         raise TypeError(
             f"For multi-round NPE-A, proposal must be one of: NPE_A_Posterior, "
-            f"MultivariateNormal, MoG, or an object with get_mog_params() method. "
-            f"Got {type(proposal).__name__}. For custom proposals, construct "
-            f"NPE_A_Posterior directly with your proposal_mog parameter."
+            f"MultivariateNormal or MoG. Got {type(proposal).__name__}. For custom "
+            f"proposals, construct NPE_A_Posterior directly with your proposal_mog "
+            f"parameter, in the estimator's z-scored space."
         )
-
-    def _compute_z_scored_prior_mog(
-        self, density_estimator: MixtureDensityEstimator
-    ) -> Optional[MoG]:
-        """Compute the prior as a MoG in z-scored space (if applicable).
-
-        For SNPE-A correction, the prior needs to be in the same coordinate system
-        as the density estimator's output. When z-scoring is applied to inputs,
-        the density estimator outputs MoG parameters in z-scored space, so the
-        prior must also be transformed to z-scored space.
-
-        For uniform priors (BoxUniform), returns None since uniform priors have
-        zero precision (infinite covariance) and are handled specially in the
-        correction formula.
-
-        Mathematical background:
-            For z-score transform: z = (theta - shift) / scale
-            If theta ~ N(mu, Sigma), then:
-            z ~ N((mu - shift) / scale, Sigma / (scale ⊗ scale))
-            where (scale ⊗ scale)_ij = scale_i * scale_j
-
-        Args:
-            density_estimator: The MixtureDensityEstimator (to get z-score parameters).
-
-        Returns:
-            MoG representation of the z-scored prior for Gaussian priors,
-            or None for uniform priors.
-        """
-        if getattr(density_estimator, "_prior_transform", None) is not None:
-            raise NotImplementedError(
-                "NPE-A's analytic leakage correction does not support "
-                "z_score_theta='transform_to_unconstrained' (it assumes an affine "
-                "z-score). Use 'independent'/'structured', or a different method."
-            )
-
-        # Uniform priors have zero precision, return None
-        if isinstance(self._prior, BoxUniform):
-            return None
-
-        if not isinstance(self._prior, MultivariateNormal):
-            raise TypeError(
-                f"Prior must be MultivariateNormal or BoxUniform, "
-                f"got {type(self._prior).__name__}"
-            )
-
-        # Get prior parameters
-        prior_mean = self._prior.mean
-        prior_cov = self._prior.covariance_matrix
-
-        # Apply z-score transform if enabled
-        if density_estimator.has_input_transform:
-            shift = density_estimator._transform_shift
-            scale = density_estimator._transform_scale
-
-            # Z-scored mean: (mu - shift) / scale
-            z_mean = (prior_mean - shift) / scale
-
-            # Z-scored covariance: Sigma_z[i,j] = Sigma[i,j] / (scale_i * scale_j)
-            scale_outer = scale.unsqueeze(-1) * scale.unsqueeze(-2)
-            z_cov = prior_cov / scale_outer
-        else:
-            z_mean = prior_mean
-            z_cov = prior_cov
-
-        # Validate covariance is positive definite
-        try:
-            torch.linalg.cholesky(z_cov)
-        except RuntimeError as e:
-            raise ValueError(
-                "Z-scored prior covariance is not positive definite. "
-                "This may indicate numerical issues with the z-score transform. "
-                f"Original error: {e}"
-            ) from e
-
-        # Convert to MoG
-        return MoG.from_gaussian(z_mean, z_cov)
 
     def build_posterior(
         self,
@@ -485,8 +393,8 @@ class NPE_A(PosteriorEstimatorTrainer):
             proposal_mog = None
             prior_mog = None
         else:
-            proposal_mog = self._get_proposal_mog(proposal)
-            prior_mog = self._compute_z_scored_prior_mog(density_estimator)
+            proposal_mog = self._get_proposal_mog(proposal, density_estimator)
+            prior_mog = _z_scored_prior_mog(self._prior, density_estimator)
 
         # Build the posterior
         self._posterior = NPE_A_Posterior(

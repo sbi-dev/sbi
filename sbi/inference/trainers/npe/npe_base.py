@@ -18,7 +18,7 @@ from typing import (
 )
 
 from torch import Tensor, ones
-from torch.distributions import Distribution
+from torch.distributions import Distribution, MultivariateNormal, Uniform
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors import DirectPosterior
@@ -45,6 +45,10 @@ from sbi.inference.trainers.base import (
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+)
+from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -69,6 +73,7 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
+    check_dist_class,
     mask_sims_from_prior,
 )
 from sbi.utils.torchutils import assert_all_finite
@@ -735,3 +740,29 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         losses = self._loss(theta_batch, x_batch, masks_batch, **asdict(loss_args))
 
         return losses
+
+
+def _z_scored_prior_mog(
+    prior: Distribution, estimator: MixtureDensityEstimator
+) -> Optional[MoG]:
+    """Return a Gaussian prior as a MoG in the estimator's z-scored space.
+
+    The closed-form MoG corrections of NPE-A and NPE-C combine the prior with the
+    estimator's MoG. A uniform prior is constant on its support and drops out of
+    them, so it gives None. The prior can be wrapped by `process_prior`.
+
+    Raises:
+        TypeError: If the prior is neither Gaussian nor uniform.
+    """
+    if check_dist_class(prior, class_to_check=Uniform)[0]:
+        return None
+    is_gaussian, gaussian = check_dist_class(prior, class_to_check=MultivariateNormal)
+    if not is_gaussian:
+        raise TypeError(
+            "The MoG proposal correction needs a MultivariateNormal or uniform "
+            f"prior, got {type(prior).__name__}."
+        )
+    assert isinstance(gaussian, MultivariateNormal)
+    return estimator.transform_mog(
+        MoG.from_gaussian(gaussian.mean, gaussian.covariance_matrix)
+    )

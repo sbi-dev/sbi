@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 import torch
 from torch import nn
+from torch.distributions.transforms import ExpTransform
 
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
@@ -498,3 +499,98 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
 
         assert isinstance(mog, MoG)
         assert mog.batch_shape == torch.Size([8])
+
+    def test_transform_mog_maps_between_input_and_transformed_space(
+        self, standard_mdn, standard_condition, standard_inputs
+    ):
+        """The MoG mapped to inputs has the estimator's density; the maps invert."""
+        estimator = MixtureDensityEstimator(
+            net=standard_mdn,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+            transform_input=torch.tensor([[1.0, -2.0, 0.5], [10.0, 0.5, 2.0]]),
+        )
+        with torch.no_grad():
+            mog = estimator.get_uncorrected_mog(standard_condition)
+            input_mog = estimator.inverse_transform_mog(mog)
+            assert torch.allclose(
+                input_mog.log_prob(standard_inputs),
+                estimator.log_prob(standard_inputs, standard_condition),
+                atol=1e-5,
+            )
+            # A float64 MoG, e.g. from a float64 prior, comes back as float32.
+            mapped = estimator.transform_mog(input_mog.to(dtype=torch.float64))
+            assert mapped.dtype == torch.float32
+            for name in ("means", "precisions", "precision_factors"):
+                assert torch.allclose(
+                    getattr(mapped, name), getattr(mog, name), atol=1e-5
+                )
+
+    def test_mog_maps_keep_small_offsets_at_a_large_shift(self, standard_mdn):
+        """With a shift far above the scale, a MoG is z-scored like the inputs, and
+        the map between two equal z-scored spaces keeps its small offsets. At a
+        scale whose square overflows float32, that map keeps the precisions."""
+        shift, scale = torch.full((3,), 1e4), torch.full((3,), 3e-3)
+        estimator = MixtureDensityEstimator(
+            net=standard_mdn,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+            transform_input=torch.stack([shift, scale]),
+        )
+        mog = MoG.from_gaussian(shift, torch.diag(scale**2))
+        assert torch.allclose(
+            estimator.transform_mog(mog).means[0, 0],
+            estimator._transform_input(shift.unsqueeze(0))[0],
+            atol=1e-3,
+        )
+        z_mog = MoG.from_gaussian(torch.full((3,), 0.13), torch.eye(3))
+        mapped = estimator.transform_mog_from(estimator, z_mog)
+        assert torch.allclose(mapped.means, z_mog.means, atol=1e-5)
+
+        estimator = MixtureDensityEstimator(
+            net=standard_mdn,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+            transform_input=torch.stack([torch.zeros(3), torch.full((3,), 1e20)]),
+        )
+        mapped = estimator.transform_mog_from(estimator, z_mog)
+        assert torch.allclose(mapped.precisions, z_mog.precisions)
+
+    def test_transform_mog_from_another_estimator(self, make_mdn):
+        """The direct map between two z-scored spaces equals the way through inputs."""
+
+        def estimator(shift, scale):
+            return MixtureDensityEstimator(
+                net=make_mdn(),
+                input_shape=torch.Size([3]),
+                condition_shape=torch.Size([5]),
+                transform_input=torch.stack([shift, scale]),
+            )
+
+        source = estimator(torch.tensor([1.0, -2.0, 0.5]), torch.tensor([3.0, 0.5, 2]))
+        target = estimator(torch.tensor([0.0, 1.0, -1.0]), torch.tensor([1.0, 2.0, 4]))
+        with torch.no_grad():
+            mog = source.get_uncorrected_mog(torch.randn(4, 5))
+            direct = target.transform_mog_from(source, mog)
+            via_inputs = target.transform_mog(source.inverse_transform_mog(mog))
+        for name in ("means", "precisions", "precision_factors"):
+            assert torch.allclose(
+                getattr(direct, name), getattr(via_inputs, name), atol=1e-4
+            )
+
+    @pytest.mark.parametrize(
+        "map_name", ["transform_mog", "inverse_transform_mog", "transform_mog_from"]
+    )
+    def test_mog_maps_raise_for_non_affine_transform(self, standard_mdn, map_name):
+        """The MoG maps need an affine z-score, so they raise for an unconstraining
+        transform."""
+        estimator = MixtureDensityEstimator(
+            net=standard_mdn,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([5]),
+            prior_transform=ExpTransform(),
+        )
+        mog = MoG.from_gaussian(torch.zeros(3), torch.eye(3))
+        args = (estimator, mog) if map_name == "transform_mog_from" else (mog,)
+        with pytest.raises(NotImplementedError, match="affine z-score"):
+            getattr(estimator, map_name)(*args)

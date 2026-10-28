@@ -489,16 +489,61 @@ class MoG:
             ),
         )
 
-    def to(self, device: Union[str, torch.device]) -> MoG:
-        """Move all tensors to the specified device.
+    def to(
+        self,
+        device: Optional[Union[str, torch.device]] = None,
+        dtype: Optional[torch.dtype] = None,
+    ) -> MoG:
+        """Move all tensors to the specified device and dtype.
 
         Args:
-            device: Target device.
+            device: Target device. None keeps the device.
+            dtype: Target dtype. None keeps the dtype.
 
         Returns:
-            New MoG with tensors on the specified device.
+            New MoG with tensors on the specified device and dtype.
         """
-        return self.apply(lambda tensor: tensor.to(device))
+        return self.apply(lambda tensor: tensor.to(device, dtype))
+
+    def standardize(self, shift: Tensor, scale: Tensor) -> MoG:
+        """Return the MoG of z = (x - shift) / scale for x from this MoG.
+
+        Args:
+            shift: Elementwise shift, shape (dim,).
+            scale: Elementwise scale, strictly positive, shape (dim,).
+
+        Returns:
+            New MoG with the same logits.
+        """
+        # Subtract before dividing: m / scale - shift / scale cancels for large m.
+        return self._rescaled((self.means - shift) / scale, 1 / scale)
+
+    def unstandardize(self, shift: Tensor, scale: Tensor) -> MoG:
+        """Return the MoG of x = z * scale + shift for z from this MoG.
+
+        Args:
+            shift: Elementwise shift, shape (dim,).
+            scale: Elementwise scale, strictly positive, shape (dim,).
+
+        Returns:
+            New MoG with the same logits.
+        """
+        return self._rescaled(self.means * scale + shift, scale)
+
+    def _rescaled(self, means: Tensor, factor: Tensor) -> MoG:
+        """Return the MoG with `means` whose variables are multiplied by `factor`.
+
+        The precision P maps to P / (f f^T). Dividing the columns of an upper
+        triangular precision factor by f keeps it upper triangular.
+        """
+        assert self.precision_factors is not None
+        return MoG(
+            logits=self.logits,
+            means=means,
+            # Divide rows and columns separately: f f^T can overflow in float32.
+            precisions=self.precisions / factor.unsqueeze(-1) / factor,
+            precision_factors=self.precision_factors / factor,
+        )
 
     def detach(self) -> MoG:
         """Detach all tensors from the computation graph.

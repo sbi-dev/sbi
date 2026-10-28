@@ -867,7 +867,7 @@ def _npe_c_with_mog_loss_state(prior, num_components=3, transform_input=None):
     theta = prior.sample((100,))
     inference.append_simulations(theta, theta + torch.randn_like(theta))
     inference.train(max_num_epochs=1)
-    inference._set_state_for_mog_proposal()
+    inference._set_prior_state()
     return inference, estimator
 
 
@@ -956,10 +956,11 @@ def test_npe_c_warns_if_trained_estimator_has_non_normalizable_pairs(
     prior = MultivariateNormal(torch.zeros(2), prior_var * torch.eye(2))
     inference, estimator = _npe_c_with_mog_loss_state(prior)
     proposal = DirectPosterior(estimator, prior).set_default_x(torch.zeros(1, 2))
+    inference._proposal_mog = inference._proposal_mog_in_z_space(proposal)
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        inference._warn_if_pairs_not_normalizable(proposal, batch_size=50)
+        inference._warn_if_pairs_not_normalizable(batch_size=50)
 
     assert any("infinite mass" in str(w.message) for w in caught) == warns
 
@@ -997,6 +998,39 @@ def test_npe_c_uses_atomic_loss_for_corrected_npe_a_proposal():
 
     assert inference._multiround_loss_is_per_row(round_1)
     assert not inference._multiround_loss_is_per_row(round_2)
+
+
+@pytest.mark.slow
+def test_npe_c_mog_loss_with_retrain_from_scratch():
+    """With `retrain_from_scratch=True`, the round-2 posterior has the true moments.
+
+    The retrained network has its own z-score, so the MoG loss must map the proposal
+    and the prior into it.
+    """
+    prior_cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
+    prior = MultivariateNormal(torch.tensor([1.0, -1.0]), prior_cov)
+    x_o = zeros(1, 2)
+    # x = theta + N(0, I), so the posterior precision is the prior precision + I.
+    post_cov = torch.inverse(torch.inverse(prior_cov) + eye(2))
+    post_mean = post_cov @ torch.linalg.solve(prior_cov, prior.mean)
+    post_std = post_cov.diag().sqrt()
+
+    inference = NPE_C(prior, density_estimator="mdn", show_progress_bars=False)
+    proposal = prior
+    for round_ in range(2):
+        theta = proposal.sample((1000,))
+        inference.append_simulations(
+            theta, theta + torch.randn_like(theta), proposal=proposal
+        )
+        inference.train(retrain_from_scratch=round_ > 0)
+        proposal = inference.build_posterior().set_default_x(x_o)
+    samples = proposal.sample((5000,), show_progress_bars=False)
+
+    # Loose bounds: the spread of the retrained posterior varies between seeds.
+    assert ((samples.mean(0) - post_mean).abs() / post_std).max() < 0.5
+    std_ratio = samples.std(0) / post_std
+    assert std_ratio.min() > 0.7 and std_ratio.max() < 1.75
+    assert (torch.cov(samples.T)[0, 1] - post_cov[0, 1]).abs() < 0.6
 
 
 @pytest.mark.slow
@@ -1085,3 +1119,24 @@ def test_npe_a_rejects_unconstrained_transform_after_first_round(prior):
     )
     with pytest.raises(NotImplementedError, match="affine z-score"):
         inference.build_posterior()
+
+
+def test_npe_a_gaussian_proposal_equal_to_prior_keeps_the_density():
+    """The correction maps a Gaussian proposal into the z-scored space. With the
+    proposal equal to the prior, it leaves the network's density unchanged."""
+    prior = MultivariateNormal(torch.tensor([1.0, -1.0]), 4 * eye(2))
+    inference = NPE_A(prior, num_components=1, show_progress_bars=False)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=1)
+
+    proposal = MultivariateNormal(torch.tensor([1.0, -1.0]), 4 * eye(2))
+    theta = proposal.sample((100,))
+    inference.append_simulations(theta, theta, proposal=proposal).train(
+        max_num_epochs=1
+    )
+    estimator = inference.build_posterior().posterior_estimator
+    theta, x = prior.sample((5,)), zeros(5, 2)
+    with torch.no_grad():
+        assert torch.allclose(
+            estimator.log_prob(theta, x), estimator.net.log_prob(theta, x), atol=1e-3
+        )
