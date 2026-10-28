@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import torch
+from joblib import parallel_config
 
 from sbi.inference import simulate_for_sbi
 from sbi.utils import BoxUniform, parallelize_simulator, simulate_from_theta
@@ -484,3 +485,51 @@ def test_unpicklable_simulator_error_keeps_parallel_results(on_error):
 
     assert torch.isnan(x[3]).all()
     assert torch.equal(x[torch.arange(8) != 3], theta[torch.arange(8) != 3] * 2.0)
+
+
+def test_simulator_that_reuses_an_array_inside_a_list():
+    array = np.zeros(1)
+
+    def simulator(theta):
+        array[0] = float(theta[0])
+        return [array]
+
+    x = simulate_from_theta(
+        simulator,
+        np.arange(4.0).reshape(-1, 1),
+        simulation_batch_size=4,
+        show_progress_bar=False,
+    )
+
+    assert np.array_equal(np.asarray(x).ravel(), np.arange(4.0))
+
+
+def test_failed_simulations_keep_integer_outputs_exact():
+    def simulator(theta):
+        if theta[0] < 0:
+            raise ValueError("negative parameter")
+        return torch.tensor([2**24 + 1])
+
+    with pytest.warns(UserWarning, match="1 of 2 simulations failed"):
+        x = simulate_from_theta(
+            simulator,
+            torch.tensor([[1.0], [-1.0]]),
+            on_error="nan",
+            show_progress_bar=False,
+        )
+
+    assert x[0].item() == 2**24 + 1
+    assert torch.isnan(x[1]).all()
+
+
+def test_thread_workers_run_without_seed_and_reject_one():
+    with parallel_config(backend="threading"):
+        x = simulate_from_theta(
+            numpy_noise, np.zeros((8, 2)), num_workers=2, show_progress_bar=False
+        )
+        with pytest.raises(ValueError, match="process workers"):
+            simulate_from_theta(
+                double, np.zeros((8, 2)), num_workers=2, seed=0, show_progress_bar=False
+            )
+
+    assert len(np.unique(x, axis=0)) == 8

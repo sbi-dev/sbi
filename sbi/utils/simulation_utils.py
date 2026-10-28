@@ -24,6 +24,7 @@ from typing import (
 import numpy as np
 import torch
 from joblib import Parallel, delayed, effective_n_jobs
+from joblib.parallel import get_active_backend
 from torch import Tensor, float32
 from tqdm.auto import tqdm
 
@@ -164,7 +165,9 @@ def simulate_from_theta(
             simulator gets tensors on the CPU. The caller's random state is
             restored afterwards. If None, the current random state is used; with
             more than one worker, the workers are seeded from the global numpy
-            random state, so seeding before the call reproduces it.
+            random state, so seeding before the call reproduces it. Seeding needs
+            joblib's default process workers: with a thread backend, which shares
+            one random state, a seed raises an error.
         on_error: What to do when the simulator raises an exception. "raise" stops
             all simulations and raises it. "nan" keeps going: a failed simulation
             returns NaN, or None for outputs that are not numeric (for a batched
@@ -375,6 +378,12 @@ def _simulate(
     batch_size = settings.batch_size(num_simulations)
     starts = range(0, num_simulations, batch_size)
     sizes = [min(batch_size, num_simulations - start) for start in starts]
+    uses_threads = settings.num_workers != 1 and _uses_threads()
+    if seed is not None and uses_threads:
+        raise ValueError(
+            "`seed` needs process workers, but joblib is set to use threads, which "
+            "share one random state. Use joblib's default backend, or pass no seed."
+        )
     call_seeds = [None] * len(starts)
     if seed is not None and settings.simulator_is_batched:
         call_seeds = _distinct_seeds(len(starts), seed)[:, None]
@@ -389,14 +398,15 @@ def _simulate(
     else:
         thetas = [_to_transport(part) for part in _split(theta, batch_size)]
         batches = map(_Batch, thetas, starts, call_seeds)
+        worker_seeds = (
+            [None] * len(starts) if uses_threads else _distinct_seeds(len(starts), seed)
+        )
         parallel = Parallel(n_jobs=settings.num_workers, return_as="generator")
         results = cast(
             Generator,
             parallel(
                 delayed(_run_in_worker)(run, batch, worker_seed)
-                for batch, worker_seed in zip(
-                    batches, _distinct_seeds(len(starts), seed), strict=True
-                )
+                for batch, worker_seed in zip(batches, worker_seeds, strict=True)
             ),
         )
 
@@ -476,14 +486,19 @@ def _snapshot(output: Any) -> Any:
     """Copies tensor, array and list outputs, which a simulator may reuse."""
     if isinstance(output, Tensor):
         return output.clone()
-    if isinstance(output, (np.ndarray, list)):
+    if isinstance(output, np.ndarray):
         return output.copy()
+    if isinstance(output, list):
+        return [_snapshot(item) for item in output]
     return output
 
 
-def _run_in_worker(run: Callable, batch: _Batch, worker_seed: int) -> _BatchResult:
+def _run_in_worker(
+    run: Callable, batch: _Batch, worker_seed: Optional[int]
+) -> _BatchResult:
     # Without this, worker results would not follow the caller's seed.
-    seed_all_backends(worker_seed)
+    if worker_seed is not None:
+        seed_all_backends(worker_seed)
     try:
         result = run(batch._replace(theta=_from_transport(batch.theta)))
     except Exception as error:
@@ -497,6 +512,12 @@ def _run_in_worker(run: Callable, batch: _Batch, worker_seed: int) -> _BatchResu
             first_failure=failure._replace(error=_sendable(failure.error))
         )
     return result._replace(output=_to_transport(result.output))
+
+
+def _uses_threads() -> bool:
+    """Whether joblib's active backend runs tasks in threads of this process."""
+    backend, _ = get_active_backend()
+    return getattr(backend, "uses_threads", False)
 
 
 def _sendable(error: Exception) -> Exception:
@@ -669,7 +690,7 @@ def _fill_failed(rows: List[Any]) -> List[Any]:
     template = next((row for row in rows if row is not None), None)
     if isinstance(template, Tensor):
         floating = template.is_floating_point() or template.is_complex()
-        dtype = template.dtype if floating else torch.float32
+        dtype = template.dtype if floating else torch.float64
         nan = torch.full_like(template, float("nan"), dtype=dtype)
         # Rows of a partly failed worker task can sit on another device.
         return [nan if row is None else row.to(template.device, dtype) for row in rows]
