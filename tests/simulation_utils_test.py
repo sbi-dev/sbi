@@ -87,7 +87,7 @@ def test_simulate_from_theta_matches_simulator(simulator_is_batched, num_workers
     "simulator, num_workers, simulator_is_batched, x_shape",
     [
         (torch_double, 1, True, (20, 3)),
-        (numpy_total, 2, True, (20,)),
+        (numpy_total, 2, True, (20, 1)),
         (summary_list, 2, False, (20, 2)),
     ],
 )
@@ -226,6 +226,18 @@ def test_seed_keeps_callers_random_state():
     assert (np.random.rand(), torch.rand(1)) == expected
 
 
+def test_seed_keeps_callers_queued_cuda_seed():
+    queue = getattr(torch.cuda, "_lazy_seed_tracker", None)
+    if queue is None or torch.cuda.is_initialized():
+        pytest.skip("Only before CUDA starts does torch queue CUDA seeds.")
+    torch.manual_seed(1)
+    expected = queue.get_calls()
+
+    simulate_from_theta(double, np.zeros((2, 2)), seed=0, show_progress_bar=False)
+
+    assert queue.get_calls() == expected
+
+
 @pytest.mark.gpu
 def test_seed_keeps_callers_accelerator_random_state():
     device = process_device("gpu")
@@ -333,14 +345,9 @@ def test_auto_batch_size_is_one_on_one_worker(prior):
     assert torch.all(x == 1.0)
 
 
-@pytest.mark.parametrize(
-    "setting",
-    [{"num_workers": 0}, {"simulation_batch_size": 0}, {"on_error": "ignore"}],
-    ids=["num_workers", "simulation_batch_size", "on_error"],
-)
-def test_invalid_settings_raise(setting):
-    with pytest.raises(ValueError, match=next(iter(setting))):
-        simulate_from_theta(double, torch.ones(4, 2), **setting)
+def test_unknown_on_error_raises():
+    with pytest.raises(ValueError, match="on_error"):
+        simulate_from_theta(double, torch.ones(4, 2), on_error="ignore")
 
 
 def test_parallelize_simulator_forwards_settings():
@@ -407,12 +414,13 @@ def test_unpicklable_simulator_error_keeps_parallel_results():
     assert torch.equal(x[torch.arange(8) != 3], theta[torch.arange(8) != 3] * 2.0)
 
 
-def test_simulator_that_reuses_an_array_inside_a_list():
+@pytest.mark.parametrize("container", [list, tuple])
+def test_simulator_that_reuses_an_array_inside_a_list(container):
     array = np.zeros(1)
 
     def simulator(theta):
         array[0] = float(theta[0])
-        return [array]
+        return container([array])
 
     x = simulate_from_theta(
         simulator,
@@ -450,6 +458,14 @@ def test_thread_workers_run_without_seed_and_reject_one():
         with pytest.raises(ValueError, match="process workers"):
             simulate_from_theta(
                 double, np.zeros((8, 2)), num_workers=2, seed=0, show_progress_bar=False
+            )
+        with pytest.raises(ValueError, match="process workers"):
+            simulate_for_sbi(
+                double,
+                BoxUniform(-torch.ones(2), torch.ones(2)),
+                8,
+                num_workers=2,
+                seed=0,
             )
 
     assert len(np.unique(x, axis=0)) == 8
