@@ -311,7 +311,9 @@ class NPE_A(PosteriorEstimatorTrainer):
         if final_round is None:
             if resume_training and self._neural_net is not None:
                 # Resuming keeps the network, and with it the round's choice.
-                final_round = self._neural_net.net.num_components > 1
+                mdn = self._neural_net.net
+                assert isinstance(mdn, MultivariateGaussianMDN)
+                final_round = mdn.num_components > 1
             else:
                 final_round = self._round == 0
         num_components = self._num_components if final_round else 1
