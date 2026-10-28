@@ -137,6 +137,20 @@ def test_simulator_gets_theta_type_for_any_num_workers(device):
         assert x.device == theta.device
 
 
+def test_list_of_tensors_becomes_one_tensor():
+    x = simulate_from_theta(
+        lambda t: [t[0], t[1]], torch.ones(3, 2), show_progress_bar=False
+    )
+
+    assert isinstance(x, torch.Tensor)
+    assert x.shape == (3, 2)
+
+
+def test_simulate_for_sbi_rejects_complex_outputs(prior):
+    with pytest.raises(TypeError, match="real numeric"):
+        simulate_for_sbi(lambda t: t * 1j, prior, 4, show_progress_bar=False)
+
+
 @pytest.mark.gpu
 def test_simulate_for_sbi_returns_numpy_outputs_on_theta_device():
     device = process_device("gpu")

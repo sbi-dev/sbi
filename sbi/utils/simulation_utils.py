@@ -3,6 +3,7 @@
 
 import pickle
 import warnings
+from contextlib import suppress
 from dataclasses import dataclass
 from functools import partial, wraps
 from math import ceil
@@ -115,13 +116,14 @@ def simulate_for_sbi(
         seed=None if simulator_is_batched else seed,
         show_progress_bar=show_progress_bar,
     )
-    if not isinstance(x, (Tensor, np.ndarray)):
+    complex_x = x.is_complex() if isinstance(x, Tensor) else np.iscomplexobj(x)
+    if not isinstance(x, (Tensor, np.ndarray)) or complex_x:
         raise TypeError(
-            "`simulate_for_sbi` needs numeric simulator outputs of one shape. For "
-            "other outputs, such as file paths, use `simulate_from_theta`."
+            "`simulate_for_sbi` needs real numeric simulator outputs of one shape. "
+            "For other outputs, such as file paths, use `simulate_from_theta`."
         )
 
-    x = torch.as_tensor(x, dtype=float32, device=theta.device)
+    x = torch.as_tensor(x, dtype=float32, device=theta.device).detach()
     return torch.as_tensor(theta, dtype=float32), x[:, None] if x.ndim == 1 else x
 
 
@@ -358,9 +360,8 @@ def _simulate(
     if theta.ndim < 2:
         raise ValueError(
             "`theta` must have shape (num_simulations, *parameter_shape), got "
-            f"{tuple(theta.shape)}. For one parameter set, pass `theta[None]`. A "
-            "proposal over one parameter needs the event shape (1,), e.g. "
-            "`BoxUniform(torch.zeros(1), torch.ones(1))`."
+            f"{tuple(theta.shape)}. For one parameter set, pass `theta[None]`; for "
+            "one parameter, `theta[:, None]`."
         )
     num_simulations = len(theta)
     if num_simulations == 0:
@@ -524,13 +525,13 @@ def _check_backend(seed: Optional[int], num_workers: int) -> bool:
     if num_workers == 1:
         return False
     backend, _ = get_active_backend()
-    if not getattr(backend, "supports_return_generator", True):
+    parallel = backend.effective_n_jobs(num_workers) > 1
+    if parallel and not getattr(backend, "supports_return_generator", True):
         raise ValueError(
             f"joblib's {type(backend).__name__} cannot return results as they "
             "finish. Use joblib's default backend."
         )
-    uses_threads = getattr(backend, "uses_threads", False)
-    runs_threads = uses_threads and backend.effective_n_jobs(num_workers) > 1
+    runs_threads = parallel and getattr(backend, "uses_threads", False)
     if seed is not None and runs_threads:
         raise ValueError(
             "`seed` needs process workers, but joblib is set to use threads, which "
@@ -645,6 +646,9 @@ def _concatenate(outputs: List[Any], fill_failed: bool) -> SimulationOutput:
     except (RuntimeError, ValueError):  # Outputs of different shapes.
         pass
     rows = [row for batch in outputs for row in batch]
+    if all(type(row) in (list, tuple) and _all_tensors(row) for row in rows):
+        with suppress(RuntimeError):  # Items of different shapes stay lists.
+            rows = [torch.stack(list(row)) for row in rows]
     if fill_failed:
         rows = _fill_failed(rows)
     if isinstance(rows[0], Tensor):
@@ -658,6 +662,10 @@ def _concatenate(outputs: List[Any], fill_failed: bool) -> SimulationOutput:
         except (TypeError, ValueError):  # Different shapes, or no numpy dtype.
             return rows
     return rows
+
+
+def _all_tensors(row: Any) -> bool:
+    return len(row) > 0 and all(isinstance(item, Tensor) for item in row)
 
 
 def _fill_failed(rows: List[Any]) -> List[Any]:
