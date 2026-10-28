@@ -188,6 +188,22 @@ class TestMultivariateGaussianMDNDevice:
         assert mog.device.type == device
 
 
+def test_expand_components_keeps_the_density_and_separates_the_copies(make_mdn):
+    """NPE-A's final round copies the single Gaussian: without noise the density
+    stays the same, with noise the copies differ, so training can move them apart."""
+    mdn = make_mdn(num_components=1)
+    context, inputs = torch.randn(8, 5), torch.randn(8, 3)
+    log_prob_before = mdn.log_prob(inputs, context)
+    mdn.expand_components(4, perturbation=0.0)
+    assert torch.allclose(mdn.log_prob(inputs, context), log_prob_before, atol=1e-5)
+
+    mdn = make_mdn(num_components=1)
+    mdn.expand_components(4, perturbation=5e-3)
+    means = mdn.get_mixture_components(context).means
+    assert means.shape == (8, 4, 3)
+    assert not torch.allclose(means[:, 0], means[:, 1])
+
+
 class TestMixtureDensityEstimatorFunctional:
     """Functional tests for MixtureDensityEstimator accuracy.
 

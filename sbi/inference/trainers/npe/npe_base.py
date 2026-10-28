@@ -589,11 +589,15 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         """
         if proposal is not None:
             check_if_proposal_has_default_x(proposal)
+            # Also catch the network inside a wrapper, e.g. NPE-A's correction.
             if (
                 isinstance(proposal, NeuralPosterior)
                 and hasattr(proposal, "posterior_estimator")
                 and self._neural_net is not None
-                and proposal.posterior_estimator is self._neural_net  # type: ignore
+                and any(
+                    module is self._neural_net
+                    for module in proposal.posterior_estimator.modules()  # type: ignore
+                )
             ):
                 raise ValueError(
                     "The proposal's posterior_estimator is the same object as the "

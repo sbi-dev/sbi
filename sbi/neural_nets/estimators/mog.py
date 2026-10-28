@@ -608,6 +608,23 @@ class MoG:
 _CORRECTION_EPSILON: float = 1e-6
 
 
+def _check_single_gaussian_proposal(num_components: int) -> None:
+    """Raise if the NPE-A proposal is a mixture.
+
+    Args:
+        num_components: Number of Gaussian components of the proposal.
+
+    Raises:
+        ValueError: If the proposal has more than one component.
+    """
+    if num_components > 1:
+        raise ValueError(
+            f"NPE-A needs a single-Gaussian proposal, this one has {num_components} "
+            "components, e.g. a final-round posterior. In a loop over rounds, pass "
+            "`final_round=(r == num_rounds - 1)` to `train()`."
+        )
+
+
 def correct_for_proposal(
     density_mog: MoG,
     proposal_mog: MoG,
@@ -620,24 +637,15 @@ def correct_for_proposal(
     The true posterior is computed as:
         posterior = density_estimator * prior / proposal
 
-    Since all distributions are MoGs, this can be done analytically.
-    If the proposal has L components and the density has K components,
-    the posterior has L*K components.
+    With a single-Gaussian proposal, the result is a MoG with the components of the
+    density estimator.
 
     For uniform priors, pass `prior_mog=None`. The prior term is then omitted
     from the correction (uniform has zero precision).
 
-    Warning:
-        Component count grows multiplicatively across rounds. In multi-round
-        SNPE-A, if round N has L components, round N+1 will have L*K components
-        (where K is the density estimator's component count). This can lead to
-        memory issues for many rounds. However, the original SNPE-A algorithm
-        uses a single Gaussian (K=1) in intermediate rounds, expanding to
-        multiple components only in the final round, which avoids this issue.
-
     Args:
         density_mog: MoG from the density estimator for current observation.
-        proposal_mog: MoG from previous round's proposal distribution.
+        proposal_mog: MoG of the proposal, with a single component.
         prior_mog: MoG representation of the prior. Use `MoG.from_gaussian()`
             for Gaussian priors. Pass None for uniform priors.
 
@@ -645,28 +653,21 @@ def correct_for_proposal(
         Corrected MoG representing the true posterior.
 
     Raises:
-        ValueError: If posterior precision is not positive definite.
+        ValueError: If the proposal has more than one component, or if the
+            posterior precision is not positive definite.
     """
-    num_comps_proposal = proposal_mog.num_components
-    num_comps_density = density_mog.num_components
+    _check_single_gaussian_proposal(proposal_mog.num_components)
     dim = density_mog.dim
 
     # Compute posterior precisions (Eq. 23)
     # prec_post = prec_density - prec_proposal + prec_prior
+    # The single proposal and prior components broadcast over the density's ones.
     # For uniform priors, prec_prior = 0
-    prec_proposal_rep = proposal_mog.precisions.repeat_interleave(
-        num_comps_density, dim=1
-    )
-    prec_density_rep = density_mog.precisions.repeat(1, num_comps_proposal, 1, 1)
-
-    prec_post = prec_density_rep - prec_proposal_rep
+    prec_post = density_mog.precisions - proposal_mog.precisions
 
     # Add prior precision term only for Gaussian priors
     if prior_mog is not None:
-        prec_prior_rep = prior_mog.precisions.repeat(
-            1, num_comps_proposal * num_comps_density, 1, 1
-        )
-        prec_post = prec_post + prec_prior_rep
+        prec_post = prec_post + prior_mog.precisions
 
     # Add small epsilon to diagonal for numerical stability
     eye = torch.eye(dim, device=prec_post.device, dtype=prec_post.dtype)
@@ -677,10 +678,10 @@ def correct_for_proposal(
         precf_post = torch.linalg.cholesky(prec_post_stabilized, upper=True)
     except torch.linalg.LinAlgError as e:
         raise ValueError(
-            "Posterior precision matrix is not positive definite. "
-            "This is a known issue with NPE-A when the proposal and density "
-            "estimator don't align well. Try different hyperparameters. "
-            f"Original error: {e}"
+            "The NPE-A posterior precision is not positive definite, because a "
+            "component of the density estimator is wider than the proposal. Use "
+            "a wider proposal (see the how-to guide 'How to run sequential "
+            f"methods') or NPE_C. Original error: {e}"
         ) from e
 
     # Compute posterior covariances using solve for numerical stability
@@ -695,20 +696,12 @@ def correct_for_proposal(
     prec_mean_proposal = _batched_mv(proposal_mog.precisions, proposal_mog.means)
     prec_mean_density = _batched_mv(density_mog.precisions, density_mog.means)
 
-    prec_mean_proposal_rep = prec_mean_proposal.repeat_interleave(
-        num_comps_density, dim=1
-    )
-    prec_mean_density_rep = prec_mean_density.repeat(1, num_comps_proposal, 1)
-
-    summed_prec_mean = prec_mean_density_rep - prec_mean_proposal_rep
+    summed_prec_mean = prec_mean_density - prec_mean_proposal
 
     # Add prior mean term only for Gaussian priors
     if prior_mog is not None:
         prec_mean_prior = _batched_mv(prior_mog.precisions, prior_mog.means)
-        prec_mean_prior_rep = prec_mean_prior.repeat(
-            1, num_comps_proposal * num_comps_density, 1
-        )
-        summed_prec_mean = summed_prec_mean + prec_mean_prior_rep
+        summed_prec_mean = summed_prec_mean + prec_mean_prior
 
     mean_post = _batched_mv(cov_post, summed_prec_mean)
 
@@ -723,8 +716,6 @@ def correct_for_proposal(
         density_mog.logits,
         density_mog.means,
         density_mog.precisions,
-        num_comps_proposal,
-        num_comps_density,
     )
 
     return MoG(
@@ -745,50 +736,37 @@ def _compute_posterior_logits(
     logits_density: Tensor,
     mean_density: Tensor,
     prec_density: Tensor,
-    num_comps_proposal: int,
-    num_comps_density: int,
 ) -> Tensor:
     """Compute posterior logits using Eqs. 25-26 from SNPE-A paper.
 
     Computes unnormalized log weights for the posterior MoG components.
     The formula combines logit differences, log-determinant ratios, and
     quadratic form differences from the proposal, density, and posterior.
+    The single proposal component broadcasts over the K density components.
 
     Args:
-        mean_post: Posterior means, shape (batch, L*K, dim).
-        prec_post: Posterior precisions, shape (batch, L*K, dim, dim).
-        cov_post: Posterior covariances, shape (batch, L*K, dim, dim).
-        logits_proposal: Proposal logits, shape (batch, L).
-        mean_proposal: Proposal means, shape (batch, L, dim).
-        prec_proposal: Proposal precisions, shape (batch, L, dim, dim).
+        mean_post: Posterior means, shape (batch, K, dim).
+        prec_post: Posterior precisions, shape (batch, K, dim, dim).
+        cov_post: Posterior covariances, shape (batch, K, dim, dim).
+        logits_proposal: Proposal logits, shape (batch, 1).
+        mean_proposal: Proposal means, shape (batch, 1, dim).
+        prec_proposal: Proposal precisions, shape (batch, 1, dim, dim).
         logits_density: Density logits, shape (batch, K).
         mean_density: Density means, shape (batch, K, dim).
         prec_density: Density precisions, shape (batch, K, dim, dim).
-        num_comps_proposal: Number of proposal components (L).
-        num_comps_density: Number of density components (K).
 
     Returns:
-        Posterior logits of shape (batch, L*K).
+        Posterior logits of shape (batch, K).
     """
-    # Compute logit factors
-    logits_proposal_rep = logits_proposal.repeat_interleave(num_comps_density, dim=1)
-    logits_density_rep = logits_density.repeat(1, num_comps_proposal)
-    logit_factors = logits_density_rep - logits_proposal_rep
+    logit_factors = logits_density - logits_proposal
 
     # Compute log-determinant terms using slogdet for numerical stability
     _, logdet_cov_post = torch.linalg.slogdet(cov_post)
     _, logdet_prec_proposal = torch.linalg.slogdet(prec_proposal)
     _, logdet_prec_density = torch.linalg.slogdet(prec_density)
-    logdet_cov_proposal = -logdet_prec_proposal
-    logdet_cov_density = -logdet_prec_density
-
-    logdet_cov_proposal_rep = logdet_cov_proposal.repeat_interleave(
-        num_comps_density, dim=1
-    )
-    logdet_cov_density_rep = logdet_cov_density.repeat(1, num_comps_proposal)
 
     log_sqrt_det_ratio = 0.5 * (
-        logdet_cov_post + logdet_cov_proposal_rep - logdet_cov_density_rep
+        logdet_cov_post - logdet_prec_proposal + logdet_prec_density
     )
 
     # Compute quadratic form terms (m^T P m)
@@ -796,12 +774,7 @@ def _compute_posterior_logits(
     exponent_density = _batched_vmv(prec_density, mean_density)
     exponent_post = _batched_vmv(prec_post, mean_post)
 
-    exponent_proposal_rep = exponent_proposal.repeat_interleave(
-        num_comps_density, dim=1
-    )
-    exponent_density_rep = exponent_density.repeat(1, num_comps_proposal)
-
-    exponent = -0.5 * (exponent_density_rep - exponent_proposal_rep - exponent_post)
+    exponent = -0.5 * (exponent_density - exponent_proposal - exponent_post)
 
     return logit_factors + log_sqrt_det_ratio + exponent
 

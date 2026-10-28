@@ -258,6 +258,41 @@ class MultivariateGaussianMDN(nn.Module):
         mog = self.get_mixture_components(context)
         return mog.sample(sample_shape)
 
+    def expand_components(self, num_components: int, perturbation: float) -> None:
+        """Replace the single component by `num_components` noisy copies of it.
+
+        Equal logits keep the density of the single component, and the noise lets
+        training move the copies apart (Papamakarios & Murray 2016, Algorithm 2).
+
+        Args:
+            num_components: Number of components after the expansion.
+            perturbation: Standard deviation of the noise on the copied weights.
+        """
+        assert self._num_components == 1
+        for name in (
+            "_logits_layer",
+            "_means_layer",
+            "_unconstrained_diagonal_layer",
+            "_upper_layer",
+        ):
+            layer = getattr(self, name)
+            if layer is None:
+                continue
+            expanded = nn.Linear(
+                layer.in_features,
+                layer.out_features * num_components,
+                device=layer.weight.device,
+                dtype=layer.weight.dtype,
+            )
+            # Outputs are ordered by component, so repeated rows copy components.
+            with torch.no_grad():
+                expanded.weight.copy_(layer.weight.repeat(num_components, 1))
+                expanded.bias.copy_(layer.bias.repeat(num_components))
+                expanded.weight.add_(torch.randn_like(expanded.weight) * perturbation)
+                expanded.bias.add_(torch.randn_like(expanded.bias) * perturbation)
+            setattr(self, name, expanded)
+        self._num_components = num_components
+
     def _initialize(self) -> None:
         """Initialize MDN for approximately uniform mixture and identity covariance.
 

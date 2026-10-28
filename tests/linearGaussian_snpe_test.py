@@ -465,17 +465,15 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         _ = inference.append_simulations(theta, x, proposal=posterior1).train()
         posterior = inference.build_posterior().set_default_x(x_o)
     elif method_str == "snpe_a":
-        # Use 3 components with 2 rounds to test multi-component MDN.
-        # Component growth: round 1 = 3, round 2 = 3×3 = 9 components.
         snpe_a_args = {**creation_args, "num_components": 3}
         inference = NPE_A(**snpe_a_args)
         proposal = prior
         num_rounds = 2
-        for _ in range(num_rounds):
+        for r in range(num_rounds):
             theta = proposal.sample((1000,))
             x = simulator(theta)
             inference = inference.append_simulations(theta, x, proposal=proposal)
-            _ = inference.train()
+            _ = inference.train(final_round=(r == num_rounds - 1))
             posterior = inference.build_posterior().set_default_x(x_o)
             proposal = posterior
     elif method_str.startswith("tsnpe"):
@@ -503,6 +501,46 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=method_str)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("widen", [False, True], ids=["posterior", "widened"])
+def test_multi_round_npe_a_matches_true_posterior_moments(widen):
+    """Two NPE-A rounds with a final round recover the true mean and std, with the
+    posterior or a widened Gaussian fitted to it as the second proposal.
+
+    c2st misses moment errors of this size, so the moments are checked directly.
+    The bounds are about twice the spread over seeds 0 to 5.
+    """
+    prior = MultivariateNormal(zeros(2), eye(2))
+    likelihood_shift, likelihood_cov = -1.0 * ones(2), 0.3 * eye(2)
+    x_o = zeros(1, 2)
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o[0], likelihood_shift, likelihood_cov, zeros(2), eye(2)
+    )
+    true_std = true_posterior.covariance_matrix.diagonal().sqrt()
+
+    inference = NPE_A(prior, num_components=5, show_progress_bars=False)
+    proposal = prior
+    for r in range(2):
+        theta = proposal.sample((3000,))
+        x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+        inference.append_simulations(theta, x, proposal=proposal).train(
+            final_round=(r == 1)
+        )
+        posterior = inference.build_posterior().set_default_x(x_o)
+        if r == 0:
+            if widen:
+                samples = posterior.sample((10_000,))
+                proposal = MultivariateNormal(samples.mean(0), 2 * torch.cov(samples.T))
+            else:
+                proposal = posterior
+
+    samples = posterior.sample((10_000,))
+    mean_error = (samples.mean(0) - true_posterior.mean) / true_std
+    std_ratio = samples.std(0) / true_std
+    assert mean_error.abs().max() < 0.3, f"mean error {mean_error} posterior stds"
+    assert ((std_ratio > 0.8) & (std_ratio < 1.25)).all(), f"std ratio {std_ratio}"
 
 
 # Testing rejection and mcmc sampling methods.
