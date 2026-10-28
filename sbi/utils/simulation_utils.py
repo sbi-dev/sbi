@@ -148,9 +148,9 @@ def simulate_from_theta(
         theta: Parameters of shape (num_simulations, \*parameter_shape), as a
             tensor or numpy array. Other array-likes become numpy arrays.
         num_workers: Number of parallel joblib workers; -1 uses all CPUs, -2 all
-            but one, and so on. The
-            simulator receives parameters of the same type as `theta` for any number
-            of workers; with more than one worker, tensors are on the CPU.
+            but one, and so on. The simulator receives parameters of the same type
+            as `theta` for any number of workers; with more than one worker, tensors
+            are on the CPU.
         simulation_batch_size: Number of parameter sets per simulator call, or per
             worker task for a simulator that is not batched. "auto" uses one
             parameter set per call with one worker, and four tasks per worker with
@@ -160,18 +160,14 @@ def simulate_from_theta(
             per call. A batched simulator passed with False gets one parameter set
             per call: indexing such as `theta[:, 0]` raises, and outputs sized by
             `len(theta)` gain a dimension.
-        seed: Seed for reproducibility. The simulator is reseeded before each call:
-            before each simulation if it is not batched, before each batch if it
-            is. For a simulator that is not batched, the outputs then depend on
-            neither `num_workers` nor `simulation_batch_size`; for a batched one,
-            they do not depend on `num_workers` at a fixed `simulation_batch_size`.
-            This holds for noise drawn on the CPU: with more than one worker, the
-            simulator gets tensors on the CPU. The caller's random state is
-            restored afterwards. If None, the current random state is used; with
-            more than one worker, the workers are seeded from the global numpy
-            random state, so seeding before the call reproduces it. Seeding needs
-            joblib's default process workers: with a thread backend, which shares
-            one random state, a seed raises an error.
+        seed: Seed for reproducibility. The simulator is reseeded before each
+            simulation, or before each batch if it is batched. So for noise drawn on
+            the CPU and a fixed `simulation_batch_size`, the outputs do not depend
+            on `num_workers`; if the simulator is not batched, not on
+            `simulation_batch_size` either. The caller's random state is restored
+            afterwards. If None, the current random state is used, and seeding
+            before the call reproduces it. Seeding needs joblib's default process
+            workers: with a thread backend, a seed raises an error.
         on_error: What to do when the simulator raises an exception. "raise" stops
             all simulations and raises it. "nan" keeps going: a failed simulation
             returns NaN, or None for outputs that are not numeric (for a batched
