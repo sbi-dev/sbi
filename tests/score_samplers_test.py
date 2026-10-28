@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Tuple
 
 import pytest
@@ -220,6 +221,40 @@ def test_prior_guide_score_does_not_depend_on_the_batch_layout(covariance_type):
             guidance(inputs[:, None], conditions[:, None], time)[:, 0],
             guidance(inputs, conditions, time),
         )
+
+
+@pytest.mark.parametrize("estimator_type", ["ve", "vp", "subvp", "fmpe"])
+def test_interval_guidance_samples_the_truncated_posterior(estimator_type):
+    """With the exact score of N(0, sd^2), a lower bound at 0 gives the half-normal."""
+    posterior_sd = 0.5
+    theta, x = torch.randn(100, 1), torch.randn(100, 1)
+    if estimator_type == "fmpe":
+        estimator = posterior_flow_nn()(theta, x)
+    else:
+        estimator = posterior_score_nn(sde_type=estimator_type)(theta, x)
+
+    def exact_score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        m, s = estimator.mean_t_fn(t), estimator.std_fn(t)
+        return -input / (m**2 * posterior_sd**2 + s**2)
+
+    estimator.score = exact_score
+    posterior = VectorFieldPosterior(
+        estimator, MultivariateNormal(torch.zeros(1), torch.eye(1)), sample_with="sde"
+    )
+    samples = posterior.sample(
+        (2000,),
+        x=torch.zeros(1, 1),
+        guidance_method="interval",
+        guidance_params={"lower_bound": 0.0, "upper_bound": None},
+        show_progress_bars=False,
+    )
+
+    half_normal_mean = posterior_sd * math.sqrt(2 / math.pi)
+    half_normal_sd = posterior_sd * math.sqrt(1 - 2 / math.pi)
+    # Guidance denoises with Tweedie's formula, an approximation: measured bias up to
+    # 0.11 sd and sd ratio up to 1.05.
+    assert abs(samples.mean() - half_normal_mean) < 0.2 * posterior_sd
+    assert abs(samples.std() / half_normal_sd - 1) < 0.15
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve"])

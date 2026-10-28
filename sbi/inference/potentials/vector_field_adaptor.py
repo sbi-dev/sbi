@@ -370,7 +370,9 @@ class IntervalGuidanceConfig:
         lower_bound: Optional lower bound for parameters.
         upper_bound: Optional upper bound for parameters.
         mask: Optional boolean mask selecting constrained dimensions.
-        scale_factor: Soft-constraint strength.
+        scale_factor: Soft-constraint strength. The log-sigmoid walls have slope
+            `scale_factor / std(t)^2`, inversely proportional to the noise variance
+            of the diffused parameters, as in [1] of :class:`IntervalGuidance`.
     """
 
     lower_bound: Optional[Union[float, Tensor]]
@@ -437,8 +439,8 @@ class IntervalGuidance(UniversalGuidance):
         def interval_fn(
             input: Tensor, condition: Tensor, m: Tensor, std: Tensor
         ) -> Tensor:
-            del condition
-            scale = config.scale_factor / (m**2 * std**2 + 1e-6)
+            del condition, m
+            scale = config.scale_factor / (std**2 + 1e-6)
             upper_bound = (
                 F.logsigmoid(-scale * (input - config.upper_bound))
                 if config.upper_bound is not None
