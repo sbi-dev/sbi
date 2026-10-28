@@ -1,8 +1,8 @@
-# Mean flow in sbi: results (2026-10-22 and 2026-10-23)
+# Mean flow in sbi: results (2026-10-22 to 2026-10-28)
 
 Question: is a conditional mean flow (see `paper_summary.md`) a useful density estimator in sbi, above all as an NLE likelihood compared with sbi's NSF?
 
-Short answer: at the paper's data scale it **ties NSF in NLE** when both get the same training recipe, is **1.8x slower per new observation** in MCMC, trains 9x longer, and is **worse in NPE**. At 2,000 simulations it beats NSF in NLE on 3 of 4 mini-sbibm tasks. The paper's g-and-k result (mean flow 0.577 vs coupling flow 0.679) reproduces with the paper's code; with the coupling flow trained as long as the mean flow the gap halves (0.584 to 0.600 against 0.630) but holds, and sbi's port of the paper's network matches the paper's mean flow while sbi's own network does not (`results_gandk.md`).
+Short answer: at the paper's data scale it **ties NSF in NLE** when both get the same training recipe, is **1.8x slower per new observation** in MCMC, trains 9x longer, and is **worse in NPE**. At 2,000 simulations it beats NSF in NLE on 3 of 4 mini-sbibm tasks. The paper's g-and-k result (mean flow 0.577 vs coupling flow 0.679) reproduces with the paper's code; with the coupling flow trained as long as the mean flow the gap halves (0.584 to 0.600 against 0.630) but holds, and sbi's port of the paper's network matches the paper's mean flow while sbi's own network does not (`results_gandk.md`). That does not carry over to other NLE tasks: at 50,176 simulations both networks tie NSF on three mini-sbibm tasks and lose on slcp, and at 2,000 sbi's network beats the paper's on every task (NLE benchmark below).
 
 ## Implementation
 
@@ -33,7 +33,7 @@ References at 2,000 simulations: NSF 0.57 to 0.63, sbi FMPE with defaults 0.781.
 
 At 2,000 simulations the paper's fixed epoch count overfits without model selection: on gaussian_linear the held-out loss goes 7.46 (epoch 25), 7.36 (100), 10.78 (200), 36.64 (400) while the training loss falls to 2.6, and the NPE C2ST ends at 0.995. All runs below therefore keep the best epoch on a 10% held-out split (fixed noise per evaluation), for NSF and the mean flow alike (`scripts/mean_flow_paper_trainer.py`).
 
-This rule does not carry over to the data-rich regime. On g-and-k (100,000 simulations, `results_gandk.md`) the mean flow's held-out loss bottoms out at epochs 233 to 373 and then rises slightly (3.29 to 3.30 to 3.32) while the training loss keeps falling, yet the last epoch gives clearly better posteriors: C2ST 0.573 against 0.649 at S=2 for the paper network, with best-epoch failures at 0.76 to 0.84 on 3 of 10 datasets. The mean-flow objective on held-out data is a poor proxy for density quality. Keep the best epoch only where the held-out loss runs away (small data, as above); otherwise keep the last epoch of the decaying schedule, as the paper does. For the flows, where the loss is the negative log-likelihood, best-epoch selection stays right: the wide NSF trained 1,000 epochs on g-and-k overfits and its last epoch does not sample (C2ST 0.958, no chain converged). A better criterion for the mean flow would be the held-out exact S-step log-likelihood (not tried).
+This rule does not carry over to the data-rich regime. On g-and-k (100,000 simulations, `results_gandk.md`) the mean flow's held-out loss bottoms out at epochs 233 to 373 and then rises slightly (3.29 to 3.30 to 3.32) while the training loss keeps falling, yet the last epoch gives clearly better posteriors: C2ST 0.573 against 0.649 at S=2 for the paper network, with best-epoch failures at 0.76 to 0.84 on 3 of 10 datasets. The mean-flow objective on held-out data is a poor proxy for density quality. The NLE benchmark below shows that the last epoch is not a safe alternative either: sbi's mean-flow network fails at the last epoch on gaussian_linear even with 50,176 simulations (C2ST 0.979 against 0.513 at the best epoch), while the paper network's last epoch is fine there. Best-epoch selection is the safe default; it costs the paper network 0.04 to 0.08 C2ST on slcp and g-and-k. For the flows, where the loss is the negative log-likelihood, best-epoch selection stays right: the wide NSF trained 1,000 epochs on g-and-k overfits and its last epoch does not sample (C2ST 0.958, no chain converged). A better criterion for the mean flow would be the held-out exact S-step log-likelihood (not tried).
 
 ## mini-sbibm at 2,000 simulations
 
@@ -94,6 +94,46 @@ After matching the paper's code (separate cycle times, see the differences table
 
 The fix helps few-step sampling (most at S=1) and makes the NLE normalization almost independent of θ. The NPE density stays inconsistent with the samples. The grids above ran without the fix, so they understate the mean flow somewhat, most at S=1; the g-and-k reproduction uses the fixed estimator.
 
+## NLE benchmark: paper network, sbi network, single differences, NSF (2026-10-28)
+
+Question: does the g-and-k result (the paper's network ahead of every flow, sbi's own network 0.06 behind it) hold on other NLE tasks, and which difference between the two networks matters? Script `scripts/nle_bench.py`; raw rows `results/nle_bench.jsonl`; every table, including S=1 and all paired differences, in `results/nle_bench_summary.txt` (made by `scripts/nle_bench_summary.py`).
+
+Setup: mini-sbibm, 10 observations per task, sbi's default MCMC, C2ST against the reference posteriors, as in the 2,000-simulation grid above. 2,000 simulations with 400 epochs (CPU) and 50,176 simulations with 1,000 epochs (mean flows on GPU 1), 3 seeds each; the single-difference arms at 50,176 with one seed. Mean flows and `nsf_paper` train with the paper's recipe and are scored with both the best held-out and the last-epoch weights; `nsf_default` trains with `NLE.train()` defaults. All mean flows include the cycle-loss fix.
+
+- `mf_paper`: `MeanFlowConfig(variant="paper")`, the port of the paper's FiLM network (1.76M parameters), which matched the paper's code on g-and-k.
+- `mf_sbi`: `MeanFlowConfig()`, sbi's adaptive-layer-norm network (2.85M parameters).
+- `abl_time`, `abl_actinit`, `abl_zeroout`: the paper network with one difference switched to sbi's choice: time input $(s, t-s)$ through fixed Fourier features; GELU with PyTorch's default initialization; zero-initialized output layers.
+- `nsf_default`, `nsf_paper`: `NSFConfig()` (61k to 98k parameters).
+
+C2ST at S=2, mean ± sd over 3 seeds (0.5 is perfect; paired differences below about 0.02 are mostly noise):
+
+| 2,000 simulations | two_moons | linear_mvg_2d | gaussian_linear | slcp |
+|---|---|---|---|---|
+| `mf_paper` best | 0.685 ± 0.017 | 0.524 ± 0.005 | 0.750 ± 0.009 | 0.943 ± 0.005 |
+| `mf_paper` last | 0.666 ± 0.005 | 0.519 ± 0.006 | 0.884 ± 0.010 | 0.954 ± 0.003 |
+| `mf_sbi` best | 0.610 ± 0.038 | 0.516 ± 0.013 | **0.616 ± 0.016** | **0.856 ± 0.005** |
+| `mf_sbi` last | **0.580 ± 0.008** | **0.503 ± 0.003** | 0.968 ± 0.006 | 0.863 ± 0.004 |
+| `nsf_default` | 0.612 ± 0.008 | 0.517 ± 0.003 | 0.647 ± 0.017 | 0.903 ± 0.006 |
+| `nsf_paper` best | 0.597 ± 0.013 | 0.518 ± 0.012 | 0.655 ± 0.015 | 0.913 ± 0.007 |
+
+| 50,176 simulations | two_moons | linear_mvg_2d | gaussian_linear | slcp |
+|---|---|---|---|---|
+| `mf_paper` best | 0.547 ± 0.008 | 0.505 ± 0.003 | 0.531 ± 0.001 | 0.721 ± 0.015 |
+| `mf_paper` last | 0.552 ± 0.005 | 0.502 ± 0.002 | 0.542 ± 0.003 | 0.685 ± 0.013 |
+| `mf_sbi` best | 0.533 ± 0.007 | 0.500 ± 0.003 | **0.513 ± 0.003** | 0.703 ± 0.006 |
+| `mf_sbi` last | 0.534 ± 0.011 | 0.500 ± 0.003 | 0.979 ± 0.008 | 0.761 ± 0.012 |
+| `nsf_default` | 0.535 ± 0.004 | 0.503 ± 0.002 | 0.529 ± 0.002 | **0.651 ± 0.005** |
+| `nsf_paper` best | 0.528 ± 0.003 | 0.504 ± 0.004 | 0.528 ± 0.004 | 0.657 ± 0.017 |
+
+Findings (paired differences over seeds and observations, mean with standard error; negative means the first estimator is better):
+
+1. **The mean flow does not beat NSF with plenty of data.** At 50,176, `mf_sbi` (best epoch) ties `nsf_default` on the two 2-D tasks, is 0.016 (0.003) better on gaussian_linear and 0.052 (0.016) worse on slcp. `mf_paper` is behind NSF on two moons (+0.012 to +0.017) and slcp (+0.034 at the last epoch, +0.070 at the best). At 2,000, `mf_sbi` beats NSF on gaussian_linear (−0.031, 0.008) and slcp (−0.047, 0.015) and ties on the 2-D tasks, which repeats the earlier grid; `mf_paper` is behind NSF on every task.
+2. **The paper's network is not better in general.** sbi's network beats it at the best epoch on every task at 2,000 (−0.075, −0.009, −0.134, −0.086) and by 0.014 to 0.018 at 50,176 (two moons, gaussian_linear, slcp). On g-and-k the order was the other way round (`results_gandk.md`), so that result is task-specific.
+3. **Single differences (2,000, best epoch, against `mf_paper`):** sbi's activation and initialization give the largest single gain: −0.057 (0.008) of the −0.134 gap on gaussian_linear, −0.044 (0.005) of −0.086 on slcp, −0.013 (0.009) of −0.075 on two moons. Zero-initialized outputs help on gaussian_linear (−0.057, 0.004) and slcp (−0.014, 0.004) but hurt on two moons (+0.030, 0.005). The time input changes nothing beyond noise. No single switch closes the gap; the rest is FiLM against adaptive layer norm, the larger network, or interactions. At 50,176 (one seed) all single differences are within ±0.02 except zero-initialized outputs on slcp (+0.039, 0.017 at the best epoch).
+4. **Neither epoch rule is safe.** Where the held-out loss bottoms out early (gaussian_linear: best epoch 10 to 124 of 400 at 2,000, 163 to 377 of 1,000 at 50,176), the last epoch fails: `mf_sbi` 0.968 and 0.979, `nsf_paper` 0.752 and 0.702, `mf_paper` 0.884 at 2,000 (but 0.542 at 50,176). Where it bottoms out late, the last epoch is equal or better: `mf_paper` on slcp at 50,176 (−0.036, 0.008), as on g-and-k (−0.076). So the g-and-k rule "last epoch for the mean flow when data is plentiful" holds for the paper network but fails for sbi's network on gaussian_linear even at 50,176 simulations. Best-epoch selection is the safe default; it costs the paper network 0.04 to 0.08 on slcp and g-and-k.
+5. **S=1 is enough in NLE.** For `mf_sbi` at the best epoch, S=1 against S=2 is within ±0.004 at 2,000 and within ±0.003 at 50,176 except slcp (S=1 0.017 worse, 0.009). S=1 halves the MCMC cost.
+6. **Cost** (medians over tasks and seeds; the machine was fully loaded, so ratios are rough): at 2,000 on CPU, mean-flow training took 640 to 910 s against 46 s for `nsf_default`; MCMC for 10 observations took 1,180 to 1,600 s at S=1 and 2,220 to 2,730 s at S=2, against 864 s for NSF (1.4 to 1.9x at S=1, 2.6 to 3.2x at S=2). At 50,176, the mean flows trained for 3.7 to 5 h on the GPU (12 jobs sharing it) against 12 min for `nsf_default` on 2 CPU threads.
+
 ## Bugs in existing sbi found on the way
 
 Both are fixed on branch `fix/sample-shapes-and-mcmc-init-grad` (PR pending) and in the first two commits of this branch.
@@ -104,8 +144,10 @@ Both are fixed on branch `fix/sample-shapes-and-mcmc-init-grad` (PR pending) and
 ## Mistakes in our own benchmark (fixed, recorded so they are not repeated)
 
 - `build_posterior` deep-copies the estimator (`sbi/inference/trainers/base.py:623`). Setting `num_steps` on the trained estimator afterwards does not reach the posterior. The first grid ran every mean flow at S=2; set `num_steps` before `build_posterior`.
-- The paper recipe without model selection overfits at 2,000 simulations (above); with plenty of data, best-epoch selection on the mean-flow loss picks worse weights than the last epoch (above and `results_gandk.md`).
+- The paper recipe without model selection overfits at 2,000 simulations (above); with plenty of data, best-epoch selection on the mean-flow loss can pick worse weights than the last epoch (g-and-k, slcp), but the last epoch can also fail (gaussian_linear at 50,176 with sbi's network). Report both.
 
 ## Verdict
+
+After the NLE benchmark (2026-10-28): park the mean flow; do not add it to sbi. With plenty of data it ties sbi's default NSF on three of four mini-sbibm tasks and loses on slcp, with either network. Its gains are narrow: g-and-k with the paper's network only, and 0.03 to 0.05 C2ST on gaussian_linear and slcp at 2,000 simulations with sbi's network only. Against that stand 14 to 20x the training time (2,000 simulations, CPU), 1.4 to 1.9x the MCMC time at S=1, a training recipe that sbi's `train()` does not offer, and no reliable rule for which epoch to keep. The branch stays as a documented experiment; the fixes for sbi that came out of it are listed separately.
 
 Before g-and-k: park the mean flow in sbi unless the g-and-k reproduction shows a clear NLE gain over a fairly trained flow. The g-and-k outcome is in `results_gandk.md`: a gain of 0.03 to 0.05 C2ST over the paper's coupling flow trained equally long and over sbi's best flow, with the paper's network only. The rest of this paragraph is the pre-g-and-k assessment. With equal training it gives no accuracy gain over NSF on two moons at the paper's scale, costs 1.8x more MCMC time per new observation, and needs a cosine learning-rate schedule that sbi's `train()` does not offer.
