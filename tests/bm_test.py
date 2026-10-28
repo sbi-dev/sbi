@@ -422,6 +422,9 @@ def test_run_benchmark(
         benchmark_seed: The training seed.
         request: The pytest request, to read the benchmark mode.
     """
+    estimator = extra_kwargs.get("density_estimator", "mdn")
+    if inference_class is NPE_A and estimator != "mdn":
+        pytest.skip("NPE-A needs a mixture density network.")
     mode = _benchmark_mode(request.config)
     # Set before training, so a crashed case replaces the stored result of its label.
     results_bag.method = (
