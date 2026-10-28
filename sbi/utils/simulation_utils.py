@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import pickle
-import random
 import warnings
 from dataclasses import dataclass
 from functools import partial, wraps
@@ -10,7 +9,6 @@ from math import ceil
 from typing import (
     Any,
     Callable,
-    Dict,
     Generator,
     List,
     NamedTuple,
@@ -164,9 +162,9 @@ def simulate_from_theta(
             simulation, or before each batch if it is batched. So for noise drawn on
             the CPU and a fixed `simulation_batch_size`, the outputs do not depend
             on `num_workers`; if the simulator is not batched, not on
-            `simulation_batch_size` either. The caller's random state is restored
-            afterwards. If None, the current random state is used, and seeding
-            before the call reproduces it. Seeding needs joblib's default process
+            `simulation_batch_size` either. It leaves the random state seeded. If
+            None, the current random state is used, and seeding before the call
+            reproduces it. Seeding needs joblib's default process
             workers: with a thread backend, a seed raises an error.
         on_error: What to do when the simulator raises an exception. "raise" stops
             all simulations and raises it. "nan" keeps going: a failed simulation
@@ -391,7 +389,6 @@ def _simulate(
     elif seed is not None:
         call_seeds = np.split(_distinct_seeds(num_simulations, seed), starts[1:])
 
-    random_state = _get_random_state() if seed is not None else None
     results: Generator[Any, None, None]
     if settings.num_workers == 1:
         batches = map(_Batch, _split(theta, batch_size), starts, call_seeds)
@@ -425,8 +422,6 @@ def _simulate(
     finally:
         # Closing joblib's generator cancels the simulations not yet run.
         results.close()
-        if random_state is not None:
-            _set_random_state(random_state)
 
     if first_failure is not None:
         _report_failures(first_failure, num_failed, num_simulations)
@@ -650,42 +645,6 @@ def _distinct_seeds(num_seeds: int, seed: Optional[int]) -> np.ndarray:
         seed = np.random.randint(2**31)
     # `np.random.seed` accepts seeds below 2**32.
     return np.random.default_rng(seed).choice(2**32, size=num_seeds, replace=False)
-
-
-def _get_random_state() -> Dict[str, Any]:
-    state = {
-        "random": random.getstate(),
-        "numpy": np.random.get_state(),
-        "torch": torch.get_rng_state(),
-    }
-    if torch.cuda.is_initialized():
-        state["cuda"] = torch.cuda.get_rng_state_all()
-    elif hasattr(torch.cuda, "_lazy_seed_tracker"):
-        # Before CUDA starts, torch queues CUDA seeds, which seeding overwrites.
-        queue = torch.cuda._lazy_seed_tracker
-        state["cuda_queue"] = (
-            queue.manual_seed_all_cb,
-            queue.manual_seed_cb,
-            list(queue.call_order),
-        )
-    if torch.backends.mps.is_available():
-        state["mps"] = torch.mps.get_rng_state()
-    return state
-
-
-def _set_random_state(state: Dict[str, Any]) -> None:
-    random.setstate(state["random"])
-    np.random.set_state(state["numpy"])
-    torch.set_rng_state(state["torch"])
-    if "cuda" in state:
-        torch.cuda.set_rng_state_all(state["cuda"])
-    if "cuda_queue" in state:
-        queue = torch.cuda._lazy_seed_tracker
-        queue.manual_seed_all_cb, queue.manual_seed_cb, queue.call_order = state[
-            "cuda_queue"
-        ]
-    if "mps" in state:
-        torch.mps.set_rng_state(state["mps"])
 
 
 def _is_numeric(output: Any) -> bool:

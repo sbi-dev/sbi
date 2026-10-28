@@ -209,47 +209,6 @@ def test_seeded_outputs_do_not_depend_on_workers_or_batch_size(
         assert np.array_equal(other, x)
 
 
-def test_seed_keeps_callers_random_state():
-    np.random.seed(1)
-    torch.manual_seed(1)
-    expected = np.random.rand(), torch.rand(1)
-    np.random.seed(1)
-    torch.manual_seed(1)
-
-    simulate_from_theta(
-        noise_from_all_backends,
-        np.zeros((5, 2)),
-        seed=0,
-        show_progress_bar=False,
-    )
-
-    assert (np.random.rand(), torch.rand(1)) == expected
-
-
-def test_seed_keeps_callers_queued_cuda_seed():
-    queue = getattr(torch.cuda, "_lazy_seed_tracker", None)
-    if queue is None or torch.cuda.is_initialized():
-        pytest.skip("Only before CUDA starts does torch queue CUDA seeds.")
-    torch.manual_seed(1)
-    expected = queue.get_calls()
-
-    simulate_from_theta(double, np.zeros((2, 2)), seed=0, show_progress_bar=False)
-
-    assert queue.get_calls() == expected
-
-
-@pytest.mark.gpu
-def test_seed_keeps_callers_accelerator_random_state():
-    device = process_device("gpu")
-    torch.manual_seed(1)
-    expected = torch.rand(1, device=device)
-    torch.manual_seed(1)
-
-    simulate_from_theta(double, np.zeros((5, 2)), seed=0, show_progress_bar=False)
-
-    assert torch.equal(torch.rand(1, device=device), expected)
-
-
 @pytest.mark.parametrize(
     "single_theta_simulator",
     [lambda theta: np.ravel(theta) * 2.0, lambda theta: "sim.npy"],
