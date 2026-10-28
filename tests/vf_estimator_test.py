@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Tuple
 
 import pytest
@@ -254,6 +255,22 @@ def test_flow_matching_score_broadcasts_one_time_per_sample(num_dim):
     ])
     assert scores.shape == (4, num_dim)
     torch.testing.assert_close(scores, expected)
+
+
+@pytest.mark.parametrize("method", ["drift_fn", "diffusion_fn", "mean_t_fn"])
+def test_flow_matching_effective_t_max_argument_is_deprecated(method):
+    """The per-call cutoff still applies, with a warning; the default call is quiet."""
+    estimator = FlowMatchingConfig().build(torch.randn(100, 1), torch.randn(100, 1))
+    sde_fn = getattr(estimator, method)
+    inputs = () if method == "mean_t_fn" else (torch.ones(1, 1),)
+
+    with pytest.warns(FutureWarning, match="effective_t_max"):
+        old_call = sde_fn(*inputs, torch.tensor([0.97]), effective_t_max=0.95)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        default_call = sde_fn(*inputs, torch.tensor([0.95]))
+
+    torch.testing.assert_close(old_call, default_call)
 
 
 @pytest.mark.parametrize("config_cls", CONFIGS)
