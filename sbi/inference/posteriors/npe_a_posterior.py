@@ -93,10 +93,19 @@ class NPE_A_Posterior(DirectPosterior):
 
         Args:
             state_dict: State to be restored.
+
+        Raises:
+            ValueError: If the pickled proposal is a mixture.
         """
         proposal_mog = state_dict.pop("_proposal_mog", None)
         prior_mog = state_dict.pop("_prior_mog", None)
         state_dict.pop("_apply_correction", None)
+        if proposal_mog is not None and proposal_mog.num_components > 1:
+            raise ValueError(
+                "This NPE-A posterior was saved by sbi 0.26 or 0.27 with a mixture "
+                "proposal, for which the correction was wrong (sbi issue #2108). It "
+                "cannot be loaded. Please train it again."
+            )
         if proposal_mog is not None:
             estimator = ProposalCorrectedMDN(
                 state_dict["posterior_estimator"], proposal_mog, prior_mog
