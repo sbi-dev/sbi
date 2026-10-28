@@ -970,15 +970,15 @@ def test_simulate_for_sbi(
     likelihood_cov = 0.3 * eye(num_dim)
     prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    def failing_simulator(theta):
+    def tensor_simulator(theta):
         if isinstance(theta, np.ndarray):
             raise TypeError("This simulator does not support numpy arrays.")
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator = (
-        failing_simulator
+        tensor_simulator
         if not use_process_simulator
-        else process_simulator(failing_simulator, prior, False)
+        else process_simulator(tensor_simulator, prior, False)
     )
 
     if num_simulations == 0:
@@ -994,29 +994,19 @@ def test_simulate_for_sbi(
         )
         assert x.numel() == 0, "x should be an empty tensor when num_simulations=0"
     else:
-        if not use_process_simulator and num_workers > 1:
-            with pytest.raises(TypeError, match="For multiprocessing"):
-                simulate_for_sbi(
-                    simulator=simulator,
-                    proposal=prior,
-                    num_simulations=num_simulations,
-                    simulation_batch_size=simulation_batch_size,
-                    num_workers=num_workers,
-                )
-        else:
-            theta, x = simulate_for_sbi(
-                simulator=simulator,
-                proposal=prior,
-                num_simulations=num_simulations,
-                simulation_batch_size=simulation_batch_size,
-                num_workers=num_workers,
-            )
-            assert theta.shape[0] == num_simulations, (
-                "Theta should have num_simulations rows"
-            )
-            assert x.shape[0] == num_simulations, "x should have num_simulations rows"
-            assert theta.shape[1] == num_dim, "Theta should have num_dim columns"
-            assert x.shape[1] == num_dim, "x should have num_dim columns"
+        theta, x = simulate_for_sbi(
+            simulator=simulator,
+            proposal=prior,
+            num_simulations=num_simulations,
+            simulation_batch_size=simulation_batch_size,
+            num_workers=num_workers,
+        )
+        assert theta.shape[0] == num_simulations, (
+            "Theta should have num_simulations rows"
+        )
+        assert x.shape[0] == num_simulations, "x should have num_simulations rows"
+        assert theta.shape[1] == num_dim, "Theta should have num_dim columns"
+        assert x.shape[1] == num_dim, "x should have num_dim columns"
 
 
 def test_proposal_sharing_weights_with_trainer_raises():
