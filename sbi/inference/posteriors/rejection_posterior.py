@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from functools import partial
-from typing import Any, Optional, Union
+from typing import Optional, Union
 from warnings import warn
 
 import torch
@@ -11,9 +11,9 @@ from torch import Tensor
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
-from sbi.sbi_types import Shape, TorchTransform
+from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -26,7 +26,7 @@ class RejectionPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Union[BasePotential, CustomPotential],
-        proposal: Any,
+        proposal: Proposal,
         theta_transform: Optional[TorchTransform] = None,
         max_sampling_batch_size: int = 10_000,
         num_samples_to_find_max: int = 10_000,
@@ -81,6 +81,7 @@ class RejectionPosterior(NeuralPosterior):
         Args:
             device: The device to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
@@ -120,7 +121,7 @@ class RejectionPosterior(NeuralPosterior):
         )
         warn("The log-probability is unnormalized!", stacklevel=2)
 
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -135,19 +136,27 @@ class RejectionPosterior(NeuralPosterior):
         num_samples_to_find_max: Optional[int] = None,
         num_iter_to_find_max: Optional[int] = None,
         m: Optional[float] = None,
-        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ):
-        r"""Return samples from posterior $p(\theta|x)$ via rejection sampling.
+        r"""Draw samples from the approximate posterior via rejection sampling.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
-            sample_with: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
+            x: Conditioning observation $x_o$. If not provided, uses the default `x`
+                set via `.set_default_x()`.
+            max_sampling_batch_size: Maximum batch size for rejection sampling.
+                If not provided, uses the value specified at initialization.
+            num_samples_to_find_max: Number of samples to find the maximum of the
+                potential function. If not provided, uses the value from initialization.
+            num_iter_to_find_max: Number of optimization iterations to find the
+                maximum. If not provided, uses the value from initialization.
+            m: Multiplier for the proposal distribution. If not provided, uses the
+                value from initialization.
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
@@ -157,21 +166,19 @@ class RejectionPosterior(NeuralPosterior):
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True` (no effect otherwise since
                 direct sampling from the proposal is fast).
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`
+                (default).
 
         Returns:
             Samples from posterior.
         """
         num_samples = torch.Size(sample_shape).numel()
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         potential = partial(self.potential_fn, track_gradients=True)
 
-        if sample_with is not None:
-            raise ValueError(
-                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                f"`sample_with` is no longer supported. You have to rerun "
-                f"`.build_posterior(sample_with={sample_with}).`"
-            )
         # Replace arguments that were not passed with their default.
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -194,6 +201,7 @@ class RejectionPosterior(NeuralPosterior):
             samples, _ = rejection_sample(
                 potential,
                 proposal=self.proposal,
+                theta_transform=self.theta_transform,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 warn_acceptance=0.01,
@@ -202,6 +210,7 @@ class RejectionPosterior(NeuralPosterior):
                 num_iter_to_find_max=num_iter_to_find_max,
                 m=m,
                 max_sampling_time=max_sampling_time,
+                return_partial_on_timeout=return_partial_on_timeout,
                 device=self._device,
             )
         else:
@@ -278,8 +287,6 @@ class RejectionPosterior(NeuralPosterior):
                 the posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
                 have a cached value.
-            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
-                {'norm_posterior': True} for SNPE.
 
         Returns:
             The MAP estimate.

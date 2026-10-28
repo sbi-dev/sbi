@@ -87,8 +87,8 @@ def test_reject_outside_prior_support_behavior():
         def __call__(self, theta, x_o=None):
             return torch.zeros(theta.shape[0])
 
-        def set_x(self, x):
-            pass
+        def bind(self, x_o, x_is_iid=True):
+            return self
 
         def to(self, device):
             self.device = device
@@ -121,6 +121,31 @@ def test_reject_outside_prior_support_behavior():
         no_reject = unbounded_posterior.sample((5,), reject_outside_prior=False)
 
     assert torch.all(no_reject == 5.0)
+
+
+def test_accept_reject_sample_partial_return():
+    """Test that return_partial_on_timeout returns collected samples."""
+
+    def accept_rare_fn(x):
+        # Accept only 1% of samples to ensure we don't finish
+        return torch.rand(x.shape[0]) < 0.01
+
+    proposal = DummyProposal()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        samples, acceptance = accept_reject_sample(
+            proposal=proposal,
+            accept_reject_fn=accept_rare_fn,
+            num_samples=10000,  # Request many samples
+            max_sampling_time=0.001,  # Very short timeout
+            return_partial_on_timeout=True,
+        )
+        # Should have some samples (not all 10000)
+        assert samples.shape[0] > 0
+        assert samples.shape[0] < 10000
+        # Should have issued a warning
+        assert len(w) == 1
+        assert "partial results" in str(w[0].message).lower()
 
 
 def test_warn_if_outside_prior_support():

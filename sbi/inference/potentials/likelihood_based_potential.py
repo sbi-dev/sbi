@@ -19,6 +19,7 @@ from sbi.neural_nets.estimators.shape_handling import (
 )
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
+from sbi.utils.user_input_checks import process_x
 
 
 def likelihood_estimator_based_potential(
@@ -81,20 +82,42 @@ class LikelihoodBasedPotential(BasePotential):
         self.likelihood_estimator = likelihood_estimator
         self.likelihood_estimator.eval()
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move likelihood_estimator, prior and x_o to the given device.
-
-        It also set the device attribute to the given device.
+    def to(self, device: Union[str, torch.device]) -> "LikelihoodBasedPotential":
+        """Move likelihood estimator, prior and x_o to the given device.
 
         Args:
             device: Device to move the likelihood_estimator, prior and x_o to.
+
+        Returns:
+            Self for method chaining.
         """
-        self.device = device
+        super().to(device)
         self.likelihood_estimator.to(device)
-        self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
+        return self
+
+    def bind(
+        self, x_o: Optional[Tensor], x_is_iid: bool = True
+    ) -> "LikelihoodBasedPotential":
+        """Create new potential with x bound, without mutable state.
+
+        Args:
+            x_o: Observed data to bind.
+            x_is_iid: Whether x_o is a batch of iid observations.
+
+        Returns:
+            A new LikelihoodBasedPotential with x_o bound.
+        """
+        bound = LikelihoodBasedPotential(
+            likelihood_estimator=self.likelihood_estimator,
+            prior=self.prior,
+            x_o=None,
+            device=self.device,
+        )
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        return bound
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential $\log(p(x_o|\theta)p(\theta))$.

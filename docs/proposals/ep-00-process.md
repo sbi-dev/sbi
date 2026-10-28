@@ -35,7 +35,7 @@ Recommended sections:
 
 ## Authoring and location
 
-- Canonical source: sbi docs site under `mkdocs/docs/proposals/ep-XX-title.md`.
+- Canonical source: sbi docs site under `docs/proposals/ep-XX-title.md`.
 - Numbering: Incremental (EP-00, EP-01, …). Use a short kebab-case slug.
 - Reviews happen via PRs to the repository, like other changes.
 

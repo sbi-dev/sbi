@@ -1,57 +1,59 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
-import warnings
 
 from sbi.neural_nets.factory import (
     classifier_nn,
-    flowmatching_nn,  # To be removed
     likelihood_nn,
     marginal_nn,
     posterior_flow_nn,
     posterior_nn,
     posterior_score_nn,
 )
-
-
-def __getattr__(name):
-    if name in [
-        "CNNEmbedding",
-        "FCEmbedding",
-        "PermutationInvariantEmbedding",
-        "ResNetEmbedding1D",
-        "ResNetEmbedding2D",
-        "CausalCNNEmbedding",
-        "CNNEmbedding",
-        "FCEmbedding",
-        "PermutationInvariantEmbedding",
-    ]:
-        raise ImportError(
-            "As of sbi v0.23.0, you have to import embedding networks from "
-            "`sbi.neural_nets.embedding_nets`. For example, use: "
-            f"`from sbi.neural_nets.embedding_nets import {name}`"
-        )
-    elif name == "classifier_nn":
-        return classifier_nn
-    elif name == "flowmatching_nn":
-        warnings.warn(
-            "`flowmatching_nn` is deprecated and will be removed in the future. "
-            "Please use `posterior_flow_nn` instead.",
-            FutureWarning,
-            stacklevel=2,
-        )
-        return flowmatching_nn  # To be removed
-    elif name == "posterior_flow_nn":
-        return posterior_flow_nn
-    elif name == "likelihood_nn":
-        return likelihood_nn
-    elif name == "posterior_nn":
-        return posterior_nn
-    elif name == "posterior_score_nn":
-        return posterior_score_nn
-    elif name == "marginal_nn":
-        return marginal_nn
-    raise AttributeError(f"Module '{__name__}' has no attribute '{name}'")
-
+from sbi.neural_nets.net_builders.estimator_configs import (
+    ClassifierConfigBase,
+    DensityConfigBase,
+    LinearClassifierConfig,
+    MADEConfig,
+    MAFConfig,
+    MAFRQSConfig,
+    MDNConfig,
+    MLPClassifierConfig,
+    MarginalBPFConfig,
+    MarginalConfigBase,
+    MarginalGFConfig,
+    MarginalMAFConfig,
+    MarginalNAFConfig,
+    MarginalNCSFConfig,
+    MarginalNICEConfig,
+    MarginalNSFConfig,
+    MarginalSOSPFConfig,
+    MarginalUNAFConfig,
+    MixedConfig,
+    NSFConfig,
+    ResNetClassifierConfig,
+    TabPFNConfig,
+    ZukoBPFConfig,
+    ZukoGFConfig,
+    ZukoMAFConfig,
+    ZukoNAFConfig,
+    ZukoNCSFConfig,
+    ZukoNICEConfig,
+    ZukoNSFConfig,
+    ZukoSOSPFConfig,
+    ZukoUNAFConfig,
+)
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    AdaMLPConfig,
+    FlowMatchingConfig,
+    MLPConfig,
+    ScoreConfigBase,
+    SubVPScoreConfig,
+    TransformerConfig,
+    VEScoreConfig,
+    VPScoreConfig,
+    VectorFieldConfigBase,
+    VectorFieldNetConfigBase,
+)
 
 __all__ = [
     "classifier_nn",
@@ -60,5 +62,50 @@ __all__ = [
     "posterior_nn",
     "posterior_score_nn",
     "posterior_flow_nn",
-    "flowmatching_nn",  # To be removed
+    # Vector field estimators (FMPE / NPSE).
+    "VectorFieldConfigBase",
+    "FlowMatchingConfig",
+    "ScoreConfigBase",
+    "VEScoreConfig",
+    "VPScoreConfig",
+    "SubVPScoreConfig",
+    "VectorFieldNetConfigBase",
+    "MLPConfig",
+    "AdaMLPConfig",
+    "TransformerConfig",
+    # Conditional density estimators (NPE / NLE).
+    "DensityConfigBase",
+    "MAFConfig",
+    "MAFRQSConfig",
+    "NSFConfig",
+    "MADEConfig",
+    "MDNConfig",
+    "TabPFNConfig",
+    "ZukoBPFConfig",
+    "ZukoGFConfig",
+    "ZukoMAFConfig",
+    "ZukoNAFConfig",
+    "ZukoNCSFConfig",
+    "ZukoNICEConfig",
+    "ZukoNSFConfig",
+    "ZukoSOSPFConfig",
+    "ZukoUNAFConfig",
+    # Mixed density estimators (MNLE / MNPE).
+    "MixedConfig",
+    # Ratio estimators (NRE).
+    "ClassifierConfigBase",
+    "LinearClassifierConfig",
+    "MLPClassifierConfig",
+    "ResNetClassifierConfig",
+    # Marginal density estimators.
+    "MarginalConfigBase",
+    "MarginalBPFConfig",
+    "MarginalGFConfig",
+    "MarginalMAFConfig",
+    "MarginalNAFConfig",
+    "MarginalNCSFConfig",
+    "MarginalNICEConfig",
+    "MarginalNSFConfig",
+    "MarginalSOSPFConfig",
+    "MarginalUNAFConfig",
 ]

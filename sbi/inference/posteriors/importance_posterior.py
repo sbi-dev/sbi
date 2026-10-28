@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Callable, Literal, Optional, Tuple, Union
+from typing import Callable, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -10,9 +10,9 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
-from sbi.sbi_types import Shape, TorchTransform
+from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
@@ -28,7 +28,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Union[Callable, BasePotential],
-        proposal: Any,
+        proposal: Proposal,
         theta_transform: Optional[TorchTransform] = None,
         method: Literal["sir", "importance"] = "sir",
         oversampling_factor: int = 32,
@@ -87,6 +87,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Args:
             device: Device on which to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
@@ -128,7 +129,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         x = self._x_else_default_x(x)
-        self.potential_fn.set_x(x)
+        self.potential_fn = self.potential_fn.bind(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -190,14 +191,14 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         method: Optional[str] = None,
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
-        sample_with: Optional[str] = None,
         show_progress_bars: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
-        """Return samples from the approximate posterior distribution.
+        """Draw samples from the approximate posterior distribution $p(\theta|x)$.
 
         Args:
             sample_shape: Shape of samples that are drawn from posterior.
-            x: Observed data.
+            x: Conditioning observation $x_o$. If not provided, uses the default `x`
+                set via `.set_default_x()`.
             method: Either of [`sir`|`importance`]. This sets the behavior of the
                 `.sample()` method. With `sir`, approximate posterior samples are
                 generated with sampling importance resampling (SIR). With
@@ -212,14 +213,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         method = self.method if method is None else method
 
-        if sample_with is not None:
-            raise ValueError(
-                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                f"`sample_with` is no longer supported. You have to rerun "
-                f"`.build_posterior(sample_with={sample_with}).`"
-            )
-
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         if method == "sir":
             return self._sir_sample(
@@ -255,8 +249,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior.
-            sample_with: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
@@ -286,13 +278,10 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
-            x: Observed data.
-            sample_with: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
-            oversampling_factor: Number of proposed samples form which only one is
+            oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight.
-            max_sampling_batch_size: The batchsize of samples being drawn from
-                the proposal at every iteration. Used only in `sir_sample()`.
+            max_sampling_batch_size: The batch size of samples being drawn from
+                the proposal at every iteration.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
@@ -372,8 +361,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
                 have a cached value.
-            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
-                {'norm_posterior': True} for SNPE.
 
         Returns:
             The MAP estimate.

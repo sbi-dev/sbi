@@ -3,11 +3,11 @@
 
 from copy import deepcopy
 from math import floor
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
-from pyknos.nflows.nn import nets
+from nflows.nn import nets
 from torch import Tensor, nn, relu
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
@@ -15,8 +15,6 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
-from sbi.samplers import rejection
-from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
@@ -24,7 +22,7 @@ from sbi.utils.sbiutils import (
     standardizing_net,
     z_score_parser,
 )
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import validate_theta_and_x
 
 
@@ -74,7 +72,9 @@ class RestrictionEstimator:
         hidden_features: int = 100,
         num_blocks: int = 2,
         dropout_probability: float = 0.5,
-        z_score: Optional[str] = "independent",
+        z_score: Optional[
+            Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        ] = "independent",
         embedding_net: nn.Module = nn.Identity(),
     ) -> None:
         r"""
@@ -163,10 +163,10 @@ class RestrictionEstimator:
     def build_mlp(self, theta) -> nn.Module:
         classifier = nn.Sequential(
             nn.Linear(theta.shape[1], self._hidden_features),
-            nn.BatchNorm1d(self._hidden_features),
+            nn.LayerNorm(self._hidden_features),
             nn.ReLU(),
             nn.Linear(self._hidden_features, self._hidden_features),
-            nn.BatchNorm1d(self._hidden_features),
+            nn.LayerNorm(self._hidden_features),
             nn.ReLU(),
             nn.Linear(self._hidden_features, 2),
         )
@@ -643,7 +643,7 @@ class RestrictedPrior(Distribution):
         self._accept_reject_fn = accept_reject_fn
         self._posterior = posterior  # Only used for SIR.
         self._sample_with = sample_with
-        self._device = device
+        self._device = process_device(device)
         self.acceptance_rate = None  # Only defined for rejection sampling.
 
     def sample(
@@ -683,12 +683,19 @@ class RestrictedPrior(Distribution):
         Returns:
             Samples from the `RestrictedPrior`.
         """
+        # The samplers import `sbi.utils`, so importing them at module level would
+        # make every `sbi.utils` import inside `sbi.samplers` a circular import.
+        from sbi.samplers import rejection
+        from sbi.samplers.importance.sir import sampling_importance_resampling
+
         num_samples = torch.Size(sample_shape).numel()
         sample_with = self._sample_with if sample_with is None else sample_with
 
         if sample_with == "rejection":
             samples, acceptance_rate = rejection.accept_reject_sample(
-                proposal=self._prior.sample,
+                proposal=lambda sample_shape, **kwargs: self._prior.sample(
+                    sample_shape
+                ),
                 accept_reject_fn=self._accept_reject_fn,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,

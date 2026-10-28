@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.utils.kde import KDEWrapper, get_kde
+from sbi.utils.torchutils import assert_all_finite
 from sbi.utils.user_input_checks import process_x
 
 
@@ -128,6 +129,11 @@ class MCABC(ABCBASE):
                 can .sample() and .log_prob().
             summary (if summary True): dictionary containing the accepted paramters (if
                 kde True), distances and simulated data x.
+
+        Examples:
+            >>> from sbi.inference import MCABC
+            >>> inference = MCABC(simulator, prior)
+            >>> samples = inference(x_o, num_simulations=1000, quantile=0.1)
         """
 
         # Exactly one of eps or quantile need to be passed.
@@ -178,6 +184,7 @@ class MCABC(ABCBASE):
             self.x_shape = x[0, 0].shape
 
         self.x_o = process_x(x_o, self.x_shape)
+        assert_all_finite(self.x_o, "Observed data x_o")
         distances = self.distance(self.x_o, x)
 
         # Select based on acceptance threshold epsilon.

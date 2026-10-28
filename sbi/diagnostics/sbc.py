@@ -33,7 +33,6 @@ def run_sbc(
     num_workers: int = 1,
     show_progress_bar: bool = True,
     use_batched_sampling: bool = True,
-    **kwargs,
 ) -> Tuple[Tensor, Tensor]:
     """Run simulation-based calibration (SBC) or expected coverage.
 
@@ -69,15 +68,6 @@ def run_sbc(
 
     # Validate input parameters.
     _validate_sbc_inputs(thetas, xs, num_sbc_samples, num_posterior_samples)
-
-    # Handle deprecated parameter.
-    if "sbc_batch_size" in kwargs:
-        warnings.warn(
-            "`sbc_batch_size` is deprecated and will be removed in future versions."
-            " Use `num_workers` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     # Get posterior samples, batched or parallelized.
     posterior_samples = get_posterior_samples_on_batch(
@@ -240,7 +230,11 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
     If calculated for many thetas (>100), NLTP can be used as a comparable measure
     of posterior accuracy when comparing inference methods or settings.
 
-    Note: This is interpretable only for normalized log probs, i.e., when using (S)NPE.
+    Note: This is interpretable only for normalized log probs, i.e., for NPE, FMPE
+    and NPSE.
+    With a bounded prior, `log_prob()` estimates a leakage correction for each `x`.
+    For vector field posteriors (FMPE, NPSE), this needs ODE sampling for each `x`
+    and can be slow.
 
     Args:
         thetas: Parameters (sampled from the prior) for which to calculate NLTP values.

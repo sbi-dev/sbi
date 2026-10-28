@@ -4,19 +4,21 @@
 import logging
 import time
 import warnings
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
+from sbi.sbi_types import AcceptRejectFn, Proposal, SampleProposal
+from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
 from sbi.utils.sbiutils import gradient_ascent
 
 
 def rejection_sample(
     potential_fn: Callable,
-    proposal: Any,
+    proposal: Proposal,
     theta_transform: Optional[torch_tf.Transform] = None,
     num_samples: int = 1,
     show_progress_bars: bool = False,
@@ -26,6 +28,7 @@ def rejection_sample(
     num_iter_to_find_max: int = 100,
     m: float = 1.2,
     max_sampling_time: Optional[float] = None,
+    return_partial_on_timeout: bool = False,
     device: str = "cpu",
 ) -> Tuple[Tensor, Tensor]:
     r"""Return samples from a `potential_fn` obtained via rejection sampling.
@@ -57,11 +60,14 @@ def rejection_sample(
             value will ensure that the samples are indeed from the correct
             distribution, but will increase the fraction of rejected samples and thus
             computation time.
-        device: Device on which to sample.
         max_sampling_time: Optional maximum allowed sampling time (in seconds).
             If this time is exceeded, rejection sampling is aborted and a RuntimeError
-            is raised. This prevents jobs from stalling indefinitely when the
-            acceptance rate is extremely low.
+            is raised (unless `return_partial_on_timeout=True`). This prevents jobs
+            from stalling indefinitely when the acceptance rate is extremely low.
+        return_partial_on_timeout: If True and `max_sampling_time` is exceeded, return
+            the samples collected so far instead of raising a RuntimeError. A warning
+            will be issued indicating the partial return. Default is False.
+        device: Device on which to sample.
 
     Returns:
         Accepted samples and acceptance rate as scalar Tensor.
@@ -71,7 +77,8 @@ def rejection_sample(
             torch_tf.identity_transform, reinterpreted_batch_ndims=1
         )
 
-    samples_to_find_max = proposal.sample((num_samples_to_find_max,))
+    with nested_pbar_context():
+        samples_to_find_max = proposal.sample((num_samples_to_find_max,))
 
     # Define a potential as the ratio between target distribution and proposal.
     def potential_over_proposal(theta):
@@ -99,7 +106,7 @@ def rejection_sample(
         Proposal for rejection sampling which is strictly larger than the potential_fn.
         """
 
-        def __init__(self, proposal: Any, max_log_ratio: Tensor, log_m: Tensor):
+        def __init__(self, proposal: Proposal, max_log_ratio: Tensor, log_m: Tensor):
             self.proposal = proposal
             self.max_log_ratio = max_log_ratio
             self.log_m = log_m
@@ -126,9 +133,9 @@ def rejection_sample(
         # Progress bar can be skipped, e.g. when sampling after each round just for
         # logging.
         pbar = tqdm(
-            disable=not show_progress_bars,
+            disable=not show_progress_bars or is_nested(),
             total=num_samples,
-            desc=f"Drawing {num_samples} posterior samples",
+            desc=sampling_desc(num_samples, "rejection"),
         )
 
         num_sampled_total, num_remaining = 0, num_samples
@@ -143,6 +150,16 @@ def rejection_sample(
                 max_sampling_time is not None
                 and (time.time() - start_time) > max_sampling_time
             ):
+                num_collected = sum(s.shape[0] for s in accepted)
+                if return_partial_on_timeout and num_collected > 0:
+                    pbar.close()
+                    warnings.warn(
+                        f"Timeout exceeded after collecting {num_collected}/"
+                        f"{num_samples} samples. Returning partial results.",
+                        stacklevel=2,
+                    )
+                    samples = torch.cat(accepted)
+                    return samples, as_tensor(acceptance_rate)
                 raise RuntimeError(
                     "Sampling aborted early because rejection sampling exceeded "
                     "max_sampling_time. This is likely due to extremely low "
@@ -153,9 +170,10 @@ def rejection_sample(
                 )
 
             # Sample and reject.
-            candidates = proposal.sample(sampling_batch_size).reshape(
-                sampling_batch_size, -1
-            )
+            with nested_pbar_context():
+                candidates = proposal.sample(sampling_batch_size).reshape(
+                    sampling_batch_size, -1
+                )
 
             target_proposal_ratio = torch.exp(
                 potential_fn(candidates) - proposal.log_prob(candidates)
@@ -167,8 +185,8 @@ def rejection_sample(
 
             # Update.
             num_sampled_total += sampling_batch_size
+            pbar.update(min(samples.shape[0], num_remaining))
             num_remaining -= samples.shape[0]
-            pbar.update(samples.shape[0])
 
             # To avoid endless sampling when leakage is high, we raise a warning if the
             # acceptance rate is too low after the first 1_000 samples.
@@ -214,8 +232,8 @@ def rejection_sample(
 
 @torch.no_grad()
 def accept_reject_sample(
-    proposal: Callable,
-    accept_reject_fn: Callable,
+    proposal: SampleProposal,
+    accept_reject_fn: AcceptRejectFn,
     num_samples: int,
     num_xos: int = 1,
     show_progress_bars: bool = False,
@@ -225,6 +243,7 @@ def accept_reject_sample(
     proposal_sampling_kwargs: Optional[Dict] = None,
     alternative_method: Optional[str] = None,
     max_sampling_time: Optional[float] = None,
+    return_partial_on_timeout: bool = False,
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:
     r"""Returns samples from a proposal according to a acception criterion.
@@ -242,12 +261,12 @@ def accept_reject_sample(
            density during evaluation of the posterior.
 
     Args:
-        proposal: A callable that takes `sample_shape` as arguments (and kwargs as
-            needed). Returns samples from the proposal distribution with shape
-            (*sample_shape, event_dim).
-        accept_reject_fn: Function that evaluates which samples are accepted or
-            rejected. Must take a batch of parameters and return a boolean tensor which
-            indicates which parameters get accepted.
+        proposal: A callable following the `SampleProposal` protocol, i.e., takes
+            `sample_shape` as first argument (and kwargs as needed). Returns samples
+            from the proposal distribution with shape (*sample_shape, event_dim).
+        accept_reject_fn: A callable following the `AcceptRejectFn` protocol that
+            evaluates which samples are accepted or rejected. Takes a batch of
+            parameters and returns a boolean tensor indicating which are accepted.
         num_samples: Desired number of samples.
         num_xos: Number of conditions for batched_sampling (currently only accepting
             one batch dimension for the condition).
@@ -264,12 +283,16 @@ def accept_reject_sample(
         alternative_method: An alternative method for sampling from the restricted
             proposal. E.g., for SNPE, we suggest to sample with MCMC if the rejection
             rate is too high. Used only for printing during a potential warning.
+        max_sampling_time: Optional maximum allowed sampling time (in seconds).
+            If exceeded, the sampling loop is interrupted and a RuntimeError is raised
+            unless `return_partial_on_timeout=True`. This prevents infinite or
+            excessively slow rejection sampling runs, e.g. in cases of heavy leakage
+            or extremely low acceptance rates.
+        return_partial_on_timeout: If True and `max_sampling_time` is exceeded, return
+            the samples collected so far instead of raising a RuntimeError. A warning
+            will be issued indicating the partial return. Default is False.
         kwargs: Absorb additional unused arguments that can be passed to
             `rejection_sample()`. Warn if not empty.
-        max_sampling_time: Optional maximum allowed sampling time (in seconds).
-            If exceeded, the sampling loop is interrupted and a RuntimeError is raised.
-            This prevents infinite or excessively slow rejection sampling runs, e.g.
-            in cases of heavy leakage or extremely low acceptance rates.
 
     Returns:
         Accepted samples of shape `(sample_dim, batch_dim, *event_shape)`, and
@@ -296,11 +319,9 @@ def accept_reject_sample(
         num_xos = proposal_sampling_kwargs["condition"].shape[0]
 
     pbar = tqdm(
-        disable=not show_progress_bars,
+        disable=not show_progress_bars or is_nested(),
         total=num_samples,
-        desc=f"Drawing {num_samples} samples for {num_xos} observation" + "s"
-        if num_xos > 1
-        else "",
+        desc=sampling_desc(num_samples, "rejection", num_xos=num_xos),
     )
 
     accepted = [[] for _ in range(num_xos)]
@@ -318,6 +339,24 @@ def accept_reject_sample(
             max_sampling_time is not None
             and (time.time() - start_time) > max_sampling_time
         ):
+            # Check if we have any samples collected
+            num_collected = min(
+                sum(s.shape[0] for s in accepted[i]) for i in range(num_xos)
+            )
+            if return_partial_on_timeout and num_collected > 0:
+                pbar.close()
+                warnings.warn(
+                    f"Timeout exceeded after collecting {num_collected}/{num_samples}"
+                    f" samples. Returning partial results.",
+                    stacklevel=2,
+                )
+                # Return partial samples with proper shape
+                samples = [
+                    torch.cat(accepted[i], dim=0)[:num_collected]
+                    for i in range(num_xos)
+                ]
+                samples = torch.stack(samples, dim=1)
+                return samples, as_tensor(acceptance_rate, device=samples.device)
             raise RuntimeError(
                 "Sampling aborted early because rejection sampling exceeded "
                 "max_sampling_time. This is likely due to extremely low "
@@ -328,10 +367,11 @@ def accept_reject_sample(
             )
 
         # Sample and reject.
-        candidates = proposal(
-            (sampling_batch_size,),  # type: ignore
-            **proposal_sampling_kwargs,
-        )
+        with nested_pbar_context():
+            candidates = proposal(
+                torch.Size((sampling_batch_size,)),
+                **proposal_sampling_kwargs,
+            )
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
 
@@ -353,8 +393,8 @@ def accept_reject_sample(
         num_sampled_total += num_accepted.to(num_sampled_total.device)
         num_samples_possible += sampling_batch_size
         min_num_accepted = num_accepted.min().item()
+        pbar.update(min(min_num_accepted, num_remaining))
         num_remaining -= min_num_accepted
-        pbar.update(min_num_accepted)
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.

@@ -20,7 +20,11 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import (
+    ensure_theta_batched,
+    process_device,
+    split_leading_dim,
+)
 from sbi.utils.user_input_checks import check_prior
 
 
@@ -40,6 +44,9 @@ class DirectPosterior(NeuralPosterior):
 
     This class can not be used in combination with NLE or NRE.
     """
+
+    # Suggested in the warning when rejection sampling accepts few samples.
+    _alternative_sampling_method = "build_posterior(..., sample_with='mcmc')"
 
     def __init__(
         self,
@@ -88,7 +95,6 @@ class DirectPosterior(NeuralPosterior):
         self.posterior_estimator = posterior_estimator
 
         self.max_sampling_batch_size = max_sampling_batch_size
-        self._leakage_density_correction_factor = None
 
         self._purpose = """It samples the posterior network and rejects samples that
             lie outside of the prior bounds."""
@@ -102,6 +108,7 @@ class DirectPosterior(NeuralPosterior):
         Args:
             device: device where to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         if hasattr(self.prior, "to"):
             self.prior.to(device)  # type: ignore
@@ -137,19 +144,20 @@ class DirectPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         max_sampling_batch_size: int = 10_000,
-        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
-        r"""Return samples from posterior distribution $p(\theta|x)$.
+        r"""Draw samples from the approximate posterior distribution $p(\theta|x)$.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
-            sample_with: This argument only exists to keep backward-compatibility with
-                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
+            x: Conditioning observation $x_o$. If not provided, uses the default `x`
+                set via `.set_default_x()`.
+            max_sampling_batch_size: Maximum batch size for rejection sampling.
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
@@ -159,6 +167,10 @@ class DirectPosterior(NeuralPosterior):
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True` (no effect otherwise since
                 direct sampling is fast).
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`
+                (default).
         """
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
@@ -180,34 +192,39 @@ class DirectPosterior(NeuralPosterior):
             else max_sampling_batch_size
         )
 
-        if sample_with is not None:
-            raise ValueError(
-                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                f"`sample_with` is no longer supported. You have to rerun "
-                f"`.build_posterior(sample_with={sample_with}).`"
-            )
-
         if reject_outside_prior:
             # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
-                proposal=self.posterior_estimator.sample,
+                proposal=self._sample_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
-                alternative_method="build_posterior(..., sample_with='mcmc')",
+                alternative_method=self._alternative_sampling_method,
                 max_sampling_time=max_sampling_time,
+                return_partial_on_timeout=return_partial_on_timeout,
             )[0]
         else:
             # Bypass rejection sampling entirely.
-            samples = self.posterior_estimator.sample(
+            samples = self._sample_estimator(
                 torch.Size([num_samples]),
                 condition=x,
             )
             warn_if_outside_prior_support(self.prior, samples[:, 0])
 
-        return samples[:, 0]  # Remove batch dimension.
+        # Remove batch dimension.
+        return self._reshape_to_sample_shape(samples[:, 0], sample_shape)
+
+    @staticmethod
+    def _reshape_to_sample_shape(samples: Tensor, sample_shape: Shape) -> Tensor:
+        """Reshape the leading sample dimension of `samples` into `sample_shape`.
+
+        A partial result on timeout holds fewer samples and stays flat.
+        """
+        if samples.shape[0] != torch.Size(sample_shape).numel():
+            return samples
+        return split_leading_dim(samples, sample_shape)
 
     def sample_batched(
         self,
@@ -217,10 +234,12 @@ class DirectPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
-        r"""Given a batch of observations [x_1, ..., x_B] this function samples from
-        posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
-        manner.
+        r"""Draw samples from the posteriors for a batch of different xs.
+
+        Given a batch of observations `[x_1, ..., x_B]`, this method samples from
+        posteriors $p(\theta|x_1), \ldots, p(\theta|x_B)$ in a vectorized manner.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from the posterior
@@ -236,13 +255,17 @@ class DirectPosterior(NeuralPosterior):
             max_sampling_time: Optional maximum allowed sampling time in seconds.
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True`.
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`.
 
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
+        self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
         condition_shape = self.posterior_estimator.condition_shape
-        x = reshape_to_batch_event(x, event_shape=condition_shape)
+        x = reshape_to_batch_event(x.to(self._device), event_shape=condition_shape)
         num_xos = x.shape[0]
 
         # throw warning if num_x * num_samples is too large
@@ -274,24 +297,25 @@ class DirectPosterior(NeuralPosterior):
         if reject_outside_prior:
             # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
-                proposal=self.posterior_estimator.sample,
+                proposal=self._sample_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
-                alternative_method="build_posterior(..., sample_with='mcmc')",
+                alternative_method=self._alternative_sampling_method,
                 max_sampling_time=max_sampling_time,
+                return_partial_on_timeout=return_partial_on_timeout,
             )[0]
         else:
             # Bypass rejection sampling entirely.
-            samples = self.posterior_estimator.sample(
+            samples = self._sample_estimator(
                 torch.Size([num_samples]),
                 condition=x,
             )
             warn_if_outside_prior_support(self.prior, samples)
 
-        return samples
+        return self._reshape_to_sample_shape(samples, sample_shape)
 
     def log_prob(
         self,
@@ -347,8 +371,8 @@ class DirectPosterior(NeuralPosterior):
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self.posterior_estimator.log_prob(
-                theta_density_estimator, condition=x_density_estimator
+            unnorm_log_prob = self._log_prob_estimator(
+                theta_density_estimator, x_density_estimator
             )
             # `log_prob` supports only a single observation (i.e. `batchsize==1`).
             # We now remove this additional dimension.
@@ -412,10 +436,15 @@ class DirectPosterior(NeuralPosterior):
             in the support of the prior, -∞ (corresponding to 0 probability) outside.
         """
 
+        self._assert_finite_x(x)
         theta = ensure_theta_batched(torch.as_tensor(theta))
+        x = x.to(self._device)
         event_shape = self.posterior_estimator.input_shape
+        # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
+        # overwise, the leading is sample.
+        num_leading = len(theta.shape) - len(event_shape)
         theta_density_estimator = reshape_to_sample_batch_event(
-            theta, event_shape, leading_is_sample=True
+            theta, event_shape, leading_is_sample=(num_leading > 1)
         )
         x_density_estimator = reshape_to_batch_event(
             x, event_shape=self.posterior_estimator.condition_shape
@@ -425,8 +454,8 @@ class DirectPosterior(NeuralPosterior):
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self.posterior_estimator.log_prob(
-                theta_density_estimator, condition=x_density_estimator
+            unnorm_log_prob = self._log_prob_estimator(
+                theta_density_estimator, x_density_estimator
             )
 
             # Force probability to be zero outside prior support.
@@ -460,15 +489,13 @@ class DirectPosterior(NeuralPosterior):
         r"""Return leakage correction factor for a leaky posterior density estimate.
 
         The factor is estimated from the acceptance probability during rejection
-        sampling from the posterior.
-
-        This is to avoid re-estimating the acceptance probability from scratch
-        whenever `log_prob` is called and `norm_posterior=True`. Here, it
-        is estimated only once for `self.default_x` and saved for later. We
-        re-evaluate only whenever a new `x` is passed.
+        sampling from the posterior. It is saved for the last `x` and re-estimated
+        whenever `x` changes. It is 1 for unbounded priors.
 
         Arguments:
+            x: Observation at which to estimate the factor.
             num_rejection_samples: Number of samples used to estimate correction factor.
+            force_update: Whether to re-estimate the factor even if it is saved.
             show_progress_bars: Whether to show a progress bar during sampling.
             rejection_sampling_batch_size: Batch size for rejection sampling.
 
@@ -476,10 +503,9 @@ class DirectPosterior(NeuralPosterior):
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
 
-        def acceptance_at(x: Tensor) -> Tensor:
-            # [1:] to remove batch-dimension for `reshape_to_batch_event`.
+        def acceptance() -> Tensor:
             return rejection.accept_reject_sample(
-                proposal=self.posterior_estimator.sample,
+                proposal=self._sample_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_rejection_samples,
                 show_progress_bars=show_progress_bars,
@@ -492,20 +518,13 @@ class DirectPosterior(NeuralPosterior):
                 },
             )[1]
 
-        # Check if the provided x matches the default x (short-circuit on identity).
-        is_new_x = self.default_x is None or (
-            x is not self.default_x and (x != self.default_x).any()
-        )
+        return self._cached_leakage_factor(x, self.prior, acceptance, force_update)
 
-        not_saved_at_default_x = self._leakage_density_correction_factor is None
+    def _sample_estimator(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
+        return self.posterior_estimator.sample(sample_shape, **kwargs)
 
-        if is_new_x:  # Calculate at x; don't save.
-            return acceptance_at(x)
-        elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
-            assert self.default_x is not None
-            self._leakage_density_correction_factor = acceptance_at(self.default_x)
-
-        return self._leakage_density_correction_factor  # type: ignore
+    def _log_prob_estimator(self, theta: Tensor, condition: Tensor) -> Tensor:
+        return self.posterior_estimator.log_prob(theta, condition=condition)
 
     def map(
         self,
@@ -556,8 +575,6 @@ class DirectPosterior(NeuralPosterior):
                 posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
                 have a cached value.
-            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
-                {'norm_posterior': True} for SNPE.
 
         Returns:
             The MAP estimate.

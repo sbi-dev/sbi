@@ -30,7 +30,7 @@ from sbi.utils.sbiutils import (
     warn_if_outside_prior_support,
     within_support,
 )
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, process_device
 
 
 class VectorFieldPosterior(NeuralPosterior):
@@ -115,6 +115,7 @@ class VectorFieldPosterior(NeuralPosterior):
         Args:
             device: device where to move the posterior to.
         """
+        device = process_device(device)
         self.device = device
         if hasattr(self.prior, "to"):
             self.prior.to(device)  # type: ignore
@@ -159,11 +160,14 @@ class VectorFieldPosterior(NeuralPosterior):
             Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"]
         ] = None,
         iid_params: Optional[Dict] = None,
+        guidance_method: Optional[str] = None,
+        guidance_params: Optional[Dict] = None,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
@@ -196,10 +200,23 @@ class VectorFieldPosterior(NeuralPosterior):
                 SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
+            guidance_method: Method to guide the diffusion process. If None, no guidance
+                is used. Currently we support `affine_classifier_free`, which allows to
+                scale and shift the "likelihood" or "prior" score contribution. This can
+                be used to perform "super" conditioning i.e. shrink the variance of the
+                likelihood. `Universal` can be used to guide the diffusion process with
+                a general guidance function. `Interval` is an instance of that where
+                the guidance function constraints the diffusion process to a given
+                interval.
+            guidance_params: Additional parameters passed to the guidance method. See
+                the specific `ScoreAdaptation` child class for details, specifically
+                `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
             max_sampling_batch_size: Maximum batch size for sampling.
-            sample_with: Sampling method to use - 'ode' or 'sde'. Note that in order to
-                use the 'sde' sampling method, the vector field estimator must support
-                it and have the SCORE_DEFINED class attribute set to True.
+            sample_with: Deprecated, set it at construction instead; will be removed
+                in v0.28.0. Sampling method to use - 'ode' or 'sde'. Note that in
+                order to use the 'sde' sampling method, the vector field estimator
+                must support it and have the SCORE_DEFINED class attribute set to
+                True.
             show_progress_bars: Whether to show a progress bar during sampling.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
@@ -209,19 +226,43 @@ class VectorFieldPosterior(NeuralPosterior):
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True` (no effect otherwise since
                 direct sampling does not use rejection).
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`
+                (default).
         """
 
         if sample_with is None:
             sample_with = self.sample_with
+        else:
+            warnings.warn(
+                "Passing `sample_with` to `VectorFieldPosterior.sample()` is "
+                "deprecated since sbi v0.27.0 and will be removed in v0.28.0. Set "
+                "it at construction, e.g. "
+                "`build_posterior(..., sample_with=...)`, instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
-        self.potential_fn.set_x(
+        # IID and guidance require transforming the prior to standardized space.
+        if self.vector_field_estimator.compose_enabled and (
+            is_iid or guidance_method is not None
+        ):
+            raise NotImplementedError(
+                "compose_standardization does not yet support iid (x with batch>1) or "
+                "guided sampling. Use a single observation, or disable "
+                "compose_standardization."
+            )
+        self.potential_fn = self.potential_fn.bind(
             x,
             x_is_iid=is_iid,
             iid_method=iid_method or self.potential_fn.iid_method,
             iid_params=iid_params,
+            guidance_method=guidance_method,
+            guidance_params=guidance_params,
         )
 
         num_samples = torch.Size(sample_shape).numel()
@@ -235,6 +276,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     show_progress_bars=show_progress_bars,
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -259,6 +301,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -291,6 +334,7 @@ class VectorFieldPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
         save_intermediate: bool = False,
+        **kwargs,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
@@ -306,8 +350,8 @@ class VectorFieldPosterior(NeuralPosterior):
             corrector: The corrector for the diffusion-based sampler. Either of
                 [None].
             steps: Number of steps to take for the Euler-Maruyama method.
-            ts: Time points at which to evaluate the diffusion process. If None, a
-                linear grid between t_max and t_min is used.
+            ts: Time points at which to evaluate the diffusion process. If None,
+                uses the solve_schedule() specific to the estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
@@ -333,11 +377,8 @@ class VectorFieldPosterior(NeuralPosterior):
         # Ensure we don't use larger batches than total samples needed
         effective_batch_size = min(effective_batch_size, total_samples_needed)
 
-        # TODO: the time schedule should be provided by the estimator, see issue #1437
         if ts is None:
-            t_max = self.vector_field_estimator.t_max
-            t_min = self.vector_field_estimator.t_min
-            ts = torch.linspace(t_max, t_min, steps)
+            ts = self.vector_field_estimator.solve_schedule(steps)
         ts = ts.to(self.device)
 
         # Initialize the diffusion sampler
@@ -381,6 +422,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 "This may indicate numerical instability in the vector field."
             )
 
+        if self.vector_field_estimator.compose_enabled:
+            samples = self.vector_field_estimator.from_z(samples)
+
         return samples
 
     def sample_via_ode(
@@ -409,6 +453,9 @@ class VectorFieldPosterior(NeuralPosterior):
             torch.Size((num_samples,))
         )
 
+        if self.vector_field_estimator.compose_enabled:
+            samples = self.vector_field_estimator.from_z(samples)
+
         return samples
 
     def log_prob(
@@ -417,10 +464,16 @@ class VectorFieldPosterior(NeuralPosterior):
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
         ode_kwargs: Optional[Dict] = None,
+        norm_posterior: bool = True,
+        leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
         r"""Returns the log-probability of the posterior $p(\theta|x)$.
 
         This requires building and evaluating the probability flow ODE.
+
+        For iid `x` (batch size > 1), the log-probability is only defined up to a
+        constant: it combines the single-observation posteriors as
+        $p(\theta)^{1-n} \prod_i p(\theta|x_i)$ and drops the evidence ratio.
 
         Args:
             theta: Parameters $\theta$.
@@ -429,6 +482,11 @@ class VectorFieldPosterior(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
             ode_kwargs: Additional keyword arguments for the ODE solver.
+            norm_posterior: Whether to divide by the probability mass of the ODE
+                density inside the prior support, estimated with ODE samples. Has
+                no effect for unbounded priors or iid `x`.
+            leakage_correction_params: A `dict` of keyword arguments to override the
+                default values of `leakage_correction()`.
 
         Returns:
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
@@ -437,12 +495,79 @@ class VectorFieldPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
-        self.potential_fn.set_x(x, x_is_iid=is_iid, **(ode_kwargs or {}))
+        if self.vector_field_estimator.compose_enabled and is_iid:
+            raise NotImplementedError(
+                "compose_standardization does not yet support iid (x with batch>1) "
+                "log_prob. Use a single observation, or disable "
+                "compose_standardization."
+            )
+        self.potential_fn = self.potential_fn.bind(
+            x, x_is_iid=is_iid, **(ode_kwargs or {})
+        )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        return self.potential_fn(
+        log_prob = self.potential_fn(
             theta.to(self._device),
             track_gradients=track_gradients,
+        )
+        if is_iid:
+            warnings.warn("The log-probability is unnormalized!", stacklevel=2)
+        elif norm_posterior:
+            log_prob = log_prob - torch.log(
+                self.leakage_correction(
+                    x=x, ode_kwargs=ode_kwargs, **(leakage_correction_params or {})
+                )
+            )
+        return log_prob
+
+    def leakage_correction(
+        self,
+        x: Tensor,
+        num_rejection_samples: int = 10_000,
+        force_update: bool = False,
+        ode_kwargs: Optional[Dict] = None,
+    ) -> Tensor:
+        r"""Return the probability mass of the ODE density inside the prior support.
+
+        The mass is the fraction of probability flow ODE samples inside the prior
+        support. It is 1 for unbounded priors. The factor is saved for the last `x`
+        and re-estimated whenever `x` changes, or for any call with `ode_kwargs`.
+
+        Args:
+            x: A single observation.
+            num_rejection_samples: Number of ODE samples used to estimate the factor.
+            force_update: Whether to re-estimate the factor even if it is saved.
+            ode_kwargs: Additional keyword arguments for the ODE solver. Must match
+                the ones used for the density that is corrected.
+
+        Returns:
+            Saved or newly-estimated correction factor (as a scalar `Tensor`).
+        """
+
+        def acceptance() -> Tensor:
+            self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
+            batch_size = self.max_sampling_batch_size
+            num_inside = sum(
+                within_support(
+                    self.prior,
+                    self.sample_via_ode(
+                        (min(batch_size, num_rejection_samples - start),),
+                        **(ode_kwargs or {}),
+                    ),
+                ).sum()
+                for start in range(0, num_rejection_samples, batch_size)
+            )
+            mass = torch.as_tensor(num_inside / num_rejection_samples)
+            if mass == 0:
+                raise RuntimeError(
+                    f"None of {num_rejection_samples} ODE samples lie inside the prior "
+                    "support, so `log_prob()` cannot be normalized. Use "
+                    "`norm_posterior=False` to get the unnormalized log-probability."
+                )
+            return mass
+
+        return self._cached_leakage_factor(
+            x, self.prior, acceptance, force_update, use_cache=not ode_kwargs
         )
 
     def sample_batched(
@@ -459,6 +584,7 @@ class VectorFieldPosterior(NeuralPosterior):
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
+        return_partial_on_timeout: bool = False,
     ) -> Tensor:
         r"""Given a batch of observations [x_1, ..., x_B] this function samples from
         posteriors $p(\theta|x_1)$, ... ,$p(\theta|x_B)$, in a batched (i.e. vectorized)
@@ -488,16 +614,26 @@ class VectorFieldPosterior(NeuralPosterior):
             max_sampling_time: Optional maximum allowed sampling time in seconds.
                 If exceeded, sampling is aborted and a RuntimeError is raised. Only
                 applies when `reject_outside_prior=True`.
+            return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
+                return the samples collected so far instead of raising a RuntimeError.
+                A warning will be issued. Only applies when `reject_outside_prior=True`.
 
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
+        self._assert_finite_x(x)
+        if self.vector_field_estimator.compose_enabled:
+            raise NotImplementedError(
+                "compose_standardization does not yet support sample_batched "
+                "(batched / multi-observation sampling). Use a single observation "
+                "via sample(), or disable compose_standardization."
+            )
         num_samples = torch.Size(sample_shape).numel()
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()
-        self.potential_fn.set_x(x)
+        self.potential_fn = self.potential_fn.bind(x)
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -525,6 +661,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     show_progress_bars=show_progress_bars,
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling.
@@ -553,6 +690,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
+                    return_partial_on_timeout=return_partial_on_timeout,
                 )
             else:
                 # Bypass rejection sampling.
@@ -612,7 +750,7 @@ class VectorFieldPosterior(NeuralPosterior):
             save_best_every: The best log-probability is computed, saved in the
                 `map`-attribute, and printed every `save_best_every`-th iteration.
                 Computing the best log-probability creates a significant overhead
-                (thus, the default is `10`.)
+                for score-based estimators (thus, the default is `1000`.)
             show_progress_bars: Whether to show a progressbar during sampling from
                 the posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
@@ -621,6 +759,13 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             The MAP estimate.
         """
+        if self.vector_field_estimator.compose_enabled:
+            raise NotImplementedError(
+                "MAP is not yet supported with compose_standardization. "
+                "The potential gradient is computed in standardized z-space, so "
+                "gradient ascent in theta-space would be incorrect."
+            )
+
         if x is not None:
             raise ValueError(
                 "Passing `x` directly to `.map()` has been deprecated."
@@ -635,7 +780,9 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if self._map is None or force_update:
             # rebuild coarse flow fast for MAP optimization.
-            self.potential_fn.set_x(self.default_x, atol=1e-2, rtol=1e-3, exact=True)
+            self.potential_fn = self.potential_fn.bind(
+                self.default_x, atol=1e-2, rtol=1e-3, exact=True
+            )
             callable_potential_fn = CallableDifferentiablePotentialFunction(
                 self.potential_fn
             )

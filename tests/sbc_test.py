@@ -160,7 +160,7 @@ def test_consistent_sbc_results(
     simulator = gaussian_setup["simulator"]
 
     # Test parameters
-    num_simulations = 4000
+    num_simulations = 4500
     num_posterior_samples = 1000
     num_sbc_runs = 100
 
@@ -270,7 +270,7 @@ def test_sbc_checks():
 
 
 @pytest.mark.parametrize("num_bins", (None, 30))
-@pytest.mark.parametrize("plot_type", ("cdf", "hist"))
+@pytest.mark.parametrize("plot_type", ("cdf", "hist", "cdf-diff"))
 @pytest.mark.parametrize("legend_kwargs", (None, {"loc": "upper left"}))
 @pytest.mark.parametrize("num_rank_sets", (1, 2))
 def test_sbc_plotting(

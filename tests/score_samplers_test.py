@@ -16,6 +16,30 @@ from sbi.inference.potentials.vector_field_potential import (
 from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.utils import BoxUniform, MultipleIndependent
+from sbi.utils.vector_field_utils import VectorFieldNet
+
+
+def build_random_priors(num_dim: int):
+    # Diag normal prior
+    prior1 = Independent(Normal(torch.zeros(num_dim), torch.ones(num_dim)), 1)
+    # Uniform prior
+    prior2 = Independent(Uniform(torch.zeros(num_dim), torch.ones(num_dim)), 1)
+    prior2_2 = BoxUniform(torch.zeros(num_dim), torch.ones(num_dim))
+    # Multivariate normal prior
+    prior3 = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    # Gamma prior - analytical not implemented but should fall back to general case
+    prior4 = Independent(Gamma(torch.ones(num_dim), torch.ones(num_dim)), 1)
+    # Multiple independent prior
+    if num_dim == 1:
+        prior5 = Independent(Normal(torch.zeros(1), torch.ones(1)), 1)
+    else:
+        prior5 = MultipleIndependent([
+            Normal(torch.zeros(1), torch.ones(1)) for _ in range(num_dim)
+        ])
+
+    priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]
+
+    return priors
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
@@ -41,32 +65,107 @@ def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
     mean0 = torch.zeros(num_dim)
     std0 = torch.ones(num_dim)
     score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
-    # Diag normal prior
-    prior1 = Independent(Normal(torch.zeros(num_dim), torch.ones(num_dim)), 1)
-    # Uniform prior
-    prior2 = Independent(Uniform(torch.zeros(num_dim), torch.ones(num_dim)), 1)
-    prior2_2 = BoxUniform(torch.zeros(num_dim), torch.ones(num_dim))
-    # Multivariate normal prior
-    prior3 = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
-    # Gamma prior - analytical not implemented but should fall back to general case
-    prior4 = Independent(Gamma(torch.ones(num_dim), torch.ones(num_dim)), 1)
-    # Multiple independent prior
-    if num_dim == 1:
-        prior5 = Independent(Normal(torch.zeros(1), torch.ones(1)), 1)
-    else:
-        prior5 = MultipleIndependent([
-            Normal(torch.zeros(1), torch.ones(1)) for _ in range(num_dim)
-        ])
 
-    priors = [prior1, prior2, prior2_2, prior3, prior4, prior5]
+    priors = build_random_priors(num_dim)
     x_o_iid = torch.ones((5, 1))
-    score_fn.set_x(x_o_iid, x_is_iid=True, iid_method=iid_method)
+    score_fn = score_fn.bind(x_o_iid, x_is_iid=True, iid_method=iid_method)
     inputs = torch.ones((1, 1, num_dim))
+    time = torch.ones(1)
     for prior in priors:
-        time = torch.ones(1)
         score_fn.prior = prior
         output = score_fn.gradient(inputs, time=time)
 
+        assert output.shape == (1, 1, num_dim), (
+            f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
+        )
+        assert torch.isfinite(output).all(), "Output contains non-finite values"
+
+
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+@pytest.mark.parametrize(
+    "guidance_method",
+    [
+        ("affine_classifier_free", {"likelihood_scale": 0.1}),
+        ("affine_classifier_free", {"likelihood_scale": 10.0, "prior_scale": 1.0}),
+        (
+            "affine_classifier_free",
+            {
+                "likelihood_scale": 0.1,
+                "prior_scale": 1.0,
+                "prior_shift": 1.0,
+                "likelihood_shift": 1.0,
+            },
+        ),
+        ("universal", {"guidance_fn": lambda x, t, y, z: x}),
+        (
+            "universal",
+            {
+                "guidance_fn": lambda x, t, y, z: x + 1.0,
+                "guidance_fn_score": lambda x, t, y, z: x,
+            },
+        ),
+        ("interval", {"lower_bound": 0.0, "upper_bound": 1.0}),
+        ("interval", {"lower_bound": None, "upper_bound": 1.0}),
+        ("interval", {"lower_bound": -1.0, "upper_bound": None}),
+    ],
+)
+@pytest.mark.parametrize("num_dim", [1, 2, 3])
+def test_score_fn_guidance_general(sde_type, guidance_method, num_dim):
+    """ """
+    mean0 = torch.zeros(num_dim)
+    std0 = torch.ones(num_dim)
+    score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
+    x_o = torch.ones((1, 1))
+    guidance_name, guidance_params = guidance_method
+    score_fn = score_fn.bind(
+        x_o, guidance_method=guidance_name, guidance_params=guidance_params
+    )
+    inputs = torch.ones((1, 1, num_dim))
+    time = torch.ones(1)
+
+    priors = build_random_priors(num_dim)
+    for prior in priors:
+        score_fn.prior = prior
+        output = score_fn.gradient(inputs, time=time)
+
+    assert output.shape == (1, 1, num_dim), (
+        f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
+    )
+    assert torch.isfinite(output).all(), "Output contains non-finite values"
+
+
+@pytest.mark.parametrize("sde_type", ["vp", "ve"])
+@pytest.mark.parametrize("iid_method", ["fnpe", "gauss"])
+@pytest.mark.parametrize(
+    "guidance_method",
+    [
+        ("affine_classifier_free", {"likelihood_scale": 0.7}),
+        ("interval", {"lower_bound": 0.0, "upper_bound": 1.0}),
+    ],
+)
+def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_method):
+    """Test that guidance can be combined with IID score accumulation."""
+    num_dim = 2
+    mean0 = torch.zeros(num_dim)
+    std0 = torch.ones(num_dim)
+    score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
+
+    x_o_iid = torch.ones((5, 1))
+    guidance_name, guidance_params = guidance_method
+    score_fn = score_fn.bind(
+        x_o_iid,
+        x_is_iid=True,
+        iid_method=iid_method,
+        guidance_method=guidance_name,
+        guidance_params=guidance_params,
+    )
+
+    inputs = torch.ones((1, 1, num_dim))
+    time = torch.ones(1)
+
+    for prior in build_random_priors(num_dim):
+        score_fn.prior = prior
+        output = score_fn.gradient(inputs, time=time)
         assert output.shape == (1, 1, num_dim), (
             f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
         )
@@ -117,7 +216,7 @@ def _build_gaussian_score_estimator(
 
     # Note the precondition predicts a correct Gaussian score by default if the neural
     # net predicts 0!
-    class DummyNet(torch.nn.Module):
+    class DummyNet(VectorFieldNet):
         def __init__(self):
             super().__init__()
             self.dummy_param_for_device_detection = torch.nn.Linear(1, 1)
@@ -127,7 +226,7 @@ def _build_gaussian_score_estimator(
 
     score_estimator = posterior_score_nn(
         sde_type=sde_type,
-        net=DummyNet(),
+        model=DummyNet(),
         embedding_net=torch.nn.Identity(),
     )(building_thetas, building_xs)
 

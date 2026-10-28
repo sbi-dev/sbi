@@ -7,9 +7,14 @@ import numpy as np
 import pymc
 import pytensor.tensor as pt
 import torch
-from arviz.data import InferenceData
 
 from sbi.utils.torchutils import tensor2numpy
+from sbi.utils.typechecks import validate_target_accept
+
+# PyMC's `HamiltonianMC` defaults to `target_accept=0.65`, which mixes poorly on
+# peaked posteriors and biases the samples (see sbi #1908). NUTS is unaffected and
+# keeps PyMC's own default.
+_DEFAULT_HMC_TARGET_ACCEPT = 0.9
 
 
 class PyMCPotential(pt.Op):  # type: ignore
@@ -115,6 +120,8 @@ class PyMCSampler:
         progressbar: bool = True,
         param_name: str = "theta",
         device: str = "cpu",
+        seed: Optional[int] = None,
+        target_accept: Optional[float] = None,
     ):
         """Interface for PyMC samplers
 
@@ -129,6 +136,14 @@ class PyMCSampler:
             progressbar: Whether to show/hide progress bars.
             param_name: Name for parameter variable, for PyMC and ArviZ structures
             device: The device to which to move the parameters for potential_fn.
+            seed: Random seed passed to `pymc.sample` for reproducible sampling.
+                If None (default), PyMC seeds from system entropy.
+            target_accept: Target acceptance probability for the `"hmc"` and
+                `"nuts"` step methods. If `None`, HMC uses sbi's default of `0.9`
+                (`_DEFAULT_HMC_TARGET_ACCEPT`), while NUTS keeps PyMC's backend
+                default. The HMC default avoids poor finite-chain mixing observed
+                with PyMC's `0.65` default in sbi's Gaussian regression test.
+                Ignored for the `"slice"` step.
         """
         self.param_name = param_name
         self._step = step
@@ -139,6 +154,13 @@ class PyMCSampler:
         self._mp_ctx = mp_ctx
         self._progressbar = progressbar
         self._device = device
+        self._seed = seed
+        validate_target_accept(target_accept)
+        self._target_accept = (
+            _DEFAULT_HMC_TARGET_ACCEPT
+            if target_accept is None and step == "hmc"
+            else target_accept
+        )
 
         # create PyMC model object
         track_gradients = step in ("nuts", "hmc")
@@ -158,15 +180,21 @@ class PyMCSampler:
             MCMC samples
         """
         step_class = dict(slice=pymc.Slice, hmc=pymc.HamiltonianMC, nuts=pymc.NUTS)
+        # target_accept only applies to the gradient-based samplers; Slice
+        # does not take it.
+        step_kwargs = {}
+        if self._target_accept is not None and self._step in ("hmc", "nuts"):
+            step_kwargs["target_accept"] = self._target_accept
         with self._model:
             inference_data = pymc.sample(
-                step=step_class[self._step](),
+                step=step_class[self._step](**step_kwargs),
                 tune=self._tune,
                 draws=self._draws,
                 initvals=self._initvals,  # type: ignore
                 chains=self._chains,
                 progressbar=self._progressbar,
                 mp_ctx=self._mp_ctx,
+                random_seed=self._seed,
             )
         self._inference_data = inference_data
         traces = inference_data.posterior  # type: ignore
@@ -206,7 +234,7 @@ class PyMCSampler:
         else:
             return samples[-num_samples:, :]
 
-    def get_inference_data(self) -> InferenceData:
+    def get_inference_data(self) -> Any:
         """Returns InferenceData from last call to self.run,
         which contains diagnostic information in addition to samples
 

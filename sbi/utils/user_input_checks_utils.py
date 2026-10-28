@@ -16,7 +16,11 @@ from torch.distributions import (
     constraints,
 )
 
-from sbi.utils.torchutils import process_device
+from sbi.utils.torchutils import (
+    move_all_tensor_to_device,
+    process_device,
+    set_validate_args,
+)
 
 
 def get_distribution_parameters(
@@ -37,6 +41,39 @@ def get_distribution_parameters(
     elif isinstance(dist, (Binomial, Bernoulli, Categorical, Multinomial)):
         params["logits"] = None
     return params
+
+
+def move_distribution_to_device(
+    dist: Distribution, device: Union[str, torch.device]
+) -> Distribution:
+    """Move a distribution to the specified device.
+
+    If the distribution has a `.to()` method (e.g. sbi prior wrappers like
+    ``PytorchReturnTypeWrapper`` or ``BoxUniform``), it is called directly.
+    Otherwise, the distribution is reconstructed on the target device by
+    extracting its parameters via ``get_distribution_parameters()``.
+
+    Args:
+        dist: The distribution to move.
+        device: The target device.
+
+    Returns:
+        The distribution on the target device. If `.to()` was used, this is the
+        same object; otherwise it is a newly constructed instance.
+    """
+    if hasattr(dist, "to"):
+        dist.to(device)  # type: ignore
+        return dist
+    else:
+        try:
+            params = get_distribution_parameters(dist, device)
+            rebuilt = type(dist)(**params)
+        except Exception:
+            move_all_tensor_to_device(dist, device)
+            return dist
+        # Not a constructor argument: a user subclass need not accept `validate_args`.
+        set_validate_args(rebuilt, dist._validate_args)
+        return rebuilt
 
 
 class CustomPriorWrapper(Distribution):
@@ -141,16 +178,34 @@ class CustomPriorWrapper(Distribution):
 
 
 class PytorchReturnTypeWrapper(Distribution):
-    """Wrap PyTorch Distribution to return a given return type."""
+    """Wrap PyTorch Distribution to return a given return type.
+
+    Args:
+        prior: Distribution to wrap.
+        return_type: dtype of the samples, log probs, mean and variance.
+        batch_shape: Batch shape of the wrapper. Defaults to the one of `prior`.
+        event_shape: Event shape of the wrapper. Defaults to the one of `prior`.
+        validate_args: Whether to validate arguments. Defaults to the setting of
+            `prior`.
+    """
 
     def __init__(
         self,
         prior: Distribution,  # type: ignore
         return_type: Optional[torch.dtype] = float32,
-        batch_shape=torch.Size(),
-        event_shape=torch.Size(),
+        batch_shape: Optional[torch.Size] = None,
+        event_shape: Optional[torch.Size] = None,
         validate_args=None,
     ):
+        self.prior = prior
+        if validate_args is not None:
+            set_validate_args(prior, validate_args)
+
+        batch_shape = prior.batch_shape if batch_shape is None else batch_shape
+        event_shape = prior.event_shape if event_shape is None else event_shape
+
+        self.device = None
+        self.return_type = return_type
         super().__init__(
             batch_shape=batch_shape,
             event_shape=event_shape,
@@ -158,10 +213,6 @@ class PytorchReturnTypeWrapper(Distribution):
                 prior._validate_args if validate_args is None else validate_args
             ),
         )
-
-        self.prior = prior
-        self.device = None
-        self.return_type = return_type
 
     def log_prob(self, value) -> Tensor:
         return torch.as_tensor(
@@ -190,6 +241,11 @@ class PytorchReturnTypeWrapper(Distribution):
         )
 
     @property
+    def arg_constraints(self) -> Dict[str, constraints.Constraint]:
+        # Torch looks up a same-named attribute per constraint; this wrapper has none.
+        return {}
+
+    @property
     def support(self):
         return self.prior.support
 
@@ -203,8 +259,8 @@ class PytorchReturnTypeWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
-        params = get_distribution_parameters(self.prior, device)
-        self.prior = type(self.prior)(**params)
+        device = process_device(device)
+        self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
 
@@ -213,7 +269,7 @@ class MultipleIndependent(Distribution):
 
     def __init__(
         self,
-        dists: Sequence[Distribution],
+        dists: list[Distribution],
         validate_args: Optional[bool] = None,
         arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
         device: Optional[str] = None,
@@ -241,21 +297,23 @@ class MultipleIndependent(Distribution):
             from sbi.utils.user_input_checks_utils import MultipleIndependent
 
             prior = MultipleIndependent([
-                Gamma(torch.zeros(1), torch.ones(1)),
-                Beta(torch.zeros(1), torch.ones(1)),
+                Gamma(torch.ones(1), torch.ones(1)),
+                Beta(2 * torch.ones(1), 2 * torch.ones(1)),
                 MultivariateNormal(torch.ones(2), torch.tensor([[1, .1], [.1, 1.]]))
             ])
         """
         self._check_distributions(dists)
         if validate_args is not None:
-            [d.set_default_validate_args(validate_args) for d in dists]
+            for d in dists:
+                set_validate_args(d, validate_args)
 
         self.dists = dists
         self.device = process_device(device or "cpu")
         self.to(self.device)
-        # numel() instead of event_shape because for all dists both is possible,
-        # event_shape=[1] or batch_shape=[1]
-        self.dims_per_dist = [d.sample().numel() for d in self.dists]
+        # A component can carry its dimensions in batch_shape [1] or in event_shape.
+        self.dims_per_dist = [
+            (d.batch_shape + d.event_shape).numel() for d in self.dists
+        ]
 
         self.ndims = int(torch.sum(torch.as_tensor(self.dims_per_dist)).item())
         self.custom_arg_constraints = arg_constraints or {}
@@ -295,12 +353,16 @@ class MultipleIndependent(Distribution):
         ), """priors passed to MultipleIndependent must be PyTorch distributions. Make \
             sure to process custom priors individually using :func:`process_prior` \
             before passing them in a list to :func:`process_prior`."""
-        # Make sure batch shape is smaller or equal to 1.
         assert dist.batch_shape in (
             torch.Size([1]),
-            torch.Size([0]),
             torch.Size([]),
-        ), "The batch shape of every distribution must be smaller or equal to 1."
+        ), "The batch shape of every distribution must be [] or [1]."
+
+        assert len(dist.event_shape) <= 1, (
+            f"The event shape of every distribution must have at most one dimension, "
+            f"but one is {tuple(dist.event_shape)}. Define the distribution over a "
+            f"flat parameter vector instead."
+        )
 
         assert (
             len(dist.batch_shape) > 0 or len(dist.event_shape) > 0
@@ -311,53 +373,38 @@ class MultipleIndependent(Distribution):
         """
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
-        # Sample from every sub distribution and concatenate samples.
-        sample = torch.cat([d.sample(sample_shape) for d in self.dists], dim=-1)
-
-        # This reshape is needed to cover the case .sample() vs. .sample((n, )).
-        if sample_shape == torch.Size():
-            sample = sample.reshape(self.ndims)
-        else:
-            sample = sample.reshape(-1, self.ndims)
-
-        return sample
+        sample_shape = torch.Size(sample_shape)
+        samples = [
+            d.sample(sample_shape).reshape(*sample_shape, ndims)
+            for d, ndims in zip(self.dists, self.dims_per_dist, strict=True)
+        ]
+        return torch.cat(samples, dim=-1)
 
     def log_prob(self, value) -> Tensor:
         value = self._prepare_value(value)
+        batch_shape = value.shape[:-1]
 
-        # Evaluate value per distribution, taking into account that individual
-        # distributions can be multivariate.
-        num_samples = value.shape[0]
         log_probs = []
         dims_covered = 0
-        for idx, d in enumerate(self.dists):
-            ndims = int(self.dims_per_dist[idx])
-            v = value[:, dims_covered : dims_covered + ndims]
-            # Reshape here to ensure all returned log_probs are 2D for concatenation.
-            log_probs.append(d.log_prob(v).reshape(num_samples, 1))
+        for d, ndims in zip(self.dists, self.dims_per_dist, strict=True):
+            v = value[..., dims_covered : dims_covered + ndims]
+            log_probs.append(d.log_prob(v).reshape(batch_shape))
             dims_covered += ndims
 
-        # Sum accross last dimension to get joint log prob over all distributions.
-        return torch.cat(log_probs, dim=1).sum(-1)
+        return torch.stack(log_probs, dim=-1).sum(-1)
 
     def _prepare_value(self, value) -> Tensor:
-        """Return input value with fixed shape.
+        """Return input value with at least one batch dimension.
 
         Raises:
-            AssertionError: if value has more than 2 dimensions or invalid size in
-                2nd dimension.
+            AssertionError: if the last dimension does not match the dimensions of
+                this joint.
         """
 
         if value.ndim < 2:
             value = value.unsqueeze(0)
 
-        assert value.ndim == 2, (
-            f"value in log_prob must have ndim <= 2, it is {value.ndim}."
-        )
-
-        batch_shape, num_value_dims = value.shape
-
-        assert num_value_dims == self.ndims, (
+        assert value.shape[-1] == self.ndims, (
             f"Number of dimensions must match dimensions of this joint: {self.ndims}."
         )
 
@@ -365,11 +412,11 @@ class MultipleIndependent(Distribution):
 
     @property
     def mean(self) -> Tensor:
-        return torch.cat([d.mean for d in self.dists])
+        return torch.cat([d.mean.reshape(-1) for d in self.dists])
 
     @property
     def variance(self) -> Tensor:
-        return torch.cat([d.variance for d in self.dists])
+        return torch.cat([d.variance.reshape(-1) for d in self.dists])
 
     @property
     def support(self):
@@ -401,13 +448,9 @@ class MultipleIndependent(Distribution):
         Args:
             device: device to move the distribution to.
         """
+        device = process_device(device)
         for i in range(len(self.dists)):
-            # ignoring because it is related to torch and not sbi
-            if hasattr(self.dists[i], "to"):
-                self.dists[i].to(device)  # type: ignore
-            else:
-                params = get_distribution_parameters(self.dists[i], device)
-                self.dists[i] = type(self.dists[i])(**params)  # type: ignore
+            self.dists[i] = move_distribution_to_device(self.dists[i], device)
         self.device = device
 
 
@@ -499,6 +542,9 @@ class OneDimPriorWrapper(Distribution):
     """
 
     def __init__(self, prior: Distribution, validate_args=None) -> None:
+        self.prior = prior
+        if validate_args is not None:
+            set_validate_args(prior, validate_args)
         super().__init__(
             batch_shape=prior.batch_shape,
             event_shape=prior.event_shape,
@@ -506,7 +552,6 @@ class OneDimPriorWrapper(Distribution):
                 prior._validate_args if validate_args is None else validate_args
             ),
         )
-        self.prior = prior
         self.device = None
 
     def to(self, device: Union[str, torch.device]) -> None:
@@ -519,8 +564,8 @@ class OneDimPriorWrapper(Distribution):
         Args:
             device: device to move the distribution to.
         """
-        params = get_distribution_parameters(self.prior, device)
-        self.prior = type(self.prior)(**params)
+        device = process_device(device)
+        self.prior = move_distribution_to_device(self.prior, device)
         self.device = device
 
     def sample(self, *args, **kwargs) -> Tensor:
@@ -532,7 +577,8 @@ class OneDimPriorWrapper(Distribution):
 
     @property
     def arg_constraints(self) -> Dict[str, constraints.Constraint]:
-        return self.prior.arg_constraints
+        # Torch looks up a same-named attribute per constraint; this wrapper has none.
+        return {}
 
     @property
     def support(self):

@@ -5,7 +5,8 @@ Developer notes
 
 `sbi` welcomes contributions from the community.
 These are guides to get set up as a developer, as well as
-developer-focused resources.
+developer-focused resources. For a list of current and former project
+maintainers, see the :doc:`credits page <credits>`.
 
 
 .. toctree::
@@ -13,5 +14,6 @@ developer-focused resources.
    :caption: Contribution guides
 
    contributing
+   mini_sbibm
    proposals
    code_of_conduct

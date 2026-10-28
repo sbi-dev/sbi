@@ -5,7 +5,10 @@ from typing import List, Optional, Tuple, Union
 
 from torch import Tensor, nn
 
-from sbi.neural_nets.embedding_nets.cnn import calculate_filter_output_size
+from sbi.neural_nets.embedding_nets.cnn import (
+    _validate_cnn_input_shape,
+    calculate_filter_output_size,
+)
 
 
 def causalConv1d(
@@ -134,7 +137,7 @@ def WaveNetSRLikeAggregator(
 
 
 class CausalCNNEmbedding(nn.Module):
-    """Embedding network that uses 1D causal convolutions."""
+    """Embedding network that uses channel-first 1D causal convolutions."""
 
     def __init__(
         self,
@@ -163,8 +166,9 @@ class CausalCNNEmbedding(nn.Module):
         layers, and global average poolingg to obtain a final low dimensional embedding.
 
         Args:
-            input_shape: Dimensionality of the input e.g. (num_timepoints,),
-                currently only 1D is supported.
+            input_shape: Spatial input shape without batch or channel dimensions,
+                e.g. (num_timepoints,). Inputs may be flat or use channel-first
+                layout, and currently only 1D is supported.
             in_channels: Number of input channels, default = 1.
             out_channels_per_layer: number of out_channels for each layer, number
                 of entries should correspond with num_conv_layers passed below.
@@ -263,11 +267,26 @@ class CausalCNNEmbedding(nn.Module):
         self.aggregation = aggregator
 
     def forward(self, x: Tensor) -> Tensor:
+        """Embed a batch of time series.
+
+        Args:
+            x: Inputs of shape `(batch_dim, in_channels, *input_shape)`. A flat
+                `(batch_dim, in_channels * prod(input_shape))` is also accepted, as
+                is `(batch_dim, *input_shape)` when `in_channels` is 1.
+
+        Returns:
+            Embeddings of shape `(batch_dim, output_dim)` for the default
+            aggregator, otherwise the flattened output of the given `aggregator`.
+
+        Raises:
+            ValueError: If the trailing shape of `x` is none of the above.
+        """
         batch_size = x.size(0)
-        x = x.view(batch_size, *self.input_shape)
+        _validate_cnn_input_shape(x, self.input_shape)
+        x = x.reshape(batch_size, *self.input_shape)
         x = self.causal_cnns(x)
         x = self.pooling_layer(x)
         x = self.aggregation(x)
         # ensure flattening when aggregator uses global average pooling
-        x = x.view(batch_size, -1)
+        x = x.reshape(batch_size, -1)
         return x

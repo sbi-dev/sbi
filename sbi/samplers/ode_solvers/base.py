@@ -9,7 +9,7 @@ from abc import abstractmethod
 from typing import Any, Dict, Protocol
 
 import torch.nn as nn
-from torch import Tensor
+from torch import Size, Tensor
 from torch.distributions import Distribution
 from zuko.lazy import LazyDistribution
 
@@ -50,6 +50,7 @@ class NeuralODE(LazyDistribution):
         net: nn.Module,
         mean_base: Tensor,
         std_base: Tensor,
+        condition_shape: Size,
         t_min: float = 0.0,
         t_max: float = 1.0,
         **kwargs,
@@ -70,6 +71,10 @@ class NeuralODE(LazyDistribution):
                 Expected shape: (1, theta_dim).
             std_base: The std of the base distribution.
                 Expected shape: (1, theta_dim).
+            condition_shape: The event shape of the condition tensor (excluding batch
+                dimensions). For example, for 2D image conditions with shape
+                (batch, H, W), use Size([H, W]). For 1D vector conditions with
+                shape (batch, dim), use Size([dim]).
             t_min: The minimum time value for the ODE solver.
             t_max: The maximum time value for the ODE solver.
             **kwargs: Additional arguments for the ODE solver.
@@ -77,6 +82,7 @@ class NeuralODE(LazyDistribution):
         super().__init__()
         self.f = f
         self.net = net
+        self.condition_shape = condition_shape
         self.t_min = t_min
         self.t_max = t_max
         self.mean_base = mean_base

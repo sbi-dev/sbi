@@ -8,7 +8,7 @@ Zuko ODE solver.
 import functools
 
 import torch.nn as nn
-from torch import Tensor
+from torch import Size, Tensor
 from torch.distributions import Distribution
 from zuko.distributions import DiagNormal, NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
@@ -23,6 +23,7 @@ class ZukoNeuralODE(NeuralODE):
         net: nn.Module,
         mean_base: Tensor,
         std_base: Tensor,
+        condition_shape: Size,
         t_min: float = 0.0,
         t_max: float = 1.0,
         atol: float = 1e-6,
@@ -51,12 +52,16 @@ class ZukoNeuralODE(NeuralODE):
                 Expected shape: (1, theta_dim).
             std_base: The std of the base distribution.
                 Expected shape: (1, theta_dim).
+            condition_shape: The event shape of the condition tensor (excluding batch
+                dimensions). For example, for 2D image conditions with shape
+                (batch, H, W), use Size([H, W]). For 1D vector conditions with
+                shape (batch, dim), use Size([dim]).
             t_min: The minimum time value for the ODE solver.
             t_max: The maximum time value for the ODE solver.
             atol: The absolute tolerance for the ODE solver.
             rtol: The relative tolerance for the ODE solver.
             exact: Whether the exact log-determinant of the Jacobian or an unbiased
-            stochastic estimate thereof is calculated.
+                stochastic estimate thereof is calculated.
         """
 
         super().__init__(
@@ -64,6 +69,7 @@ class ZukoNeuralODE(NeuralODE):
             net,
             mean_base,
             std_base,
+            condition_shape,
             t_min,
             t_max,
             atol=atol,
@@ -82,7 +88,25 @@ class ZukoNeuralODE(NeuralODE):
         Returns:
             The distribution object with `log_prob` and
             `sample` methods that wraps the ODE solver.
+
+        Raises:
+            ValueError: If the condition tensor shape does not match condition_shape.
         """
+        # Validate condition shape
+        cond_event_dims = len(self.condition_shape)
+        if condition.ndim < cond_event_dims:
+            raise ValueError(
+                f"Condition tensor has {condition.ndim} dimensions, but "
+                f"condition_shape {tuple(self.condition_shape)} requires at least "
+                f"{cond_event_dims} dimensions."
+            )
+        actual_event_shape = condition.shape[-cond_event_dims:]
+        if actual_event_shape != self.condition_shape:
+            raise ValueError(
+                f"Condition tensor event shape {tuple(actual_event_shape)} does not "
+                f"match expected condition_shape {tuple(self.condition_shape)}."
+            )
+
         partial_f = functools.partial(self._f_condition_last, condition=condition)
         transform = FreeFormJacobianTransform(
             f=partial_f,
@@ -94,7 +118,9 @@ class ZukoNeuralODE(NeuralODE):
 
         return NormalizingFlow(
             transform=transform,
-            base=DiagNormal(self.mean_base, self.std_base).expand(condition.shape[:-1]),
+            base=DiagNormal(self.mean_base, self.std_base).expand(
+                condition.shape[: -len(self.condition_shape)]
+            ),
         )
 
     def _f_condition_last(self, t, input, condition):

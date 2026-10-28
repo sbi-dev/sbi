@@ -33,9 +33,13 @@ def reshape_to_sample_batch_event(
 
     trailing_theta_or_x_shape = theta_or_x.shape[-event_shape_dim:]
     leading_theta_or_x_shape = theta_or_x.shape[:-event_shape_dim]
-    assert trailing_theta_or_x_shape == event_shape, (
-        "The trailing dimensions of `theta_or_x` do not match the `event_shape`."
-    )
+    if trailing_theta_or_x_shape != event_shape:
+        raise RuntimeError(
+            f"The shape of the input does not match the expected shape. "
+            f"Expected trailing dimensions {tuple(event_shape)}, but got "
+            f"{tuple(trailing_theta_or_x_shape)}. This can happen when `x_o` has "
+            f"more (or fewer) entries than the `x` used during training."
+        )
 
     if len(leading_theta_or_x_shape) == 0:
         # A single datapoint is passed. Add batch and sample dim artificially.
@@ -71,9 +75,13 @@ def reshape_to_batch_event(theta_or_x: Tensor, event_shape: torch.Size) -> Tenso
 
     trailing_theta_or_x_shape = theta_or_x.shape[-event_shape_dim:]
     leading_theta_or_x_shape = theta_or_x.shape[:-event_shape_dim]
-    assert trailing_theta_or_x_shape == event_shape, (
-        "The trailing dimensions of `theta_or_x` do not match the `event_shape`."
-    )
+    if trailing_theta_or_x_shape != event_shape:
+        raise RuntimeError(
+            f"The shape of the input does not match the expected shape. "
+            f"Expected trailing dimensions {tuple(event_shape)}, but got "
+            f"{tuple(trailing_theta_or_x_shape)}. This can happen when `x_o` has "
+            f"more (or fewer) entries than the `x` used during training."
+        )
 
     if len(leading_theta_or_x_shape) == 0:
         # A single datapoint is passed. Add batch artificially.

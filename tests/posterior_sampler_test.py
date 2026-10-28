@@ -6,17 +6,16 @@ from __future__ import annotations
 from dataclasses import asdict
 
 import pytest
-from pyro.infer.mcmc import MCMC
 from torch import Tensor, eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import (
-    SNL,
+    NLE_A,
     MCMCPosterior,
     likelihood_estimator_based_potential,
 )
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
-from sbi.samplers.mcmc import PyMCSampler, SliceSamplerSerial, SliceSamplerVectorized
+from sbi.samplers.mcmc import SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
 
@@ -44,7 +43,7 @@ def test_api_posterior_sampler_set(
     num_trials: int = 2,
     num_simulations: int = 10,
 ):
-    """Runs SNL and checks that posterior_sampler is correctly set."""
+    """Runs NLE and checks that posterior_sampler is correctly set."""
     x_o = zeros((num_trials, num_dim))
     mcmc_params_fast = mcmc_params_fast.with_param(
         num_chains=num_chains, method=sampling_method
@@ -53,7 +52,7 @@ def test_api_posterior_sampler_set(
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
 
-    inference = SNL(prior, show_progress_bars=False)
+    inference = NLE_A(prior, show_progress_bars=False)
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
@@ -77,8 +76,12 @@ def test_api_posterior_sampler_set(
     assert samples.shape == (num_samples, num_chains, num_dim)
 
     if "pyro" in sampling_method:
+        from pyro.infer.mcmc import MCMC
+
         assert type(posterior.posterior_sampler) is MCMC
     elif "pymc" in sampling_method:
+        from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
+
         assert type(posterior.posterior_sampler) is PyMCSampler
     elif sampling_method == "slice_np":
         assert type(posterior.posterior_sampler) is SliceSamplerSerial

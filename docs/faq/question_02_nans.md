@@ -1,8 +1,8 @@
 # Can the algorithms deal with invalid data, e.g., NaN or inf?
 
-Yes. By default, whenever a simulation returns at least one `NaN` or `inf`, it is
-completely excluded from the training data. In other words, the simulation is simply
-discarded.
+Yes. In single-round NPE, whenever a simulation returns at least one `NaN` or `inf`,
+it is completely excluded from the training data by default. In other words, the
+simulation is simply discarded.
 
 In cases where a very large fraction of simulations return `NaN` or `inf`,
 discarding many simulations can be wasteful. There are two options to deal with
@@ -16,15 +16,17 @@ Importantly, in order for neural network training work well, the floating point
 number should still be in a reasonable range, i.e., maybe a few standard
 deviations outside of 'good' values.
 
-If you are running **multi-round** NPE (SNPE), however, things can go fully wrong if
-invalid data are encountered. In that case, you will get the following warning
+NLE, NRE, and **multi-round** NPE are different: discarding invalid simulations
+biases their training objective. These methods therefore raise an error when the
+simulations contain `NaN` or `inf`:
 
 ```python
-When invalid simulations are excluded, multi-round SNPE-C can leak into the regions
-where parameters led to invalid simulations. This can lead to poor results.
+ValueError: Found 5 NaN simulations and 0 Inf simulations. Multiround NPE_C does
+not allow invalid simulations. Replace the invalid values with an unreasonably
+low or high value.
 ```
 
-Hence, if you are running multi-round NPE and a significant fraction of
-simulations returns at least one invalid number, we strongly recommend manually
-replacing the value in your simulation code as described above (or resorting to
-single-round NPE, or using a different `sbi` method entirely).
+You can override this with `append_simulations(..., exclude_invalid_x=True)`, but
+this gives systematically wrong results and is only recommended for expert users.
+The safe options are the two described above: restrict the prior with the
+`RestrictionEstimator`, or replace the invalid values in your simulation code.

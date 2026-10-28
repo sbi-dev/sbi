@@ -1,25 +1,34 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from functools import partial
+
 import pytest
 import torch
 from pytest_harvest import ResultsBag
 
-from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
+from sbi.inference import FMPE, MNLE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
+from sbi.neural_nets import DensityConfigBase, FlowMatchingConfig, MixedConfig
+from sbi.neural_nets.net_builders.estimator_configs import (
+    _CLASSIFIER_CONFIGS,
+    _DENSITY_CONFIGS,
+)
+from sbi.neural_nets.net_builders.vector_field_nets import _SDE_CONFIGS, _VF_NET_CONFIGS
 from sbi.utils.metrics import c2st
 
-from .mini_sbibm import get_task
+from .mini_sbibm import MixedData, get_task
 from .mini_sbibm.base_task import Task
 
 # Global settings
 SEED = 0
 TASKS = ["two_moons", "linear_mvg_2d", "gaussian_linear", "slcp"]
-NUM_EVALUATION_OBS = 3  # Currently only 3 observation tested for speed
+NUM_EVALUATION_OBS = 10
 NUM_ROUNDS_SEQUENTIAL = 2
 NUM_EVALUATION_OBS_SEQ = 1
+SEQUENTIAL_MODES = {"snpe", "snle", "snre"}
 TRAIN_KWARGS = {}
 
 # Density estimators to test
@@ -29,8 +38,9 @@ VF_ESTIMATORS = ["mlp", "ada_mlp", "transformer"]
 
 # Benchmarking method groups i.e. what to run for different --bm-mode
 METHOD_GROUPS = {
-    "none": [NPE, NRE, NLE, FMPE, NPSE],
+    "none": [NPE, NPE_PFN, NRE, NLE, FMPE, NPSE],
     "npe": [NPE],
+    "npe_pfn": [NPE_PFN],
     "nle": [NLE],
     "nre": [NRE_A, NRE_B, NRE_C, BNRE],
     "fmpe": [FMPE],
@@ -39,10 +49,12 @@ METHOD_GROUPS = {
     "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
+    "mnle": [MNLE],
 }
 METHOD_PARAMS = {
     "none": [{}],
     "npe": [{"density_estimator": de} for de in DENSITY_ESTIMATORS],
+    "npe_pfn": [{}],
     "nle": [{"density_estimator": de} for de in ["maf", "nsf"]],
     "nre": [{"classifier": cl} for cl in CLASSIFIERS],
     "fmpe": [{"vf_estimator": nn} for nn in VF_ESTIMATORS],
@@ -55,41 +67,126 @@ METHOD_PARAMS = {
     "snpe": [{}],
     "snle": [{}],
     "snre": [{}],
+    "mnle": [{}],
+}
+ESTIMATOR_ARGUMENTS = {
+    "mnle": "density_estimator",
+    "npe": "density_estimator",
+    "nle": "density_estimator",
+    "nre": "classifier",
+    "fmpe": "vf_estimator",
+    "npse": "vf_estimator",
+    "vfpe": "vf_estimator",
+    "snpe": "density_estimator",
+    "snle": "density_estimator",
+    "snre": "classifier",
+}
+# sbi's own maps from estimator names to per-model configs. Pretrained density
+# models such as TabPFN cannot be trained, so they are left out.
+ESTIMATOR_CONFIGS = {
+    "density_estimator": {
+        name: config
+        for name, config in _DENSITY_CONFIGS.items()
+        if issubclass(config, DensityConfigBase)
+    },
+    "classifier": _CLASSIFIER_CONFIGS,
+    "vf_estimator": _VF_NET_CONFIGS,
 }
 
 
-@pytest.fixture
-def method_list(benchmark_mode: str) -> list:
-    """
-    Fixture to get the list of methods based on the benchmark mode.
-
-    Args:
-        benchmark_mode (str): The benchmark mode.
-
-    Returns:
-        list: List of methods for the given benchmark mode.
-    """
-    name = str(benchmark_mode).lower()
+def _benchmark_mode(config) -> str:
+    """Return and validate the selected benchmark mode."""
+    mode = config.getoption("--bm-mode")
+    name = "none" if mode is None else str(mode).lower()
     if name not in METHOD_GROUPS:
-        raise ValueError(f"Benchmark mode '{benchmark_mode}' is not supported.")
-    return METHOD_GROUPS[name]
+        supported = ", ".join(name for name in METHOD_GROUPS if name != "none")
+        raise pytest.UsageError(
+            f"Unknown benchmark mode '{mode}'. Supported modes: {supported}."
+        )
+    return name
 
 
-@pytest.fixture
-def kwargs_list(benchmark_mode: str) -> list:
+def _benchmark_kwargs(config, mode: str) -> list[dict]:
+    """Return method arguments, applying an optional estimator override."""
+    estimator_option = config.getoption("--bm-estimators")
+    if estimator_option is None:
+        return METHOD_PARAMS[mode]
+
+    estimator_argument = ESTIMATOR_ARGUMENTS.get(mode)
+    if estimator_argument is None:
+        raise pytest.UsageError(
+            "--bm-estimators requires a benchmark mode whose methods use the same "
+            "estimator argument."
+        )
+
+    estimators = [value.strip() for value in estimator_option.split(",")]
+    if not estimators or any(not value for value in estimators):
+        raise pytest.UsageError(
+            "--bm-estimators requires one or more comma-separated estimator names."
+        )
+    supported = set(ESTIMATOR_CONFIGS[estimator_argument])
+    if mode == "mnle":
+        supported.add("mnle")
+    unknown = [name for name in estimators if name not in supported]
+    if unknown:
+        raise pytest.UsageError(
+            f"Unknown estimators for mode '{mode}': {', '.join(unknown)}. "
+            f"Supported: {', '.join(sorted(supported))}."
+        )
+
+    remaining_options = []
+    for parameters in METHOD_PARAMS[mode]:
+        options = {
+            key: value for key, value in parameters.items() if key != estimator_argument
+        }
+        if options not in remaining_options:
+            remaining_options.append(options)
+
+    return [
+        {estimator_argument: estimator, **options}
+        for estimator in estimators
+        for options in remaining_options
+    ]
+
+
+def _kwargs_id(parameters: dict) -> str:
+    """Return a readable identifier for one method configuration."""
+    return "-".join(str(value) for value in parameters.values()) or "default"
+
+
+def _estimator_kwargs(inference_class, parameters: dict) -> dict:
+    """Replace estimator names with sbi's per-model configs.
+
+    The method settings keep plain names, which give the test ids and the rows of
+    the results table.
     """
-    Fixture to get the list of kwargs based on the benchmark mode.
+    kwargs = dict(parameters)
+    if "density_estimator" in kwargs:
+        name = kwargs["density_estimator"]
+        if inference_class is MNLE:
+            kwargs["density_estimator"] = (
+                MixedConfig()
+                if name == "mnle"
+                else MixedConfig(continuous=_DENSITY_CONFIGS[name]())
+            )
+        else:
+            kwargs["density_estimator"] = _DENSITY_CONFIGS[name]()
+    if "classifier" in kwargs:
+        kwargs["classifier"] = _CLASSIFIER_CONFIGS[kwargs["classifier"]]()
+    if "vf_estimator" in kwargs:
+        net = _VF_NET_CONFIGS[kwargs["vf_estimator"]]()
+        if issubclass(inference_class, NPSE):
+            sde_type = kwargs.pop("sde_type", "ve")
+            kwargs["vf_estimator"] = _SDE_CONFIGS[sde_type](net=net)
+        else:
+            kwargs["vf_estimator"] = FlowMatchingConfig(net=net)
+    return kwargs
 
-    Args:
-        benchmark_mode (str): The benchmark mode.
 
-    Returns:
-        list: List of kwargs for the given benchmark mode.
-    """
-    name = str(benchmark_mode).lower()
-    if name not in METHOD_PARAMS:
-        raise ValueError(f"Benchmark mode '{benchmark_mode}' is not supported.")
-    return METHOD_PARAMS[name]
+def _class_id(inference_class, mode: str) -> str:
+    """Return the class name, prefixed with "S" for multi-round runs."""
+    prefix = "S" if mode in SEQUENTIAL_MODES else ""
+    return prefix + inference_class.__name__
 
 
 # Use pytest.mark.parametrize dynamically
@@ -101,130 +198,176 @@ def pytest_generate_tests(metafunc):
     Args:
         metafunc: The metafunc object from pytest.
     """
+    if not {"inference_class", "extra_kwargs", "task"}.intersection(
+        metafunc.fixturenames
+    ):
+        return
+
+    mode = _benchmark_mode(metafunc.config)
     if "inference_class" in metafunc.fixturenames:
-        method_list = metafunc.config.getoption("--bm-mode")
-        name = str(method_list).lower()
-        method_group = METHOD_GROUPS.get(name, [])
-        metafunc.parametrize("inference_class", method_group)
+        classes = METHOD_GROUPS[mode]
+        metafunc.parametrize(
+            "inference_class", classes, ids=[_class_id(c, mode) for c in classes]
+        )
     if "extra_kwargs" in metafunc.fixturenames:
-        kwargs_list = metafunc.config.getoption("--bm-mode")
-        name = str(kwargs_list).lower()
-        kwargs_group = METHOD_PARAMS.get(name, [])
-        metafunc.parametrize("extra_kwargs", kwargs_group)
+        kwargs_group = _benchmark_kwargs(metafunc.config, mode)
+        metafunc.parametrize(
+            "extra_kwargs", kwargs_group, ids=[_kwargs_id(p) for p in kwargs_group]
+        )
+    num_seeds = metafunc.config.getoption("--bm-seeds")
+    if num_seeds < 1:
+        raise pytest.UsageError("--bm-seeds must be at least 1.")
+    # One seed keeps the `benchmark_seed` fixture, and with it today's test ids.
+    if "benchmark_seed" in metafunc.fixturenames and num_seeds > 1:
+        seeds = range(SEED, SEED + num_seeds)
+        metafunc.parametrize("benchmark_seed", seeds, ids=[f"seed{s}" for s in seeds])
+    if "task" in metafunc.fixturenames:
+        if mode == "mnle":
+            num_trials = metafunc.config.getoption("--bm-num-iid-trials")
+            tasks = [partial(MixedData, num_trials=num_trials)]
+            task_ids = [f"mixed_data-{num_trials}trials"]
+        else:
+            tasks = [partial(get_task, name) for name in TASKS]
+            task_ids = TASKS
+        metafunc.parametrize("task", tasks, ids=task_ids, indirect=True)
 
 
-def standard_eval_c2st_loop(posterior: NeuralPosterior, task: Task) -> float:
+@pytest.fixture
+def benchmark_seed() -> int:
+    """Training seed of a benchmark case. Parametrized by --bm-seeds."""
+    return SEED
+
+
+@pytest.fixture
+def task(request) -> Task:
+    """Build the task selected by the benchmark mode."""
+    return request.param()
+
+
+def eval_observations(posterior: NeuralPosterior, task: Task) -> dict[str, float]:
     """
-    Evaluates the C2ST metric for the given posterior and task.
+    Evaluates the posterior on the first `NUM_EVALUATION_OBS` observations.
 
     Args:
         posterior: The posterior distribution.
         task: The task object.
 
     Returns:
-        float: The mean C2ST value.
+        The metrics of `eval_observation`, averaged over the observations.
     """
-    c2st_scores = []
-    for i in range(1, NUM_EVALUATION_OBS + 1):
-        c2st_val = eval_c2st(posterior, task, i)
-        c2st_scores.append(c2st_val)
-
-    mean_c2st = sum(c2st_scores) / len(c2st_scores)
-    # Convert to float rounded to 3 decimal places
-    mean_c2st = float(f"{mean_c2st:.3f}")
-    return mean_c2st
+    metrics = [
+        eval_observation(posterior, task, i) for i in range(1, NUM_EVALUATION_OBS + 1)
+    ]
+    return {key: sum(m[key] for m in metrics) / len(metrics) for key in metrics[0]}
 
 
-def eval_c2st(
+def eval_observation(
     posterior: NeuralPosterior,
     task: Task,
     idx_observation: int,
     num_samples: int = 1000,
-) -> float:
+) -> dict[str, float]:
     """
-    Evaluates the C2ST metric for a specific observation.
+    Compares posterior samples with reference samples for one observation.
+
+    The mean and std errors are absolute errors of the marginal means and standard
+    deviations, divided by the reference standard deviation and averaged over
+    parameter dimensions. Unlike C2ST, the std error says directly how much too wide
+    or too narrow the posterior is.
 
     Args:
         posterior: The posterior distribution.
         task: The task object.
-        i (int): The observation index.
+        idx_observation: The observation index.
+        num_samples: The number of posterior samples.
 
     Returns:
-        float: The C2ST value.
+        The C2ST value and the mean and std errors.
     """
     x_o = task.get_observation(idx_observation)
-    posterior_samples = task.get_reference_posterior_samples(idx_observation)
-    approx_posterior_samples = posterior.sample((num_samples,), x=x_o)
-    if isinstance(approx_posterior_samples, tuple):
-        approx_posterior_samples = approx_posterior_samples[0]
-    assert posterior_samples.shape[0] >= num_samples, "Not enough reference samples"
-    c2st_val = c2st(posterior_samples[:num_samples], approx_posterior_samples)
-    return float(c2st_val)
+    reference_samples = task.get_reference_posterior_samples(idx_observation)
+    samples = posterior.sample((num_samples,), x=x_o)
+    if isinstance(samples, tuple):
+        samples = samples[0]
+    assert reference_samples.shape[0] >= num_samples, "Not enough reference samples"
+
+    reference_std = reference_samples.std(0)
+    mean_error = (samples.mean(0) - reference_samples.mean(0)).abs() / reference_std
+    std_error = (samples.std(0) - reference_std).abs() / reference_std
+    return {
+        "c2st": float(c2st(reference_samples[:num_samples], samples)),
+        "mean_err": float(mean_error.mean()),
+        "std_err": float(std_error.mean()),
+    }
 
 
 def train_and_eval_amortized_inference(
     inference_class,
-    task_name: str,
+    task: Task,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
-    results_bag: ResultsBag,
-) -> None:
+    seed: int,
+) -> dict[str, float]:
     """
     Performs amortized inference evaluation.
 
     Args:
-        method: The inference method.
-        task_name: The name of the task.
+        inference_class: The inference class.
+        task: The benchmark task.
+        benchmark_num_simulations: The number of training simulations.
         extra_kwargs: Additional keyword arguments for the method.
-        results_bag: The results bag to store evaluation results. Subclass of dict, but
-            allows item assignment with dot notation.
+        seed: The training seed.
+
+    Returns:
+        The metrics, averaged over the evaluation observations.
     """
-    torch.manual_seed(SEED)
-    task = get_task(task_name)
+    torch.manual_seed(seed)
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
-    inference = inference_class(prior, **extra_kwargs)
+    inference = inference_class(
+        prior, **_estimator_kwargs(inference_class, extra_kwargs)
+    )
     _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
     posterior = inference.build_posterior()
 
-    mean_c2st = standard_eval_c2st_loop(posterior, task)
-
-    # Cache results
-    results_bag.metric = mean_c2st
-    results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task_name
-    results_bag.method = inference_class.__name__ + str(extra_kwargs)
+    return eval_observations(posterior, task)
 
 
 def train_and_eval_sequential_inference(
     inference_class,
-    task_name: str,
+    task: Task,
     benchmark_num_simulations: int,
     extra_kwargs: dict,
-    results_bag: ResultsBag,
-) -> None:
+    seed: int,
+) -> dict[str, float]:
     """
     Performs sequential inference evaluation.
 
     Args:
-        method: The inference method.
-        task_name (str): The name of the task.
-        extra_kwargs (dict): Additional keyword arguments for the method.
-        results_bag: The results bag to store evaluation results.
+        inference_class: The inference class.
+        task: The benchmark task.
+        benchmark_num_simulations: The total number of training simulations.
+        extra_kwargs: Additional keyword arguments for the method.
+        seed: The training seed.
+
+    Returns:
+        The metrics for the evaluation observation.
     """
-    torch.manual_seed(SEED)
-    task = get_task(task_name)
+    idx_eval = NUM_EVALUATION_OBS_SEQ
+    # Load x_o before seeding: the Gaussian tasks reseed torch in get_observation.
+    x_o = task.get_observation(idx_eval)
+    torch.manual_seed(seed)
     num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
     thetas, xs = task.get_data(num_simulations)
     prior = task.get_prior()
-    idx_eval = NUM_EVALUATION_OBS_SEQ
-    x_o = task.get_observation(idx_eval)
     simulator = task.get_simulator()
 
     # Round 1
-    inference = inference_class(prior, **extra_kwargs)
+    inference = inference_class(
+        prior, **_estimator_kwargs(inference_class, extra_kwargs)
+    )
     _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
     for _ in range(NUM_ROUNDS_SEQUENTIAL - 1):
@@ -241,49 +384,51 @@ def train_and_eval_sequential_inference(
 
     posterior = inference.build_posterior()
 
-    c2st_val = eval_c2st(posterior, task, idx_eval)
-
-    # Cache results
-    results_bag.metric = c2st_val
-    results_bag.num_simulations = benchmark_num_simulations
-    results_bag.task_name = task_name
-    results_bag.method = inference_class.__name__ + str(extra_kwargs)
+    return eval_observation(posterior, task, idx_eval)
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("task_name", TASKS, ids=str)
 def test_run_benchmark(
     inference_class,
-    task_name: str,
-    results_bag,
+    task: Task,
+    results_bag: ResultsBag,
     extra_kwargs: dict,
-    benchmark_mode: str,
     benchmark_num_simulations: int,
+    benchmark_seed: int,
+    request: pytest.FixtureRequest,
 ) -> None:
     """
     Benchmark test for amortized and sequential inference methods.
 
     Args:
         inference_class: The inference class to test i.e. NPE, NLE, NRE ...
-        task_name: The name of the task.
-        results_bag: The results bag to store evaluation results.
+        task: The benchmark task.
+        results_bag: The results bag to store evaluation results. Subclass of dict,
+            but allows item assignment with dot notation.
         extra_kwargs: Additional keyword arguments for the method.
-        benchmark_mode: The benchmark mode. This is a fixture which based on user
-            input, determines which type of methods should be run.
+        benchmark_num_simulations: The number of training simulations.
+        benchmark_seed: The training seed.
+        request: The pytest request, to read the benchmark mode.
     """
-    if benchmark_mode in ["snpe", "snle", "snre"]:
-        train_and_eval_sequential_inference(
-            inference_class,
-            task_name,
-            benchmark_num_simulations,
-            extra_kwargs,
-            results_bag,
-        )
+    mode = _benchmark_mode(request.config)
+    # Set before training, so a crashed case replaces the stored result of its label.
+    results_bag.method = (
+        f"{_class_id(inference_class, mode)}-{_kwargs_id(extra_kwargs)}"
+    )
+    results_bag.task_name = task.name
+    results_bag.seed = benchmark_seed
+    results_bag.num_simulations = benchmark_num_simulations
+    if mode in SEQUENTIAL_MODES:
+        train_and_eval = train_and_eval_sequential_inference
     else:
-        train_and_eval_amortized_inference(
-            inference_class,
-            task_name,
-            benchmark_num_simulations,
-            extra_kwargs,
-            results_bag,
-        )
+        train_and_eval = train_and_eval_amortized_inference
+    metrics = train_and_eval(
+        inference_class,
+        task,
+        benchmark_num_simulations,
+        extra_kwargs,
+        benchmark_seed,
+    )
+
+    for key, value in metrics.items():
+        results_bag[key] = round(value, 3)

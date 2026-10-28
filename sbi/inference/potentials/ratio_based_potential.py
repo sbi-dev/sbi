@@ -11,6 +11,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, mcmc_transform
 from sbi.utils.torchutils import atleast_2d
+from sbi.utils.user_input_checks import process_x
 
 
 def ratio_estimator_based_potential(
@@ -69,21 +70,39 @@ class RatioBasedPotential(BasePotential):
         self.ratio_estimator = ratio_estimator
         self.ratio_estimator.eval()
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Moves ratio_estimator and prior and the x_o to the given device.
+    @property
+    def x_embedding_net(self) -> Optional[nn.Module]:
+        """Return the net embedding `x` in the ratio estimator."""
+        return getattr(self.ratio_estimator, "embedding_net_x", None)
 
-        It also sets the device attribute to the given device.
+    def to(self, device: Union[str, torch.device]) -> "RatioBasedPotential":
+        """Move ratio estimator, prior and x_o to the given device.
 
         Args:
             device: Device to move the ratio_estimator, prior and x_o to.
 
+        Returns:
+            Self for method chaining.
         """
-        self.device = device
+        super().to(device)
         self.ratio_estimator.to(device)
-        self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
+        return self
+
+    def bind(
+        self, x_o: Optional[Tensor], x_is_iid: bool = True
+    ) -> "RatioBasedPotential":
+        """Create new potential with x bound, without mutable state."""
+        bound = RatioBasedPotential(
+            ratio_estimator=self.ratio_estimator,
+            prior=self.prior,
+            x_o=None,
+            device=self.device,
+        )
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        return bound
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for likelihood-ratio-based methods.

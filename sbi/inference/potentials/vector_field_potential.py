@@ -1,15 +1,19 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from torch.distributions import Distribution
 from zuko.distributions import NormalizingFlow
 
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.inference.potentials.score_fn_iid import get_iid_method
+from sbi.inference.potentials.vector_field_adaptor import (
+    get_guidance_method,
+    get_iid_method,
+)
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -19,6 +23,7 @@ from sbi.samplers.ode_solvers import build_neural_ode
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks import process_x
 
 
 class VectorFieldBasedPotential(BasePotential):
@@ -39,7 +44,8 @@ class VectorFieldBasedPotential(BasePotential):
         the vector field estimator does not define the score (SCORE_DEFINED = False),
         the gradient is not available and an error is raised.
 
-        Note that the potential function is not defined for the iid setting yet.
+        For iid observations, the potential is unnormalized: it combines the
+        single-observation posteriors as $p(\theta)^{1-n} \prod_i p(\theta|x_i)$.
 
         Args:
             vector_field_estimator: The neural network modelling the vector field.
@@ -58,6 +64,9 @@ class VectorFieldBasedPotential(BasePotential):
         self.vector_field_estimator.eval()
         self.iid_method = iid_method
         self.iid_params = iid_params
+        self.guidance_method: Optional[str] = None
+        self.guidance_params: Optional[Dict[str, Any]] = None
+        self.neural_ode_backend = neural_ode_backend
 
         neural_ode_kwargs = neural_ode_kwargs or {}
         self.neural_ode = build_neural_ode(
@@ -65,6 +74,7 @@ class VectorFieldBasedPotential(BasePotential):
             self.vector_field_estimator.net,
             self.vector_field_estimator.mean_base,
             self.vector_field_estimator.std_base,
+            self.vector_field_estimator.condition_shape,
             backend=neural_ode_backend,
             t_min=self.vector_field_estimator.t_min,
             t_max=self.vector_field_estimator.t_max,
@@ -72,23 +82,26 @@ class VectorFieldBasedPotential(BasePotential):
         )
 
         super().__init__(prior, x_o, device=device)
+        self._x_is_iid = False
+        if self._x_o is not None:
+            self.flow = self.rebuild_flow()
+
+    @property
+    def x_embedding_net(self) -> nn.Module:
+        """Return the net embedding `x`: the estimator's condition is `x`."""
+        return self.vector_field_estimator.embedding_net
 
     def to(self, device: Union[str, torch.device]) -> None:
         """
-        Moves score_estimator, prior and x_o to the given device.
+        Moves the vector field estimator, prior and x_o to the given device.
 
         It also sets the device attribute to the given device.
 
         Args:
-            device: Device to move the score_estimator, prior and x_o to.
+            device: Device to move the vector field estimator, prior and x_o to.
         """
-
-        self.device = device
-        self.vector_field_estimator.to(device)
-        if self.prior:
-            self.prior.to(device)  # type: ignore
-        if self._x_o is not None:
-            self._x_o = self._x_o.to(device)
+        super().to(device)
+        self.vector_field_estimator.to(self.device)
 
     def set_x(
         self,
@@ -96,6 +109,8 @@ class VectorFieldBasedPotential(BasePotential):
         x_is_iid: Optional[bool] = False,
         iid_method: Optional[str] = None,
         iid_params: Optional[Dict[str, Any]] = None,
+        guidance_method: Optional[str] = None,
+        guidance_params: Optional[Dict[str, Any]] = None,
         **ode_kwargs,
     ):
         """
@@ -103,6 +118,8 @@ class VectorFieldBasedPotential(BasePotential):
 
         Rebuilds the continuous normalizing flow if the observed data is set.
 
+        DEPRECATED: Use bind() instead. This method delegates to bind() internally.
+        It will be removed in a future release.
         Args:
             x_o: The observed data.
             x_is_iid: Whether the observed data is IID (if batch_dim>1).
@@ -112,13 +129,78 @@ class VectorFieldBasedPotential(BasePotential):
                 `IIDScoreFunction`.
             ode_kwargs: Additional keyword arguments for the neural ODE.
         """
-        super().set_x(x_o, x_is_iid)
-        self.iid_method = iid_method or self.iid_method
-        self.iid_params = iid_params
-        if not x_is_iid and (self._x_o is not None):
-            self.flow = self.rebuild_flow(**ode_kwargs)
-        elif self._x_o is not None:
-            self.flows = self.rebuild_flows_for_batch(**ode_kwargs)
+
+        warnings.warn(
+            "set_x() is deprecated and will be removed in a future release. "
+            "Use bind() instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        bound = self.bind(
+            x_o,
+            x_is_iid=x_is_iid,
+            iid_method=iid_method,
+            iid_params=iid_params,
+            guidance_method=guidance_method,
+            guidance_params=guidance_params,
+            **ode_kwargs,
+        )
+        self._x_o = bound._x_o
+        self._x_is_iid = bound._x_is_iid
+        self.iid_method = bound.iid_method
+        self.iid_params = bound.iid_params
+        self.guidance_method = bound.guidance_method
+        self.guidance_params = bound.guidance_params
+        if not x_is_iid and (bound._x_o is not None):
+            self.flow = bound.flow
+        elif bound._x_o is not None:
+            self.flows = bound.flows
+
+    def bind(
+        self,
+        x_o: Optional[Tensor],
+        x_is_iid: bool = False,
+        iid_method: Optional[str] = None,
+        iid_params: Optional[Dict[str, Any]] = None,
+        guidance_method: Optional[str] = None,
+        guidance_params: Optional[Dict[str, Any]] = None,
+        **ode_kwargs,
+    ) -> "VectorFieldBasedPotential":
+        """Create new potential with x bound, without mutable state."""
+        # IID and guidance require transforming the prior to standardized space.
+        if self.vector_field_estimator.compose_enabled:
+            if x_is_iid:
+                raise NotImplementedError(
+                    "compose_standardization does not yet support iid (x with "
+                    "batch>1). Use a single observation, or disable "
+                    "compose_standardization."
+                )
+            if guidance_method is not None:
+                raise NotImplementedError(
+                    "compose_standardization does not yet support guided sampling. "
+                    "Disable guidance, or disable compose_standardization."
+                )
+        bound = VectorFieldBasedPotential(
+            vector_field_estimator=self.vector_field_estimator,
+            prior=self.prior,
+            x_o=None,
+            device=self.device,
+            iid_method=iid_method if iid_method is not None else self.iid_method,
+            iid_params=iid_params,
+            neural_ode_backend=self.neural_ode_backend,
+        )
+        bound.neural_ode.params.update(self.neural_ode.params)
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+        bound._x_o = x_o
+        bound._x_is_iid = x_is_iid
+        bound.guidance_method = guidance_method
+        bound.guidance_params = guidance_params
+        if not x_is_iid and (bound._x_o is not None):
+            bound.flow = bound.rebuild_flow(**ode_kwargs)
+        elif bound._x_o is not None:
+            bound.flows = bound.rebuild_flows_for_batch(**ode_kwargs)
+        return bound
 
     def __call__(
         self,
@@ -136,11 +218,23 @@ class VectorFieldBasedPotential(BasePotential):
             The potential function, i.e., the log probability of the posterior.
         """
 
+        if self.guidance_method is not None:
+            raise NotImplementedError(
+                "Potential evaluation for guidance is not supported yet."
+            )
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
         self.vector_field_estimator.eval()
+
+        compose = self.vector_field_estimator.compose_enabled
+        if compose:
+            flow_input = self.vector_field_estimator.to_z(theta_density_estimator)
+            log_abs_det = self.vector_field_estimator.log_abs_det()
+        else:
+            flow_input = theta_density_estimator
 
         with torch.set_grad_enabled(track_gradients):
             if self.x_is_iid:
@@ -153,10 +247,7 @@ class VectorFieldBasedPotential(BasePotential):
                 num_iid = self.x_o.shape[0]  # number of iid samples
                 iid_posteriors_prob = torch.sum(
                     torch.stack(
-                        [
-                            flow.log_prob(theta_density_estimator).squeeze(-1)
-                            for flow in self.flows
-                        ],
+                        [flow.log_prob(flow_input).squeeze(-1) for flow in self.flows],
                         dim=0,
                     ),
                     dim=0,
@@ -167,7 +258,9 @@ class VectorFieldBasedPotential(BasePotential):
                     theta_density_estimator
                 ).squeeze(-1)
             else:
-                log_probs = self.flow.log_prob(theta_density_estimator).squeeze(-1)
+                log_probs = self.flow.log_prob(flow_input).squeeze(-1)
+                if compose:
+                    log_probs = log_probs - log_abs_det
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
 
@@ -209,6 +302,7 @@ class VectorFieldBasedPotential(BasePotential):
 
         if time is None:
             time = torch.tensor([self.vector_field_estimator.t_min])
+        assert time is not None
 
         if self._x_o is None:
             raise ValueError(
@@ -216,9 +310,23 @@ class VectorFieldBasedPotential(BasePotential):
                 "the potential or manually set self._x_o."
             )
 
+        if self.guidance_method is not None:
+            score_wrapper, config_cls = get_guidance_method(self.guidance_method)
+            config_params = config_cls(**(self.guidance_params or {}))
+            # Note to make this cross compatible with IID we need make this
+            # wrapper more like a proper estimator.
+            vf_estimator = score_wrapper(
+                self.vector_field_estimator,
+                self.prior,
+                config=config_params,
+                device=device,
+            )
+        else:
+            vf_estimator = self.vector_field_estimator
+
         with torch.set_grad_enabled(track_gradients):
             if not self.x_is_iid or self._x_o.shape[0] == 1:
-                score = self.vector_field_estimator.score(
+                score = vf_estimator.score(
                     input=theta, condition=self.x_o, t=time.to(device)
                 )
             else:
@@ -226,7 +334,7 @@ class VectorFieldBasedPotential(BasePotential):
 
                 iid_method = get_iid_method(self.iid_method)
                 score_fn_iid = iid_method(
-                    self.vector_field_estimator,
+                    vf_estimator,
                     self.prior,
                     device=device,
                     **(self.iid_params or {}),

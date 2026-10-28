@@ -11,6 +11,7 @@ import torch
 from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import (
+    Distance,
     biased_mmd_hypothesis_test,
     c2st,
     l1,
@@ -240,6 +241,21 @@ def test_distance_basic_functionality():
     assert wasserstein_distance(xo_stat, x_stat).min() >= 0
 
 
+def test_l1_matches_manhattan_distance_definition():
+    """l1 sums absolute differences over the last axis."""
+    y = torch.zeros(10)
+    y[0] = 1.0
+    assert torch.allclose(l1(torch.zeros(10), y), torch.tensor(1.0))
+
+    # Differing coordinates add up instead of averaging out.
+    y[1] = 2.0
+    assert torch.allclose(l1(torch.zeros(10), y), torch.tensor(3.0))
+
+    # Padding both inputs with identical coordinates leaves the distance alone.
+    y_wide = torch.cat([y, torch.zeros(10)])
+    assert torch.allclose(l1(torch.zeros(20), y_wide), torch.tensor(3.0))
+
+
 def test_distance_output_shapes():
     """Test that distance functions return correct output shapes."""
     # Test pairwise distances
@@ -257,3 +273,17 @@ def test_distance_output_shapes():
 
     assert mmd_distance(xo_stat, x_stat).shape == (batch_size,)
     assert wasserstein_distance(xo_stat, x_stat).shape == (batch_size,)
+
+
+@pytest.mark.parametrize("distance, x_o_shape", [("l2", (3,)), ("mmd", (4, 3))])
+@pytest.mark.parametrize("batch_size", [2, 3, 5, 12])
+def test_batched_distance_matches_unbatched(distance, x_o_shape, batch_size):
+    """Test that batching gives the same distances for every batch size."""
+    torch.manual_seed(0)
+    x_o = torch.randn(x_o_shape)
+    x = torch.randn(10, *x_o_shape)
+
+    expected = Distance(distance)(x_o, x)
+    actual = Distance(distance, batch_size=batch_size)(x_o, x)
+
+    assert torch.allclose(actual, expected)
