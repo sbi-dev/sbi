@@ -266,8 +266,8 @@ def test_forward_sde_matches_marginals(config_cls):
     estimator = config_cls().build(torch.randn(100, 1), torch.randn(100, 1)).double()
     one = torch.ones(1, 1, dtype=torch.float64)
     h = 1e-5
-    # Flow matching clamps its schedule at t = 0.99.
-    t_upper = min(estimator.t_max, 0.99)
+    # Flow matching clamps time at effective_t_max: its SDE is frozen above.
+    t_upper = getattr(estimator, "effective_t_max", estimator.t_max)
     times = torch.linspace(
         estimator.t_min + 0.01, t_upper - 0.01, 9, dtype=torch.float64
     )
@@ -307,8 +307,12 @@ def test_flow_matching_score_is_the_marginal_score():
     estimator.forward = exact_velocity
     inputs = torch.randn(5, 2, dtype=dtype)
     condition = torch.zeros(5, 1, dtype=dtype)
-    for t in [0.05, 0.5, 0.95]:
+    # Above effective_t_max (0.99), all SDE functions use the marginal at 0.99; the
+    # iid methods and guidance combine `score` with `mean_t_fn` and `std_fn`.
+    for t in [0.05, 0.5, 0.95, 0.995, 1.0]:
         time = torch.tensor([t], dtype=dtype)
-        a, _, marginal_cov = marginal(time)
-        expected = -torch.linalg.solve(marginal_cov, (inputs - a * mean).T).T
+        m = estimator.mean_t_fn(time).reshape(())
+        s = estimator.std_fn(time).reshape(())
+        marginal_cov = m**2 * cov + s**2 * eye
+        expected = -torch.linalg.solve(marginal_cov, (inputs - m * mean).T).T
         torch.testing.assert_close(estimator.score(inputs, condition, time), expected)
