@@ -170,10 +170,11 @@ def simulate_from_theta(
             all simulations and raises it. "nan" keeps going: a failed simulation
             returns NaN, or None for outputs that are not numeric (for a batched
             simulator, the whole batch), with one warning at the end; integer
-            outputs then become float64. If all simulations fail, the first
-            exception is raised. With more than one worker, an exception that the
-            workers cannot send back, e.g. one whose class is defined in a script,
-            arrives as a RuntimeError with its type and message.
+            outputs then become float64 (float32 on MPS). If all simulations
+            fail, the first exception is raised. With more than one worker, an
+            exception that the workers cannot send back, e.g. one whose class is
+            defined in a script, arrives as a RuntimeError with its type and
+            message.
         show_progress_bar: Whether to show a progress bar.
 
     Returns:
@@ -382,6 +383,9 @@ def _simulate(
         call_seeds = _distinct_seeds(len(starts), seed)[:, None]
     elif seed is not None:
         call_seeds = np.split(_distinct_seeds(num_simulations, seed), starts[1:])
+    if seed is not None:
+        # Leaves this process seeded also when only workers reseed.
+        seed_all_backends(seed)
 
     results: Generator[Any, None, None]
     if settings.num_workers == 1:
@@ -421,14 +425,12 @@ def _simulate(
     if first_failure is not None:
         _report_failures(first_failure, num_failed, num_simulations)
     x = _concatenate(outputs, fill_failed=num_failed > 0)
-    if device is None:
-        return x
-    if isinstance(x, list):
-        return [_to_device(row, device) for row in x]
-    return _to_device(x, device)
+    return x if device is None else _to_device(x, device)
 
 
 def _to_device(value: Any, device: torch.device) -> Any:
+    if type(value) in (list, tuple):
+        return type(value)(_to_device(item, device) for item in value)
     if not isinstance(value, Tensor):
         return value
     if device.type == "mps" and value.dtype == torch.float64:
@@ -663,10 +665,10 @@ def _fill_failed(rows: List[Any]) -> List[Any]:
     template = next((row for row in rows if row is not None), None)
     if isinstance(template, Tensor):
         floating = template.is_floating_point() or template.is_complex()
-        dtype = template.dtype if floating else torch.float64
+        mps = template.device.type == "mps"  # MPS has no float64.
+        dtype = template.dtype if floating else (float32 if mps else torch.float64)
         nan = torch.full_like(template, float("nan"), dtype=dtype)
-        # Rows of a partly failed worker task can sit on another device.
-        return [nan if row is None else row.to(template.device, dtype) for row in rows]
+        return [nan if row is None else row.to(dtype) for row in rows]
     if template is None or not _is_numeric(template):
         return rows
     nan = np.full(np.shape(template), np.nan)

@@ -151,18 +151,18 @@ def test_simulate_for_sbi_returns_numpy_outputs_on_theta_device():
 
 @pytest.mark.gpu
 @pytest.mark.parametrize("num_workers", [1, 2])
-def test_ragged_tensor_outputs_stay_on_theta_device(num_workers):
+def test_tensors_in_list_outputs_stay_on_theta_device(num_workers):
     theta = torch.arange(4.0, device=process_device("gpu")).unsqueeze(1)
 
     x = simulate_from_theta(
-        lambda t: torch.zeros(int(t[0]) + 1, device=t.device),
+        lambda t: [torch.zeros(int(t[0]) + 1, device=t.device)],
         theta,
         num_workers=num_workers,
         show_progress_bar=False,
     )
 
-    assert [row.shape[0] for row in x] == [1, 2, 3, 4]
-    assert {row.device for row in x} == {theta.device}
+    assert [row[0].shape[0] for row in x] == [1, 2, 3, 4]
+    assert {row[0].device for row in x} == {theta.device}
 
 
 def test_simulate_for_sbi_reproducible_with_seed(prior):
@@ -178,6 +178,15 @@ def test_simulate_for_sbi_reproducible_with_seed(prior):
 
     assert torch.equal(run(seed=0), run(seed=0))
     assert not torch.equal(run(seed=0), run(seed=1))
+
+
+@pytest.mark.parametrize("num_workers", [1, 2])
+def test_seed_leaves_random_state_seeded(num_workers):
+    def draw_after_seeded_call():
+        simulate_from_theta(double, np.zeros((4, 2)), num_workers=num_workers, seed=0)
+        return np.random.rand()
+
+    assert draw_after_seeded_call() == draw_after_seeded_call()
 
 
 @pytest.mark.parametrize(
