@@ -54,3 +54,8 @@ trainer.append_simulations(theta, x).train()
 `cloudpickle` to serialize the simulator. Almost all simulators will be
 picklable with `cloudpickle`, but we have experienced issues, e.g., with `neuron`
 simulators, see [here](https://github.com/sbi-dev/sbi/issues/317).
+
+## See also
+
+For how to run simulations in parallel with `sbi`, see the how-to guide
+[How to run simulations in parallel](../how_to_guide/27_running_simulations_in_parallel.ipynb).
