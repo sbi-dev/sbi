@@ -33,6 +33,7 @@ from sbi.neural_nets import posterior_flow_nn, posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, MultipleIndependent
+from sbi.utils.torchutils import process_device
 from sbi.utils.vector_field_utils import (
     VectorFieldNet,
     add_diag_or_dense,
@@ -302,6 +303,26 @@ def test_interval_guidance_takes_any_batch_size_after_the_first_call():
         inputs = torch.randn(num_samples, 1, 2)
         scores = guidance(inputs, torch.zeros(1, 2), torch.tensor([0.5]))
         assert scores.shape == inputs.shape
+
+
+@pytest.mark.gpu
+def test_interval_guidance_on_gpu_matches_cpu():
+    """Bounds and a mask given on the CPU guide inputs on the GPU."""
+    device = process_device("gpu")
+    theta = torch.randn(100, 2)
+    estimator = posterior_score_nn(sde_type="vp")(theta, theta)
+    config = IntervalGuidanceConfig(
+        lower_bound=torch.tensor([-0.2, -1.0]),
+        upper_bound=torch.tensor([0.3, 1.0]),
+        mask=torch.tensor([True, False]),
+    )
+    inputs, x_o, time = torch.randn(5, 1, 2), torch.zeros(1, 2), torch.tensor([0.5])
+    expected = IntervalGuidance(estimator, None, config)(inputs, x_o, time)
+
+    guidance = IntervalGuidance(estimator.to(device), None, config, device=device)
+    scores = guidance(inputs.to(device), x_o.to(device), time.to(device))
+
+    torch.testing.assert_close(scores.cpu(), expected, rtol=1e-4, atol=1e-5)
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve"])

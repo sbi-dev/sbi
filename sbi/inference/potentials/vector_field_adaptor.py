@@ -444,20 +444,25 @@ class IntervalGuidance(UniversalGuidance):
             input: Tensor, condition: Tensor, m: Tensor, std: Tensor
         ) -> Tensor:
             del condition, m
+
+            def like_input(value: Union[float, Tensor]) -> Tensor:
+                return torch.as_tensor(value, dtype=input.dtype, device=input.device)
+
             scale = config.scale_factor / (std**2 + 1e-6)
             upper_bound = (
-                F.logsigmoid(-scale * (input - config.upper_bound))
+                F.logsigmoid(-scale * (input - like_input(config.upper_bound)))
                 if config.upper_bound is not None
                 else torch.zeros_like(input)
             )
             lower_bound = (
-                F.logsigmoid(scale * (input - config.lower_bound))
+                F.logsigmoid(scale * (input - like_input(config.lower_bound)))
                 if config.lower_bound is not None
                 else torch.zeros_like(input)
             )
             out = upper_bound + lower_bound
             if config.mask is not None:
-                out = torch.where(config.mask, out, torch.zeros_like(out))
+                mask = config.mask.to(out.device)
+                out = torch.where(mask, out, torch.zeros_like(out))
             return out
 
         super().__init__(
