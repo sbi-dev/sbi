@@ -378,7 +378,7 @@ def _simulate(
     batch_size = settings.batch_size(num_simulations)
     starts = range(0, num_simulations, batch_size)
     sizes = [min(batch_size, num_simulations - start) for start in starts]
-    uses_threads = settings.num_workers != 1 and _uses_threads()
+    uses_threads = _runs_threads(settings.num_workers)
     if seed is not None and uses_threads:
         raise ValueError(
             "`seed` needs process workers, but joblib is set to use threads, which "
@@ -514,10 +514,13 @@ def _run_in_worker(
     return result._replace(output=_to_transport(result.output))
 
 
-def _uses_threads() -> bool:
-    """Whether joblib's active backend runs tasks in threads of this process."""
+def _runs_threads(num_workers: int) -> bool:
+    """Whether joblib runs tasks in several threads of this process at once."""
+    if num_workers == 1:
+        return False
     backend, _ = get_active_backend()
-    return getattr(backend, "uses_threads", False)
+    uses_threads = getattr(backend, "uses_threads", False)
+    return uses_threads and backend.effective_n_jobs(num_workers) > 1
 
 
 def _sendable(error: Exception) -> Exception:
