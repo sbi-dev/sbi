@@ -6,11 +6,10 @@ from functools import partial
 import pytest
 import torch
 from pytest_harvest import ResultsBag
-from torch.distributions import MultivariateNormal
 
 from sbi.inference import FMPE, MNLE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.trainers.npe import NPE_A, NPE_C
+from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
 from sbi.neural_nets import DensityConfigBase, FlowMatchingConfig, MixedConfig
 from sbi.neural_nets.net_builders.estimator_configs import (
@@ -47,7 +46,7 @@ METHOD_GROUPS = {
     "fmpe": [FMPE],
     "npse": [NPSE],
     "vfpe": [FMPE, NPSE],
-    "snpe": [NPE_C, NPE_A],  # NPE_B not implemented
+    "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
     "mnle": [MNLE],
@@ -369,27 +368,16 @@ def train_and_eval_sequential_inference(
     inference = inference_class(
         prior, **_estimator_kwargs(inference_class, extra_kwargs)
     )
-    # NPE-A treats a first round on prior simulations as final unless told not to.
-    first_round = dict(final_round=False) if inference_class is NPE_A else {}
-    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS, **first_round)
+    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
-    for r in range(1, NUM_ROUNDS_SEQUENTIAL):
+    for _ in range(NUM_ROUNDS_SEQUENTIAL - 1):
         proposal = inference.build_posterior().set_default_x(x_o)
-        if inference_class is NPE_A and isinstance(prior, MultivariateNormal):
-            # As in the how-to guide: a widened Gaussian keeps the correction stable.
-            samples = proposal.sample((10_000,))
-            proposal = MultivariateNormal(samples.mean(0), 2 * torch.cov(samples.T))
         thetas_i = proposal.sample((num_simulations,))
         xs_i = simulator(thetas_i)
         if "npe" in inference_class.__name__.lower():
-            # NPE-A trains its mixture only in the final round.
-            final_round = (
-                dict(final_round=r == NUM_ROUNDS_SEQUENTIAL - 1)
-                if inference_class is NPE_A
-                else {}
-            )
+            # NPE_C requires a Gaussian prior
             _ = inference.append_simulations(thetas_i, xs_i, proposal=proposal).train(
-                **TRAIN_KWARGS, **final_round
+                **TRAIN_KWARGS
             )
         else:
             inference.append_simulations(thetas_i, xs_i).train(**TRAIN_KWARGS)
@@ -422,9 +410,6 @@ def test_run_benchmark(
         benchmark_seed: The training seed.
         request: The pytest request, to read the benchmark mode.
     """
-    estimator = extra_kwargs.get("density_estimator", "mdn")
-    if inference_class is NPE_A and estimator != "mdn":
-        pytest.skip("NPE-A needs a mixture density network.")
     mode = _benchmark_mode(request.config)
     # Set before training, so a crashed case replaces the stored result of its label.
     results_bag.method = (
