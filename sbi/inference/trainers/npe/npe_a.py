@@ -277,7 +277,8 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         Raises:
             ValueError: If the proposal is a mixture, e.g. the posterior of a final
-                round, or if `final_round=True` would expand the network while
+                round, if a round that is not final follows a final round, or if
+                `final_round=True` would expand the network while
                 `resume_training=True`.
         """
 
@@ -327,10 +328,10 @@ class NPE_A(PosteriorEstimatorTrainer):
             self._build_neural_net = partial(
                 self._build_neural_net, num_components=num_components
             )
-        elif num_components > 1:
+        else:
             mdn = self._neural_net.net
             assert isinstance(mdn, MultivariateGaussianMDN)
-            if mdn.num_components == 1:
+            if num_components > 1 and mdn.num_components == 1:
                 if resume_training:
                     raise ValueError(
                         "`final_round=True` replaces the output layers of the "
@@ -338,6 +339,15 @@ class NPE_A(PosteriorEstimatorTrainer):
                         "`train(final_round=True)` without `resume_training`."
                     )
                 mdn.expand_components(num_components, component_perturbation)
+            elif num_components == 1 and mdn.num_components > 1:
+                raise ValueError(
+                    f"The network is already a mixture of {mdn.num_components} "
+                    "Gaussians from a final round, so this round cannot train one "
+                    "Gaussian. A first round on simulations from the prior is final "
+                    "by default. Pass `final_round=True` to train the mixture again, "
+                    "or start a new NPE_A and pass `final_round=False` in its first "
+                    "round."
+                )
 
         density_estimator = super().train(**kwargs)
 

@@ -1305,3 +1305,20 @@ def test_npe_a_trainer_pickled_without_num_components_can_finish():
     loaded.train(max_num_epochs=2, final_round=True)
 
     assert loaded._num_components == 3
+
+
+def test_npe_a_rejects_a_round_that_is_not_final_after_a_final_round():
+    """The mixture of a final round cannot shrink back to one Gaussian, so a round
+    that is not final must raise instead of silently training the mixture."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference = NPE_A(prior, num_components=3, show_progress_bars=False)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=2)
+    proposal = MultivariateNormal(zeros(2), 0.5 * eye(2))
+    theta = proposal.sample((100,))
+    inference.append_simulations(theta, theta, proposal=proposal)
+    rounds_trained = len(inference._summary["epochs_trained"])
+
+    with pytest.raises(ValueError, match="already a mixture"):
+        inference.train(max_num_epochs=2, final_round=False)
+    assert len(inference._summary["epochs_trained"]) == rounds_trained
