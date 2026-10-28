@@ -10,7 +10,7 @@ import pytest
 import torch
 
 from sbi.inference import simulate_for_sbi
-from sbi.utils import BoxUniform, simulate_from_theta
+from sbi.utils import BoxUniform, parallelize_simulator, simulate_from_theta
 from sbi.utils.torchutils import process_device
 
 
@@ -45,6 +45,25 @@ def numpy_noise(theta):
 def noise_from_all_backends(theta):
     noise = np.random.randn(*np.shape(theta)) + torch.randn(np.shape(theta)).numpy()
     return np.asarray(theta) + noise + random.random()
+
+
+def fails_for_negative(theta):
+    if (theta < 0).any():
+        raise ValueError("negative parameter")
+    return theta * 2.0
+
+
+class SolverError(Exception):
+    """An exception that cannot be unpickled: `args` holds one message."""
+
+    def __init__(self, code, detail):
+        super().__init__(f"code {code}: {detail}")
+
+
+def fails_with_solver_error(theta):
+    if (theta < 0).any():
+        raise SolverError(3, "diverged")
+    return theta * 2.0
 
 
 @pytest.fixture
@@ -296,11 +315,99 @@ def test_parallel_error_cancels_remaining_simulations(tmp_path):
     assert len(list(tmp_path.iterdir())) < num_simulations // 2
 
 
+@pytest.mark.parametrize("num_workers", [1, 2])
+@pytest.mark.parametrize("simulator_is_batched", [False, True])
+def test_on_error_nan_keeps_finished_simulations(num_workers, simulator_is_batched):
+    theta = torch.ones(8, 2)
+    theta[3] = -1.0
+    failed = torch.zeros(8, dtype=torch.bool)
+    failed[[2, 3] if simulator_is_batched else [3]] = True
+
+    with pytest.warns(UserWarning, match="simulations failed") as record:
+        x = simulate_from_theta(
+            fails_for_negative,
+            theta,
+            num_workers=num_workers,
+            simulation_batch_size=2,
+            simulator_is_batched=simulator_is_batched,
+            on_error="nan",
+            show_progress_bar=False,
+        )
+
+    assert len(record) == 1
+    assert f"{int(failed.sum())} of 8 simulations failed" in str(record[0].message)
+    assert torch.isnan(x[failed]).all()
+    assert torch.equal(x[~failed], theta[~failed] * 2.0)
+
+
+@pytest.mark.parametrize("on_error", ["raise", "nan"])
+@pytest.mark.parametrize("num_workers", [1, 2])
+def test_simulator_error_keeps_type_and_names_parameter_set(on_error, num_workers):
+    theta = -torch.ones(4, 2) if on_error == "nan" else torch.ones(4, 2)
+    theta[2] = -1.0
+
+    with pytest.raises(ValueError, match="negative parameter") as error:
+        simulate_from_theta(
+            fails_for_negative,
+            theta,
+            num_workers=num_workers,
+            on_error=on_error,
+            show_progress_bar=False,
+        )
+
+    assert "theta[" in " ".join(error.value.__notes__)
+
+
 @pytest.mark.parametrize(
     "setting",
-    [{"num_workers": 0}, {"simulation_batch_size": 0}],
-    ids=["num_workers", "simulation_batch_size"],
+    [{"num_workers": 0}, {"simulation_batch_size": 0}, {"on_error": "ignore"}],
+    ids=["num_workers", "simulation_batch_size", "on_error"],
 )
 def test_invalid_settings_raise(setting):
     with pytest.raises(ValueError, match=next(iter(setting))):
         simulate_from_theta(double, torch.ones(4, 2), **setting)
+
+
+def test_parallelize_simulator_forwards_settings():
+    @parallelize_simulator(
+        num_workers=2,
+        simulation_batch_size=3,
+        simulator_is_batched=True,
+        on_error="nan",
+    )
+    def simulator(theta):
+        if (theta < 0).any():
+            raise ValueError("negative parameter")
+        return np.full((len(theta), 1), float(len(theta)))
+
+    theta = np.ones((10, 1))
+    theta[9] = -1.0
+    with pytest.warns(UserWarning, match="1 of 10 simulations failed"):
+        x = simulator(theta)
+
+    assert np.array_equal(x[:9], np.full((9, 1), 3.0))
+    assert np.isnan(x[9]).all()
+
+
+@pytest.mark.parametrize("on_error", ["raise", "nan"])
+def test_unpicklable_simulator_error_keeps_parallel_results(on_error):
+    theta = torch.ones(8, 2)
+    theta[3] = -1.0
+
+    if on_error == "raise":
+        with pytest.raises(RuntimeError, match="SolverError: code 3: diverged"):
+            simulate_from_theta(
+                fails_with_solver_error, theta, num_workers=2, show_progress_bar=False
+            )
+        return
+    with pytest.warns(UserWarning, match="1 of 8 simulations failed"):
+        x = simulate_from_theta(
+            fails_with_solver_error,
+            theta,
+            num_workers=2,
+            on_error="nan",
+            show_progress_bar=False,
+        )
+
+    assert torch.isnan(x[3]).all()
+    assert torch.equal(x[torch.arange(8) != 3], theta[torch.arange(8) != 3] * 2.0)
