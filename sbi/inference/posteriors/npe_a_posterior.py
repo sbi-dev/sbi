@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
 from typing import Dict, Optional, Union
 
 import torch
@@ -14,11 +13,6 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     ProposalCorrectedMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
-from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
-
-# A corrected posterior this much wider (in variance) than its proposal in some
-# direction is a sign of an unstable correction.
-_UNSTABLE_WIDTH_RATIO: float = 5.0
 
 
 class NPE_A_Posterior(DirectPosterior):
@@ -103,8 +97,8 @@ class NPE_A_Posterior(DirectPosterior):
         if proposal_mog is not None and proposal_mog.num_components > 1:
             raise ValueError(
                 "This NPE-A posterior was saved by sbi 0.26 or 0.27 with a mixture "
-                "proposal, for which the correction was wrong (sbi issue #2108). It "
-                "cannot be loaded. Please train it again."
+                "proposal, whose correction was wrong (sbi issue #2108). Please "
+                "train it again."
             )
         if proposal_mog is not None:
             estimator = ProposalCorrectedMDN(
@@ -115,40 +109,6 @@ class NPE_A_Posterior(DirectPosterior):
             # A cached MAP was computed from the uncorrected density.
             state_dict["_map"] = None
         super().__setstate__(state_dict)
-
-    def set_default_x(self, x: Tensor) -> "NPE_A_Posterior":
-        """Set the default x, and warn if the correction looks unstable for it.
-
-        With a Gaussian prior, a corrected posterior much wider than its proposal
-        means that a component of the density estimator was barely narrower than
-        the proposal, which makes the closed-form correction unstable (Papamakarios
-        & Murray 2016, Appendix C). The check runs here, once per observation, and
-        not in `sample()` or `log_prob()` with an explicit `x`.
-
-        Args:
-            x: The default observation.
-
-        Returns:
-            The posterior, with `x` as its default.
-        """
-        super().set_default_x(x)
-        estimator = self.posterior_estimator
-        if isinstance(estimator, ProposalCorrectedMDN):
-            condition = reshape_to_batch_event(
-                self.default_x, estimator.condition_shape
-            )
-            ratio = estimator.width_ratio_to_proposal(condition)
-            if ratio is not None and ratio > _UNSTABLE_WIDTH_RATIO:
-                warnings.warn(
-                    f"The NPE-A posterior is {ratio:.1f} times wider (in variance) "
-                    "than its proposal in some direction, which usually means the "
-                    "closed-form correction is unstable (Papamakarios & Murray "
-                    "2016, Appendix C). See the NPE-A section of the how-to guide "
-                    "'How to run sequential methods', or use NPE_C.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-        return self
 
     def get_mog_params(self, x: Tensor) -> MoG:
         """Get the (possibly corrected) MoG parameters for given observation.

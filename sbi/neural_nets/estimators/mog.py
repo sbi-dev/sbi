@@ -619,48 +619,10 @@ def _check_single_gaussian_proposal(num_components: int) -> None:
     """
     if num_components > 1:
         raise ValueError(
-            "NPE-A divides by the proposal in closed form, which needs a proposal "
-            "with a single Gaussian (Papamakarios & Murray 2016, Appendix C), but "
-            f"this proposal has {num_components}. NPE-A trains one "
-            "Gaussian in every round but the final one, so the posterior of a final "
-            "round cannot be the proposal of another round. A first round on "
-            "simulations from the prior is final by default: in a loop over "
-            "rounds, pass `final_round=(r == num_rounds - 1)` to `train()`. For "
-            "more rounds with a mixture, use NPE_C."
+            f"NPE-A needs a single-Gaussian proposal, this one has {num_components} "
+            "components, e.g. a final-round posterior. In a loop over rounds, pass "
+            "`final_round=(r == num_rounds - 1)` to `train()`."
         )
-
-
-def _width_ratio_to_proposal(posterior_mog: MoG, proposal_mog: MoG) -> float:
-    """How much wider the corrected posterior is than its proposal, in variance.
-
-    Returns the largest eigenvalue of `P_proposal @ Cov(posterior)`, over the batch.
-    A density component that is barely narrower than the proposal keeps almost no
-    precision after the correction, so the corrected component becomes very wide and
-    can get most of the weight. A large ratio is therefore a sign of an unstable
-    correction (Papamakarios & Murray 2016, Appendix C). It is meaningful for
-    Gaussian priors; a bounded prior cuts off wide directions.
-
-    Args:
-        posterior_mog: Corrected MoG.
-        proposal_mog: MoG of the proposal, with a single component.
-
-    Returns:
-        The largest variance ratio.
-    """
-    with torch.no_grad():
-        weights = posterior_mog.weights.unsqueeze(-1)
-        means = posterior_mog.means
-        covariances = torch.linalg.inv(posterior_mog.precisions)
-        # Centered means: a raw second moment minus the squared mean loses the
-        # covariance in float32 when the means are large.
-        centered = means - (weights * means).sum(1, keepdim=True)
-        covariance = (
-            weights.unsqueeze(-1)
-            * (covariances + centered.unsqueeze(-1) * centered.unsqueeze(-2))
-        ).sum(1)
-        # Eigenvalues of P_proposal @ covariance, in the symmetric form L^T C L.
-        factor = torch.linalg.cholesky(proposal_mog.precisions[:, 0])
-        return torch.linalg.eigvalsh(factor.mT @ covariance @ factor).max().item()
 
 
 def correct_for_proposal(
@@ -675,10 +637,8 @@ def correct_for_proposal(
     The true posterior is computed as:
         posterior = density_estimator * prior / proposal
 
-    With a single Gaussian as proposal, this is a MoG with the components of the
-    density estimator, computed in closed form. A mixture proposal would put a sum
-    of Gaussians in the denominator, which is no MoG, so it raises. The correction
-    also fails if the proposal is narrower than a component of the density.
+    With a single-Gaussian proposal, the result is a MoG with the components of the
+    density estimator.
 
     For uniform priors, pass `prior_mog=None`. The prior term is then omitted
     from the correction (uniform has zero precision).
@@ -718,13 +678,10 @@ def correct_for_proposal(
         precf_post = torch.linalg.cholesky(prec_post_stabilized, upper=True)
     except torch.linalg.LinAlgError as e:
         raise ValueError(
-            "The NPE-A posterior precision is not positive definite: a component "
-            "of the density estimator is wider than the proposal in some direction "
-            "(Papamakarios & Murray 2016, Appendix C). Draw the next round from a "
-            "wider Gaussian, simulate more per round, use fewer `num_components`, "
-            "or use NPE_C. See the NPE-A section of the how-to guide 'How to run "
-            "sequential methods'. "
-            f"Original error: {e}"
+            "The NPE-A posterior precision is not positive definite, because a "
+            "component of the density estimator is wider than the proposal. Use "
+            "a wider proposal (see the how-to guide 'How to run sequential "
+            f"methods') or NPE_C. Original error: {e}"
         ) from e
 
     # Compute posterior covariances using solve for numerical stability

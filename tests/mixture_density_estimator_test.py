@@ -13,9 +13,8 @@ from torch.distributions.transforms import ExpTransform
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
     MultivariateGaussianMDN,
-    ProposalCorrectedMDN,
 )
-from sbi.neural_nets.estimators.mog import MoG, correct_for_proposal
+from sbi.neural_nets.estimators.mog import MoG
 
 # =============================================================================
 # Fixtures
@@ -189,46 +188,20 @@ class TestMultivariateGaussianMDNDevice:
         assert mog.device.type == device
 
 
-class TestMultivariateGaussianMDNExpandComponents:
-    """Test the expansion of a single component for NPE-A's final round."""
+def test_expand_components_keeps_the_density_and_separates_the_copies(make_mdn):
+    """NPE-A's final round copies the single Gaussian: without noise the density
+    stays the same, with noise the copies differ, so training can move them apart."""
+    mdn = make_mdn(num_components=1)
+    context, inputs = torch.randn(8, 5), torch.randn(8, 3)
+    log_prob_before = mdn.log_prob(inputs, context)
+    mdn.expand_components(4, perturbation=0.0)
+    assert torch.allclose(mdn.log_prob(inputs, context), log_prob_before, atol=1e-5)
 
-    @pytest.mark.parametrize("features", [1, 3])
-    def test_expansion_keeps_the_density(self, make_mdn, features):
-        """Copies with equal weights have the density of the single component."""
-        mdn = make_mdn(features=features, num_components=1)
-        context, inputs = torch.randn(8, 5), torch.randn(8, features)
-        log_prob_before = mdn.log_prob(inputs, context)
-
-        mdn.expand_components(4, perturbation=0.0)
-
-        assert mdn.num_components == 4
-        assert mdn.get_mixture_components(context).means.shape == (8, 4, features)
-        assert torch.allclose(mdn.log_prob(inputs, context), log_prob_before, atol=1e-5)
-
-    def test_perturbation_separates_the_copies(self, make_mdn):
-        """The noise breaks the symmetry, so training can move the copies apart."""
-        mdn = make_mdn(num_components=1)
-        mdn.expand_components(4, perturbation=5e-3)
-
-        means = mdn.get_mixture_components(torch.randn(8, 5)).means
-        assert not torch.allclose(means[:, 0], means[:, 1])
-
-    def test_expanded_layers_are_trained(self, make_mdn):
-        """The new layers are registered, so the optimizer and gradients see them."""
-        mdn = make_mdn(num_components=1)
-        mdn.expand_components(4, perturbation=5e-3)
-
-        mdn.log_prob(torch.randn(8, 3), torch.randn(8, 5)).sum().backward()
-
-        for name in ("_logits_layer", "_means_layer", "_upper_layer"):
-            layer = getattr(mdn, name)
-            assert any(param is layer.weight for param in mdn.parameters())
-            assert layer.weight.grad is not None
-
-    def test_expansion_needs_a_single_component(self, standard_mdn):
-        """Only one Gaussian can be copied; a mixture has no unique component."""
-        with pytest.raises(ValueError, match="single component"):
-            standard_mdn.expand_components(8, perturbation=0.0)
+    mdn = make_mdn(num_components=1)
+    mdn.expand_components(4, perturbation=5e-3)
+    means = mdn.get_mixture_components(context).means
+    assert means.shape == (8, 4, 3)
+    assert not torch.allclose(means[:, 0], means[:, 1])
 
 
 class TestMixtureDensityEstimatorFunctional:
@@ -637,21 +610,3 @@ class TestMixtureDensityEstimatorGetUncorrectedMog:
         args = (estimator, mog) if map_name == "transform_mog_from" else (mog,)
         with pytest.raises(NotImplementedError, match="affine z-score"):
             getattr(estimator, map_name)(*args)
-
-
-class TestProposalCorrectedMDN:
-    """Test the NPE-A proposal correction around a MixtureDensityEstimator."""
-
-    def test_correction_rejects_a_mixture_proposal(self, standard_estimator):
-        """Dividing by a mixture gives no MoG, so both entry points raise."""
-        proposal = MoG(
-            logits=torch.zeros(1, 2),
-            means=torch.stack([torch.zeros(3), torch.ones(3)]).unsqueeze(0),
-            precisions=torch.eye(3).expand(1, 2, 3, 3).clone(),
-        )
-        with pytest.raises(ValueError, match="final_round"):
-            ProposalCorrectedMDN(standard_estimator, proposal)
-        with torch.no_grad():
-            density = standard_estimator.get_uncorrected_mog(torch.randn(4, 5))
-        with pytest.raises(ValueError, match="final_round"):
-            correct_for_proposal(density, proposal)

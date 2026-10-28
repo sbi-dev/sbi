@@ -19,12 +19,7 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
-from sbi.neural_nets.estimators.mog import (
-    MoG,
-    _check_single_gaussian_proposal,
-    _width_ratio_to_proposal,
-    correct_for_proposal,
-)
+from sbi.neural_nets.estimators.mog import MoG, correct_for_proposal
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import CallableTransform
 from sbi.utils.torchutils import infer_module_device
@@ -264,31 +259,16 @@ class MultivariateGaussianMDN(nn.Module):
         return mog.sample(sample_shape)
 
     def expand_components(self, num_components: int, perturbation: float) -> None:
-        """Replace the single mixture component by `num_components` copies of it.
+        """Replace the single component by `num_components` noisy copies of it.
 
-        Every output layer is repeated per component, and equal logits give each copy
-        the weight `1 / num_components`, so without noise the mixture has the density
-        of the single component. Gaussian noise on the copied weights and biases breaks
-        the symmetry, so that training can move the copies apart. NPE-A uses this for
-        its final round (Papamakarios & Murray 2016, Algorithm 2).
+        Equal logits keep the density of the single component, and the noise lets
+        training move the copies apart (Papamakarios & Murray 2016, Algorithm 2).
 
         Args:
             num_components: Number of components after the expansion.
-            perturbation: Standard deviation of the noise added to the copied weights
-                and biases.
-
-        Raises:
-            ValueError: If the MDN has more than one component, or if
-                `num_components` is smaller than one.
+            perturbation: Standard deviation of the noise on the copied weights.
         """
-        if self._num_components != 1:
-            raise ValueError(
-                "Only an MDN with a single component can be expanded, this one has "
-                f"{self._num_components}."
-            )
-        if num_components < 1:
-            raise ValueError(f"num_components must be >= 1, got {num_components}")
-
+        assert self._num_components == 1
         for name in (
             "_logits_layer",
             "_means_layer",
@@ -304,8 +284,7 @@ class MultivariateGaussianMDN(nn.Module):
                 device=layer.weight.device,
                 dtype=layer.weight.dtype,
             )
-            # Outputs are ordered by component, so repeating the rows copies whole
-            # components.
+            # Outputs are ordered by component, so repeated rows copy components.
             with torch.no_grad():
                 expanded.weight.copy_(layer.weight.repeat(num_components, 1))
                 expanded.bias.copy_(layer.bias.repeat(num_components))
@@ -766,10 +745,8 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
 
         Raises:
             NotImplementedError: If the estimator's input transform is not affine.
-            ValueError: If the proposal has more than one component.
         """
         estimator._affine_transform()  # Raises for a non-affine z-score.
-        _check_single_gaussian_proposal(proposal_mog.num_components)
         super().__init__(estimator, estimator.input_shape, estimator.condition_shape)
         device = infer_module_device(estimator, fallback="cpu")
         self._proposal_mog = proposal_mog.to(device).detach()
@@ -801,21 +778,6 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
         """
         density_mog = self.net.get_uncorrected_mog(condition)
         return correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
-
-    def width_ratio_to_proposal(self, condition: Tensor) -> Optional[float]:
-        """How much wider the corrected posterior is than its proposal, in variance.
-
-        Args:
-            condition: Conditions, shape (batch_dim, *condition_shape).
-
-        Returns:
-            The largest variance ratio over the batch, or None for a uniform prior,
-            whose bounds make the ratio meaningless.
-        """
-        if self._prior_mog is None:
-            return None
-        mog = self.get_corrected_mog(condition)
-        return _width_ratio_to_proposal(mog, self._proposal_mog)
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Log probability under the corrected MoG; shapes as in the wrapped MDN."""
