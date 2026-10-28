@@ -198,7 +198,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 "auto_gauss" for these reasons. Note that in order to use the iid
                 method, the vector field estimator must support it and have
                 SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.
-                iid methods need `sample_with="sde"`.
+                iid methods need a posterior built with `sample_with="sde"`.
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
             guidance_method: Method to guide the diffusion process. If None, no guidance
@@ -208,7 +208,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 likelihood. `Universal` can be used to guide the diffusion process with
                 a general guidance function. `Interval` is an instance of that where
                 the guidance function constraints the diffusion process to a given
-                interval. Guidance needs `sample_with="sde"`.
+                interval. Guidance needs a posterior built with `sample_with="sde"`.
             guidance_params: Additional parameters passed to the guidance method. See
                 the specific `ScoreAdaptation` child class for details, specifically
                 `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
@@ -810,6 +810,15 @@ class VectorFieldPosterior(NeuralPosterior):
             raise ValueError(
                 "Default `x` has not been set."
                 "To set the default, use the `.set_default_x()` method."
+            )
+
+        num_x = reshape_to_batch_event(
+            self.default_x, self.vector_field_estimator.condition_shape
+        ).shape[0]
+        if num_x > 1:
+            raise ValueError(
+                f"x has {num_x} rows, which are used as iid observations. `.map()` "
+                "supports a single observation only."
             )
 
         if self._map is None or force_update:

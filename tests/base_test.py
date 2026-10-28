@@ -258,6 +258,20 @@ def test_vector_field_posterior_ode_rejects_iid_and_guidance(
         posterior.sample((1,), x=x_o, show_progress_bars=False, **sample_kwargs)
 
 
+def test_vector_field_posterior_map_rejects_iid_x():
+    """MAP optimizes the potential of a single observation."""
+    theta, x = torch.randn(20, 2), torch.randn(20, 2)
+    posterior = VectorFieldPosterior(
+        vector_field_estimator=FlowMatchingConfig().build(theta, x),
+        prior=utils.BoxUniform(-torch.ones(2), torch.ones(2)),
+        sample_with="sde",
+    )
+    posterior.set_default_x(torch.zeros(3, 2))
+
+    with pytest.raises(ValueError, match="x has 3 rows"):
+        posterior.map(init_method=torch.zeros(1, 2), num_iter=1)
+
+
 @pytest.mark.parametrize(
     "losses",
     (

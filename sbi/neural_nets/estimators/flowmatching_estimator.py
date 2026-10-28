@@ -399,7 +399,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: variable whose distribution is estimated.
             condition: Conditioning variable.
-            t: Time.
+            t: Time, one for all samples or one per sample.
 
         Returns:
             Score function of the vector field estimator.
