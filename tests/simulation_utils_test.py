@@ -175,6 +175,22 @@ def test_simulate_for_sbi_returns_numpy_outputs_on_theta_device():
     assert x.device == theta.device
 
 
+@pytest.mark.gpu
+@pytest.mark.parametrize("num_workers", [1, 2])
+def test_ragged_tensor_outputs_stay_on_theta_device(num_workers):
+    theta = torch.arange(4.0, device=process_device("gpu")).unsqueeze(1)
+
+    x = simulate_from_theta(
+        lambda t: torch.zeros(int(t[0]) + 1, device=t.device),
+        theta,
+        num_workers=num_workers,
+        show_progress_bar=False,
+    )
+
+    assert [row.shape[0] for row in x] == [1, 2, 3, 4]
+    assert {row.device for row in x} == {theta.device}
+
+
 @pytest.mark.parametrize("num_workers", [1, 2])
 def test_simulate_for_sbi_reproducible_with_seed(prior, num_workers):
     def run(seed):

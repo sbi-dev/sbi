@@ -162,7 +162,9 @@ def simulate_from_theta(
             they do not depend on `num_workers` at a fixed `simulation_batch_size`.
             This holds for noise drawn on the CPU: with more than one worker, the
             simulator gets tensors on the CPU. The caller's random state is
-            restored afterwards. If None, the current random state is used.
+            restored afterwards. If None, the current random state is used; with
+            more than one worker, the workers are seeded from the global numpy
+            random state, so seeding before the call reproduces it.
         on_error: What to do when the simulator raises an exception. "raise" stops
             all simulations and raises it. "nan" keeps going: a failed simulation
             returns NaN, or None for outputs that are not numeric (for a batched
@@ -418,7 +420,11 @@ def _simulate(
     if first_failure is not None:
         _report_failures(first_failure, num_failed, num_simulations)
     x = _concatenate(outputs, fill_failed=num_failed > 0)
-    return x.to(device) if device is not None and isinstance(x, Tensor) else x
+    if device is None:
+        return x
+    if isinstance(x, list):
+        return [row.to(device) if isinstance(row, Tensor) else row for row in x]
+    return x.to(device) if isinstance(x, Tensor) else x
 
 
 def _run_batched(simulator: Callable, batch: _Batch, on_error: OnError) -> _BatchResult:
@@ -476,7 +482,7 @@ def _snapshot(output: Any) -> Any:
 
 
 def _run_in_worker(run: Callable, batch: _Batch, worker_seed: int) -> _BatchResult:
-    # Worker processes start from the same torch random state.
+    # Without this, worker results would not follow the caller's seed.
     seed_all_backends(worker_seed)
     try:
         result = run(batch._replace(theta=_from_transport(batch.theta)))
