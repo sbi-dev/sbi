@@ -167,10 +167,7 @@ def test_neutral_guidance_returns_the_score(estimator_type, guidance):
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
     theta = prior.sample((100,))
     x = theta + 0.1 * torch.randn_like(theta)
-    if estimator_type == "fmpe":
-        estimator = posterior_flow_nn()(theta, x)
-    else:
-        estimator = posterior_score_nn(sde_type=estimator_type)(theta, x)
+    estimator = _build_estimator(estimator_type, theta, x)
     # The zero-initialized output layer would make the net output zero.
     for parameter in estimator.net.parameters():
         torch.nn.init.normal_(parameter, std=0.1)
@@ -230,17 +227,10 @@ def test_prior_guide_score_does_not_depend_on_the_batch_layout(covariance_type):
 def test_interval_guidance_samples_the_truncated_posterior(estimator_type):
     """With the exact score of N(0, sd^2), a lower bound at 0 gives the half-normal."""
     posterior_sd = 0.5
-    theta, x = torch.randn(100, 1), torch.randn(100, 1)
-    if estimator_type == "fmpe":
-        estimator = posterior_flow_nn()(theta, x)
-    else:
-        estimator = posterior_score_nn(sde_type=estimator_type)(theta, x)
-
-    def exact_score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
-        m, s = estimator.mean_t_fn(t), estimator.std_fn(t)
-        return -input / (m**2 * posterior_sd**2 + s**2)
-
-    estimator.score = exact_score
+    estimator = _build_estimator(
+        estimator_type, torch.randn(100, 1), torch.randn(100, 1)
+    )
+    _use_exact_gaussian_score(estimator, posterior_sd**2)
     posterior = VectorFieldPosterior(
         estimator, MultivariateNormal(torch.zeros(1), torch.eye(1)), sample_with="sde"
     )
@@ -502,12 +492,7 @@ def test_jac_gauss_survives_float32_cancellation():
     num_dim, posterior_var = 2, 1e-4
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
     estimator = posterior_flow_nn()(prior.sample((100,)), torch.randn(100, num_dim))
-
-    def exact_score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
-        m, s = estimator.mean_t_fn(t), estimator.std_fn(t)
-        return -input / (m**2 * posterior_var + s**2)
-
-    estimator.score = exact_score
+    _use_exact_gaussian_score(estimator, posterior_var)
     score_fn = JacCorrectedScoreFn(estimator, prior)
     inputs, x_o = torch.randn(4, 1, num_dim), torch.zeros(3, num_dim)
 
@@ -610,6 +595,27 @@ def test_fnpe_uses_custom_prior_score_weight():
     )
 
     assert not torch.allclose(no_prior(*args), default(*args))
+
+
+def _build_estimator(estimator_type: str, theta: Tensor, x: Tensor):
+    """Default FMPE ("fmpe") or NPSE (any `sde_type`) estimator."""
+    if estimator_type == "fmpe":
+        return posterior_flow_nn()(theta, x)
+    return posterior_score_nn(sde_type=estimator_type)(theta, x)
+
+
+def _use_exact_gaussian_score(estimator, posterior_var: float) -> None:
+    """Replace the score of `estimator` by the exact score of N(x, posterior_var I).
+
+    The mean depends on x, so the score has one row per observation, as the iid
+    methods expect from a network.
+    """
+
+    def exact_score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        m, s = estimator.mean_t_fn(t), estimator.std_fn(t)
+        return -(input - m * condition) / (m**2 * posterior_var + s**2)
+
+    estimator.score = exact_score
 
 
 class _ZeroNet(VectorFieldNet):
