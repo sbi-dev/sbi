@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import os
 import random
 import time
 from pathlib import Path
@@ -64,6 +65,20 @@ def fails_with_solver_error(theta):
     if (theta < 0).any():
         raise SolverError(3, "diverged")
     return theta * 2.0
+
+
+def process_id(theta):
+    time.sleep(0.01)
+    return np.array([os.getpid()])
+
+
+def batch_process_ids(theta):
+    time.sleep(0.01)
+    return np.full((len(theta), 1), os.getpid())
+
+
+def batch_sizes(theta):
+    return torch.full((len(theta), 1), float(len(theta)))
 
 
 @pytest.fixture
@@ -179,7 +194,7 @@ def test_simulate_for_sbi_reproducible_with_seed(prior, num_workers):
 @pytest.mark.parametrize(
     "simulator_is_batched, runs",
     [
-        (False, [(1, 1), (1, 7), (2, 1), (4, 7)]),
+        (False, [(1, 1), (1, 7), (1, "auto"), (2, 1), (4, 7)]),
         (True, [(1, 7), (2, 7), (4, 7)]),
     ],
 )
@@ -356,6 +371,39 @@ def test_simulator_error_keeps_type_and_names_parameter_set(on_error, num_worker
         )
 
     assert "theta[" in " ".join(error.value.__notes__)
+
+
+@pytest.mark.parametrize(
+    "simulator, simulator_is_batched",
+    [(process_id, False), (batch_process_ids, True)],
+)
+def test_auto_batch_size_splits_simulations_across_workers(
+    simulator, simulator_is_batched
+):
+    x = simulate_from_theta(
+        simulator,
+        np.zeros((40, 1)),
+        num_workers=2,
+        simulator_is_batched=simulator_is_batched,
+        show_progress_bar=False,
+    )
+
+    assert len(np.unique(x)) == 2
+
+
+def test_auto_batch_size_is_one_on_one_worker(prior):
+    _, x = simulate_for_sbi(batch_sizes, prior, 10, show_progress_bar=False)
+
+    assert torch.all(x == 1.0)
+
+
+def test_none_batch_size_warns_and_means_auto(prior):
+    with pytest.warns(FutureWarning, match="auto"):
+        _, x = simulate_for_sbi(
+            batch_sizes, prior, 10, simulation_batch_size=None, show_progress_bar=False
+        )
+
+    assert torch.all(x == 1.0)
 
 
 @pytest.mark.parametrize(

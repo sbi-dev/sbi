@@ -953,10 +953,10 @@ def test_passing_custom_density_estimator(arg):
     "num_simulations, simulation_batch_size, num_workers, \
         use_process_simulator",
     [
-        (0, None, 1, True),
-        (10, None, 1, True),
+        (0, "auto", 1, True),
+        (10, "auto", 1, True),
         (100, 10, 1, True),
-        (100, None, 2, True),
+        (100, "auto", 2, True),
         (1000, 50, 4, True),
         (100, 10, 2, False),
     ],

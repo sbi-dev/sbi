@@ -6,6 +6,7 @@ import random
 import warnings
 from dataclasses import dataclass
 from functools import partial, wraps
+from math import ceil
 from typing import (
     Any,
     Callable,
@@ -22,7 +23,7 @@ from typing import (
 
 import numpy as np
 import torch
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, effective_n_jobs
 from torch import Tensor, float32
 from tqdm.auto import tqdm
 
@@ -30,6 +31,7 @@ from sbi.sbi_types import (
     Array,
     OnError,
     Proposal,
+    SimulationBatchSize,
     SimulationOutput,
 )
 from sbi.utils.sbiutils import seed_all_backends
@@ -40,7 +42,7 @@ def simulate_for_sbi(
     proposal: Proposal,
     num_simulations: int,
     num_workers: int = 1,
-    simulation_batch_size: Optional[int] = 1,
+    simulation_batch_size: SimulationBatchSize = "auto",
     seed: Optional[int] = None,
     show_progress_bar: bool = True,
     simulator_is_batched: bool = True,
@@ -65,8 +67,10 @@ def simulate_for_sbi(
         num_simulations: Number of simulations that are run.
         num_workers: Number of parallel joblib workers; -1 uses all CPUs.
         simulation_batch_size: Number of parameter sets per simulator call, or per
-            worker task for a simulator that is not batched. If None, all parameter
-            sets go into one call.
+            worker task for a simulator that is not batched. "auto" uses one
+            parameter set per call with one worker, and four tasks per worker with
+            more workers. For all parameter sets in one call, pass their number.
+            None is deprecated and means "auto".
         seed: Seed for reproducibility. It seeds the global random state before
             the parameters are sampled and leaves it seeded. A simulator that is not
             batched is also reseeded before each simulation, see
@@ -117,7 +121,7 @@ def simulate_from_theta(
     theta: Array,
     *,
     num_workers: int = 1,
-    simulation_batch_size: Optional[int] = 1,
+    simulation_batch_size: SimulationBatchSize = "auto",
     simulator_is_batched: bool = False,
     seed: Optional[int] = None,
     on_error: OnError = "raise",
@@ -136,8 +140,10 @@ def simulate_from_theta(
             simulator receives parameters of the same type as `theta` for any number
             of workers; with more than one worker, tensors are on the CPU.
         simulation_batch_size: Number of parameter sets per simulator call, or per
-            worker task for a simulator that is not batched. If None, all parameter
-            sets go into one call.
+            worker task for a simulator that is not batched. "auto" uses one
+            parameter set per call with one worker, and four tasks per worker with
+            more workers. For all parameter sets in one call, pass their number.
+            None is deprecated and means "auto".
         simulator_is_batched: Whether the simulator takes a batch of parameter sets
             per call. A batched simulator passed with False gets one parameter set
             per call: indexing such as `theta[:, 0]` raises, and outputs sized by
@@ -174,7 +180,7 @@ def parallelize_simulator(
     /,
     *,
     num_workers: int = ...,
-    simulation_batch_size: Optional[int] = ...,
+    simulation_batch_size: SimulationBatchSize = ...,
     simulator_is_batched: bool = ...,
     on_error: OnError = ...,
     show_progress_bar: bool = ...,
@@ -187,7 +193,7 @@ def parallelize_simulator(
     /,
     *,
     num_workers: int = ...,
-    simulation_batch_size: Optional[int] = ...,
+    simulation_batch_size: SimulationBatchSize = ...,
     simulator_is_batched: bool = ...,
     on_error: OnError = ...,
     show_progress_bar: bool = ...,
@@ -199,7 +205,7 @@ def parallelize_simulator(
     /,
     *,
     num_workers: int = -1,
-    simulation_batch_size: Optional[int] = 1,
+    simulation_batch_size: SimulationBatchSize = "auto",
     simulator_is_batched: bool = False,
     on_error: OnError = "raise",
     show_progress_bar: bool = False,
@@ -262,7 +268,7 @@ class _Settings:
     """How to run the simulations, checked once when created."""
 
     num_workers: int
-    simulation_batch_size: Optional[int]
+    simulation_batch_size: SimulationBatchSize
     simulator_is_batched: bool
     on_error: OnError
 
@@ -272,11 +278,21 @@ class _Settings:
                 "`num_workers` must be a nonzero integer, e.g. 4, or -1 for all "
                 f"CPUs; got {self.num_workers!r}."
             )
-        if self.simulation_batch_size is not None and (
+        if self.simulation_batch_size is None:
+            warnings.warn(
+                '`simulation_batch_size=None` is deprecated and now means "auto": '
+                "one parameter set per call with one worker, four tasks per worker "
+                "with more workers. For all parameter sets in one call, pass their "
+                "number.",
+                FutureWarning,
+                stacklevel=4,
+            )
+            object.__setattr__(self, "simulation_batch_size", "auto")
+        if self.simulation_batch_size != "auto" and (
             not _is_int(self.simulation_batch_size) or self.simulation_batch_size < 1
         ):
             raise ValueError(
-                "`simulation_batch_size` must be None or a positive integer, got "
+                '`simulation_batch_size` must be "auto" or a positive integer, got '
                 f"{self.simulation_batch_size!r}."
             )
         if self.on_error not in ("raise", "nan"):
@@ -285,9 +301,11 @@ class _Settings:
             )
 
     def batch_size(self, num_simulations: int) -> int:
-        if self.simulation_batch_size is None:
-            return num_simulations
-        return int(self.simulation_batch_size)
+        if self.simulation_batch_size != "auto":
+            return int(self.simulation_batch_size)
+        if self.num_workers == 1:
+            return 1
+        return ceil(num_simulations / (4 * effective_n_jobs(self.num_workers)))
 
 
 class _Batch(NamedTuple):
