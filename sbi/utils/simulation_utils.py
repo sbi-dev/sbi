@@ -96,6 +96,13 @@ def simulate_for_sbi(
 
     seed_all_backends(seed)
     theta = proposal.sample((num_simulations,))
+    if theta.ndim < 2:
+        raise ValueError(
+            f"The proposal samples parameters of shape {tuple(theta.shape)}, but "
+            "`simulate_for_sbi` needs (num_simulations, *parameter_shape). A "
+            "proposal over one parameter needs the event shape (1,), e.g. "
+            "`BoxUniform(torch.zeros(1), torch.ones(1))`."
+        )
     # Batched simulations continue the seeded random state.
     x = _simulate(
         simulator,
@@ -347,7 +354,9 @@ def _simulate(
     if theta.ndim < 2:
         raise ValueError(
             "`theta` must have shape (num_simulations, *parameter_shape), got "
-            f"{tuple(theta.shape)}."
+            f"{tuple(theta.shape)}. For one parameter set, pass `theta[None]`. A "
+            "proposal over one parameter needs the event shape (1,), e.g. "
+            "`BoxUniform(torch.zeros(1), torch.ones(1))`."
         )
     num_simulations = len(theta)
     if num_simulations == 0:
@@ -420,7 +429,10 @@ def _run_batched(simulator: Callable, batch: _Batch, on_error: OnError) -> _Batc
         return _BatchResult(_snapshot(simulator(batch.theta)), 0, None)
     except Exception as error:
         where = f"theta[{batch.start}:{batch.start + len(batch.theta)}]"
-        failure = _Failure(where, f"The simulator failed for {where}.", error)
+        hint = (
+            "If it takes one parameter set per call, pass `simulator_is_batched=False`."
+        )
+        failure = _Failure(where, _failure_note(where, error, hint), error)
         if on_error == "raise":
             error.add_note(failure.note)
             raise
@@ -438,7 +450,7 @@ def _run_rows(simulator: Callable, batch: _Batch, on_error: OnError) -> _BatchRe
             outputs.append(_snapshot(simulator(theta)))
         except Exception as error:
             where = f"theta[{batch.start + i}] = {theta.tolist()}"
-            failure = _Failure(where, f"The simulator failed for {where}.", error)
+            failure = _Failure(where, _failure_note(where, error), error)
             if on_error == "raise":
                 error.add_note(failure.note)
                 raise
@@ -535,6 +547,13 @@ def _report_failures(
         UserWarning,
         stacklevel=4,
     )
+
+
+def _failure_note(where: str, error: Exception, hint: str = "") -> str:
+    note = f"The simulator failed for {where}."
+    if isinstance(error, AttributeError) and "'Tensor' object" in str(error):
+        note += " It receives tensors; convert them with `np.asarray(theta)`."
+    return f"{note} {hint}".rstrip()
 
 
 def _is_int(value: Any) -> bool:
