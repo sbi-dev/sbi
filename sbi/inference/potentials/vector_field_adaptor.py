@@ -457,8 +457,6 @@ class IntervalGuidance(UniversalGuidance):
             )
             out = upper_bound + lower_bound
             if config.mask is not None:
-                if config.mask.shape != out.shape:
-                    config.mask = config.mask.unsqueeze(0).expand_as(out)
                 out = torch.where(config.mask, out, torch.zeros_like(out))
             return out
 

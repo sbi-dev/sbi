@@ -288,6 +288,22 @@ def test_interval_guidance_takes_one_bound_per_dimension():
         )
 
 
+def test_interval_guidance_takes_any_batch_size_after_the_first_call():
+    """The mask broadcasts over the batch of each call."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    theta = prior.sample((100,))
+    config = IntervalGuidanceConfig(
+        lower_bound=-0.2, upper_bound=0.3, mask=torch.tensor([True, False])
+    )
+    guidance = IntervalGuidance(
+        posterior_score_nn(sde_type="vp")(theta, theta), prior, config
+    )
+    for num_samples in (5, 3):
+        inputs = torch.randn(num_samples, 1, 2)
+        scores = guidance(inputs, torch.zeros(1, 2), torch.tensor([0.5]))
+        assert scores.shape == inputs.shape
+
+
 @pytest.mark.parametrize("sde_type", ["vp", "ve"])
 @pytest.mark.parametrize("iid_method", ["fnpe", "gauss"])
 @pytest.mark.parametrize(
