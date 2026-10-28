@@ -17,6 +17,8 @@ from sbi.inference.potentials.vector_field_adaptor import (
     AffineClassifierFreeGuidanceConfig,
     FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
+    IntervalGuidance,
+    IntervalGuidanceConfig,
     JacCorrectedScoreFn,
     PriorGuide,
     PriorGuideConfig,
@@ -255,6 +257,35 @@ def test_interval_guidance_samples_the_truncated_posterior(estimator_type):
     # 0.11 sd and sd ratio up to 1.05.
     assert abs(samples.mean() - half_normal_mean) < 0.2 * posterior_sd
     assert abs(samples.std() / half_normal_sd - 1) < 0.15
+
+
+def test_interval_guidance_takes_one_bound_per_dimension():
+    """Tensor bounds hold one bound per dimension. An infinite bound guides like a
+    masked-out dimension, and each lower bound must be below its upper bound."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    theta = prior.sample((100,))
+    estimator = posterior_score_nn(sde_type="vp")(theta, theta)
+    inputs, x_o, time = 2 + torch.randn(5, 1, 2), torch.zeros(1, 2), torch.tensor([0.5])
+
+    def guided_score(**bounds) -> Tensor:
+        config = IntervalGuidanceConfig(**bounds)
+        return IntervalGuidance(estimator, prior, config)(inputs, x_o, time)
+
+    inf = float("inf")
+    with torch.no_grad():
+        per_dimension = guided_score(
+            lower_bound=torch.tensor([-0.2, -inf]), upper_bound=torch.tensor([0.3, inf])
+        )
+        masked = guided_score(
+            lower_bound=-0.2, upper_bound=0.3, mask=torch.tensor([True, False])
+        )
+        unguided = estimator.score(inputs, x_o, time)
+    assert not torch.allclose(per_dimension[..., 0], unguided[..., 0])
+    torch.testing.assert_close(per_dimension, masked)
+    with pytest.raises(ValueError, match="must be less than"):
+        IntervalGuidanceConfig(
+            lower_bound=torch.tensor([0.0, 2.0]), upper_bound=torch.tensor([1.0, 1.0])
+        )
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve"])

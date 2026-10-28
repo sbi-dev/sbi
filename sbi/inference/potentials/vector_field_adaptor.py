@@ -367,8 +367,11 @@ class IntervalGuidanceConfig:
     """Configuration for :class:`IntervalGuidance`.
 
     Attributes:
-        lower_bound: Optional lower bound for parameters.
-        upper_bound: Optional upper bound for parameters.
+        lower_bound: Optional lower bound for parameters: a float, or a tensor with
+            one bound per dimension (`-inf` for no bound).
+        upper_bound: Optional upper bound for parameters: a float, or a tensor with
+            one bound per dimension (`inf` for no bound). Each lower bound must be
+            less than its upper bound.
         mask: Optional boolean mask selecting constrained dimensions.
         scale_factor: Soft-constraint strength. The log-sigmoid walls have slope
             `scale_factor / std(t)^2`, inversely proportional to the noise variance
@@ -386,7 +389,8 @@ class IntervalGuidanceConfig:
         if (
             self.lower_bound is not None
             and self.upper_bound is not None
-            and self.lower_bound >= self.upper_bound
+            # Compare before any conversion, so that float bounds keep their precision.
+            and not torch.as_tensor(self.lower_bound < self.upper_bound).all()
         ):
             raise ValueError(
                 f"lower_bound ({self.lower_bound}) must be less than "
