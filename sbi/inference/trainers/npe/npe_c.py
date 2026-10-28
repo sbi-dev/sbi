@@ -303,8 +303,6 @@ class NPE_C(PosteriorEstimatorTrainer):
         drops out of the loss, so only a Gaussian prior is stored.
         """
         assert isinstance(self._neural_net, MixtureDensityEstimator)
-        self.z_score_theta = self._neural_net.has_input_transform
-
         prior_mog = _z_scored_prior_mog(self._prior, self._neural_net)
         self._prior_mog = prior_mog.to(self._device) if prior_mog is not None else None
 
@@ -485,8 +483,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         m_d = mog_d.means
         prec_d = mog_d.precisions
 
-        # z-score theta if z-scoring was requested.
-        theta = self._maybe_z_score_theta(theta)
+        theta = self._neural_net._transform_input(theta)
 
         # Compute the MoG parameters of the proposal posterior.
         (
@@ -679,15 +676,6 @@ class NPE_C(PosteriorEstimatorTrainer):
         means_pp = batched_mixture_mv(covariances_pp, summed_cov_m_prod_rep)
 
         return means_pp
-
-    def _maybe_z_score_theta(self, theta: Tensor) -> Tensor:
-        """Return potentially standardized theta if z-scoring was requested."""
-
-        if self.z_score_theta:
-            assert isinstance(self._neural_net, MixtureDensityEstimator)
-            theta = self._neural_net._transform_input(theta)
-
-        return theta
 
     @staticmethod
     def _logits_proposal_posterior(
