@@ -1,11 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import random
 from dataclasses import dataclass
 from functools import partial, wraps
 from typing import (
     Any,
     Callable,
+    Dict,
     Generator,
     List,
     NamedTuple,
@@ -62,7 +64,11 @@ def simulate_for_sbi(
             worker task for a simulator that is not batched. If None, all parameter
             sets go into one call.
         seed: Seed for reproducibility. It seeds the global random state before
-            the parameters are sampled and leaves it seeded.
+            the parameters are sampled and leaves it seeded. A simulator that is not
+            batched is also reseeded before each simulation, see
+            :func:`simulate_from_theta`. A batched simulator continues the seeded
+            random state on one worker; with more workers, each batch gets its own
+            seed, so `x` depends on `num_workers`.
         show_progress_bar: Whether to show a progress bar for simulating. This will not
             affect whether there will be a progressbar while drawing samples from the
             proposal.
@@ -78,8 +84,13 @@ def simulate_for_sbi(
 
     seed_all_backends(seed)
     theta = proposal.sample((num_simulations,))
+    # Batched simulations continue the seeded random state.
     x = _simulate(
-        simulator, theta, settings, seed=None, show_progress_bar=show_progress_bar
+        simulator,
+        theta,
+        settings,
+        seed=None if simulator_is_batched else seed,
+        show_progress_bar=show_progress_bar,
     )
     if not isinstance(x, (Tensor, np.ndarray)):
         raise TypeError(
@@ -122,9 +133,14 @@ def simulate_from_theta(
             per call. A batched simulator passed with False gets one parameter set
             per call: indexing such as `theta[:, 0]` raises, and outputs sized by
             `len(theta)` gain a dimension.
-        seed: Seed for reproducibility. It seeds the global random state before
-            the simulations, and each worker task gets a distinct seed derived from
-            it. If None, the current random state is used.
+        seed: Seed for reproducibility. The simulator is reseeded before each call:
+            before each simulation if it is not batched, before each batch if it
+            is. For a simulator that is not batched, the outputs then depend on
+            neither `num_workers` nor `simulation_batch_size`; for a batched one,
+            they do not depend on `num_workers` at a fixed `simulation_batch_size`.
+            This holds for noise drawn on the CPU: with more than one worker, the
+            simulator gets tensors on the CPU. The caller's random state is
+            restored afterwards. If None, the current random state is used.
         show_progress_bar: Whether to show a progress bar.
 
     Returns:
@@ -178,8 +194,9 @@ def parallelize_simulator(
     `@parallelize_simulator` or `@parallelize_simulator(num_workers=4)`. By default,
     the simulator takes one parameter set per call and runs on all CPUs.
 
-    To reproduce a call, seed beforehand, e.g. with
-    :func:`sbi.utils.sbiutils.seed_all_backends`.
+    Calls are not reseeded. To reproduce a call, seed beforehand, e.g. with
+    :func:`sbi.utils.sbiutils.seed_all_backends`; consecutive calls still draw
+    different noise.
 
     Each call sends the simulator to the workers; for slow calls, see the how-to
     guide "How to run simulations in parallel".
@@ -245,6 +262,13 @@ class _Settings:
         return int(self.simulation_batch_size)
 
 
+class _Batch(NamedTuple):
+    """Parameter sets and their call seeds."""
+
+    theta: Array
+    seeds: Optional[np.ndarray]
+
+
 class _TensorAsNumpy(NamedTuple):
     """A tensor sent to or from a worker as a numpy array."""
 
@@ -273,24 +297,33 @@ def _simulate(
         return np.empty(0)
 
     device = theta.device if isinstance(theta, Tensor) else None
-    run = simulator if settings.simulator_is_batched else partial(_run_rows, simulator)
+    run = partial(
+        _run_batched if settings.simulator_is_batched else _run_rows, simulator
+    )
     batch_size = settings.batch_size(num_simulations)
     starts = range(0, num_simulations, batch_size)
     sizes = [min(batch_size, num_simulations - start) for start in starts]
-    if seed is not None:
-        seed_all_backends(seed)
+    call_seeds = [None] * len(starts)
+    if seed is not None and settings.simulator_is_batched:
+        call_seeds = _distinct_seeds(len(starts), seed)[:, None]
+    elif seed is not None:
+        call_seeds = np.split(_distinct_seeds(num_simulations, seed), starts[1:])
+
+    random_state = _get_random_state() if seed is not None else None
     results: Generator[Any, None, None]
     if settings.num_workers == 1:
-        results = (run(part) for part in _split(theta, batch_size))
+        batches = map(_Batch, _split(theta, batch_size), call_seeds)
+        results = (run(batch) for batch in batches)
     else:
         thetas = [_to_transport(part) for part in _split(theta, batch_size)]
+        batches = map(_Batch, thetas, call_seeds)
         parallel = Parallel(n_jobs=settings.num_workers, return_as="generator")
         results = cast(
             Generator,
             parallel(
-                delayed(_run_in_worker)(run, part, worker_seed)
-                for part, worker_seed in zip(
-                    thetas, _distinct_seeds(len(starts), None), strict=True
+                delayed(_run_in_worker)(run, batch, worker_seed)
+                for batch, worker_seed in zip(
+                    batches, _distinct_seeds(len(starts), seed), strict=True
                 )
             ),
         )
@@ -306,14 +339,28 @@ def _simulate(
     finally:
         # Closing joblib's generator cancels the simulations not yet run.
         results.close()
+        if random_state is not None:
+            _set_random_state(random_state)
 
     x = _concatenate(outputs)
     return x.to(device) if device is not None and isinstance(x, Tensor) else x
 
 
-def _run_rows(simulator: Callable, theta: Array) -> Any:
+def _run_batched(simulator: Callable, batch: _Batch) -> Any:
+    """Runs a batched simulator on one batch."""
+    if batch.seeds is not None:
+        seed_all_backends(batch.seeds[0])
+    return simulator(batch.theta)
+
+
+def _run_rows(simulator: Callable, batch: _Batch) -> Any:
     """Runs a simulator that is not batched on each parameter set of a batch."""
-    outputs = [simulator(row) for row in theta]
+    outputs = []
+    for i, theta in enumerate(batch.theta):
+        if batch.seeds is not None:
+            seed_all_backends(batch.seeds[i])
+        outputs.append(simulator(theta))
+
     if isinstance(outputs[0], Tensor):
         try:
             return torch.stack(outputs)
@@ -322,10 +369,10 @@ def _run_rows(simulator: Callable, theta: Array) -> Any:
     return outputs
 
 
-def _run_in_worker(run: Callable, theta: Any, worker_seed: int) -> Any:
+def _run_in_worker(run: Callable, batch: _Batch, worker_seed: int) -> Any:
     # Worker processes start from the same torch random state.
     seed_all_backends(worker_seed)
-    return _to_transport(run(_from_transport(theta)))
+    return _to_transport(run(batch._replace(theta=_from_transport(batch.theta))))
 
 
 def _to_transport(value: Any) -> Any:
@@ -389,6 +436,29 @@ def _distinct_seeds(num_seeds: int, seed: Optional[int]) -> np.ndarray:
         seed = np.random.randint(2**31)
     # `np.random.seed` accepts seeds below 2**32.
     return np.random.default_rng(seed).choice(2**32, size=num_seeds, replace=False)
+
+
+def _get_random_state() -> Dict[str, Any]:
+    state = {
+        "random": random.getstate(),
+        "numpy": np.random.get_state(),
+        "torch": torch.get_rng_state(),
+    }
+    if torch.cuda.is_initialized():
+        state["cuda"] = torch.cuda.get_rng_state_all()
+    if torch.backends.mps.is_available():
+        state["mps"] = torch.mps.get_rng_state()
+    return state
+
+
+def _set_random_state(state: Dict[str, Any]) -> None:
+    random.setstate(state["random"])
+    np.random.set_state(state["numpy"])
+    torch.set_rng_state(state["torch"])
+    if "cuda" in state:
+        torch.cuda.set_rng_state_all(state["cuda"])
+    if "mps" in state:
+        torch.mps.set_rng_state(state["mps"])
 
 
 def _is_numeric(output: Any) -> bool:

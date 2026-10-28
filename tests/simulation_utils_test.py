@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import random
 import time
 from pathlib import Path
 
@@ -39,6 +40,11 @@ def summary_list(theta):
 
 def numpy_noise(theta):
     return np.asarray(theta) + np.random.randn(*np.shape(theta))
+
+
+def noise_from_all_backends(theta):
+    noise = np.random.randn(*np.shape(theta)) + torch.randn(np.shape(theta)).numpy()
+    return np.asarray(theta) + noise + random.random()
 
 
 @pytest.fixture
@@ -149,6 +155,66 @@ def test_simulate_for_sbi_reproducible_with_seed(prior, num_workers):
 
     assert torch.equal(run(seed=0), run(seed=0))
     assert not torch.equal(run(seed=0), run(seed=1))
+
+
+@pytest.mark.parametrize(
+    "simulator_is_batched, runs",
+    [
+        (False, [(1, 1), (1, 7), (2, 1), (4, 7)]),
+        (True, [(1, 7), (2, 7), (4, 7)]),
+    ],
+)
+def test_seeded_outputs_do_not_depend_on_workers_or_batch_size(
+    simulator_is_batched, runs
+):
+    """`runs` are (num_workers, simulation_batch_size) pairs."""
+    x, *others = [
+        simulate_from_theta(
+            noise_from_all_backends,
+            np.zeros((30, 2)),
+            num_workers=num_workers,
+            simulation_batch_size=simulation_batch_size,
+            simulator_is_batched=simulator_is_batched,
+            seed=0,
+            show_progress_bar=False,
+        )
+        for num_workers, simulation_batch_size in runs
+    ]
+
+    assert len(np.unique(x, axis=0)) == 30
+    for other in others:
+        assert np.array_equal(other, x)
+
+
+@pytest.mark.parametrize("simulator_is_batched", [False, True])
+def test_seed_keeps_callers_random_state(simulator_is_batched):
+    np.random.seed(1)
+    torch.manual_seed(1)
+    expected = np.random.rand(), torch.rand(1)
+    np.random.seed(1)
+    torch.manual_seed(1)
+
+    simulate_from_theta(
+        noise_from_all_backends,
+        np.zeros((5, 2)),
+        simulator_is_batched=simulator_is_batched,
+        seed=0,
+        show_progress_bar=False,
+    )
+
+    assert (np.random.rand(), torch.rand(1)) == expected
+
+
+@pytest.mark.gpu
+def test_seed_keeps_callers_accelerator_random_state():
+    device = process_device("gpu")
+    torch.manual_seed(1)
+    expected = torch.rand(1, device=device)
+    torch.manual_seed(1)
+
+    simulate_from_theta(double, np.zeros((5, 2)), seed=0, show_progress_bar=False)
+
+    assert torch.equal(torch.rand(1, device=device), expected)
 
 
 def test_parallel_batches_draw_distinct_noise():
