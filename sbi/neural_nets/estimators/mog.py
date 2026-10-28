@@ -608,20 +608,20 @@ class MoG:
 _CORRECTION_EPSILON: float = 1e-6
 
 
-def _check_single_gaussian_proposal(proposal_mog: MoG) -> None:
+def _check_single_gaussian_proposal(num_components: int) -> None:
     """Raise if the NPE-A proposal is a mixture.
 
     Args:
-        proposal_mog: MoG of the proposal.
+        num_components: Number of Gaussian components of the proposal.
 
     Raises:
         ValueError: If the proposal has more than one component.
     """
-    if proposal_mog.num_components > 1:
+    if num_components > 1:
         raise ValueError(
             "NPE-A divides by the proposal in closed form, which needs a proposal "
             "with a single Gaussian (Papamakarios & Murray 2016, Appendix C), but "
-            f"this proposal has {proposal_mog.num_components}. NPE-A trains one "
+            f"this proposal has {num_components}. NPE-A trains one "
             "Gaussian in every round but the final one, so the posterior of a final "
             "round cannot be the proposal of another round. A first round on "
             "simulations from the prior is final by default: in a loop over "
@@ -696,7 +696,7 @@ def correct_for_proposal(
         ValueError: If the proposal has more than one component, or if the
             posterior precision is not positive definite.
     """
-    _check_single_gaussian_proposal(proposal_mog)
+    _check_single_gaussian_proposal(proposal_mog.num_components)
     dim = density_mog.dim
 
     # Compute posterior precisions (Eq. 23)

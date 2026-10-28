@@ -769,7 +769,7 @@ class ProposalCorrectedMDN(ConditionalDensityEstimator):
             ValueError: If the proposal has more than one component.
         """
         estimator._affine_transform()  # Raises for a non-affine z-score.
-        _check_single_gaussian_proposal(proposal_mog)
+        _check_single_gaussian_proposal(proposal_mog.num_components)
         super().__init__(estimator, estimator.input_shape, estimator.condition_shape)
         device = infer_module_device(estimator, fallback="cpu")
         self._proposal_mog = proposal_mog.to(device).detach()

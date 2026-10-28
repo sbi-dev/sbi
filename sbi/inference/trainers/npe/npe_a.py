@@ -7,7 +7,6 @@ from dataclasses import replace
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
-import torch
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -266,8 +265,9 @@ class NPE_A(PosteriorEstimatorTrainer):
                 and validation dataloaders (like, e.g., a collate_fn)
             final_round: Whether this is the last round. If None (default), only a
                 first round on simulations from the prior is final, so that
-                single-round NPE-A trains the mixture. In a loop over rounds, pass
-                `final_round=(r == num_rounds - 1)`.
+                single-round NPE-A trains the mixture, and `resume_training=True`
+                keeps the choice of the round it resumes. In a loop over rounds,
+                pass `final_round=(r == num_rounds - 1)`.
             component_perturbation: Standard deviation of the noise added to the
                 copies of the Gaussian in the final round. It breaks the symmetry
                 between the copies.
@@ -276,8 +276,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             Density estimator that approximates the distribution $p(\theta|x)$.
 
         Raises:
-            ValueError: If the proposal is a mixture, e.g. the posterior of a final
-                round, if a round that is not final follows a final round, or if
+            ValueError: If a round that is not final follows a final round, or if
                 `final_round=True` would expand the network while
                 `resume_training=True`.
         """
@@ -309,20 +308,12 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         self._round = max(self._data_round_index)
 
-        # Fail before training if the correction would fail after it. The count does
-        # not need the network, which is not built yet if the first round already
-        # came from a proposal.
-        proposal = self._proposal_roundwise[-1]
-        if isinstance(proposal, NPE_A_Posterior) and proposal.default_x is not None:
-            with torch.no_grad():
-                _check_single_gaussian_proposal(
-                    proposal.get_mog_params(proposal.default_x)
-                )
-        elif isinstance(proposal, MoG):
-            _check_single_gaussian_proposal(proposal)
-
         if final_round is None:
-            final_round = self._round == 0
+            if resume_training and self._neural_net is not None:
+                # Resuming keeps the network, and with it the round's choice.
+                final_round = self._neural_net.net.num_components > 1
+            else:
+                final_round = self._round == 0
         num_components = self._num_components if final_round else 1
         if self._neural_net is None:
             self._build_neural_net = partial(
@@ -516,13 +507,28 @@ class NPE_A(PosteriorEstimatorTrainer):
         """Check the proposal, accepting a Gaussian proposal without a warning.
 
         The correction divides by a single Gaussian in closed form, so a Gaussian
-        proposal is a supported use of NPE-A, not an expert-only one.
+        proposal is a supported use of NPE-A, not an expert-only one, and a mixture
+        proposal is rejected before its simulations are stored.
 
         Args:
             proposal: The proposal passed to `append_simulations()`.
+
+        Raises:
+            ValueError: If the proposal is a mixture, e.g. the posterior of a final
+                round.
         """
         if not isinstance(proposal, MultivariateNormal):
             super()._check_proposal(proposal)
+        if isinstance(proposal, NPE_A_Posterior):
+            # The corrected MoG has as many components as the network, since the
+            # proposal it corrects for is a single Gaussian.
+            estimator = proposal.posterior_estimator
+            if isinstance(estimator, ProposalCorrectedMDN):
+                estimator = estimator.net
+            assert isinstance(estimator, MixtureDensityEstimator)
+            _check_single_gaussian_proposal(estimator.net.num_components)
+        elif isinstance(proposal, MoG):
+            _check_single_gaussian_proposal(proposal.num_components)
 
     def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
         """Return True: NPE-A trains on the plain log-prob for any proposal.

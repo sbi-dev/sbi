@@ -1201,21 +1201,19 @@ def test_npe_a_final_round_expands_the_gaussian():
     assert posterior.get_mog_params(zeros(1, 2)).num_components == 3
 
 
-def test_npe_a_rejects_a_final_round_posterior_as_proposal_before_training():
+def test_npe_a_rejects_a_final_round_posterior_as_proposal_before_storing():
     """A final-round posterior is a mixture, which cannot be divided out in closed
-    form. The trainer raises before it spends time on the round."""
+    form. The trainer raises before it stores the round."""
     prior = MultivariateNormal(zeros(2), eye(2))
     inference = NPE_A(prior, num_components=3, show_progress_bars=False)
     theta = prior.sample((100,))
     inference.append_simulations(theta, theta).train(max_num_epochs=2, final_round=True)
     proposal = inference.build_posterior().set_default_x(zeros(1, 2))
     theta = proposal.sample((100,))
-    inference.append_simulations(theta, theta, proposal=proposal)
-    rounds_trained = len(inference._summary["epochs_trained"])
 
     with pytest.raises(ValueError, match="final_round"):
-        inference.train(max_num_epochs=2)
-    assert len(inference._summary["epochs_trained"]) == rounds_trained
+        inference.append_simulations(theta, theta, proposal=proposal)
+    assert len(inference._data_round_index) == 1
 
 
 @pytest.mark.parametrize(
@@ -1239,12 +1237,11 @@ def test_npe_a_first_round_from_a_proposal(proposal, error):
     prior = MultivariateNormal(zeros(2), eye(2))
     inference = NPE_A(prior, num_components=3, show_progress_bars=False)
     theta = MultivariateNormal(ones(2), 0.5 * eye(2)).sample((100,))
-    inference.append_simulations(theta, theta, proposal=proposal)
-
     if error is not None:
         with pytest.raises(error, match="single Gaussian"):
-            inference.train(max_num_epochs=2)
+            inference.append_simulations(theta, theta, proposal=proposal)
     else:
+        inference.append_simulations(theta, theta, proposal=proposal)
         inference.train(max_num_epochs=2)
         estimator = inference.build_posterior().posterior_estimator
         assert isinstance(estimator, ProposalCorrectedMDN)
