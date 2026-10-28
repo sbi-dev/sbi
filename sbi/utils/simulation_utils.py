@@ -344,12 +344,6 @@ class _BatchResult(NamedTuple):
     first_failure: Optional[_Failure]
 
 
-class _TensorAsNumpy(NamedTuple):
-    """A tensor sent to or from a worker as a numpy array."""
-
-    array: np.ndarray
-
-
 def _simulate(
     simulator: Callable,
     theta: Array,
@@ -394,8 +388,9 @@ def _simulate(
         batches = map(_Batch, _split(theta, batch_size), starts, call_seeds)
         results = (run(batch) for batch in batches)
     else:
-        thetas = [_to_transport(part) for part in _split(theta, batch_size)]
-        batches = map(_Batch, thetas, starts, call_seeds)
+        if isinstance(theta, Tensor):
+            theta = theta.detach().cpu()
+        batches = map(_Batch, _split(theta, batch_size), starts, call_seeds)
         worker_seeds = (
             [None] * len(starts) if uses_threads else _distinct_seeds(len(starts), seed)
         )
@@ -413,7 +408,7 @@ def _simulate(
     try:
         with tqdm(total=num_simulations, disable=not show_progress_bar) as pbar:
             for size, result in zip(sizes, results, strict=True):
-                output = _from_transport(result.output)
+                output = result.output
                 _check_num_outputs(output, size)
                 outputs.append(output)
                 num_failed += result.num_failed
@@ -504,7 +499,7 @@ def _run_in_worker(
     if worker_seed is not None:
         seed_all_backends(worker_seed)
     try:
-        result = run(batch._replace(theta=_from_transport(batch.theta)))
+        result = run(batch)
     except Exception as error:
         sendable = _sendable(error)
         if sendable is error:
@@ -515,7 +510,7 @@ def _run_in_worker(
         result = result._replace(
             first_failure=failure._replace(error=_sendable(failure.error))
         )
-    return result._replace(output=_to_transport(result.output))
+    return result
 
 
 def _check_backend(seed: Optional[int], num_workers: int) -> bool:
@@ -556,28 +551,6 @@ def _sendable(error: Exception) -> Exception:
         for note in getattr(error, "__notes__", []):
             sendable.add_note(note)
         return sendable
-
-
-def _to_transport(value: Any) -> Any:
-    """Returns a tensor as a numpy array, which is faster to send to a worker.
-
-    Tensors that numpy cannot hold, e.g. bfloat16, and other values stay as they are.
-    """
-    if not isinstance(value, Tensor):
-        return value
-    value = value.detach().cpu()
-    try:
-        return _TensorAsNumpy(value.resolve_conj().resolve_neg().numpy())
-    except (TypeError, RuntimeError):  # No numpy dtype, e.g. bfloat16.
-        return value
-
-
-def _from_transport(value: Any) -> Any:
-    if not isinstance(value, _TensorAsNumpy):
-        return value
-    # joblib passes large arrays as read-only memory maps, which torch must copy.
-    array = value.array
-    return torch.from_numpy(array) if array.flags.writeable else torch.tensor(array)
 
 
 def _report_failures(
