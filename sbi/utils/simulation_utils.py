@@ -98,6 +98,7 @@ def simulate_for_sbi(
     if num_simulations == 0:
         return torch.tensor([], dtype=float32), torch.tensor([], dtype=float32)
 
+    # Batched simulators get no seed below, so a thread backend is checked here.
     _check_backend(seed, num_workers)
     seed_all_backends(seed)
     theta = proposal.sample((num_simulations,))
@@ -116,8 +117,10 @@ def simulate_for_sbi(
         seed=None if simulator_is_batched else seed,
         show_progress_bar=show_progress_bar,
     )
-    complex_x = x.is_complex() if isinstance(x, Tensor) else np.iscomplexobj(x)
-    if not isinstance(x, (Tensor, np.ndarray)) or complex_x:
+    real = (isinstance(x, Tensor) and not x.is_complex()) or (
+        isinstance(x, np.ndarray) and x.dtype.kind in "biuf"
+    )
+    if not real:
         raise TypeError(
             "`simulate_for_sbi` needs real numeric simulator outputs of one shape. "
             "For other outputs, such as file paths, use `simulate_from_theta`."
@@ -170,7 +173,8 @@ def simulate_from_theta(
             workers: with a thread backend, a seed raises an error.
         on_error: What to do when the simulator raises an exception. "raise" stops
             all simulations and raises it. "nan" keeps going: a failed simulation
-            returns NaN, or None for outputs that are not numeric (for a batched
+            returns NaN in the shape of the first successful output, or None for
+            outputs that are not numeric (for a batched
             simulator, the whole batch), with one warning at the end; integer
             outputs then become float64 (float32 on MPS). If all simulations
             fail, the first exception is raised. With more than one worker, an
@@ -388,14 +392,13 @@ def _simulate(
         # Leaves this process seeded also when only workers reseed.
         seed_all_backends(seed)
 
+    if settings.num_workers != 1 and isinstance(theta, Tensor):
+        theta = theta.detach().cpu()
+    batches = map(_Batch, _split(theta, batch_size), starts, call_seeds)
     results: Generator[Any, None, None]
     if settings.num_workers == 1:
-        batches = map(_Batch, _split(theta, batch_size), starts, call_seeds)
         results = (run(batch) for batch in batches)
     else:
-        if isinstance(theta, Tensor):
-            theta = theta.detach().cpu()
-        batches = map(_Batch, _split(theta, batch_size), starts, call_seeds)
         worker_seeds = (
             [None] * len(starts) if uses_threads else _distinct_seeds(len(starts), seed)
         )
@@ -419,9 +422,17 @@ def _simulate(
                 num_failed += result.num_failed
                 first_failure = first_failure or result.first_failure
                 pbar.update(size)
+    except pickle.PicklingError as error:
+        error.add_note(
+            "Workers need the simulator and its inputs pickled. See the FAQ on "
+            "pickling errors, or pass `num_workers=1`."
+        )
+        raise
     finally:
-        # Closing joblib's generator cancels the simulations not yet run.
-        results.close()
+        with warnings.catch_warnings():
+            # Closing joblib's generator cancels the simulations not yet run.
+            warnings.filterwarnings("ignore", ".*tasks", module="joblib")
+            results.close()
 
     if first_failure is not None:
         _report_failures(first_failure, num_failed, num_simulations)
@@ -444,11 +455,12 @@ def _run_batched(simulator: Callable, batch: _Batch, on_error: OnError) -> _Batc
     if batch.seeds is not None:
         seed_all_backends(batch.seeds[0])
     try:
-        return _BatchResult(_snapshot(simulator(batch.theta)), 0, None)
+        return _BatchResult(_call(simulator, batch.theta), 0, None)
     except Exception as error:
         where = f"theta[{batch.start}:{batch.start + len(batch.theta)}]"
         hint = (
-            "If it takes one parameter set per call, pass `simulator_is_batched=False`."
+            "It was called with a batch of parameter sets; if it takes one per "
+            "call, pass `simulator_is_batched=False`."
         )
         failure = _Failure(where, _failure_note(where, error, hint), error)
         if on_error == "raise":
@@ -465,7 +477,7 @@ def _run_rows(simulator: Callable, batch: _Batch, on_error: OnError) -> _BatchRe
         if batch.seeds is not None:
             seed_all_backends(batch.seeds[i])
         try:
-            outputs.append(_snapshot(simulator(theta)))
+            outputs.append(_call(simulator, theta))
         except Exception as error:
             where = f"theta[{batch.start + i}] = {theta.tolist()}"
             failure = _Failure(where, _failure_note(where, error), error)
@@ -476,16 +488,18 @@ def _run_rows(simulator: Callable, batch: _Batch, on_error: OnError) -> _BatchRe
             num_failed += 1
             first_failure = first_failure or failure
 
-    if not num_failed and isinstance(outputs[0], Tensor):
-        try:
-            return _BatchResult(torch.stack(outputs), 0, None)
-        except RuntimeError:  # Outputs of different shapes.
-            pass
     return _BatchResult(outputs, num_failed, first_failure)
 
 
+def _call(simulator: Callable, theta: Array) -> Any:
+    output = simulator(theta)
+    if output is None:
+        raise ValueError("The simulator returned None. Does it miss a `return`?")
+    return _snapshot(output)
+
+
 def _snapshot(output: Any) -> Any:
-    """Copies tensor, array, list and tuple outputs, which a simulator may reuse."""
+    """Copies tensors, arrays and plain lists or tuples that a simulator may reuse."""
     if isinstance(output, Tensor):
         return output.clone()
     if isinstance(output, np.ndarray):
@@ -498,7 +512,7 @@ def _snapshot(output: Any) -> Any:
 def _run_in_worker(
     run: Callable, batch: _Batch, worker_seed: Optional[int]
 ) -> _BatchResult:
-    # Without this, worker results would not follow the caller's seed.
+    # Without this, worker results would not follow the caller's random state.
     if worker_seed is not None:
         seed_all_backends(worker_seed)
     try:
@@ -654,7 +668,7 @@ def _concatenate(outputs: List[Any], fill_failed: bool) -> SimulationOutput:
     if isinstance(rows[0], Tensor):
         try:
             return torch.stack(rows)
-        except RuntimeError:  # Outputs of different shapes.
+        except (RuntimeError, TypeError):  # Different shapes, or not all tensors.
             return rows
     if all(_is_numeric(row) for row in rows):
         try:

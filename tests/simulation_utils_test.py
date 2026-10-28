@@ -146,6 +146,11 @@ def test_list_of_tensors_becomes_one_tensor():
     assert x.shape == (3, 2)
 
 
+def test_simulator_without_return_raises():
+    with pytest.raises(ValueError, match="miss a `return`"):
+        simulate_from_theta(lambda t: None, torch.ones(3, 2), show_progress_bar=False)
+
+
 def test_simulate_for_sbi_rejects_complex_outputs(prior):
     with pytest.raises(TypeError, match="real numeric"):
         simulate_for_sbi(lambda t: t * 1j, prior, 4, show_progress_bar=False)
