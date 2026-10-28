@@ -55,10 +55,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     # Whether the marginals are defined for this estimator.
     # Required for iid methods.
     MARGINALS_DEFINED: bool = True
-    # The SDE of the noise path is singular at t = 1, and m(t) = 1 - t vanishes there
-    # (iid methods and guidance divide by it). The SDE functions (score, drift,
-    # diffusion and the marginals' mean and std) all clamp time at this value, so
-    # they describe the same marginal at every time. ODE sampling does not use it.
+    # All SDE functions clamp time here: the SDE is singular at t = 1, and iid methods
+    # and guidance divide by m(t) = 1 - t. ODE sampling does not use it.
     effective_t_max: float = 0.99
 
     def __init__(
@@ -530,7 +528,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         .. math::
             N(\theta_t; \mu_t(t), \sigma_t(t)^2) ,
             \mu_t(t) = (1 - t) \cdot \theta_0 + t \cdot \mu_{base}
-            \sigma_t(t) = t \cdot \sigma_{base}
+            \sigma_t(t) = (t + \sigma_{min}) \cdot \sigma_{base}
 
         So far, the implementation of iid methods assumes that the mean_base
         :math:`\mu_{base}` is 0. Therefore, the linear coefficient of the perturbation

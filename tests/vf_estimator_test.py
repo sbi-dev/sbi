@@ -324,8 +324,7 @@ def test_flow_matching_score_is_the_marginal_score():
     estimator.forward = exact_velocity
     inputs = torch.randn(5, 2, dtype=dtype)
     condition = torch.zeros(5, 1, dtype=dtype)
-    # Above effective_t_max (0.99), all SDE functions use the marginal at 0.99; the
-    # iid methods and guidance combine `score` with `mean_t_fn` and `std_fn`.
+    # Above effective_t_max (0.99), all SDE functions use the marginal at 0.99.
     for t in [0.05, 0.5, 0.95, 0.995, 1.0]:
         time = torch.tensor([t], dtype=dtype)
         m = estimator.mean_t_fn(time).reshape(())

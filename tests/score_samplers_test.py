@@ -255,7 +255,7 @@ def test_interval_guidance_samples_the_truncated_posterior(estimator_type):
     half_normal_mean = posterior_sd * math.sqrt(2 / math.pi)
     half_normal_sd = posterior_sd * math.sqrt(1 - 2 / math.pi)
     # Guidance denoises with Tweedie's formula, an approximation: measured bias up to
-    # 0.11 sd and sd ratio up to 1.05.
+    # 0.14 sd and sd ratio up to 1.11.
     assert abs(samples.mean() - half_normal_mean) < 0.2 * posterior_sd
     assert abs(samples.std() / half_normal_sd - 1) < 0.15
 
