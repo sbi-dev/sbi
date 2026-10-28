@@ -23,7 +23,8 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
     Note: Time convention and integration direction
         - t=0 is data (θ_data ~ posterior), t=1 is noise (θ_noise ~ N(0, 1)).
-        - Training interpolates θ_t = (1 - t) * θ_data + t * θ_noise.
+        - Training interpolates θ_t = (1 - t) * θ_data + (t + σ_min) * θ_noise, with
+          σ_min = ``noise_scale``.
         - The ODE integrates from t=1 → t=0 to generate samples.
         - ``mean_0`` and ``std_0`` are statistics of the data distribution (at t=0).
 
@@ -390,11 +391,14 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             \nabla_{\theta_t} \log p(\theta_t | x_o) =
             (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / t
 
-        Taking into account the noise scale :math:`\sigma_{min}`, the score function is
+        Taking into account the noise scale :math:`\sigma_{min}`, i.e. the path
+        :math:`\theta_t = (1 - t) \theta_0 + (t + \sigma_{min}) \epsilon`, the score
+        function is
 
         .. math::
             \nabla_{\theta_t} \log p(\theta_t | x_o) =
-            (- (1 - t) v(\theta_t, t; x_o) - \theta_t ) / (t + \sigma_{min}).
+            (- (1 - t) v(\theta_t, t; x_o) - \theta_t )
+            / ((t + \sigma_{min}) (1 + \sigma_{min})).
 
         Args:
             input: variable whose distribution is estimated.
@@ -409,7 +413,9 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         event_dims = len(self.input_shape)
         batch_shape = v.shape[: v.dim() - event_dims]
         t = torch.broadcast_to(t, batch_shape).reshape(*batch_shape, *[1] * event_dims)
-        score = (-(1 - t) * v - input) / (t + self.noise_scale)
+        score = (-(1 - t) * v - input) / (
+            (t + self.noise_scale) * (1 + self.noise_scale)
+        )
         return score
 
     def drift_fn(
@@ -422,12 +428,12 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         .. math::
             f(t) = - \theta_t / (1 - t)
 
-        The drift function :math:`f(t)` and diffusion function :math:`\g(t)`
+        The drift function :math:`f(t)` and diffusion function :math:`g(t)`
         enable SDE sampling:
 
         .. math::
             d\theta_t = [f(t) - g(t)^2 \nabla_{\theta_t} \log p(\theta_t | x_o)]dt
-            + \g(t) dW_t
+            + g(t) dW_t
 
         where :math:`dW_t` is the Wiener process.
 
@@ -455,13 +461,13 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         The diffusion function is calculated based on [3]_ (see Equation 7):
 
         .. math::
-            \g(t) = \sqrt{2t / (1 - t)}
+            g(t) = \sqrt{2t / (1 - t)}
 
         Taking into account the noise scale :math:`\sigma_{min}`, the diffusion
         function becomes:
 
         .. math::
-            \g(t) = \sqrt{2(t + \sigma_{min}) / (1 - t)}
+            g(t) = \sqrt{2(t + \sigma_{min}) (1 + \sigma_{min}) / (1 - t)}
 
 
         Args:
@@ -479,6 +485,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         return torch.sqrt(
             2
             * (times + self.noise_scale)
+            * (1 + self.noise_scale)
             / torch.maximum(1 - times, torch.tensor(1 - effective_t_max).to(times))
         )
 

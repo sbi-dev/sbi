@@ -254,3 +254,61 @@ def test_flow_matching_score_broadcasts_one_time_per_sample(num_dim):
     ])
     assert scores.shape == (4, num_dim)
     torch.testing.assert_close(scores, expected)
+
+
+@pytest.mark.parametrize("config_cls", CONFIGS)
+def test_forward_sde_matches_marginals(config_cls):
+    """The forward SDE d theta = f theta dt + g dW reproduces the time marginals.
+
+    With marginals N(m(t) theta_0, s(t)^2), this needs dm/dt = f m and
+    d(s^2)/dt = 2 f s^2 + g^2. Checked with central differences in float64.
+    """
+    estimator = config_cls().build(torch.randn(100, 1), torch.randn(100, 1)).double()
+    one = torch.ones(1, 1, dtype=torch.float64)
+    h = 1e-5
+    # Flow matching clamps its schedule at t = 0.99.
+    t_upper = min(estimator.t_max, 0.99)
+    times = torch.linspace(
+        estimator.t_min + 0.01, t_upper - 0.01, 9, dtype=torch.float64
+    )
+    for t in times.reshape(-1, 1):
+        m = estimator.mean_t_fn(t).reshape(-1)
+        s = estimator.std_fn(t).reshape(-1)
+        dm = (estimator.mean_t_fn(t + h) - estimator.mean_t_fn(t - h)).reshape(-1)
+        ds2 = (estimator.std_fn(t + h) ** 2 - estimator.std_fn(t - h) ** 2).reshape(-1)
+        f = estimator.drift_fn(one, t).reshape(-1)
+        g = estimator.diffusion_fn(one, t).reshape(-1)
+        torch.testing.assert_close(dm / (2 * h), f * m, rtol=1e-6, atol=0)
+        torch.testing.assert_close(
+            ds2 / (2 * h), 2 * f * s**2 + g**2, rtol=1e-6, atol=0
+        )
+
+
+def test_flow_matching_score_is_the_marginal_score():
+    """With the exact velocity of a Gaussian, `score` is the exact marginal score."""
+    dtype = torch.float64
+    mean = torch.tensor([0.5, -1.0], dtype=dtype)
+    cov = torch.tensor([[0.3, 0.1], [0.1, 0.2]], dtype=dtype)
+    eye = torch.eye(2, dtype=dtype)
+    estimator = FlowMatchingConfig().build(torch.randn(100, 2), torch.randn(100, 1))
+    estimator = estimator.double()
+
+    def marginal(time):
+        # theta_t = a theta_0 + b eps with theta_0 ~ N(mean, cov), eps ~ N(0, I).
+        a, b = 1 - time, time + estimator.noise_scale
+        return a, b, a**2 * cov + b**2 * eye
+
+    def exact_velocity(input, condition, time):
+        # E[eps - theta_0 | theta_t], the target of the flow matching loss.
+        a, b, marginal_cov = marginal(time)
+        residual = torch.linalg.solve(marginal_cov, (input - a * mean).T).T
+        return residual @ (b * eye - a * cov) - mean
+
+    estimator.forward = exact_velocity
+    inputs = torch.randn(5, 2, dtype=dtype)
+    condition = torch.zeros(5, 1, dtype=dtype)
+    for t in [0.05, 0.5, 0.95]:
+        time = torch.tensor([t], dtype=dtype)
+        a, _, marginal_cov = marginal(time)
+        expected = -torch.linalg.solve(marginal_cov, (inputs - a * mean).T).T
+        torch.testing.assert_close(estimator.score(inputs, condition, time), expected)
