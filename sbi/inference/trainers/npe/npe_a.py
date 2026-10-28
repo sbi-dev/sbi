@@ -55,9 +55,11 @@ class NPE_A(PosteriorEstimatorTrainer):
         The correction divides by the proposal in closed form, which needs a
         proposal with a single Gaussian (Appendix C of [1]). As in [1], NPE-A
         therefore trains a single Gaussian in every round, and a mixture of
-        `num_components` Gaussians only in the round trained with
-        `train(final_round=True)`. The posterior of that round cannot be the
-        proposal of another round.
+        `num_components` Gaussians only in the final round. The posterior of that
+        round cannot be the proposal of another round. By default, a first round on
+        simulations from the prior is final, so single-round NPE-A trains the
+        mixture; in a loop over rounds, pass `final_round=(r == num_rounds - 1)` to
+        `train()`.
 
         The correction also becomes unstable when a component of the density is
         about as wide as the proposal, which a mixture of many components trained
@@ -138,9 +140,9 @@ class NPE_A(PosteriorEstimatorTrainer):
                 called with the keyword `num_components`, and has to build that many
                 mixture components.
             num_components: Number of components of the mixture of Gaussians in the
-                round trained with `train(final_round=True)`. All other rounds train
-                a single Gaussian. Many components trained on few simulations can
-                make the correction unstable; see the note above.
+                final round. All other rounds train a single Gaussian. Many
+                components trained on few simulations can make the correction
+                unstable; see the note above.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -220,7 +222,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-        final_round: bool = False,
+        final_round: Optional[bool] = None,
         component_perturbation: float = 5e-3,
     ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the proposal posterior.
@@ -234,9 +236,9 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         As in [1], the density estimator is a single Gaussian in every round but the
         final one, so that its posterior can be the proposal of the next round
-        (Algorithm 1). A round trained with `final_round=True` copies that Gaussian
-        `num_components` times with small noise and trains the mixture (Algorithm 2).
-        Its posterior cannot be a proposal anymore.
+        (Algorithm 1). The final round copies that Gaussian `num_components` times
+        with small noise and trains the mixture (Algorithm 2). Its posterior cannot
+        be a proposal anymore.
 
         Args:
             training_batch_size: Training batch size.
@@ -262,9 +264,10 @@ class NPE_A(PosteriorEstimatorTrainer):
                 loss and leakage after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
-            final_round: Whether this is the last round. Set it in the last iteration
-                of the loop over rounds, or call `train(final_round=True)` once more
-                after the loop, which retrains on the data of the last round.
+            final_round: Whether this is the last round. If None (default), only a
+                first round on simulations from the prior is final, so that
+                single-round NPE-A trains the mixture. In a loop over rounds, pass
+                `final_round=(r == num_rounds - 1)`.
             component_perturbation: Standard deviation of the noise added to the
                 copies of the Gaussian in the final round. It breaks the symmetry
                 between the copies.
@@ -317,6 +320,8 @@ class NPE_A(PosteriorEstimatorTrainer):
         elif isinstance(proposal, MoG):
             _check_single_gaussian_proposal(proposal)
 
+        if final_round is None:
+            final_round = self._round == 0
         num_components = self._num_components if final_round else 1
         if self._neural_net is None:
             self._build_neural_net = partial(

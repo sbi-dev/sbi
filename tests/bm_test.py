@@ -369,7 +369,9 @@ def train_and_eval_sequential_inference(
     inference = inference_class(
         prior, **_estimator_kwargs(inference_class, extra_kwargs)
     )
-    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
+    # NPE-A treats a first round on prior simulations as final unless told not to.
+    first_round = dict(final_round=False) if inference_class is NPE_A else {}
+    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS, **first_round)
 
     for r in range(1, NUM_ROUNDS_SEQUENTIAL):
         proposal = inference.build_posterior().set_default_x(x_o)

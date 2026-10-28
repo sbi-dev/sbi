@@ -622,9 +622,11 @@ def _check_single_gaussian_proposal(proposal_mog: MoG) -> None:
             "NPE-A divides by the proposal in closed form, which needs a proposal "
             "with a single Gaussian (Papamakarios & Murray 2016, Appendix C), but "
             f"this proposal has {proposal_mog.num_components}. NPE-A trains one "
-            "Gaussian in every round but the final one, so the posterior of a round "
-            "trained with `train(final_round=True)` cannot be the proposal of "
-            "another round. For more rounds with a mixture, use NPE_C."
+            "Gaussian in every round but the final one, so the posterior of a final "
+            "round cannot be the proposal of another round. A first round on "
+            "simulations from the prior is final by default: in a loop over "
+            "rounds, pass `final_round=(r == num_rounds - 1)` to `train()`. For "
+            "more rounds with a mixture, use NPE_C."
         )
 
 

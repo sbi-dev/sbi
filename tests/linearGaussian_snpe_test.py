@@ -1181,22 +1181,19 @@ def test_npe_a_gaussian_proposal_equal_to_prior_keeps_the_density():
         )
 
 
-@pytest.mark.parametrize("form", ["in_loop", "after_loop"])
-def test_npe_a_final_round_expands_the_gaussian(form):
-    """Both documented loops end with a mixture whose proposal is one Gaussian:
-    the flag in the last round, or one more `train(final_round=True)` after it."""
+def test_npe_a_final_round_expands_the_gaussian():
+    """The last round of a loop copies the round's Gaussian into the mixture."""
     prior = MultivariateNormal(zeros(2), eye(2))
     inference = NPE_A(prior, num_components=3, show_progress_bars=False)
     proposal = prior
     for r in range(2):
         theta = proposal.sample((100,))
         inference.append_simulations(theta, theta, proposal=proposal).train(
-            max_num_epochs=2, final_round=(form == "in_loop" and r == 1)
+            max_num_epochs=2, final_round=(r == 1)
         )
         proposal = inference.build_posterior().set_default_x(zeros(1, 2))
-    if form == "after_loop":
-        assert proposal.get_mog_params(zeros(1, 2)).num_components == 1
-        inference.train(max_num_epochs=2, final_round=True)
+        if r == 0:
+            assert proposal.get_mog_params(zeros(1, 2)).num_components == 1
     # Retraining the final round must not copy the components again.
     inference.train(max_num_epochs=2, final_round=True)
 
@@ -1258,7 +1255,9 @@ def test_npe_a_final_round_cannot_resume_the_optimizer():
     prior = MultivariateNormal(zeros(2), eye(2))
     inference = NPE_A(prior, num_components=3, show_progress_bars=False)
     theta = prior.sample((100,))
-    inference.append_simulations(theta, theta).train(max_num_epochs=2)
+    inference.append_simulations(theta, theta).train(
+        max_num_epochs=2, final_round=False
+    )
 
     with pytest.raises(ValueError, match="resume"):
         inference.train(final_round=True, resume_training=True)

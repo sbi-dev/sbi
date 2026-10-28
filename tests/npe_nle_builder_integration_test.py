@@ -452,11 +452,17 @@ def test_npe_a_string_warns():
     [MDNConfig(hidden_features=16), "mdn_snpe_a", posterior_nn("mdn_snpe_a")],
     ids=["config", "string", "factory"],
 )
-@pytest.mark.parametrize("final_round", [False, True], ids=["round", "final"])
+@pytest.mark.parametrize(
+    "final_round, expected",
+    [(False, 1), (True, 3), (None, 3)],
+    ids=["round", "final", "default"],
+)
 def test_npe_a_builds_one_gaussian_before_the_final_round(
-    density_estimator, final_round
+    density_estimator, final_round, expected
 ):
-    """Every builder gets one component, or `num_components` in a final round."""
+    """Every builder gets one component, or `num_components` in a final round. By
+    default, a first round on prior simulations is final, so a single round trains
+    the mixture."""
     prior = MultivariateNormal(zeros(2), eye(2))
     theta = prior.sample((50,))
     x = theta + 0.1 * torch.randn_like(theta)
@@ -471,7 +477,7 @@ def test_npe_a_builds_one_gaussian_before_the_final_round(
         max_num_epochs=1, final_round=final_round
     )
 
-    assert estimator.net.num_components == (3 if final_round else 1)
+    assert estimator.net.num_components == expected
 
 
 def test_npe_a_rejects_a_builder_that_ignores_num_components():
