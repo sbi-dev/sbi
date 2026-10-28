@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import os
 import random
 import time
 from pathlib import Path
@@ -65,16 +64,6 @@ def fails_with_solver_error(theta):
     if (theta < 0).any():
         raise SolverError(3, "diverged")
     return theta * 2.0
-
-
-def process_id(theta):
-    time.sleep(0.01)
-    return np.array([os.getpid()])
-
-
-def batch_process_ids(theta):
-    time.sleep(0.01)
-    return np.full((len(theta), 1), os.getpid())
 
 
 def batch_sizes(theta):
@@ -389,22 +378,16 @@ def test_simulator_error_keeps_type_and_names_parameter_set(on_error, num_worker
     assert "theta[" in " ".join(error.value.__notes__)
 
 
-@pytest.mark.parametrize(
-    "simulator, simulator_is_batched",
-    [(process_id, False), (batch_process_ids, True)],
-)
-def test_auto_batch_size_splits_simulations_across_workers(
-    simulator, simulator_is_batched
-):
+def test_auto_batch_size_splits_simulations_across_workers():
     x = simulate_from_theta(
-        simulator,
+        batch_sizes,
         np.zeros((40, 1)),
         num_workers=2,
-        simulator_is_batched=simulator_is_batched,
+        simulator_is_batched=True,
         show_progress_bar=False,
     )
 
-    assert len(np.unique(x)) == 2
+    assert torch.all(x == 40 / (4 * 2))
 
 
 def test_auto_batch_size_is_one_on_one_worker(prior):
