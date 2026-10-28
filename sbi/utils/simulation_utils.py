@@ -399,7 +399,7 @@ def _run_batched(simulator: Callable, batch: _Batch, on_error: OnError) -> _Batc
     if batch.seeds is not None:
         seed_all_backends(batch.seeds[0])
     try:
-        return _BatchResult(simulator(batch.theta), 0, None)
+        return _BatchResult(_snapshot(simulator(batch.theta)), 0, None)
     except Exception as error:
         where = f"theta[{batch.start}:{batch.start + len(batch.theta)}]"
         failure = _Failure(where, f"The simulator failed for {where}.", error)
@@ -417,7 +417,7 @@ def _run_rows(simulator: Callable, batch: _Batch, on_error: OnError) -> _BatchRe
         if batch.seeds is not None:
             seed_all_backends(batch.seeds[i])
         try:
-            outputs.append(simulator(theta))
+            outputs.append(_snapshot(simulator(theta)))
         except Exception as error:
             where = f"theta[{batch.start + i}] = {theta.tolist()}"
             failure = _Failure(where, f"The simulator failed for {where}.", error)
@@ -434,6 +434,15 @@ def _run_rows(simulator: Callable, batch: _Batch, on_error: OnError) -> _BatchRe
         except RuntimeError:  # Outputs of different shapes.
             pass
     return _BatchResult(outputs, num_failed, first_failure)
+
+
+def _snapshot(output: Any) -> Any:
+    """Copies tensor, array and list outputs, which a simulator may reuse."""
+    if isinstance(output, Tensor):
+        return output.clone()
+    if isinstance(output, (np.ndarray, list)):
+        return output.copy()
+    return output
 
 
 def _run_in_worker(run: Callable, batch: _Batch, worker_seed: int) -> _BatchResult:

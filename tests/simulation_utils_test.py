@@ -389,6 +389,32 @@ def test_parallelize_simulator_forwards_settings():
     assert np.isnan(x[9]).all()
 
 
+@pytest.mark.parametrize("simulator_is_batched", [False, True])
+@pytest.mark.parametrize(
+    "make_buffer",
+    [np.zeros, torch.zeros, lambda size: [0.0] * size],
+    ids=["numpy", "torch", "list"],
+)
+def test_simulator_that_reuses_its_output_buffer(simulator_is_batched, make_buffer):
+    buffer = make_buffer(4 if simulator_is_batched else 1)
+
+    def simulator(theta):
+        rows = theta if simulator_is_batched else theta[None]
+        for i, row in enumerate(rows):
+            buffer[i] = float(row[0])
+        return buffer
+
+    x = simulate_from_theta(
+        simulator,
+        np.arange(16.0).reshape(-1, 1),
+        simulation_batch_size=4,
+        simulator_is_batched=simulator_is_batched,
+        show_progress_bar=False,
+    )
+
+    assert np.array_equal(np.asarray(x).ravel(), np.arange(16.0))
+
+
 @pytest.mark.parametrize("on_error", ["raise", "nan"])
 def test_unpicklable_simulator_error_keeps_parallel_results(on_error):
     theta = torch.ones(8, 2)
