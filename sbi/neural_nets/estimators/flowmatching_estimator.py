@@ -315,7 +315,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         times_ = times[..., None]
 
         # Sample from probability path at time t
-        # θ_t = (1-t) * θ_data + t * θ_noise, where θ_noise ~ N(0,1)
+        # θ_t = (1-t) * θ_data + (t + σ_min) * θ_noise, where θ_noise ~ N(0,1)
         theta_1 = torch.randn_like(input)
         theta_t = (1 - times_) * input + (times_ + self.noise_scale) * theta_1
 
