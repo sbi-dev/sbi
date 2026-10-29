@@ -396,13 +396,13 @@ def check_uniformity_c2st(
     c2st_scores = torch.tensor([
         [
             c2st(
-                rks.unsqueeze(1),
+                rks.unsqueeze(1).float(),
                 torch.randint(
                     0,
                     num_posterior_samples + 1,
                     (ranks.shape[0], 1),
                     device=ranks.device,
-                ).to(rks),
+                ).float(),
             )
             for rks in ranks.T
         ]
