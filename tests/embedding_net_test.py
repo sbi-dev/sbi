@@ -204,7 +204,11 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
     ("input_shape", "kwargs", "match"),
     [
         ((32, 32, 3), {}, "in_channels"),
-        ((32,), {"num_conv_layers": 3}, "num_conv_layers is 3"),
+        (
+            (32,),
+            {"num_conv_layers": 3, "out_channels_per_layer": [6, 12]},
+            "num_conv_layers is 3",
+        ),
         # Kernel larger than the padded input: both sizes are negative, and
         # their product is positive.
         ((4, 4), {"kernel_size": 9}, "num_conv_layers"),
@@ -214,6 +218,15 @@ def test_cnn_embedding_errors_name_arguments(input_shape, kwargs, match):
     """CNNEmbedding errors name the constructor arguments that fix them."""
     with pytest.raises(AssertionError, match=match):
         CNNEmbedding(input_shape, **kwargs)
+
+
+def test_cnn_embedding_default_channels_follow_num_conv_layers():
+    """The default channels double per layer, starting at 6."""
+    embedding_net = CNNEmbedding((32,), num_conv_layers=3)
+    convs = [m for m in embedding_net.cnn_subnet if isinstance(m, nn.Conv1d)]
+
+    assert [conv.out_channels for conv in convs] == [6, 12, 24]
+    assert embedding_net(torch.randn(4, 32)).shape == (4, 20)
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])

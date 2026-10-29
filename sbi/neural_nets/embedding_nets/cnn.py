@@ -118,8 +118,9 @@ class CNNEmbedding(nn.Module):
                 channel-first layout.
             in_channels: Number of input channels, e.g., 3 for RGB images.
             out_channels_per_layer: Number of output channels of each convolutional
-                layer, one entry per layer. Defaults to `[6, 12]`, which only fits
-                `num_conv_layers=2`.
+                layer, one entry per layer. Defaults to 6 channels in the first
+                layer, doubling in each further layer, e.g., `[6, 12]` for two
+                layers.
             num_conv_layers: Number of convolutional layers.
             num_linear_layers: Number of fully connected layers.
             num_linear_units: Number of hidden units in the fully connected layers.
@@ -140,11 +141,11 @@ class CNNEmbedding(nn.Module):
         pool_module = nn.MaxPool2d if use_2d_cnn else nn.MaxPool1d
 
         if out_channels_per_layer is None:
-            out_channels_per_layer = [6, 12]
+            out_channels_per_layer = [6 * 2**ii for ii in range(num_conv_layers)]
         assert len(out_channels_per_layer) == num_conv_layers, (
             f"out_channels_per_layer has {len(out_channels_per_layer)} entries, but "
             f"num_conv_layers is {num_conv_layers}. Pass one entry per convolutional "
-            "layer; the default [6, 12] only fits num_conv_layers=2."
+            "layer."
         )
 
         # define input shape with channel
