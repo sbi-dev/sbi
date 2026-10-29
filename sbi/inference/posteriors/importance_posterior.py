@@ -287,7 +287,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             num_candidate_samples=oversampling_factor,
             show_progress_bars=show_progress_bars,
             max_sampling_batch_size=max_sampling_batch_size,
-            device=self._device,
         )
 
         return samples.reshape((*sample_shape, -1)).to(self._device)

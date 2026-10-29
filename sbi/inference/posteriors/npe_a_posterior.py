@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Optional, Self, Union
+from typing import Dict, Optional, Union
 
 import torch
 from torch import Tensor
@@ -10,6 +10,7 @@ from torch.distributions import Distribution
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
+    ProposalCorrectedMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
 
@@ -27,14 +28,15 @@ class NPE_A_Posterior(DirectPosterior):
     behaves like a standard DirectPosterior.
 
     For multi-round inference, the correction is applied analytically since all
-    distributions are Mixtures of Gaussians (MoG).
+    distributions are Mixtures of Gaussians (MoG). The density estimator is then
+    wrapped in a `ProposalCorrectedMDN`, so all methods use the corrected density.
 
     Note:
         Z-scored space: When the density estimator uses z-scoring (input
         normalization), all MoG parameters (means, precisions) are in z-scored
         coordinates. The prior_mog must also be transformed to z-scored space
         for the correction to be valid. The NPE_A trainer handles this
-        transformation automatically via ``_compute_z_scored_prior_mog()``.
+        transformation automatically in ``build_posterior()``.
     """
 
     # NPE-A does not support `sample_with='mcmc'`.
@@ -63,30 +65,50 @@ class NPE_A_Posterior(DirectPosterior):
             device: Device for computation.
             enable_transform: Whether to enable transforms for MAP optimization.
         """
+        estimator = (
+            posterior_estimator
+            if proposal_mog is None
+            else ProposalCorrectedMDN(posterior_estimator, proposal_mog, prior_mog)
+        )
         super().__init__(
-            posterior_estimator=posterior_estimator,
+            posterior_estimator=estimator,
             prior=prior,
             max_sampling_batch_size=max_sampling_batch_size,
             device=device,
             enable_transform=enable_transform,
         )
 
-        # Move MoG parameters to the correct device (handles cross-device multi-round)
-        self._proposal_mog = (
-            proposal_mog.to(self._device).detach() if proposal_mog is not None else None
-        )
-        self._prior_mog = (
-            prior_mog.to(self._device).detach() if prior_mog is not None else None
-        )
-        self._apply_correction = proposal_mog is not None
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
 
-    def to(self, device: Union[str, torch.device]) -> Self:
-        super().to(device)
-        if self._proposal_mog is not None:
-            self._proposal_mog = self._proposal_mog.to(self._device).detach()
-        if self._prior_mog is not None:
-            self._prior_mog = self._prior_mog.to(self._device).detach()
-        return self
+        Posteriors pickled by sbi 0.27 keep the correction MoGs on the posterior and
+        an unwrapped estimator. Without re-wrapping, they would silently skip the
+        correction.
+
+        Args:
+            state_dict: State to be restored.
+
+        Raises:
+            ValueError: If the pickled proposal is a mixture.
+        """
+        proposal_mog = state_dict.pop("_proposal_mog", None)
+        prior_mog = state_dict.pop("_prior_mog", None)
+        state_dict.pop("_apply_correction", None)
+        if proposal_mog is not None and proposal_mog.num_components > 1:
+            raise ValueError(
+                "This NPE-A posterior was saved by sbi 0.26 or 0.27 with a mixture "
+                "proposal, whose correction was wrong (sbi issue #2108). Please "
+                "train it again."
+            )
+        if proposal_mog is not None:
+            estimator = ProposalCorrectedMDN(
+                state_dict["posterior_estimator"], proposal_mog, prior_mog
+            )
+            state_dict["posterior_estimator"] = estimator
+            state_dict["potential_fn"].posterior_estimator = estimator
+            # A cached MAP was computed from the uncorrected density.
+            state_dict["_map"] = None
+        super().__setstate__(state_dict)
 
     def get_mog_params(self, x: Tensor) -> MoG:
         """Get the (possibly corrected) MoG parameters for given observation.
@@ -100,57 +122,6 @@ class NPE_A_Posterior(DirectPosterior):
         Returns:
             MoG parameters (corrected if this is a multi-round posterior).
         """
-        return self._get_corrected_mog(x)
-
-    def _get_corrected_mog(self, x: Tensor) -> MoG:
-        """Get corrected MoG for the given observation.
-
-        Args:
-            x: Observation tensor, shape (batch_dim, *condition_shape).
-
-        Returns:
-            Corrected MoG if correction is needed, otherwise raw MoG from estimator.
-        """
-        # Import here to avoid circular imports
-        from sbi.inference.trainers.npe.npe_a import _correct_for_proposal
-
-        density_mog = self.posterior_estimator.get_uncorrected_mog(x)
-
-        if not self._apply_correction:
-            return density_mog
-
-        # When correction is applied, proposal_mog is guaranteed to be set
-        assert self._proposal_mog is not None
-        return _correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
-
-    def _sample_estimator(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
-        """Sample from the corrected MoG distribution.
-
-        Args:
-            sample_shape: Shape of samples to draw.
-            **kwargs: Must contain 'condition' key with conditioning observations,
-                shape (batch_dim, *condition_shape).
-
-        Returns:
-            Samples from corrected distribution, shape (*sample_shape, batch, dim).
-        """
-        corrected_mog = self._get_corrected_mog(kwargs["condition"])
-        samples = corrected_mog.sample(sample_shape)
-        return self.posterior_estimator._inverse_transform_input(samples)
-
-    def _log_prob_estimator(self, theta: Tensor, condition: Tensor) -> Tensor:
-        """Compute log probability under the corrected MoG.
-
-        Args:
-            theta: Parameters to evaluate, shape (sample_dim, batch_dim, dim).
-            condition: Conditioning observations, shape (batch_dim, *condition_shape).
-
-        Returns:
-            Log probabilities, shape (sample_dim, batch_dim).
-        """
-        corrected_mog = self._get_corrected_mog(condition)
-        theta_transformed = self.posterior_estimator._transform_input(theta)
-        log_probs = corrected_mog.log_prob(theta_transformed)
-        return log_probs + self.posterior_estimator._log_det_jacobian_forward(
-            theta, theta_transformed
-        )
+        if isinstance(self.posterior_estimator, ProposalCorrectedMDN):
+            return self.posterior_estimator.get_corrected_mog(x)
+        return self.posterior_estimator.get_uncorrected_mog(x)

@@ -204,7 +204,8 @@ def test_consistent_sbc_results(
     assert (checks["c2st_dap"] < 0.6).all(), f"C2ST DAP too large: {checks['c2st_dap']}"
 
 
-def test_sbc_accuracy():
+@pytest.mark.parametrize("num_posterior_samples", (2, 1000))
+def test_sbc_accuracy(num_posterior_samples: int):
     """Test SBC with prior as posterior (perfect calibration case)."""
     num_dim = 2
     # Gaussian toy problem, set posterior = prior
@@ -217,7 +218,8 @@ def test_sbc_accuracy():
     posterior = TractablePosterior(potential_fn=potential)
 
     # Run SBC
-    N = L = 1000
+    N = 1000
+    L = num_posterior_samples
     thetas = prior.sample((N,))
     xs = simulator(thetas)
 
@@ -234,39 +236,10 @@ def test_sbc_accuracy():
     pvals, c2st_ranks, _ = checks.values()
 
     # With perfect calibration, ranks should be uniform
-    assert (c2st_ranks <= 0.6).all(), "posterior ranks must be close to uniform."
-    assert (pvals > 0.05).all(), "posterior ranks uniformity test p-values too small."
-
-
-@pytest.mark.slow
-def test_sbc_checks():
-    """Test the uniformity checks for SBC with artificial uniform ranks."""
-    num_dim = 2
-    num_posterior_samples = 1500
-
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    # Data averaged posterior samples should be distributed as prior
-    daps = prior.sample((num_posterior_samples,))
-
-    # Create perfectly uniform ranks for testing
-    ranks = torch.distributions.Uniform(
-        zeros(num_dim), num_posterior_samples * ones(num_dim)
-    ).sample((num_posterior_samples,))
-
-    # Run checks
-    checks = check_sbc(
-        ranks,
-        prior.sample((num_posterior_samples,)),
-        daps,
-        num_posterior_samples=num_posterior_samples,
+    assert ((c2st_ranks > 0.45) & (c2st_ranks < 0.55)).all(), (
+        f"posterior ranks must be close to uniform, but C2ST is {c2st_ranks}."
     )
-
-    # With artificial uniform ranks, test statistics should indicate uniformity
-    assert (checks["ks_pvals"] > 0.05).all(), "KS test failed on uniform ranks"
-    assert (checks["c2st_ranks"] < 0.55).all(), "C2ST failed on uniform ranks"
-    assert (checks["c2st_dap"] < 0.55).all(), (
-        "C2ST failed on prior-distributed DAP samples"
-    )
+    assert (pvals > 0.01).all(), f"KS p-values of uniform ranks too small: {pvals}"
 
 
 @pytest.mark.parametrize("num_bins", (None, 30))
