@@ -346,8 +346,8 @@ def test_sbc_rank_plot_bins_over_full_rank_range(plot_type):
     assert (band[:, 0].min(), band[:, 0].max()) == (0, num_posterior_samples)
     if plot_type == "hist":
         assert ax.patches[0].get_x() == 0 and ax.patches[0].get_height() == 0
-        # Each of the num_bins bins expects a fraction 1 / num_bins of the runs.
-        expected = binom(num_sbc_runs, 1 / num_bins).ppf([0.005, 0.995])
+        # Bins 0-8 hold 10 of the 101 integer ranks, the last bin 11.
+        expected = binom(num_sbc_runs, np.array([10, 11]) / 101).ppf([0.005, 0.995])
         assert (band[:, 1].min(), band[:, 1].max()) == tuple(expected)
     else:
         x, y = ax.lines[0].get_data()
@@ -356,6 +356,32 @@ def test_sbc_rank_plot_bins_over_full_rank_range(plot_type):
             assert np.all(y[: len(y) // 4] == 0)
         else:
             assert np.abs(y).max() > 0.2
+    close()
+
+
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+def test_sbc_rank_plot_bands_for_uniform_integer_ranks(plot_type):
+    """Bins over [0, 10] hold one of the 11 integer ranks each, the last bin two."""
+    np.testing.assert_allclose(
+        plt._uniform_rank_bin_probs(10, 10), [1 / 11] * 9 + [2 / 11]
+    )
+    num_sbc_runs = 220
+    ranks = np.tile(np.arange(11), 20)[:, None]  # every rank exactly 20 times
+    _, ax = sbc_rank_plot(ranks, 10, num_bins=10, plot_type=plot_type)
+    ax = np.atleast_1d(ax)[0]
+    band = ax.collections[0].get_paths()[0].vertices
+    if plot_type == "hist":
+        # One flat band that holds the 99% interval of the 1-rank and 2-rank bins.
+        expected = binom(num_sbc_runs, np.array([1, 2]) / 11).ppf([0.005, 0.995])
+        assert (band[:, 1].min(), band[:, 1].max()) == tuple(expected)
+    else:
+        # In bin 8 (8 < x < 9), the CDF of uniform integer ranks is 9 / 11.
+        in_bin_8 = band[(band[:, 0] > 8) & (band[:, 0] < 9), 1]
+        expected = binom(num_sbc_runs, 9 / 11).ppf([0.005, 0.995]) / num_sbc_runs
+        if plot_type == "cdf-diff":
+            expected -= 9 / 11
+            np.testing.assert_allclose(ax.lines[0].get_ydata(), 0, atol=1e-12)
+        np.testing.assert_allclose((in_bin_8.min(), in_bin_8.max()), expected)
     close()
 
 

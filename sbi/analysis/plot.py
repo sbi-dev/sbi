@@ -2130,7 +2130,7 @@ def _plot_ranks_as_cdf_diff(
     hist, *_ = np.histogram(ranks, bins=num_bins, range=(0, num_posterior_samples))
     histcs = hist.cumsum()
     ecdf = histcs / histcs.max()
-    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
+    uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
     diff = ecdf - uniform_cdf
 
     plt.plot(
@@ -2154,6 +2154,20 @@ def _plot_ranks_as_cdf_diff(
     plt.xlabel("posterior rank" if xlabel is None else xlabel)
 
 
+def _uniform_rank_bin_probs(num_bins: int, num_posterior_samples: int) -> np.ndarray:
+    """Probability of each bin when the ranks are uniform on 0, ..., N.
+
+    Bins over [0, N] can hold different numbers of the N + 1 integer ranks: for
+    N = 10 and 10 bins, the last bin holds ranks 9 and 10.
+    """
+    counts, _ = np.histogram(
+        np.arange(num_posterior_samples + 1),
+        bins=num_bins,
+        range=(0, num_posterior_samples),
+    )
+    return counts / (num_posterior_samples + 1)
+
+
 def _plot_cdf_region_expected_under_uniformity(
     num_sbc_runs: int,
     num_bins: int,
@@ -2164,9 +2178,7 @@ def _plot_cdf_region_expected_under_uniformity(
 ) -> None:
     """Plot region of empirical cdfs expected under uniformity on the current axis."""
 
-    # Construct uniform histogram.
-    uni_bins = binom(num_sbc_runs, p=1 / num_bins).ppf(0.5) * np.ones(num_bins)
-    uni_bins_cdf = uni_bins.cumsum() / uni_bins.sum()
+    uni_bins_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
     # Decrease value one in last entry by epsilon to find valid
     # confidence intervals.
     uni_bins_cdf[-1] -= 1e-9
@@ -2195,14 +2207,13 @@ def _plot_cdf_diff_region_expected_under_uniformity(
 ) -> None:
     """Plot region of empirical CDF differences expected under uniformity."""
 
-    uni_bins = binom(num_sbc_runs, p=1 / num_bins).ppf(0.5) * np.ones(num_bins)
-    uni_bins_cdf = uni_bins.cumsum() / uni_bins.sum()
+    uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
+    uni_bins_cdf = uniform_cdf.copy()
     uni_bins_cdf[-1] -= 1e-9
 
     lower = [binom(num_sbc_runs, p=p).ppf(0.005) for p in uni_bins_cdf]
     upper = [binom(num_sbc_runs, p=p).ppf(0.995) for p in uni_bins_cdf]
 
-    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
     plt.fill_between(
         x=np.linspace(0, num_posterior_samples, num_repeats * num_bins),
         y1=np.repeat(np.array(lower) / np.max(lower) - uniform_cdf, num_repeats),
@@ -2220,10 +2231,12 @@ def _plot_hist_region_expected_under_uniformity(
     alpha: float = 0.2,
     color: str = "gray",
 ) -> None:
-    """Plot region of empirical cdfs expected under uniformity."""
+    """Plot one flat band that holds the 99% interval of every bin under uniformity."""
 
-    lower = binom(num_sbc_runs, p=1 / num_bins).ppf(0.005)
-    upper = binom(num_sbc_runs, p=1 / num_bins).ppf(0.995)
+    # Binomial quantiles grow with p, so this band holds every bin's interval.
+    p = _uniform_rank_bin_probs(num_bins, num_posterior_samples)
+    lower = binom(num_sbc_runs, p=p.min()).ppf(0.005)
+    upper = binom(num_sbc_runs, p=p.max()).ppf(0.995)
 
     # Plot grey area with expected ECDF.
     plt.fill_between(
