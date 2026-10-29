@@ -558,6 +558,9 @@ class VIPosterior(NeuralPosterior):
             self._q_spec = replace(q._q_spec)
             self._trained_on = q._trained_on
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
+            self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
+            if self._amortized_q is not None:
+                self._amortized_q.to(self._device)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x

@@ -482,7 +482,12 @@ def test_amortized_posterior_survives_roundtrip():
     )
 
     x_o = zeros(1, num_dim)
-    for candidate in (pickle.loads(pickle.dumps(posterior)), deepcopy(posterior)):
+    clone = VIPosterior(posterior.potential_fn, posterior._prior, q=posterior)
+    for candidate in (
+        pickle.loads(pickle.dumps(posterior)),
+        deepcopy(posterior),
+        clone,
+    ):
         assert candidate._mode == "amortized"
         assert candidate.sample((5,), x=x_o).shape == (5, num_dim)
 
