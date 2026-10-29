@@ -842,6 +842,23 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
 
 
 @pytest.mark.gpu
+def test_map_moves_tensor_starts_to_the_posterior_device():
+    """CPU prior samples are valid MAP starts for a posterior on the GPU."""
+    device = process_device("gpu")
+    prior = BoxUniform(-torch.ones(2), torch.ones(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    trainer = NPE(prior)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    posterior = trainer.build_posterior()
+    posterior.to(device)
+    posterior.set_default_x(zeros(1, 2))
+    cpu_starts = BoxUniform(-torch.ones(2), torch.ones(2)).sample((10,))
+    theta_map = posterior.map(init_method=cpu_starts, num_iter=2, num_to_optimize=5)
+    assert theta_map.device.type == torch.device(device).type
+
+
+@pytest.mark.gpu
 def test_importance_posterior_log_prob_across_devices():
     """The normalization constant works after `.to()`, with x from any device."""
     device = process_device("gpu")

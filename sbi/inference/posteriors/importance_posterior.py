@@ -343,6 +343,17 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         return samples.reshape((*sample_shape, -1)).to(self._device)
 
+    def _map_inits(
+        self,
+        init_method: Union[str, Tensor],
+        num_init_samples: int,
+        x: Optional[Tensor] = None,
+    ) -> Tensor:
+        # With method="importance", `.sample()` returns weighted proposal samples.
+        if init_method == "posterior":
+            return self._sir_sample((num_init_samples,))
+        return super()._map_inits(init_method, num_init_samples, x)
+
     def map(
         self,
         x: Optional[Tensor] = None,
@@ -376,9 +387,12 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be either `posterior` or `proposal`, which
+                samples the respective distribution `num_init_samples` times (the
+                proposal is the prior for posteriors from `build_posterior()`).
+                `posterior` draws the samples with SIR, whatever `method` is set. If it
+                is a tensor, the tensor is used as the initial locations, so
+                prior-based initialization can be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the

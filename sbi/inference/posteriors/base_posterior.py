@@ -275,6 +275,40 @@ class NeuralPosterior:
         )
         return value if same_x else None
 
+    def _map_inits(
+        self,
+        init_method: Union[str, Tensor],
+        num_init_samples: int,
+        x: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Returns the starting points of the MAP optimization.
+
+        Args:
+            init_method: `posterior`, `proposal` or a tensor of starting points, see
+                `map()` of the child classes.
+            num_init_samples: Number of samples to draw for a string `init_method`.
+            x: Observation for `posterior` samples. If None, the default `x`.
+        """
+        has_proposal = getattr(self, "proposal", None) is not None
+        if init_method == "posterior":
+            return self.sample((num_init_samples,), x=x)
+        elif init_method == "proposal":
+            if not has_proposal:
+                raise ValueError(
+                    f"init_method='proposal' is not available for "
+                    f"{type(self).__name__}, which has no proposal distribution. "
+                    "Use 'posterior', or pass initial locations as a tensor "
+                    "(for example prior samples)."
+                )
+            return self.proposal.sample((num_init_samples,))
+        elif isinstance(init_method, Tensor):
+            return init_method.to(self._device)
+        valid = "'posterior', 'proposal'" if has_proposal else "'posterior'"
+        raise ValueError(
+            f"Invalid init_method '{init_method}'. Use {valid}, or pass "
+            "initial locations as a tensor (for example prior samples)."
+        )
+
     def _calculate_map(
         self,
         num_iter: int = 1_000,
@@ -288,16 +322,8 @@ class NeuralPosterior:
         """Calculates the maximum-a-posteriori estimate (MAP).
         See `map()` method of child classes for docstring.
         """
-
-        if init_method == "posterior":
-            inits = self.sample((num_init_samples,))
-        elif init_method == "proposal":
-            inits = self.proposal.sample((num_init_samples,))  # type: ignore
-        elif isinstance(init_method, Tensor):
-            inits = init_method
-        else:
-            raise ValueError
-
+        inits = self._map_inits(init_method, num_init_samples)
+        # Read after `_map_inits()`, whose `sample()` may rebind the potential.
         return gradient_ascent(
             potential_fn=self.potential_fn,
             inits=inits,
@@ -343,9 +369,11 @@ class NeuralPosterior:
                 for the optimization.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be `posterior` or, for posteriors that
+                have a proposal, `proposal`, which samples the respective
+                distribution `num_init_samples` times. If it is a tensor, the tensor
+                is used as the initial locations, so prior-based initialization can
+                be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             save_best_every: The best log-probability is computed, saved in the
