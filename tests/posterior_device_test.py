@@ -61,11 +61,13 @@ def _npe_a_round_two(prior_name: str):
     prior = _prior(prior_name)
     trainer = NPE_A(prior, num_components=2, show_progress_bars=False)
     theta, x = _simulate(prior, 300)
-    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2, final_round=False)
     proposal = trainer.build_posterior().set_default_x(torch.zeros(1, NUM_DIM))
     theta = proposal.sample((300,), show_progress_bars=False)
     x = theta + 0.1 * torch.randn_like(theta)
-    trainer.append_simulations(theta, x, proposal=proposal).train(max_num_epochs=2)
+    trainer.append_simulations(theta, x, proposal=proposal).train(
+        max_num_epochs=2, final_round=True
+    )
     return trainer.build_posterior()
 
 
