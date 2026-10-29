@@ -210,7 +210,7 @@ def pairplot(
             if they exist, the 4th, 5th and so on).
         upper: Plotting style for upper diagonal, {hist, scatter, contour, kde,
             None}.
-        lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
+        lower: Plotting style for lower diagonal, {hist, scatter, contour, kde,
             None}.
         diag: Plotting style for diagonal, {hist, scatter, kde, bar}.
         figsize: Size of the entire figure.
@@ -1701,6 +1701,9 @@ def sbc_rank_plot(
     Returns:
         fig, ax: figure and axis objects.
 
+    Raises:
+        ValueError: If a rank lies outside [0, num_posterior_samples].
+
     """
 
     return _sbc_rank_plot(
@@ -1788,8 +1791,8 @@ def _sbc_rank_plot(
         ranks_list[idx] = ensure_numpy(rank)
     if not all(((r >= 0) & (r <= num_posterior_samples)).all() for r in ranks_list):
         raise ValueError(
-            "Ranks must lie in [0, num_posterior_samples]. Pass the number of "
-            "posterior samples that was used to compute the ranks."
+            f"Ranks must lie in [0, num_posterior_samples={num_posterior_samples}]. "
+            "Pass the number of posterior samples used to compute the ranks."
         )
 
     plot_types = ["hist", "cdf", "cdf-diff"]
