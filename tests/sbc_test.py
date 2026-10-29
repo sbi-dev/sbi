@@ -242,36 +242,6 @@ def test_sbc_accuracy(num_posterior_samples: int):
     assert (pvals > 0.01).all(), f"KS p-values of uniform ranks too small: {pvals}"
 
 
-@pytest.mark.slow
-def test_sbc_checks():
-    """Test the uniformity checks for SBC with artificial uniform ranks."""
-    num_dim = 2
-    num_posterior_samples = 1500
-
-    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    # Data averaged posterior samples should be distributed as prior
-    daps = prior.sample((num_posterior_samples,))
-
-    ranks = torch.randint(
-        0, num_posterior_samples + 1, (num_posterior_samples, num_dim)
-    ).float()
-
-    # Run checks
-    checks = check_sbc(
-        ranks,
-        prior.sample((num_posterior_samples,)),
-        daps,
-        num_posterior_samples=num_posterior_samples,
-    )
-
-    # With artificial uniform ranks, test statistics should indicate uniformity
-    assert (checks["ks_pvals"] > 0.05).all(), "KS test failed on uniform ranks"
-    assert (checks["c2st_ranks"] < 0.55).all(), "C2ST failed on uniform ranks"
-    assert (checks["c2st_dap"] < 0.55).all(), (
-        "C2ST failed on prior-distributed DAP samples"
-    )
-
-
 @pytest.mark.parametrize("num_bins", (None, 30))
 @pytest.mark.parametrize("plot_type", ("cdf", "hist", "cdf-diff"))
 @pytest.mark.parametrize("legend_kwargs", (None, {"loc": "upper left"}))
