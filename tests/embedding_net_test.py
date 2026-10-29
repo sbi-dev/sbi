@@ -89,6 +89,13 @@ def test_embedding_net_api(
     )
 
 
+def test_fc_embedding_output_takes_negative_values():
+    """A final ReLU would make every output non-negative."""
+    embedding = FCEmbedding(input_dim=2, output_dim=20)
+
+    assert (embedding(torch.randn(100, 2)) < 0).any()
+
+
 @pytest.mark.parametrize("num_xo_batch", [1, 2])
 @pytest.mark.parametrize("num_trials", [1, 2])
 @pytest.mark.parametrize("num_dim", [1, 2])
