@@ -83,8 +83,8 @@ def sampling_importance_resampling(
             raise RuntimeError(
                 f"None of the {num_candidates_drawn} candidates drawn from the "
                 "proposal has a finite importance weight, i.e., the potential is "
-                "-inf for all of them. Check that the proposal overlaps with the "
-                "support of the target."
+                "-inf or NaN for all of them. Check that the proposal overlaps with "
+                "the support of the target."
             )
     pbar.close()
 
