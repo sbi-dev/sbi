@@ -291,10 +291,10 @@ class _EstimatorBuilderBase:
 
 @dataclass(frozen=True, eq=False, repr=False)
 class MarginalFlowConfig(_EstimatorBuilderBase):
-    """Configuration for marginal density estimator builders.
+    """Legacy flat configuration for marginal density estimator builders.
 
-    Used by ``marginal_nn``.  Covers parameters accepted by
-    ``build_zuko_unconditional_flow`` and the underlying Zuko constructors.
+    Covers parameters accepted by ``build_zuko_unconditional_flow`` and the
+    underlying Zuko constructors.  The per-model marginal configs replace it.
     """
 
     z_score_x: Optional[Any] = None
