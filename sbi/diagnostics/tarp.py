@@ -66,7 +66,8 @@ def run_tarp(
 
     Returns:
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
-        alpha: credibility values, see equation 2 of the paper
+        alpha: credibility values, ``num_bins + 1`` points evenly spaced over
+            ``[0, 1]``, see equation 2 of the paper
     """
 
     thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
@@ -145,7 +146,8 @@ def _run_tarp(
 
     Returns:
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
-        alpha: grid of credibility values, see equation 2 of the paper
+        alpha: grid of credibility values, ``num_bins + 1`` points evenly spaced over
+            ``[0, 1]``, see equation 2 of the paper
 
     """
     num_posterior_samples, num_tarp_samples, _ = posterior_samples.shape
@@ -178,8 +180,9 @@ def _run_tarp(
 
     # enforce execution on the CPU due to
     # https://github.com/pytorch/pytorch/issues/69519
+    # fixed range: the bin edges are the alpha grid and must span [0, 1]
     hist, alpha_grid = torch.histogram(
-        coverage_values.cpu(), density=True, bins=num_bins
+        coverage_values.cpu(), density=True, bins=num_bins, range=(0.0, 1.0)
     )
 
     # return all tensors to input_device to keep contract valid
@@ -241,6 +244,6 @@ def check_tarp(
     atc = ((ecp[midindex:] - alpha[midindex:]) * dalpha).sum().item()
 
     # Kolmogorov-Smirnov test between ecp and alpha
-    kstest_pvals: float = kstest(ecp.numpy(), alpha.numpy())[1]  # type: ignore
+    kstest_pvals: float = kstest(ecp.cpu().numpy(), alpha.cpu().numpy())[1]  # type: ignore
 
     return atc, kstest_pvals

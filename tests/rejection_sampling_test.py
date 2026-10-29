@@ -143,6 +143,8 @@ def test_accept_reject_sample_partial_return():
         # Should have some samples (not all 10000)
         assert samples.shape[0] > 0
         assert samples.shape[0] < 10000
+        # Same event shape as a complete run, without an extra x_o dim.
+        assert samples.shape[1:] == (1,)
         # Should have issued a warning
         assert len(w) == 1
         assert "partial results" in str(w[0].message).lower()

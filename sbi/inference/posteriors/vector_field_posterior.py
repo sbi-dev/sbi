@@ -162,7 +162,7 @@ class VectorFieldPosterior(NeuralPosterior):
         iid_params: Optional[Dict] = None,
         guidance_method: Optional[str] = None,
         guidance_params: Optional[Dict] = None,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
@@ -175,16 +175,18 @@ class VectorFieldPosterior(NeuralPosterior):
             sample_shape: Shape of the samples to be drawn.
             predictor: The predictor for the vector field sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-                Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the vector field sampler. Either of
-                [None].
+                Currently, `euler_maruyama` and `heun` are implemented.
+            corrector: The corrector for the vector field sampler: None, `langevin` or
+                `gibbs`.
             predictor_params: Additional parameters passed to predictor.
             corrector_params: Additional parameters passed to corrector.
-            steps: Number of steps to take for the Euler-Maruyama method.
-                If `sample_with` is "ode", this is ignored.
-            ts: Time points at which to evaluate the vector field process. If None, a
-                linear grid between t_max and t_min is used. If `sample_with` is "ode",
-                this is ignored.
+            steps: Number of points of the time grid, so the predictor takes
+                `steps - 1` steps. Each step costs one network evaluation for
+                `euler_maruyama` and two for `heun`; correctors add `num_steps`
+                (default 5) calls per step. If `sample_with` is "ode", this is ignored.
+            ts: Time points at which to evaluate the vector field process. If None, the
+                estimator's `solve_schedule` with `steps` points is used. If
+                `sample_with` is "ode", this is ignored.
             iid_method: Which method to use for computing the score in the iid setting.
                 We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss". The
                 fnpe method is simple and generally applicable. However, it can become
@@ -212,6 +214,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 the specific `ScoreAdaptation` child class for details, specifically
                 `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
             max_sampling_batch_size: Maximum batch size for sampling.
+                If not provided, uses the value specified at initialization.
             sample_with: Deprecated, set it at construction instead; will be removed
                 in v0.28.0. Sampling method to use - 'ode' or 'sde'. Note that in
                 order to use the 'sde' sampling method, the vector field estimator
@@ -266,6 +269,11 @@ class VectorFieldPosterior(NeuralPosterior):
         )
 
         num_samples = torch.Size(sample_shape).numel()
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
+        )
 
         if sample_with == "ode":
             if reject_outside_prior:
@@ -331,7 +339,7 @@ class VectorFieldPosterior(NeuralPosterior):
         corrector_params: Optional[Dict] = None,
         steps: int = 500,
         ts: Optional[Tensor] = None,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
         save_intermediate: bool = False,
         **kwargs,
@@ -346,13 +354,17 @@ class VectorFieldPosterior(NeuralPosterior):
             sample_shape: Shape of the samples to be drawn.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-                Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the diffusion-based sampler. Either of
-                [None].
-            steps: Number of steps to take for the Euler-Maruyama method.
+                Currently, `euler_maruyama` and `heun` are implemented.
+            corrector: The corrector for the diffusion-based sampler: None, `langevin`
+                or `gibbs`.
+            steps: Number of points of the time grid, so the predictor takes
+                `steps - 1` steps. Each step costs one network evaluation for
+                `euler_maruyama` and two for `heun`; correctors add `num_steps`
+                (default 5) calls per step.
             ts: Time points at which to evaluate the diffusion process. If None,
                 uses the solve_schedule() specific to the estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
+                If not provided, uses the value specified at initialization.
             sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
                 `.sample()`.
             show_progress_bars: Whether to show a progress bar during sampling.
@@ -416,11 +428,25 @@ class VectorFieldPosterior(NeuralPosterior):
         # Concatenate all batches and ensure we return exactly the requested number
         samples = torch.cat(all_samples, dim=0)[:total_samples_needed]
 
-        if torch.isnan(samples).all():
-            raise RuntimeError(
-                "All samples NaN after diffusion sampling. "
-                "This may indicate numerical instability in the vector field."
+        # The final step is in the last `num_xos` entries, also with save_intermediate.
+        final_samples = samples[:, -diffuser.num_xos :]
+        finite_samples = torch.isfinite(final_samples).flatten(2).all(-1)
+        if not finite_samples.any(0).all():
+            message = (
+                "No finite sample after diffusion sampling: for at least one "
+                "observation, every sample has NaN or infinite entries. This may "
+                "indicate numerical instability in the vector field."
             )
+            num_iid = self.potential_fn.num_iid_observations
+            if self.potential_fn.iid_method == "fnpe" and num_iid > 1:
+                message += (
+                    " With iid_method='fnpe', the sampler steps become unstable for "
+                    f"many iid observations ({num_iid} here). Use "
+                    "iid_method='auto_gauss', or increase `steps` (or use a finer "
+                    "`ts`); the number of steps needed grows with the number of "
+                    "observations."
+                )
+            raise RuntimeError(message)
 
         if self.vector_field_estimator.compose_enabled:
             samples = self.vector_field_estimator.from_z(samples)
@@ -580,7 +606,7 @@ class VectorFieldPosterior(NeuralPosterior):
         corrector_params: Optional[Dict] = None,
         steps: int = 500,
         ts: Optional[Tensor] = None,
-        max_sampling_batch_size: int = 10000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -598,14 +624,19 @@ class VectorFieldPosterior(NeuralPosterior):
                 drawn.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-                Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the diffusion-based sampler.
+                Currently, `euler_maruyama` and `heun` are implemented.
+            corrector: The corrector for the diffusion-based sampler: None, `langevin`
+                or `gibbs`.
             predictor_params: Additional parameters passed to predictor.
             corrector_params: Additional parameters passed to corrector.
-            steps: Number of steps to take for the Euler-Maruyama method.
-            ts: Time points at which to evaluate the diffusion process. If None, a
-                linear grid between t_max and t_min is used.
+            steps: Number of points of the time grid, so the predictor takes
+                `steps - 1` steps. Each step costs one network evaluation for
+                `euler_maruyama` and two for `heun`; correctors add `num_steps`
+                (default 5) calls per step.
+            ts: Time points at which to evaluate the diffusion process. If None, the
+                estimator's `solve_schedule` with `steps` points is used.
             max_sampling_batch_size: Maximum batch size for sampling.
+                If not provided, uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
