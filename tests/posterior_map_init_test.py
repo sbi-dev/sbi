@@ -75,7 +75,8 @@ def test_importance_map_posterior_init_with_importance_method(toy):
 def test_amortized_vi_map_starts_from_amortized_q_for_iid_x(toy):
     """The single-x `q` sits far from the prior; a MAP seeded from it stays there.
 
-    Two iid observations check that the per-observation samples are pooled.
+    Two iid observations check that the per-observation samples are pooled into
+    `num_init_samples` starts in total.
     """
     prior, theta, x = toy
     potential_fn, _ = _likelihood_potential(prior, theta, x)
@@ -87,3 +88,4 @@ def test_amortized_vi_map_starts_from_amortized_q_for_iid_x(toy):
     posterior.set_default_x(torch.zeros(2, 2))
     theta_map = posterior.map(init_method="proposal", **MAP_KWARGS)
     assert theta_map.abs().max() < 10
+    assert posterior._map_inits("proposal", num_init_samples=21).shape == (21, 2)

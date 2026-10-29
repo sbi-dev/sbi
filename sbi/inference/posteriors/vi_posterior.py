@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import math
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, replace
@@ -1333,10 +1334,13 @@ class VIPosterior(NeuralPosterior):
         x: Optional[TorchTensor] = None,
     ) -> Tensor:
         # Amortized training fits q(θ|x) and leaves `q` untouched. With several iid
-        # observations in `x`, `.sample()` returns samples per observation; pool them.
+        # observations in `x`, `.sample()` returns samples per observation. Pool
+        # `num_init_samples` in total: the potential scores each start against each
+        # observation, so drawing that many per observation costs num_obs times more.
         if self._mode == "amortized" and init_method in ("posterior", "proposal"):
-            samples = self.sample((num_init_samples,), x=x)
-            return samples.reshape(-1, samples.shape[-1])
+            num_obs = self._x_else_default_x(x).shape[0]
+            samples = self.sample((math.ceil(num_init_samples / num_obs),), x=x)
+            return samples.reshape(-1, samples.shape[-1])[:num_init_samples]
         return super()._map_inits(init_method, num_init_samples, x)
 
     def map(
@@ -1372,12 +1376,12 @@ class VIPosterior(NeuralPosterior):
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either `posterior` or `proposal`, which
-                samples the respective distribution `num_init_samples` times. For
-                `VIPosterior` the proposal is the variational distribution, not the
-                prior (in amortized mode, q(θ|x) for each observation in the default
-                `x`). If it is a tensor, the tensor is used as the initial locations,
-                so prior-based initialization can be done by passing prior samples.
+                it is a string, it can be either `posterior` or `proposal`. For
+                `VIPosterior` both draw `num_init_samples` samples from the variational
+                distribution, not the prior (in amortized mode, from q(θ|x) for the
+                observations in the default `x`). If it is a tensor, the tensor is used
+                as the initial locations, so prior-based initialization can be done by
+                passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the
