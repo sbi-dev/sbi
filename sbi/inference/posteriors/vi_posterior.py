@@ -1337,10 +1337,14 @@ class VIPosterior(NeuralPosterior):
         # observations in `x`, `.sample()` returns samples per observation. Pool
         # `num_init_samples` in total: the potential scores each start against each
         # observation, so drawing that many per observation costs num_obs times more.
+        # Keep a random subset, so that the order of the observations does not decide
+        # which of them are dropped.
         if self._mode == "amortized" and init_method in ("posterior", "proposal"):
             num_obs = self._x_else_default_x(x).shape[0]
             samples = self.sample((math.ceil(num_init_samples / num_obs),), x=x)
-            return samples.reshape(-1, samples.shape[-1])[:num_init_samples]
+            samples = samples.reshape(-1, samples.shape[-1])
+            keep = torch.randperm(samples.shape[0], device=samples.device)
+            return samples[keep[:num_init_samples]]
         return super()._map_inits(init_method, num_init_samples, x)
 
     def map(
