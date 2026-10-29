@@ -379,7 +379,7 @@ def test_restricted_prior_sir_uses_oversampling_factor():
 
 
 def test_restricted_prior_log_prob_one_value_per_theta():
-    """log_prob returns shape (N,) when prior and restriction return shape (N, 1)."""
+    """log_prob and SIR work when prior and restriction return shape (N, 1)."""
     # A univariate prior without `Independent` returns log probs of shape (N, 1).
     prior = torch.distributions.Normal(zeros(1), ones(1))
 
@@ -393,6 +393,13 @@ def test_restricted_prior_log_prob_one_value_per_theta():
     expected = prior.log_prob(theta).squeeze(1)
     expected[1] = float("-inf")
     assert torch.equal(log_prob, expected)
+
+    # Keep sizes tiny: a shape bug here builds (N, N) importance weights.
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=prior, sample_with="sir"
+    )
+    samples = restricted_prior.sample((2,), oversampling_factor=4)
+    assert samples.shape == (2, 1) and bool((samples > 0).all())
 
 
 def test_restricted_prior_sir_samples_truncated_prior():

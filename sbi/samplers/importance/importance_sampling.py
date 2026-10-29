@@ -35,8 +35,10 @@ def importance_sample(
     with nullcontext() if show_progress_bars else nested_pbar_context():
         samples = proposal.sample((num_samples,))
 
-    potential_logprobs = potential_fn(samples)
-    proposal_logprobs = proposal.log_prob(samples)
+    # A univariate torch distribution returns shape (N, 1); without the reshape,
+    # (N,) minus (N, 1) broadcasts to an (N, N) tensor.
+    potential_logprobs = potential_fn(samples).reshape(num_samples)
+    proposal_logprobs = proposal.log_prob(samples).reshape(num_samples)
     log_importance_weights = potential_logprobs - proposal_logprobs
 
     return samples, log_importance_weights
