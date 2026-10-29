@@ -362,7 +362,7 @@ def check_uniformity_frequentist(ranks: Tensor, num_posterior_samples: int) -> T
     kstest_pvals = torch.tensor(
         [
             kstest(
-                rks + torch.rand_like(rks, dtype=torch.float32),
+                (rks + torch.rand_like(rks, dtype=torch.float32)).cpu(),
                 uniform(loc=0, scale=num_posterior_samples + 1).cdf,
             )[1]
             for rks in ranks.T
