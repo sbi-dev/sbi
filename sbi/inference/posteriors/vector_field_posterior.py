@@ -175,16 +175,18 @@ class VectorFieldPosterior(NeuralPosterior):
             sample_shape: Shape of the samples to be drawn.
             predictor: The predictor for the vector field sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-                Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the vector field sampler. Either of
-                [None].
+                Currently, `euler_maruyama` and `heun` are implemented.
+            corrector: The corrector for the vector field sampler: None, `langevin` or
+                `gibbs`.
             predictor_params: Additional parameters passed to predictor.
             corrector_params: Additional parameters passed to corrector.
-            steps: Number of steps to take for the Euler-Maruyama method.
-                If `sample_with` is "ode", this is ignored.
-            ts: Time points at which to evaluate the vector field process. If None, a
-                linear grid between t_max and t_min is used. If `sample_with` is "ode",
-                this is ignored.
+            steps: Number of points of the time grid, so the predictor takes
+                `steps - 1` steps. Each step costs one network evaluation for
+                `euler_maruyama` and two for `heun`; correctors add `num_steps`
+                (default 5) calls per step. If `sample_with` is "ode", this is ignored.
+            ts: Time points at which to evaluate the vector field process. If None, the
+                estimator's `solve_schedule` with `steps` points is used. If
+                `sample_with` is "ode", this is ignored.
             iid_method: Which method to use for computing the score in the iid setting.
                 We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss". The
                 fnpe method is simple and generally applicable. However, it can become
@@ -352,10 +354,13 @@ class VectorFieldPosterior(NeuralPosterior):
             sample_shape: Shape of the samples to be drawn.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-                Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the diffusion-based sampler. Either of
-                [None].
-            steps: Number of steps to take for the Euler-Maruyama method.
+                Currently, `euler_maruyama` and `heun` are implemented.
+            corrector: The corrector for the diffusion-based sampler: None, `langevin`
+                or `gibbs`.
+            steps: Number of points of the time grid, so the predictor takes
+                `steps - 1` steps. Each step costs one network evaluation for
+                `euler_maruyama` and two for `heun`; correctors add `num_steps`
+                (default 5) calls per step.
             ts: Time points at which to evaluate the diffusion process. If None,
                 uses the solve_schedule() specific to the estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
@@ -619,13 +624,17 @@ class VectorFieldPosterior(NeuralPosterior):
                 drawn.
             predictor: The predictor for the diffusion-based sampler. Can be a string or
                 a custom predictor following the API in `sbi.samplers.score.predictors`.
-                Currently, only `euler_maruyama` is implemented.
-            corrector: The corrector for the diffusion-based sampler.
+                Currently, `euler_maruyama` and `heun` are implemented.
+            corrector: The corrector for the diffusion-based sampler: None, `langevin`
+                or `gibbs`.
             predictor_params: Additional parameters passed to predictor.
             corrector_params: Additional parameters passed to corrector.
-            steps: Number of steps to take for the Euler-Maruyama method.
-            ts: Time points at which to evaluate the diffusion process. If None, a
-                linear grid between t_max and t_min is used.
+            steps: Number of points of the time grid, so the predictor takes
+                `steps - 1` steps. Each step costs one network evaluation for
+                `euler_maruyama` and two for `heun`; correctors add `num_steps`
+                (default 5) calls per step.
+            ts: Time points at which to evaluate the diffusion process. If None, the
+                estimator's `solve_schedule` with `steps` points is used.
             max_sampling_batch_size: Maximum batch size for sampling.
                 If not provided, uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.

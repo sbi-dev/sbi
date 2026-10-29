@@ -11,6 +11,8 @@ from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.sbi_types import Proposal
 from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
 
+_MAX_CANDIDATES_WITHOUT_SAMPLE = 100_000
+
 
 def sampling_importance_resampling(
     potential_fn: Callable,
@@ -19,7 +21,6 @@ def sampling_importance_resampling(
     num_candidate_samples: int = 32,
     max_sampling_batch_size: int = 10_000,
     show_progress_bars: bool = False,
-    device: str = "cpu",
     **kwargs,
 ) -> Tensor:
     """Return samples obtained with sampling importance resampling (SIR).
@@ -33,10 +34,13 @@ def sampling_importance_resampling(
         max_sampling_batch_size: The batchsize of samples being drawn from the
             proposal at every iteration.
         show_progress_bars: Whether to show a progress bar.
-        device: Device on which to sample.
 
     Returns:
         Tensor: Samples of shape (num_samples, event_shape).
+
+    Raises:
+        RuntimeError: If none of the first 100_000 or more candidates has a finite
+            importance weight.
     """
 
     selected_samples = []
@@ -44,6 +48,7 @@ def sampling_importance_resampling(
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
 
     num_remaining = num_samples
+    num_candidates_drawn = 0
     pbar = tqdm(
         disable=not show_progress_bars or is_nested(),
         total=num_samples,
@@ -61,13 +66,29 @@ def sampling_importance_resampling(
                 )
             log_weights = log_weights.reshape(batch_size, num_candidate_samples)
             weights = log_weights.softmax(-1).cumsum(-1)
-            uniform_decision = torch.rand(batch_size, 1, device=device)
-            mask = torch.cumsum(weights >= uniform_decision, -1) == 1
+            uniform_decision = torch.rand(batch_size, 1, device=log_weights.device)
+            # Strict, so that a draw of 0 cannot select a zero-weight candidate.
+            mask = torch.cumsum(weights > uniform_decision, -1) == 1
             samples = thetas.reshape(batch_size, num_candidate_samples, -1)[mask]
             selected_samples.append(samples)
 
         num_remaining -= samples.shape[0]
         pbar.update(samples.shape[0])
+
+        # A group whose candidates all have weight zero yields no sample, so with
+        # zero weight everywhere the loop would never end.
+        num_candidates_drawn += batch_size * num_candidate_samples
+        if (
+            num_remaining == num_samples
+            and num_candidates_drawn >= _MAX_CANDIDATES_WITHOUT_SAMPLE
+        ):
+            pbar.close()
+            raise RuntimeError(
+                f"None of the {num_candidates_drawn} candidates drawn from the "
+                "proposal has a finite importance weight, i.e., the potential is "
+                "-inf or NaN for all of them. Check that the proposal overlaps with "
+                "the support of the target."
+            )
     pbar.close()
 
     selected_samples = torch.cat(selected_samples)
