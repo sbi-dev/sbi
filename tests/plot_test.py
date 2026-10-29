@@ -110,6 +110,21 @@ def test_pairplot(
     close()
 
 
+@pytest.mark.parametrize("style", get_args(plt.LowerLiteral))
+def test_pairplot_offdiag_cells_plot_column_on_x(style):
+    """Both triangles draw x = column, y = row, inside the cell's axis limits."""
+    rng = np.random.default_rng(0)
+    d0 = rng.uniform(-0.9, 0.9, 500)
+    samples = np.stack([d0, 10 + 0.5 * d0 + rng.uniform(-0.3, 0.3, 500)], axis=1)
+    _, axes = pairplot(samples, limits=[[-1, 1], [9, 11]], upper=style, lower=style)
+    for ax in (axes[0, 1], axes[1, 0]):
+        (x0, x1), (y0, y1), drawn = ax.get_xlim(), ax.get_ylim(), ax.dataLim
+        assert drawn.width > 0 and drawn.height > 0
+        assert x0 <= drawn.x0 and drawn.x1 <= x1
+        assert y0 <= drawn.y0 and drawn.y1 <= y1
+    close()
+
+
 @pytest.mark.parametrize("samples", (torch.randn(100, 2), [torch.randn(100, 2)] * 2))
 @pytest.mark.parametrize("labels", (None, ["a", "b"]))
 @pytest.mark.parametrize("legend", (True, False))

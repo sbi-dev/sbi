@@ -1566,25 +1566,27 @@ def _arrange_grid(
                 if fig_kwargs.legend and col == subset[0]:
                     _legend_handles = ax.get_legend_handles_labels()  # pyright: ignore reportOptionalMemberAccess
 
-            # Off-diagonals
-
-            # upper
-            elif current == "upper":
-                if excl_upper:
+            # Off-diagonals: both triangles plot x = column, y = row.
+            else:
+                if current == "upper":
+                    funcs, kwargs, excluded = upper_funcs, upper_kwargs, excl_upper
+                else:
+                    funcs, kwargs, excluded = lower_funcs, lower_kwargs, excl_lower
+                if excluded:
                     ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
                     col_discrete = col in discrete_set
                     row_discrete = row in discrete_set
                     for sample_ind, sample in enumerate(samples):
-                        upper_f = upper_funcs[sample_ind]
-                        upper_kw = upper_kwargs[sample_ind]
+                        offdiag_f = funcs[sample_ind]
+                        offdiag_kw = kwargs[sample_ind]
                         samples_col = sample[:, col]
                         samples_row = sample[:, row]
                         if col_discrete or row_discrete:
-                            upper_f, upper_kw, samples_col, samples_row = (
+                            offdiag_f, offdiag_kw, samples_col, samples_row = (
                                 _discrete_offdiag_override(
-                                    upper_f,
-                                    upper_kw,
+                                    offdiag_f,
+                                    offdiag_kw,
                                     samples_col,
                                     samples_row,
                                     col_discrete,
@@ -1592,55 +1594,14 @@ def _arrange_grid(
                                     sample_ind,
                                 )
                             )
-                        if callable(upper_f):
-                            upper_f(
+                        if callable(offdiag_f):
+                            offdiag_f(
                                 ax,
                                 samples_col,
                                 samples_row,
                                 limits[col],
                                 limits[row],
-                                upper_kw,
-                            )
-                    if len(points) > 0:
-                        for n, v in enumerate(points):
-                            ax.plot(  # pyright: ignore reportOptionalMemberAccess
-                                v[:, col],
-                                v[:, row],
-                                color=fig_kwargs.points_colors[n],
-                                **fig_kwargs.points_offdiag,
-                            )
-            # lower
-            elif current == "lower":
-                if excl_lower:
-                    ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
-                else:
-                    row_discrete = row in discrete_set
-                    col_discrete = col in discrete_set
-                    for sample_ind, sample in enumerate(samples):
-                        lower_f = lower_funcs[sample_ind]
-                        lower_kw = lower_kwargs[sample_ind]
-                        samples_row_l = sample[:, row]
-                        samples_col_l = sample[:, col]
-                        if row_discrete or col_discrete:
-                            lower_f, lower_kw, samples_row_l, samples_col_l = (
-                                _discrete_offdiag_override(
-                                    lower_f,
-                                    lower_kw,
-                                    samples_row_l,
-                                    samples_col_l,
-                                    row_discrete,
-                                    col_discrete,
-                                    sample_ind,
-                                )
-                            )
-                        if callable(lower_f):
-                            lower_f(
-                                ax,
-                                samples_row_l,
-                                samples_col_l,
-                                limits[row],
-                                limits[col],
-                                lower_kw,
+                                offdiag_kw,
                             )
                     if len(points) > 0:
                         for n, v in enumerate(points):
