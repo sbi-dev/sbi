@@ -82,6 +82,20 @@ def test_score_loss_is_invariant_to_theta_dimensions(config_cls, input_event_sha
     torch.testing.assert_close(loss, expected)
 
 
+@pytest.mark.parametrize("weight_fn", ("identity", "max_likelihood", "variance"))
+@pytest.mark.parametrize("config_cls", SCORE_CONFIGS)
+def test_score_loss_weights_each_sample(config_cls, weight_fn):
+    """Test that every time weighting returns one weighted loss per sample."""
+    batch_dim = 4
+    estimator = config_cls(extra_kwargs={"weight_fn": weight_fn}).build(
+        torch.randn(batch_dim, 3), torch.randn(batch_dim, 2)
+    )
+
+    loss = estimator.loss(torch.randn(batch_dim, 3), torch.randn(batch_dim, 2))
+
+    assert loss.shape == (batch_dim,)
+
+
 @pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 @pytest.mark.parametrize("config_cls", CONFIGS)
 def test_vector_field_estimator_on_device(device, config_cls):

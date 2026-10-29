@@ -514,7 +514,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
 
     def _variance_weight_fn(self, times):
         """Return weights as the variance."""
-        return self.std_fn(times) ** 2
+        return self.std_fn(times).reshape(times.shape) ** 2
 
     def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
         """ODE flow function of the score estimator.
