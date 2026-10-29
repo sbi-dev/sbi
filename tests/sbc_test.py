@@ -12,7 +12,7 @@ from torch.distributions import MultivariateNormal, Uniform
 
 from sbi.analysis import sbc_rank_plot
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
-from sbi.diagnostics.sbc import check_uniformity_c2st
+from sbi.diagnostics.sbc import check_uniformity_c2st, check_uniformity_frequentist
 from sbi.inference import NLE, NPE, NPSE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -239,8 +239,8 @@ def test_sbc_accuracy():
     assert (pvals > 0.05).all(), "posterior ranks uniformity test p-values too small."
 
 
-def test_check_uniformity_c2st_discrete_ranks():
-    """Test that the rank C2ST is close to 0.5 for a calibrated posterior."""
+def test_uniformity_checks_discrete_ranks():
+    """Test that both uniformity checks accept the ranks of a calibrated posterior."""
     num_dim = 2
     num_posterior_samples = 2
     prior = BoxUniform(-ones(num_dim), ones(num_dim))
@@ -255,8 +255,10 @@ def test_check_uniformity_c2st_discrete_ranks():
         num_posterior_samples=num_posterior_samples,
         show_progress_bar=False,
     )
+    ks_pvals = check_uniformity_frequentist(ranks, num_posterior_samples)
     c2st_ranks = check_uniformity_c2st(ranks, num_posterior_samples)
 
+    assert (ks_pvals > 0.01).all(), f"KS p-values too small: {ks_pvals}"
     assert c2st_ranks.shape == (num_dim,)
     assert ((c2st_ranks > 0.45) & (c2st_ranks < 0.55)).all(), (
         "C2ST should be close to 0.5 for the ranks of a calibrated posterior, "

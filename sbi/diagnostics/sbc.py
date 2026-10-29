@@ -344,9 +344,15 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
 def check_uniformity_frequentist(ranks: Tensor, num_posterior_samples: int) -> Tensor:
     """Return p-values for uniformity of the ranks using Kolmogorov-Smirnov test.
 
+    The test runs on the ranks plus uniform noise on [0, 1), because it needs
+    continuous samples. For a calibrated posterior, the ranks are uniform on
+    ``0, ..., num_posterior_samples`` (Talts et al., https://arxiv.org/abs/1804.06788),
+    so the noisy ranks are uniform on [0, num_posterior_samples + 1]. The p-values
+    therefore vary between calls unless the torch seed is fixed.
+
     Args:
-        ranks: Ranks for each SBC run and for each model parameter,
-            shape (N, dim_parameters)
+        ranks: Ranks for each SBC run and for each model parameter, as returned by
+            `run_sbc`, shape (N, dim_parameters)
         num_posterior_samples: Number of posterior samples used for SBC ranking.
 
     Returns:
@@ -355,7 +361,10 @@ def check_uniformity_frequentist(ranks: Tensor, num_posterior_samples: int) -> T
     """
     kstest_pvals = torch.tensor(
         [
-            kstest(rks, uniform(loc=0, scale=num_posterior_samples).cdf)[1]
+            kstest(
+                rks + torch.rand_like(rks, dtype=torch.float32),
+                uniform(loc=0, scale=num_posterior_samples + 1).cdf,
+            )[1]
             for rks in ranks.T
         ],
         dtype=torch.float32,
