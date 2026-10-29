@@ -465,6 +465,46 @@ def test_smcabc_resampling_keeps_particles_paired_with_simulations():
         assert torch.allclose(distances, smcabc.distance(zeros(1, 2), xs))
 
 
+@pytest.mark.parametrize("quantile", [0.1, 0.5, 0.9])
+def test_smcabc_next_epsilon_is_distance_quantile(quantile):
+    """`distance_based_decay` must use the distance quantile, not a weighted index."""
+    distances = torch.tensor([0.0, 0.1, 0.2, 100.0])
+    epsilon = SMCABC._get_next_epsilon(None, distances, quantile)
+
+    assert epsilon == pytest.approx(torch.quantile(distances, quantile).item())
+
+
+def test_smcabc_next_epsilon_handles_integer_and_non_finite_distances():
+    """Integer counts and infinite distances must not break the quantile."""
+    integer_distances = torch.tensor([0, 1, 2, 100])
+    assert SMCABC._get_next_epsilon(None, integer_distances, 0.5) == pytest.approx(1.5)
+
+    half_precision = torch.tensor([0.0, 1.0, 2.0], dtype=torch.float16)
+    assert SMCABC._get_next_epsilon(None, half_precision, 0.5) == pytest.approx(1.0)
+
+    with_inf = torch.tensor([0.0, 1.0, float("inf")])
+    assert SMCABC._get_next_epsilon(None, with_inf, 0.5) == pytest.approx(0.5)
+
+    with pytest.raises(ValueError, match="non-finite"):
+        SMCABC._get_next_epsilon(None, torch.tensor([float("inf")] * 3), 0.5)
+
+
+def test_smcabc_rejects_invalid_quantile_with_distance_based_decay():
+    """`epsilon_decay` is a quantile then, so values above 1 fail before simulating."""
+    prior = BoxUniform(-ones(2), ones(2))
+    smcabc = SMCABC(lambda theta: theta, prior)
+
+    with pytest.raises(AssertionError, match="quantile"):
+        smcabc(
+            zeros(1, 2),
+            num_particles=10,
+            num_initial_pop=20,
+            num_simulations=100,
+            epsilon_decay=1.5,
+            distance_based_decay=True,
+        )
+
+
 @pytest.mark.parametrize(
     "method, call_kwargs, per_sample_key",
     [
