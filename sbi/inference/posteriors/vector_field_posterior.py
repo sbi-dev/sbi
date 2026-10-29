@@ -200,6 +200,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 "auto_gauss" for these reasons. Note that in order to use the iid
                 method, the vector field estimator must support it and have
                 SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.
+                iid methods need a posterior built with `sample_with="sde"`.
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
             guidance_method: Method to guide the diffusion process. If None, no guidance
@@ -209,7 +210,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 likelihood. `Universal` can be used to guide the diffusion process with
                 a general guidance function. `Interval` is an instance of that where
                 the guidance function constraints the diffusion process to a given
-                interval.
+                interval. Guidance needs a posterior built with `sample_with="sde"`.
             guidance_params: Additional parameters passed to the guidance method. See
                 the specific `ScoreAdaptation` child class for details, specifically
                 `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
@@ -250,14 +251,25 @@ class VectorFieldPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
+        adjusts_score = is_iid or guidance_method is not None
         # IID and guidance require transforming the prior to standardized space.
-        if self.vector_field_estimator.compose_enabled and (
-            is_iid or guidance_method is not None
-        ):
+        if self.vector_field_estimator.compose_enabled and adjusts_score:
             raise NotImplementedError(
                 "compose_standardization does not yet support iid (x with batch>1) or "
                 "guided sampling. Use a single observation, or disable "
                 "compose_standardization."
+            )
+        if sample_with == "ode" and adjusts_score:
+            if is_iid:
+                reason = (
+                    f"x has {x.shape[0]} rows, which are used as iid observations. "
+                    "For independent posteriors of several x, use `sample_batched`. "
+                )
+            else:
+                reason = f"Guidance ('{guidance_method}') is requested. "
+            raise ValueError(
+                reason + "iid observations and guidance adjust the score, which "
+                "only SDE sampling uses. Build the posterior with sample_with='sde'."
             )
         self.potential_fn = self.potential_fn.bind(
             x,
@@ -809,6 +821,15 @@ class VectorFieldPosterior(NeuralPosterior):
                 "To set the default, use the `.set_default_x()` method."
             )
 
+        num_x = reshape_to_batch_event(
+            self.default_x, self.vector_field_estimator.condition_shape
+        ).shape[0]
+        if num_x > 1:
+            raise ValueError(
+                f"x has {num_x} rows, which are used as iid observations. `.map()` "
+                "supports a single observation only."
+            )
+
         if self._map is None or force_update:
             # rebuild coarse flow fast for MAP optimization.
             self.potential_fn = self.potential_fn.bind(
@@ -818,7 +839,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 self.potential_fn
             )
             if init_method == "posterior":
-                inits = self.sample((num_init_samples,))
+                inits = self.sample(
+                    (num_init_samples,), show_progress_bars=show_progress_bars
+                )
             elif init_method == "proposal":
                 inits = self.proposal.sample((num_init_samples,))  # type: ignore
             elif isinstance(init_method, Tensor):

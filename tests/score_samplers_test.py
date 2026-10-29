@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Tuple
 
 import pytest
@@ -12,18 +13,27 @@ from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, 
 
 from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_adaptor import (
+    AffineClassifierFreeGuidance,
+    AffineClassifierFreeGuidanceConfig,
     FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
+    IntervalGuidance,
+    IntervalGuidanceConfig,
     JacCorrectedScoreFn,
+    PriorGuide,
+    PriorGuideConfig,
+    UniversalGuidance,
+    UniversalGuidanceConfig,
     ensure_lam_positive_definite,
 )
 from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
-from sbi.neural_nets import posterior_score_nn
+from sbi.neural_nets import posterior_flow_nn, posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, MultipleIndependent
+from sbi.utils.torchutils import process_device
 from sbi.utils.vector_field_utils import (
     VectorFieldNet,
     add_diag_or_dense,
@@ -144,6 +154,165 @@ def test_score_fn_guidance_general(sde_type, guidance_method, num_dim):
         f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
     )
     assert torch.isfinite(output).all(), "Output contains non-finite values"
+
+
+@pytest.mark.parametrize("estimator_type", ["ve", "fmpe"])
+@pytest.mark.parametrize("guidance", ["affine_classifier_free", "universal"])
+def test_neutral_guidance_returns_the_score(estimator_type, guidance):
+    """Guidance that changes nothing returns the estimator's score.
+
+    For flow matching, the estimator's `forward` returns the velocity, not the score.
+    """
+    num_dim = 2
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    estimator = _build_estimator(estimator_type, theta, x)
+    # The zero-initialized output layer would make the net output zero.
+    for parameter in estimator.net.parameters():
+        torch.nn.init.normal_(parameter, std=0.1)
+
+    if guidance == "affine_classifier_free":
+        guided = AffineClassifierFreeGuidance(
+            estimator, prior, AffineClassifierFreeGuidanceConfig()
+        )
+    else:
+        guided = UniversalGuidance(
+            estimator,
+            prior,
+            UniversalGuidanceConfig(
+                guidance_fn=lambda input, condition, m, std: input.sum(-1) * 0.0,
+                guidance_fn_score=lambda input, condition, m, std: input * 0.0,
+            ),
+        )
+
+    inputs, conditions = torch.randn(4, num_dim), torch.randn(4, num_dim)
+    time = torch.tensor([0.5])
+    with torch.no_grad():
+        torch.testing.assert_close(
+            guided.score(inputs, conditions, time),
+            estimator.score(inputs, conditions, time),
+        )
+
+
+@pytest.mark.parametrize("covariance_type", ["diag", "full"])
+def test_prior_guide_score_does_not_depend_on_the_batch_layout(covariance_type):
+    """The sampler passes inputs of shape (samples, 1, dim) to the guidance."""
+    train_prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    test_prior = MultivariateNormal(torch.ones(2), 0.5 * torch.eye(2))
+    theta = train_prior.sample((100,))
+    estimator = posterior_score_nn(sde_type="ve")(theta, theta)
+    guidance = PriorGuide(
+        estimator,
+        train_prior,
+        PriorGuideConfig(
+            train_prior=train_prior,
+            test_prior=test_prior,
+            K=2,
+            covariance_type=covariance_type,
+            num_steps=50,
+        ),
+    )
+    inputs, conditions = torch.randn(5, 2), torch.randn(5, 2)
+    time = torch.tensor([0.5])
+
+    with torch.no_grad():
+        torch.testing.assert_close(
+            guidance(inputs[:, None], conditions[:, None], time)[:, 0],
+            guidance(inputs, conditions, time),
+        )
+
+
+@pytest.mark.parametrize("estimator_type", ["ve", "vp", "subvp", "fmpe"])
+def test_interval_guidance_samples_the_truncated_posterior(estimator_type):
+    """With the exact score of N(0, sd^2), a lower bound at 0 gives the half-normal."""
+    posterior_sd = 0.5
+    estimator = _build_estimator(
+        estimator_type, torch.randn(100, 1), torch.randn(100, 1)
+    )
+    _use_exact_gaussian_score(estimator, posterior_sd**2)
+    posterior = VectorFieldPosterior(
+        estimator, MultivariateNormal(torch.zeros(1), torch.eye(1)), sample_with="sde"
+    )
+    samples = posterior.sample(
+        (2000,),
+        x=torch.zeros(1, 1),
+        guidance_method="interval",
+        guidance_params={"lower_bound": 0.0, "upper_bound": None},
+        show_progress_bars=False,
+    )
+
+    half_normal_mean = posterior_sd * math.sqrt(2 / math.pi)
+    half_normal_sd = posterior_sd * math.sqrt(1 - 2 / math.pi)
+    # Guidance denoises with Tweedie's formula, an approximation: measured bias up to
+    # 0.14 sd and sd ratio up to 1.11.
+    assert abs(samples.mean() - half_normal_mean) < 0.2 * posterior_sd
+    assert abs(samples.std() / half_normal_sd - 1) < 0.15
+
+
+def test_interval_guidance_takes_one_bound_per_dimension():
+    """Tensor bounds hold one bound per dimension. An infinite bound guides like a
+    masked-out dimension, and each lower bound must be below its upper bound."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    theta = prior.sample((100,))
+    estimator = posterior_score_nn(sde_type="vp")(theta, theta)
+    inputs, x_o, time = 2 + torch.randn(5, 1, 2), torch.zeros(1, 2), torch.tensor([0.5])
+
+    def guided_score(**bounds) -> Tensor:
+        config = IntervalGuidanceConfig(**bounds)
+        return IntervalGuidance(estimator, prior, config)(inputs, x_o, time)
+
+    inf = float("inf")
+    with torch.no_grad():
+        per_dimension = guided_score(
+            lower_bound=torch.tensor([-0.2, -inf]), upper_bound=torch.tensor([0.3, inf])
+        )
+        masked = guided_score(
+            lower_bound=-0.2, upper_bound=0.3, mask=torch.tensor([True, False])
+        )
+        unguided = estimator.score(inputs, x_o, time)
+    assert not torch.allclose(per_dimension[..., 0], unguided[..., 0])
+    torch.testing.assert_close(per_dimension, masked)
+    with pytest.raises(ValueError, match="must be less than"):
+        IntervalGuidanceConfig(
+            lower_bound=torch.tensor([0.0, 2.0]), upper_bound=torch.tensor([1.0, 1.0])
+        )
+
+
+def test_interval_guidance_takes_any_batch_size_after_the_first_call():
+    """The mask broadcasts over the batch of each call."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    theta = prior.sample((100,))
+    config = IntervalGuidanceConfig(
+        lower_bound=-0.2, upper_bound=0.3, mask=torch.tensor([True, False])
+    )
+    guidance = IntervalGuidance(
+        posterior_score_nn(sde_type="vp")(theta, theta), prior, config
+    )
+    for num_samples in (5, 3):
+        inputs = torch.randn(num_samples, 1, 2)
+        scores = guidance(inputs, torch.zeros(1, 2), torch.tensor([0.5]))
+        assert scores.shape == inputs.shape
+
+
+@pytest.mark.gpu
+def test_interval_guidance_on_gpu_matches_cpu():
+    """Bounds and a mask given on the CPU guide inputs on the GPU."""
+    device = process_device("gpu")
+    theta = torch.randn(100, 2)
+    estimator = posterior_score_nn(sde_type="vp")(theta, theta)
+    config = IntervalGuidanceConfig(
+        lower_bound=torch.tensor([-0.2, -1.0]),
+        upper_bound=torch.tensor([0.3, 1.0]),
+        mask=torch.tensor([True, False]),
+    )
+    inputs, x_o, time = torch.randn(5, 1, 2), torch.zeros(1, 2), torch.tensor([0.5])
+    expected = IntervalGuidance(estimator, None, config)(inputs, x_o, time)
+
+    guidance = IntervalGuidance(estimator.to(device), None, config, device=device)
+    scores = guidance(inputs.to(device), x_o.to(device), time.to(device))
+
+    torch.testing.assert_close(scores.cpu(), expected, rtol=1e-4, atol=1e-5)
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve"])
@@ -318,6 +487,20 @@ def test_iid_score_is_exact_for_linear_gaussian(sde_type, iid_method):
         assert torch.allclose(score_fn(theta, x_o, time), expected, rtol=1e-8), t
 
 
+def test_jac_gauss_survives_float32_cancellation():
+    """For a posterior much narrower than the noise, I + s^2 J rounds to zero."""
+    num_dim, posterior_var = 2, 1e-4
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    estimator = posterior_flow_nn()(prior.sample((100,)), torch.randn(100, num_dim))
+    _use_exact_gaussian_score(estimator, posterior_var)
+    score_fn = JacCorrectedScoreFn(estimator, prior)
+    inputs, x_o = torch.randn(4, 1, num_dim), torch.zeros(3, num_dim)
+
+    scores = score_fn(inputs, x_o, torch.tensor([estimator.effective_t_max]))
+
+    assert torch.isfinite(scores).all()
+
+
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("predictor", ("euler_maruyama",))
 @pytest.mark.parametrize("corrector", (None, "gibbs", "langevin"))
@@ -459,6 +642,27 @@ def test_fnpe_uses_custom_prior_score_weight():
     )
 
     assert not torch.allclose(no_prior(*args), default(*args))
+
+
+def _build_estimator(estimator_type: str, theta: Tensor, x: Tensor):
+    """Default FMPE ("fmpe") or NPSE (any `sde_type`) estimator."""
+    if estimator_type == "fmpe":
+        return posterior_flow_nn()(theta, x)
+    return posterior_score_nn(sde_type=estimator_type)(theta, x)
+
+
+def _use_exact_gaussian_score(estimator, posterior_var: float) -> None:
+    """Replace the score of `estimator` by the exact score of N(x, posterior_var I).
+
+    The mean depends on x, so the score has one row per observation, as the iid
+    methods expect from a network.
+    """
+
+    def exact_score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        m, s = estimator.mean_t_fn(t), estimator.std_fn(t)
+        return -(input - m * condition) / (m**2 * posterior_var + s**2)
+
+    estimator.score = exact_score
 
 
 class _ZeroNet(VectorFieldNet):

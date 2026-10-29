@@ -434,7 +434,11 @@ class EnsemblePosterior(NeuralPosterior):
             self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
             if init_method == "posterior":
-                inits = self.sample((num_init_samples,), self._x_else_default_x(x))
+                inits = self.sample(
+                    (num_init_samples,),
+                    self._x_else_default_x(x),
+                    show_progress_bars=show_progress_bars,
+                )
             elif isinstance(init_method, Tensor):
                 inits = init_method
             else:
