@@ -432,8 +432,10 @@ class NeuralPosterior:
         Args:
             state_dict: State to be restored.
         """
-        # Posteriors pickled by older sbi versions can miss this key.
-        state_dict.setdefault("_leakage_cache", None)
+        # Posteriors pickled by older sbi versions can miss this key, or save it
+        # without the number of samples.
+        if len(state_dict.get("_leakage_cache") or ()) != 3:
+            state_dict["_leakage_cache"] = None
         self.__dict__ = state_dict
 
         actual_device = infer_tensor_device(self)

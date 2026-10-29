@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import pickle
+
 import pytest
 import torch
 
@@ -104,6 +106,16 @@ def test_leakage_cache_matches_nan_padded_x():
             x.clone(), 100, prior, lambda: calls.append(1) or torch.ones(())
         )
     assert len(calls) == 1
+
+
+def test_leakage_cache_pickled_without_num_samples():
+    """Posteriors pickled before the cache saved the number of samples still load."""
+    prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
+    posterior = _posterior("direct", prior).set_default_x(torch.zeros(1, 2))
+    posterior._leakage_cache = (torch.zeros(1, 2), torch.ones(()))
+
+    loaded = pickle.loads(pickle.dumps(posterior))
+    assert torch.isfinite(loaded.log_prob(torch.ones(1, 2))).all()
 
 
 @pytest.mark.gpu
