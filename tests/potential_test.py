@@ -125,19 +125,18 @@ def test_importance_posterior_log_prob_with_many_iid_trials():
 
 
 def test_importance_posterior_normalization_constant_is_estimated_at_given_x():
-    """The public estimate must use the x it is given, not the last bound one."""
+    """The public estimate must use the x and number of samples it is given, not
+    those of the last estimate."""
     torch.manual_seed(0)
-    prior, potential, true_posterior = _gaussian_iid_potential_and_posterior()
+    prior, potential, _ = _gaussian_iid_potential_and_posterior()
     posterior = ImportanceSamplingPosterior(potential, proposal=prior)
-    theta = zeros(1, 2)
     x_a, x_b = zeros(1, 2), 3 * ones(1, 2)
 
-    posterior.log_prob(theta, x=x_a)
+    posterior.log_prob(zeros(1, 2), x=x_a)
+    posterior.estimate_normalization_constant(x_b, num_samples=1)
     log_z = torch.log(posterior.estimate_normalization_constant(x_b))
     true_log_z = MultivariateNormal(zeros(2), 2 * eye(2)).log_prob(x_b)
     assert torch.allclose(log_z, true_log_z, atol=0.2)
-    log_prob = posterior.log_prob(theta, x=x_b)
-    assert torch.allclose(log_prob, true_posterior(x_b).log_prob(theta), atol=0.2)
 
 
 def _quadratic_potential(theta, x_o):

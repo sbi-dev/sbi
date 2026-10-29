@@ -65,8 +65,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         )
 
         self.proposal = proposal
-        # The x of the last estimate and its log normalization constant.
-        self._log_normalization_cache: Optional[Tuple[Tensor, Tensor]] = None
+        # The x and number of samples of the last estimate, and its log normalization
+        # constant.
+        self._log_normalization_cache: Optional[Tuple[Tensor, int, Tensor]] = None
         self.method = method
         self.theta_transform = theta_transform
 
@@ -169,13 +170,19 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     def _estimate_log_normalization_constant(
         self, x: Tensor, num_samples: int = 10_000, force_update: bool = False
     ) -> Tensor:
-        """Returns the log normalization constant, cached for the last x.
+        """Returns the log normalization constant, cached for the last x and
+        number of samples.
 
         The estimate is computed in log space, because the importance weights of
         e.g. many iid observations underflow when exponentiated.
         """
         cache = self._log_normalization_cache
-        if force_update or cache is None or not self._matches_cached_x(cache[0], x):
+        if (
+            force_update
+            or cache is None
+            or cache[1] != num_samples
+            or not self._matches_cached_x(cache[0], x)
+        ):
             _, log_importance_weights = importance_sample(
                 self.potential_fn.bind(x),
                 proposal=self.proposal,
@@ -184,10 +191,10 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             log_normalization_constant = torch.logsumexp(
                 log_importance_weights, dim=0
             ) - math.log(log_importance_weights.shape[0])
-            cache = (x.clone(), log_normalization_constant)
+            cache = (x.clone(), num_samples, log_normalization_constant)
             self._log_normalization_cache = cache
 
-        return cache[1].to(self._device)
+        return cache[2].to(self._device)
 
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
