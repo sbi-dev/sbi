@@ -87,7 +87,7 @@ class NeuralPosterior:
             self.theta_transform = theta_transform
 
         self._map = None
-        self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
+        self._leakage_cache: Optional[Tuple[Tensor, int, Tensor]] = None
         self._purpose = ""
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
@@ -235,6 +235,7 @@ class NeuralPosterior:
     def _cached_leakage_factor(
         self,
         x: Tensor,
+        num_samples: int,
         prior: Any,
         estimate_fn: Callable[[], Tensor],
         force_update: bool = False,
@@ -243,17 +244,19 @@ class NeuralPosterior:
         """Return the leakage correction factor saved for `x`, or estimate it.
 
         The factor is 1 for priors with unbounded support. Otherwise, one factor is
-        saved, for the last `x`, unless `use_cache=False`.
+        saved, for the last `x` and `num_samples`, unless `use_cache=False`.
         """
         if prior_support_is_bounded(prior) is False:
             return torch.ones((), device=self._device)
         if self._leakage_cache is not None and use_cache and not force_update:
-            cached_x, factor = self._leakage_cache
-            if self._matches_cached_x(cached_x, x):
+            cached_x, cached_num_samples, factor = self._leakage_cache
+            if cached_num_samples == num_samples and self._matches_cached_x(
+                cached_x, x
+            ):
                 return factor
         factor = estimate_fn()
         if use_cache:
-            self._leakage_cache = (x.detach().clone(), factor)
+            self._leakage_cache = (x.detach().clone(), num_samples, factor)
         return factor
 
     @staticmethod

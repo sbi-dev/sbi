@@ -45,8 +45,8 @@ def test_log_prob_is_normalized_inside_bounded_prior(estimator_type):
 
 @pytest.mark.parametrize("estimator_type", ["direct", "npe_a", "flow"])
 def test_leakage_correction_caching(estimator_type, monkeypatch):
-    """The factor is saved for the last `x` only, and samples at the given `x` (and
-    for vector fields, with the given `ode_kwargs`)."""
+    """The factor is saved for the last `x` and number of samples only, and samples at
+    the given `x` (and for vector fields, with the given `ode_kwargs`)."""
     prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
     posterior = _posterior(estimator_type, prior)
     is_vf = isinstance(posterior, VectorFieldPosterior)
@@ -65,7 +65,7 @@ def test_leakage_correction_caching(estimator_type, monkeypatch):
     params = {"num_rejection_samples": 100}
     x_a, x_b = torch.zeros(1, 2), torch.ones(1, 2)
 
-    def estimates(**kwargs) -> int:
+    def estimates(params=params, **kwargs) -> int:
         num_calls = len(calls)
         posterior.log_prob(theta, leakage_correction_params=params, **kwargs)
         return len(calls) - num_calls
@@ -85,6 +85,9 @@ def test_leakage_correction_caching(estimator_type, monkeypatch):
         assert estimates(ode_kwargs=ode_kwargs) > 0 and calls[-1][0] == ode_kwargs
         assert estimates() == 0, "A call with `ode_kwargs` must not replace the cache."
 
+    assert estimates({"num_rejection_samples": 50}) > 0, (
+        "Another number of samples must not reuse the saved factor."
+    )
     posterior.log_prob(theta, x=2 * x_b, leakage_correction_params=params)
     posterior.leakage_correction(posterior.default_x, force_update=True, **params)
     assert torch.equal(calls[-1][1], posterior.default_x)
@@ -98,7 +101,7 @@ def test_leakage_cache_matches_nan_padded_x():
     x = torch.tensor([[0.0, float("nan")]])
     for _ in range(2):
         posterior._cached_leakage_factor(
-            x.clone(), prior, lambda: calls.append(1) or torch.ones(())
+            x.clone(), 100, prior, lambda: calls.append(1) or torch.ones(())
         )
     assert len(calls) == 1
 

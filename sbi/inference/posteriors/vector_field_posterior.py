@@ -557,7 +557,8 @@ class VectorFieldPosterior(NeuralPosterior):
 
         The mass is the fraction of probability flow ODE samples inside the prior
         support. It is 1 for unbounded priors. The factor is saved for the last `x`
-        and re-estimated whenever `x` changes, or for any call with `ode_kwargs`.
+        and re-estimated whenever `x` or `num_rejection_samples` changes, or for any
+        call with `ode_kwargs`.
 
         Args:
             x: A single observation.
@@ -593,7 +594,12 @@ class VectorFieldPosterior(NeuralPosterior):
             return mass
 
         return self._cached_leakage_factor(
-            x, self.prior, acceptance, force_update, use_cache=not ode_kwargs
+            x,
+            num_rejection_samples,
+            self.prior,
+            acceptance,
+            force_update,
+            use_cache=not ode_kwargs,
         )
 
     def sample_batched(
