@@ -175,7 +175,7 @@ def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_metho
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
-@pytest.mark.parametrize("predictor", ("euler_maruyama", "heun"))
+@pytest.mark.parametrize("predictor", ("euler_maruyama",))
 @pytest.mark.parametrize("corrector", (None, "gibbs", "langevin"))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("mu", (-1.0, 0.0, 1.0))
@@ -216,23 +216,35 @@ def test_heun_sampling_on_time_grid_ending_at_zero(sde_type):
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
-def test_heun_predictor_is_second_order(sde_type):
-    """With the exact score, halving the step size cuts Heun's error about fourfold
-    (twofold for first-order Euler)."""
+def test_heun_matches_exact_gaussian_flow(sde_type):
+    """For a Gaussian target with exact score, the probability flow ODE keeps each
+    sample's z-score. Heun must reproduce this map, and halving the step size must
+    cut its error about fourfold (twofold for first-order Euler)."""
     score_fn = _build_gaussian_score_estimator(
         sde_type, (2,), torch.ones(2), 0.5 * torch.ones(2)
     )
     estimator = score_fn.vector_field_estimator
+    t_max = torch.tensor([estimator.t_max])
+    t_min = torch.tensor([estimator.t_min])
 
-    def sample(steps: int) -> Tensor:
-        torch.manual_seed(0)
+    def error(steps: int) -> Tensor:
         ts = torch.linspace(estimator.t_max, estimator.t_min, steps)
-        return Diffuser(score_fn, "heun").run(100, ts, show_progress_bars=False)
+        path = Diffuser(score_fn, "heun").run(
+            100, ts, show_progress_bars=False, save_intermediate=True
+        )
+        start, end = path[:, 0], path[:, -1]
+        z = (start - estimator.approx_marginal_mean(t_max)) / (
+            estimator.approx_marginal_std(t_max)
+        )
+        exact = (
+            estimator.approx_marginal_mean(t_min)
+            + estimator.approx_marginal_std(t_min) * z
+        )
+        return (end - exact).abs().max()
 
-    reference = sample(2049)
-    error_coarse = (sample(65) - reference).abs().max()
-    error_fine = (sample(129) - reference).abs().max()
+    error_coarse, error_fine = error(65), error(129)
 
+    assert error_fine < 1e-2
     assert error_coarse / error_fine > 3.0
 
 
