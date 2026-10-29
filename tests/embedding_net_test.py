@@ -204,19 +204,21 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
     ("input_shape", "kwargs", "match"),
     [
         ((32, 32, 3), {}, "in_channels"),
+        ((32,), {"num_conv_layers": 0}, "num_conv_layers must be at least 1"),
         (
             (32,),
             {"num_conv_layers": 3, "out_channels_per_layer": [6, 12]},
             "num_conv_layers is 3",
         ),
-        # Kernel larger than the padded input: both sizes are negative, and
+        # Kernel much larger than the padded input: both sizes are negative, and
         # their product is positive.
-        ((4, 4), {"kernel_size": 9}, "num_conv_layers"),
+        ((4, 4), {"kernel_size": 9}, "smaller kernel_size"),
+        ((8,), {"pool_kernel_size": 4}, "num_conv_layers to at most 1"),
     ],
 )
 def test_cnn_embedding_errors_name_arguments(input_shape, kwargs, match):
     """CNNEmbedding errors name the constructor arguments that fix them."""
-    with pytest.raises(AssertionError, match=match):
+    with pytest.raises(ValueError, match=match):
         CNNEmbedding(input_shape, **kwargs)
 
 

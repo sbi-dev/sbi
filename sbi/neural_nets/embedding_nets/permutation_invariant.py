@@ -70,10 +70,8 @@ class PermutationInvariantEmbedding(nn.Module):
         super().__init__()
         self.trial_net = trial_net
         self.aggregation_dim = aggregation_dim
-        assert aggregation_fn in [
-            "mean",
-            "sum",
-        ], "aggregation_fn must be 'mean' or 'sum'."
+        if aggregation_fn not in ("mean", "sum"):
+            raise ValueError("aggregation_fn must be 'mean' or 'sum'.")
         self.aggregation_fn = aggregation_fn
 
         # construct fully connected layers

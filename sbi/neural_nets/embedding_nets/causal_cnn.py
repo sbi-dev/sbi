@@ -191,17 +191,21 @@ class CausalCNNEmbedding(nn.Module):
         """
 
         super(CausalCNNEmbedding, self).__init__()
-        assert isinstance(input_shape, Tuple), (
-            "input_shape must be a Tuple of size 1, e.g. (timepoints,)."
-        )
-        assert len(input_shape) == 1, "Currently only 1D causal CNNs are supported."
+        if not isinstance(input_shape, tuple):
+            raise TypeError(
+                "input_shape must be a tuple of length 1, e.g. (timepoints,), but "
+                f"got {type(input_shape).__name__}."
+            )
+        if len(input_shape) != 1:
+            raise ValueError("Currently only 1D causal CNNs are supported.")
         self.input_shape = (in_channels, *input_shape)
 
         total_timepoints = input_shape[0]
-        assert total_timepoints >= pool_kernel_size, (
-            "Please ensure that the pool kernel size is not "
-            "larger than the number of observed timepoints."
-        )
+        if total_timepoints < pool_kernel_size:
+            raise ValueError(
+                "Please ensure that the pool kernel size is not "
+                "larger than the number of observed timepoints."
+            )
         if isinstance(dilation, str):
             match dilation.lower():
                 case "exponential_cyclic":
@@ -221,15 +225,15 @@ class CausalCNNEmbedding(nn.Module):
                         "of dilation sizes."
                     )
         else:
-            assert isinstance(dilation, List), (
-                "Please pass dilation size as list or a string option."
-            )
+            if not isinstance(dilation, list):
+                raise TypeError("Please pass dilation size as list or a string option.")
             dilation_per_layer = dilation
 
-        assert max(dilation_per_layer) < total_timepoints, (
-            "The largest dilation is not smaller than the number of timepoints "
-            "in your input. Please provide a list with smaller dilations."
-        )
+        if max(dilation_per_layer) >= total_timepoints:
+            raise ValueError(
+                "The largest dilation is not smaller than the number of timepoints "
+                "in your input. Please provide a list with smaller dilations."
+            )
         if out_channels_per_layer is None:
             out_channels_per_layer = [16] * num_conv_layers
 
@@ -255,10 +259,11 @@ class CausalCNNEmbedding(nn.Module):
                 out_channels_per_layer[-1],
                 int(total_timepoints / pool_kernel_size),
             )
-            assert aggregator_out_shape[-1] > 1, (
-                "Your dimensionality is already small. "
-                "Please ensure a larger input size or use a custom aggregator."
-            )
+            if aggregator_out_shape[-1] <= 1:
+                raise ValueError(
+                    "Your dimensionality is already small. "
+                    "Please ensure a larger input size or use a custom aggregator."
+                )
             aggregator = WaveNetSRLikeAggregator(
                 aggregator_out_shape[0],
                 aggregator_out_shape[-1],

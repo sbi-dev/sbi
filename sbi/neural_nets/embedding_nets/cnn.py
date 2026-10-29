@@ -131,22 +131,33 @@ class CNNEmbedding(nn.Module):
         """
         super(CNNEmbedding, self).__init__()
 
-        assert isinstance(input_shape, Tuple) and 0 < len(input_shape) < 3, (
-            "input_shape must be a tuple of length 1 or 2, e.g., (28,) or (28, 28). "
-            "Pass the number of channels as in_channels."
-        )
+        if not isinstance(input_shape, tuple):
+            raise TypeError(
+                "input_shape must be a tuple, e.g., (28,) or (28, 28), but got "
+                f"{type(input_shape).__name__}."
+            )
+        if not 0 < len(input_shape) < 3:
+            raise ValueError(
+                "input_shape must have length 1 or 2, e.g., (28,) or (28, 28). "
+                "Pass the number of channels as in_channels."
+            )
 
         use_2d_cnn = len(input_shape) == 2
         conv_module = nn.Conv2d if use_2d_cnn else nn.Conv1d
         pool_module = nn.MaxPool2d if use_2d_cnn else nn.MaxPool1d
 
+        if num_conv_layers < 1:
+            raise ValueError(
+                f"num_conv_layers must be at least 1, but got {num_conv_layers}."
+            )
         if out_channels_per_layer is None:
             out_channels_per_layer = [6 * 2**ii for ii in range(num_conv_layers)]
-        assert len(out_channels_per_layer) == num_conv_layers, (
-            f"out_channels_per_layer has {len(out_channels_per_layer)} entries, but "
-            f"num_conv_layers is {num_conv_layers}. Pass one entry per convolutional "
-            "layer."
-        )
+        if len(out_channels_per_layer) != num_conv_layers:
+            raise ValueError(
+                f"out_channels_per_layer has {len(out_channels_per_layer)} entries, "
+                f"but num_conv_layers is {num_conv_layers}. Pass one entry per "
+                "convolutional layer."
+            )
 
         # define input shape with channel
         self.input_shape = (in_channels, *input_shape)
@@ -170,11 +181,15 @@ class CNNEmbedding(nn.Module):
             # Calculate change of output size of each CNN layer
             cnn_output_size = get_new_cnn_output_size(cnn_output_size, conv_layer, pool)
 
-            assert all(size > 0 for size in cnn_output_size), (
-                f"CNN output size {cnn_output_size} is not positive at layer "
-                f"{ii + 1}. Use fewer convolutional layers (num_conv_layers) or a "
-                "smaller kernel_size or pool_kernel_size."
-            )
+            if not all(size > 0 for size in cnn_output_size):
+                fewer_layers = (
+                    f", or set num_conv_layers to at most {ii}" if ii > 0 else ""
+                )
+                raise ValueError(
+                    f"CNN output size {cnn_output_size} is not positive at layer "
+                    f"{ii + 1}. Use a smaller kernel_size or pool_kernel_size"
+                    f"{fewer_layers}."
+                )
 
         self.cnn_subnet = nn.Sequential(*cnn_layers)
 
