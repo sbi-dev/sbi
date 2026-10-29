@@ -585,6 +585,7 @@ def build_zuko_nsf(
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     num_bins: int = 10,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -618,10 +619,11 @@ def build_zuko_nsf(
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         num_bins: The number of bins in the spline transformations. Defaults to 10.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NSF"
-    additional_kwargs = {"bins": num_bins, **kwargs}
+    additional_kwargs = {"bins": num_bins, "randperm": randperm, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -640,9 +642,7 @@ def build_zuko_nsf(
 def build_zuko_ncsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_x: Literal["none"] = "none",
     z_score_y: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
@@ -650,6 +650,7 @@ def build_zuko_ncsf(
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     num_bins: int = 10,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     r"""
@@ -664,24 +665,24 @@ def build_zuko_ncsf(
         | https://arxiv.org/abs/2002.02428
 
     Arguments:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_x: Batch of xs, used to infer dimensionality.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network, can be one of:
+        z_score_x: Must be `none`: a z-score would move xs off :math:`[-\pi, \pi[`.
+        z_score_y: Whether to z-score ys passing into the network, can be one of:
             - `none`, or None: do not z-score.
             - `independent`: z-score each dimension independently.
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
-        z_score_y: Whether to z-score ys passing into the network, same options as
-            z_score_x.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         num_bins: The number of bins in the spline transformations. Defaults to 10.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NCSF"
-    additional_kwargs = {"bins": num_bins, **kwargs}
+    additional_kwargs = {"bins": num_bins, "randperm": randperm, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -711,6 +712,7 @@ def build_zuko_sospf(
     embedding_net: nn.Module = nn.Identity(),
     degree: int = 4,
     polynomials: int = 3,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -736,10 +738,16 @@ def build_zuko_sospf(
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         degree: The degree of the polynomials. Defaults to 4.
         polynomials: The number of polynomials. Defaults to 3.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "SOSPF"
-    additional_kwargs = {"degree": degree, "polynomials": polynomials, **kwargs}
+    additional_kwargs = {
+        "degree": degree,
+        "polynomials": polynomials,
+        "randperm": randperm,
+        **kwargs,
+    }
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -1027,6 +1035,7 @@ def build_zuko_bpf(
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     degree: int = 16,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -1057,10 +1066,11 @@ def build_zuko_bpf(
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         degree: The degree :math:`M` of the Bernstein polynomial.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "BPF"
-    additional_kwargs = {"degree": degree, **kwargs}
+    additional_kwargs = {"degree": degree, "randperm": randperm, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -1149,7 +1159,7 @@ def build_zuko_flow(
     )
 
     # Get x transforms (z-score or logit transform)
-    x_transforms = _prepare_x_transforms(z_score_x, batch_x, x_dist)
+    x_transforms = _prepare_x_transforms(which_nf, z_score_x, batch_x, x_dist)
 
     # Combine all transforms
     transforms = x_transforms + base_transforms
@@ -1277,6 +1287,7 @@ def _get_base_and_transforms(
 
 
 def _prepare_x_transforms(
+    which_nf: str,
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ],
@@ -1287,13 +1298,22 @@ def _prepare_x_transforms(
     Prepare transforms to prepend for x processing.
 
     Args:
+        which_nf: The type of normalizing flow the transforms are prepended to.
         z_score_x: Type of x preprocessing.
         batch_x: Batch of x data.
         x_dist: Distribution for unconstrained transformation.
 
     Returns:
         Tuple of transforms to prepend (empty tuple if no preprocessing).
+
+    Raises:
+        ValueError: If an NCSF gets any x preprocessing.
     """
+    if which_nf == "NCSF" and z_score_x not in (None, "none"):
+        raise ValueError(
+            "NCSF models data on [-pi, pi), which any transform of x would move. "
+            f"Use z_score_x='none' instead of {z_score_x!r}."
+        )
     transforms = ()
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x == "transform_to_unconstrained":
@@ -1367,18 +1387,12 @@ def build_zuko_unconditional_flow(
         which_nf, x_numel, 0, hidden_features, num_transforms, **kwargs
     )
 
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
-        # TODO: Check whether first base transform, then z-score is correct (it's the
-        # other way around in the conditional flows).
-        transforms = (
-            *base_transforms,
-            standardizing_transform_zuko(batch_x, structured_x),
-        )
-    else:
-        transforms = base_transforms
+    # z-score first, so that the flow transforms see standardized data.
+    transforms = (
+        _prepare_x_transforms(which_nf, z_score_x, batch_x, x_dist=None)
+        + base_transforms
+    )
 
-    # Combine transforms.
     neural_net = zuko.flows.Flow(transforms, base)
 
     flow = ZukoUnconditionalFlow(

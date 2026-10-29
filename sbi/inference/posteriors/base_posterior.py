@@ -3,14 +3,13 @@
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Self, Tuple, Union
 from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
 from torch.distributions import Distribution
-from typing_extensions import Self
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,

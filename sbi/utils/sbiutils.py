@@ -37,6 +37,7 @@ from torch.optim.adam import Adam
 
 from sbi import __version__
 from sbi.sbi_types import TorchTransform
+from sbi.utils.torchutils import unwrap_mixture_support
 
 _T = TypeVar("_T")
 
@@ -802,9 +803,9 @@ def prior_support_is_bounded(prior: Any) -> Optional[bool]:
         support = prior.support
     except (NotImplementedError, AttributeError):
         return None
-    return not isinstance(
-        getattr(support, "base_constraint", support), constraints._Real
-    )
+    while hasattr(support, "base_constraint"):
+        support = support.base_constraint
+    return not isinstance(support, constraints._Real)
 
 
 def within_support(distribution: Any, samples: Tensor) -> Tensor:
@@ -1004,7 +1005,8 @@ def mcmc_transform(
             )
         # Unbounded and discrete supports are z-scored, which `biject_to()` does not do.
         if support_is_bounded and not getattr(prior.support, "is_discrete", False):
-            transform = biject_to(prior.support)
+            support = unwrap_mixture_support(prior.support, prior.event_shape, device)
+            transform = biject_to(support)
         else:
             transform = prior_mean_std_transform(prior, device)
     else:
@@ -1265,13 +1267,14 @@ def gradient_ascent(
 
     # The `_overall` variables store data accross the iterations, whereas the
     # `_iter` variables contain data exclusively extracted from the current
-    # iteration.
-    best_log_prob_iter = torch.max(init_probs)
-    best_theta_iter = sorted_inits[-1]
-    best_theta_overall = best_theta_iter.detach().clone()
+    # iteration. Slicing keeps the batch dim, so `argmax` is `(1, D)` and `max`
+    # is `(1,)` on every return path, as in the loop below.
+    best_log_prob_iter = init_probs[sort_indices[-1:]]
+    best_theta_iter = sorted_inits[-1:]
+    best_theta_overall = theta_transform(best_theta_iter.detach().clone())
     best_log_prob_overall = best_log_prob_iter.detach().clone()
 
-    argmax_ = best_theta_overall
+    argmax_ = theta_transform.inv(best_theta_overall)
     max_val = best_log_prob_overall
 
     optimize_inits = theta_transform(optimize_inits)

@@ -22,12 +22,16 @@ from torch import eye, ones, zeros
 from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
 from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
-from sbi.inference.posteriors import VIPosterior
+from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
 from sbi.neural_nets.factory import ZukoFlowType
+from sbi.samplers.vi.vi_divergence_optimizers import (
+    IWElboOptimizer,
+    RenyiDivergenceOptimizer,
+)
 from sbi.samplers.vi.vi_utils import AdaptedVariationalDistribution, LearnableGaussian
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -571,6 +575,82 @@ def test_retrain_fails_after_setting_an_already_built_q():
         posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
 
 
+@pytest.mark.parametrize("dreg", [False, True])
+@pytest.mark.parametrize("offset", [0.0, 100.0, -100.0])
+def test_iwelbo_optimizer_uses_importance_weighted_loss(
+    monkeypatch, dreg: bool, offset: float
+):
+    """IW uses IWELBO (or DReG) gradient weights and a stable displayed loss."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = IWElboOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=2,
+        K=3,
+        dreg=dreg,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    particles = (
+        torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]) + offset
+    ).requires_grad_()
+    monkeypatch.setattr(
+        optimizer, "generate_elbo_particles", lambda x_o, num_samples=None: particles
+    )
+    surrogate_loss, loss = optimizer.loss(zeros(1))
+
+    # IWELBO gradient weights (Burda et al. 2016), squared for DReG (Tucker et al.
+    # 2018), averaged over the n_particles groups of K samples.
+    weights = torch.softmax(particles.detach().reshape(2, 3), dim=-1)
+    if dreg:
+        weights = weights.square()
+    grad = torch.autograd.grad(surrogate_loss, particles)[0]
+    assert torch.allclose(grad, -weights.flatten() / 2)
+    assert not loss.requires_grad
+
+    # With K equal log-weights c, the IWELBO is c for any K.
+    monkeypatch.setattr(
+        optimizer,
+        "generate_elbo_particles",
+        lambda x_o, num_samples=None: torch.full((6,), offset),
+    )
+    _, loss = optimizer.loss(zeros(1))
+    assert torch.allclose(loss, torch.tensor(-offset))
+
+
+@pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
+@pytest.mark.parametrize("dreg_before, dreg_after", [(False, True), (True, False)])
+def test_dreg_changed_by_update_matches_new_optimizer(
+    optimizer_class, dreg_before: bool, dreg_after: bool
+):
+    """Switching `dreg` between `train` calls gives the gradient of a new optimizer."""
+    prior = MultivariateNormal(2 * ones(1), eye(1))
+    q = LearnableGaussian(dim=1, full_covariance=False)
+
+    def gradient(dreg: bool, update_to: bool | None = None):
+        optimizer = optimizer_class(
+            potential_fn=FakePotential(prior=prior),
+            q=deepcopy(q),
+            prior=prior,
+            n_particles=4,
+            dreg=dreg,
+            lr=1e-3,
+            gamma=0.999,
+        )
+        if update_to is not None:
+            # As a second `train` call does; it also rebuilds the scheduler.
+            optimizer.update({"dreg": update_to, "gamma": 0.999})
+        torch.manual_seed(0)
+        surrogate_loss, _ = optimizer.loss(zeros(1))
+        return torch.autograd.grad(surrogate_loss, list(optimizer.q.parameters()))
+
+    for updated, new in zip(
+        gradient(dreg_before, update_to=dreg_after), gradient(dreg_after), strict=True
+    ):
+        assert torch.allclose(updated, new)
+
+
 def test_vi_posterior_interface():
     """Test VIPosterior interface: hyperparameters, training, evaluation."""
     num_dim = 2
@@ -743,6 +823,25 @@ def test_amortized_vi_accuracy(linear_gaussian_setup_trainers):
             f"C2ST too high for {setup['trainer_type']}, "
             f"x_o={x_o.squeeze().tolist()}: {c2st_score:.3f}"
         )
+
+
+@pytest.mark.parametrize("vi_method", ["fKL", "IW", "alpha"])
+@pytest.mark.parametrize("via_params", [False, True])
+def test_train_amortized_rejects_methods_other_than_rkl(
+    vi_method: str, via_params: bool
+):
+    """Amortized VI fits only rKL, so other methods must raise, not run as rKL."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((8,))
+    if via_params:
+        posterior = VIPosterior(FakePotential(prior=prior), prior)
+        kwargs = {"params": VIPosteriorParameters(vi_method=vi_method)}
+    else:
+        posterior = VIPosterior(FakePotential(prior=prior), prior, vi_method=vi_method)
+        kwargs = {}
+
+    with pytest.raises(NotImplementedError, match="rKL"):
+        posterior.train_amortized(theta, theta, **kwargs)
 
 
 @pytest.mark.slow

@@ -13,7 +13,7 @@ from torch import Tensor
 
 from sbi.inference import MarginalTrainer
 from sbi.neural_nets.estimators import UnconditionalDensityEstimator
-from sbi.neural_nets.factory import ZukoFlowType
+from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
 from sbi.neural_nets.net_builders.estimator_configs import (
     MARGINAL_MODELS,
     _BUILD_KWARG_ALIASES,
@@ -152,9 +152,13 @@ def test_no_field_is_dropped_before_the_flow(model):
     """
     config_cls = _MARGINAL_CONFIGS[model]
     build_params = inspect.signature(build_zuko_unconditional_flow).parameters
-    zuko_params = inspect.signature(
-        getattr(zuko.flows, config_cls._WHICH_NF).__init__
-    ).parameters
+    # Zuko's flows pass their **kwargs on to the base class, e.g. NSF to MAF.
+    zuko_params = {
+        name
+        for cls in getattr(zuko.flows, config_cls._WHICH_NF).__mro__
+        if "__init__" in vars(cls)
+        for name in inspect.signature(cls.__init__).parameters
+    }
 
     for name in config_cls()._build_kwargs():
         assert name not in nflow_specific_kwargs, (
@@ -230,6 +234,17 @@ def test_marginal_nsf_defaults_to_ten_bins(batch_x):
 
     assert _differs(_build_seeded(MarginalNSFConfig(), batch_x), zuko_default)
     assert not _differs(_build_seeded(MarginalNSFConfig(), batch_x), ten_bins)
+
+
+@pytest.mark.parametrize("num_bins", [10, 16])
+def test_marginal_nn_builds_the_flow_of_the_marginal_config(num_bins, batch_x):
+    """`marginal_nn` must build the same flow as the config for the same settings."""
+    torch.manual_seed(0)
+    from_factory = marginal_nn(ZukoFlowType.NSF, num_bins=num_bins)(batch_x)
+
+    assert not _differs(
+        _build_seeded(MarginalNSFConfig(bins=num_bins), batch_x), from_factory
+    )
 
 
 @pytest.mark.parametrize("model", MODELS)
