@@ -10,6 +10,7 @@ import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.pyplot import close, subplots
+from scipy.stats import binom
 from torch.utils.tensorboard.writer import SummaryWriter
 
 import sbi.analysis.plot as plt
@@ -122,6 +123,11 @@ def test_pairplot_offdiag_cells_plot_column_on_x(style):
         assert drawn.width > 0 and drawn.height > 0
         assert x0 <= drawn.x0 and drawn.x1 <= x1
         assert y0 <= drawn.y0 and drawn.y1 <= y1
+        # Densities and contours are empty if the samples miss the cell's limits.
+        for image in ax.images:
+            assert np.nan_to_num(np.asarray(image.get_array(), dtype=float)).max() > 0
+        if ax.collections:
+            assert sum(len(p.vertices) for c in ax.collections for p in c.get_paths())
     close()
 
 
@@ -328,21 +334,28 @@ def test_sbc_rank_plot(num_parameters, num_cols, custom_figure, plot_type):
 
 @pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
 def test_sbc_rank_plot_bins_over_full_rank_range(plot_type):
-    """Ranks that never reach 0 or N must not be stretched over the whole axis."""
-    num_posterior_samples = 100
-    # Over-dispersed posterior: all 200 ranks lie in [30, 70].
-    ranks = np.linspace(30, 70, 200).round()[:, None]
-    _, ax = sbc_rank_plot(ranks, num_posterior_samples, plot_type=plot_type)
+    """Ranks, curves and bands use [0, N]; ranks are not stretched to fill it."""
+    num_posterior_samples, num_sbc_runs, num_bins = 100, 200, 10
+    # Over-dispersed posterior: all ranks lie in [30, 70].
+    ranks = np.linspace(30, 70, num_sbc_runs).round()[:, None]
+    _, ax = sbc_rank_plot(
+        ranks, num_posterior_samples, num_bins=num_bins, plot_type=plot_type
+    )
     ax = np.atleast_1d(ax)[0]
+    band = ax.collections[0].get_paths()[0].vertices
+    assert (band[:, 0].min(), band[:, 0].max()) == (0, num_posterior_samples)
     if plot_type == "hist":
         assert ax.patches[0].get_x() == 0 and ax.patches[0].get_height() == 0
+        # Each of the num_bins bins expects a fraction 1 / num_bins of the runs.
+        expected = binom(num_sbc_runs, 1 / num_bins).ppf([0.005, 0.995])
+        assert (band[:, 1].min(), band[:, 1].max()) == tuple(expected)
     else:
-        y = ax.lines[0].get_ydata()
+        x, y = ax.lines[0].get_data()
+        assert ax.get_xlim() == (0, num_posterior_samples) == (x.min(), x.max())
         if plot_type == "cdf":
             assert np.all(y[: len(y) // 4] == 0)
         else:
             assert np.abs(y).max() > 0.2
-        assert ax.get_xlim() == (0, num_posterior_samples)
     close()
 
 
