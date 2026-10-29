@@ -473,7 +473,7 @@ def test_multi_round_q_is_an_independent_warm_start():
 
 
 def test_amortized_posterior_survives_roundtrip():
-    """Amortized mode had no serialization coverage."""
+    """Pickling, deepcopy and `q=` cloning keep the trained amortized flow."""
     num_dim = 2
     posterior = _make_posterior("flow", num_dim)
     theta = posterior._prior.sample((128,))
@@ -490,6 +490,7 @@ def test_amortized_posterior_survives_roundtrip():
     ):
         assert candidate._mode == "amortized"
         assert candidate.sample((5,), x=x_o).shape == (5, num_dim)
+    assert clone._amortized_q is not posterior._amortized_q
 
 
 def test_retrain_from_scratch_with_bounded_prior():
