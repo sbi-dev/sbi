@@ -1333,12 +1333,8 @@ class VIPosterior(NeuralPosterior):
         num_init_samples: int,
         x: Optional[TorchTensor] = None,
     ) -> Tensor:
-        # Amortized training fits q(θ|x) and leaves `q` untouched. With several iid
-        # observations in `x`, `.sample()` returns samples per observation. Pool
-        # `num_init_samples` in total: the potential scores each start against each
-        # observation, so drawing that many per observation costs num_obs times more.
-        # Keep a random subset, so that the order of the observations does not decide
-        # which of them are dropped.
+        # Amortized training leaves `q` untouched. Pool `num_init_samples` starts in
+        # total over the observations in `x`.
         if self._mode == "amortized" and init_method in ("posterior", "proposal"):
             num_obs = self._x_else_default_x(x).shape[0]
             samples = self.sample((math.ceil(num_init_samples / num_obs),), x=x)

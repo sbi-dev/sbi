@@ -54,8 +54,7 @@ def _untrained_posterior(kind, prior, theta, x):
         ("direct", "proposal", "no proposal distribution"),
         ("vector_field", "proposal", "no proposal distribution"),
         ("ensemble", "proposal", "no proposal distribution"),
-        ("direct", "bogus", "Use 'posterior', or pass"),
-        ("rejection", "bogus", "Use 'posterior', 'proposal', or pass"),
+        ("rejection", "prior", "Use 'posterior', 'proposal', or pass"),
     ],
 )
 def test_map_init_method_errors_list_supported_options(kind, init_method, match, toy):
