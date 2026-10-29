@@ -159,8 +159,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Args:
             x: Observation at which to estimate the normalization constant.
             num_samples: Number of importance samples used for the estimate.
-            force_update: Whether to re-calculate the normalization constant when x is
-                unchanged and have a cached value.
+            force_update: Whether to re-calculate the normalization constant even if
+                it is cached for this x and `num_samples`.
 
         Returns:
             The normalization constant as a scalar tensor.
@@ -174,8 +174,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     def _estimate_log_normalization_constant(
         self, x: Tensor, num_samples: int = 10_000, force_update: bool = False
     ) -> Tensor:
-        """Returns the log normalization constant, cached for the last x and
-        number of samples.
+        """Returns the log normalization constant, cached per x and sample count.
 
         The estimate is computed in log space, because the importance weights of
         e.g. many iid observations underflow when exponentiated.

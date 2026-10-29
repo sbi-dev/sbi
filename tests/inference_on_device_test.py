@@ -843,7 +843,7 @@ def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_para
 
 @pytest.mark.gpu
 def test_importance_posterior_log_prob_across_devices():
-    """The cached normalization constant is looked up with x from any device."""
+    """The normalization constant works after `.to()`, with x from any device."""
     device = process_device("gpu")
     prior = BoxUniform(-ones(2), ones(2))
     posterior = ImportanceSamplingPosterior(
