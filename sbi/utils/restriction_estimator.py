@@ -608,7 +608,8 @@ class AcceptRejectFunction:
         pred = F.softmax(logits, dim=1)[:, 1]
         if self._reweigh_factor is None:
             threshold = self._classifier_thr
-            predictions = pred > threshold
+            # Inclusive: a classifier certain of every valid sample sets it to 1.0.
+            predictions = pred >= threshold
         else:
             # `pred` is the probability of a valid simulation.
             probs_valid = pred * (1 - self._reweigh_factor)
