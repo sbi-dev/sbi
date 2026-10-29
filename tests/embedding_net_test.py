@@ -630,15 +630,18 @@ def test_permutation_invariant_embedding_ignores_padding_per_observation(
     assert torch.allclose(batched[1], embedding(x[1:])[0])
 
 
+@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
 @pytest.mark.parametrize(
     "pattern", ("padded_trial", "partially_nan_trial", "no_real_trial")
 )
-def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
+def test_permutation_invariant_embedding_warns_on_invalid_padding(
+    pattern, aggregation_fn
+):
     """NaN outside whole padded trials must not silently become data; warn once."""
     embedding = PermutationInvariantEmbedding(
         FCEmbedding(input_dim=2, output_dim=4),
         trial_net_output_dim=4,
-        aggregation_fn="sum",
+        aggregation_fn=aggregation_fn,
     )
     x = torch.randn(2, 3, 2)
     x[0, 1:] = float("nan")

@@ -142,15 +142,20 @@ class PermutationInvariantEmbedding(nn.Module):
         trial_embeddings = trial_embeddings * is_real_trial.unsqueeze(-1).float()
 
         # Take mean over permutation dimension divide by number of trials
-        # (instead of just taking torch.mean) to account for masking.
+        # (instead of just taking torch.mean) to account for masking. Observations
+        # without real trials get a zero embedding, as with "sum".
         if self.aggregation_fn == "mean":
-            combined_embedding = (
-                trial_embeddings.sum(dim=self.aggregation_dim) / trial_counts
-            )
+            combined_embedding = trial_embeddings.sum(
+                dim=self.aggregation_dim
+            ) / trial_counts.clamp(min=1)
         else:
             combined_embedding = trial_embeddings.sum(dim=self.aggregation_dim)
 
-        assert not torch.isnan(combined_embedding).any(), "NaNs in embedding."
+        if torch.isnan(combined_embedding).any():
+            raise ValueError(
+                "NaNs in embedding: the trial_net returned NaN or inf, e.g., because "
+                "the input contains inf."
+            )
 
         # add number of trials as additional input
         return self.fc_subnet(torch.cat([combined_embedding, trial_counts], dim=1))
