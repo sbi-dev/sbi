@@ -100,13 +100,14 @@ def _gaussian_iid_potential_and_posterior():
 
 
 def test_importance_posterior_log_prob_after_changing_default_x():
-    """The normalization constant must not be reused for another default x."""
+    """The normalization constant must not be reused for another default x, also not
+    for more trials of the same value."""
     torch.manual_seed(0)
     prior, potential, true_posterior = _gaussian_iid_potential_and_posterior()
     posterior = ImportanceSamplingPosterior(potential, proposal=prior)
     theta = zeros(1, 2)
 
-    for x_o in [zeros(1, 2), 3 * ones(1, 2)]:
+    for x_o in [3 * ones(1, 2), zeros(1, 2), zeros(3, 2)]:
         log_prob = posterior.set_default_x(x_o).log_prob(theta)
         assert torch.allclose(log_prob, true_posterior(x_o).log_prob(theta), atol=0.2)
 
