@@ -65,9 +65,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         )
 
         self.proposal = proposal
-        # Log normalization constant and the x at which it was estimated.
-        self._log_normalization_constant: Optional[Tensor] = None
-        self._normalization_x: Optional[Tensor] = None
+        # The x of the last estimate and its log normalization constant.
+        self._log_normalization_cache: Optional[Tuple[Tensor, Tensor]] = None
         self.method = method
         self.theta_transform = theta_transform
 
@@ -161,6 +160,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             force_update: Whether to re-calculate the normalization constant when x is
                 unchanged and have a cached value.
         """
+        x = self._x_else_default_x(x)
         return torch.exp(
             self._estimate_log_normalization_constant(x, num_samples, force_update)
         )
@@ -174,24 +174,20 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         The estimate is computed in log space, because the importance weights of
         e.g. many iid observations underflow when exponentiated.
         """
-        cached_x = self._normalization_x
-        is_cached_x = (
-            cached_x is not None
-            and cached_x.shape == x.shape
-            and torch.equal(cached_x, x)
-        )
-        if force_update or self._log_normalization_constant is None or not is_cached_x:
+        cache = self._log_normalization_cache
+        if force_update or cache is None or not self._matches_cached_x(cache[0], x):
             _, log_importance_weights = importance_sample(
                 self.potential_fn.bind(x),
                 proposal=self.proposal,
                 num_samples=num_samples,
             )
-            self._log_normalization_constant = torch.logsumexp(
+            log_normalization_constant = torch.logsumexp(
                 log_importance_weights, dim=0
             ) - math.log(log_importance_weights.shape[0])
-            self._normalization_x = x.clone()
+            cache = (x.clone(), log_normalization_constant)
+            self._log_normalization_cache = cache
 
-        return self._log_normalization_constant.to(self._device)  # type: ignore
+        return cache[1].to(self._device)
 
     def sample(
         self,

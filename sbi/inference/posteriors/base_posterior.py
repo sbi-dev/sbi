@@ -249,14 +249,19 @@ class NeuralPosterior:
             return torch.ones((), device=self._device)
         if self._leakage_cache is not None and use_cache and not force_update:
             cached_x, factor = self._leakage_cache
-            if cached_x.shape == x.shape and torch.allclose(
-                cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
-            ):
+            if self._matches_cached_x(cached_x, x):
                 return factor
         factor = estimate_fn()
         if use_cache:
             self._leakage_cache = (x.detach().clone(), factor)
         return factor
+
+    @staticmethod
+    def _matches_cached_x(cached_x: Tensor, x: Tensor) -> bool:
+        """Return whether `x` equals the `x` of a cache, on any device and with NaN."""
+        return cached_x.shape == x.shape and torch.allclose(
+            cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
+        )
 
     def _calculate_map(
         self,
