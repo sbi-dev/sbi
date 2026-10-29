@@ -1362,8 +1362,9 @@ class VIPosterior(NeuralPosterior):
                 it is a string, it can be either `posterior` or `proposal`, which
                 samples the respective distribution `num_init_samples` times. For
                 `VIPosterior` the proposal is the variational distribution, not the
-                prior. If it is a tensor, the tensor is used as the initial locations,
-                so prior-based initialization can be done by passing prior samples.
+                prior (in amortized mode, q(θ|x) at the default `x`). If it is a
+                tensor, the tensor is used as the initial locations, so prior-based
+                initialization can be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -1382,6 +1383,9 @@ class VIPosterior(NeuralPosterior):
             The MAP estimate.
         """
         self.proposal = self.q
+        # Amortized training fits q(θ|x) and leaves `q` untouched.
+        if self._mode == "amortized" and init_method == "proposal":
+            init_method = "posterior"
         return super().map(
             x=x,
             num_iter=num_iter,
