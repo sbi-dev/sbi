@@ -1786,7 +1786,7 @@ def _sbc_rank_plot(
     for idx, rank in enumerate(ranks_list):
         assert isinstance(rank, (Tensor, np.ndarray))
         ranks_list[idx] = ensure_numpy(rank)
-    if any(r.min() < 0 or r.max() > num_posterior_samples for r in ranks_list):
+    if not all(((r >= 0) & (r <= num_posterior_samples)).all() for r in ranks_list):
         raise ValueError(
             "Ranks must lie in [0, num_posterior_samples]. Pass the number of "
             "posterior samples that was used to compute the ranks."

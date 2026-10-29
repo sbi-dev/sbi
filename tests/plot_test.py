@@ -346,7 +346,7 @@ def test_sbc_rank_plot_bins_over_full_rank_range(plot_type):
     close()
 
 
-@pytest.mark.parametrize("bad_rank", (-1.0, 11.0))
+@pytest.mark.parametrize("bad_rank", (-1.0, 11.0, np.nan))
 def test_sbc_rank_plot_rejects_ranks_outside_0_to_n(bad_rank):
     with pytest.raises(ValueError, match="num_posterior_samples"):
         sbc_rank_plot(np.full((10, 1), bad_rank), 10)
