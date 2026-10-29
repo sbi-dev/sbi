@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
+    ProposalCorrectedMDN,
 )
 from sbi.utils.torchutils import ensure_theta_batched
 
@@ -155,7 +156,8 @@ def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
 
 
 def extract_and_transform_mog(
-    estimator: MixtureDensityEstimator, context: Optional[Tensor] = None
+    estimator: Union[MixtureDensityEstimator, ProposalCorrectedMDN],
+    context: Optional[Tensor] = None,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Extracts the Mixture of Gaussians (MoG) parameters
     from an MDN based DirectPosterior at either the default x or input x.
@@ -164,7 +166,8 @@ def extract_and_transform_mog(
     transformed back to the original (un-z-scored) parameter space.
 
     Args:
-        estimator: MixtureDensityEstimator instance.
+        estimator: MixtureDensityEstimator, or a ProposalCorrectedMDN whose
+            corrected MoG is used.
         context: Conditioning context for posterior $p(\theta|x)$. If not provided,
             fall back onto `x` passed to `set_default_x()`.
 
@@ -181,53 +184,16 @@ def extract_and_transform_mog(
     if context is None:
         raise ValueError("context must be provided for extract_and_transform_mog")
 
-    # Get MoG (raw density estimator output in z-scored space)
-    mog = estimator.get_uncorrected_mog(context)
+    if isinstance(estimator, ProposalCorrectedMDN):
+        mog = estimator.net.inverse_transform_mog(estimator.get_corrected_mog(context))
+    else:
+        mog = estimator.inverse_transform_mog(estimator.get_uncorrected_mog(context))
 
-    norm_logits = mog.log_weights
-    means = mog.means
-    # precision_factors is guaranteed non-None after MoG.__post_init__
     precfs = mog.precision_factors
     assert precfs is not None  # For type checker
+    sumlogdiag = torch.sum(torch.log(torch.diagonal(precfs, dim1=2, dim2=3)), dim=2)
 
-    # Transform means and precision factors to original space if z-scoring is enabled
-    if getattr(estimator, "_prior_transform", None) is not None:
-        raise NotImplementedError(
-            "Conditional density extraction is not supported for "
-            "z_score='transform_to_unconstrained' (it assumes an affine "
-            "z-score)."
-        )
-    if estimator.has_input_transform:
-        # The z-score transform is: z = (theta - shift) / scale
-        # To transform means: theta = z * scale + shift
-        shift = estimator._transform_shift
-        scale = estimator._transform_scale
-
-        # Transform means: mu_theta = mu_z * scale + shift
-        means_transformed = means * scale + shift
-
-        # Transform precision factors:
-        # For z = (theta - shift) / scale:
-        #   - Covariance transforms as: Cov_theta = Cov_z * scale^2 (element-wise)
-        #   - Precision transforms as: Prec_theta = Prec_z / scale^2 (element-wise)
-        #   - More precisely: Prec_theta_ij = Prec_z_ij / (scale_i * scale_j)
-        #
-        # For precision factors U (upper triangular) where Prec = U^T @ U:
-        #   - We need: U_theta^T @ U_theta = U_z^T @ U_z / (scale ⊗ scale)
-        #   - This is achieved by: U_theta = U_z @ diag(1/scale)
-        #   - Which is equivalent to: U_theta[:, :, :, j] = U_z[:, :, :, j] / scale[j]
-        #   - Or simply: U_theta = U_z / scale (broadcasting divides columns)
-        precfs_transformed = precfs / scale
-    else:
-        means_transformed = means
-        precfs_transformed = precfs
-
-    # Compute sumlogdiag for the (potentially transformed) precision factors
-    sumlogdiag = torch.sum(
-        torch.log(torch.diagonal(precfs_transformed, dim1=2, dim2=3)), dim=2
-    )
-
-    return norm_logits, means_transformed, precfs_transformed, sumlogdiag
+    return mog.log_weights, mog.means, precfs, sumlogdiag
 
 
 class ConditionedPotential(BasePotential):

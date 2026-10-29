@@ -1372,7 +1372,11 @@ def ensure_lam_positive_definite(
         denoising_prior_precision: The prior precision tensor.
         denoising_posterior_precision: The posterior precision tensor.
         N: The scaling factor used in the correction.
-        precision_nugget: The nugget value to ensure positive definiteness.
+        precision_nugget: The nugget value to ensure positive definiteness. For a
+            dense `Lam`, the total nugget is at least 100 machine epsilons times
+            the largest absolute eigenvalue of `Lam`, and the nugget per trial is
+            at least one machine epsilon times the largest posterior precision.
+            For a diagonal `Lam`, both bounds hold per diagonal entry.
 
     Returns:
         A tuple of (denoising_prior_precision, denoising_posterior_precision) where the
@@ -1395,7 +1399,14 @@ def ensure_lam_positive_definite(
         Lam_corr = torch.einsum(
             '...ij,...j,...kj->...ik', eigenvectors, corrected_eigs, eigenvectors
         )
-        Lam_corr += precision_nugget * torch.eye(
+        # The nugget must survive rounding in `Lam` and in each posterior precision.
+        eps = torch.finfo(Lam.dtype).eps
+        nugget = torch.maximum(
+            100 * eps * eigenvalues.abs().amax(-1) / N,
+            eps * denoising_posterior_precision.flatten(1).abs().amax(-1)[..., None],
+        )
+        nugget = torch.clamp(nugget, min=precision_nugget)[..., None, None]
+        Lam_corr += nugget * torch.eye(
             Lam.shape[-1], device=Lam.device, dtype=Lam.dtype
         )
 
@@ -1404,12 +1415,12 @@ def ensure_lam_positive_definite(
         )
     else:
         # For one-dimensional case, treat Lam as a vector by putting it on the diagonal.
-        Lam_diag = Lam
-        average_diff = (
-            torch.where(Lam_diag > 0, torch.zeros_like(Lam_diag), -Lam_diag) / (N - 1)
-            + precision_nugget
-        )
-        Lam_corr = average_diff
+        eps = torch.finfo(Lam.dtype).eps
+        nugget = torch.maximum(
+            100 * eps * Lam.abs() / N,
+            eps * denoising_posterior_precision.abs().amax(1, keepdim=True),
+        ).clamp(min=precision_nugget)
+        Lam_corr = torch.where(Lam > 0, torch.zeros_like(Lam), -Lam) / (N - 1) + nugget
         denoising_posterior_precision = denoising_posterior_precision + Lam_corr
 
     return denoising_prior_precision, denoising_posterior_precision
