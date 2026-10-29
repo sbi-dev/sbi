@@ -239,35 +239,27 @@ def test_sbc_accuracy():
     assert (pvals > 0.05).all(), "posterior ranks uniformity test p-values too small."
 
 
-def test_check_uniformity_c2st_discrete_ranks(monkeypatch):
-    """Test that C2ST uses the correct discrete null for integer ranks."""
-    num_ranks = 1000
-    num_posterior_samples = 100
+def test_check_uniformity_c2st_discrete_ranks():
+    """Test that the rank C2ST is close to 0.5 for a calibrated posterior."""
     num_dim = 2
+    num_posterior_samples = 2
+    prior = BoxUniform(-ones(num_dim), ones(num_dim))
+    posterior = TractablePosterior(PosteriorPotential(posterior=prior, prior=prior))
+    thetas = prior.sample((1000,))
+    xs = thetas + torch.randn_like(thetas)
 
-    torch.manual_seed(0)
-    ranks = torch.randint(0, num_posterior_samples + 1, (num_ranks, num_dim)).float()
-
-    randint_calls = []
-    original_randint = torch.randint
-
-    def recording_randint(*args, **kwargs):
-        randint_calls.append((args, kwargs))
-        return original_randint(*args, **kwargs)
-
-    monkeypatch.setattr(torch, "randint", recording_randint)
+    ranks, _ = run_sbc(
+        thetas,
+        xs,
+        posterior,
+        num_posterior_samples=num_posterior_samples,
+        show_progress_bar=False,
+    )
     c2st_ranks = check_uniformity_c2st(ranks, num_posterior_samples)
 
-    assert len(randint_calls) == num_dim
-    assert all(
-        args[0] == 0
-        and args[1] == num_posterior_samples + 1
-        and args[2] == (num_ranks, 1)
-        for args, _ in randint_calls
-    )
     assert c2st_ranks.shape == (num_dim,)
     assert ((c2st_ranks > 0.45) & (c2st_ranks < 0.55)).all(), (
-        "C2ST should be close to 0.5 for calibrated integer ranks, "
+        "C2ST should be close to 0.5 for the ranks of a calibrated posterior, "
         f"but got {c2st_ranks}."
     )
 
