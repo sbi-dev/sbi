@@ -149,8 +149,9 @@ class SMCABC(ABCBASE):
             num_simulations: Total number of possible simulations.
             epsilon_decay: Factor with which the acceptance threshold $\epsilon$ decays.
             distance_based_decay: Whether the $\epsilon$ decay is constant over
-                populations or calculated from the previous populations distribution of
-                distances.
+                populations or calculated from the previous population's distribution of
+                distances. If True, `epsilon_decay` is used as the quantile of the
+                previous population's distances that determines the next $\epsilon$.
             ess_min: Threshold of effective sampling size for resampling weights. Not
                 used when None (default).
             kernel_variance_scale: Factor for scaling the perturbation kernel variance.
@@ -212,6 +213,11 @@ class SMCABC(ABCBASE):
         if kde_kwargs is None:
             kde_kwargs = {}
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
+        if distance_based_decay:
+            assert 0.0 <= epsilon_decay <= 1.0, (
+                "`epsilon_decay` is used as a quantile when `distance_based_decay=True`"
+                f" and must be in [0, 1], got {epsilon_decay}."
+            )
         assert not (self.distance.requires_iid_data and lra), (
             "Currently there is no support to run inference "
         )
@@ -551,34 +557,26 @@ class SMCABC(ABCBASE):
     def _get_next_epsilon(self, distances: Tensor, quantile: float) -> float:
         """Return epsilon for next round based on quantile of this round's distances.
 
-        Note: distances are made unique to avoid repeated distances from simulations
-        that result in the same observation.
-
         Args:
             distances: The distances accepted in this round.
             quantile: Quantile in the distance distribution to determine new epsilon.
 
         Returns:
             epsilon: Epsilon for the next population.
-        """
-        # Take unique distances to skip same distances simulations (return is sorted).
-        distances = torch.unique(distances)
-        # Cumsum as cdf proxy.
-        distances_cdf = torch.cumsum(distances, dim=0) / distances.sum()
-        # Take the q quantile of distances.
-        try:
-            qidx = torch.where(distances_cdf >= quantile)[0][0]
-        except IndexError:
-            self.logger.warning(
-                "Accepted unique distances=%s don't match quantile=%s. "
-                "Selecting last distance.",
-                distances,
-                quantile,
-            )
-            qidx = -1
 
-        # The new epsilon is given by that distance.
-        return distances[qidx].item()
+        Raises:
+            ValueError: If no distance in the previous population is finite.
+        """
+        finite_distances = distances[torch.isfinite(distances)]
+        if finite_distances.numel() == 0:
+            raise ValueError(
+                "Cannot compute the next epsilon: all distances in the previous "
+                "population are non-finite."
+            )
+        if finite_distances.dtype not in (torch.float32, torch.float64):
+            finite_distances = finite_distances.to(torch.get_default_dtype())
+
+        return torch.quantile(finite_distances, quantile).item()
 
     def _calculate_new_log_weights(
         self,

@@ -335,6 +335,14 @@ class NeuralPosterior:
             show_progress_bars=show_progress_bars,
         )[0]
 
+    @staticmethod
+    def _raise_if_x_passed_to_map(x: Optional[Tensor]) -> None:
+        if x is not None:
+            raise ValueError(
+                "Passing `x` directly to `.map()` has been deprecated. "
+                "Use `.set_default_x()` to set `x`, and then run `.map()`."
+            )
+
     def map(
         self,
         x: Optional[Tensor] = None,
@@ -387,15 +395,11 @@ class NeuralPosterior:
         Returns:
             The MAP estimate.
         """
-        if x is not None:
-            raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated."
-                "Use `.self_default_x()` to set `x`, and then run `.map()` "
-            )
+        self._raise_if_x_passed_to_map(x)
 
         if self.default_x is None:
             raise ValueError(
-                "Default `x` has not been set."
+                "Default `x` has not been set. "
                 "To set the default, use the `.set_default_x()` method."
             )
 
