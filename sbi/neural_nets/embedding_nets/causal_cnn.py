@@ -56,8 +56,7 @@ def WaveNetSRLikeAggregator(
     intermediate_channel_sizes: Optional[List] = None,
     stride_sizes: Union[int, List] = 1,
 ) -> nn.Module:
-    """
-    Creates a non-causal 1D CNN aggregator based on the WaveNet speach recognition task
+    """Non-causal 1D CNN aggregator based on WaveNet's speech recognition setup.
 
     By default this function creates an aggregator with two CNN layers,
     after every convolution a maxpooling operation halves the number of timepoints.
@@ -68,14 +67,14 @@ def WaveNetSRLikeAggregator(
     Args:
         in_channels: number of channels at input.
         num_timepoints: length of the input.
-        output dim: wanted number of features as output.
+        output_dim: wanted number of features as output.
         activation: activation to apply after the convolution.
         kernel_sizes: (optional) alter the kernel size used and the number of CNN layers
             (through the length of the kernel size vector).
         intermediate_channel_sizes: (optional) alter the intermediate channel sizes
             used, should have length = len(kernel_sizes) - 1.
-        stride_sizes = Optional alter the stride used, either a vector of
-            len = len(kernel_sizes) or a single integer, in which case the same stride
+        stride_sizes: (optional) alter the stride used, either a list of length
+            len(kernel_sizes) or a single integer, in which case the same stride
             is used in every convolution.
 
     Returns:
@@ -93,22 +92,24 @@ def WaveNetSRLikeAggregator(
         ]
     if intermediate_channel_sizes is None:
         intermediate_channel_sizes = [64]
-    assert len(intermediate_channel_sizes) == len(kernel_sizes) - 1, (
-        "Provided kernel size list should be exactly one element longer "
-        "than channel size list."
-    )
-    intermediate_channel_sizes += [output_dim]
-    if isinstance(stride_sizes, List):
-        assert len(stride_sizes) == len(kernel_sizes), (
-            "Provided stride size list should be have the same size as"
-            "the kernel size list."
+    if len(intermediate_channel_sizes) != len(kernel_sizes) - 1:
+        raise ValueError(
+            "intermediate_channel_sizes needs one entry less than kernel_sizes, but "
+            f"has {len(intermediate_channel_sizes)} entries for {len(kernel_sizes)} "
+            "kernel sizes."
         )
+    intermediate_channel_sizes = [*intermediate_channel_sizes, output_dim]
+    if isinstance(stride_sizes, list):
+        if len(stride_sizes) != len(kernel_sizes):
+            raise ValueError(
+                f"stride_sizes has {len(stride_sizes)} entries, but kernel_sizes has "
+                f"{len(kernel_sizes)}. Pass one stride per kernel size."
+            )
     else:
         stride_sizes = [stride_sizes] * len(kernel_sizes)
 
     non_causal_layers = []
     for ll in range(len(kernel_sizes)):
-        print(aggregator_out_shape)
         conv_layer = nn.Conv1d(
             in_channels=in_channels if ll == 0 else intermediate_channel_sizes[ll - 1],
             out_channels=intermediate_channel_sizes[ll],
@@ -131,7 +132,6 @@ def WaveNetSRLikeAggregator(
                 / 2
             ),
         )
-    print(aggregator_out_shape)
     aggregator = nn.Sequential(*non_causal_layers, nn.AdaptiveAvgPool1d(1))
     return aggregator
 
@@ -152,10 +152,10 @@ class CausalCNNEmbedding(nn.Module):
         aggregator: Optional[nn.Module] = None,
         output_dim: int = 20,
     ):
-        """Intitialize embedding network that uses 1D causal convolutions.
+        """Initialize embedding network that uses 1D causal convolutions.
 
         This is a simplified version of the architecture introduced for
-        the speech recognition task in the WaveNet paper (van den Oord, et al. (2016))
+        the speech recognition task in the WaveNet paper (van den Oord, et al. (2016)).
 
         After several dilated causal convolutions (that maintain the dimensionality
         of the input), an aggregator network is used to bring down the dimensionality.
@@ -163,7 +163,7 @@ class CausalCNNEmbedding(nn.Module):
         If you do not provide an aggregator network yourself, a default aggregator
         is used. This default aggregator is based on the WaveNet paper's description
         of their Speech Recognition Task, and uses non-causal convolutions and pooling
-        layers, and global average poolingg to obtain a final low dimensional embedding.
+        layers, and global average pooling to obtain a final low dimensional embedding.
 
         Args:
             input_shape: Spatial input shape without batch or channel dimensions,
@@ -191,17 +191,25 @@ class CausalCNNEmbedding(nn.Module):
         """
 
         super(CausalCNNEmbedding, self).__init__()
-        assert isinstance(input_shape, Tuple), (
-            "input_shape must be a Tuple of size 1, e.g. (timepoints,)."
-        )
-        assert len(input_shape) == 1, "Currently only 1D causal CNNs are supported."
+        if not isinstance(input_shape, tuple):
+            raise TypeError(
+                "input_shape must be a tuple of length 1, e.g. (timepoints,), but "
+                f"got {type(input_shape).__name__}."
+            )
+        if len(input_shape) != 1:
+            raise ValueError("Currently only 1D causal CNNs are supported.")
         self.input_shape = (in_channels, *input_shape)
 
         total_timepoints = input_shape[0]
-        assert total_timepoints >= pool_kernel_size, (
-            "Please ensure that the pool kernel size is not "
-            "larger than the number of observed timepoints."
-        )
+        if total_timepoints < pool_kernel_size:
+            raise ValueError(
+                f"pool_kernel_size ({pool_kernel_size}) must not be larger than the "
+                f"number of timepoints ({total_timepoints})."
+            )
+        if num_conv_layers < 1:
+            raise ValueError(
+                f"num_conv_layers must be at least 1, but got {num_conv_layers}."
+            )
         if isinstance(dilation, str):
             match dilation.lower():
                 case "exponential_cyclic":
@@ -216,22 +224,37 @@ class CausalCNNEmbedding(nn.Module):
                     dilation_per_layer = [1] * num_conv_layers
                 case _:
                     raise ValueError(
-                        f"{dilation} is not a valid option, please use \"none\","
-                        "\"exponential\",or \"exponential_cyclic\", or pass a list "
-                        "of dilation sizes."
+                        f"dilation must be \"none\", \"exponential\", "
+                        f"\"exponential_cyclic\" or a list of dilation sizes, but got "
+                        f"\"{dilation}\"."
                     )
         else:
-            assert isinstance(dilation, List), (
-                "Please pass dilation size as list or a string option."
-            )
+            if not isinstance(dilation, list):
+                raise TypeError(
+                    "dilation must be a list of dilation sizes or a string option, "
+                    f"but got {type(dilation).__name__}."
+                )
+            if len(dilation) != num_conv_layers:
+                raise ValueError(
+                    f"dilation has {len(dilation)} entries, but num_conv_layers is "
+                    f"{num_conv_layers}. Pass one dilation per convolutional layer."
+                )
             dilation_per_layer = dilation
 
-        assert max(dilation_per_layer) < total_timepoints, (
-            "Your maximal dilations size used is larger than the number of "
-            "timepoints in your input, please provide a list with smaller dilations."
-        )
+        if max(dilation_per_layer) >= total_timepoints:
+            raise ValueError(
+                f"The largest dilation ({max(dilation_per_layer)}) must be smaller "
+                f"than the number of timepoints ({total_timepoints}). Pass smaller "
+                "dilations or fewer num_conv_layers."
+            )
         if out_channels_per_layer is None:
             out_channels_per_layer = [16] * num_conv_layers
+        if len(out_channels_per_layer) != num_conv_layers:
+            raise ValueError(
+                f"out_channels_per_layer has {len(out_channels_per_layer)} entries, "
+                f"but num_conv_layers is {num_conv_layers}. Pass one entry per "
+                "convolutional layer."
+            )
 
         causal_layers = []
         for ll in range(num_conv_layers):
@@ -255,10 +278,13 @@ class CausalCNNEmbedding(nn.Module):
                 out_channels_per_layer[-1],
                 int(total_timepoints / pool_kernel_size),
             )
-            assert aggregator_out_shape[-1] > 1, (
-                "Your dimensionality is already small,"
-                "Please ensure a larger input size or use a custom aggregator."
-            )
+            if aggregator_out_shape[-1] <= 1:
+                raise ValueError(
+                    f"After pooling with pool_kernel_size={pool_kernel_size}, "
+                    f"{aggregator_out_shape[-1]} timepoint(s) remain, but the default "
+                    "aggregator needs at least 2. Use a smaller pool_kernel_size, a "
+                    "longer input, or pass your own aggregator."
+                )
             aggregator = WaveNetSRLikeAggregator(
                 aggregator_out_shape[0],
                 aggregator_out_shape[-1],

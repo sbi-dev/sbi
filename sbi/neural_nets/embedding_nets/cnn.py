@@ -105,46 +105,59 @@ class CNNEmbedding(nn.Module):
     ):
         """Convolutional embedding network.
 
-        First two layers are convolutional, followed by fully connected layers.
-
-        Automatically infers whether to apply 1D or 2D convolution depending on
-        input_shape.
-        Allows usage of multiple (color) channels by passing in_channels > 1.
+        Applies `num_conv_layers` blocks of convolution, ReLU and max pooling,
+        followed by fully connected layers. A 1D `input_shape` uses `Conv1d` and
+        `MaxPool1d`, a 2D `input_shape` uses `Conv2d` and `MaxPool2d`. Each
+        convolution (stride 1, padding 1) turns a spatial size `n` into
+        `n + 3 - kernel_size`, and each pooling step then divides it by
+        `pool_kernel_size`, rounding down.
 
         Args:
             input_shape: Spatial input shape without batch or channel dimensions, e.g.,
                 (28,) for 1D or (28, 28) for 2D. Inputs may be flat or use
                 channel-first layout.
-            in_channels: Number of image channels, default 1.
-            out_channels_per_layer: Number of out convolutional out_channels for each
-                layer. Must match the number of layers passed below.
-            num_cnn_layers: Number of convolutional layers.
-            num_linear_layers: Number fully connected layer.
-            num_linear_units: Number of hidden units in fully-connected layers.
-            output_dim: Number of output units of the final layer.
-            kernel_size: Kernel size for both convolutional layers.
-            pool_size: pool size for MaxPool1d operation after the convolutional
+            in_channels: Number of input channels, e.g., 3 for RGB images.
+            out_channels_per_layer: Number of output channels of each convolutional
+                layer, one entry per layer. Defaults to 6 channels in the first
+                layer, doubling in each further layer, e.g., `[6, 12]` for two
                 layers.
+            num_conv_layers: Number of convolutional layers.
+            num_linear_layers: Number of fully connected layers.
+            num_linear_units: Number of hidden units in the fully connected layers.
+            output_dim: Number of output units of the final layer.
+            kernel_size: Kernel size of every convolutional layer.
+            pool_kernel_size: Kernel size of the max pooling after every
+                convolutional layer.
         """
         super(CNNEmbedding, self).__init__()
 
-        assert isinstance(input_shape, Tuple), (
-            "input_shape must be a Tuple of size 1 or 2, e.g., (width, [height])."
-        )
-        assert (
-            0 < len(input_shape) < 3
-        ), """input_shape must be a Tuple of size 1 or 2, e.g.,
-            (width, [height]). Number of input channels are passed separately"""
+        if not isinstance(input_shape, tuple):
+            raise TypeError(
+                "input_shape must be a tuple, e.g., (28,) or (28, 28), but got "
+                f"{type(input_shape).__name__}."
+            )
+        if not 0 < len(input_shape) < 3:
+            raise ValueError(
+                "input_shape must have length 1 or 2, e.g., (28,) or (28, 28). "
+                "Pass the number of channels as in_channels."
+            )
 
         use_2d_cnn = len(input_shape) == 2
         conv_module = nn.Conv2d if use_2d_cnn else nn.Conv1d
         pool_module = nn.MaxPool2d if use_2d_cnn else nn.MaxPool1d
 
+        if num_conv_layers < 1:
+            raise ValueError(
+                f"num_conv_layers must be at least 1, but got {num_conv_layers}."
+            )
         if out_channels_per_layer is None:
-            out_channels_per_layer = [6, 12]
-        assert len(out_channels_per_layer) == num_conv_layers, (
-            "out_channels needs as many entries as num_cnn_layers."
-        )
+            out_channels_per_layer = [6 * 2**ii for ii in range(num_conv_layers)]
+        if len(out_channels_per_layer) != num_conv_layers:
+            raise ValueError(
+                f"out_channels_per_layer has {len(out_channels_per_layer)} entries, "
+                f"but num_conv_layers is {num_conv_layers}. Pass one entry per "
+                "convolutional layer."
+            )
 
         # define input shape with channel
         self.input_shape = (in_channels, *input_shape)
@@ -156,7 +169,6 @@ class CNNEmbedding(nn.Module):
         padding = 1
 
         for ii in range(num_conv_layers):
-            # Defining another 2D convolution layer
             conv_layer = conv_module(
                 in_channels=in_channels if ii == 0 else out_channels_per_layer[ii - 1],
                 out_channels=out_channels_per_layer[ii],
@@ -169,11 +181,15 @@ class CNNEmbedding(nn.Module):
             # Calculate change of output size of each CNN layer
             cnn_output_size = get_new_cnn_output_size(cnn_output_size, conv_layer, pool)
 
-            assert all(
-                cnn_output_size
-            ), f"""CNN output size is zero at layer {ii + 1}. Either reduce
-                 num_cnn_layers to {ii} or adjust the kernel_size
-                 and pool_kernel_size accordingly."""
+            if not all(size > 0 for size in cnn_output_size):
+                fewer_layers_hint = (
+                    f", or set num_conv_layers to at most {ii}" if ii > 0 else ""
+                )
+                raise ValueError(
+                    f"CNN output size {cnn_output_size} is not positive at layer "
+                    f"{ii + 1}. Use a smaller kernel_size or pool_kernel_size"
+                    f"{fewer_layers_hint}."
+                )
 
         self.cnn_subnet = nn.Sequential(*cnn_layers)
 
