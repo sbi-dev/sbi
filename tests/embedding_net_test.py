@@ -222,6 +222,22 @@ def test_cnn_embedding_errors_name_arguments(input_shape, kwargs, match):
         CNNEmbedding(input_shape, **kwargs)
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"num_conv_layers": 0}, "num_conv_layers must be at least 1"),
+        ({"out_channels_per_layer": [16, 16]}, "num_conv_layers is 5"),
+        ({"dilation": [1, 2]}, "dilation has 2 entries"),
+        ({"pool_kernel_size": 128}, "pool_kernel_size"),
+        ({"pool_kernel_size": 64}, "pool_kernel_size"),
+    ],
+)
+def test_causal_cnn_embedding_errors_name_arguments(kwargs, match):
+    """CausalCNNEmbedding errors name the constructor arguments that fix them."""
+    with pytest.raises(ValueError, match=match):
+        CausalCNNEmbedding((64,), **{"pool_kernel_size": 2, **kwargs})
+
+
 def test_cnn_embedding_default_channels_follow_num_conv_layers():
     """The default channels double per layer, starting at 6."""
     embedding_net = CNNEmbedding((32,), num_conv_layers=3)

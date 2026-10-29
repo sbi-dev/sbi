@@ -203,8 +203,12 @@ class CausalCNNEmbedding(nn.Module):
         total_timepoints = input_shape[0]
         if total_timepoints < pool_kernel_size:
             raise ValueError(
-                "Please ensure that the pool kernel size is not "
-                "larger than the number of observed timepoints."
+                f"pool_kernel_size ({pool_kernel_size}) must not be larger than the "
+                f"number of timepoints ({total_timepoints})."
+            )
+        if num_conv_layers < 1:
+            raise ValueError(
+                f"num_conv_layers must be at least 1, but got {num_conv_layers}."
             )
         if isinstance(dilation, str):
             match dilation.lower():
@@ -227,15 +231,27 @@ class CausalCNNEmbedding(nn.Module):
         else:
             if not isinstance(dilation, list):
                 raise TypeError("Please pass dilation size as list or a string option.")
+            if len(dilation) != num_conv_layers:
+                raise ValueError(
+                    f"dilation has {len(dilation)} entries, but num_conv_layers is "
+                    f"{num_conv_layers}. Pass one dilation per convolutional layer."
+                )
             dilation_per_layer = dilation
 
         if max(dilation_per_layer) >= total_timepoints:
             raise ValueError(
-                "The largest dilation is not smaller than the number of timepoints "
-                "in your input. Please provide a list with smaller dilations."
+                f"The largest dilation ({max(dilation_per_layer)}) must be smaller "
+                f"than the number of timepoints ({total_timepoints}). Pass smaller "
+                "dilations or fewer num_conv_layers."
             )
         if out_channels_per_layer is None:
             out_channels_per_layer = [16] * num_conv_layers
+        if len(out_channels_per_layer) != num_conv_layers:
+            raise ValueError(
+                f"out_channels_per_layer has {len(out_channels_per_layer)} entries, "
+                f"but num_conv_layers is {num_conv_layers}. Pass one entry per "
+                "convolutional layer."
+            )
 
         causal_layers = []
         for ll in range(num_conv_layers):
@@ -261,8 +277,10 @@ class CausalCNNEmbedding(nn.Module):
             )
             if aggregator_out_shape[-1] <= 1:
                 raise ValueError(
-                    "Your dimensionality is already small. "
-                    "Please ensure a larger input size or use a custom aggregator."
+                    f"After pooling with pool_kernel_size={pool_kernel_size}, "
+                    f"{aggregator_out_shape[-1]} timepoint(s) remain, but the default "
+                    "aggregator needs at least 2. Use a smaller pool_kernel_size, a "
+                    "longer input, or pass your own aggregator."
                 )
             aggregator = WaveNetSRLikeAggregator(
                 aggregator_out_shape[0],
