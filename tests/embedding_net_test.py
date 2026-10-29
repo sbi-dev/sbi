@@ -652,11 +652,14 @@ def test_permutation_invariant_embedding_warns_on_invalid_padding(
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        embedding(x)
+        output = embedding(x)
         embedding(x)
 
     issued = [w for w in caught if "should only mark padded trials" in str(w.message)]
     assert len(issued) == (0 if pattern == "padded_trial" else 1)
+    if pattern == "no_real_trial":
+        # Zero aggregate and zero trial count, for "mean" as for "sum".
+        assert torch.allclose(output[1], embedding.fc_subnet(torch.zeros(1, 5))[0])
 
 
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
