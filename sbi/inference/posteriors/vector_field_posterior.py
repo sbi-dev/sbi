@@ -570,6 +570,7 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
+        x = self._x_else_default_x(x)
 
         def acceptance() -> Tensor:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))

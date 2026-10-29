@@ -504,6 +504,7 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
+        x = self._x_else_default_x(x)
 
         def acceptance() -> Tensor:
             return rejection.accept_reject_sample(

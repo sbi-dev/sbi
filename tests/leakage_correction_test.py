@@ -93,6 +93,9 @@ def test_leakage_correction_caching(estimator_type, monkeypatch):
     posterior.log_prob(theta, x=2 * x_b, leakage_correction_params=params)
     posterior.leakage_correction(posterior.default_x, force_update=True, **params)
     assert torch.equal(calls[-1][1], posterior.default_x)
+    num_calls = len(calls)
+    posterior.leakage_correction(posterior.default_x.double(), **params)
+    assert len(calls) == num_calls, "A float64 `x` must find the saved factor."
 
 
 def test_leakage_cache_matches_nan_padded_x():
