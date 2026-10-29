@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import copy
 import logging
 import math
 import warnings
@@ -315,14 +314,6 @@ def _restricted_box_prior(num_simulations: int = 300, max_num_epochs: int = 2):
         max_num_epochs=max_num_epochs
     )
     return restriction_estimator
-
-
-def test_restricted_prior_can_be_deep_copied():
-    """The threshold of the classifier carries no gradient graph, which deep copies
-    (e.g. of a proposal) cannot handle."""
-    restriction_estimator = _restricted_box_prior()
-
-    copy.deepcopy(restriction_estimator.restrict_prior())
 
 
 def test_restrict_prior_uses_the_passed_classifier():

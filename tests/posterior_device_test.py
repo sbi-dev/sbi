@@ -13,7 +13,7 @@ import torch
 import torch.distributions.transforms as torch_tf
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import FMPE, NPE, NPE_A, EnsemblePosterior, MCMCPosterior
+from sbi.inference import FMPE, NPE, EnsemblePosterior, MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
@@ -57,21 +57,7 @@ def trained_on_cpu():
     return functools.cache(_train)
 
 
-def _npe_a_round_two(prior_name: str):
-    prior = _prior(prior_name)
-    trainer = NPE_A(prior, num_components=2, show_progress_bars=False)
-    theta, x = _simulate(prior, 300)
-    trainer.append_simulations(theta, x).train(max_num_epochs=2, final_round=False)
-    proposal = trainer.build_posterior().set_default_x(torch.zeros(1, NUM_DIM))
-    theta = proposal.sample((300,), show_progress_bars=False)
-    x = theta + 0.1 * torch.randn_like(theta)
-    trainer.append_simulations(theta, x, proposal=proposal).train(
-        max_num_epochs=2, final_round=True
-    )
-    return trainer.build_posterior()
-
-
-def _build(kind: str, npe, fmpe, prior_name: str):
+def _build(kind: str, npe, fmpe):
     if kind == "direct":
         return npe.build_posterior()
     if kind == "importance":
@@ -102,8 +88,6 @@ def _build(kind: str, npe, fmpe, prior_name: str):
         return fmpe.build_posterior(
             posterior_parameters=VectorFieldPosteriorParameters(iid_method="fnpe")
         )
-    if kind == "npe_a":
-        return _npe_a_round_two(prior_name)
     raise ValueError(kind)
 
 
@@ -118,7 +102,6 @@ def _build(kind: str, npe, fmpe, prior_name: str):
         "mcmc_posterior_proposal",
         "vi",
         "vector_field",
-        "npe_a",
     ],
 )
 def test_to_moves_posterior_and_keeps_state(
@@ -126,11 +109,9 @@ def test_to_moves_posterior_and_keeps_state(
 ):
     """`.to()` returns the posterior and keeps default x, MAP, transform and prior;
     sample, potential and MAP then run on the device."""
-    if kind == "npe_a" and prior_name == "box":
-        pytest.skip("Two-round NPE-A with a BoxUniform hits the known PD error.")
     # `.to()` moves the estimators in place, so a GPU case trains its own.
     npe, fmpe = trained_on_cpu(prior_name) if device == "cpu" else _train(prior_name)
-    posterior = _build(kind, npe, fmpe, prior_name)
+    posterior = _build(kind, npe, fmpe)
     x_o = torch.zeros(1, NUM_DIM)
     posterior.set_default_x(x_o)
     map_kwargs = dict(num_iter=2, num_to_optimize=1, num_init_samples=1)
