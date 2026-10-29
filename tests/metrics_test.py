@@ -10,6 +10,8 @@ import numpy as np
 import pytest
 import torch
 from scipy.optimize import linear_sum_assignment
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
 from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import (
@@ -88,6 +90,99 @@ def test_c2st_with_constant_features(dims_constant: int):
     y[:, :dims_constant] = 1.0
 
     c2st(x, y)
+
+
+@pytest.mark.parametrize(
+    "classifier",
+    (
+        LogisticRegression,
+        LogisticRegression(),
+        KNeighborsClassifier,
+        lambda **kwargs: LogisticRegression(**kwargs),
+    ),
+)
+def test_c2st_custom_classifier(classifier):
+    """Test c2st with custom classifier classes, instances, and callables."""
+    torch.manual_seed(0)
+    x = torch.randn(200, 2)
+    y = torch.randn(200, 2) + 2.0
+    kwargs = (
+        {"C": 0.5}
+        if (hasattr(classifier, "C") or classifier is LogisticRegression)
+        else None
+    )
+    score = c2st(x, y, classifier=classifier, classifier_kwargs=kwargs)
+    assert isinstance(score, torch.Tensor)
+    assert 0.0 <= score.item() <= 1.0
+
+
+@pytest.mark.parametrize("invalid_classifier", ("unsupported", "svm", 123))
+def test_c2st_invalid_classifier_raises(invalid_classifier):
+    """Test that unsupported classifier specifications raise a ValueError."""
+    x = torch.randn(50, 2)
+    y = torch.randn(50, 2)
+    with pytest.raises(ValueError, match="Invalid classifier"):
+        c2st(x, y, classifier=invalid_classifier)
+
+
+@pytest.mark.parametrize("z_score", (True, False))
+def test_c2st_does_not_mutate_inputs(z_score: bool):
+    """Test that noise addition and z-scoring do not modify caller tensors."""
+    torch.manual_seed(0)
+    x = torch.randn(100, 2)
+    y = torch.randn(100, 2)
+    x_orig = x.clone()
+    y_orig = y.clone()
+
+    c2st(x, y, z_score=z_score, noise_scale=1.0)
+
+    assert torch.equal(x, x_orig)
+    assert torch.equal(y, y_orig)
+
+
+def test_c2st_classifier_kwargs_rf_and_mlp():
+    """Test that classifier_kwargs are respected without conflicting random_state."""
+    torch.manual_seed(0)
+    x = torch.randn(100, 2)
+    y = torch.randn(100, 2)
+    score_rf = c2st(
+        x,
+        y,
+        classifier="rf",
+        classifier_kwargs={"n_estimators": 10, "random_state": 42},
+    )
+    score_mlp = c2st(
+        x,
+        y,
+        classifier="mlp",
+        classifier_kwargs={"hidden_layer_sizes": (5, 5), "random_state": 42},
+    )
+    assert 0.0 <= score_rf.item() <= 1.0
+    assert 0.0 <= score_mlp.item() <= 1.0
+
+
+@pytest.mark.gpu
+def test_c2st_cuda_with_noise():
+    """Test that c2st handles CUDA tensors and noise on device without mismatch."""
+    if not torch.cuda.is_available():
+        pytest.skip("Requires CUDA.")
+
+    x = torch.randn(100, 2, device="cuda")
+    y = torch.randn(100, 2, device="cuda")
+    score = c2st(x, y, noise_scale=0.5)
+    assert 0.0 <= score.item() <= 1.0
+
+
+def test_c2st_with_requires_grad():
+    """Test that c2st accepts tensors requiring gradients without autograd errors."""
+    x = torch.randn(100, 2, requires_grad=True)
+    y = torch.randn(100, 2)
+    score = c2st(x, y)
+    assert 0.0 <= score.item() <= 1.0
+
+    x_noise = torch.randn(100, 2, requires_grad=True)
+    score_noise = c2st(x_noise, y, z_score=False, noise_scale=0.5)
+    assert 0.0 <= score_noise.item() <= 1.0
 
 
 @pytest.mark.slow
