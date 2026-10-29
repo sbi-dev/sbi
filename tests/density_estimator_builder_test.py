@@ -429,6 +429,10 @@ def test_nflows_dtype_reaches_the_base_distribution(batches):
     assert estimator.net._distribution._log_z.dtype == torch.float64
 
 
+# An int is two hidden layers of that width, a list one layer per entry.
+ZUKO_WIDTH_CASES = [(24, [24, 24]), ([24, 32, 16], [24, 32, 16])]
+
+
 def _zuko_hidden_layer_widths(estimator: nn.Module) -> list[list[int]]:
     """Return the hidden-layer widths of each transform's network in a Zuko flow."""
     nets = [
@@ -446,17 +450,12 @@ def _zuko_hidden_layer_widths(estimator: nn.Module) -> list[list[int]]:
     ]
 
 
-@pytest.mark.parametrize(
-    "hidden_features, widths", [(24, [24, 24]), ([24, 32, 16], [24, 32, 16])]
-)
+@pytest.mark.parametrize("hidden_features, widths", ZUKO_WIDTH_CASES)
 @pytest.mark.parametrize("model", ZUKO_DENSITY_MODELS)
 def test_zuko_hidden_features_set_the_hidden_layers(
     model, hidden_features, widths, batches
 ):
-    """An int is two hidden layers of that width, a list one layer per entry.
-
-    The depth must not follow `num_transforms`.
-    """
+    """The depth must not follow `num_transforms`."""
     theta, x = batches
     estimator = _DENSITY_CONFIGS[model](
         hidden_features=hidden_features, num_transforms=3
@@ -465,9 +464,7 @@ def test_zuko_hidden_features_set_the_hidden_layers(
     assert _zuko_hidden_layer_widths(estimator) == [widths] * 3
 
 
-@pytest.mark.parametrize(
-    "hidden_features, widths", [(24, [24, 24]), ([24, 32, 16], [24, 32, 16])]
-)
+@pytest.mark.parametrize("hidden_features, widths", ZUKO_WIDTH_CASES)
 def test_zuko_cnf_hidden_features_set_the_hidden_layers(
     hidden_features, widths, batches
 ):
@@ -479,9 +476,7 @@ def test_zuko_cnf_hidden_features_set_the_hidden_layers(
     assert _zuko_hidden_layer_widths(estimator) == [widths]
 
 
-@pytest.mark.parametrize(
-    "hidden_features, widths", [(24, [24, 24]), ([24, 32, 16], [24, 32, 16])]
-)
+@pytest.mark.parametrize("hidden_features, widths", ZUKO_WIDTH_CASES)
 @pytest.mark.parametrize("model", ZUKO_MARGINAL_MODELS)
 def test_zuko_marginal_hidden_features_set_the_hidden_layers(
     model, hidden_features, widths, batches
