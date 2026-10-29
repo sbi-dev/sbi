@@ -8,6 +8,7 @@ from torch.distributions import MultivariateNormal
 from sbi.inference.posteriors import (
     DirectPosterior,
     EnsemblePosterior,
+    ImportanceSamplingPosterior,
     RejectionPosterior,
     VectorFieldPosterior,
 )
@@ -60,3 +61,13 @@ def test_map_init_method_errors_list_supported_options(kind, init_method, match,
     posterior = _untrained_posterior(kind, *toy).set_default_x(torch.zeros(1, 2))
     with pytest.raises(ValueError, match=match):
         posterior.map(init_method=init_method, **MAP_KWARGS)
+
+
+def test_importance_map_posterior_init_with_importance_method(toy):
+    """`.sample()` returns (samples, weights) here, so the inits must come from SIR."""
+    potential_fn, theta_transform = _likelihood_potential(*toy)
+    posterior = ImportanceSamplingPosterior(
+        potential_fn, toy[0], theta_transform, method="importance"
+    ).set_default_x(torch.zeros(1, 2))
+    theta_map = posterior.map(init_method="posterior", **MAP_KWARGS)
+    assert theta_map.shape == (1, 2)

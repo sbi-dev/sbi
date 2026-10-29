@@ -315,6 +315,29 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         return samples.reshape((*sample_shape, -1)).to(self._device)
 
+    def _calculate_map(
+        self,
+        num_iter: int = 1_000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        init_method: Union[str, Tensor] = "proposal",
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        # With method="importance", `.sample()` returns weighted proposal samples.
+        if init_method == "posterior":
+            init_method = self._sir_sample((num_init_samples,))
+        return super()._calculate_map(
+            num_iter=num_iter,
+            num_to_optimize=num_to_optimize,
+            learning_rate=learning_rate,
+            init_method=init_method,
+            num_init_samples=num_init_samples,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+        )
+
     def map(
         self,
         x: Optional[Tensor] = None,
@@ -350,10 +373,10 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             init_method: How to select the starting parameters for the optimization. If
                 it is a string, it can be either `posterior` or `proposal`, which
                 samples the respective distribution `num_init_samples` times (the
-                proposal defaults to the prior). `posterior` requires `method="sir"`,
-                since `method="importance"` makes `sample()` return weighted samples.
-                If it is a tensor, the tensor is used as the initial locations, so
-                prior-based initialization can be done by passing prior samples.
+                proposal defaults to the prior). `posterior` draws the samples with
+                SIR, whatever `method` is set. If it is a tensor, the tensor is used as
+                the initial locations, so prior-based initialization can be done by
+                passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the
