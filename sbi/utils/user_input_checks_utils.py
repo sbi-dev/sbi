@@ -65,13 +65,16 @@ def move_distribution_to_device(
         device: The target device.
 
     Returns:
-        The distribution on the target device. If `.to()` was used or the
-        distribution is already on `device`, this is the same object; otherwise it
-        is a newly constructed instance.
+        The distribution on the target device. If it moved in place or is already on
+        `device`, this is the same object; otherwise it is a new instance.
     """
     if hasattr(dist, "to"):
-        dist.to(device)  # type: ignore
-        return dist
+        # sbi priors move in place; a user prior may return a moved copy instead.
+        moved = dist.to(device)  # type: ignore
+        if moved is None or moved is dist:
+            return dist
+        set_validate_args(moved, dist._validate_args)
+        return moved
     if isinstance(dist, Independent):
         dist.base_dist = move_distribution_to_device(dist.base_dist, device)
         return dist
