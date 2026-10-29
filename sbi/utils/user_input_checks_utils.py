@@ -11,6 +11,7 @@ from torch.distributions import (
     Binomial,
     Categorical,
     Distribution,
+    Independent,
     Multinomial,
     MultivariateNormal,
     constraints,
@@ -70,6 +71,9 @@ def move_distribution_to_device(
     """
     if hasattr(dist, "to"):
         dist.to(device)  # type: ignore
+        return dist
+    if isinstance(dist, Independent):
+        dist.base_dist = move_distribution_to_device(dist.base_dist, device)
         return dist
     if all_tensors_on_device(dist, device):
         return dist
