@@ -42,8 +42,10 @@ def _untrained_posterior(kind, prior, theta, x):
         return EnsemblePosterior([
             _untrained_posterior("direct", prior, theta, x) for _ in range(2)
         ])
-    potential_fn, theta_transform = _likelihood_potential(prior, theta, x)
-    return RejectionPosterior(potential_fn, prior, theta_transform)
+    if kind == "rejection":
+        potential_fn, theta_transform = _likelihood_potential(prior, theta, x)
+        return RejectionPosterior(potential_fn, prior, theta_transform)
+    raise ValueError(f"Unknown posterior kind '{kind}'.")
 
 
 @pytest.mark.parametrize(
