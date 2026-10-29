@@ -132,7 +132,9 @@ def test_importance_posterior_normalization_constant_is_estimated_at_given_x():
     x_a, x_b = zeros(1, 2), 3 * ones(1, 2)
 
     posterior.log_prob(theta, x=x_a)
-    posterior.estimate_normalization_constant(x_b)
+    log_z = torch.log(posterior.estimate_normalization_constant(x_b))
+    true_log_z = MultivariateNormal(zeros(2), 2 * eye(2)).log_prob(x_b)
+    assert torch.allclose(log_z, true_log_z, atol=0.2)
     log_prob = posterior.log_prob(theta, x=x_b)
     assert torch.allclose(log_prob, true_posterior(x_b).log_prob(theta), atol=0.2)
 
