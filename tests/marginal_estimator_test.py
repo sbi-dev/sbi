@@ -72,7 +72,7 @@ def test_marginal_estimator(
 
 @pytest.mark.parametrize("which_nf", ["MAF", "NSF"])
 def test_unconditional_flow_is_equivariant_to_affine_data_changes(which_nf: str):
-    """With z-scoring, an affine change of the data only adds its log-determinant.
+    """With z-scoring, an affine change of the data only subtracts its log-determinant.
 
     This holds only if the flow transforms see z-scored data, i.e., the z-score is
     applied before them.
