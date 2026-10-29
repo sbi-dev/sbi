@@ -285,7 +285,8 @@ def check_sbc(
     Returns:
         Dictionary containing:
         - ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
-          one for each dim_parameters.
+          one for each dim_parameters. They vary between calls unless the torch
+          seed is fixed, see `check_uniformity_frequentist`.
         - c2st_ranks: C2ST accuracy between ranks and the discrete uniform baseline,
           one for each dim_parameters.
         - c2st_dap: C2ST accuracy between prior and DAP samples, single value.
@@ -347,7 +348,7 @@ def check_uniformity_frequentist(ranks: Tensor, num_posterior_samples: int) -> T
     The test runs on the ranks plus uniform noise on [0, 1), because it needs
     continuous samples. For a calibrated posterior, the ranks are uniform on
     ``0, ..., num_posterior_samples`` (Talts et al., https://arxiv.org/abs/1804.06788),
-    so the noisy ranks are uniform on [0, num_posterior_samples + 1]. The p-values
+    so the noisy ranks are uniform on [0, num_posterior_samples + 1). The p-values
     therefore vary between calls unless the torch seed is fixed.
 
     Args:
