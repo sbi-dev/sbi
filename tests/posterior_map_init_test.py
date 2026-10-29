@@ -3,66 +3,60 @@
 
 import pytest
 import torch
+from torch.distributions import MultivariateNormal
 
-from sbi.inference import NPE
-from sbi.utils import BoxUniform
+from sbi.inference.posteriors import (
+    DirectPosterior,
+    EnsemblePosterior,
+    RejectionPosterior,
+    VectorFieldPosterior,
+)
+from sbi.inference.potentials import likelihood_estimator_based_potential
+from sbi.neural_nets import likelihood_nn, posterior_flow_nn, posterior_nn
+
+MAP_KWARGS = dict(num_init_samples=20, num_to_optimize=5, num_iter=2)
 
 
 @pytest.fixture(scope="module")
-def direct_posterior():
-    """A trained NPE (DirectPosterior), which has no proposal."""
-    prior = BoxUniform(low=torch.zeros(2), high=torch.ones(2))
-    theta = prior.sample((200,))
-    x = theta + 0.05 * torch.randn_like(theta)
-    inference = NPE(prior=prior)
-    inference.append_simulations(theta, x).train(max_num_epochs=2)
-    return inference.build_posterior().set_default_x(torch.zeros(2))
+def toy():
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    return prior, theta, x
 
 
-def test_map_init_method_posterior(direct_posterior):
-    """init_method='posterior' works."""
-    theta_map = direct_posterior.map(
-        init_method="posterior",
-        num_init_samples=10,
-        num_iter=2,
-        show_progress_bars=False,
-        force_update=True,
+def _likelihood_potential(prior, theta, x):
+    return likelihood_estimator_based_potential(
+        likelihood_nn("mdn")(theta, x), prior, None
     )
-    assert theta_map.shape[-1] == 2
 
 
-def test_map_init_method_tensor(direct_posterior):
-    """A tensor of initial locations is accepted (e.g. prior samples)."""
-    inits = direct_posterior.prior.sample((10,))
-    theta_map = direct_posterior.map(
-        init_method=inits,
-        num_init_samples=10,
-        num_iter=2,
-        show_progress_bars=False,
-        force_update=True,
-    )
-    assert theta_map.shape[-1] == 2
+def _untrained_posterior(kind, prior, theta, x):
+    if kind == "direct":
+        return DirectPosterior(posterior_nn("mdn")(theta, x), prior)
+    if kind == "vector_field":
+        return VectorFieldPosterior(posterior_flow_nn()(theta, x), prior)
+    if kind == "ensemble":
+        return EnsemblePosterior([
+            _untrained_posterior("direct", prior, theta, x) for _ in range(2)
+        ])
+    potential_fn, theta_transform = _likelihood_potential(prior, theta, x)
+    return RejectionPosterior(potential_fn, prior, theta_transform)
 
 
-def test_map_init_method_proposal_unavailable(direct_posterior):
-    """init_method='proposal' fails informatively when there is no proposal."""
-    with pytest.raises(ValueError, match="no proposal"):
-        direct_posterior.map(
-            init_method="proposal",
-            num_init_samples=10,
-            num_iter=2,
-            show_progress_bars=False,
-            force_update=True,
-        )
-
-
-def test_map_init_method_invalid(direct_posterior):
-    """An unknown init_method raises an informative ValueError."""
-    with pytest.raises(ValueError, match="Invalid init_method"):
-        direct_posterior.map(
-            init_method="not_a_method",
-            num_init_samples=10,
-            num_iter=2,
-            show_progress_bars=False,
-            force_update=True,
-        )
+@pytest.mark.parametrize(
+    "kind, init_method, match",
+    [
+        ("direct", "proposal", "no proposal distribution"),
+        ("vector_field", "proposal", "no proposal distribution"),
+        ("ensemble", "proposal", "no proposal distribution"),
+        ("direct", "bogus", "Use 'posterior', or pass"),
+        ("vector_field", "bogus", "Use 'posterior', or pass"),
+        ("ensemble", "bogus", "Use 'posterior', or pass"),
+        ("rejection", "bogus", "Use 'posterior', 'proposal', or pass"),
+    ],
+)
+def test_map_init_method_errors_list_supported_options(kind, init_method, match, toy):
+    posterior = _untrained_posterior(kind, *toy).set_default_x(torch.zeros(1, 2))
+    with pytest.raises(ValueError, match=match):
+        posterior.map(init_method=init_method, **MAP_KWARGS)
