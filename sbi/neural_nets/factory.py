@@ -87,7 +87,6 @@ _MARGINAL_FACTORY_FIELDS: dict = {
     "hidden_features": "hidden_features",
     "num_transforms": "num_transforms",
     "bins": "num_bins",
-    "num_components": "num_components",
 }
 
 
@@ -602,7 +601,6 @@ def marginal_nn(
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
-    num_components: int = 10,
     **kwargs: Any,
 ) -> Callable:
     r"""
@@ -616,7 +614,6 @@ def marginal_nn(
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms when a flow is used.
         num_bins: Number of bins used for the splines in `nsf` and `ncsf`.
-        num_components: Not used by any marginal model, so setting it raises.
         **kwargs: Additional estimator arguments.  Valid keys are the fields of
             the chosen model's marginal config (e.g. `randperm` for `maf`); a key
             the model does not use raises, and an unknown key triggers a warning
@@ -630,7 +627,6 @@ def marginal_nn(
             hidden_features=hidden_features,
             num_transforms=num_transforms,
             bins=num_bins,
-            num_components=num_components,
         )
     )
     config = _config_from_factory_kwargs(
