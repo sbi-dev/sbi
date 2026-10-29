@@ -182,13 +182,13 @@ class CNNEmbedding(nn.Module):
             cnn_output_size = get_new_cnn_output_size(cnn_output_size, conv_layer, pool)
 
             if not all(size > 0 for size in cnn_output_size):
-                fewer_layers = (
+                fewer_layers_hint = (
                     f", or set num_conv_layers to at most {ii}" if ii > 0 else ""
                 )
                 raise ValueError(
                     f"CNN output size {cnn_output_size} is not positive at layer "
                     f"{ii + 1}. Use a smaller kernel_size or pool_kernel_size"
-                    f"{fewer_layers}."
+                    f"{fewer_layers_hint}."
                 )
 
         self.cnn_subnet = nn.Sequential(*cnn_layers)

@@ -92,16 +92,19 @@ def WaveNetSRLikeAggregator(
         ]
     if intermediate_channel_sizes is None:
         intermediate_channel_sizes = [64]
-    assert len(intermediate_channel_sizes) == len(kernel_sizes) - 1, (
-        "Provided kernel size list should be exactly one element longer "
-        "than channel size list."
-    )
+    if len(intermediate_channel_sizes) != len(kernel_sizes) - 1:
+        raise ValueError(
+            "intermediate_channel_sizes needs one entry less than kernel_sizes, but "
+            f"has {len(intermediate_channel_sizes)} entries for {len(kernel_sizes)} "
+            "kernel sizes."
+        )
     intermediate_channel_sizes = [*intermediate_channel_sizes, output_dim]
     if isinstance(stride_sizes, list):
-        assert len(stride_sizes) == len(kernel_sizes), (
-            "Provided stride size list should be have the same size as"
-            "the kernel size list."
-        )
+        if len(stride_sizes) != len(kernel_sizes):
+            raise ValueError(
+                f"stride_sizes has {len(stride_sizes)} entries, but kernel_sizes has "
+                f"{len(kernel_sizes)}. Pass one stride per kernel size."
+            )
     else:
         stride_sizes = [stride_sizes] * len(kernel_sizes)
 
@@ -221,13 +224,16 @@ class CausalCNNEmbedding(nn.Module):
                     dilation_per_layer = [1] * num_conv_layers
                 case _:
                     raise ValueError(
-                        f"{dilation} is not a valid option, please use \"none\", "
-                        "\"exponential\", or \"exponential_cyclic\", or pass a list "
-                        "of dilation sizes."
+                        f"dilation must be \"none\", \"exponential\", "
+                        f"\"exponential_cyclic\" or a list of dilation sizes, but got "
+                        f"\"{dilation}\"."
                     )
         else:
             if not isinstance(dilation, list):
-                raise TypeError("Please pass dilation size as list or a string option.")
+                raise TypeError(
+                    "dilation must be a list of dilation sizes or a string option, "
+                    f"but got {type(dilation).__name__}."
+                )
             if len(dilation) != num_conv_layers:
                 raise ValueError(
                     f"dilation has {len(dilation)} entries, but num_conv_layers is "
