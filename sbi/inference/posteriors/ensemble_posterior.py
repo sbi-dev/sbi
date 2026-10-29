@@ -434,28 +434,11 @@ class EnsemblePosterior(NeuralPosterior):
             return log_weights, maps
 
         else:
-            self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
-
-            if init_method == "posterior":
-                inits = self.sample((num_init_samples,), self._x_else_default_x(x))
-            elif init_method == "proposal":
-                raise ValueError(
-                    "init_method='proposal' is not available for the ensemble "
-                    "posterior, which has no proposal distribution. Use 'posterior', "
-                    "or pass initial locations as a tensor (for example prior "
-                    "samples)."
-                )
-            elif isinstance(init_method, Tensor):
-                inits = init_method
-            else:
-                raise ValueError(
-                    f"Invalid init_method '{init_method}'. Use 'posterior', or pass "
-                    "initial locations as a tensor (for example prior samples)."
-                )
-
+            x = self._x_else_default_x(x)
+            self.potential_fn = self.potential_fn.bind(x)
             return gradient_ascent(
                 potential_fn=self.potential_fn,
-                inits=inits,
+                inits=self._map_inits(init_method, num_init_samples, x),
                 theta_transform=self.theta_transform,
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,

@@ -818,26 +818,9 @@ class VectorFieldPosterior(NeuralPosterior):
             callable_potential_fn = CallableDifferentiablePotentialFunction(
                 self.potential_fn
             )
-            if init_method == "posterior":
-                inits = self.sample((num_init_samples,))
-            elif init_method == "proposal":
-                raise ValueError(
-                    "init_method='proposal' is not available for the vector field "
-                    "posterior, which has no proposal distribution. Use 'posterior', "
-                    "or pass initial locations as a tensor (for example prior "
-                    "samples)."
-                )
-            elif isinstance(init_method, Tensor):
-                inits = init_method
-            else:
-                raise ValueError(
-                    f"Invalid init_method '{init_method}'. Use 'posterior', or pass "
-                    "initial locations as a tensor (for example prior samples)."
-                )
-
             self._map = gradient_ascent(
                 potential_fn=callable_potential_fn,
-                inits=inits,
+                inits=self._map_inits(init_method, num_init_samples),
                 theta_transform=self.theta_transform,
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,

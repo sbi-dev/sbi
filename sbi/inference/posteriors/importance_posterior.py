@@ -315,28 +315,17 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         return samples.reshape((*sample_shape, -1)).to(self._device)
 
-    def _calculate_map(
+    def _map_inits(
         self,
-        num_iter: int = 1_000,
-        num_to_optimize: int = 100,
-        learning_rate: float = 0.01,
-        init_method: Union[str, Tensor] = "proposal",
-        num_init_samples: int = 1_000,
-        save_best_every: int = 10,
-        show_progress_bars: bool = False,
+        init_method: Union[str, Tensor],
+        num_init_samples: int,
+        x: Optional[Tensor] = None,
     ) -> Tensor:
         # With method="importance", `.sample()` returns weighted proposal samples.
         if init_method == "posterior":
-            init_method = self._sir_sample((num_init_samples,))
-        return super()._calculate_map(
-            num_iter=num_iter,
-            num_to_optimize=num_to_optimize,
-            learning_rate=learning_rate,
-            init_method=init_method,
-            num_init_samples=num_init_samples,
-            save_best_every=save_best_every,
-            show_progress_bars=show_progress_bars,
-        )
+            self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+            return self._sir_sample((num_init_samples,))
+        return super()._map_inits(init_method, num_init_samples, x)
 
     def map(
         self,

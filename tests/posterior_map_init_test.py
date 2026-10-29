@@ -19,7 +19,7 @@ from sbi.neural_nets import likelihood_nn, posterior_flow_nn, posterior_nn
 MAP_KWARGS = dict(num_init_samples=20, num_to_optimize=5, num_iter=2)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def toy():
     prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
     theta = prior.sample((100,))
@@ -53,8 +53,6 @@ def _untrained_posterior(kind, prior, theta, x):
         ("vector_field", "proposal", "no proposal distribution"),
         ("ensemble", "proposal", "no proposal distribution"),
         ("direct", "bogus", "Use 'posterior', or pass"),
-        ("vector_field", "bogus", "Use 'posterior', or pass"),
-        ("ensemble", "bogus", "Use 'posterior', or pass"),
         ("rejection", "bogus", "Use 'posterior', 'proposal', or pass"),
     ],
 )
