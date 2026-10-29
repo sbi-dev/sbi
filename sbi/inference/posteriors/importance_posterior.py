@@ -1,7 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Literal, Optional, Tuple, Union
+import math
+from typing import Callable, Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -64,7 +65,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         )
 
         self.proposal = proposal
-        self._normalization_constant = None
+        # The x and number of samples of the last estimate, and its log normalization
+        # constant.
+        self._log_normalization_cache: Optional[Tuple[Tensor, int, Tensor]] = None
         self.method = method
         self.theta_transform = theta_transform
 
@@ -91,6 +94,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
+        self._log_normalization_cache = None
         x_o = None
         if hasattr(self, "_x") and (self._x is not None):
             x_o = self._x.to(device)
@@ -140,13 +144,11 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
             if normalization_constant_params is None:
                 normalization_constant_params = dict()  # use defaults
-            normalization_constant = self.estimate_normalization_constant(
+            log_normalization_constant = self._estimate_log_normalization_constant(
                 x, **normalization_constant_params
             )
 
-            return (potential_values - torch.log(normalization_constant)).to(
-                self._device
-            )
+            return (potential_values - log_normalization_constant).to(self._device)
 
     @torch.no_grad()
     def estimate_normalization_constant(
@@ -155,34 +157,60 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         """Returns the normalization constant via importance sampling.
 
         Args:
+            x: Observation at which to estimate the normalization constant.
             num_samples: Number of importance samples used for the estimate.
-            force_update: Whether to re-calculate the normlization constant when x is
-                unchanged and have a cached value.
+            force_update: Whether to re-calculate the normalization constant even if
+                it is cached for this x and `num_samples`.
+
+        Returns:
+            The normalization constant as a scalar tensor.
         """
-        # Check if the provided x matches the default x (short-circuit on identity).
-        is_new_x = self.default_x is None or (
-            x is not self.default_x and (x != self.default_x).any()
+        x = self._x_else_default_x(x)
+        return torch.exp(
+            self._estimate_log_normalization_constant(x, num_samples, force_update)
         )
 
-        not_saved_at_default_x = self._normalization_constant is None
+    @torch.no_grad()
+    def _estimate_log_normalization_constant(
+        self, x: Tensor, num_samples: int = 10_000, force_update: bool = False
+    ) -> Tensor:
+        """Returns the log normalization constant, cached per x and sample count.
 
-        if is_new_x:  # Calculate at x; don't save.
+        The estimate is computed in log space, because the importance weights of
+        e.g. many iid observations underflow when exponentiated.
+        """
+        log_normalization_constant = None
+        if not force_update:
+            log_normalization_constant = self._cached_value(
+                self._log_normalization_cache, x, num_samples
+            )
+        if log_normalization_constant is None:
             _, log_importance_weights = importance_sample(
-                self.potential_fn,
+                self.potential_fn.bind(x),
                 proposal=self.proposal,
                 num_samples=num_samples,
             )
-            return torch.mean(torch.exp(log_importance_weights))
-        elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
-            assert self.default_x is not None
-            _, log_importance_weights = importance_sample(
-                self.potential_fn,
-                proposal=self.proposal,
-                num_samples=num_samples,
+            log_normalization_constant = torch.logsumexp(
+                log_importance_weights, dim=0
+            ) - math.log(log_importance_weights.shape[0])
+            self._log_normalization_cache = (
+                x.clone(),
+                num_samples,
+                log_normalization_constant,
             )
-            self._normalization_constant = torch.mean(torch.exp(log_importance_weights))
 
-        return self._normalization_constant.to(self._device)  # type: ignore
+        return log_normalization_constant.to(self._device)
+
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
+
+        Args:
+            state_dict: State to be restored.
+        """
+        # Posteriors pickled by sbi 0.27 saved Z at the default x under another name.
+        state_dict.pop("_normalization_constant", None)
+        state_dict.setdefault("_log_normalization_cache", None)
+        super().__setstate__(state_dict)
 
     def sample(
         self,

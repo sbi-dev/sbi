@@ -87,7 +87,7 @@ class NeuralPosterior:
             self.theta_transform = theta_transform
 
         self._map = None
-        self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
+        self._leakage_cache: Optional[Tuple[Tensor, int, Tensor]] = None
         self._purpose = ""
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
@@ -235,6 +235,7 @@ class NeuralPosterior:
     def _cached_leakage_factor(
         self,
         x: Tensor,
+        num_samples: int,
         prior: Any,
         estimate_fn: Callable[[], Tensor],
         force_update: bool = False,
@@ -243,20 +244,36 @@ class NeuralPosterior:
         """Return the leakage correction factor saved for `x`, or estimate it.
 
         The factor is 1 for priors with unbounded support. Otherwise, one factor is
-        saved, for the last `x`, unless `use_cache=False`.
+        saved, for the last `x` and `num_samples`, unless `use_cache=False`.
         """
         if prior_support_is_bounded(prior) is False:
             return torch.ones((), device=self._device)
-        if self._leakage_cache is not None and use_cache and not force_update:
-            cached_x, factor = self._leakage_cache
-            if cached_x.shape == x.shape and torch.allclose(
-                cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
-            ):
+        if use_cache and not force_update:
+            factor = self._cached_value(self._leakage_cache, x, num_samples)
+            if factor is not None:
                 return factor
         factor = estimate_fn()
         if use_cache:
-            self._leakage_cache = (x.detach().clone(), factor)
+            self._leakage_cache = (x.detach().clone(), num_samples, factor)
         return factor
+
+    @staticmethod
+    def _cached_value(
+        cache: Optional[Tuple[Tensor, int, Tensor]], x: Tensor, num_samples: int
+    ) -> Optional[Tensor]:
+        """Return the value of an `(x, num_samples, value)` cache for these arguments.
+
+        `x` matches on any device and with NaN entries. Returns None on a miss.
+        """
+        if cache is None:
+            return None
+        cached_x, cached_num_samples, value = cache
+        if cached_num_samples != num_samples or cached_x.shape != x.shape:
+            return None
+        same_x = torch.allclose(
+            cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
+        )
+        return value if same_x else None
 
     def _calculate_map(
         self,
@@ -424,8 +441,10 @@ class NeuralPosterior:
         Args:
             state_dict: State to be restored.
         """
-        # Posteriors pickled by older sbi versions can miss this key.
-        state_dict.setdefault("_leakage_cache", None)
+        # Posteriors pickled by older sbi versions can miss this key, or save it
+        # without the number of samples.
+        if len(state_dict.get("_leakage_cache") or ()) != 3:
+            state_dict["_leakage_cache"] = None
         self.__dict__ = state_dict
 
         actual_device = infer_tensor_device(self)

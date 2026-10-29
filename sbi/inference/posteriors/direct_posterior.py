@@ -492,7 +492,7 @@ class DirectPosterior(NeuralPosterior):
 
         The factor is estimated from the acceptance probability during rejection
         sampling from the posterior. It is saved for the last `x` and re-estimated
-        whenever `x` changes. It is 1 for unbounded priors.
+        whenever `x` or `num_rejection_samples` changes. It is 1 for unbounded priors.
 
         Arguments:
             x: Observation at which to estimate the factor.
@@ -504,6 +504,7 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
+        x = self._x_else_default_x(x)
 
         def acceptance() -> Tensor:
             return rejection.accept_reject_sample(
@@ -520,7 +521,9 @@ class DirectPosterior(NeuralPosterior):
                 },
             )[1]
 
-        return self._cached_leakage_factor(x, self.prior, acceptance, force_update)
+        return self._cached_leakage_factor(
+            x, num_rejection_samples, self.prior, acceptance, force_update
+        )
 
     def map(
         self,

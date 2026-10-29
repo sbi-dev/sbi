@@ -429,8 +429,8 @@ def accept_reject_sample(
                         to collect the remaining {num_remaining} samples.
                         Consider interrupting (Ctrl-C) and either basing the
                         estimate of the normalizing constant on fewer samples (by
-                        calling `posterior.leakage_correction(x_o,
-                        num_rejection_samples=N)`, where `N` is the number of
+                        passing `leakage_correction_params={{"num_rejection_samples":
+                        N}}` to `log_prob()`, where `N` is the number of
                         samples you want to base the
                         estimate on (default N=10000), or not estimating the
                         normalizing constant at all
