@@ -368,6 +368,7 @@ class EnsemblePosterior(NeuralPosterior):
         num_init_samples: int = 1_000,
         save_best_every: int = 10,
         show_progress_bars: bool = False,
+        force_update: bool = False,
         individually: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         r"""Returns the average maximum-a-posteriori estimate (MAP).
@@ -384,7 +385,7 @@ class EnsemblePosterior(NeuralPosterior):
         self.posteriors[idx].
 
         Args:
-            x: Observed data at which to evaluate the MAP.
+            x: Deprecated - use `.set_default_x()` prior to `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -406,12 +407,28 @@ class EnsemblePosterior(NeuralPosterior):
                 (thus, the default is `10`.)
             show_progress_bars: Whether to show a progressbar during sampling from
                 the posterior.
+            force_update: Whether to re-calculate the MAPs of the component
+                posteriors when `x` is unchanged and they have a cached value. It is
+                passed to each component when `individually=True`. The joint MAP is
+                computed on every call, so it has no effect otherwise.
             individually: If true, returns log weights and MAPs individually.
 
         Returns:
             The ensemble MAP estimate or individual log_weigths and component MAP
             estimate if individually == True.
         """
+
+        if x is not None:
+            raise ValueError(
+                "Passing `x` directly to `.map()` has been deprecated. "
+                "Use `.set_default_x()` to set `x`, and then run `.map()`."
+            )
+
+        if self.default_x is None:
+            raise ValueError(
+                "Default `x` has not been set. "
+                "To set the default, use the `.set_default_x()` method."
+            )
 
         if individually:
             maps = []
@@ -420,7 +437,6 @@ class EnsemblePosterior(NeuralPosterior):
             for posterior in self.posteriors:
                 maps.append(
                     posterior.map(
-                        x=x,
                         num_iter=num_iter,
                         num_to_optimize=num_to_optimize,
                         learning_rate=learning_rate,
@@ -428,15 +444,15 @@ class EnsemblePosterior(NeuralPosterior):
                         num_init_samples=num_init_samples,
                         save_best_every=save_best_every,
                         show_progress_bars=show_progress_bars,
+                        force_update=force_update,
                     )
                 )
             maps = torch.stack(maps)
             return log_weights, maps
 
         else:
-            x = self._x_else_default_x(x)
-            self.potential_fn = self.potential_fn.bind(x)
-            inits = self._map_inits(init_method, num_init_samples, x)
+            self.potential_fn = self.potential_fn.bind(self.default_x)
+            inits = self._map_inits(init_method, num_init_samples, self.default_x)
             # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(
                 potential_fn=self.potential_fn,
