@@ -66,7 +66,7 @@ def sampling_importance_resampling(
                 )
             log_weights = log_weights.reshape(batch_size, num_candidate_samples)
             weights = log_weights.softmax(-1).cumsum(-1)
-            uniform_decision = torch.rand(batch_size, 1, device=device)
+            uniform_decision = torch.rand(batch_size, 1, device=log_weights.device)
             # Strict, so that a draw of 0 cannot select a zero-weight candidate.
             mask = torch.cumsum(weights > uniform_decision, -1) == 1
             samples = thetas.reshape(batch_size, num_candidate_samples, -1)[mask]
