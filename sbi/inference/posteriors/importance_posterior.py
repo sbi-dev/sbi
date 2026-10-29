@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from typing import Callable, Literal, Optional, Tuple, Union
+from typing import Callable, Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -188,6 +188,16 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             self._log_normalization_cache = cache
 
         return cache[1].to(self._device)
+
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
+
+        Args:
+            state_dict: State to be restored.
+        """
+        # Posteriors pickled by older sbi versions can miss this key.
+        state_dict.setdefault("_log_normalization_cache", None)
+        super().__setstate__(state_dict)
 
     def sample(
         self,
