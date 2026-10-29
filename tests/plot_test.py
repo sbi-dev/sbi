@@ -326,6 +326,32 @@ def test_sbc_rank_plot(num_parameters, num_cols, custom_figure, plot_type):
     close()
 
 
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+def test_sbc_rank_plot_bins_over_full_rank_range(plot_type):
+    """Ranks that never reach 0 or N must not be stretched over the whole axis."""
+    num_posterior_samples = 100
+    # Over-dispersed posterior: all 200 ranks lie in [30, 70].
+    ranks = np.linspace(30, 70, 200).round()[:, None]
+    _, ax = sbc_rank_plot(ranks, num_posterior_samples, plot_type=plot_type)
+    ax = np.atleast_1d(ax)[0]
+    if plot_type == "hist":
+        assert ax.patches[0].get_x() == 0 and ax.patches[0].get_height() == 0
+    else:
+        y = ax.lines[0].get_ydata()
+        if plot_type == "cdf":
+            assert np.all(y[: len(y) // 4] == 0)
+        else:
+            assert np.abs(y).max() > 0.2
+        assert ax.get_xlim() == (0, num_posterior_samples)
+    close()
+
+
+@pytest.mark.parametrize("bad_rank", (-1.0, 11.0))
+def test_sbc_rank_plot_rejects_ranks_outside_0_to_n(bad_rank):
+    with pytest.raises(ValueError, match="num_posterior_samples"):
+        sbc_rank_plot(np.full((10, 1), bad_rank), 10)
+
+
 def test_plotting_dataclass_overrides_defaults(mocker):
     """
     Verify that custom keyword arguments in `HistOffDiagOptions` correctly
