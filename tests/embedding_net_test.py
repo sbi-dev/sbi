@@ -30,6 +30,7 @@ from sbi.neural_nets.embedding_nets import (
     SpectralConvEmbedding,
     TransformerEmbedding,
 )
+from sbi.neural_nets.embedding_nets.causal_cnn import WaveNetSRLikeAggregator
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -236,6 +237,17 @@ def test_causal_cnn_embedding_errors_name_arguments(kwargs, match):
     """CausalCNNEmbedding errors name the constructor arguments that fix them."""
     with pytest.raises(ValueError, match=match):
         CausalCNNEmbedding((64,), **{"pool_kernel_size": 2, **kwargs})
+
+
+def test_wavenet_aggregator_keeps_arguments_and_prints_nothing(capsys):
+    """Building the aggregator neither changes the caller's list nor prints."""
+    intermediate_channel_sizes = [8]
+    WaveNetSRLikeAggregator(
+        4, 32, output_dim=5, intermediate_channel_sizes=intermediate_channel_sizes
+    )
+
+    assert intermediate_channel_sizes == [8]
+    assert capsys.readouterr().out == ""
 
 
 def test_cnn_embedding_default_channels_follow_num_conv_layers():

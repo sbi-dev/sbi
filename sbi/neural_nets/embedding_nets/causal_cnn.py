@@ -56,8 +56,7 @@ def WaveNetSRLikeAggregator(
     intermediate_channel_sizes: Optional[List] = None,
     stride_sizes: Union[int, List] = 1,
 ) -> nn.Module:
-    """
-    Creates a non-causal 1D CNN aggregator based on the WaveNet speach recognition task
+    """Non-causal 1D CNN aggregator based on WaveNet's speech recognition setup.
 
     By default this function creates an aggregator with two CNN layers,
     after every convolution a maxpooling operation halves the number of timepoints.
@@ -68,14 +67,14 @@ def WaveNetSRLikeAggregator(
     Args:
         in_channels: number of channels at input.
         num_timepoints: length of the input.
-        output dim: wanted number of features as output.
+        output_dim: wanted number of features as output.
         activation: activation to apply after the convolution.
         kernel_sizes: (optional) alter the kernel size used and the number of CNN layers
             (through the length of the kernel size vector).
         intermediate_channel_sizes: (optional) alter the intermediate channel sizes
             used, should have length = len(kernel_sizes) - 1.
-        stride_sizes = Optional alter the stride used, either a vector of
-            len = len(kernel_sizes) or a single integer, in which case the same stride
+        stride_sizes: (optional) alter the stride used, either a list of length
+            len(kernel_sizes) or a single integer, in which case the same stride
             is used in every convolution.
 
     Returns:
@@ -97,8 +96,8 @@ def WaveNetSRLikeAggregator(
         "Provided kernel size list should be exactly one element longer "
         "than channel size list."
     )
-    intermediate_channel_sizes += [output_dim]
-    if isinstance(stride_sizes, List):
+    intermediate_channel_sizes = [*intermediate_channel_sizes, output_dim]
+    if isinstance(stride_sizes, list):
         assert len(stride_sizes) == len(kernel_sizes), (
             "Provided stride size list should be have the same size as"
             "the kernel size list."
@@ -108,7 +107,6 @@ def WaveNetSRLikeAggregator(
 
     non_causal_layers = []
     for ll in range(len(kernel_sizes)):
-        print(aggregator_out_shape)
         conv_layer = nn.Conv1d(
             in_channels=in_channels if ll == 0 else intermediate_channel_sizes[ll - 1],
             out_channels=intermediate_channel_sizes[ll],
@@ -131,7 +129,6 @@ def WaveNetSRLikeAggregator(
                 / 2
             ),
         )
-    print(aggregator_out_shape)
     aggregator = nn.Sequential(*non_causal_layers, nn.AdaptiveAvgPool1d(1))
     return aggregator
 
