@@ -346,6 +346,53 @@ def test_gaussian_score_sampling(
     assert torch.allclose(std_est, std0, atol=1e-1)
 
 
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+def test_heun_sampling_on_time_grid_ending_at_zero(sde_type):
+    """The VP and sub-VP scores diverge at t=0, where Heun's last step ends."""
+    score_fn = _build_gaussian_score_estimator(
+        sde_type, (2,), torch.ones(2), torch.ones(2)
+    )
+    ts = torch.linspace(score_fn.vector_field_estimator.t_max, 0.0, 50)
+
+    samples = Diffuser(score_fn, "heun").run(100, ts, show_progress_bars=False)
+
+    assert torch.isfinite(samples).all()
+
+
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+def test_heun_matches_exact_gaussian_flow(sde_type):
+    """For a Gaussian target with exact score, the probability flow ODE keeps each
+    sample's z-score. Heun must reproduce this map, and halving the step size must
+    cut its error about fourfold (twofold for first-order Euler)."""
+    score_fn = _build_gaussian_score_estimator(
+        sde_type, (2,), torch.ones(2), 0.5 * torch.ones(2)
+    )
+    estimator = score_fn.vector_field_estimator
+    t_max = torch.tensor([estimator.t_max])
+    t_min = torch.tensor([estimator.t_min])
+
+    def error(steps: int) -> Tensor:
+        torch.manual_seed(0)
+        ts = torch.linspace(estimator.t_max, estimator.t_min, steps)
+        path = Diffuser(score_fn, "heun").run(
+            100, ts, show_progress_bars=False, save_intermediate=True
+        )
+        start, end = path[:, 0], path[:, -1]
+        z = (start - estimator.approx_marginal_mean(t_max)) / (
+            estimator.approx_marginal_std(t_max)
+        )
+        exact = (
+            estimator.approx_marginal_mean(t_min)
+            + estimator.approx_marginal_std(t_min) * z
+        )
+        return (end - exact).abs().max()
+
+    error_coarse, error_fine = error(65), error(129)
+
+    assert error_fine < 1e-2
+    assert error_coarse / error_fine > 3.0
+
+
 def test_fnpe_batched_observations_keep_base_distribution():
     """fnpe only contracts the sampler when it composes iid observations, not for a
     batch of independent observations as in `sample_batched`."""
