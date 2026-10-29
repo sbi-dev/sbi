@@ -285,7 +285,7 @@ class NeuralPosterior:
                 )
             return self.proposal.sample((num_init_samples,))
         elif isinstance(init_method, Tensor):
-            return init_method
+            return init_method.to(self._device)
         valid = "'posterior', 'proposal'" if has_proposal else "'posterior'"
         raise ValueError(
             f"Invalid init_method '{init_method}'. Use {valid}, or pass "
