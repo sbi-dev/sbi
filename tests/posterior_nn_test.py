@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
+import pickle
+
 import pytest
 import torch
 from torch import eye, nn, ones, zeros
 from torch.distributions import Independent, MultivariateNormal, Uniform
 
+from sbi.analysis import ConditionedMDN
 from sbi.inference import (
     FMPE,
     NLE_A,
@@ -363,6 +366,89 @@ def test_npe_a_matches_direct_posterior_with_unconstrained_transform():
     assert prior.support.check(npe_a.sample((100,), x=x[0], **kwargs)).all()
     samples = npe_a.sample_batched((100,), x, **kwargs)
     assert prior.support.check(samples).all()
+
+
+def test_npe_a_map_potential_and_conditional_apply_proposal_correction():
+    """`potential()`, `map()` and `ConditionedMDN` must use the corrected MoG."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), 4 * eye(2))
+    theta = prior.sample((500,))
+    estimator = posterior_nn("mdn", num_components=1)(
+        theta, theta + 0.5 * torch.randn_like(theta)
+    )
+    posterior = NPE_A_Posterior(
+        estimator,
+        prior,
+        proposal_mog=MoG.from_gaussian(torch.tensor([1.0, -1.0]), 3 * eye(2)),
+        prior_mog=MoG.from_gaussian(zeros(2), eye(2)),
+    )
+    x_o = torch.tensor([[0.5, 0.5]])
+    posterior.set_default_x(x_o)
+
+    theta = prior.sample((10,))
+    assert torch.allclose(
+        posterior.potential(theta),
+        posterior.log_prob(theta, norm_posterior=False),
+        atol=1e-5,
+    )
+
+    # With one component in the estimator and the proposal, the corrected posterior
+    # is a Gaussian, so its mode is its mean.
+    with torch.no_grad():
+        corrected_mean = posterior.get_mog_params(x_o).means[0, 0]
+        raw_mean = estimator.get_uncorrected_mog(x_o).means[0, 0]
+    corrected_mode = estimator._inverse_transform_input(corrected_mean)
+    raw_mode = estimator._inverse_transform_input(raw_mean)
+    assert (corrected_mode - raw_mode).norm() > 0.1, "The correction must move it."
+    map_ = posterior.map(num_iter=500, show_progress_bars=False)
+    assert torch.allclose(map_[0], corrected_mode, atol=1e-2)
+
+    # The conditional is proportional to the joint along the slice theta_1 = 1.
+    conditioned = ConditionedMDN(
+        posterior.posterior_estimator,
+        x_o,
+        condition=torch.tensor([[0.0, 1.0]]),
+        dims_to_sample=[0],
+    )
+    theta_0 = torch.linspace(-3, 3, 7).unsqueeze(1)
+    joint = posterior.log_prob(
+        torch.cat([theta_0, ones(7, 1)], dim=1), norm_posterior=False
+    )
+    difference = conditioned.log_prob(theta_0) - joint
+    assert torch.allclose(difference, difference[0], atol=1e-4)
+
+
+def test_npe_a_posterior_pickled_before_wrapper_applies_correction():
+    """Posteriors pickled by sbi 0.27 keep the correction MoGs on the posterior and an
+    unwrapped estimator. Loading must restore the corrected density."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((200,))
+    estimator = posterior_nn("mdn")(theta, theta + 0.1 * torch.randn_like(theta))
+    proposal_mog = MoG.from_gaussian(ones(2), 2 * eye(2))
+    prior_mog = MoG.from_gaussian(zeros(2), eye(2))
+    corrected = NPE_A_Posterior(estimator, prior, proposal_mog, prior_mog)
+    legacy = NPE_A_Posterior(estimator, prior)
+    legacy._proposal_mog = proposal_mog
+    legacy._prior_mog = prior_mog
+    legacy._apply_correction = True
+    x_o = torch.tensor([[0.5, -0.5]])
+    legacy.set_default_x(x_o)
+    uncorrected_map = legacy.map(num_iter=10, show_progress_bars=False)
+
+    loaded = pickle.loads(pickle.dumps(legacy))
+
+    theta = prior.sample((10,))
+    assert torch.allclose(
+        loaded.log_prob(theta, x=x_o, norm_posterior=False),
+        corrected.log_prob(theta, x=x_o, norm_posterior=False),
+    )
+    assert torch.allclose(
+        loaded.potential(theta, x=x_o), corrected.potential(theta, x=x_o)
+    )
+    assert not torch.allclose(
+        loaded.map(num_iter=10, show_progress_bars=False), uncorrected_map
+    )
 
 
 @pytest.mark.mcmc

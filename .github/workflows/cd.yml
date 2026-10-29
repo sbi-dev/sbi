@@ -49,6 +49,9 @@ jobs:
     - name: Install dependencies with uv
       run: uv sync --locked --extra dev
 
+    - name: Show the CPU model
+      run: lscpu | grep -E '^(Model name|CPU\(s\)):'
+
     - name: Run the fast and the slow CPU tests with coverage
       # Shard the suite across runners with pytest-split, balanced by the
       # committed .test_durations (refreshed by refresh-test-durations.yml).
