@@ -283,7 +283,7 @@ def standardizing_transform(
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
-        structured_dim: Whether data dimensions are structured (e.g., time-series,
+        structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which requires computing mean and std per sample first before
             aggregating over samples for a single standardization mean and std for the
             batch, or independent (default), which z-scores dimensions independently.
@@ -308,7 +308,7 @@ def standardizing_transform_zuko(
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
-        structured_dim: Whether data dimensions are structured (e.g., time-series,
+        structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which requires computing mean and std per sample first before
             aggregating over samples for a single standardization mean and std for the
             batch, or independent (default), which z-scores dimensions independently.
@@ -433,13 +433,12 @@ def z_standardization(
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
-        structured_dim: Whether data dimensions are structured (e.g., time-series,
+        structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which requires computing mean and std per sample first before
             aggregating over samples for a single standardization mean and std for the
             batch, or independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
-        backend: Whether to use nflows or zuko backend
 
     Returns:
         Mean and standard deviation for z-scoring
@@ -501,7 +500,7 @@ def standardizing_net(
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
-        structured_dim: Whether data dimensions are structured (e.g., time-series,
+        structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which requires computing mean and std per sample first before
             aggregating over samples for a single standardization mean and std for the
             batch, or independent (default), which z-scores dimensions independently.
