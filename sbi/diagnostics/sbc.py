@@ -286,7 +286,7 @@ def check_sbc(
         Dictionary containing:
         - ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
           one for each dim_parameters.
-        - c2st_ranks: C2ST accuracy between ranks and uniform baseline,
+        - c2st_ranks: C2ST accuracy between ranks and the discrete uniform baseline,
           one for each dim_parameters.
         - c2st_dap: C2ST accuracy between prior and DAP samples, single value.
     """
@@ -369,14 +369,13 @@ def check_uniformity_c2st(
 ) -> Tensor:
     """Return C2ST scores for uniformity of the ranks.
 
-    Run a C2ST between ranks and samples from the discrete uniform distribution
-    on the integers ``0, ..., num_posterior_samples``. Ranks are integer counts,
-    so comparing them against a continuous uniform distribution would make them
-    trivially distinguishable and produce inflated C2ST scores.
+    Run a C2ST between the ranks and samples from the discrete uniform distribution
+    on ``0, ..., num_posterior_samples``, the distribution of the ranks under a
+    calibrated posterior (Talts et al., https://arxiv.org/abs/1804.06788).
 
     Args:
-        ranks: Ranks for each SBC run and for each model parameter,
-            shape (N, dim_parameters)
+        ranks: Ranks for each SBC run and for each model parameter, as returned by
+            `run_sbc`, shape (N, dim_parameters)
         num_posterior_samples: Number of posterior samples used for SBC ranking.
         num_repetitions: Repetitions of C2ST tests to estimate classifier variance.
 
@@ -384,7 +383,7 @@ def check_uniformity_c2st(
         c2st_ranks: C2ST accuracy between ranks and the discrete uniform baseline,
             one for each dim_parameters.
     """
-    # Run C2ST multiple times to estimate stability.
+    # Run C2ST multiple times to estimate stability
     c2st_scores = torch.tensor([
         [
             c2st(
