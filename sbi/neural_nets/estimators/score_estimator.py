@@ -246,9 +246,9 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
     ) -> Tensor:
         r"""Defines the denoising score matching loss (e.g., from Song et al., ICLR
         2021). A random diffusion time is sampled from [0,1], and the network is trained
-        to predict thescore of the true conditional distribution given the noised input,
-        which is equivalent to predicting the (scaled) Gaussian noise added to the
-        input.
+        to predict the score of the true conditional distribution given the noised
+        input, which is equivalent to predicting the (scaled) Gaussian noise added to
+        the input.
 
         Args:
             input: Input variable i.e. theta.
@@ -293,9 +293,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         # Compute weights over time.
         weights = self.weight_fn(times)
 
-        # Compute MSE loss between network output and true score. The mean over the
-        # parameter dimension keeps the loss scale independent of the parameter
-        # dimension, consistent with the flow matching estimator.
+        # Mean, so that the gradient norm does not grow with the parameter dimension.
         loss = torch.mean((score_pred - score_target) ** 2.0, dim=-1)
 
         # For times -> 0 this loss has high variance a standard method to reduce the
@@ -312,8 +310,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
             # Loss terms that depend on eps, reduced with the same mean as the loss.
             term1 = 2 / s * torch.mean(eps * score_mean_pred, dim=-1)
             term2 = torch.mean(eps**2, dim=-1) / s**2
-            # This term is the analytical expectation of the above term. For the mean
-            # reduction E[mean(eps**2)] = 1, independent of the parameter dimension.
+            # Analytical expectation of term2: E[mean(eps**2)] = 1.
             term3 = 1.0 / s**2
 
             control_variate = term3 - term1 - term2

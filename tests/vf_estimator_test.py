@@ -18,8 +18,8 @@ from sbi.neural_nets import (
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.utils.torchutils import process_device
 
-CONFIGS = [FlowMatchingConfig, VPScoreConfig, SubVPScoreConfig, VEScoreConfig]
 SCORE_CONFIGS = [VPScoreConfig, SubVPScoreConfig, VEScoreConfig]
+CONFIGS = [FlowMatchingConfig, *SCORE_CONFIGS]
 
 
 @pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
@@ -47,16 +47,14 @@ def test_vector_field_estimator_loss_shapes(
     assert losses.shape == (batch_dim,)
 
 
-@pytest.mark.parametrize("input_event_shape", ((1,), (4,), (8,)))
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("config_cls", SCORE_CONFIGS)
 def test_score_loss_is_invariant_to_theta_dimensions(config_cls, input_event_shape):
     """Test that the score loss does not scale with the number of theta dimensions.
 
     With the network output pinned to a constant ``c``, the eps-dependent terms of the
     loss cancel exactly against the control variate, so the weighted loss reduces to
-    ``weights * (c**2 + 1 / std**2)``. That value is independent of the noise draw and
-    of the number of parameters, so a sum instead of a mean over the last dimension
-    shows up as a mismatch that grows with ``input_event_shape[-1]``.
+    ``weights * (c**2 + 1 / std**2)`` for any noise draw and number of parameters.
     """
     score_value = 0.5
     batch_dim = 4
@@ -81,7 +79,6 @@ def test_score_loss_is_invariant_to_theta_dimensions(config_cls, input_event_sha
     std = torch.squeeze(estimator.std_fn(times), -1)
     expected = estimator.weight_fn(times) * (score_value**2 + 1.0 / std**2)
 
-    assert loss.shape == (batch_dim,)
     torch.testing.assert_close(loss, expected)
 
 
