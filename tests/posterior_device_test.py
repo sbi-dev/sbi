@@ -17,6 +17,7 @@ from sbi.inference import FMPE, NPE, EnsemblePosterior, MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
+    RejectionPosteriorParameters,
     VIPosteriorParameters,
     VectorFieldPosteriorParameters,
 )
@@ -60,6 +61,8 @@ def trained_on_cpu():
 def _build(kind: str, npe, fmpe):
     if kind == "direct":
         return npe.build_posterior()
+    if kind == "rejection":
+        return npe.build_posterior(posterior_parameters=RejectionPosteriorParameters())
     if kind == "importance":
         return npe.build_posterior(
             posterior_parameters=ImportanceSamplingPosteriorParameters()
@@ -97,6 +100,7 @@ def _build(kind: str, npe, fmpe):
     "kind",
     [
         "direct",
+        "rejection",
         "importance",
         "mcmc",
         "mcmc_posterior_proposal",

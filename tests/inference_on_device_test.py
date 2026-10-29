@@ -783,66 +783,6 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
         )
 
 
-@pytest.fixture(scope="module")
-def trained_npe_for_device_test():
-    """Train NPE once, reused across all posterior .to() device tests."""
-    seed_all_backends(1)
-    num_dims = 2
-    num_simulations = 1000
-    prior = BoxUniform(-torch.ones(num_dims), torch.ones(num_dims))
-    trainer = NPE()
-    theta = prior.sample((num_simulations,))
-    x = theta + 0.1 * torch.randn_like(theta)
-    trainer.append_simulations(theta, x).train(max_num_epochs=10)
-    return trainer, prior
-
-
-@pytest.mark.gpu
-@pytest.mark.parametrize(
-    "posterior_params",
-    [
-        pytest.param(DirectPosteriorParameters(), id="direct"),
-        pytest.param(RejectionPosteriorParameters(), id="rejection"),
-        pytest.param(ImportanceSamplingPosteriorParameters(), id="importance"),
-        pytest.param(
-            MCMCPosteriorParameters(num_chains=1, warmup_steps=1, thin=1),
-            id="mcmc",
-        ),
-    ],
-)
-def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_params):
-    """Test .to() method moves posteriors to GPU correctly and sampling works."""
-    device = process_device("gpu")
-    trainer, prior = trained_npe_for_device_test
-    num_dims = 2
-    x_o = torch.zeros(num_dims).to(device)
-    posterior = trainer.build_posterior(
-        prior=prior,
-        posterior_parameters=posterior_params,
-    )
-    posterior.set_default_x(x_o)
-    posterior.to(device)
-
-    assert (posterior.device).split(":")[0] == device.split(":")[0], (
-        ".to() should change the device attribute"
-    )
-    sample_device = posterior.sample((10,), x=x_o)
-    assert sample_device.device.type == device.split(":")[0], (
-        f"sample was not correctly moved to {device}."
-    )
-    bound_potential = posterior.potential_fn.bind(x_o)
-    potential_values = bound_potential(sample_device)
-    assert potential_values.device.type == device.split(":")[0], (
-        f"potential was not correctly evaluated on {device}."
-    )
-
-    for transform in posterior.theta_transform._inv.base_transform.parts:
-        assert (
-            transform(torch.tensor([0.0], device=device)).device.type
-            == device.split(":")[0]
-        ), "Prior transform is on the correct device."
-
-
 @pytest.mark.gpu
 @pytest.mark.parametrize("move_with_to", [True, False])
 def test_ensemble_posterior_on_gpu(move_with_to: bool):
