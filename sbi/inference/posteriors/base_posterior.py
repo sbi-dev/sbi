@@ -248,11 +248,9 @@ class NeuralPosterior:
         """
         if prior_support_is_bounded(prior) is False:
             return torch.ones((), device=self._device)
-        if self._leakage_cache is not None and use_cache and not force_update:
-            cached_x, cached_num_samples, factor = self._leakage_cache
-            if cached_num_samples == num_samples and self._matches_cached_x(
-                cached_x, x
-            ):
+        if use_cache and not force_update:
+            factor = self._cached_value(self._leakage_cache, x, num_samples)
+            if factor is not None:
                 return factor
         factor = estimate_fn()
         if use_cache:
@@ -260,11 +258,22 @@ class NeuralPosterior:
         return factor
 
     @staticmethod
-    def _matches_cached_x(cached_x: Tensor, x: Tensor) -> bool:
-        """Return whether `x` equals the `x` of a cache, on any device and with NaN."""
-        return cached_x.shape == x.shape and torch.allclose(
+    def _cached_value(
+        cache: Optional[Tuple[Tensor, int, Tensor]], x: Tensor, num_samples: int
+    ) -> Optional[Tensor]:
+        """Return the value of an `(x, num_samples, value)` cache for these arguments.
+
+        `x` matches on any device and with NaN entries. Returns None on a miss.
+        """
+        if cache is None:
+            return None
+        cached_x, cached_num_samples, value = cache
+        if cached_num_samples != num_samples or cached_x.shape != x.shape:
+            return None
+        same_x = torch.allclose(
             cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
         )
+        return value if same_x else None
 
     def _calculate_map(
         self,

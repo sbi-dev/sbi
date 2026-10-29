@@ -179,13 +179,12 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         The estimate is computed in log space, because the importance weights of
         e.g. many iid observations underflow when exponentiated.
         """
-        cache = self._log_normalization_cache
-        if (
-            force_update
-            or cache is None
-            or cache[1] != num_samples
-            or not self._matches_cached_x(cache[0], x)
-        ):
+        log_normalization_constant = None
+        if not force_update:
+            log_normalization_constant = self._cached_value(
+                self._log_normalization_cache, x, num_samples
+            )
+        if log_normalization_constant is None:
             _, log_importance_weights = importance_sample(
                 self.potential_fn.bind(x),
                 proposal=self.proposal,
@@ -194,10 +193,13 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             log_normalization_constant = torch.logsumexp(
                 log_importance_weights, dim=0
             ) - math.log(log_importance_weights.shape[0])
-            cache = (x.clone(), num_samples, log_normalization_constant)
-            self._log_normalization_cache = cache
+            self._log_normalization_cache = (
+                x.clone(),
+                num_samples,
+                log_normalization_constant,
+            )
 
-        return cache[2].to(self._device)
+        return log_normalization_constant.to(self._device)
 
     def __setstate__(self, state_dict: Dict):
         """Sets the state when being loaded from pickle.
