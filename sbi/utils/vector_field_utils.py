@@ -316,6 +316,11 @@ def denoise_independent(
     Returns:
         The posterior independent distribution.
     """
+    exact = (Independent, MixtureSameFamily, Normal, MultivariateNormal, Uniform)
+    if not isinstance(p.base_dist, exact):
+        # Fit the whole prior: wrapping a fitted base would fold the batch of x_t
+        # into the event.
+        return denoise_general(p, m, s, x_t)
     denoised_base_dist = denoise(p.base_dist, m, s, x_t)
     batch_shape = denoised_base_dist.batch_shape
     if len(batch_shape) < p.reinterpreted_batch_ndims:
