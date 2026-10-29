@@ -436,9 +436,11 @@ class EnsemblePosterior(NeuralPosterior):
         else:
             x = self._x_else_default_x(x)
             self.potential_fn = self.potential_fn.bind(x)
+            inits = self._map_inits(init_method, num_init_samples, x)
+            # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(
                 potential_fn=self.potential_fn,
-                inits=self._map_inits(init_method, num_init_samples, x),
+                inits=inits,
                 theta_transform=self.theta_transform,
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,
