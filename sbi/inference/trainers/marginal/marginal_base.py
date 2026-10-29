@@ -270,13 +270,11 @@ class MarginalTrainer:
                 we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
-            show_train_summary: Whether to print the number of epochs and validation
-                loss after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
-            Density estimator that approximates the distribution $p(\theta|x)$.
+            Density estimator that approximates the distribution $p(x)$.
         """
 
         # fake round setting just for compatibility with NeuralInference
