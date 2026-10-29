@@ -463,7 +463,8 @@ def denoise_general(
     Returns:
         The posterior empirical distribution.
     """
-    gmm = fit_gmm(p)
+    # `fit_gmm` caches by prior; a prior moved in place keeps its key.
+    gmm = move_distribution_to_device(fit_gmm(p), x_t.device)
     return denoise_mixture(gmm, m, s, x_t)
 
 
@@ -624,7 +625,8 @@ def marginalize_empirical(
     Returns:
         The marginal empirical distribution.
     """
-    gmm_approx = fit_gmm(p)
+    # `fit_gmm` caches by prior; a prior moved in place keeps its key.
+    gmm_approx = move_distribution_to_device(fit_gmm(p), torch.as_tensor(m).device)
     return marginalize_mixture(gmm_approx, m, s)
 
 
