@@ -94,6 +94,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self.device = device
         self.potential_fn.to(device)  # type: ignore
         self.proposal.to(device)
+        self._log_normalization_cache = None
         x_o = None
         if hasattr(self, "_x") and (self._x is not None):
             x_o = self._x.to(device)
@@ -160,6 +161,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             num_samples: Number of importance samples used for the estimate.
             force_update: Whether to re-calculate the normalization constant when x is
                 unchanged and have a cached value.
+
+        Returns:
+            The normalization constant as a scalar tensor.
         """
         x = self._x_else_default_x(x)
         return torch.exp(
@@ -202,7 +206,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Args:
             state_dict: State to be restored.
         """
-        # Posteriors pickled by older sbi versions can miss this key.
+        # Posteriors pickled by sbi 0.27 saved Z at the default x under another name.
+        state_dict.pop("_normalization_constant", None)
         state_dict.setdefault("_log_normalization_cache", None)
         super().__setstate__(state_dict)
 
