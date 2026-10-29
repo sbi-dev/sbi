@@ -12,12 +12,17 @@ from torch.distributions import (
     MixtureSameFamily,
     MultivariateNormal,
     Normal,
+    VonMises,
 )
 
 from sbi.inference.trainers.marginal import MarginalTrainer
-from sbi.neural_nets import MarginalConfigBase, MarginalNSFConfig
+from sbi.neural_nets import MarginalConfigBase, MarginalNCSFConfig, MarginalNSFConfig
 from sbi.neural_nets.factory import ZukoFlowType, marginal_nn
-from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
+from sbi.neural_nets.net_builders.flow import (
+    build_zuko_flow,
+    build_zuko_ncsf,
+    build_zuko_unconditional_flow,
+)
 from sbi.utils.metrics import check_c2st
 from sbi.utils.torchutils import process_device
 
@@ -91,6 +96,43 @@ def test_unconditional_flow_is_equivariant_to_affine_data_changes(which_nf: str)
         log_prob_y = flow_y.log_prob(y.unsqueeze(0))
     log_det = x.shape[1] * torch.log(torch.tensor(scale))
     assert torch.allclose(log_prob_y, log_prob_x - log_det, atol=1e-3)
+
+
+@pytest.mark.parametrize("build", ["marginal_config", "marginal_nn", "conditional"])
+def test_ncsf_with_defaults_integrates_to_one(build: str):
+    """NCSF takes no z-score by default, so its density integrates to one.
+
+    A z-score would move the data off [-pi, pi). For concentrated data, the
+    density would then wrap around the circle several times.
+    """
+    torch.manual_seed(0)
+    x = VonMises(torch.tensor(0.5), torch.tensor(20.0)).sample((500, 2))
+    grid_1d = torch.linspace(-torch.pi, torch.pi, 201)[:-1] + torch.pi / 200
+    grid = torch.cartesian_prod(grid_1d, grid_1d)
+    cell_area = (2 * torch.pi / 200) ** 2
+
+    with torch.no_grad():
+        if build == "conditional":
+            flow = build_zuko_ncsf(x, torch.randn(500, 1))
+            log_prob = flow.log_prob(grid.unsqueeze(1), torch.zeros(1, 1))
+        else:
+            if build == "marginal_config":
+                flow = MarginalNCSFConfig().build(x)
+            else:
+                flow = marginal_nn(ZukoFlowType.NCSF)(x)
+            log_prob = flow.log_prob(grid.unsqueeze(0))
+    assert log_prob.exp().sum().item() * cell_area == pytest.approx(1.0, abs=0.01)
+
+
+@pytest.mark.parametrize("z_score_x", ["independent", "structured"])
+def test_ncsf_rejects_a_z_score_in_both_builders(z_score_x: str):
+    """A z-score would move NCSF's data off [-pi, pi)."""
+    x = torch.pi * (2 * torch.rand(100, 2) - 1)
+
+    with pytest.raises(ValueError, match="NCSF"):
+        build_zuko_unconditional_flow("NCSF", x, z_score_x=z_score_x)
+    with pytest.raises(ValueError, match="NCSF"):
+        build_zuko_flow("NCSF", x, torch.randn(100, 1), z_score_x=z_score_x)
 
 
 def test_marginal_trainer_exhausted_epoch_budget_returns_the_best_weights():

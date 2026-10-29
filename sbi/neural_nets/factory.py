@@ -603,7 +603,8 @@ def marginal_nn(
     Args:
         model: The type of density estimator that will be created.
         z_score_x: Whether to z-score samples $x$ before passing them into
-            the network.
+            the network. NCSF models data on $[-\pi, \pi)$, which a z-score
+            would move, so for NCSF the default becomes `none`.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms when a flow is used.
         num_bins: Number of bins used for the splines in `nsf`.
@@ -612,6 +613,11 @@ def marginal_nn(
             ``MarginalFlowConfig``; unknown keys trigger a warning and are forwarded to
             the builder.
     """
+
+    # As in the other factories, an argument left at its default gives way to
+    # the model's own.
+    if model == ZukoFlowType.NCSF and z_score_x == "independent":
+        z_score_x = "none"
 
     # Map user-facing parameter names to internal names (no renaming needed here).
     mapped = dict(

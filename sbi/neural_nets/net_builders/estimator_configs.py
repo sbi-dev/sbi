@@ -559,12 +559,16 @@ class MarginalNAFConfig(MarginalConfigBase):
 
 @dataclass(frozen=True, eq=False, repr=False)
 class MarginalNCSFConfig(MarginalConfigBase):
-    """Marginal neural circular spline flow.
+    r"""Marginal neural circular spline flow.
+
+    NCSF models data on $[-\pi, \pi)$, which a z-score would move, so
+    `z_score_input` offers `none` only.
 
     Args:
         bins: Number of bins of the spline transforms.
     """
 
+    z_score_input: Literal["none"] = "none"
     bins: int = 10
 
     _WHICH_NF: ClassVar[str] = "NCSF"
@@ -837,12 +841,16 @@ class ZukoNAFConfig(_ZukoDensityConfigBase):
 
 @dataclass(frozen=True, eq=False, repr=False)
 class ZukoNCSFConfig(_ZukoDensityConfigBase):
-    """Conditional neural circular spline flow.
+    r"""Conditional neural circular spline flow.
+
+    NCSF models data on $[-\pi, \pi)$, which a z-score would move, so
+    `z_score_input` offers `none` only.
 
     Args:
         num_bins: Number of bins of the spline transforms.
     """
 
+    z_score_input: Literal["none"] = "none"
     num_bins: int = 10
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_ncsf)

@@ -640,9 +640,7 @@ def build_zuko_nsf(
 def build_zuko_ncsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_x: Literal["none"] = "none",
     z_score_y: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
@@ -664,16 +662,15 @@ def build_zuko_ncsf(
         | https://arxiv.org/abs/2002.02428
 
     Arguments:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_x: Batch of xs, used to infer dimensionality.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network, can be one of:
+        z_score_x: Must be `none`: a z-score would move xs off :math:`[-\pi, \pi[`.
+        z_score_y: Whether to z-score ys passing into the network, can be one of:
             - `none`, or None: do not z-score.
             - `independent`: z-score each dimension independently.
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
-        z_score_y: Whether to z-score ys passing into the network, same options as
-            z_score_x.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
@@ -1149,7 +1146,7 @@ def build_zuko_flow(
     )
 
     # Get x transforms (z-score or logit transform)
-    x_transforms = _prepare_x_transforms(z_score_x, batch_x, x_dist)
+    x_transforms = _prepare_x_transforms(which_nf, z_score_x, batch_x, x_dist)
 
     # Combine all transforms
     transforms = x_transforms + base_transforms
@@ -1277,6 +1274,7 @@ def _get_base_and_transforms(
 
 
 def _prepare_x_transforms(
+    which_nf: str,
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ],
@@ -1287,13 +1285,22 @@ def _prepare_x_transforms(
     Prepare transforms to prepend for x processing.
 
     Args:
+        which_nf: The type of normalizing flow the transforms are prepended to.
         z_score_x: Type of x preprocessing.
         batch_x: Batch of x data.
         x_dist: Distribution for unconstrained transformation.
 
     Returns:
         Tuple of transforms to prepend (empty tuple if no preprocessing).
+
+    Raises:
+        ValueError: If an NCSF gets any x preprocessing.
     """
+    if which_nf == "NCSF" and z_score_x not in (None, "none"):
+        raise ValueError(
+            "NCSF models data on [-pi, pi), which any transform of x would move. "
+            f"Use z_score_x='none' instead of {z_score_x!r}."
+        )
     transforms = ()
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x == "transform_to_unconstrained":
@@ -1369,7 +1376,8 @@ def build_zuko_unconditional_flow(
 
     # z-score first, so that the flow transforms see standardized data.
     transforms = (
-        _prepare_x_transforms(z_score_x, batch_x, x_dist=None) + base_transforms
+        _prepare_x_transforms(which_nf, z_score_x, batch_x, x_dist=None)
+        + base_transforms
     )
 
     neural_net = zuko.flows.Flow(transforms, base)
