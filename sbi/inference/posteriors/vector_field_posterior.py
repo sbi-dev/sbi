@@ -182,8 +182,8 @@ class VectorFieldPosterior(NeuralPosterior):
             corrector_params: Additional parameters passed to corrector.
             steps: Number of points of the time grid, so the predictor takes
                 `steps - 1` steps. Each step costs one network evaluation for
-                `euler_maruyama` and two for `heun`; correctors add their own. If
-                `sample_with` is "ode", this is ignored.
+                `euler_maruyama` and two for `heun`; correctors add `num_steps`
+                (default 5) calls per step. If `sample_with` is "ode", this is ignored.
             ts: Time points at which to evaluate the vector field process. If None, the
                 estimator's `solve_schedule` with `steps` points is used. If
                 `sample_with` is "ode", this is ignored.
@@ -359,7 +359,8 @@ class VectorFieldPosterior(NeuralPosterior):
                 or `gibbs`.
             steps: Number of points of the time grid, so the predictor takes
                 `steps - 1` steps. Each step costs one network evaluation for
-                `euler_maruyama` and two for `heun`; correctors add their own.
+                `euler_maruyama` and two for `heun`; correctors add `num_steps`
+                (default 5) calls per step.
             ts: Time points at which to evaluate the diffusion process. If None,
                 uses the solve_schedule() specific to the estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
@@ -630,7 +631,8 @@ class VectorFieldPosterior(NeuralPosterior):
             corrector_params: Additional parameters passed to corrector.
             steps: Number of points of the time grid, so the predictor takes
                 `steps - 1` steps. Each step costs one network evaluation for
-                `euler_maruyama` and two for `heun`; correctors add their own.
+                `euler_maruyama` and two for `heun`; correctors add `num_steps`
+                (default 5) calls per step.
             ts: Time points at which to evaluate the diffusion process. If None, the
                 estimator's `solve_schedule` with `steps` points is used.
             max_sampling_batch_size: Maximum batch size for sampling.

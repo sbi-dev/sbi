@@ -228,6 +228,7 @@ def test_heun_matches_exact_gaussian_flow(sde_type):
     t_min = torch.tensor([estimator.t_min])
 
     def error(steps: int) -> Tensor:
+        torch.manual_seed(0)
         ts = torch.linspace(estimator.t_max, estimator.t_min, steps)
         path = Diffuser(score_fn, "heun").run(
             100, ts, show_progress_bars=False, save_intermediate=True

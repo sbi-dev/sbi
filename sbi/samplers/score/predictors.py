@@ -134,9 +134,9 @@ class Heun(Predictor):
         Each step evaluates the network twice, so a grid of `steps` points costs
         `2 * (steps - 1)` evaluations. At equal evaluations, it is less accurate
         than first-order Euler on the same ODE (`euler_maruyama` with a small
-        `eta`) below about 100 evaluations and more accurate from there on. On the
-        two moons task, about 100 evaluations gave the same posterior as
-        `sample_with="ode"` at less than half its cost.
+        `eta`) at low budgets and more accurate from about 50 to 100 evaluations
+        on, depending on the SDE. With NPSE on two moons, about 100 evaluations
+        came close to the `sample_with="ode"` solution at less than half its cost.
 
         [1] Karras et al., Elucidating the Design Space of Diffusion-Based
         Generative Models, NeurIPS 2022.
