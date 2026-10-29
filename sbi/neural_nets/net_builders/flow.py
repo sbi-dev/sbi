@@ -585,6 +585,7 @@ def build_zuko_nsf(
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     num_bins: int = 10,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -618,10 +619,11 @@ def build_zuko_nsf(
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         num_bins: The number of bins in the spline transformations. Defaults to 10.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NSF"
-    additional_kwargs = {"bins": num_bins, **kwargs}
+    additional_kwargs = {"bins": num_bins, "randperm": randperm, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -648,6 +650,7 @@ def build_zuko_ncsf(
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     num_bins: int = 10,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     r"""
@@ -675,10 +678,11 @@ def build_zuko_ncsf(
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         num_bins: The number of bins in the spline transformations. Defaults to 10.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NCSF"
-    additional_kwargs = {"bins": num_bins, **kwargs}
+    additional_kwargs = {"bins": num_bins, "randperm": randperm, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -708,6 +712,7 @@ def build_zuko_sospf(
     embedding_net: nn.Module = nn.Identity(),
     degree: int = 4,
     polynomials: int = 3,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -733,10 +738,16 @@ def build_zuko_sospf(
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         degree: The degree of the polynomials. Defaults to 4.
         polynomials: The number of polynomials. Defaults to 3.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "SOSPF"
-    additional_kwargs = {"degree": degree, "polynomials": polynomials, **kwargs}
+    additional_kwargs = {
+        "degree": degree,
+        "polynomials": polynomials,
+        "randperm": randperm,
+        **kwargs,
+    }
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -1024,6 +1035,7 @@ def build_zuko_bpf(
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     degree: int = 16,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -1054,10 +1066,11 @@ def build_zuko_bpf(
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         degree: The degree :math:`M` of the Bernstein polynomial.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "BPF"
-    additional_kwargs = {"degree": degree, **kwargs}
+    additional_kwargs = {"degree": degree, "randperm": randperm, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,

@@ -152,9 +152,13 @@ def test_no_field_is_dropped_before_the_flow(model):
     """
     config_cls = _MARGINAL_CONFIGS[model]
     build_params = inspect.signature(build_zuko_unconditional_flow).parameters
-    zuko_params = inspect.signature(
-        getattr(zuko.flows, config_cls._WHICH_NF).__init__
-    ).parameters
+    # Zuko's flows pass their **kwargs on to the base class, e.g. NSF to MAF.
+    zuko_params = {
+        name
+        for cls in getattr(zuko.flows, config_cls._WHICH_NF).__mro__
+        if "__init__" in vars(cls)
+        for name in inspect.signature(cls.__init__).parameters
+    }
 
     for name in config_cls()._build_kwargs():
         assert name not in nflow_specific_kwargs, (

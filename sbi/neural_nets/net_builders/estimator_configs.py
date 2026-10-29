@@ -488,9 +488,11 @@ class MarginalBPFConfig(MarginalConfigBase):
 
     Args:
         degree: Degree of the Bernstein polynomial.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     degree: int = 16
+    randperm: bool = False
 
     _WHICH_NF: ClassVar[str] = "BPF"
 
@@ -566,10 +568,12 @@ class MarginalNCSFConfig(MarginalConfigBase):
 
     Args:
         bins: Number of bins of the spline transforms.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     z_score_input: Literal["none"] = "none"
     bins: int = 10
+    randperm: bool = False
 
     _WHICH_NF: ClassVar[str] = "NCSF"
 
@@ -593,9 +597,11 @@ class MarginalNSFConfig(MarginalConfigBase):
 
     Args:
         bins: Number of bins of the spline transforms.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     bins: int = 10
+    randperm: bool = False
 
     _WHICH_NF: ClassVar[str] = "NSF"
 
@@ -607,10 +613,12 @@ class MarginalSOSPFConfig(MarginalConfigBase):
     Args:
         degree: Degree of the polynomials.
         polynomials: Number of polynomials.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     degree: int = 4
     polynomials: int = 3
+    randperm: bool = False
 
     _WHICH_NF: ClassVar[str] = "SOSPF"
 
@@ -791,9 +799,11 @@ class ZukoBPFConfig(_ZukoDensityConfigBase):
 
     Args:
         degree: Degree of the Bernstein polynomial.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     degree: int = 16
+    randperm: bool = False
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_bpf)
 
@@ -848,10 +858,12 @@ class ZukoNCSFConfig(_ZukoDensityConfigBase):
 
     Args:
         num_bins: Number of bins of the spline transforms.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     z_score_input: Literal["none"] = "none"
     num_bins: int = 10
+    randperm: bool = False
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_ncsf)
     _SHADOWED_EXTRA_KWARGS: ClassVar[frozenset[str]] = frozenset({"bins"})
@@ -876,9 +888,11 @@ class ZukoNSFConfig(_ZukoDensityConfigBase):
 
     Args:
         num_bins: Number of bins of the spline transforms.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     num_bins: int = 10
+    randperm: bool = False
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_nsf)
     _SHADOWED_EXTRA_KWARGS: ClassVar[frozenset[str]] = frozenset({"bins"})
@@ -891,10 +905,12 @@ class ZukoSOSPFConfig(_ZukoDensityConfigBase):
     Args:
         degree: Degree of the polynomials.
         polynomials: Number of polynomials.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     degree: int = 4
     polynomials: int = 3
+    randperm: bool = False
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_sospf)
 
