@@ -3,7 +3,7 @@
 
 import copy
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Protocol, Union
+from typing import Optional, Protocol, Self, Union
 
 import torch
 from torch import Tensor, nn
@@ -121,7 +121,7 @@ class BasePotential(metaclass=ABCMeta):
         """
         return self._x_o
 
-    def to(self, device: Union[str, torch.device]) -> "BasePotential":
+    def to(self, device: Union[str, torch.device]) -> Self:
         """Move prior and x_o to the given device.
 
         It also sets the device attribute to the given device.

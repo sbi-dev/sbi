@@ -559,10 +559,11 @@ class AcceptRejectFunction:
         self._print_fp_rate = print_fp_rate
         self._safety_margin = safety_margin
 
-        assert (
-            allowed_false_negatives is None or reweigh_factor is None
-        ), """Both the `allowed_false_negatives` and the `reweigh_factor` are set. You
-            can only set one of them."""
+        if allowed_false_negatives is not None and reweigh_factor is not None:
+            raise ValueError(
+                "Both `allowed_false_negatives` and `reweigh_factor` are set. You can "
+                "only set one of them."
+            )
         if reweigh_factor is not None and not 0.0 <= reweigh_factor < 1.0:
             raise ValueError(
                 f"`reweigh_factor` must be in [0, 1), got {reweigh_factor}. At 1, "

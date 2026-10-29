@@ -462,7 +462,7 @@ class MultipleIndependent(Distribution):
             reinterpreted_batch_ndims=1,
         )
 
-    def to(self, device: Union[str, torch.device]) -> None:
+    def to(self, device: Union[str, torch.device]) -> Self:
         """Move the distribution to the specified device.
 
         If the distribution has the `to` method, it is used. Otherwise, the
@@ -470,6 +470,9 @@ class MultipleIndependent(Distribution):
 
         Args:
             device: device to move the distribution to.
+
+        Returns:
+            The distribution itself.
         """
         device = process_device(device)
         originals = list(self.dists)
@@ -483,6 +486,7 @@ class MultipleIndependent(Distribution):
                 self.dists[i] = move_distribution_to_device(dist, self.device)
             raise
         self.device = device
+        return self
 
 
 def build_support(
@@ -568,8 +572,10 @@ class OneDimPriorWrapper(Distribution):
     dist.log_prob(samples).shape  # (10, 1)
     ```
 
-    This will lead to unexpected errors in `sbi`. The point of this class is to wrap
-    those batched 1D distributions to get rid of their batch dimension in `.log_prob()`.
+    This will lead to unexpected errors in `sbi`. `process_prior` folds such a batch
+    dimension with torch's `Independent`, which the vector field methods recognise. It
+    uses this wrapper only for priors without that batch dimension whose `.log_prob()`
+    still returns shape `(N, 1)`, e.g. custom priors.
     """
 
     def __init__(self, prior: Distribution, validate_args=None) -> None:

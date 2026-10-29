@@ -316,8 +316,8 @@ def denoise_independent(
     Returns:
         The posterior independent distribution.
     """
-    exact = (Independent, MixtureSameFamily, Normal, MultivariateNormal, Uniform)
-    if not isinstance(p.base_dist, exact):
+    exact_types = (Independent, MixtureSameFamily, Normal, MultivariateNormal, Uniform)
+    if not isinstance(p.base_dist, exact_types):
         # Fit the whole prior: wrapping a fitted base would fold the batch of x_t
         # into the event.
         return denoise_general(p, m, s, x_t)
