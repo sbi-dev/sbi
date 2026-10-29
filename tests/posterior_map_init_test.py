@@ -72,8 +72,11 @@ def test_importance_map_posterior_init_with_importance_method(toy):
     assert theta_map.shape == (1, 2)
 
 
-def test_amortized_vi_map_proposal_init_uses_amortized_q(toy):
-    """The single-x `q` sits far from the prior; a MAP seeded from it stays there."""
+def test_amortized_vi_map_starts_from_amortized_q_for_iid_x(toy):
+    """The single-x `q` sits far from the prior; a MAP seeded from it stays there.
+
+    Two iid observations check that the per-observation samples are pooled.
+    """
     prior, theta, x = toy
     potential_fn, _ = _likelihood_potential(prior, theta, x)
     loc = torch.full((2,), 50.0, requires_grad=True)
@@ -81,6 +84,6 @@ def test_amortized_vi_map_proposal_init_uses_amortized_q(toy):
         potential_fn, prior, q=MultivariateNormal(loc, torch.eye(2)), parameters=[loc]
     )
     posterior.train_amortized(theta, x, max_num_iters=2, show_progress_bar=False)
-    posterior.set_default_x(torch.zeros(1, 2))
+    posterior.set_default_x(torch.zeros(2, 2))
     theta_map = posterior.map(init_method="proposal", **MAP_KWARGS)
     assert theta_map.abs().max() < 10

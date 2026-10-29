@@ -1326,6 +1326,19 @@ class VIPosterior(NeuralPosterior):
         metric = round(float(quality_control_fn(self, N=N)), 3)
         print(f"Quality Score: {metric} " + quality_control_msg)
 
+    def _map_inits(
+        self,
+        init_method: Union[str, TorchTensor],
+        num_init_samples: int,
+        x: Optional[TorchTensor] = None,
+    ) -> Tensor:
+        # Amortized training fits q(θ|x) and leaves `q` untouched. With several iid
+        # observations in `x`, `.sample()` returns samples per observation; pool them.
+        if self._mode == "amortized" and init_method in ("posterior", "proposal"):
+            samples = self.sample((num_init_samples,), x=x)
+            return samples.reshape(-1, samples.shape[-1])
+        return super()._map_inits(init_method, num_init_samples, x)
+
     def map(
         self,
         x: Optional[TorchTensor] = None,
@@ -1362,9 +1375,9 @@ class VIPosterior(NeuralPosterior):
                 it is a string, it can be either `posterior` or `proposal`, which
                 samples the respective distribution `num_init_samples` times. For
                 `VIPosterior` the proposal is the variational distribution, not the
-                prior (in amortized mode, q(θ|x) at the default `x`). If it is a
-                tensor, the tensor is used as the initial locations, so prior-based
-                initialization can be done by passing prior samples.
+                prior (in amortized mode, q(θ|x) for each observation in the default
+                `x`). If it is a tensor, the tensor is used as the initial locations,
+                so prior-based initialization can be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -1383,9 +1396,6 @@ class VIPosterior(NeuralPosterior):
             The MAP estimate.
         """
         self.proposal = self.q
-        # Amortized training fits q(θ|x) and leaves `q` untouched.
-        if self._mode == "amortized" and init_method == "proposal":
-            init_method = "posterior"
         return super().map(
             x=x,
             num_iter=num_iter,
