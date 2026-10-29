@@ -11,14 +11,24 @@ from torch import Tensor
 from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, Uniform
 
 from sbi.inference.posteriors import VectorFieldPosterior
-from sbi.inference.potentials.vector_field_adaptor import FactorizedNPEScoreFunction
+from sbi.inference.potentials.vector_field_adaptor import (
+    FactorizedNPEScoreFunction,
+    GaussCorrectedScoreFn,
+    JacCorrectedScoreFn,
+    ensure_lam_positive_definite,
+)
 from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets import posterior_score_nn
 from sbi.samplers.score import Diffuser
+from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, MultipleIndependent
-from sbi.utils.vector_field_utils import VectorFieldNet
+from sbi.utils.vector_field_utils import (
+    VectorFieldNet,
+    add_diag_or_dense,
+    solve_diag_or_dense,
+)
 
 
 def build_random_priors(num_dim: int):
@@ -174,6 +184,140 @@ def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_metho
         assert torch.isfinite(output).all(), "Output contains non-finite values"
 
 
+@pytest.mark.parametrize(
+    "num_trials, magnitude, prior_scale",
+    (
+        pytest.param(5, 1e7, 1.0, id="large-lam"),
+        pytest.param(2048, 2.0**20, 2.0**20, id="many-trials"),
+    ),
+)
+def test_ensure_lam_positive_definite_survives_float32_cancellation(
+    num_trials, magnitude, prior_scale
+):
+    """`Lam` must stay invertible when the precision sum cancels to rank one.
+
+    An absolute nugget of 0.01 is lost in float32, at the magnitude of `Lam` for
+    `large-lam` and at the magnitude of each posterior precision for `many-trials`.
+    """
+    ones = torch.ones(2)
+    prior_precision = prior_scale * torch.eye(2).expand(1, 1, 2, 2)
+    # Chosen such that (1 - N) * prior + sum(posterior) = magnitude * ones ones^T.
+    posterior_precision = (
+        (magnitude * torch.outer(ones, ones) + (num_trials - 1) * prior_precision)
+        / num_trials
+    ).expand(1, num_trials, 2, 2)
+
+    prior_precision, posterior_precision = ensure_lam_positive_definite(
+        prior_precision, posterior_precision, num_trials, precision_nugget=0.01
+    )
+    lam = add_diag_or_dense(
+        (1 - num_trials) * prior_precision,
+        posterior_precision.sum(1, keepdim=True),
+        batch_dims=2,
+    ).squeeze(1)
+
+    eigenvalues = torch.linalg.eigvalsh(lam)
+    assert (eigenvalues[:, 0] / eigenvalues[:, -1] > 5e-6).all()
+    assert torch.isfinite(solve_diag_or_dense(lam, torch.ones(1, 2), 1)).all()
+
+
+def test_ensure_lam_positive_definite_survives_float32_cancellation_diagonal():
+    """A diagonal `Lam` that cancels to zero must become positive.
+
+    At a precision of 1e7, float32 cannot represent an absolute nugget of 0.01.
+    """
+    num_trials = 4
+    prior_precision = torch.full((1, 1, 2), 2.0**24)
+    # Chosen such that (1 - N) * prior + sum(posterior) = 0.
+    posterior_precision = torch.full((1, num_trials, 2), 3 * 2.0**22)
+
+    _, posterior_precision = ensure_lam_positive_definite(
+        prior_precision, posterior_precision, num_trials, precision_nugget=0.01
+    )
+    lam = (1 - num_trials) * prior_precision + posterior_precision.sum(1, keepdim=True)
+
+    assert (lam > 0).all()
+
+
+def test_ensure_lam_positive_definite_keeps_well_conditioned_tall_data():
+    """The guard changes a well-conditioned `Lam` by about one rounding unit per trial.
+
+    The summed precisions are huge, `Lam` is not. Values are exact in float32.
+    """
+    num_trials, prior_precision_value = 2048, 2.0**20
+    prior_precision = prior_precision_value * torch.eye(2).expand(1, 1, 2, 2)
+    posterior_precision = (prior_precision_value + 1) * torch.eye(2)
+    posterior_precision = posterior_precision.expand(1, num_trials, 2, 2)
+
+    _, corrected = ensure_lam_positive_definite(
+        prior_precision, posterior_precision, num_trials, precision_nugget=0.01
+    )
+
+    assert torch.allclose(corrected, posterior_precision, rtol=1e-6)
+
+
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+@pytest.mark.parametrize("iid_method", ["gauss", "jac_gauss"])
+def test_iid_score_is_exact_for_linear_gaussian(sde_type, iid_method):
+    """`gauss` and `jac_gauss` must reproduce the exact iid posterior score.
+
+    With exact single-trial scores, a Gaussian prior and a Gaussian likelihood, both
+    methods (`gauss` given the true posterior precision) must reproduce the score of
+    the diffused posterior given all trials, at every diffusion time. Runs in float64
+    so that the comparison is exact up to rounding on any CPU.
+    """
+    num_dim, num_trials = 2, 5
+    dtype = torch.float64
+    prior_mean = torch.zeros(num_dim, dtype=dtype)
+    prior_cov = torch.eye(num_dim, dtype=dtype)
+    likelihood_shift = -torch.ones(num_dim, dtype=dtype)
+    likelihood_cov = 0.5 * torch.eye(num_dim, dtype=dtype)
+    prior = MultivariateNormal(prior_mean, prior_cov)
+    x_o = torch.randn(num_trials, num_dim, dtype=dtype)
+
+    # Single-trial posterior N(A (x - shift) + b, S) of the linear Gaussian model.
+    prior_precision = torch.inverse(prior_cov)
+    likelihood_precision = torch.inverse(likelihood_cov)
+    posterior_cov = torch.inverse(prior_precision + likelihood_precision)
+    A = posterior_cov @ likelihood_precision
+    b = posterior_cov @ prior_precision @ prior_mean
+
+    def diffused_gaussian_score(theta, mean, cov, m, s):
+        precision = torch.inverse(m**2 * cov + s**2 * torch.eye(num_dim, dtype=dtype))
+        return -(theta - m * mean) @ precision
+
+    estimator = posterior_score_nn(
+        sde_type=sde_type, model=_ZeroNet(), embedding_net=torch.nn.Identity()
+    )(prior.sample((100,)), torch.randn(100, num_dim, dtype=dtype)).to(dtype)
+
+    def exact_single_trial_score(input: Tensor, condition: Tensor, t: Tensor):
+        mean = (condition - likelihood_shift) @ A.T + b
+        m, s = estimator.mean_t_fn(t), estimator.std_fn(t)
+        return diffused_gaussian_score(input, mean, posterior_cov, m, s)
+
+    estimator.score = exact_single_trial_score
+
+    if iid_method == "gauss":
+        score_fn = GaussCorrectedScoreFn(
+            estimator, prior, posterior_precision=torch.inverse(posterior_cov)
+        )
+    else:
+        score_fn = JacCorrectedScoreFn(estimator, prior, ensure_lam_psd=False)
+
+    posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    for t in [estimator.t_min, 0.01, 0.1, 0.5, 0.9, estimator.t_max]:
+        time = torch.tensor([t], dtype=dtype)
+        m, s = estimator.mean_t_fn(time), estimator.std_fn(time)
+        theta = m * posterior.mean + s * torch.randn(64, 1, num_dim, dtype=dtype)
+
+        expected = diffused_gaussian_score(
+            theta, posterior.mean, posterior.covariance_matrix, m, s
+        )
+        assert torch.allclose(score_fn(theta, x_o, time), expected, rtol=1e-8), t
+
+
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("predictor", ("euler_maruyama",))
 @pytest.mark.parametrize("corrector", (None, "gibbs", "langevin"))
@@ -200,6 +344,53 @@ def test_gaussian_score_sampling(
 
     assert torch.allclose(mean_est, mean0, atol=1e-1)
     assert torch.allclose(std_est, std0, atol=1e-1)
+
+
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+def test_heun_sampling_on_time_grid_ending_at_zero(sde_type):
+    """The VP and sub-VP scores diverge at t=0, where Heun's last step ends."""
+    score_fn = _build_gaussian_score_estimator(
+        sde_type, (2,), torch.ones(2), torch.ones(2)
+    )
+    ts = torch.linspace(score_fn.vector_field_estimator.t_max, 0.0, 50)
+
+    samples = Diffuser(score_fn, "heun").run(100, ts, show_progress_bars=False)
+
+    assert torch.isfinite(samples).all()
+
+
+@pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
+def test_heun_matches_exact_gaussian_flow(sde_type):
+    """For a Gaussian target with exact score, the probability flow ODE keeps each
+    sample's z-score. Heun must reproduce this map, and halving the step size must
+    cut its error about fourfold (twofold for first-order Euler)."""
+    score_fn = _build_gaussian_score_estimator(
+        sde_type, (2,), torch.ones(2), 0.5 * torch.ones(2)
+    )
+    estimator = score_fn.vector_field_estimator
+    t_max = torch.tensor([estimator.t_max])
+    t_min = torch.tensor([estimator.t_min])
+
+    def error(steps: int) -> Tensor:
+        torch.manual_seed(0)
+        ts = torch.linspace(estimator.t_max, estimator.t_min, steps)
+        path = Diffuser(score_fn, "heun").run(
+            100, ts, show_progress_bars=False, save_intermediate=True
+        )
+        start, end = path[:, 0], path[:, -1]
+        z = (start - estimator.approx_marginal_mean(t_max)) / (
+            estimator.approx_marginal_std(t_max)
+        )
+        exact = (
+            estimator.approx_marginal_mean(t_min)
+            + estimator.approx_marginal_std(t_min) * z
+        )
+        return (end - exact).abs().max()
+
+    error_coarse, error_fine = error(65), error(129)
+
+    assert error_fine < 1e-2
+    assert error_coarse / error_fine > 3.0
 
 
 def test_fnpe_batched_observations_keep_base_distribution():
@@ -270,6 +461,17 @@ def test_fnpe_uses_custom_prior_score_weight():
     assert not torch.allclose(no_prior(*args), default(*args))
 
 
+class _ZeroNet(VectorFieldNet):
+    """Vector field net that predicts zero everywhere."""
+
+    def __init__(self):
+        super().__init__()
+        self.dummy_param_for_device_detection = torch.nn.Linear(1, 1)
+
+    def forward(self, input, condition, time):
+        return torch.zeros_like(input)
+
+
 def _build_gaussian_score_estimator(
     sde_type: str,
     input_event_shape: Tuple[int],
@@ -286,17 +488,9 @@ def _build_gaussian_score_estimator(
 
     # Note the precondition predicts a correct Gaussian score by default if the neural
     # net predicts 0!
-    class DummyNet(VectorFieldNet):
-        def __init__(self):
-            super().__init__()
-            self.dummy_param_for_device_detection = torch.nn.Linear(1, 1)
-
-        def forward(self, input, condition, time):
-            return torch.zeros_like(input)
-
     score_estimator = posterior_score_nn(
         sde_type=sde_type,
-        model=DummyNet(),
+        model=_ZeroNet(),
         embedding_net=torch.nn.Identity(),
     )(building_thetas, building_xs)
 
