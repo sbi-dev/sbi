@@ -134,6 +134,24 @@ Findings (paired differences over seeds and observations, mean with standard err
 5. **S=1 is enough in NLE.** For `mf_sbi` at the best epoch, S=1 against S=2 is within ±0.004 at 2,000 and within ±0.003 at 50,176 except slcp (S=1 0.017 worse, 0.009). S=1 halves the MCMC cost.
 6. **Cost** (medians over tasks and seeds; the machine was fully loaded, so ratios are rough): at 2,000 on CPU, mean-flow training took 640 to 910 s against 46 s for `nsf_default`; MCMC for 10 observations took 1,180 to 1,600 s at S=1 and 2,220 to 2,730 s at S=2, against 864 s for NSF (1.4 to 1.9x at S=1, 2.6 to 3.2x at S=2). At 50,176, the mean flows trained for 3.7 to 5 h on the GPU (12 jobs sharing it) against 12 min for `nsf_default` on 2 CPU threads.
 
+## What this means for the paper
+
+Our results do not contradict the paper; they narrow it. The paper makes two different claims.
+
+**Claim A: few-step mean flows give flow-matching-quality densities at a cost that MCMC can afford.** This is the paper's main story, and its speed-ups (182 to 216x on the drift-diffusion model, about 50x on g-and-k) are against flow matching, which needs hundreds of network evaluations per density. The g-and-k reproduction confirms it: the mean flow (C2ST 0.58 to 0.60) is at least as accurate as flow matching with 200 Euler steps (0.614), which ran about 50x slower.
+
+**Claim B: mean flows are more accurate than normalizing flows.** The evidence in the paper is two moons NPE (0.523 against 0.543) and g-and-k (0.58 against 0.68). Here we disagree on size and generality:
+
+- On g-and-k, half of the gap comes from the baseline's training: the coupling flow trained 200 epochs, the mean flow 1,000 with a tuned recipe. With equal training the gap is 0.03 to 0.05 (`results_gandk.md`).
+- On the mini-sbibm NLE tasks at the paper's data scale, both mean-flow networks tie sbi's NSF on three tasks and lose on slcp (benchmark above). At two moons NPE scale, sbi's NSF reaches 0.518 to 0.530 against 0.578 for the mean flow (before the cycle-loss fix).
+- The drift-diffusion experiment, where the speed story is strongest, has no normalizing-flow baseline.
+
+**Why the speed claim does not reach sbi users.** sbi's NLE runs on normalizing flows (MAF by default, or NSF), which already evaluate a density in one network pass. Against those the mean flow is not faster: 1.4 to 1.9x slower per MCMC run at S=1 on mini-sbibm and about the same on g-and-k, because every step needs a full Jacobian log-determinant, which costs $O(d^3)$ in the data dimension.
+
+**In one sentence:** mean flows bring flow-matching-class density estimators into likelihood-based inference at normalizing-flow cost, but not at better-than-normalizing-flow accuracy in general.
+
+**Where the method could still matter: architectures that flows cannot use.** A normalizing flow needs an invertible architecture with a cheap Jacobian determinant, so its network is constrained to coupling or autoregressive layers of fixed width. A mean flow only needs a network that predicts an average velocity; the density comes from autodiff of the flow map. Any architecture works, including a transformer over tokens. The paper uses this in its third experiment: a stochastic renewal epidemic model (128 whitened Gaussian-process coefficients for $\log R_t$, 123 observed log-incidence values, 30% missing completely at random, 8,192 simulations). Its mean flow runs on a transformer that treats each observation as a token and takes a mask of the missing ones, so it learns the density of the observed coordinates with the missing ones integrated out, which is the correct likelihood under random missingness. The coupling flow can only be shown a fill-in value (−1) where data are missing. The paper reports lower parameter error (0.187 against 0.199), lower predictive error (0.060 against 0.125) and calibration for the mean flow, with the flow finishing 22x sooner (1,624 s against 36,146 s). If there is a case for the mean flow in sbi, it is this one: likelihoods over observations of varying size and missingness, which sbi's NLE cannot express today. We have not tested it; the obvious competitor in sbi is NPE with the missingness mask appended to the observation, which needs no new estimator.
+
 ## Bugs in existing sbi found on the way
 
 Both are fixed on branch `fix/sample-shapes-and-mcmc-init-grad` (PR pending) and in the first two commits of this branch.
