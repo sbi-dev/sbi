@@ -1465,11 +1465,9 @@ class ContextSplineMap(nn.Module):
 
         # Initialize with input layer.
         layer_list = [nn.Linear(context_features, hidden_features), nn.ReLU()]
-        # Add hidden layers.
-        layer_list += [
-            nn.Linear(hidden_features, hidden_features),
-            nn.ReLU(),
-        ] * hidden_layers
+        # Add hidden layers, each with its own weights.
+        for _ in range(hidden_layers):
+            layer_list += [nn.Linear(hidden_features, hidden_features), nn.ReLU()]
         # Add output layer.
         layer_list += [nn.Linear(hidden_features, out_features)]
         self.spline_predictor = nn.Sequential(*layer_list)
