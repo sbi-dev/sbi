@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
+import math
 import warnings
 
 import pytest
@@ -375,3 +376,78 @@ def test_restricted_prior_sir_uses_oversampling_factor():
     restricted_prior.sample((10,), oversampling_factor=4)
 
     assert sum(num_candidates) == 40
+
+
+def test_restricted_prior_log_prob_one_value_per_theta():
+    """log_prob and SIR work when prior and restriction return shape (N, 1)."""
+    # A univariate prior without `Independent` returns log probs of shape (N, 1).
+    prior = torch.distributions.Normal(zeros(1), ones(1))
+
+    def accept_reject_fn(theta):
+        return theta > 0.0
+
+    restricted_prior = utils.RestrictedPrior(prior, accept_reject_fn)
+    theta = torch.tensor([[0.5], [-0.5], [1.0]])
+    log_prob = restricted_prior.log_prob(theta, norm_restricted_prior=False)
+
+    expected = prior.log_prob(theta).squeeze(1)
+    expected[1] = float("-inf")
+    assert torch.equal(log_prob, expected)
+
+    # Keep sizes tiny: a shape bug here builds (N, N) importance weights.
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=prior, sample_with="sir"
+    )
+    samples = restricted_prior.sample((2,), oversampling_factor=4)
+    assert samples.shape == (2, 1) and bool((samples > 0).all())
+
+
+def test_restricted_prior_sir_samples_truncated_prior():
+    """SIR samples follow the prior truncated to the restriction."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+    # A shifted proposal, like a posterior, needs reweighting by the prior.
+    proposal = MultivariateNormal(torch.tensor([0.5, 0.0]), eye(2))
+
+    def accept_reject_fn(theta):
+        return theta[:, 0] > 0.0
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=proposal, sample_with="sir"
+    )
+    samples = restricted_prior.sample((5_000,), oversampling_factor=64)
+
+    assert torch.all(samples[:, 0] > 0.0)
+    # theta_0 follows a standard half-normal distribution, with mean sqrt(2 / pi).
+    assert abs(samples[:, 0].mean().item() - math.sqrt(2 / math.pi)) < 0.05
+
+
+def test_restricted_prior_sir_raises_without_accepted_candidates():
+    """SIR sampling raises instead of looping forever when no candidate is accepted."""
+    prior = utils.BoxUniform(-ones(2), ones(2))
+
+    def reject_all(theta):
+        return zeros(theta.shape[0], dtype=torch.bool)
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, reject_all, posterior=prior, sample_with="sir"
+    )
+    with pytest.raises(RuntimeError, match="finite importance weight"):
+        restricted_prior.sample((10,), oversampling_factor=16)
+
+
+def test_restricted_prior_sir_ignores_rejected_candidates_at_zero_draw(monkeypatch):
+    """A uniform draw of exactly 0 in SIR does not select a rejected candidate."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def accept_reject_fn(theta):
+        return theta[:, 0] > 0.0
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=prior, sample_with="sir"
+    )
+    monkeypatch.setattr(torch, "rand", lambda *args, **kwargs: zeros(args[0], 1))
+    samples = restricted_prior.sample((100,), oversampling_factor=8)
+
+    assert torch.all(samples[:, 0] > 0.0)
