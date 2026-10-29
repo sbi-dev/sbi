@@ -496,7 +496,7 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     num_thetas = 5000 + trial_factor * max_num_trials
 
     theta = prior.sample(sample_shape=torch.Size((num_thetas,)))
-    num_trials = torch.randint(1, max_num_trials, size=(num_thetas,))
+    num_trials = torch.randint(1, max_num_trials + 1, size=(num_thetas,))
 
     # simulate iid x, pad smaller number of trials with nans.
     x = ones(num_thetas, max_num_trials, 2) * float("nan")
