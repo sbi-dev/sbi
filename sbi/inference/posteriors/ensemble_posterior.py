@@ -384,7 +384,7 @@ class EnsemblePosterior(NeuralPosterior):
         self.posteriors[idx].
 
         Args:
-            x: Observed data at which to evaluate the MAP.
+            x: Deprecated - use `.set_default_x()` prior to `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -413,6 +413,14 @@ class EnsemblePosterior(NeuralPosterior):
             estimate if individually == True.
         """
 
+        self._raise_if_x_passed_to_map(x)
+
+        if self.default_x is None:
+            raise ValueError(
+                "Default `x` has not been set. "
+                "To set the default, use the `.set_default_x()` method."
+            )
+
         if individually:
             maps = []
             log_weights = torch.log(self._weights).reshape(-1, 1)
@@ -420,7 +428,6 @@ class EnsemblePosterior(NeuralPosterior):
             for posterior in self.posteriors:
                 maps.append(
                     posterior.map(
-                        x=x,
                         num_iter=num_iter,
                         num_to_optimize=num_to_optimize,
                         learning_rate=learning_rate,
@@ -434,9 +441,8 @@ class EnsemblePosterior(NeuralPosterior):
             return log_weights, maps
 
         else:
-            x = self._x_else_default_x(x)
-            self.potential_fn = self.potential_fn.bind(x)
-            inits = self._map_inits(init_method, num_init_samples, x)
+            self.potential_fn = self.potential_fn.bind(self.default_x)
+            inits = self._map_inits(init_method, num_init_samples, self.default_x)
             # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(
                 potential_fn=self.potential_fn,

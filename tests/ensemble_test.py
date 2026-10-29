@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 import pytest
-from torch import eye, ones, randn_like, tensor, zeros
+from torch import eye, isfinite, ones, randn_like, tensor, zeros
 from torch.distributions import Categorical, MixtureSameFamily, MultivariateNormal
 from torch.testing import assert_close
 
@@ -168,6 +168,47 @@ def test_ensemble_posterior_weights(weights, expected_exception):
         posterior = EnsemblePosterior(posteriors, weights=weights)
         posterior.set_default_x(x_o)
         _ = posterior.sample((2,))
+
+
+def test_ensemble_map_uses_default_x():
+    """`map()` must use the default `x` for both the joint and the individual MAP."""
+    num_dim = 2
+    ensemble_size = 2
+    num_simulations = 50
+    x_o = zeros(1, num_dim)
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+
+    posteriors = []
+    for _ in range(ensemble_size):
+        theta = prior.sample((num_simulations,))
+        x = theta + 0.1 * randn_like(theta)
+        inferer = NPE_C(prior)
+        inferer.append_simulations(theta, x).train(max_num_epochs=1)
+        posteriors.append(inferer.build_posterior())
+
+    ensemble = EnsemblePosterior(posteriors)
+    ensemble.set_default_x(x_o)
+
+    map_kwargs = {
+        "num_iter": 5,
+        "num_to_optimize": 5,
+        "num_init_samples": 20,
+        "show_progress_bars": False,
+    }
+
+    log_weights, maps = ensemble.map(individually=True, **map_kwargs)
+    assert log_weights.shape == (ensemble_size, 1)
+    assert maps.shape == (ensemble_size, 1, num_dim)
+    assert isfinite(maps).all()
+
+    assert ensemble.map(**map_kwargs).shape == (1, num_dim)
+
+    with pytest.raises(ValueError, match=r"deprecated\. Use `\.set_default_x\(\)`"):
+        ensemble.map(x=x_o, individually=True)
+
+    with pytest.raises(ValueError, match=r"deprecated\. Use `\.set_default_x\(\)`"):
+        ensemble.map(x=x_o)
 
 
 def test_ensemble_potential_follows_weight_change():
