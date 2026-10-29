@@ -11,6 +11,8 @@ from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.sbi_types import Proposal
 from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
 
+_MAX_CANDIDATES_WITHOUT_SAMPLE = 100_000
+
 
 def sampling_importance_resampling(
     potential_fn: Callable,
@@ -19,7 +21,6 @@ def sampling_importance_resampling(
     num_candidate_samples: int = 32,
     max_sampling_batch_size: int = 10_000,
     show_progress_bars: bool = False,
-    device: str = "cpu",
     **kwargs,
 ) -> Tensor:
     """Return samples obtained with sampling importance resampling (SIR).
@@ -33,13 +34,12 @@ def sampling_importance_resampling(
         max_sampling_batch_size: The batchsize of samples being drawn from the
             proposal at every iteration.
         show_progress_bars: Whether to show a progress bar.
-        device: Device on which to sample.
 
     Returns:
         Tensor: Samples of shape (num_samples, event_shape).
 
     Raises:
-        RuntimeError: If none of the first 10_000 or more candidates has a finite
+        RuntimeError: If none of the first 100_000 or more candidates has a finite
             importance weight.
     """
 
@@ -78,7 +78,10 @@ def sampling_importance_resampling(
         # A group whose candidates all have weight zero yields no sample, so with
         # zero weight everywhere the loop would never end.
         num_candidates_drawn += batch_size * num_candidate_samples
-        if num_remaining == num_samples and num_candidates_drawn >= 10_000:
+        if (
+            num_remaining == num_samples
+            and num_candidates_drawn >= _MAX_CANDIDATES_WITHOUT_SAMPLE
+        ):
             pbar.close()
             raise RuntimeError(
                 f"None of the {num_candidates_drawn} candidates drawn from the "

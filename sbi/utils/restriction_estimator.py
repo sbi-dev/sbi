@@ -685,7 +685,7 @@ class RestrictedPrior(Distribution):
 
         Raises:
             RuntimeError: If `sample_with="sir"` and the restriction rejects every
-                one of the first 10_000 or more posterior samples.
+                posterior sample that SIR draws before it gives up.
         """
         # The samplers import `sbi.utils`, so importing them at module level would
         # make every `sbi.utils` import inside `sbi.samplers` a circular import.
@@ -734,7 +734,6 @@ class RestrictedPrior(Distribution):
                 num_candidate_samples=oversampling_factor,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-                device=self._device,
             )
         else:
             raise ValueError("Only [rejection | sir] implemented as `method`")
