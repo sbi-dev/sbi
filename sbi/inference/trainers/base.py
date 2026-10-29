@@ -1057,11 +1057,14 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
             elif isinstance(
                 posterior_parameters, ImportanceSamplingPosteriorParameters
             ):
+                importance_parameters = asdict(posterior_parameters)
+                if importance_parameters["theta_transform"] is None:
+                    importance_parameters["theta_transform"] = theta_transform
                 posterior = ImportanceSamplingPosterior(
                     potential_fn=potential_fn,
                     proposal=prior,
                     device=device,
-                    **asdict(posterior_parameters),
+                    **importance_parameters,
                 )
             else:
                 raise NotImplementedError(

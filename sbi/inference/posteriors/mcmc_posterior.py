@@ -4,7 +4,7 @@ import inspect
 import warnings
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, Literal, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Self, Union
 from warnings import warn
 
 import torch
@@ -32,7 +32,6 @@ from sbi.utils.pbar import sampling_desc
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import (
     ensure_theta_batched,
-    process_device,
     tensor2numpy,
 )
 from sbi.utils.typechecks import validate_target_accept
@@ -149,34 +148,24 @@ class MCMCPosterior(NeuralPosterior):
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """Moves potential_fn, proposal, x_o and theta_transform to the
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the posterior to `device` in place, see `NeuralPosterior.to()`.
 
-        specified device. Reinstantiates the posterior and resets the default x_o.
+        The chain states stored for `init_strategy="latest_sample"` move as well. The
+        sampler of the last run stays for its diagnostics; `sample()` builds a new one.
 
         Args:
             device: Device to move the posterior to.
+
+        Returns:
+            The posterior itself.
         """
-        device = process_device(device)
-        self.device = device
-        self.potential_fn.to(device)  # type: ignore
-        self.proposal.to(device)
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-
-        self.theta_transform = mcmc_transform(self.proposal, device=device)
-
-        super().__init__(
-            self.potential_fn,
-            theta_transform=self.theta_transform,
-            device=device,
-            x_shape=self.x_shape,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
+        super().to(device)
+        init_params = getattr(self, "_mcmc_init_params", None)
+        if init_params is not None:
+            self._mcmc_init_params = init_params.to(self._device)
         self.potential_ = self._prepare_potential(self.method)
+        return self
 
     @property
     def mcmc_method(self) -> str:

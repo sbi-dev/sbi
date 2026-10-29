@@ -8,7 +8,7 @@ from dataclasses import asdict
 import pytest
 import torch
 from torch import Tensor, eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import MultivariateNormal, Normal
 
 from sbi.inference import (
     ImportanceSamplingPosterior,
@@ -27,6 +27,8 @@ from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPote
 from sbi.neural_nets import posterior_nn, posterior_score_nn
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
+from sbi.utils.user_input_checks import process_prior
+from sbi.utils.vector_field_utils import marginalize
 
 
 @pytest.mark.parametrize(
@@ -133,6 +135,20 @@ def test_bind_preserves_estimator(potential_type: str):
 
     assert bound is not potential
     assert bound.x_o is not None
+
+
+def test_vector_field_potential_marginalizes_1d_prior_exactly():
+    """A processed 1-D prior keeps the exact marginal, not a Gaussian mixture fit."""
+    prior, _, _ = process_prior(Normal(zeros(1), ones(1)))
+    theta = prior.sample((20,))
+    potential = VectorFieldBasedPotential(
+        posterior_score_nn()(theta, torch.randn(20, 2)), prior
+    )
+    m, s = torch.tensor(0.7), torch.tensor(0.5)
+    t = torch.linspace(-3, 3, 7).unsqueeze(-1)
+
+    exact = marginalize(Normal(zeros(1), ones(1)), m, s).log_prob(t).sum(-1)
+    assert torch.allclose(marginalize(potential.prior, m, s).log_prob(t), exact)
 
 
 @pytest.mark.parametrize("potential_type", ("posterior", "vector_field"))

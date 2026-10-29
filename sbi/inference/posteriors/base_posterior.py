@@ -18,6 +18,7 @@ from sbi.inference.potentials.base_potential import (
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import (
+    _apply_to_transform,
     gradient_ascent,
     load_with_version,
     nan_tolerant_input_net,
@@ -107,6 +108,51 @@ class NeuralPosterior:
         validate_nan_input = getattr(net, "validate_nan_input", None)
         if validate_nan_input is not None and torch.isnan(x).any():
             validate_nan_input(x)
+
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the posterior to `device` in place and keep its state.
+
+        Moves the potential (with the estimator and the prior), the parameter
+        transform, the default `x`, the cached MAP and the leakage correction cache.
+        A prior or proposal that is the potential's prior keeps pointing to it, and a
+        proposal that is a posterior moves with its own `to()`. A proposal that is
+        neither a posterior nor a torch `Distribution` is left as it is. Subclasses
+        with more state extend this method.
+
+        Args:
+            device: Device to move the posterior to, e.g. `"cpu"` or `"cuda"`.
+
+        Returns:
+            The posterior itself.
+        """
+        device = process_device(device)
+        shared_prior = getattr(self.potential_fn, "prior", None)
+        self.potential_fn.to(device)  # type: ignore[union-attr]
+        for attr in ("prior", "_prior", "proposal"):
+            value = getattr(self, attr, None)
+            if value is None:
+                continue
+            if value is shared_prior:
+                value = self.potential_fn.prior  # type: ignore[union-attr]
+            elif isinstance(value, NeuralPosterior):
+                value = value.to(device)
+            elif isinstance(value, Distribution):
+                value = move_distribution_to_device(value, device)
+            setattr(self, attr, value)
+
+        if self.theta_transform is not None:
+            _apply_to_transform(self.theta_transform, lambda t: t.to(device))
+        if self._x is not None:
+            self._x = self._x.to(device)
+        if self._map is not None:
+            self._map = self._map.to(device)
+        if self._leakage_cache is not None:
+            cached_x, factor = self._leakage_cache
+            self._leakage_cache = (cached_x.to(device), factor.to(device))
+
+        self._device = device
+        self.device = device
+        return self
 
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
@@ -419,7 +465,8 @@ class NeuralPosterior:
 
         `torch.load(..., map_location=...)` remaps the tensors but not the stored device
         strings. If the restored tensors live on another device than `_device` claims,
-        the device strings of the posterior, its potential and its prior are updated.
+        the posterior is moved there with `to()`, which updates the device strings of
+        the posterior, its potential and its prior.
 
         Args:
             state_dict: State to be restored.
@@ -433,18 +480,4 @@ class NeuralPosterior:
             self._device
         ):
             return
-
-        # The tensors already live on `actual_device`. Only the device strings, and the
-        # distributions that cache one, must follow.
-        self._device = actual_device
-        if hasattr(self, "device"):
-            self.device = actual_device
-        shared_prior = getattr(self.potential_fn, "prior", None)
-        self.potential_fn.to(actual_device)  # type: ignore[union-attr]
-        for attr in ("prior", "_prior", "proposal"):
-            value = getattr(self, attr, None)
-            if value is shared_prior and value is not None:
-                # The potential moved this object already. Keep sharing it.
-                setattr(self, attr, self.potential_fn.prior)  # type: ignore[union-attr]
-            elif isinstance(value, Distribution):
-                setattr(self, attr, move_distribution_to_device(value, actual_device))
+        self.to(actual_device)

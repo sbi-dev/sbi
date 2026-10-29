@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Literal, Optional, Tuple, Union
+from typing import Callable, Literal, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -11,8 +11,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Proposal, Shape, TorchTransform
-from sbi.utils.sbiutils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
@@ -66,7 +65,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self.proposal = proposal
         self._normalization_constant = None
         self.method = method
-        self.theta_transform = theta_transform
 
         self.oversampling_factor = oversampling_factor
         self.max_sampling_batch_size = max_sampling_batch_size
@@ -78,33 +76,11 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         )
         self.x_shape = x_shape
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move the potential, the proposal and x_o to a new device.
-
-        It also reinstantiates the posterior with the new device.
-
-        Args:
-            device: Device on which to move the posterior to.
-        """
-        device = process_device(device)
-        self.device = device
-        self.potential_fn.to(device)  # type: ignore
-        self.proposal.to(device)
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-
-        self.theta_transform = mcmc_transform(self.proposal, device=device)
-        super().__init__(
-            self.potential_fn,
-            theta_transform=self.theta_transform,
-            device=device,
-            x_shape=self.x_shape,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
+    def to(self, device: Union[str, torch.device]) -> Self:
+        super().to(device)
+        if self._normalization_constant is not None:
+            self._normalization_constant = self._normalization_constant.to(self._device)
+        return self
 
     def log_prob(
         self,

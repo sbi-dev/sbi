@@ -25,6 +25,7 @@ from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     DirectPosteriorParameters,
+    FilteredDirectPosteriorParameters,
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
     RejectionPosteriorParameters,
@@ -54,8 +55,9 @@ from sbi.neural_nets.factory import (
     likelihood_nn,
     posterior_nn,
 )
+from sbi.neural_nets.net_builders.estimator_configs import TabPFNConfig
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
-from sbi.utils import BoxUniform
+from sbi.utils import BoxUniform, RestrictionEstimator
 from sbi.utils.sbiutils import seed_all_backends
 from sbi.utils.torchutils import gpu_available, process_device
 from sbi.utils.user_input_checks import process_x, validate_theta_and_x
@@ -781,66 +783,6 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
         )
 
 
-@pytest.fixture(scope="module")
-def trained_npe_for_device_test():
-    """Train NPE once, reused across all posterior .to() device tests."""
-    seed_all_backends(1)
-    num_dims = 2
-    num_simulations = 1000
-    prior = BoxUniform(-torch.ones(num_dims), torch.ones(num_dims))
-    trainer = NPE()
-    theta = prior.sample((num_simulations,))
-    x = theta + 0.1 * torch.randn_like(theta)
-    trainer.append_simulations(theta, x).train(max_num_epochs=10)
-    return trainer, prior
-
-
-@pytest.mark.gpu
-@pytest.mark.parametrize(
-    "posterior_params",
-    [
-        pytest.param(DirectPosteriorParameters(), id="direct"),
-        pytest.param(RejectionPosteriorParameters(), id="rejection"),
-        pytest.param(ImportanceSamplingPosteriorParameters(), id="importance"),
-        pytest.param(
-            MCMCPosteriorParameters(num_chains=1, warmup_steps=1, thin=1),
-            id="mcmc",
-        ),
-    ],
-)
-def test_to_method_on_npe_posteriors(trained_npe_for_device_test, posterior_params):
-    """Test .to() method moves posteriors to GPU correctly and sampling works."""
-    device = process_device("gpu")
-    trainer, prior = trained_npe_for_device_test
-    num_dims = 2
-    x_o = torch.zeros(num_dims).to(device)
-    posterior = trainer.build_posterior(
-        prior=prior,
-        posterior_parameters=posterior_params,
-    )
-    posterior.set_default_x(x_o)
-    posterior.to(device)
-
-    assert (posterior.device).split(":")[0] == device.split(":")[0], (
-        ".to() should change the device attribute"
-    )
-    sample_device = posterior.sample((10,), x=x_o)
-    assert sample_device.device.type == device.split(":")[0], (
-        f"sample was not correctly moved to {device}."
-    )
-    bound_potential = posterior.potential_fn.bind(x_o)
-    potential_values = bound_potential(sample_device)
-    assert potential_values.device.type == device.split(":")[0], (
-        f"potential was not correctly evaluated on {device}."
-    )
-
-    for transform in posterior.theta_transform._inv.base_transform.parts:
-        assert (
-            transform(torch.tensor([0.0], device=device)).device.type
-            == device.split(":")[0]
-        ), "Prior transform is on the correct device."
-
-
 @pytest.mark.gpu
 @pytest.mark.parametrize("move_with_to", [True, False])
 def test_ensemble_posterior_on_gpu(move_with_to: bool):
@@ -988,9 +930,17 @@ def test_npe_pfn_on_device(prior_device):
     x = theta + torch.randn_like(theta)
     x_o = torch.zeros(1, num_dim)
 
-    inferer = NPE_PFN(prior=prior, device=prior_device)
+    # A z-scoring embedding holds buffers that move with the posterior.
+    inferer = NPE_PFN(
+        prior=prior,
+        density_estimator=TabPFNConfig(z_score_condition="independent"),
+        device=prior_device,
+    )
     inferer.append_simulations(theta, x)
-    posterior = inferer.build_posterior(sample_with="filtered_direct")
+    # A filter smaller than the simulation budget runs the k-NN context filter.
+    posterior = inferer.build_posterior(
+        posterior_parameters=FilteredDirectPosteriorParameters(filter_size=10)
+    )
     posterior.set_default_x(x_o)
 
     expected_device = prior_device.split(":")[0]
@@ -1010,6 +960,12 @@ def test_npe_pfn_on_device(prior_device):
     assert posterior.posterior_estimator._context_input.device.type == "cpu", (
         "TabPFN context must always remain on CPU."
     )
+
+    other_device = process_device("gpu") if expected_device == "cpu" else "cpu"
+    posterior.to(other_device)
+    samples = posterior.sample((5,))
+    assert samples.device.type == torch.device(other_device).type
+    assert posterior.posterior_estimator._context_input.device.type == "cpu"
 
 
 @pytest.mark.gpu
@@ -1121,3 +1077,58 @@ def test_torch_load_map_location_reconciles_device(posterior_parameters):
     assert samples.device.type == "cpu", f"samples on {samples.device}"
     potential = loaded.potential(samples)
     assert potential.device.type == "cpu", f"potential on {potential.device}"
+
+
+def _restricted_prior_on(device: str):
+    prior = BoxUniform(-2 * ones(2, device=device), 2 * ones(2, device=device))
+    theta = prior.sample((300,))
+    x = theta.clone()
+    x[theta[:, 0] > 1.0] = float("nan")
+    restriction = RestrictionEstimator(prior=prior)
+    restriction.append_simulations(theta, x).train(max_num_epochs=5)
+    return prior, restriction
+
+
+@pytest.mark.gpu
+def test_restricted_prior_on_gpu():
+    """A restricted prior of a prior on the GPU samples there and moves with `to()`."""
+    device = process_device("gpu")
+    _, restriction = _restricted_prior_on(device)
+    restricted_prior = restriction.restrict_prior()
+
+    samples = restricted_prior.sample((10,))
+    assert samples.device.type == torch.device(device).type
+    log_prob = restricted_prior.log_prob(samples, norm_restricted_prior=False)
+    assert log_prob.device.type == torch.device(device).type
+
+    restricted_prior.to("cpu")
+    assert restricted_prior.sample((10,)).device.type == "cpu"
+
+
+@pytest.mark.gpu
+def test_torch_load_map_location_moves_restricted_prior_proposal():
+    """A mapped load moves a `RestrictedPrior` proposal along with the posterior."""
+    device = process_device("gpu")
+    prior, restriction = _restricted_prior_on(device)
+    restricted_prior = restriction.restrict_prior()
+    trainer = NPE(prior=prior, device=device, show_progress_bars=False)
+    theta = prior.sample((200,))
+    trainer.append_simulations(theta, theta + 0.1 * torch.randn_like(theta))
+    trainer.train(max_num_epochs=1)
+    posterior = MCMCPosterior(
+        trainer.build_posterior().potential_fn,
+        proposal=restricted_prior,
+        num_chains=1,
+        thin=1,
+        warmup_steps=1,
+        init_strategy="proposal",
+    )
+
+    buffer = io.BytesIO()
+    torch.save(posterior, buffer)
+    buffer.seek(0)
+    loaded = torch.load(buffer, weights_only=False, map_location="cpu")
+
+    assert loaded.proposal.sample((10,)).device.type == "cpu"
+    samples = loaded.sample((2,), x=zeros(1, 2), show_progress_bars=False)
+    assert samples.device.type == "cpu"

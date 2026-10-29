@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -60,9 +60,9 @@ class EnsemblePosterior(NeuralPosterior):
         weights: Weight of each posterior distribution. If none are provided each
             posterior is weighted with 1/N.
         priors: Prior distributions of all posterior components.
-        theta_transform: If passed, this transformation will be applied during the
-            optimization performed when obtaining the map. It does not affect the
-            .sample() and .log_prob() methods.
+        theta_transform: Transformation applied during the optimization performed
+            when obtaining the map. It does not affect the .sample() and .log_prob()
+            methods.
         device: device to host the posterior distribution.
     """
 
@@ -79,9 +79,11 @@ class EnsemblePosterior(NeuralPosterior):
                 up the ensemble.
             weights: Assign weights to posteriors manually, otherwise they will be
                 weighted with 1/N.
-            theta_transform: If passed, this transformation will be applied during the
-                optimization performed when obtaining the map. It does not affect the
-                `.sample()` and `.log_prob()` methods.
+            theta_transform: Transformation applied during the optimization performed
+                when obtaining the map. If None, the map is optimized in the
+                unconstrained space of the prior, or without a transform when the
+                components have no prior. It does not affect the `.sample()`
+                and `.log_prob()` methods.
             device: Device of the component posteriors. If None, infer it from them.
                 To move an ensemble, construct it on its components' device and then
                 call `.to(device)`.
@@ -92,7 +94,6 @@ class EnsemblePosterior(NeuralPosterior):
         """
         self.posteriors = posteriors
         self.num_components = len(posteriors)
-        self.theta_transform = theta_transform
         # Take first prior as reference
         self.prior = posteriors[0].potential_fn.prior
         component_device = self.ensure_same_device(posteriors)
@@ -103,28 +104,29 @@ class EnsemblePosterior(NeuralPosterior):
                 f"{component_device}. Construct the ensemble without device, then "
                 "call ensemble.to(device) to move it."
             )
+        if theta_transform is None and self.prior is not None:
+            theta_transform = mcmc_transform(self.prior, device=self.device)
+        self.theta_transform = theta_transform
 
         self.weights = weights
         self._build_potential_fns()
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """Moves each posterior to device.
-
-        Prior and weights are also moved to
-        the specified device.
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the ensemble and its component posteriors to `device` in place.
 
         Args:
             device: The device to move the ensemble posterior to.
+
+        Returns:
+            The ensemble posterior itself.
         """
-        device = process_device(device)
-        self.device = device
-        self._device = device
-        for i in range(len(self.posteriors)):
-            self.posteriors[i].to(device)
-        self.prior.to(device)
-        self.theta_transform = mcmc_transform(self.prior, device=device)
-        self._weights = self._weights.to(device)
-        self._build_potential_fns()
+        # The members move first: they keep their prior shared with their
+        # potential, and the ensemble potential then finds them on `device`.
+        for posterior in self.posteriors:
+            posterior.to(device)
+        super().to(device)
+        self._weights = self.potential_fn._weights
+        return self
 
     def _build_potential_fns(self):
         potential_fns = []
@@ -488,19 +490,20 @@ class EnsemblePotential(BasePotential):
         if self._x_o is not None:
             self.potential_fns = [p.bind(self._x_o) for p in self.potential_fns]
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Moves the ensemble potentials, the prior, the weights and x_o to
-
-        the specified device.
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the component potentials, the prior, the weights and x_o to `device`.
 
         Args:
             device: The device to move the ensemble potential to.
+
+        Returns:
+            Self for method chaining.
         """
         super().to(device)
         for potential_fn in self.potential_fns:
             potential_fn.to(self.device)
         self._weights = self._weights.to(self.device)
+        return self
 
     def allow_iid_x(self) -> bool:
         # in case there is different kinds of posteriors, this will produce an error
