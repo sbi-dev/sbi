@@ -682,6 +682,10 @@ class RestrictedPrior(Distribution):
 
         Returns:
             Samples from the `RestrictedPrior`.
+
+        Raises:
+            RuntimeError: If `sample_with="sir"` and the restriction rejects every
+                posterior sample that SIR draws before it gives up.
         """
         # The samplers import `sbi.utils`, so importing them at module level would
         # make every `sbi.utils` import inside `sbi.samplers` a circular import.
@@ -723,18 +727,13 @@ class RestrictedPrior(Distribution):
 
             num_samples = torch.Size(sample_shape).numel()
 
-            accept_reject_fn = lambda theta: self._accept_reject_fn(theta).type(
-                torch.float32
-            )
-
             samples = sampling_importance_resampling(
-                accept_reject_fn,
+                lambda theta: self.log_prob(theta, norm_restricted_prior=False),
                 proposal=self._posterior,
                 num_samples=num_samples,
                 num_candidate_samples=oversampling_factor,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-                device=self._device,
             )
         else:
             raise ValueError("Only [rejection | sir] implemented as `method`")
@@ -774,15 +773,11 @@ class RestrictedPrior(Distribution):
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
         with torch.set_grad_enabled(track_gradients):
-            # Evaluate on device, move back to cpu for comparison with prior.
-            prior_log_prob = self._prior.log_prob(theta)
-            accepted = self._accept_reject_fn(theta).bool()
-
-            masked_log_prob = torch.where(
-                accepted,
-                prior_log_prob,
-                torch.tensor(float("-inf"), dtype=torch.float32),
-            )
+            # A univariate prior or an `accept_reject_fn` can return shape (N, 1).
+            batch_shape = theta.shape[:-1]
+            prior_log_prob = self._prior.log_prob(theta).reshape(batch_shape)
+            accepted = self._accept_reject_fn(theta).bool().reshape(batch_shape)
+            masked_log_prob = prior_log_prob.masked_fill(~accepted, float("-inf"))
 
             if prior_acceptance_params is None:
                 prior_acceptance_params = dict()  # use defaults

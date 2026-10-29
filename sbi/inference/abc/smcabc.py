@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from numpy import ndarray
 from torch import Tensor
-from torch.distributions import Distribution, Multinomial, MultivariateNormal
+from torch.distributions import Distribution, MultivariateNormal
 
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.sbi_types import Array
@@ -158,7 +158,9 @@ class SMCABC(ABCBASE):
                 samples from the previous population when the budget is used up. If
                 False, the current population is discarded and the previous population
                 is returned.
-            lra: Whether to run linear regression adjustment as in Beaumont et al. 2002
+            lra: Whether to run linear regression adjustment as in Beaumont et al. 2002.
+                Adjusted particles keep their SMC weights. Those outside the prior
+                support are removed, so fewer than `num_particles` can be returned.
             lra_with_weights: Whether to run lra as weighted linear regression with SMC
                 weights
             sass: Whether to determine semi-automatic summary statistics (sass) as in
@@ -190,7 +192,8 @@ class SMCABC(ABCBASE):
                 can .sample() and .log_prob().
             summary (if return_summary True): dictionary containing the accepted
                 paramters (if kde True), distances and simulated data x of all
-                populations.
+                populations, and under `final_particles` and `final_weights` the
+                returned parameters (after LRA, if used) and their log weights.
 
         Examples:
             >>> from sbi.inference import SMCABC
@@ -291,8 +294,8 @@ class SMCABC(ABCBASE):
 
             # Resample population if effective sampling size is too small.
             if ess_min is not None:
-                particles, log_weights = self._resample_if_ess_too_small(
-                    particles, log_weights, ess_min, pop_idx
+                particles, log_weights, distances, x = self._resample_if_ess_too_small(
+                    particles, log_weights, distances, x, ess_min, pop_idx
                 )
 
             self.logger.info(
@@ -309,19 +312,23 @@ class SMCABC(ABCBASE):
             all_epsilons.append(epsilon)
             all_x.append(x)
 
-        # Maybe run LRA and adjust weights.
+        final_particles = all_particles[-1]
+        final_log_weights = all_log_weights[-1]
+        # Maybe run LRA. Adjusted particles keep their SMC weights, see Blum 2017,
+        # section 3.2: https://arxiv.org/abs/1707.01254
         if lra:
             self.logger.info("Running Linear regression adjustment.")
-            adjusted_particles, _ = self._run_lra_update_weights(
-                particles=all_particles[-1],
-                xs=all_x[-1],
+            adjusted_particles = self._run_lra(
+                theta=final_particles,
+                x=all_x[-1],
                 observation=process_x(x_o),
-                log_weights=all_log_weights[-1],
-                lra_with_weights=lra_with_weights,
+                sample_weight=final_log_weights.exp() if lra_with_weights else None,
             )
-            final_particles = adjusted_particles
-        else:
-            final_particles = all_particles[-1]
+            is_within = self._is_within_prior_after_lra(adjusted_particles)
+            final_particles = adjusted_particles[is_within]
+            final_log_weights = final_log_weights[is_within]
+            final_log_weights -= torch.logsumexp(final_log_weights, dim=0)
+            kde_kwargs = self._mask_kde_sample_weights(kde_kwargs, is_within)
 
         if kde:
             self.logger.info(
@@ -333,7 +340,7 @@ class SMCABC(ABCBASE):
             )
             # Maybe get particles weights from last population for weighted KDE.
             if kde_sample_weights:
-                kde_kwargs["sample_weights"] = all_log_weights[-1].exp()
+                kde_kwargs = dict(kde_kwargs, sample_weights=final_log_weights.exp())
 
             kde_dist = get_kde(final_particles, **kde_kwargs)
 
@@ -346,6 +353,8 @@ class SMCABC(ABCBASE):
                         epsilons=all_epsilons,
                         distances=all_distances,
                         xs=all_x,
+                        final_particles=final_particles,
+                        final_weights=final_log_weights,
                     ),
                 )
             else:
@@ -360,6 +369,8 @@ class SMCABC(ABCBASE):
                     epsilons=all_epsilons,
                     distances=all_distances,
                     xs=all_x,
+                    final_particles=final_particles,
+                    final_weights=final_log_weights,
                 ),
             )
         else:
@@ -494,8 +505,9 @@ class SMCABC(ABCBASE):
                         num_remaining,
                     )
                     # Some new particles have been accepted already, therefore
-                    # fill up the remaining once with old particles and weights.
-                    new_particles.append(particles[:num_remaining, :])
+                    # fill up with the closest old particles and their weights.
+                    closest = torch.argsort(distances)[:num_remaining]
+                    new_particles.append(particles[closest])
                     # Recalculate weights with new particles.
                     new_log_weights = [
                         self._calculate_new_log_weights(
@@ -504,8 +516,8 @@ class SMCABC(ABCBASE):
                             log_weights,
                         )
                     ]
-                    new_distances.append(distances[:num_remaining])
-                    new_x.append(x[:num_remaining])
+                    new_distances.append(distances[closest])
+                    new_x.append(x[closest])
                 else:
                     self.logger.info(
                         "Simulation Budget exceeded, returning previous population."
@@ -601,15 +613,12 @@ class SMCABC(ABCBASE):
         particles: Tensor, weights: Tensor, num_samples: int = 1
     ) -> Tensor:
         """Return samples from particles sampled with weights."""
+        return particles[SMCABC._sample_indices_with_weights(weights, num_samples)]
 
-        # define multinomial with weights as probs
-        multi = Multinomial(probs=weights)
-        # sample num samples, with replacement
-        samples = multi.sample(sample_shape=torch.Size((num_samples,)))
-        # get indices of success trials
-        indices = torch.where(samples)[1]
-        # return those indices from trace
-        return particles[indices]
+    @staticmethod
+    def _sample_indices_with_weights(weights: Tensor, num_samples: int) -> Tensor:
+        """Return indices drawn with replacement, with probabilities from weights."""
+        return torch.multinomial(weights, num_samples, replacement=True)
 
     def _sample_and_perturb(
         self, particles: Tensor, weights: Tensor, num_samples: int = 1
@@ -703,11 +712,17 @@ class SMCABC(ABCBASE):
         self,
         particles: Tensor,
         log_weights: Tensor,
+        distances: Tensor,
+        x: Tensor,
         ess_min: float,
         pop_idx: int,
-    ) -> Tuple[Tensor, Tensor]:
-        """Return resampled particles and uniform weights if effectice sampling size is
-        too small.
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Resample the population if the effective sampling size is too small.
+
+        Returns:
+            Particles, log weights (uniform after resampling), distances and
+            simulations, with distances and simulations kept paired with their
+            particles.
         """
 
         num_particles = particles.shape[0]
@@ -719,44 +734,11 @@ class SMCABC(ABCBASE):
         if ess < ess_min:
             self.logger.info("ESS=%s too low, resampling pop %s...", ess, pop_idx)
             # First resample, then set to uniform weights as in Sisson et al. 2007.
-            particles = self.sample_from_population_with_weights(
-                particles, torch.exp(log_weights), num_samples=num_particles
-            )
+            indices = self._sample_indices_with_weights(weights, num_particles)
+            particles, distances, x = particles[indices], distances[indices], x[indices]
             log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
-        return particles, log_weights
-
-    def _run_lra_update_weights(
-        self,
-        particles: Tensor,
-        xs: Tensor,
-        observation: Tensor,
-        log_weights: Tensor,
-        lra_with_weights: bool,
-    ) -> Tuple[Tensor, Tensor]:
-        """Return particles and weights adjusted with LRA.
-
-        Runs (weighted) linear regression from xs onto particles to adjust the
-        particles.
-
-        Updates the SMC weights according to the new particles.
-        """
-
-        adjusted_particels = super()._run_lra(
-            theta=particles,
-            x=xs,
-            observation=observation,
-            sample_weight=log_weights.exp() if lra_with_weights else None,
-        )
-
-        # Update SMC weights with LRA adjusted weights
-        adjusted_log_weights = self._calculate_new_log_weights(
-            new_particles=adjusted_particels,
-            old_particles=particles,
-            old_log_weights=log_weights,
-        )
-
-        return adjusted_particels, adjusted_log_weights
+        return particles, log_weights, distances, x
 
     def _run_sass_set_xo(
         self,

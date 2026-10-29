@@ -281,7 +281,7 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     theta_ = torch.rand(100, 2)
     x_ = torch.rand(100, 2)
     _ = inference.append_simulations(theta_, x_).train(max_num_epochs=1)
-    inference._set_state_for_mog_proposal()
+    inference._set_prior_state()
 
     precs1 = torch.inverse(covs1)
     precs2 = torch.inverse(covs2)
