@@ -274,7 +274,11 @@ def test_only_the_right_models_offer_the_unconstrained_transform(model):
     the others `z_score_parser` would silently make it a no-op.
     """
     config_cls = _DENSITY_CONFIGS[model]
-    implements_it = issubclass(config_cls, _UnconstrainedCapableConfigBase)
+    # NCSF models data on [-pi, pi), which any transform of the input would move.
+    implements_it = (
+        issubclass(config_cls, _UnconstrainedCapableConfigBase)
+        and config_cls is not ZukoNCSFConfig
+    )
 
     if implements_it:
         config_cls(
