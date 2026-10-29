@@ -699,6 +699,8 @@ class RestrictedPrior(Distribution):
             self._posterior = move_distribution_to_device(self._posterior, device)
         elif self._posterior is not None:
             self._posterior.to(device)
+        if self.acceptance_rate is not None:
+            self.acceptance_rate = self.acceptance_rate.to(device)
         # Set last: if the prior cannot move, the restricted prior keeps its device.
         self._device = device
         return self
