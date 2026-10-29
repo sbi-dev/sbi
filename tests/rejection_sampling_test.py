@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 import torch
-from torch.distributions import Uniform
+from torch.distributions import Normal, Uniform
 
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.samplers.rejection import accept_reject_sample, rejection_sample
@@ -53,6 +53,29 @@ def test_rejection_sample_timeout():
             max_sampling_time=0.01,
             m=1e12,
         )
+
+
+def test_rejection_sample_with_1d_proposal():
+    """Test rejection sampling from a 1-D proposal with batch shape (1,).
+
+    Its log prob has shape (N, 1), which would broadcast against the (N,) potential to
+    (N, N).
+    """
+    proposal = Normal(torch.zeros(1), 2 * torch.ones(1))
+
+    def potential_fn(theta):
+        return Normal(0.0, 1.0).log_prob(theta).sum(-1)
+
+    samples, _ = rejection_sample(
+        potential_fn=potential_fn,
+        proposal=proposal,
+        num_samples=4,
+        max_sampling_batch_size=8,
+        num_samples_to_find_max=8,
+        num_iter_to_find_max=2,
+    )
+
+    assert samples.shape == (4, 1)
 
 
 def test_reject_outside_prior_support_behavior():
