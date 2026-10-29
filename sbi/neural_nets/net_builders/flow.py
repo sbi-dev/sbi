@@ -1367,17 +1367,11 @@ def build_zuko_unconditional_flow(
         which_nf, x_numel, 0, hidden_features, num_transforms, **kwargs
     )
 
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
-        # z-score first, so that the flow transforms see standardized data.
-        transforms = (
-            standardizing_transform_zuko(batch_x, structured_x),
-            *base_transforms,
-        )
-    else:
-        transforms = base_transforms
+    # z-score first, so that the flow transforms see standardized data.
+    transforms = (
+        _prepare_x_transforms(z_score_x, batch_x, x_dist=None) + base_transforms
+    )
 
-    # Combine transforms.
     neural_net = zuko.flows.Flow(transforms, base)
 
     flow = ZukoUnconditionalFlow(
