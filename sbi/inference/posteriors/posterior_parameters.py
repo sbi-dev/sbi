@@ -393,8 +393,8 @@ class VIPosteriorParameters(PosteriorParameters):
         num_transforms: Number of transforms in the normalizing flow. Used for
             both single-x VI (via set_q/train) and amortized VI (via
             train_amortized).
-        hidden_features: Hidden layer size in the flow networks. Used for both
-            single-x VI and amortized VI.
+        hidden_features: Width of the two hidden layers in each transform's
+            network. Used for both single-x VI and amortized VI.
         z_score_theta: Method for z-scoring θ (the parameters being sampled).
             One of "none", "independent", "structured". Used for both single-x
             VI and amortized VI. Use "structured" for parameters with

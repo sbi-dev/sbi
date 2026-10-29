@@ -167,8 +167,8 @@ class VIPosterior(NeuralPosterior):
                 attribute.
             num_transforms: Number of transforms in the normalizing flow. Used for
                 both single-x VI (when q is a string flow type) and amortized VI.
-            hidden_features: Hidden layer size in flow networks. Used for both
-                single-x VI and amortized VI.
+            hidden_features: Width of the two hidden layers in each transform's
+                network. Used for both single-x VI and amortized VI.
             z_score_theta: Method for z-scoring θ (parameters). One of "none",
                 "independent", "structured". Used for both single-x VI and amortized
                 VI. Use "structured" for parameters with correlations.
@@ -298,8 +298,8 @@ class VIPosterior(NeuralPosterior):
             flow_type: Type of flow, one of ["maf", "nsf", "naf", "unaf", "nice",
                 "sospf", "gf"]. For "gaussian"/"gaussian_diag", use LearnableGaussian.
             num_transforms: Number of flow transforms. If None, uses instance default.
-            hidden_features: Number of hidden features per layer. If None, uses
-                instance default.
+            hidden_features: Width of the two hidden layers in each transform's
+                network. If None, uses instance default.
             z_score_theta: Method for z-scoring theta (parameters). One of
                 "independent", "structured", or "none". If None, uses instance default.
                 Use "structured" for parameters with correlations.
@@ -1015,8 +1015,8 @@ class VIPosterior(NeuralPosterior):
                 If None, uses value from params or instance default.
             num_transforms: Number of transforms in the flow. If None, uses value
                 from params or instance default.
-            hidden_features: Hidden layer size in the flow. If None, uses value
-                from params or instance default.
+            hidden_features: Width of the two hidden layers in each transform's
+                network. If None, uses value from params or instance default.
             z_score_theta: Method for z-scoring θ (the parameters being modeled).
                 One of "none", "independent", "structured". If None, uses value
                 from params or instance default.
