@@ -8,7 +8,10 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    resolve_track_gradients,
+)
 from sbi.neural_nets.estimators import (
     ConditionalDensityEstimator,
     MixedDensityEstimator,
@@ -124,42 +127,43 @@ class LikelihoodBasedPotential(BasePotential):
         bound._x_is_iid = x_is_iid
         return bound
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
         r"""Returns the potential $\log(p(x_o|\theta)p(\theta))$.
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
-            track_gradients: Whether to track the gradients.
+            track_gradients: Whether to track the gradients. `None` keeps the
+                caller's grad mode.
 
         Returns:
             The potential $\log(p(x_o|\theta)p(\theta))$.
         """
+        track_gradients = resolve_track_gradients(track_gradients)
         with torch.set_grad_enabled(track_gradients):
             log_prior = self.prior.log_prob(theta)  # type: ignore
-        if self.x_is_iid:
-            # For each theta, calculate the likelihood sum over all x in batch.
-            log_likelihood_trial_sum = _log_likelihoods_over_trials(
-                x=self.x_o,
-                theta=theta.to(self.device),
-                estimator=self.likelihood_estimator,
-                track_gradients=track_gradients,
-            )
-            return log_likelihood_trial_sum + log_prior
-        else:
-            # Calculate likelihood for each (theta,x) pair separately
-            theta_batch_size = theta.shape[0]
-            x_batch_size = self.x_o.shape[0]
-            assert theta_batch_size == x_batch_size, (
-                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
-                When performing batched sampling for multiple `x`, the batch size of\
-                `theta` must match the batch size of `x`."
-            )
-            x = self.x_o.unsqueeze(0)
-            with torch.set_grad_enabled(track_gradients):
+            if self.x_is_iid:
+                # For each theta, calculate the likelihood sum over all x in batch.
+                log_likelihood_trial_sum = _log_likelihoods_over_trials(
+                    x=self.x_o,
+                    theta=theta.to(self.device),
+                    estimator=self.likelihood_estimator,
+                    track_gradients=track_gradients,
+                )
+                return log_likelihood_trial_sum + log_prior
+            else:
+                # Calculate likelihood for each (theta,x) pair separately
+                theta_batch_size = theta.shape[0]
+                x_batch_size = self.x_o.shape[0]
+                assert theta_batch_size == x_batch_size, (
+                    f"Batch size mismatch: {theta_batch_size} and {x_batch_size}. "
+                    "When performing batched sampling for multiple `x`, the batch size "
+                    "of `theta` must match the batch size of `x`."
+                )
+                x = self.x_o.unsqueeze(0)
                 log_likelihood_batches = self.likelihood_estimator.log_prob(
                     x, condition=theta
                 )
-            return log_likelihood_batches + log_prior
+                return log_likelihood_batches + log_prior
 
     def condition_on_theta(
         self,
@@ -205,40 +209,45 @@ class LikelihoodBasedPotential(BasePotential):
         global_prior_device = None
 
         def conditioned_potential(
-            theta: Tensor, x_o: Optional[Tensor] = None, track_gradients: bool = True
+            theta: Tensor,
+            x_o: Optional[Tensor] = None,
+            track_gradients: Optional[bool] = None,
         ) -> Tensor:
             nonlocal global_prior, global_prior_device
-            assert len(dims_global_theta) == theta.shape[-1], (
-                "dims_global_theta must match the number of parameters to sample."
-            )
-            if theta.dim() > 2:
-                assert theta.shape[0] == 1, (
-                    "condition_on_theta does not support sample shape for theta."
-                )
-                theta = theta.squeeze(0)
-            global_theta = theta[:, dims_global_theta].to(self.device)
-            x_o = x_o if x_o is not None else self.x_o
-            # x needs shape (sample_dim (iid), batch_dim (xs), *event_shape)
-            if x_o.dim() < 3:
-                x_o = reshape_to_sample_batch_event(
-                    x_o, event_shape=x_o.shape[1:], leading_is_sample=self.x_is_iid
-                )
-
-            log_likelihood = _log_likelihood_over_iid_trials_and_local_theta(
-                x=x_o.to(self.device),
-                global_theta=global_theta,
-                local_theta=local_theta.to(self.device),
-                estimator=self.likelihood_estimator,
-                track_gradients=track_gradients,
-            )
-            # Follow the device of this potential, also after `.to()`.
-            if global_prior_device != self.device:
-                global_prior = move_distribution_to_device(global_prior, self.device)
-                global_prior_device = self.device
-            # Priors with batch_shape [1] return one log prob per dimension.
+            track_gradients = resolve_track_gradients(track_gradients)
             with torch.set_grad_enabled(track_gradients):
+                assert len(dims_global_theta) == theta.shape[-1], (
+                    "dims_global_theta must match the number of parameters to sample."
+                )
+                if theta.dim() > 2:
+                    assert theta.shape[0] == 1, (
+                        "condition_on_theta does not support sample shape for theta."
+                    )
+                    theta = theta.squeeze(0)
+                global_theta = theta[:, dims_global_theta].to(self.device)
+                x_o = x_o if x_o is not None else self.x_o
+                # x needs shape (sample_dim (iid), batch_dim (xs), *event_shape)
+                if x_o.dim() < 3:
+                    x_o = reshape_to_sample_batch_event(
+                        x_o, event_shape=x_o.shape[1:], leading_is_sample=self.x_is_iid
+                    )
+
+                log_likelihood = _log_likelihood_over_iid_trials_and_local_theta(
+                    x=x_o.to(self.device),
+                    global_theta=global_theta,
+                    local_theta=local_theta.to(self.device),
+                    estimator=self.likelihood_estimator,
+                    track_gradients=track_gradients,
+                )
+                # Follow the device of this potential, also after `.to()`.
+                if global_prior_device != self.device:
+                    global_prior = move_distribution_to_device(
+                        global_prior, self.device
+                    )
+                    global_prior_device = self.device
+                # Priors with batch_shape [1] return one log prob per dimension.
                 log_prior = global_prior.log_prob(global_theta)
-            return log_likelihood + log_prior.reshape(len(global_theta), -1).sum(-1)
+                return log_likelihood + log_prior.reshape(len(global_theta), -1).sum(-1)
 
         return conditioned_potential
 
@@ -466,24 +475,24 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
             stacklevel=2,
         )
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
+        track_gradients = resolve_track_gradients(track_gradients)
         with torch.set_grad_enabled(track_gradients):
             prior_log_prob = self.prior.log_prob(theta)  # type: ignore
 
-        # Shape of `x` is (iid_dim, *event_shape)
-        theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
-        x = reshape_to_sample_batch_event(
-            self.x_o, event_shape=self.x_o.shape[1:], leading_is_sample=True
-        )
-        theta_batch_dim = theta.shape[0]
-        # Match the number of `x` to the number of conditions (`theta`). This is
-        # importantif the potential is simulataneously evaluated at multiple `theta`
-        # (e.g. multi-chain MCMC).
-        trailing_minus_ones = [-1 for _ in range(x.dim() - 2)]
-        x = x.expand(-1, theta_batch_dim, *trailing_minus_ones)
+            # Shape of `x` is (iid_dim, *event_shape)
+            theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
+            x = reshape_to_sample_batch_event(
+                self.x_o, event_shape=self.x_o.shape[1:], leading_is_sample=True
+            )
+            theta_batch_dim = theta.shape[0]
+            # Match the number of `x` to the number of conditions (`theta`). This is
+            # importantif the potential is simulataneously evaluated at multiple `theta`
+            # (e.g. multi-chain MCMC).
+            trailing_minus_ones = [-1 for _ in range(x.dim() - 2)]
+            x = x.expand(-1, theta_batch_dim, *trailing_minus_ones)
 
-        # Calculate likelihood in one batch.
-        with torch.set_grad_enabled(track_gradients):
+            # Calculate likelihood in one batch.
             # Call the specific log prob method of the mixed likelihood estimator as
             # this optimizes the evaluation of the discrete data part.
             log_likelihood_trial_batch = self.likelihood_estimator.log_prob(
@@ -495,4 +504,4 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
                 self.x_o.shape[0], -1
             ).sum(0)
 
-        return log_likelihood_trial_sum + prior_log_prob
+            return log_likelihood_trial_sum + prior_log_prob
