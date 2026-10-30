@@ -35,6 +35,9 @@ argv = sys.argv[1:]
 paper = Path(argv[argv.index("--paper-dir") + 1]).expanduser()
 out = Path(argv[argv.index("--out") + 1]).expanduser()
 seed = int(argv[argv.index("--seed") + 1]) if "--seed" in argv else 0
+mf_best_epoch = "--mf-best-epoch" in argv
+if mf_best_epoch:
+    argv.remove("--mf-best-epoch")
 for flag in ("--paper-dir", "--out", "--seed"):
     if flag in argv:
         position = argv.index(flag)
@@ -81,6 +84,36 @@ from experiments.tasks.base import Task  # noqa: E402
 paper_training.CausalDiffusionTransformer = ForkableDiffusionTransformer
 
 ARMS = {"mf_dit": ("mf", "causal_dit"), "nf": ("nf", "time_mlp")}
+
+
+class KeepBestWeights(paper_training.keras.callbacks.Callback):
+    """Restores the weights of the epoch with the lowest validation loss at the end."""
+
+    stopped_epoch = 0  # read by their trainer's summary line
+
+    def on_train_begin(self, logs=None):
+        self.best, self.weights, self.best_epoch = float("inf"), None, None
+
+    def on_epoch_end(self, epoch, logs=None):
+        loss = (logs or {}).get("val_loss")
+        if loss is not None and loss < self.best:
+            self.best, self.best_epoch = loss, epoch + 1
+            self.weights = self.model.get_weights()
+
+    def on_train_end(self, logs=None):
+        if self.weights is not None:
+            self.model.set_weights(self.weights)
+            print(f"[mf] kept epoch {self.best_epoch}, validation loss {self.best:.4f}")
+
+
+if mf_best_epoch:
+    # The mean flow alone, at its best epoch; the checkpoint name does not record this,
+    # so give such a run its own `--checkpoint-dir`.
+    paper_stopping = paper_training.early_stopping
+    paper_training.early_stopping = lambda kind, config, networks: (
+        KeepBestWeights() if kind == "mf" else paper_stopping(kind, config, networks)
+    )
+    ARMS = {"mf_dit": ARMS["mf_dit"]}
 KINDS = {arm: kind for arm, (kind, _) in ARMS.items()}
 TRAIN_SIZE = 8192
 
