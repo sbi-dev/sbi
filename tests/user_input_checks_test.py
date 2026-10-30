@@ -298,16 +298,39 @@ def test_process_prior(prior):
     )
 
 
-def test_process_prior_casts_support_dtype():
+def _support_lower_bound(prior):
+    """Return the lower bound of a prior support, unwrapping nested constraints."""
+    support = prior.support
+    while hasattr(support, "base_constraint"):
+        support = support.base_constraint
+    return support.lower_bound
+
+
+@pytest.mark.parametrize(
+    "prior",
+    (
+        pytest.param(
+            Pareto(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64)),
+            id="pareto",
+        ),
+        pytest.param(
+            Independent(
+                Uniform(zeros(2, dtype=torch.float64), ones(2, dtype=torch.float64)),
+                1,
+            ),
+            id="independent-uniform",
+        ),
+    ),
+)
+def test_process_prior_casts_support_dtype(prior):
     """Test that the output prior's samples and support have the same dtype.
 
     This is a regression test for a previous issue where sample and support dtypes
     could mismatch in the output prior in the specific case of a distribution with a
     tensor support that is not already a float32 tensor.
     """
-    prior = Pareto(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64))
     prior, _, _ = process_prior(prior)  # output prior
-    assert prior.sample().dtype == prior.support.lower_bound.dtype
+    assert prior.sample().dtype == _support_lower_bound(prior).dtype
 
 
 def test_process_prior_warns_and_keeps_shapes_for_float64_prior():
