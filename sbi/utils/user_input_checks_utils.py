@@ -11,6 +11,7 @@ from torch.distributions import (
     Binomial,
     Categorical,
     Distribution,
+    Independent,
     Multinomial,
     MultivariateNormal,
     constraints,
@@ -132,7 +133,15 @@ def convert_distribution_to_float32(
     # Attempt to rebuild the distribution by casting its float parameters to float32.
     rebuilt = None
     try:
-        rebuilt = type(dist)(**cast_distribution_parameters_to_float32(dist))
+        if isinstance(dist, Independent):
+            # Need to apply to base distributions within Independent.
+            rebuilt = Independent(
+                convert_distribution_to_float32(dist.base_dist),
+                dist.reinterpreted_batch_ndims,
+            )
+        else:
+            rebuilt = type(dist)(**cast_distribution_parameters_to_float32(dist))
+
         # Not a constructor argument: a user subclass need not accept it.
         set_validate_args(rebuilt, dist._validate_args)
         if rebuilt.sample().dtype == float32:
