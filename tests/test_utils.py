@@ -12,10 +12,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.potentials.base_potential import (
-    BasePotential,
-    resolve_track_gradients,
-)
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, within_support
@@ -200,20 +197,20 @@ class PosteriorPotential(BasePotential):
         )
         self.posterior = posterior
 
-    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
-            track_gradients: Whether to track the gradients. `None` keeps the
-                caller's grad mode.
+            track_gradients: Whether to track the gradients.
 
         Returns:
             The potential.
         """
 
-        with torch.set_grad_enabled(resolve_track_gradients(track_gradients)):
-            theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+
+        with torch.set_grad_enabled(track_gradients):
             posterior_log_prob = self.posterior.log_prob(theta)
 
             # Force probability to be zero outside prior support.
@@ -224,7 +221,7 @@ class PosteriorPotential(BasePotential):
                 posterior_log_prob,
                 torch.tensor(float("-inf"), dtype=torch.float32, device=self.device),
             )
-            return posterior_log_prob
+        return posterior_log_prob
 
 
 class TractablePosterior(NeuralPosterior):

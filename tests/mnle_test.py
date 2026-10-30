@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from dataclasses import asdict
-from typing import Optional, Union
+from typing import Union
 
 import pytest
 import torch
@@ -21,10 +21,7 @@ from sbi.inference import MNLE, MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.inference.potentials.base_potential import (
-    BasePotential,
-    resolve_track_gradients,
-)
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.likelihood_based_potential import (
     _log_likelihood_over_iid_trials_and_local_theta,
     likelihood_estimator_based_potential,
@@ -211,10 +208,13 @@ class BinomialGammaPotential(BasePotential):
 
         self.concentration_scaling = concentration_scaling
 
-    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
-        with torch.set_grad_enabled(resolve_track_gradients(track_gradients)):
-            theta = atleast_2d(theta)
-            return self.iid_likelihood(theta) + self.prior.log_prob(theta)
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+        theta = atleast_2d(theta)
+
+        with torch.set_grad_enabled(track_gradients):
+            iid_ll = self.iid_likelihood(theta)
+
+        return iid_ll + self.prior.log_prob(theta)
 
     def iid_likelihood(self, theta: Tensor) -> Tensor:
         batch_size = theta.shape[0]
