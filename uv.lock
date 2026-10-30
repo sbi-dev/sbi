@@ -4335,7 +4335,7 @@ tabpfn = [
 [package.metadata]
 requires-dist = [
     { name = "ffmpeg", marker = "extra == 'dev'" },
-    { name = "joblib", specifier = ">=1.0.0" },
+    { name = "joblib", specifier = ">=1.3.0" },
     { name = "jupytext", marker = "extra == 'doc'" },
     { name = "matplotlib" },
     { name = "myst-nb", marker = "extra == 'doc'" },

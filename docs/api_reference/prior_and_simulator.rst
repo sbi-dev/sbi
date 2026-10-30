@@ -15,3 +15,5 @@ Prior and simulator
    sbi.utils.RestrictedPrior
    sbi.utils.RestrictionEstimator
    sbi.inference.simulate_for_sbi
+   sbi.utils.simulate_from_theta
+   sbi.utils.parallelize_simulator
