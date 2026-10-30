@@ -1,4 +1,4 @@
-# Mean flow in sbi: results (2026-10-22 to 2026-10-28)
+# Mean flow in sbi: results (2026-10-22 to 2026-10-30)
 
 Question: is a conditional mean flow (see `paper_summary.md`) a useful density estimator in sbi, above all as an NLE likelihood compared with sbi's NSF?
 
@@ -150,11 +150,53 @@ Our results do not contradict the paper; they narrow it. The paper makes two dif
 
 **In one sentence:** mean flows bring flow-matching-class density estimators into likelihood-based inference at normalizing-flow cost, but not at better-than-normalizing-flow accuracy in general.
 
-**Where the method could still matter: architectures that flows cannot use.** A normalizing flow needs an invertible architecture with a cheap Jacobian determinant, so its network is constrained to coupling or autoregressive layers of fixed width. A mean flow only needs a network that predicts an average velocity; the density comes from autodiff of the flow map. Any architecture works, including a transformer over tokens. The paper uses this in its third experiment: a stochastic renewal epidemic model (128 whitened Gaussian-process coefficients for $\log R_t$, 123 observed log-incidence values, 30% missing completely at random, 8,192 simulations). Its mean flow runs on a transformer that treats each observation as a token and takes a mask of the missing ones, so it learns the density of the observed coordinates with the missing ones integrated out, which is the correct likelihood under random missingness. The coupling flow can only be shown a fill-in value (−1) where data are missing. The paper reports lower parameter error (0.187 against 0.199), lower predictive error (0.060 against 0.125) and calibration for the mean flow, with the flow finishing 22x sooner (1,624 s against 36,146 s). If there is a case for the mean flow in sbi, it is this one: likelihoods over observations of varying size and missingness, which sbi's NLE cannot express today. We have not tested it; the obvious competitor in sbi is NPE with the missingness mask appended to the observation, which needs no new estimator.
+**Where the method could still matter: architectures that flows cannot use.** A normalizing flow needs an invertible architecture with a cheap Jacobian determinant, so its network is constrained to coupling or autoregressive layers of fixed width. A mean flow only needs a network that predicts an average velocity; the density comes from autodiff of the flow map. Any architecture works, including a transformer over tokens. The paper uses this in its third experiment: a stochastic renewal epidemic model (128 whitened Gaussian-process coefficients for $\log R_t$, 123 observed log-incidence values, 30% missing completely at random, 8,192 simulations). Its mean flow runs on a transformer that treats each observation as a token and takes a mask of the missing ones, so it learns the density of the observed coordinates with the missing ones integrated out, which is the correct likelihood under random missingness. The coupling flow can only be shown a fill-in value (−1) where data are missing. The paper reports lower parameter error (0.187 against 0.199), lower predictive error (0.060 against 0.125) and calibration for the mean flow, with the flow finishing 22x sooner (1,624 s against 36,146 s). If there is a case for the mean flow in sbi, it is this one: likelihoods over observations of varying size and missingness, which sbi's NLE cannot express today. The obvious competitor in sbi is NPE with the missingness mask appended to the observation, which needs no new estimator. The next section tests both on a tractable stand-in.
+
+## Missing data: masked-transformer mean flow against NPE with a mask (2026-10-30)
+
+**Question.** Does the paper's third experiment hold up when the baseline is what sbi offers today, NPE with the missingness mask appended? Plan and decision rule, set in advance: `.claude/plans/weekend-checks-2026-10-31.md`, check 2 (local note).
+
+**Task.** The paper's renewal model has no tractable likelihood, so its scores are errors against the true parameters. We use a tractable stand-in with an exact likelihood for every missingness pattern (`scripts/missing/wave_task.py`): 4 parameters of an epidemic-like wave (growth rate, peak time, peak height, decay rate), log-incidence on 32 time points, Gaussian AR(1) noise with correlation 0.8 and sd 0.15, 30% missing completely at random with the paper's rule. 8,192 simulations, 10 evaluation datasets with one pattern each (19 to 29 of 32 points present). The noise level puts the posterior sd at 23 to 30% of the prior sd (the paper's task: about 15%). Reference posteriors: 20,000 draws per dataset by adaptive importance sampling on the exact likelihood (ESS about 220,000 of 400,000).
+
+**Arms.** 3 training seeds each.
+
+1. `mf_dit`: the paper's mean flow on their diffusion transformer with the missing-target mask, their code (`scripts/missing/paper_arms.py`). The attention is not causal: their causal transformer needs the parameters to span the time grid. 1,000 epochs, last epoch, NUTS at S=1, 4,000 draws, as in the paper.
+2. `nf`: the paper's spline coupling flow, shown −1 where a value is missing, depth 5, up to 1,000 epochs with their early stopping (stopped after 87 to 116), NUTS.
+3. `sbi_npe`: sbi NPE with the NSF; the observation standardized, missing entries set to 0 and the 0/1 mask appended; a new mask per training simulation every epoch; best epoch (262 to 478 epochs, 8 to 14 min on CPU) (`scripts/missing/sbi_npe.py`).
+
+**Results** (`results/missing/`, from `scripts/missing/score.py` and `stats.py`). C2ST against the reference (4,000 draws per side), mean over 10 datasets; parameter RMSE of the posterior mean against the true θ (prior units; the reference posterior itself gives 0.269).
+
+| Arm | C2ST, mean of 3 seeds | C2ST per seed | RMSE per seed |
+|---|---|---|---|
+| mean flow, transformer (`mf_dit`) | **0.614** | 0.602, 0.607, 0.632 | 0.268, 0.315, 0.277 |
+| sbi NPE, mask appended | 0.645 | 0.669, 0.630, 0.636 | 0.278, 0.276, 0.263 |
+| coupling flow, −1 fill (`nf`) | 0.745 | 0.736, 0.762, 0.737 | 0.286, 0.300, 0.343 |
+
+Paired differences in C2ST (mean over seeds per dataset, standard error over the 10 datasets):
+
+| Comparison | Difference |
+|---|---|
+| mean flow − sbi NPE | −0.031 (0.014) |
+| mean flow − sbi NPE, without the 2 non-converged NUTS runs | −0.026 (0.015) |
+| coupling flow − sbi NPE | +0.100 (0.012) |
+| mean flow − coupling flow | −0.131 (0.013) |
+
+**Cost.** NUTS per dataset (V100, the paper's sampler): median 1,924 s for the mean flow against 300 s for the coupling flow, 46 s against 4.5 s per 1,000 network evaluations. 2 of the 30 mean-flow runs failed the convergence gate (bulk ESS 29 and 7, R-hat 1.11 and 1.53); all 30 coupling-flow runs passed. NPE is amortized and samples a new observation in seconds.
+
+**Findings.**
+
+1. The paper's claim against its own baseline reproduces clearly: the masked transformer beats the coupling flow with a fill-in value by 0.13 C2ST, and by 0.02 in parameter RMSE (0.287 against 0.310, mean of 3 seeds).
+2. That baseline is weak. NPE with the mask appended, available in sbi without new code, is 0.10 C2ST better than it.
+3. Against NPE with a mask, the mean flow gains 0.03 C2ST. This meets the rule set in advance (more than 0.02 and more than 2 standard errors, 2 × 0.014 = 0.028) only narrowly, and fails it without the two non-converged runs (2 × 0.015 = 0.030). Parameter RMSE shows no gain: all arms sit near the reference's 0.27, with NPE the most stable over seeds.
+4. The gain costs a lot: about 30 min of NUTS per observation, against seconds for amortized NPE, and 2 of 30 chains did not converge.
+
+**Caveats.** Arm 1 against arm 3 compares NLE with a transformer against NPE with an MLP, so the difference cannot be pinned on the transformer alone. The mean flow ran at its last epoch only (the plan also asked for the best epoch; not run). The task is small: 4 parameters and 32 tokens favour NPE with a mask, and the paper's regime (128 parameters, 123 tokens) could differ.
+
+**What it means for sbi.** No case for adding the mean flow for missing data on this evidence. The useful outcome is the recipe that matched it at a fraction of the cost: standardize, set missing entries to 0, append the mask, and redraw the mask per epoch. sbi's documentation does not describe missing data at all; a short how-to guide with this recipe would serve users.
 
 ## Bugs in existing sbi found on the way
 
-Both are fixed on branch `fix/sample-shapes-and-mcmc-init-grad` (PR pending) and in the first two commits of this branch.
+Both are fixed in the first two commits of this branch, and for sbi on their own branches from main: `fix/sample-and-log-prob-sample-shape` and `fix/importance-weights-no-grad` (PRs pending). The second fix grew into a root-cause fix: potentials now follow the caller's grad mode by default, which also removes the unused graph in rejection sampling, importance sampling, the VI quality check and the MAP search.
 
 - `ConditionalDensityEstimator.sample_and_log_prob` passed samples with several sample dimensions to `log_prob`, which takes one. With `sample_shape=(2, 3)` and more than one condition the MDN raised a broadcasting error. Affects the MDN, the MNLE estimator and the categorical estimator.
 - The `resample` and `sir` MCMC init strategies evaluate 10,000 candidates per chain inside `torch.no_grad()`, but sbi potentials default to `track_gradients=True` and turn gradients back on. Every MCMC init built an unused autograd graph: NSF (128 hidden features) on SLCP needed 335 MB extra peak memory instead of 46 MB; the mean flow 5.4 GB instead of 0.6 GB. Results are bit-identical with the fix.
@@ -165,6 +207,8 @@ Both are fixed on branch `fix/sample-shapes-and-mcmc-init-grad` (PR pending) and
 - The paper recipe without model selection overfits at 2,000 simulations (above); with plenty of data, best-epoch selection on the mean-flow loss can pick worse weights than the last epoch (g-and-k, slcp), but the last epoch can also fail (gaussian_linear at 50,176 with sbi's network). Report both.
 
 ## Verdict
+
+After the missing-data check (2026-10-30): unchanged. The masked-transformer mean flow beats the paper's fill-in coupling flow by 0.13 C2ST, but sbi NPE with the mask appended comes within 0.03 at a fraction of the cost.
 
 After the NLE benchmark (2026-10-28): park the mean flow; do not add it to sbi. With plenty of data it ties sbi's default NSF on three of four mini-sbibm tasks and loses on slcp, with either network. Its gains are narrow: g-and-k with the paper's network only, and 0.03 to 0.05 C2ST on gaussian_linear and slcp at 2,000 simulations with sbi's network only. Against that stand 14 to 20x the training time (2,000 simulations, CPU), 1.4 to 1.9x the MCMC time at S=1, a training recipe that sbi's `train()` does not offer, and no reliable rule for which epoch to keep. The branch stays as a documented experiment; the fixes for sbi that came out of it are listed separately.
 
