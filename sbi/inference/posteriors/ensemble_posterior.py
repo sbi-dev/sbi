@@ -390,10 +390,13 @@ class EnsemblePosterior(NeuralPosterior):
             num_to_optimize: From the drawn `num_init_samples`, use the
                 `num_to_optimize` with highest log-probability as the initial points
             learning_rate: Learning rate of the optimizer.
-            init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+            init_method: How to select the starting parameters for the optimization.
+                For the joint ensemble MAP it must be `posterior`, which samples the
+                posterior `num_init_samples` times. With `individually=True` it is
+                passed to each component, so the supported strings depend on the
+                component (for example `MCMCPosterior` also accepts `proposal`). If it
+                is a tensor, the tensor is used as the initial locations, so
+                prior-based initialization can be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
                 for the optimization.
@@ -431,15 +434,10 @@ class EnsemblePosterior(NeuralPosterior):
             return log_weights, maps
 
         else:
-            self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
-
-            if init_method == "posterior":
-                inits = self.sample((num_init_samples,), self._x_else_default_x(x))
-            elif isinstance(init_method, Tensor):
-                inits = init_method
-            else:
-                raise ValueError
-
+            x = self._x_else_default_x(x)
+            self.potential_fn = self.potential_fn.bind(x)
+            inits = self._map_inits(init_method, num_init_samples, x)
+            # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(
                 potential_fn=self.potential_fn,
                 inits=inits,

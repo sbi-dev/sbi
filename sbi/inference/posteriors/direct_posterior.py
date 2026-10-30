@@ -492,7 +492,7 @@ class DirectPosterior(NeuralPosterior):
 
         The factor is estimated from the acceptance probability during rejection
         sampling from the posterior. It is saved for the last `x` and re-estimated
-        whenever `x` changes. It is 1 for unbounded priors.
+        whenever `x` or `num_rejection_samples` changes. It is 1 for unbounded priors.
 
         Arguments:
             x: Observation at which to estimate the factor.
@@ -504,6 +504,7 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
+        x = self._x_else_default_x(x)
 
         def acceptance() -> Tensor:
             return rejection.accept_reject_sample(
@@ -520,7 +521,9 @@ class DirectPosterior(NeuralPosterior):
                 },
             )[1]
 
-        return self._cached_leakage_factor(x, self.prior, acceptance, force_update)
+        return self._cached_leakage_factor(
+            x, num_rejection_samples, self.prior, acceptance, force_update
+        )
 
     def map(
         self,
@@ -555,9 +558,10 @@ class DirectPosterior(NeuralPosterior):
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it must be `posterior`, which samples the
+                posterior `num_init_samples` times. If it is a tensor, the tensor is
+                used as the initial locations, so prior-based initialization can be
+                done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the
