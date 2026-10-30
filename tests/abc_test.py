@@ -465,6 +465,32 @@ def test_smcabc_resampling_keeps_particles_paired_with_simulations():
         assert torch.allclose(distances, smcabc.distance(zeros(1, 2), xs))
 
 
+@pytest.mark.parametrize("first_call_sass", [False, True])
+def test_smcabc_second_call_matches_a_fresh_instance(first_call_sass: bool):
+    """A second call must not reuse the budget or the SASS simulator of the first."""
+    prior = BoxUniform(-ones(2), ones(2))
+
+    def simulator(theta):
+        return theta + 0.05 * torch.randn_like(theta)
+
+    call_kwargs = dict(
+        num_particles=50,
+        num_initial_pop=100,
+        num_simulations=400,
+        epsilon_decay=0.5,
+    )
+
+    reused = SMCABC(simulator, prior)
+    reused(zeros(1, 2), sass=first_call_sass, **call_kwargs)
+    torch.manual_seed(0)
+    samples_reused = reused(zeros(1, 2), **call_kwargs)
+
+    torch.manual_seed(0)
+    samples_fresh = SMCABC(simulator, prior)(zeros(1, 2), **call_kwargs)
+
+    assert torch.equal(samples_reused, samples_fresh)
+
+
 @pytest.mark.parametrize(
     "method, call_kwargs, per_sample_key",
     [
