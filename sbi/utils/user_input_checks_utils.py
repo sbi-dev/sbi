@@ -24,14 +24,8 @@ from sbi.utils.torchutils import (
 )
 
 
-def get_distribution_parameters(
-    dist: Distribution, device: Union[str, torch.device]
-) -> Dict:
-    """Used to get the tensors of the parameters in torch distributions.
-
-    Returns the tensors relocated to device.
-    """
-    params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
+def _remove_non_constructor_arguments(params: dict, dist: Distribution) -> dict:
+    """Remove parameters not to pass to the distribution's constructor."""
     # MultivariateNormal calculates precision matrix from covariance, and stores it in
     # the arg_constraints. When reinstantiating, we must provide only one of them.
     if isinstance(dist, MultivariateNormal):
@@ -41,6 +35,36 @@ def get_distribution_parameters(
     # arg_constraints. When reinstantiating, we must provide only one of them.
     elif isinstance(dist, (Binomial, Bernoulli, Categorical, Multinomial)):
         params["logits"] = None
+    return params
+
+
+def get_distribution_parameters(
+    dist: Distribution, device: Union[str, torch.device]
+) -> Dict:
+    """Used to get the tensors of the parameters in torch distributions.
+
+    Returns the tensors relocated to device.
+    """
+    params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
+    params = _remove_non_constructor_arguments(params, dist)
+    return params
+
+
+def cast_distribution_parameters_to_float32(
+    dist: Distribution,
+) -> Dict:
+    """Used to get the tensors of the parameters in torch distributions.
+
+    Returns the tensors relocated to device.
+    """
+    params = {}
+    for param in dist.arg_constraints:
+        value = getattr(dist, param)
+        # Only cast floating point tensors to float32, leave integer tensors as is.
+        if value.is_floating_point():
+            value = value.to(dtype=float32)
+        params[param] = value
+    params = _remove_non_constructor_arguments(params, dist)
     return params
 
 
@@ -75,6 +99,54 @@ def move_distribution_to_device(
         # Not a constructor argument: a user subclass need not accept `validate_args`.
         set_validate_args(rebuilt, dist._validate_args)
         return rebuilt
+
+
+def convert_distribution_to_float32(
+    dist: Distribution,
+) -> Distribution:
+    """Convert a distribution so that ``sample()`` returns float32.
+
+    First tries ``.to(dtype=float32)`` when that method accepts a dtype.
+    Next tries to rebuild the distribution by casting its float parameters to float32.
+    If ``sample().dtype`` is still not float32, wraps the distribution in a
+    ``PytorchReturnTypeWrapper`` as a last resort.
+
+    Args:
+        dist: The distribution to convert.
+
+    Returns:
+        A distribution whose ``sample()`` dtype is float32. Depending on which of the
+        cases succeeded, this may be the same object, a new object, or a
+        ``PytorchReturnTypeWrapper`` of the original distribution.
+    """
+    # Attempt to convert the distribution to float32 using `.to()`.
+    converted = None
+    try:
+        # Not all distributions implement `.to()`, and some accept only a device.
+        converted = dist.to(dtype=float32)  # type: ignore[call-arg]
+        if converted is not None and converted.sample().dtype == float32:
+            return converted
+    except (AttributeError, TypeError):
+        converted = None
+
+    # Attempt to rebuild the distribution by casting its float parameters to float32.
+    rebuilt = None
+    try:
+        rebuilt = type(dist)(**cast_distribution_parameters_to_float32(dist))
+        # Not a constructor argument: a user subclass need not accept it.
+        set_validate_args(rebuilt, dist._validate_args)
+        if rebuilt.sample().dtype == float32:
+            return rebuilt
+    except Exception:
+        rebuilt = None
+
+    # Wrap our best attempt at converting the distribution to float32 as
+    # a last resort.
+    if rebuilt is not None:
+        dist = rebuilt
+    elif converted is not None:
+        dist = converted
+    return PytorchReturnTypeWrapper(dist, return_type=float32, validate_args=False)
 
 
 class CustomPriorWrapper(Distribution):
