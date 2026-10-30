@@ -185,7 +185,8 @@ def test_importance_sampling_evaluates_potential_without_gradients(method: str):
 def _potential_recording_grad_mode(kind: str):
     """Return a potential of the given kind, its prior and a list that records the
     grad mode inside each evaluation of its network."""
-    prior = BoxUniform(-ones(2), ones(2))
+    # A Gaussian prior, so that the prior term has a gradient.
+    prior = MultivariateNormal(zeros(2), eye(2))
     theta, x = prior.sample((50,)), prior.sample((50,))
     x_o = zeros(1, 2)
     grad_enabled_in_calls = []
@@ -205,49 +206,72 @@ def _potential_recording_grad_mode(kind: str):
         )
     if kind in ("posterior", "ensemble"):
         estimator = posterior_nn("mdn")(theta, x)
-        build_potential = posterior_estimator_based_potential
     elif kind == "likelihood":
         estimator = likelihood_nn("mdn")(theta, x)
-        build_potential = likelihood_estimator_based_potential
-    else:
+    elif kind == "ratio":
         estimator = classifier_nn("mlp")(theta, x)
-        build_potential = ratio_estimator_based_potential
+    else:
+        estimator = posterior_score_nn()(theta, x)
     for module in estimator.modules():
         module.register_forward_pre_hook(record_grad_mode)
-    potential, _ = build_potential(estimator, prior, x_o)
+
+    if kind == "likelihood":
+        potential, _ = likelihood_estimator_based_potential(estimator, prior, x_o)
+    elif kind == "ratio":
+        potential, _ = ratio_estimator_based_potential(estimator, prior, x_o)
+    elif kind in ("vector_field", "conditioned"):
+        potential = VectorFieldBasedPotential(estimator, prior, x_o=x_o)
+    else:
+        potential, _ = posterior_estimator_based_potential(estimator, prior, x_o)
+
     if kind == "ensemble":
         potential = EnsemblePotential(
             [potential, potential], torch.tensor([0.5, 0.5]), prior, x_o
         )
+    elif kind == "conditioned":
+        potential = ConditionedPotential(potential, zeros(1, 2), dims_to_sample=[0, 1])
     return potential, prior, grad_enabled_in_calls
 
 
-POTENTIAL_KINDS = ("posterior", "likelihood", "ratio", "custom", "ensemble")
+POTENTIAL_KINDS = (
+    "posterior",
+    "likelihood",
+    "ratio",
+    "custom",
+    "ensemble",
+    "vector_field",
+    "conditioned",
+)
 
 
 @pytest.mark.parametrize("kind", POTENTIAL_KINDS)
 def test_potential_follows_grad_mode_by_default(kind: str):
     """Without `track_gradients`, a potential tracks gradients as its caller does."""
     potential, prior, grad_enabled_in_calls = _potential_recording_grad_mode(kind)
-    theta_o = prior.sample((3,))
+    theta_o = prior.sample((3,)).requires_grad_()
 
-    potential(theta_o)
-    assert grad_enabled_in_calls and all(grad_enabled_in_calls)
-    grad_enabled_in_calls.clear()
+    assert potential(theta_o).requires_grad
     with torch.no_grad():
-        potential(theta_o)
-    assert grad_enabled_in_calls and not any(grad_enabled_in_calls)
+        grad_enabled_in_calls.clear()
+        assert not potential(theta_o).requires_grad
+    # Vector-field log probs need autograd inside the ODE solver.
+    if kind not in ("vector_field", "conditioned"):
+        assert grad_enabled_in_calls and not any(grad_enabled_in_calls)
 
 
 @pytest.mark.parametrize("kind", POTENTIAL_KINDS)
 def test_potential_track_gradients_overrides_grad_mode(kind: str):
-    """An explicit `track_gradients` applies to the whole potential, including the
-    prior term, whatever the caller's grad mode."""
+    """An explicit `track_gradients=True` gives the full gradient, including the
+    prior term, also inside `torch.no_grad()`."""
     potential, prior, _ = _potential_recording_grad_mode(kind)
     theta_o = prior.sample((3,)).requires_grad_()
+    (expected,) = torch.autograd.grad(potential(theta_o).sum(), theta_o)
 
     with torch.no_grad():
-        assert potential(theta_o, track_gradients=True).requires_grad
+        log_probs = potential(theta_o, track_gradients=True)
+    (gradient,) = torch.autograd.grad(log_probs.sum(), theta_o)
+
+    assert torch.allclose(gradient, expected)
     assert not potential(theta_o, track_gradients=False).requires_grad
 
 

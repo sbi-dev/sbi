@@ -215,35 +215,37 @@ class LikelihoodBasedPotential(BasePotential):
         ) -> Tensor:
             nonlocal global_prior, global_prior_device
             track_gradients = resolve_track_gradients(track_gradients)
-            assert len(dims_global_theta) == theta.shape[-1], (
-                "dims_global_theta must match the number of parameters to sample."
-            )
-            if theta.dim() > 2:
-                assert theta.shape[0] == 1, (
-                    "condition_on_theta does not support sample shape for theta."
-                )
-                theta = theta.squeeze(0)
-            global_theta = theta[:, dims_global_theta].to(self.device)
-            x_o = x_o if x_o is not None else self.x_o
-            # x needs shape (sample_dim (iid), batch_dim (xs), *event_shape)
-            if x_o.dim() < 3:
-                x_o = reshape_to_sample_batch_event(
-                    x_o, event_shape=x_o.shape[1:], leading_is_sample=self.x_is_iid
-                )
-
-            log_likelihood = _log_likelihood_over_iid_trials_and_local_theta(
-                x=x_o.to(self.device),
-                global_theta=global_theta,
-                local_theta=local_theta.to(self.device),
-                estimator=self.likelihood_estimator,
-                track_gradients=track_gradients,
-            )
-            # Follow the device of this potential, also after `.to()`.
-            if global_prior_device != self.device:
-                global_prior = move_distribution_to_device(global_prior, self.device)
-                global_prior_device = self.device
-            # Priors with batch_shape [1] return one log prob per dimension.
             with torch.set_grad_enabled(track_gradients):
+                assert len(dims_global_theta) == theta.shape[-1], (
+                    "dims_global_theta must match the number of parameters to sample."
+                )
+                if theta.dim() > 2:
+                    assert theta.shape[0] == 1, (
+                        "condition_on_theta does not support sample shape for theta."
+                    )
+                    theta = theta.squeeze(0)
+                global_theta = theta[:, dims_global_theta].to(self.device)
+                x_o = x_o if x_o is not None else self.x_o
+                # x needs shape (sample_dim (iid), batch_dim (xs), *event_shape)
+                if x_o.dim() < 3:
+                    x_o = reshape_to_sample_batch_event(
+                        x_o, event_shape=x_o.shape[1:], leading_is_sample=self.x_is_iid
+                    )
+
+                log_likelihood = _log_likelihood_over_iid_trials_and_local_theta(
+                    x=x_o.to(self.device),
+                    global_theta=global_theta,
+                    local_theta=local_theta.to(self.device),
+                    estimator=self.likelihood_estimator,
+                    track_gradients=track_gradients,
+                )
+                # Follow the device of this potential, also after `.to()`.
+                if global_prior_device != self.device:
+                    global_prior = move_distribution_to_device(
+                        global_prior, self.device
+                    )
+                    global_prior_device = self.device
+                # Priors with batch_shape [1] return one log prob per dimension.
                 log_prior = global_prior.log_prob(global_theta)
                 return log_likelihood + log_prior.reshape(len(global_theta), -1).sum(-1)
 

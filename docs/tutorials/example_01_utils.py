@@ -1,10 +1,13 @@
-from typing import Union
+from typing import Optional, Union
 
 import torch
 from torch import Tensor
 from torch.distributions import Binomial, Distribution, InverseGamma
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    resolve_track_gradients,
+)
 from sbi.utils.torchutils import atleast_2d
 
 
@@ -30,13 +33,10 @@ class BinomialGammaPotential(BasePotential):
 
         self.concentration_scaling = concentration_scaling
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
-        theta = atleast_2d(theta)
-
-        with torch.set_grad_enabled(track_gradients):
-            iid_ll = self.iid_likelihood(theta)
-
-        return iid_ll + self.prior.log_prob(theta)
+    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
+        with torch.set_grad_enabled(resolve_track_gradients(track_gradients)):
+            theta = atleast_2d(theta)
+            return self.iid_likelihood(theta) + self.prior.log_prob(theta)
 
     def iid_likelihood(self, theta: Tensor) -> Tensor:
         batch_size = theta.shape[0]

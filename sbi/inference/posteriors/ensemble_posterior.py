@@ -574,11 +574,10 @@ class EnsemblePotential(BasePotential):
         Returns:
             The potential.
         """
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-        theta = theta.to(self.device)
-
         track_gradients = resolve_track_gradients(track_gradients)
         with torch.set_grad_enabled(track_gradients):
+            theta = ensure_theta_batched(torch.as_tensor(theta))
+            theta = theta.to(self.device)
             log_probs = [
                 fn(theta, track_gradients=track_gradients) for fn in self.potential_fns
             ]
