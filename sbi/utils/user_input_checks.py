@@ -36,7 +36,6 @@ from sbi.utils.user_input_checks_utils import (
 
 if TYPE_CHECKING:
     from sbi.neural_nets.net_builders.estimator_configs import (
-        _EstimatorBuilderBase,
         _PerModelConfigBase,
     )
 
@@ -243,7 +242,13 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     check_prior_batch_behavior(prior)
     check_prior_batch_dims(prior)
 
-    if prior.sample().dtype != float32:
+    prior_dtype = prior.sample().dtype
+    if prior_dtype != float32:
+        warnings.warn(
+            f"Prior has dtype {prior_dtype}. sbi casts the samples and log probs of "
+            "the prior to float32.",
+            stacklevel=2,
+        )
         prior = PytorchReturnTypeWrapper(
             prior, return_type=float32, validate_args=False
         )
@@ -677,7 +682,7 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
 
 
 def check_estimator_arg(
-    estimator: Union[str, Callable, "_PerModelConfigBase", "_EstimatorBuilderBase"],
+    estimator: Union[str, Callable, "_PerModelConfigBase"],
 ) -> None:
     """Check (density or ratio) estimator argument passed by the user.
 
@@ -687,16 +692,16 @@ def check_estimator_arg(
     Args:
         estimator: The estimator argument to check.
     """
-    from sbi.neural_nets.net_builders.estimator_configs import _ESTIMATOR_CONFIG_BASES
+    from sbi.neural_nets.net_builders.estimator_configs import _PerModelConfigBase
 
-    if isinstance(estimator, type) and issubclass(estimator, _ESTIMATOR_CONFIG_BASES):
+    if isinstance(estimator, type) and issubclass(estimator, _PerModelConfigBase):
         raise TypeError(
             f"Got the config class {estimator.__name__}, not an instance. "
             f"Use {estimator.__name__}()."
         )
 
     if not (
-        isinstance(estimator, (str, *_ESTIMATOR_CONFIG_BASES))
+        isinstance(estimator, (str, _PerModelConfigBase))
         or (isinstance(estimator, Callable) and not isinstance(estimator, nn.Module))
     ):
         raise TypeError(

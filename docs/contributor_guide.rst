@@ -14,5 +14,6 @@ maintainers, see the :doc:`credits page <credits>`.
    :caption: Contribution guides
 
    contributing
+   mini_sbibm
    proposals
    code_of_conduct

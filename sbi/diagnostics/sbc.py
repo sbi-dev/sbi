@@ -6,8 +6,7 @@ from typing import Callable, Dict, List, Tuple, Union
 
 import torch
 from scipy.stats import kstest, uniform
-from torch import Tensor, ones, zeros
-from torch.distributions import Uniform
+from torch import Tensor
 from tqdm.auto import tqdm
 
 from sbi.inference import DirectPosterior, VectorFieldPosterior
@@ -286,8 +285,9 @@ def check_sbc(
     Returns:
         Dictionary containing:
         - ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
-          one for each dim_parameters.
-        - c2st_ranks: C2ST accuracy between ranks and uniform baseline,
+          one for each dim_parameters. They vary between calls unless the torch
+          seed is fixed, see `check_uniformity_frequentist`.
+        - c2st_ranks: C2ST accuracy between ranks and the discrete uniform baseline,
           one for each dim_parameters.
         - c2st_dap: C2ST accuracy between prior and DAP samples, single value.
     """
@@ -345,9 +345,15 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
 def check_uniformity_frequentist(ranks: Tensor, num_posterior_samples: int) -> Tensor:
     """Return p-values for uniformity of the ranks using Kolmogorov-Smirnov test.
 
+    The test runs on the ranks plus uniform noise on [0, 1), because it needs
+    continuous samples. For a calibrated posterior, the ranks are uniform on
+    ``0, ..., num_posterior_samples`` (Talts et al., https://arxiv.org/abs/1804.06788),
+    so the noisy ranks are uniform on [0, num_posterior_samples + 1). The p-values
+    therefore vary between calls unless the torch seed is fixed.
+
     Args:
-        ranks: Ranks for each SBC run and for each model parameter,
-            shape (N, dim_parameters)
+        ranks: Ranks for each SBC run and for each model parameter, as returned by
+            `run_sbc`, shape (N, dim_parameters)
         num_posterior_samples: Number of posterior samples used for SBC ranking.
 
     Returns:
@@ -356,7 +362,10 @@ def check_uniformity_frequentist(ranks: Tensor, num_posterior_samples: int) -> T
     """
     kstest_pvals = torch.tensor(
         [
-            kstest(rks, uniform(loc=0, scale=num_posterior_samples).cdf)[1]
+            kstest(
+                (rks + torch.rand_like(rks, dtype=torch.float32)).cpu(),
+                uniform(loc=0, scale=num_posterior_samples + 1).cdf,
+            )[1]
             for rks in ranks.T
         ],
         dtype=torch.float32,
@@ -370,26 +379,31 @@ def check_uniformity_c2st(
 ) -> Tensor:
     """Return C2ST scores for uniformity of the ranks.
 
-    Run a C2ST between ranks and uniform samples.
+    Run a C2ST between the ranks and samples from the discrete uniform distribution
+    on ``0, ..., num_posterior_samples``, the distribution of the ranks under a
+    calibrated posterior (Talts et al., https://arxiv.org/abs/1804.06788).
 
     Args:
-        ranks: Ranks for each SBC run and for each model parameter,
-            shape (N, dim_parameters)
+        ranks: Ranks for each SBC run and for each model parameter, as returned by
+            `run_sbc`, shape (N, dim_parameters)
         num_posterior_samples: Number of posterior samples used for SBC ranking.
         num_repetitions: Repetitions of C2ST tests to estimate classifier variance.
 
     Returns:
-        c2st_ranks: C2ST accuracy between ranks and uniform baseline,
+        c2st_ranks: C2ST accuracy between ranks and the discrete uniform baseline,
             one for each dim_parameters.
     """
     # Run C2ST multiple times to estimate stability
     c2st_scores = torch.tensor([
         [
             c2st(
-                rks.unsqueeze(1),
-                Uniform(zeros(1), num_posterior_samples * ones(1)).sample(
-                    torch.Size((ranks.shape[0],))
-                ),
+                rks.unsqueeze(1).float(),
+                torch.randint(
+                    0,
+                    num_posterior_samples + 1,
+                    (ranks.shape[0], 1),
+                    device=ranks.device,
+                ).float(),
             )
             for rks in ranks.T
         ]

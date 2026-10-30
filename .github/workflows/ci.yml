@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.13']
+        python-version: ['3.11', '3.14']
         split_size: [6]
         group_number: [1, 2, 3, 4, 5, 6]
 
@@ -59,6 +59,9 @@ jobs:
         key: uv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
         restore-keys: |
           uv-${{ runner.os }}-${{ matrix.python-version }}-
+
+    - name: Show the CPU model
+      run: lscpu | grep -E '^(Model name|CPU\(s\)):'
 
     - name: Run fast CPU tests with coverage
       run: uv run pytest -v -n auto -m "not slow and not gpu" --cov=sbi --cov-report=xml --junitxml=junit.xml -o junit_family=legacy --splitting-algorithm least_duration --splits ${{ matrix.split_size }} --group ${{ matrix.group_number }} tests/

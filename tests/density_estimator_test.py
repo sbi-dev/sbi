@@ -771,6 +771,7 @@ def test_tabpfn_flow_shapes(batch_dim, input_sample_dim):
     sample_shape = (3,)
     samples = estimator.sample(sample_shape, condition=condition)
     assert samples.shape == (*sample_shape, batch_dim, *input_shape)
+    assert samples.dtype == condition.dtype
 
     samples2, lp2 = estimator.sample_and_log_prob(sample_shape, condition=condition)
     assert samples2.shape == (*sample_shape, batch_dim, *input_shape)

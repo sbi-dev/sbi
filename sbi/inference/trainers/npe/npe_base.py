@@ -11,15 +11,15 @@ from typing import (
     Dict,
     Literal,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Union,
 )
 
 from torch import Tensor, ones
-from torch.distributions import Distribution
+from torch.distributions import Distribution, MultivariateNormal, Uniform
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import Self
 
 from sbi.inference.posteriors import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -45,16 +45,20 @@ from sbi.inference.trainers.base import (
 from sbi.neural_nets import posterior_nn
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+)
+from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
     _DENSITY_CONFIGS,
-    _ESTIMATOR_CONFIG_BASES,
     DensityConfigBase,
     MAFConfig,
     PretrainedConfigBase,
+    _PerModelConfigBase,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -69,6 +73,7 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
+    check_dist_class,
     mask_sims_from_prior,
 )
 from sbi.utils.torchutils import assert_all_finite
@@ -144,7 +149,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 stacklevel=3,
             )
             self._build_neural_net = posterior_nn(model=density_estimator)
-        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
+        elif isinstance(density_estimator, _PerModelConfigBase):
             if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
                 allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
                 hint = self._BUILDER_TYPE_HINT or getattr(
@@ -584,11 +589,15 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         """
         if proposal is not None:
             check_if_proposal_has_default_x(proposal)
+            # Also catch the network inside a wrapper, e.g. NPE-A's correction.
             if (
                 isinstance(proposal, NeuralPosterior)
                 and hasattr(proposal, "posterior_estimator")
                 and self._neural_net is not None
-                and proposal.posterior_estimator is self._neural_net  # type: ignore
+                and any(
+                    module is self._neural_net
+                    for module in proposal.posterior_estimator.modules()  # type: ignore
+                )
             ):
                 raise ValueError(
                     "The proposal's posterior_estimator is the same object as the "
@@ -735,3 +744,29 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         losses = self._loss(theta_batch, x_batch, masks_batch, **asdict(loss_args))
 
         return losses
+
+
+def _z_scored_prior_mog(
+    prior: Distribution, estimator: MixtureDensityEstimator
+) -> Optional[MoG]:
+    """Return a Gaussian prior as a MoG in the estimator's z-scored space.
+
+    The closed-form MoG corrections of NPE-A and NPE-C combine the prior with the
+    estimator's MoG. A uniform prior is constant on its support and drops out of
+    them, so it gives None. The prior can be wrapped by `process_prior`.
+
+    Raises:
+        TypeError: If the prior is neither Gaussian nor uniform.
+    """
+    if check_dist_class(prior, class_to_check=Uniform)[0]:
+        return None
+    is_gaussian, gaussian = check_dist_class(prior, class_to_check=MultivariateNormal)
+    if not is_gaussian:
+        raise TypeError(
+            "The MoG proposal correction needs a MultivariateNormal or uniform "
+            f"prior, got {type(prior).__name__}."
+        )
+    assert isinstance(gaussian, MultivariateNormal)
+    return estimator.transform_mog(
+        MoG.from_gaussian(gaussian.mean, gaussian.covariance_matrix)
+    )

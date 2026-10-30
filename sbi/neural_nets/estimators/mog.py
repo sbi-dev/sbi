@@ -10,7 +10,7 @@ for evaluation (log_prob), sampling, and conditioning.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import numpy as np
 import torch
@@ -366,16 +366,25 @@ class MoG:
         assert self.precision_factors is not None  # For type checker
         precfs = self.precision_factors
 
-        precfs_xx = precfs[:, :, mask, :][:, :, :, mask]
-        precfs_yy = precfs[:, :, ~mask, :][:, :, :, ~mask]
+        # Sub-blocks of precfs are only valid if all free dims precede the fixed dims.
+        # QR re-triangularizes the factor in (free, fixed) order. Forming the
+        # precision instead loses the marginal precision of y in float32.
+        num_free = int(mask.sum())
+        perm = torch.cat([mask.nonzero(), (~mask).nonzero()]).squeeze(-1)
+        _, precfs_perm = torch.linalg.qr(precfs[:, :, :, perm])
+        # log_prob() and sample() expect a positive diagonal.
+        signs = torch.sign(torch.diagonal(precfs_perm, dim1=-2, dim2=-1))
+        precfs_perm = precfs_perm * signs.unsqueeze(-1)
 
-        # Compute precision matrices
+        precfs_xx = precfs_perm[:, :, :num_free, :num_free]
+        precfs_xy = precfs_perm[:, :, :num_free, num_free:]
+        precfs_yy = precfs_perm[:, :, num_free:, num_free:]
+
+        # With R^T R = P in (free, fixed) order:
+        #   R_xx^T R_xx = P_xx (precision of x | y)
+        #   R_yy^T R_yy = P_yy - P_yx P_xx^{-1} P_xy (marginal precision of y)
         precs_xx = torch.matmul(precfs_xx.transpose(-2, -1), precfs_xx)
         precs_yy = torch.matmul(precfs_yy.transpose(-2, -1), precfs_yy)
-
-        # Full precision and cross terms
-        precs = torch.matmul(precfs.transpose(-2, -1), precfs)
-        precs_xy = precs[:, :, mask, :][:, :, :, ~mask]
 
         # Conditional mean: mu_x|y = mu_x - precs_xx^{-1} @ precs_xy @ (y - mu_y)
         # y: (batch_size, num_fixed) -> (batch_size, num_components, num_fixed, 1)
@@ -383,10 +392,9 @@ class MoG:
         mu_y_col = mu_y.unsqueeze(-1)  # (batch_size, num_components, num_fixed, 1)
         diff_y = y_expanded - mu_y_col
 
-        # Compute precs_xx_inv @ precs_xy @ diff_y using solve for numerical stability
-        # solve(A, B) computes A^{-1} @ B more stably than inv(A) @ B
-        rhs = torch.matmul(precs_xy, diff_y)
-        adjustment = torch.linalg.solve(precs_xx, rhs)
+        # precs_xx^{-1} @ precs_xy = precfs_xx^{-1} @ precfs_xy
+        rhs = torch.matmul(precfs_xy, diff_y)
+        adjustment = torch.linalg.solve_triangular(precfs_xx, rhs, upper=True)
         cond_means = mu_x - adjustment.squeeze(-1)
 
         # Conditional precision factors are just precfs_xx (precision doesn't change)
@@ -460,24 +468,81 @@ class MoG:
 
         return log_component_probs  # (batch_size, num_components)
 
-    def to(self, device: Union[str, torch.device]) -> MoG:
-        """Move all tensors to the specified device.
+    def apply(self, fn: Callable[[Tensor], Tensor]) -> MoG:
+        """Apply `fn` to every tensor of the MoG.
 
         Args:
-            device: Target device.
+            fn: Function applied to the logits, means, precisions and precision
+                factors, e.g. a device move or a dtype cast.
 
         Returns:
-            New MoG with tensors on the specified device.
+            New MoG with the transformed tensors.
         """
         return MoG(
-            logits=self.logits.to(device),
-            means=self.means.to(device),
-            precisions=self.precisions.to(device),
+            logits=fn(self.logits),
+            means=fn(self.means),
+            precisions=fn(self.precisions),
             precision_factors=(
-                self.precision_factors.to(device)
+                fn(self.precision_factors)
                 if self.precision_factors is not None
                 else None
             ),
+        )
+
+    def to(
+        self,
+        device: Optional[Union[str, torch.device]] = None,
+        dtype: Optional[torch.dtype] = None,
+    ) -> MoG:
+        """Move all tensors to the specified device and dtype.
+
+        Args:
+            device: Target device. None keeps the device.
+            dtype: Target dtype. None keeps the dtype.
+
+        Returns:
+            New MoG with tensors on the specified device and dtype.
+        """
+        return self.apply(lambda tensor: tensor.to(device, dtype))
+
+    def standardize(self, shift: Tensor, scale: Tensor) -> MoG:
+        """Return the MoG of z = (x - shift) / scale for x from this MoG.
+
+        Args:
+            shift: Elementwise shift, shape (dim,).
+            scale: Elementwise scale, strictly positive, shape (dim,).
+
+        Returns:
+            New MoG with the same logits.
+        """
+        # Subtract before dividing: m / scale - shift / scale cancels for large m.
+        return self._rescaled((self.means - shift) / scale, 1 / scale)
+
+    def unstandardize(self, shift: Tensor, scale: Tensor) -> MoG:
+        """Return the MoG of x = z * scale + shift for z from this MoG.
+
+        Args:
+            shift: Elementwise shift, shape (dim,).
+            scale: Elementwise scale, strictly positive, shape (dim,).
+
+        Returns:
+            New MoG with the same logits.
+        """
+        return self._rescaled(self.means * scale + shift, scale)
+
+    def _rescaled(self, means: Tensor, factor: Tensor) -> MoG:
+        """Return the MoG with `means` whose variables are multiplied by `factor`.
+
+        The precision P maps to P / (f f^T). Dividing the columns of an upper
+        triangular precision factor by f keeps it upper triangular.
+        """
+        assert self.precision_factors is not None
+        return MoG(
+            logits=self.logits,
+            means=means,
+            # Divide rows and columns separately: f f^T can overflow in float32.
+            precisions=self.precisions / factor.unsqueeze(-1) / factor,
+            precision_factors=self.precision_factors / factor,
         )
 
     def detach(self) -> MoG:
@@ -486,16 +551,7 @@ class MoG:
         Returns:
             New MoG with detached tensors.
         """
-        return MoG(
-            logits=self.logits.detach(),
-            means=self.means.detach(),
-            precisions=self.precisions.detach(),
-            precision_factors=(
-                self.precision_factors.detach()
-                if self.precision_factors is not None
-                else None
-            ),
-        )
+        return self.apply(Tensor.detach)
 
     @classmethod
     def from_gaussian(
@@ -546,3 +602,205 @@ class MoG:
             precisions=precisions,
             precision_factors=precision_factors,
         )
+
+
+# Constant for numerical stability in matrix operations.
+_CORRECTION_EPSILON: float = 1e-6
+
+
+def _check_single_gaussian_proposal(num_components: int) -> None:
+    """Raise if the NPE-A proposal is a mixture.
+
+    Args:
+        num_components: Number of Gaussian components of the proposal.
+
+    Raises:
+        ValueError: If the proposal has more than one component.
+    """
+    if num_components > 1:
+        raise ValueError(
+            f"NPE-A needs a single-Gaussian proposal, this one has {num_components} "
+            "components, e.g. a final-round posterior. In a loop over rounds, pass "
+            "`final_round=(r == num_rounds - 1)` to `train()`."
+        )
+
+
+def correct_for_proposal(
+    density_mog: MoG,
+    proposal_mog: MoG,
+    prior_mog: Optional[MoG] = None,
+) -> MoG:
+    """Compute SNPE-A corrected posterior from density estimator output.
+
+    Implements Appendix C of Papamakarios et al. 2016 (SNPE-A paper).
+
+    The true posterior is computed as:
+        posterior = density_estimator * prior / proposal
+
+    With a single-Gaussian proposal, the result is a MoG with the components of the
+    density estimator.
+
+    For uniform priors, pass `prior_mog=None`. The prior term is then omitted
+    from the correction (uniform has zero precision).
+
+    Args:
+        density_mog: MoG from the density estimator for current observation.
+        proposal_mog: MoG of the proposal, with a single component.
+        prior_mog: MoG representation of the prior. Use `MoG.from_gaussian()`
+            for Gaussian priors. Pass None for uniform priors.
+
+    Returns:
+        Corrected MoG representing the true posterior.
+
+    Raises:
+        ValueError: If the proposal has more than one component, or if the
+            posterior precision is not positive definite.
+    """
+    _check_single_gaussian_proposal(proposal_mog.num_components)
+    dim = density_mog.dim
+
+    # Compute posterior precisions (Eq. 23)
+    # prec_post = prec_density - prec_proposal + prec_prior
+    # The single proposal and prior components broadcast over the density's ones.
+    # For uniform priors, prec_prior = 0
+    prec_post = density_mog.precisions - proposal_mog.precisions
+
+    # Add prior precision term only for Gaussian priors
+    if prior_mog is not None:
+        prec_post = prec_post + prior_mog.precisions
+
+    # Add small epsilon to diagonal for numerical stability
+    eye = torch.eye(dim, device=prec_post.device, dtype=prec_post.dtype)
+    prec_post_stabilized = prec_post + _CORRECTION_EPSILON * eye
+
+    # Compute precision factors via Cholesky (also validates positive definiteness)
+    try:
+        precf_post = torch.linalg.cholesky(prec_post_stabilized, upper=True)
+    except torch.linalg.LinAlgError as e:
+        raise ValueError(
+            "The NPE-A posterior precision is not positive definite, because a "
+            "component of the density estimator is wider than the proposal. Use "
+            "a wider proposal (see the how-to guide 'How to run sequential "
+            f"methods') or NPE_C. Original error: {e}"
+        ) from e
+
+    # Compute posterior covariances using solve for numerical stability
+    batch_shape = prec_post_stabilized.shape[:-2]
+    eye_expanded = eye.expand(*batch_shape, dim, dim)
+    cov_post = torch.linalg.solve(prec_post_stabilized, eye_expanded)
+
+    # Compute posterior means (Eq. 24)
+    # mean_post = cov_post @ (prec_density @ mean_density
+    #                         - prec_proposal @ mean_proposal
+    #                         + prec_prior @ mean_prior)
+    prec_mean_proposal = _batched_mv(proposal_mog.precisions, proposal_mog.means)
+    prec_mean_density = _batched_mv(density_mog.precisions, density_mog.means)
+
+    summed_prec_mean = prec_mean_density - prec_mean_proposal
+
+    # Add prior mean term only for Gaussian priors
+    if prior_mog is not None:
+        prec_mean_prior = _batched_mv(prior_mog.precisions, prior_mog.means)
+        summed_prec_mean = summed_prec_mean + prec_mean_prior
+
+    mean_post = _batched_mv(cov_post, summed_prec_mean)
+
+    # Compute posterior logits (Eqs. 25-26)
+    logits_post = _compute_posterior_logits(
+        mean_post,
+        prec_post,
+        cov_post,
+        proposal_mog.logits,
+        proposal_mog.means,
+        proposal_mog.precisions,
+        density_mog.logits,
+        density_mog.means,
+        density_mog.precisions,
+    )
+
+    return MoG(
+        logits=logits_post,
+        means=mean_post,
+        precisions=prec_post_stabilized,
+        precision_factors=precf_post,
+    )
+
+
+def _compute_posterior_logits(
+    mean_post: Tensor,
+    prec_post: Tensor,
+    cov_post: Tensor,
+    logits_proposal: Tensor,
+    mean_proposal: Tensor,
+    prec_proposal: Tensor,
+    logits_density: Tensor,
+    mean_density: Tensor,
+    prec_density: Tensor,
+) -> Tensor:
+    """Compute posterior logits using Eqs. 25-26 from SNPE-A paper.
+
+    Computes unnormalized log weights for the posterior MoG components.
+    The formula combines logit differences, log-determinant ratios, and
+    quadratic form differences from the proposal, density, and posterior.
+    The single proposal component broadcasts over the K density components.
+
+    Args:
+        mean_post: Posterior means, shape (batch, K, dim).
+        prec_post: Posterior precisions, shape (batch, K, dim, dim).
+        cov_post: Posterior covariances, shape (batch, K, dim, dim).
+        logits_proposal: Proposal logits, shape (batch, 1).
+        mean_proposal: Proposal means, shape (batch, 1, dim).
+        prec_proposal: Proposal precisions, shape (batch, 1, dim, dim).
+        logits_density: Density logits, shape (batch, K).
+        mean_density: Density means, shape (batch, K, dim).
+        prec_density: Density precisions, shape (batch, K, dim, dim).
+
+    Returns:
+        Posterior logits of shape (batch, K).
+    """
+    logit_factors = logits_density - logits_proposal
+
+    # Compute log-determinant terms using slogdet for numerical stability
+    _, logdet_cov_post = torch.linalg.slogdet(cov_post)
+    _, logdet_prec_proposal = torch.linalg.slogdet(prec_proposal)
+    _, logdet_prec_density = torch.linalg.slogdet(prec_density)
+
+    log_sqrt_det_ratio = 0.5 * (
+        logdet_cov_post - logdet_prec_proposal + logdet_prec_density
+    )
+
+    # Compute quadratic form terms (m^T P m)
+    exponent_proposal = _batched_vmv(prec_proposal, mean_proposal)
+    exponent_density = _batched_vmv(prec_density, mean_density)
+    exponent_post = _batched_vmv(prec_post, mean_post)
+
+    exponent = -0.5 * (exponent_density - exponent_proposal - exponent_post)
+
+    return logit_factors + log_sqrt_det_ratio + exponent
+
+
+def _batched_mv(matrix: Tensor, vector: Tensor) -> Tensor:
+    """Batched matrix-vector product with component dimension.
+
+    Args:
+        matrix: Shape (batch, num_components, dim, dim).
+        vector: Shape (batch, num_components, dim).
+
+    Returns:
+        Product of shape (batch, num_components, dim).
+    """
+    return torch.einsum("bcij,bcj->bci", matrix, vector)
+
+
+def _batched_vmv(matrix: Tensor, vector: Tensor) -> Tensor:
+    """Batched vector-matrix-vector product (quadratic form).
+
+    Args:
+        matrix: Shape (batch, num_components, dim, dim).
+        vector: Shape (batch, num_components, dim).
+
+    Returns:
+        Quadratic form v^T M v of shape (batch, num_components).
+    """
+    mv = torch.einsum("bcij,bcj->bci", matrix, vector)
+    return torch.einsum("bci,bci->bc", vector, mv)

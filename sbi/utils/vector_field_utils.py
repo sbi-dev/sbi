@@ -407,7 +407,7 @@ def denoise_mixture(
     denoised_components = denoise(component_dist, m, s, x_t)
     mixture_logits = mixture_dist.logits
     # Update the logits to reflect the new likelihoods
-    component_loglikelihood = denoised_components.log_prob(x_t)
+    component_loglikelihood = marginalize(component_dist, m, s).log_prob(x_t)
     # Update the logits to reflect the new likelihoods
     denoised_logits = mixture_logits[None, ...] + component_loglikelihood
     # Normalize the logits
@@ -773,16 +773,36 @@ class UniformNormalConvolution(Distribution):
         return self.scale * x + noise_sample
 
     def log_prob(self, value: Tensor) -> Tensor:
-        # Compute p(value) using the convolution formula:
-        # p(value) = 1/(b-a) * [Phi((value - scale*a)/noise)
-        # - Phi((value - scale*b)/noise)]
-        dist0 = Normal(torch.tensor(0.0, device=value.device), 1.0, validate_args=False)
-        numerator = dist0.cdf((value - self.scale * self.low) / self.noise) - dist0.cdf(
-            (value - self.scale * self.high) / self.noise
-        )
-        denom = (self.high - self.low).clamp_min(1e-30)
-        pdf = numerator / denom
-        return torch.log(pdf.clamp_min(1e-30))
+        """Log density of the scaled box convolved with the Gaussian noise.
+
+        With [u_lo, u_hi] the box [low, high] times scale, the density is
+        p(value) = [Phi((value - u_lo)/noise) - Phi((value - u_hi)/noise)]
+        / (u_hi - u_lo).
+
+        Args:
+            value: Points at which to evaluate the density.
+
+        Returns:
+            Log density at each point of `value`.
+        """
+        u_lo = torch.minimum(self.scale * self.low, self.scale * self.high)
+        u_hi = torch.maximum(self.scale * self.low, self.scale * self.high)
+        z_lo = (value - u_lo) / self.noise
+        z_hi = (value - u_hi) / self.noise
+        # Take the CDF difference from the small tail probabilities on value's side
+        # of the box, so it does not round to zero (and lose its gradient) there.
+        right = z_lo + z_hi > 0
+        near = torch.where(right, z_hi, -z_lo)
+        far = torch.where(right, z_lo, -z_hi)
+        mass = 0.5 * (torch.erfc(near / math.sqrt(2)) - torch.erfc(far / math.sqrt(2)))
+        tiny = torch.finfo(mass.dtype).tiny
+        # A box much narrower than the noise is a Gaussian up to O(width^2 / noise^2),
+        # where the CDF difference above would cancel.
+        narrow = u_hi - u_lo < 1e-3 * self.noise
+        width = torch.where(narrow, 1.0, u_hi - u_lo)
+        box = torch.log(mass.clamp_min(tiny)) - torch.log(width)
+        point = Normal((u_lo + u_hi) / 2, self.noise, validate_args=False)
+        return torch.where(narrow, point.log_prob(value), box)
 
 
 # Utility functions --------------------------------------------------------

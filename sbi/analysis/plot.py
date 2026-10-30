@@ -49,6 +49,7 @@ from sbi.utils.plotting_helpers import (
     to_list_string,
     update,
 )
+from sbi.utils.torchutils import infer_tensor_device
 
 UpperLiteral = Literal["hist", "scatter", "contour", "kde"]
 LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
@@ -855,7 +856,7 @@ def prepare_for_plot(
 
     samples = convert_to_list_of_numpy(samples)
     if points is not None:
-        points = convert_to_list_of_numpy(points)
+        points = [np.atleast_2d(p) for p in convert_to_list_of_numpy(points)]
 
     samples = handle_nan_infs(samples)
 
@@ -866,9 +867,10 @@ def prepare_for_plot(
     if limits is None or len(limits) == 0:
         limits = infer_limits(samples, dim, points)
     else:
+        limits = [ensure_numpy(lim) for lim in limits]
         limits = [limits[0] for _ in range(dim)] if len(limits) == 1 else limits
 
-    limits = torch.as_tensor(limits)
+    limits = torch.as_tensor(np.array(limits))
     return samples, dim, limits
 
 
@@ -921,12 +923,16 @@ def prepare_for_conditional_plot(condition, opts):
     # Dimensions
     dim = condition.shape[-1]
 
+    # Both the diagonal and the off-diagonal evaluate on the density's device.
+    density = opts["density"]
+    device = getattr(density, "_device", None) or infer_tensor_device(density)
+    opts["condition"] = condition.to(device or condition.device)
+
     # Prepare limits
-    if len(opts["limits"]) == 1:
-        limits = [opts["limits"][0] for _ in range(dim)]
-    else:
-        limits = opts["limits"]
-    limits = torch.as_tensor(limits)
+    limits = [ensure_numpy(lim) for lim in opts["limits"]]
+    if len(limits) == 1:
+        limits = [limits[0] for _ in range(dim)]
+    limits = torch.as_tensor(np.array(limits))
 
     # Infer the margin. This is to avoid that we evaluate the posterior **exactly**
     # at the boundary.
@@ -943,7 +949,7 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
     """
 
     def diag_func(row, **kwargs):
-        p_vector = (
+        p_vector = ensure_numpy(
             eval_conditional_density(
                 opts["density"],
                 opts["condition"],
@@ -954,8 +960,6 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[row],
             )
-            .to("cpu")
-            .numpy()
         )
         plt.plot(
             np.linspace(
@@ -1271,8 +1275,6 @@ def conditional_pairplot(
 
     Returns: figure and axis of posterior distribution plot
     """
-    device = density._device if hasattr(density, "_device") else "cpu"
-
     # Setting these is required because _pairplot_scaffold will check if opts['diag'] is
     # `None`. This would break if opts has no key 'diag'. Same for 'upper'.
     diag = "cond"
@@ -1289,19 +1291,17 @@ def conditional_pairplot(
     diag_func = get_conditional_diag_func(opts, limits, eps_margins, resolution)
 
     def offdiag_func(row, col, **kwargs):
-        p_image = (
+        p_image = ensure_numpy(
             eval_conditional_density(
                 opts["density"],
-                opts["condition"].to(device),
-                limits.to(device),
+                opts["condition"],
+                limits,
                 row,
                 col,
                 resolution=resolution,
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[col],
             )
-            .to("cpu")
-            .numpy()
         )
         plt.imshow(
             p_image.T,
@@ -1433,11 +1433,7 @@ def _arrange_grid(
     # Prepare points
     if points is None:
         points = []
-    if not isinstance(points, list):
-        points = ensure_numpy(points)  # type: ignore
-        points = [points]
-    points = [np.atleast_2d(p) for p in points]
-    points = [np.atleast_2d(ensure_numpy(p)) for p in points]
+    points = [np.atleast_2d(p) for p in convert_to_list_of_numpy(points)]
     # TODO: add asserts checking compatibility of dimensions
 
     # Prepare labels
@@ -1446,6 +1442,7 @@ def _arrange_grid(
 
     # Prepare ticks
     if ticks is not None:
+        ticks = [ensure_numpy(t) for t in ticks]
         if len(ticks) == 1:
             ticks = [ticks[0] for _ in range(dim)]
         elif ticks == []:
@@ -1823,8 +1820,7 @@ def _sbc_rank_plot(
         ranks_list = ranks
     for idx, rank in enumerate(ranks_list):
         assert isinstance(rank, (Tensor, np.ndarray))
-        if isinstance(rank, Tensor):
-            ranks_list[idx]: np.ndarray = rank.numpy()  # type: ignore
+        ranks_list[idx] = ensure_numpy(rank)
 
     plot_types = ["hist", "cdf", "cdf-diff"]
     if plot_type not in plot_types:
@@ -2512,8 +2508,9 @@ def plot_tarp(
     fig = plt.figure(figsize=(6, 6))
     ax: Axes = plt.gca()
 
-    ax.plot(alpha, ecp, color="blue", label="TARP")
-    ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")
+    ecp_np, alpha_np = ensure_numpy(ecp), ensure_numpy(alpha)
+    ax.plot(alpha_np, ecp_np, color="blue", label="TARP")
+    ax.plot(alpha_np, alpha_np, color="black", linestyle="--", label="ideal")
     ax.set_xlabel(r"Credibility Level $\alpha$")
     ax.set_ylabel(r"Expected Coverage Probability")
     ax.set_xlim(0.0, 1.0)
@@ -2853,11 +2850,7 @@ def _arrange_plots(
     # Prepare points
     if points is None:
         points = []
-    if not isinstance(points, list):
-        points = ensure_numpy(points)  # type: ignore
-        points = [points]
-    points = [np.atleast_2d(p) for p in points]
-    points = [np.atleast_2d(ensure_numpy(p)) for p in points]
+    points = [np.atleast_2d(p) for p in convert_to_list_of_numpy(points)]
 
     # TODO: add asserts checking compatibility of dimensions
 
@@ -2871,10 +2864,9 @@ def _arrange_plots(
     if opts["ticks"] == [] or opts["ticks"] is None:
         ticks = None
     else:
-        if len(opts["ticks"]) == 1:
-            ticks = [opts["ticks"][0] for _ in range(dim)]
-        else:
-            ticks = opts["ticks"]
+        ticks = [ensure_numpy(t) for t in opts["ticks"]]
+        if len(ticks) == 1:
+            ticks = [ticks[0] for _ in range(dim)]
 
     # Figure out if we subset the plot
     subset = opts["subset"]
