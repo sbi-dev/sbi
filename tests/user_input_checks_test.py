@@ -314,7 +314,7 @@ def test_process_prior_warns_and_keeps_shapes_for_float64_prior():
     prior = MultivariateNormal(
         zeros(3, dtype=torch.float64), eye(3, dtype=torch.float64)
     )
-    with pytest.warns(UserWarning, match="casts the samples and log probs"):
+    with pytest.warns(UserWarning, match="cast the samples and log probs"):
         processed, parameter_dim, _ = process_prior(prior)
 
     assert parameter_dim == 3
