@@ -188,3 +188,35 @@ def test_ensemble_potential_follows_weight_change():
 
     expected = MixtureSameFamily(Categorical(tensor([1.0, 3.0])), components)
     assert_close(ensemble.potential(theta), expected.log_prob(theta))
+
+
+class _BatchedTractablePosterior(TractablePosterior):
+    """Tractable posterior that draws the same posterior for every x in a batch."""
+
+    def sample_batched(self, sample_shape, x, **kwargs):
+        return self.potential_fn.posterior.sample((*sample_shape, x.shape[0]))
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_samples_are_not_sorted_by_component(method: str):
+    """Every slice of the samples must mix the components by their weights."""
+    prior = MultivariateNormal(zeros(1), 10 * eye(1))
+    posteriors = [
+        _BatchedTractablePosterior(
+            PosteriorPotential(MultivariateNormal(tensor([mean]), 0.01 * eye(1)), prior)
+        )
+        for mean in [-2.0, 2.0]
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+    x_o = zeros(1, 1)
+
+    if method == "sample":
+        samples = ensemble.sample((10, 200), x=x_o)
+    else:
+        samples = ensemble.sample_batched((10, 200), x=x_o)[..., 0, :]
+
+    # Each row of 200 samples holds about half of each component.
+    fraction_of_second_component = (samples > 0).float().mean(dim=(1, 2))
+    assert (
+        (fraction_of_second_component > 0.3) & (fraction_of_second_component < 0.7)
+    ).all()

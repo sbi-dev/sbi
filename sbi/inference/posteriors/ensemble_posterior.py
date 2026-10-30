@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -228,18 +228,11 @@ class EnsemblePosterior(NeuralPosterior):
         if x is not None:
             self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
-        posterior_indizes = torch.multinomial(
-            self._weights, num_samples, replacement=True
+        samples = self._sample_components(
+            num_samples,
+            lambda posterior, n: posterior.sample(torch.Size((n,)), x=x, **kwargs),
         )
-        samples = []
-        for posterior_index, sample_size in torch.vstack(
-            posterior_indizes.unique(return_counts=True)
-        ).T:
-            sample_shape_c = torch.Size((int(sample_size),))
-            samples.append(
-                self.posteriors[posterior_index].sample(sample_shape_c, x=x, **kwargs)
-            )
-        return torch.vstack(samples).reshape(*sample_shape, -1)
+        return samples.reshape(*sample_shape, -1)
 
     def sample_batched(
         self,
@@ -250,21 +243,47 @@ class EnsemblePosterior(NeuralPosterior):
         # Guard here so validation of `x` does not depend on the component draw.
         self._assert_finite_x(x)
         num_samples = torch.Size(sample_shape).numel()
+        samples = self._sample_components(
+            num_samples,
+            lambda posterior, n: posterior.sample_batched(
+                torch.Size((n,)), x=x, **kwargs
+            ),
+        )
+        return samples.reshape(sample_shape + samples.shape[1:])
+
+    def _sample_components(
+        self, num_samples: int, draw: Callable[[NeuralPosterior, int], Tensor]
+    ) -> Tensor:
+        """Return `num_samples` draws of the ensemble, in random order.
+
+        Draws a component for every sample, then fills the samples of each component
+        into the positions where it was drawn. Concatenating the components instead
+        would sort the samples by component.
+
+        Args:
+            num_samples: Number of samples.
+            draw: Returns `n` samples of a component posterior, as `draw(posterior, n)`.
+
+        Returns:
+            Samples with `num_samples` as their leading dimension.
+        """
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
         )
-        samples = []
-        for posterior_index, sample_size in torch.vstack(
-            posterior_indices.unique(return_counts=True)
-        ).T:
-            sample_shape_c = torch.Size((int(sample_size),))
-            samples.append(
-                self.posteriors[posterior_index].sample_batched(
-                    sample_shape_c, x=x, **kwargs
-                )
+        samples: Optional[Tensor] = None
+        for posterior_index in posterior_indices.unique():
+            is_drawn = posterior_indices == posterior_index
+            component_samples = draw(
+                self.posteriors[int(posterior_index)], int(is_drawn.sum())
             )
-        samples = torch.vstack(samples)
-        return samples.reshape(sample_shape + samples.shape[1:])
+            if samples is None:
+                samples = component_samples.new_empty((
+                    num_samples,
+                    *component_samples.shape[1:],
+                ))
+            samples[is_drawn.to(samples.device)] = component_samples
+        assert samples is not None
+        return samples
 
     def log_prob(
         self,
