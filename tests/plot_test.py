@@ -10,6 +10,7 @@ import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.pyplot import close, subplots
+from scipy.stats import binom
 from torch.utils.tensorboard.writer import SummaryWriter
 
 import sbi.analysis.plot as plt
@@ -107,6 +108,26 @@ def test_pairplot(
     assert isinstance(fig, Figure)
     assert isinstance(axs, np.ndarray)
     assert isinstance(axs[0, 0], Axes)
+    close()
+
+
+@pytest.mark.parametrize("style", get_args(plt.LowerLiteral))
+def test_pairplot_offdiag_cells_plot_column_on_x(style):
+    """Both triangles draw x = column, y = row, inside the cell's axis limits."""
+    rng = np.random.default_rng(0)
+    d0 = rng.uniform(-0.9, 0.9, 500)
+    samples = np.stack([d0, 10 + 0.5 * d0 + rng.uniform(-0.3, 0.3, 500)], axis=1)
+    _, axes = pairplot(samples, limits=[[-1, 1], [9, 11]], upper=style, lower=style)
+    for ax in (axes[0, 1], axes[1, 0]):
+        (x0, x1), (y0, y1), drawn = ax.get_xlim(), ax.get_ylim(), ax.dataLim
+        assert drawn.width > 0 and drawn.height > 0
+        assert x0 <= drawn.x0 and drawn.x1 <= x1
+        assert y0 <= drawn.y0 and drawn.y1 <= y1
+        # Densities and contours are empty if the samples miss the cell's limits.
+        for image in ax.images:
+            assert np.nan_to_num(np.asarray(image.get_array(), dtype=float)).max() > 0
+        if ax.collections:
+            assert sum(len(p.vertices) for c in ax.collections for p in c.get_paths())
     close()
 
 
@@ -309,6 +330,65 @@ def test_sbc_rank_plot(num_parameters, num_cols, custom_figure, plot_type):
         else:
             assert ax.shape == (num_parameters,)
     close()
+
+
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+def test_sbc_rank_plot_bins_over_full_rank_range(plot_type):
+    """Ranks, curves and bands use [0, N]; ranks are not stretched to fill it."""
+    num_posterior_samples, num_sbc_runs, num_bins = 100, 200, 10
+    # Over-dispersed posterior: all ranks lie in [30, 70].
+    ranks = np.linspace(30, 70, num_sbc_runs).round()[:, None]
+    _, ax = sbc_rank_plot(
+        ranks, num_posterior_samples, num_bins=num_bins, plot_type=plot_type
+    )
+    ax = np.atleast_1d(ax)[0]
+    band = ax.collections[0].get_paths()[0].vertices
+    assert (band[:, 0].min(), band[:, 0].max()) == (0, num_posterior_samples)
+    if plot_type == "hist":
+        assert ax.patches[0].get_x() == 0 and ax.patches[0].get_height() == 0
+        # Bins 0-8 hold 10 of the 101 integer ranks, the last bin 11.
+        expected = binom(num_sbc_runs, np.array([10, 11]) / 101).ppf([0.005, 0.995])
+        assert (band[:, 1].min(), band[:, 1].max()) == tuple(expected)
+    else:
+        x, y = ax.lines[0].get_data()
+        assert ax.get_xlim() == (0, num_posterior_samples) == (x.min(), x.max())
+        if plot_type == "cdf":
+            assert np.all(y[: len(y) // 4] == 0)
+        else:
+            assert np.abs(y).max() > 0.2
+    close()
+
+
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+def test_sbc_rank_plot_bands_for_uniform_integer_ranks(plot_type):
+    """Bins over [0, 10] hold one of the 11 integer ranks each, the last bin two."""
+    np.testing.assert_allclose(
+        plt._uniform_rank_bin_probs(10, 10), [1 / 11] * 9 + [2 / 11]
+    )
+    num_sbc_runs = 220
+    ranks = np.tile(np.arange(11), 20)[:, None]  # every rank exactly 20 times
+    _, ax = sbc_rank_plot(ranks, 10, num_bins=10, plot_type=plot_type)
+    ax = np.atleast_1d(ax)[0]
+    band = ax.collections[0].get_paths()[0].vertices
+    if plot_type == "hist":
+        # One flat band that holds the 99% interval of the 1-rank and 2-rank bins.
+        expected = binom(num_sbc_runs, np.array([1, 2]) / 11).ppf([0.005, 0.995])
+        assert (band[:, 1].min(), band[:, 1].max()) == tuple(expected)
+    else:
+        # In bin 8 (8 < x < 9), the CDF of uniform integer ranks is 9 / 11.
+        in_bin_8 = band[(band[:, 0] > 8) & (band[:, 0] < 9), 1]
+        expected = binom(num_sbc_runs, 9 / 11).ppf([0.005, 0.995]) / num_sbc_runs
+        if plot_type == "cdf-diff":
+            expected -= 9 / 11
+            np.testing.assert_allclose(ax.lines[0].get_ydata(), 0, atol=1e-12)
+        np.testing.assert_allclose((in_bin_8.min(), in_bin_8.max()), expected)
+    close()
+
+
+@pytest.mark.parametrize("bad_rank", (-1.0, 11.0, np.nan))
+def test_sbc_rank_plot_rejects_ranks_outside_0_to_n(bad_rank):
+    with pytest.raises(ValueError, match="num_posterior_samples"):
+        sbc_rank_plot(np.full((10, 1), bad_rank), 10)
 
 
 def test_plotting_dataclass_overrides_defaults(mocker):
