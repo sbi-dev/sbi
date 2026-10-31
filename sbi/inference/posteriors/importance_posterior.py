@@ -133,7 +133,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         x = self._x_else_default_x(x)
-        self.potential_fn = self.potential_fn.bind(x)
+        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -186,7 +186,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             )
         if log_normalization_constant is None:
             _, log_importance_weights = importance_sample(
-                self.potential_fn.bind(x),
+                self.potential_fn.bind(x, x_is_iid=True),
                 proposal=self.proposal,
                 num_samples=num_samples,
             )
@@ -243,7 +243,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         method = self.method if method is None else method
 
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(
+            self._x_else_default_x(x), x_is_iid=True
+        )
 
         if method == "sir":
             return self._sir_sample(

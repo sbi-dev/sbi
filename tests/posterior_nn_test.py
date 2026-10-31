@@ -824,6 +824,46 @@ def test_direct_posterior_raises_on_iid_x():
         posterior.sample((10,), x=x_o_iid)
 
 
+@pytest.mark.parametrize("sample_with", ["importance", "rejection", "vi", "mcmc"])
+def test_posterior_supports_several_iid_observations(
+    sample_with: str, mcmc_params_fast: MCMCPosteriorParameters
+):
+    """All sampling methods accept an `x` with several iid observations."""
+    num_dim = 2
+    num_simulations = 1000
+
+    prior = BoxUniform(-3 * ones(num_dim), 3 * ones(num_dim))
+    inference = NPE_C(prior=prior, show_progress_bars=False)
+    theta = prior.sample((num_simulations,))
+    x = diagonal_linear_gaussian(theta)
+    inference.append_simulations(theta, x).train(max_num_epochs=3)
+
+    posterior_parameters = mcmc_params_fast if sample_with == "mcmc" else None
+    posterior = inference.build_posterior(
+        sample_with=sample_with, posterior_parameters=posterior_parameters
+    )
+
+    x_o_iid = zeros(3, num_dim)
+    theta_eval = zeros(1, num_dim)
+
+    expected = posterior.potential_fn.bind(x_o_iid, x_is_iid=True)(theta_eval)
+    assert torch.allclose(posterior.potential(theta_eval, x=x_o_iid), expected)
+
+    if sample_with == "vi":
+        posterior.train(
+            x=x_o_iid,
+            max_num_iters=2,
+            min_num_iters=1,
+            warm_up_rounds=1,
+            show_progress_bar=False,
+            quality_control=False,
+        )
+
+    samples = posterior.sample((10,), x=x_o_iid, show_progress_bars=False)
+    assert samples.shape == (10, num_dim)
+    assert torch.isfinite(samples).all()
+
+
 @pytest.mark.gpu
 @pytest.mark.parametrize("method", ["log_prob", "log_prob_batched"])
 def test_direct_posterior_log_prob_with_theta_on_cpu(method: str):

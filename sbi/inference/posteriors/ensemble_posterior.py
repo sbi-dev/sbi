@@ -350,7 +350,9 @@ class EnsemblePosterior(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self.potential_fn.bind(
+            self._x_else_default_x(x), x_is_iid=True
+        )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
