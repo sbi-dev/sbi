@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 import pytest
-from torch import eye, ones, randn_like, tensor, zeros
+from torch import eye, float32, float64, ones, randn_like, tensor, zeros
 from torch.distributions import Categorical, MixtureSameFamily, MultivariateNormal
 from torch.testing import assert_close
 
@@ -188,3 +188,75 @@ def test_ensemble_potential_follows_weight_change():
 
     expected = MixtureSameFamily(Categorical(tensor([1.0, 3.0])), components)
     assert_close(ensemble.potential(theta), expected.log_prob(theta))
+
+
+class _BatchedTractablePosterior(TractablePosterior):
+    """Tractable posterior that draws the same posterior for every x in a batch."""
+
+    def sample_batched(self, sample_shape, x, **kwargs):
+        return self.potential_fn.posterior.sample((*sample_shape, x.shape[0]))
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_samples_are_not_sorted_by_component(method: str):
+    """Every slice of the samples must mix the components by their weights."""
+    prior = MultivariateNormal(zeros(1), 10 * eye(1))
+    posteriors = [
+        _BatchedTractablePosterior(
+            PosteriorPotential(MultivariateNormal(tensor([mean]), 0.01 * eye(1)), prior)
+        )
+        for mean in [-2.0, 2.0]
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+    x_o = zeros(1, 1)
+
+    if method == "sample":
+        samples = ensemble.sample((10, 200), x=x_o)
+    else:
+        samples = ensemble.sample_batched((10, 200), x=x_o)[..., 0, :]
+
+    # Each row of 200 samples holds about half of each component.
+    fraction_of_second_component = (samples > 0).float().mean(dim=(1, 2))
+    assert (
+        (fraction_of_second_component > 0.3) & (fraction_of_second_component < 0.7)
+    ).all()
+
+
+def test_ensemble_samples_promote_the_dtypes_of_the_components():
+    """Components of different precision give samples of the promoted dtype."""
+    posteriors = []
+    for mean, dtype in [(-2.0, float32), (2.0, float64)]:
+        prior = MultivariateNormal(zeros(1, dtype=dtype), 10 * eye(1, dtype=dtype))
+        posterior = MultivariateNormal(
+            tensor([mean], dtype=dtype), 0.01 * eye(1, dtype=dtype)
+        )
+        posteriors.append(TractablePosterior(PosteriorPotential(posterior, prior)))
+    ensemble = EnsemblePosterior(posteriors)
+
+    samples = ensemble.sample((200,), x=zeros(1, 1))
+
+    assert samples.dtype == float64
+    assert (samples < 0).any() and (samples > 0).any()
+
+
+class _TimedOutTractablePosterior(TractablePosterior):
+    """Tractable posterior that returns a single sample, like a sampler that timed out
+    with `return_partial_on_timeout=True`."""
+
+    def sample(self, sample_shape=(), x=None, **kwargs):
+        return self.potential_fn.posterior.sample((1,))
+
+
+def test_ensemble_raises_for_partial_component_samples():
+    """A component with fewer samples than requested must not fill other positions."""
+    prior = MultivariateNormal(zeros(1), 10 * eye(1))
+    posteriors = [
+        _TimedOutTractablePosterior(
+            PosteriorPotential(MultivariateNormal(tensor([mean]), 0.01 * eye(1)), prior)
+        )
+        for mean in [-2.0, 2.0]
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+
+    with pytest.raises(ValueError, match="partial samples"):
+        ensemble.sample((100,), x=zeros(1, 1))
