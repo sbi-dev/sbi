@@ -184,6 +184,9 @@ class VectorFieldBasedPotential(BasePotential):
         **ode_kwargs,
     ) -> "VectorFieldBasedPotential":
         """Create new potential with x bound, without mutable state."""
+        if x_o is not None:
+            x_o = process_x(x_o).to(self.device)
+            x_is_iid = x_is_iid and x_o.shape[0] > 1
         # IID and guidance require transforming the prior to standardized space.
         if self.vector_field_estimator.compose_enabled:
             if x_is_iid:
@@ -207,8 +210,6 @@ class VectorFieldBasedPotential(BasePotential):
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
         bound._x_is_iid = x_is_iid
         bound.guidance_method = guidance_method

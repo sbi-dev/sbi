@@ -934,7 +934,7 @@ class VIPosterior(NeuralPosterior):
         self._trained_on = x
 
         # Bind potential_fn to the trained x so it can be used for sampling/evaluation
-        self.potential_fn = self.potential_fn.bind(x)
+        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
 
         if self._mode == "amortized":
             warnings.warn(
