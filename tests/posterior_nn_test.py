@@ -707,7 +707,8 @@ def test_batched_sampling_and_logprob_accuracy(density_estimator: str):
 
         target_log_probs = gt_posterior.log_prob(samples_batched[:, idx])
         log_probs = posterior.log_prob(samples_batched[:, idx], xos[idx])
-        assert torch.allclose(log_probs, log_probs_batched[:, idx])
+        # float32 rounding differs between batch shapes, by up to about 1e-5.
+        assert torch.allclose(log_probs, log_probs_batched[:, idx], atol=1e-4)
         assert torch.allclose(
             target_log_probs.exp(), log_probs.exp(), atol=0.4, rtol=0.4
         ), "Batched log probs are not consistent with non-batched log probs."
