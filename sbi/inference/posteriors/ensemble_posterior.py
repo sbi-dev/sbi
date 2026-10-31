@@ -268,25 +268,38 @@ class EnsemblePosterior(NeuralPosterior):
 
         Returns:
             Samples with `num_samples` as their leading dimension.
+
+        Raises:
+            ValueError: If a component returns fewer samples than requested, e.g.,
+                partial samples after a timeout.
         """
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
         )
         draws = []
-        for posterior_index in posterior_indices.unique():
-            is_drawn = posterior_indices == posterior_index
+        for posterior_index, num_drawn in zip(
+            *posterior_indices.unique(return_counts=True), strict=True
+        ):
             component_samples = draw(
-                self.posteriors[int(posterior_index)], int(is_drawn.sum())
+                self.posteriors[int(posterior_index)], int(num_drawn)
             )
-            draws.append((is_drawn, component_samples))
+            if component_samples.shape[0] != num_drawn:
+                raise ValueError(
+                    f"Component {int(posterior_index)} of the ensemble returned "
+                    f"{component_samples.shape[0]} of {int(num_drawn)} samples. "
+                    "Ensembles do not support partial samples, e.g., with "
+                    "`return_partial_on_timeout=True`."
+                )
+            draws.append((posterior_index, component_samples))
 
         dtype = reduce(torch.promote_types, (s.dtype for _, s in draws))
         first_samples = draws[0][1]
         samples = first_samples.new_empty(
             (num_samples, *first_samples.shape[1:]), dtype=dtype
         )
-        for is_drawn, component_samples in draws:
-            samples[is_drawn.to(samples.device)] = component_samples.to(dtype)
+        for posterior_index, component_samples in draws:
+            is_drawn = (posterior_indices == posterior_index).to(samples.device)
+            samples[is_drawn] = component_samples.to(dtype)
         return samples
 
     def log_prob(

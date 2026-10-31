@@ -237,3 +237,26 @@ def test_ensemble_samples_promote_the_dtypes_of_the_components():
 
     assert samples.dtype == float64
     assert (samples < 0).any() and (samples > 0).any()
+
+
+class _TimedOutTractablePosterior(TractablePosterior):
+    """Tractable posterior that returns a single sample, like a sampler that timed out
+    with `return_partial_on_timeout=True`."""
+
+    def sample(self, sample_shape=(), x=None, **kwargs):
+        return self.potential_fn.posterior.sample((1,))
+
+
+def test_ensemble_raises_for_partial_component_samples():
+    """A component with fewer samples than requested must not fill other positions."""
+    prior = MultivariateNormal(zeros(1), 10 * eye(1))
+    posteriors = [
+        _TimedOutTractablePosterior(
+            PosteriorPotential(MultivariateNormal(tensor([mean]), 0.01 * eye(1)), prior)
+        )
+        for mean in [-2.0, 2.0]
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+
+    with pytest.raises(ValueError, match="partial samples"):
+        ensemble.sample((100,), x=zeros(1, 1))
