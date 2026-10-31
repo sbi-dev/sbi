@@ -190,7 +190,9 @@ Paired differences in C2ST (mean over seeds per dataset, standard error over the
 3. Against NPE with a mask, the mean flow gains 0.03 C2ST. This meets the rule set in advance (more than 0.02 and more than 2 standard errors, 2 × 0.014 = 0.028) only narrowly, and fails it without the two non-converged runs (2 × 0.015 = 0.030). Parameter RMSE shows no gain: all arms sit near the reference's 0.27, with NPE the most stable over seeds.
 4. The gain costs a lot: about 30 min of NUTS per observation, against seconds for amortized NPE, and 2 of 30 chains did not converge.
 
-**Caveats.** Arm 1 against arm 3 compares NLE with a transformer against NPE with an MLP, so the difference cannot be pinned on the transformer alone. The mean flow ran at its last epoch only (the plan also asked for the best epoch; not run). The task is small: 4 parameters and 32 tokens favour NPE with a mask, and the paper's regime (128 parameters, 123 tokens) could differ.
+**Best epoch (2026-10-31).** The same mean flow retrained with the weights of its lowest validation loss kept (`paper_arms.py --mf-best-epoch`; best epochs 456, 202 and 197 of 1,000), NUTS on the same 10 datasets (`scripts/missing/score_best.py`, `results/missing_best/`). C2ST 0.639 (per seed 0.615, 0.667, 0.636) against 0.614 at the last epoch: mean flow best − last +0.025 (0.012), best − sbi NPE −0.006 (0.016). The two seeds that stopped near epoch 200 lose the most; the seed that kept epoch 456 is close to its last epoch. All 30 NUTS runs converged (last epoch: 28 of 30), median 2,255 s. Posterior-mean RMSE 0.235, 0.228, 0.256, below the reference's 0.269, which shows that RMSE on 10 datasets does not rank posteriors. So the validation loss of the mean-flow objective again picks worse weights than the last epoch (as on g-and-k), and at its best epoch the mean flow ties NPE with a mask.
+
+**Caveats.** Arm 1 against arm 3 compares NLE with a transformer against NPE with an MLP, so the difference cannot be pinned on the transformer alone. The task is small: 4 parameters and 32 tokens favour NPE with a mask, and the paper's regime (128 parameters, 123 tokens) could differ.
 
 **What it means for sbi.** No case for adding the mean flow for missing data on this evidence. The useful outcome is the recipe that matched it at a fraction of the cost: standardize, set missing entries to 0, append the mask, and redraw the mask per epoch. sbi's documentation does not describe missing data at all; a short how-to guide with this recipe would serve users.
 
@@ -204,11 +206,11 @@ Both are fixed in the first two commits of this branch, and for sbi on their own
 ## Mistakes in our own benchmark (fixed, recorded so they are not repeated)
 
 - `build_posterior` deep-copies the estimator (`sbi/inference/trainers/base.py:623`). Setting `num_steps` on the trained estimator afterwards does not reach the posterior. The first grid ran every mean flow at S=2; set `num_steps` before `build_posterior`.
-- The paper recipe without model selection overfits at 2,000 simulations (above); with plenty of data, best-epoch selection on the mean-flow loss can pick worse weights than the last epoch (g-and-k, slcp), but the last epoch can also fail (gaussian_linear at 50,176 with sbi's network). Report both.
+- The paper recipe without model selection overfits at 2,000 simulations (above); with plenty of data, best-epoch selection on the mean-flow loss can pick worse weights than the last epoch (g-and-k, slcp, the missing-data check), but the last epoch can also fail (gaussian_linear at 50,176 with sbi's network). Report both.
 
 ## Verdict
 
-After the missing-data check (2026-10-30): unchanged. The masked-transformer mean flow beats the paper's fill-in coupling flow by 0.13 C2ST, but sbi NPE with the mask appended comes within 0.03 at a fraction of the cost.
+After the missing-data check (2026-10-30, best epoch added 2026-10-31): unchanged. The masked-transformer mean flow beats the paper's fill-in coupling flow by 0.13 C2ST, but sbi NPE with the mask appended comes within 0.03 of its last epoch and ties its best epoch, at a fraction of the cost.
 
 After the NLE benchmark (2026-10-28): park the mean flow; do not add it to sbi. With plenty of data it ties sbi's default NSF on three of four mini-sbibm tasks and loses on slcp, with either network. Its gains are narrow: g-and-k with the paper's network only, and 0.03 to 0.05 C2ST on gaussian_linear and slcp at 2,000 simulations with sbi's network only. Against that stand 14 to 20x the training time (2,000 simulations, CPU), 1.4 to 1.9x the MCMC time at S=1, a training recipe that sbi's `train()` does not offer, and no reliable rule for which epoch to keep. The branch stays as a documented experiment; the fixes for sbi that came out of it are listed separately.
 
