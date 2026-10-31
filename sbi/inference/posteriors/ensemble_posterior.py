@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
+from functools import reduce
 from typing import Callable, List, Optional, Tuple, Union
 
 import torch
@@ -258,7 +259,8 @@ class EnsemblePosterior(NeuralPosterior):
 
         Draws a component for every sample, then fills the samples of each component
         into the positions where it was drawn. Concatenating the components instead
-        would sort the samples by component.
+        would sort the samples by component. Like `torch.cat`, the samples get the
+        promoted dtype of all components.
 
         Args:
             num_samples: Number of samples.
@@ -270,19 +272,21 @@ class EnsemblePosterior(NeuralPosterior):
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
         )
-        samples: Optional[Tensor] = None
+        draws = []
         for posterior_index in posterior_indices.unique():
             is_drawn = posterior_indices == posterior_index
             component_samples = draw(
                 self.posteriors[int(posterior_index)], int(is_drawn.sum())
             )
-            if samples is None:
-                samples = component_samples.new_empty((
-                    num_samples,
-                    *component_samples.shape[1:],
-                ))
-            samples[is_drawn.to(samples.device)] = component_samples
-        assert samples is not None
+            draws.append((is_drawn, component_samples))
+
+        dtype = reduce(torch.promote_types, (s.dtype for _, s in draws))
+        first_samples = draws[0][1]
+        samples = first_samples.new_empty(
+            (num_samples, *first_samples.shape[1:]), dtype=dtype
+        )
+        for is_drawn, component_samples in draws:
+            samples[is_drawn.to(samples.device)] = component_samples.to(dtype)
         return samples
 
     def log_prob(

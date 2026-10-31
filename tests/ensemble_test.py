@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import asdict
 
 import pytest
-from torch import eye, ones, randn_like, tensor, zeros
+from torch import eye, float32, float64, ones, randn_like, tensor, zeros
 from torch.distributions import Categorical, MixtureSameFamily, MultivariateNormal
 from torch.testing import assert_close
 
@@ -220,3 +220,20 @@ def test_ensemble_samples_are_not_sorted_by_component(method: str):
     assert (
         (fraction_of_second_component > 0.3) & (fraction_of_second_component < 0.7)
     ).all()
+
+
+def test_ensemble_samples_promote_the_dtypes_of_the_components():
+    """Components of different precision give samples of the promoted dtype."""
+    posteriors = []
+    for mean, dtype in [(-2.0, float32), (2.0, float64)]:
+        prior = MultivariateNormal(zeros(1, dtype=dtype), 10 * eye(1, dtype=dtype))
+        posterior = MultivariateNormal(
+            tensor([mean], dtype=dtype), 0.01 * eye(1, dtype=dtype)
+        )
+        posteriors.append(TractablePosterior(PosteriorPotential(posterior, prior)))
+    ensemble = EnsemblePosterior(posteriors)
+
+    samples = ensemble.sample((200,), x=zeros(1, 1))
+
+    assert samples.dtype == float64
+    assert (samples < 0).any() and (samples > 0).any()
