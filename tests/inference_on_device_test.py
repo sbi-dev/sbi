@@ -751,13 +751,13 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
     """
 
     device = process_device(device)
-    prior = BoxUniform(torch.tensor([1.0]), torch.tensor([1.0]))
+    prior = BoxUniform(-torch.ones(3), torch.ones(3))
     inference = NPE()
     estimator = inference.append_simulations(
         torch.randn((100, 3)), torch.randn((100, 2))
     ).train(max_num_epochs=1)
 
-    x_o = torch.tensor([0.1]).to(device)
+    x_o = torch.tensor([0.1, 0.2]).to(device)
     if potential == EnsemblePotential:
         potential_fn = potential(
             [
@@ -775,10 +775,9 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
     assert str(potential_fn.device).split(":")[0] == device.split(":")[0], (
         "Device attribute of potential_fn is not correct"
     )
-    if hasattr("potential", "prior"):
-        assert str(potential_fn).split(":")[0].prior == device.split(":")[0], (
-            "Device attribute of potential_fn.prior is not vcorrect"
-        )
+    assert potential_fn.prior.mean.device.type == device.split(":")[0], (
+        "Device of potential_fn.prior is not correct"
+    )
 
 
 @pytest.fixture(scope="module")
