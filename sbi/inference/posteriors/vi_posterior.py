@@ -279,7 +279,10 @@ class VIPosterior(NeuralPosterior):
             self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
-            self._rebind_amortized_q(self._prior, self.link_transform)
+            # Keep the trained link: rebuilding it can re-estimate prior moments.
+            link_transform = self._amortized_q._link_transform
+            move_all_tensor_to_device(link_transform, device)
+            self._rebind_amortized_q(self._prior, link_transform)
 
         return self
 
