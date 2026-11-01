@@ -924,22 +924,25 @@ def test_posteriors_combine_several_observations_as_iid_trials(
     trainer = trainers[method]
     if sample_with == "ensemble":
         component = trainer.build_posterior(sample_with="rejection")
+        # Equal components: the mixture equals each of them.
         posterior = EnsemblePosterior([component, component])
     else:
         params = mcmc_params_fast if sample_with == "mcmc" else None
-        posterior = trainer.build_posterior(
+        component = posterior = trainer.build_posterior(
             sample_with=sample_with, posterior_parameters=params
         )
     x_o = torch.tensor([[0.0, 0.0], [0.5, -0.5], [1.0, 0.0]])
     theta = zeros(4, 2)
+    # iid trials: the sum of single-observation potentials, prior counted once.
+    singles = torch.stack([component.potential(theta, x=x_i) for x_i in x_o])
+    expected = singles.sum(0) - 2 * prior.log_prob(theta)
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         potential = posterior.potential(theta, x=x_o)
     iid_warnings = [w for w in caught if "x holds 3 observations" in str(w.message)]
     assert len(iid_warnings) == (1 if method == "npe" else 0)
-    expected = posterior.potential_fn.bind(x_o, x_is_iid=True)(theta)
-    assert torch.allclose(potential, expected)
+    assert torch.allclose(potential, expected, atol=1e-4)
 
     posterior.set_default_x(x_o)
     if sample_with == "vi":

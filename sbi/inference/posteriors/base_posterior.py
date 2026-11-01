@@ -240,8 +240,10 @@ class NeuralPosterior:
             # One location for all callers: Python's default filter shows it once.
             warn(
                 f"x holds {num_observations} observations, which are combined as iid "
-                "trials of one parameter set. For separate posteriors of several "
-                "observations, use `sample_batched()` or `log_prob_batched()`.",
+                "trials of one parameter set. For a separate posterior of each "
+                "observation, pass one observation at a time, or use "
+                "`sample_batched()` of a posterior that supports it (e.g. direct "
+                "or MCMC).",
                 stacklevel=1,
             )
         return bound

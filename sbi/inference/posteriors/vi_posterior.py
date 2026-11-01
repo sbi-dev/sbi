@@ -902,9 +902,7 @@ class VIPosterior(NeuralPosterior):
             )
 
         # Check context
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(  # type: ignore
-            self._device
-        )
+        x = self._x_else_default_x(x)
         if not torch.isfinite(x).all():
             raise ValueError("x contains NaN or Inf values.")
         # Bound to the trained x, so that the potential can be used after training.

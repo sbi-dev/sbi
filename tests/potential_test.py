@@ -301,13 +301,8 @@ def test_set_x_none_clears_observation():
     assert bound.return_x_o() is None
 
 
-@pytest.mark.parametrize("method", ["npe", "nre"])
-def test_potential_counts_iid_trials_against_the_shape_of_one_observation(method):
-    """An observation with several trials in its event shape is one iid trial.
-
-    With a permutation-invariant embedding, one observation holds 5 trials. Without
-    batch dimension, it must not be counted as 5 iid trials.
-    """
+def _potential_with_trials_in_one_observation(method: str):
+    """Untrained NPE or NRE potential whose observation holds 5 trials."""
     torch.manual_seed(0)
     prior = BoxUniform(-3 * ones(2), 3 * ones(2))
     theta = prior.sample((50,))
@@ -321,6 +316,17 @@ def test_potential_counts_iid_trials_against_the_shape_of_one_observation(method
     else:
         estimator = classifier_nn("mlp", embedding_net_x=embedding)(theta, x)
         potential_fn, _ = ratio_estimator_based_potential(estimator, prior, None)
+    return potential_fn, prior
+
+
+@pytest.mark.parametrize("method", ["npe", "nre"])
+def test_potential_counts_iid_trials_against_the_shape_of_one_observation(method):
+    """An observation with several trials in its event shape is one iid trial.
+
+    With a permutation-invariant embedding, one observation holds 5 trials. Without
+    batch dimension, it must not be counted as 5 iid trials.
+    """
+    potential_fn, prior = _potential_with_trials_in_one_observation(method)
 
     theta_o = torch.tensor([[0.5, -0.5], [1.0, 1.0]])
     x_o = torch.stack([zeros(5, 2), ones(5, 2), -ones(5, 2)])
@@ -360,3 +366,16 @@ def test_x_that_contradicts_the_estimator_raises_a_clear_error(method):
     unpaired = potential_fn.bind(zeros(3, 2), x_is_iid=False)
     with pytest.raises(ValueError, match="theta has 4 rows and x has 3 observations"):
         unpaired(zeros(4, 2))
+
+
+@pytest.mark.mcmc
+def test_mcmc_sample_batched_reads_one_observation_without_batch_dimension():
+    """One observation with 5 trials is a batch of 1, not a batch of 5 trials."""
+    potential_fn, prior = _potential_with_trials_in_one_observation("npe")
+    posterior = MCMCPosterior(
+        potential_fn, proposal=prior, method="slice_np_vectorized", warmup_steps=2
+    )
+    samples = posterior.sample_batched(
+        (4,), x=zeros(5, 2), num_chains=2, show_progress_bars=False
+    )
+    assert samples.shape == (4, 1, 2)

@@ -269,7 +269,7 @@ class DirectPosterior(NeuralPosterior):
         x = self._process_x(x)
         num_samples = torch.Size(sample_shape).numel()
         condition_shape = self.posterior_estimator.condition_shape
-        x = reshape_to_batch_event(x.to(self._device), event_shape=condition_shape)
+        x = reshape_to_batch_event(x, event_shape=condition_shape)
         num_xos = x.shape[0]
 
         # throw warning if num_x * num_samples is too large
