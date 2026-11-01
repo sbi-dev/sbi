@@ -278,7 +278,7 @@ class VIPosterior(NeuralPosterior):
             self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
-            self._rebind_amortized_q(self._prior)
+            self._rebind_amortized_q(self._prior, self.link_transform)
 
         return self
 
@@ -290,10 +290,12 @@ class VIPosterior(NeuralPosterior):
         except (AttributeError, NotImplementedError):
             return None
 
-    def _rebind_amortized_q(self, prior: Distribution) -> None:
+    def _rebind_amortized_q(
+        self, prior: Distribution, link_transform: TorchTransform
+    ) -> None:
         """Point the amortized flow's link and support at tensors on this device."""
         assert self._amortized_q is not None
-        self._amortized_q._link_transform = self.link_transform
+        self._amortized_q._link_transform = link_transform
         self._amortized_q._support = self._prior_support(prior)
 
     def _build_unconditional_flow(
@@ -581,10 +583,13 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
             if self._amortized_q is not None:
                 self._amortized_q.to(self._device)
-                # Copy, so the source posterior's prior stays on its own device.
-                self._rebind_amortized_q(
-                    move_distribution_to_device(deepcopy(q._prior), self._device)
-                )
+                # Link and support come from the source posterior's prior (not this
+                # one's), copied so that the source stays on its own device.
+                prior = move_distribution_to_device(deepcopy(q._prior), self._device)
+                theta_transform = q.theta_transform
+                if theta_transform is None:
+                    theta_transform = mcmc_transform(prior, device=self._device)
+                self._rebind_amortized_q(prior, theta_transform.inv)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
