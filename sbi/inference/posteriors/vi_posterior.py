@@ -278,10 +278,23 @@ class VIPosterior(NeuralPosterior):
             self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
-            self._amortized_q._link_transform = self.link_transform
-            self._amortized_q._support = getattr(self._prior, "support", None)
+            self._rebind_amortized_q(self._prior)
 
         return self
+
+    @staticmethod
+    def _prior_support(prior: Distribution):
+        """Support of the prior, or None if it does not define one."""
+        try:
+            return prior.support
+        except (AttributeError, NotImplementedError):
+            return None
+
+    def _rebind_amortized_q(self, prior: Distribution) -> None:
+        """Point the amortized flow's link and support at tensors on this device."""
+        assert self._amortized_q is not None
+        self._amortized_q._link_transform = self.link_transform
+        self._amortized_q._support = self._prior_support(prior)
 
     def _build_unconditional_flow(
         self,
@@ -456,7 +469,7 @@ class VIPosterior(NeuralPosterior):
             hidden_features=hidden_features,
         )
         return TransformedConditionalZukoFlow(
-            flow, self.link_transform, getattr(self._prior, "support", None)
+            flow, self.link_transform, self._prior_support(self._prior)
         ).to(self._device)
 
     @property
@@ -568,6 +581,7 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
             if self._amortized_q is not None:
                 self._amortized_q.to(self._device)
+                self._rebind_amortized_q(q._prior)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
