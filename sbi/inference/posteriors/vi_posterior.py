@@ -46,6 +46,7 @@ from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
+    move_all_tensor_to_device,
     process_device,
 )
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
@@ -585,10 +586,14 @@ class VIPosterior(NeuralPosterior):
                 self._amortized_q.to(self._device)
                 # Link and support come from the source posterior's prior (not this
                 # one's), copied so that the source stays on its own device.
-                prior = move_distribution_to_device(deepcopy(q._prior), self._device)
-                theta_transform = q.theta_transform
-                if theta_transform is None:
+                prior = move_distribution_to_device(
+                    detach_and_deepcopy(q._prior), self._device
+                )
+                if q.theta_transform is None:
                     theta_transform = mcmc_transform(prior, device=self._device)
+                else:
+                    theta_transform = detach_and_deepcopy(q.theta_transform)
+                    move_all_tensor_to_device(theta_transform, self._device)
                 self._rebind_amortized_q(prior, theta_transform.inv)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
