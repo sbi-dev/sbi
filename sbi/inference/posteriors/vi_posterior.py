@@ -581,7 +581,10 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
             if self._amortized_q is not None:
                 self._amortized_q.to(self._device)
-                self._rebind_amortized_q(q._prior)
+                # Copy, so the source posterior's prior stays on its own device.
+                self._rebind_amortized_q(
+                    move_distribution_to_device(deepcopy(q._prior), self._device)
+                )
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
