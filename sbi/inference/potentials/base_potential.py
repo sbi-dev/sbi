@@ -32,9 +32,7 @@ class BasePotential(metaclass=ABCMeta):
         """
         self.device = process_device(device)
         self.prior = prior
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        self._x_o = x_o
+        self._x_o = self._prepare_x_o(x_o)
         self._x_is_iid = True
 
     @abstractmethod
@@ -51,6 +49,24 @@ class BasePotential(metaclass=ABCMeta):
         """Return the net that embeds `x`; `None` (default) means no net is
         known to consume `x`, so posteriors validate `x_o` strictly."""
         return None
+
+    @property
+    def x_event_shape(self) -> Optional[torch.Size]:
+        """Shape of one observation `x`, without batch dimension.
+
+        `None` (default) means the shape is unknown and `x_o` is not checked.
+        """
+        return None
+
+    def _prepare_x_o(self, x_o: Optional[Tensor]) -> Optional[Tensor]:
+        """Return `x_o` with shape `(num_observations, *x_event_shape)`.
+
+        An `x_o` of shape `x_event_shape` is one observation, also if it has several
+        dimensions (e.g. trials that a permutation-invariant embedding net combines).
+        """
+        if x_o is None:
+            return None
+        return process_x(x_o, x_event_shape=self.x_event_shape).to(self.device)
 
     @property
     def x_is_iid(self) -> bool:
@@ -107,9 +123,7 @@ class BasePotential(metaclass=ABCMeta):
             New potential instance with x bound.
         """
         bound = copy.copy(self)
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        bound._x_o = x_o
+        bound._x_o = self._prepare_x_o(x_o)
         bound._x_is_iid = x_is_iid
         return bound
 

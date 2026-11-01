@@ -259,6 +259,11 @@ class ConditionedPotential(BasePotential):
         return self.potential_fn.x_embedding_net
 
     @property
+    def x_event_shape(self) -> Optional[torch.Size]:
+        """Delegate to the wrapped potential."""
+        return self.potential_fn.x_event_shape
+
+    @property
     def x_is_iid(self) -> bool:
         """If x has batch dimension greater than 1, whether to intepret the batch as iid
         samples or batch of data points."""

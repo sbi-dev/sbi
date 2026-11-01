@@ -21,7 +21,6 @@ from sbi.utils.sbiutils import (
     within_support,
 )
 from sbi.utils.torchutils import ensure_theta_batched, infer_module_device
-from sbi.utils.user_input_checks import process_x
 
 
 def posterior_estimator_based_potential(
@@ -84,15 +83,20 @@ class PosteriorBasedPotential(BasePotential):
         Returns:
             The potential function.
         """
-        super().__init__(prior, x_o, device)
-        self._x_is_iid = False
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
+        super().__init__(prior, x_o, device)
+        self._x_is_iid = False
 
     @property
     def x_embedding_net(self) -> Optional[nn.Module]:
         """Return the net embedding `x`: the estimator's condition is `x`."""
         return self.posterior_estimator.embedding_net
+
+    @property
+    def x_event_shape(self) -> torch.Size:
+        """Shape of one observation: the condition shape of the estimator."""
+        return self.posterior_estimator.condition_shape
 
     def to(self, device: Union[str, torch.device]) -> "PosteriorBasedPotential":
         """Move posterior estimator, prior and x_o to the given device.
@@ -117,9 +121,7 @@ class PosteriorBasedPotential(BasePotential):
             x_o=None,
             device=self.device,
         )
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        bound._x_o = x_o
+        bound._x_o = self._prepare_x_o(x_o)
         bound._x_is_iid = x_is_iid
         return bound
 

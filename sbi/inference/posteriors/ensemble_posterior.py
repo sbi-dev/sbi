@@ -500,6 +500,11 @@ class EnsemblePotential(BasePotential):
             potential_fn.to(self.device)
         self._weights = self._weights.to(self.device)
 
+    @property
+    def x_event_shape(self) -> Optional[torch.Size]:
+        """Shape of one observation, as the first component sees it."""
+        return self.potential_fns[0].x_event_shape
+
     def allow_iid_x(self) -> bool:
         # in case there is different kinds of posteriors, this will produce an error
         # in `set_x()`
@@ -542,8 +547,7 @@ class EnsemblePotential(BasePotential):
         Returns:
             A new EnsemblePotential with bound components.
         """
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
+        x_o = self._prepare_x_o(x_o)
 
         iid_kwargs = {} if x_is_iid is None else {"x_is_iid": x_is_iid}
         bound_potentials = [
