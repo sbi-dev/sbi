@@ -9,7 +9,10 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    unpaired_batch_error,
+)
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -194,12 +197,8 @@ class PosteriorBasedPotential(BasePotential):
                 )
                 theta_batch_size = theta.shape[0]
                 x_batch_size = x.shape[0]
-
-                assert theta_batch_size == x_batch_size or x_batch_size == 1, (
-                    f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
-                    When performing batched sampling for multiple `x`, the batch size\
-                    of `theta` must match the batch size of `x`."
-                )
+                if theta_batch_size != x_batch_size and x_batch_size != 1:
+                    raise unpaired_batch_error(theta_batch_size, x_batch_size)
 
                 if x_batch_size == 1:
                     # If a single `x` is passed (i.e. batchsize==1), we squeeze

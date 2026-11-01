@@ -209,21 +209,25 @@ class NeuralPosterior:
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        x = process_x(x, x_event_shape=None)
-        self._assert_finite_x(x)
-
-        self._x = x.to(self._device)
+        self._x = self._process_x(x)
         self._map = None
         return self
+
+    def _process_x(self, x: Array) -> Tensor:
+        """Return `x` with shape `(num_observations, *x_event_shape)` on the device.
+
+        Raises if `x` does not match the shape of one observation of the potential,
+        or holds NaN or Inf values that the net embedding `x` does not accept.
+        """
+        x = process_x(x, x_event_shape=self.potential_fn.x_event_shape)
+        self._assert_finite_x(x)
+        return x.to(self._device)
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
-            x = process_x(x, x_event_shape=None)
-            self._assert_finite_x(x)
-
-            return x.to(self._device)
+            return self._process_x(x)
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."

@@ -7,7 +7,7 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import BasePotential, unpaired_batch_error
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, mcmc_transform
 from sbi.utils.torchutils import atleast_2d
@@ -132,11 +132,8 @@ class RatioBasedPotential(BasePotential):
 
             theta_batch_size = theta.shape[0]
             x_batch_size = self.x_o.shape[0]
-            assert theta_batch_size == x_batch_size, (
-                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
-                When performing batched sampling for multiple `x`, the batch size of\
-                `theta` must match the batch size of `x`."
-            )
+            if theta_batch_size != x_batch_size:
+                raise unpaired_batch_error(theta_batch_size, x_batch_size)
             with torch.set_grad_enabled(track_gradients):
                 log_ratio_batches = self.ratio_estimator(theta, self.x_o)
                 log_ratio_batches = log_ratio_batches.reshape(-1)

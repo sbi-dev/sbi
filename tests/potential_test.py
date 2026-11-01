@@ -23,6 +23,9 @@ from sbi.inference.potentials.base_potential import (
     BasePotential,
     CustomPotentialWrapper,
 )
+from sbi.inference.potentials.likelihood_based_potential import (
+    likelihood_estimator_based_potential,
+)
 from sbi.inference.potentials.posterior_based_potential import (
     PosteriorBasedPotential,
     posterior_estimator_based_potential,
@@ -31,7 +34,12 @@ from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
-from sbi.neural_nets import classifier_nn, posterior_nn, posterior_score_nn
+from sbi.neural_nets import (
+    classifier_nn,
+    likelihood_nn,
+    posterior_nn,
+    posterior_score_nn,
+)
 from sbi.neural_nets.embedding_nets import FCEmbedding, PermutationInvariantEmbedding
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
@@ -324,3 +332,27 @@ def test_potential_counts_iid_trials_against_the_shape_of_one_observation(method
     # iid trials: the sum of single-trial potentials, with the prior counted once.
     expected = singles.sum(0) - 2 * prior.log_prob(theta_o)
     assert torch.allclose(iid_potential(x_o), expected, atol=1e-5)
+
+
+@pytest.mark.parametrize("method", ["npe", "nle", "nre"])
+def test_x_that_contradicts_the_estimator_raises_a_clear_error(method):
+    """A wrong shape of x, or theta and x batches that do not pair, raise."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((20,)), prior.sample((20,))
+    if method == "npe":
+        estimator = posterior_nn("mdn")(theta, x)
+        potential_fn, _ = posterior_estimator_based_potential(estimator, prior, None)
+    elif method == "nle":
+        estimator = likelihood_nn("mdn")(x, theta)
+        potential_fn, _ = likelihood_estimator_based_potential(estimator, prior, None)
+    else:
+        estimator = classifier_nn("mlp")(theta, x)
+        potential_fn, _ = ratio_estimator_based_potential(estimator, prior, None)
+    posterior = RejectionPosterior(potential_fn, proposal=prior)
+
+    for wrong_x in (zeros(1, 3), zeros(2, 3, 2)):
+        with pytest.raises(ValueError, match=r"one observation has shape \(2,\)"):
+            posterior.set_default_x(wrong_x)
+    unpaired = potential_fn.bind(zeros(3, 2), x_is_iid=False)
+    with pytest.raises(ValueError, match="theta has 4 rows and x has 3 observations"):
+        unpaired(zeros(4, 2))

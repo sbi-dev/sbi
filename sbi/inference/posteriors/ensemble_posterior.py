@@ -14,7 +14,6 @@ from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPot
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched, process_device
-from sbi.utils.user_input_checks import process_x
 
 
 class EnsemblePosterior(NeuralPosterior):
@@ -329,9 +328,8 @@ class EnsemblePosterior(NeuralPosterior):
             `EnsemblePosterior` that will use a default `x` when not explicitly
             passed.
         """
-        x = process_x(x, x_event_shape=None)
-        self._assert_finite_x(x)
-        self._x = x.to(self._device)
+        x = self._process_x(x)
+        self._x = x
 
         for posterior in self.posteriors:
             posterior.set_default_x(x)
