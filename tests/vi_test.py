@@ -1069,3 +1069,15 @@ def test_learnable_gaussian_ignores_the_upper_triangle_of_scale_tril():
 
     scale_tril = q._base_dist().scale_tril
     assert torch.equal(scale_tril, scale_tril.tril())
+
+
+def test_q_fit_on_one_observation_rejects_copies_of_it():
+    """A q fit on one observation is not the posterior of several iid copies."""
+    posterior = _make_posterior("gaussian")
+    posterior.train(**TRAIN_KWARGS)
+    copies = posterior.default_x.repeat(3, 1)
+
+    with pytest.raises(ValueError, match="not fit on the specified observation"):
+        posterior.sample((5,), x=copies)
+    with pytest.raises(ValueError, match="not fit on the specified observation"):
+        posterior.log_prob(zeros(1, 2), x=copies)

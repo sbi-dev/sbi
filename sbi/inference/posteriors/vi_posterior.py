@@ -650,7 +650,7 @@ class VIPosterior(NeuralPosterior):
         else:
             # Single-x mode: sample from unconditional flow q(θ)
             x = self._x_else_default_x(x)
-            if self._trained_on is None or (x != self._trained_on).any():
+            if not self._is_trained_on(x):
                 raise ValueError(
                     f"The variational posterior was not fit on the specified "
                     f"observation {x}. Please train using posterior.train()."
@@ -766,12 +766,25 @@ class VIPosterior(NeuralPosterior):
             else:
                 # Single-x mode: evaluate log q(θ)
                 x = self._x_else_default_x(x)
-                if self._trained_on is None or (x != self._trained_on).any():
+                if not self._is_trained_on(x):
                     raise ValueError(
                         f"The variational posterior was not fit on the specified "
                         f"observation {x}. Please train using posterior.train()."
                     )
                 return self.q.log_prob(theta)
+
+    def _is_trained_on(self, x: Tensor) -> bool:
+        """Whether q was trained on `x`: the same shape and the same values.
+
+        Comparing values alone would broadcast, so that a q trained on one observation
+        would pass for several copies of it.
+        """
+        trained_on = self._trained_on
+        return (
+            trained_on is not None
+            and trained_on.shape == x.shape
+            and bool((x == trained_on).all())
+        )
 
     def train(
         self,
@@ -897,7 +910,7 @@ class VIPosterior(NeuralPosterior):
         # Bound to the trained x, so that the potential can be used after training.
         self.potential_fn = self._bind_iid(x)
 
-        already_trained = self._trained_on is not None and (x == self._trained_on).all()
+        already_trained = self._is_trained_on(x)
 
         # Optimize
         optimizer = self._optimizer
