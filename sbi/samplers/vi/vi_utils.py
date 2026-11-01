@@ -22,7 +22,7 @@ from torch.distributions import (
 )
 from torch.nn import Module
 
-from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
+from sbi.neural_nets.estimators.zuko_flow import ZukoFlow, ZukoUnconditionalFlow
 from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
 from sbi.utils.torchutils import _base_recursor
 
@@ -134,6 +134,57 @@ class TransformedZukoFlow(nn.Module):
             log_det_jacobian = log_det_jacobian.sum(dim=-1)
         log_prob_theta = log_prob_z - log_det_jacobian
         return theta, log_prob_theta
+
+
+class TransformedConditionalZukoFlow(nn.Module):
+    """Conditional counterpart of `TransformedZukoFlow` for amortized VI.
+
+    The wrapped flow q(z|x) lives in unconstrained space. Samples and log-probs of
+    this wrapper are in the prior's (constrained) space, so a bounded prior is never
+    evaluated outside its support.
+    """
+
+    def __init__(self, flow: ZukoFlow, link_transform: TorchTransform):
+        """Initialize the wrapper.
+
+        Args:
+            flow: Conditional Zuko flow operating in unconstrained space.
+            link_transform: Transform from unconstrained to constrained space.
+        """
+        super().__init__()
+        self._flow = flow
+        self._link_transform = link_transform
+
+    @staticmethod
+    def _sum_log_det(log_det: Tensor, like: Tensor) -> Tensor:
+        # Elementwise transforms return per-dimension Jacobians; sum them if needed.
+        return log_det.sum(dim=-1) if log_det.dim() > like.dim() else log_det
+
+    def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
+        """Sample θ ~ q(θ|x) in constrained space."""
+        theta = self._link_transform(self._flow.sample(sample_shape, condition))
+        assert isinstance(theta, Tensor)
+        return theta
+
+    def log_prob(self, theta: Tensor, condition: Tensor) -> Tensor:
+        """Log density of constrained θ, including the Jacobian of the link."""
+        z = self._link_transform.inv(theta)
+        assert isinstance(z, Tensor)
+        log_prob_z = self._flow.log_prob(z, condition)
+        log_det = self._link_transform.inv.log_abs_det_jacobian(theta, z)
+        return log_prob_z + self._sum_log_det(log_det, log_prob_z)
+
+    def sample_and_log_prob(
+        self, sample_shape: Shape, condition: Tensor
+    ) -> tuple[Tensor, Tensor]:
+        """Reparameterized constrained samples and their log density."""
+        z, log_prob_z = self._flow.sample_and_log_prob(
+            torch.Size(sample_shape), condition
+        )
+        theta = self._link_transform(z)
+        assert isinstance(theta, Tensor)
+        log_det = self._link_transform.log_abs_det_jacobian(z, theta)
+        return theta, log_prob_z - self._sum_log_det(log_det, log_prob_z)
 
 
 class LearnableGaussian(nn.Module):

@@ -20,7 +20,6 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 if TYPE_CHECKING:
     from sbi.inference.posteriors.posterior_parameters import VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.neural_nets.net_builders.flow import (
@@ -32,6 +31,7 @@ from sbi.samplers.vi.vi_quality_control import get_quality_metric
 from sbi.samplers.vi.vi_utils import (
     AdaptedVariationalDistribution,
     LearnableGaussian,
+    TransformedConditionalZukoFlow,
     TransformedZukoFlow,
     check_variational_distribution,
     detach_and_deepcopy,
@@ -208,7 +208,7 @@ class VIPosterior(NeuralPosterior):
         self._mode: Optional[Literal["single_x", "amortized"]] = None
 
         # Amortized mode: conditional flow q(θ|x)
-        self._amortized_q: Optional[ConditionalDensityEstimator] = None
+        self._amortized_q: Optional[TransformedConditionalZukoFlow] = None
 
         self._num_transforms: int = num_transforms
         self._hidden_features: int = hidden_features
@@ -411,7 +411,7 @@ class VIPosterior(NeuralPosterior):
         hidden_features: int = 32,
         z_score_theta: Literal["none", "independent", "structured"] = "independent",
         z_score_x: Literal["none", "independent", "structured"] = "independent",
-    ) -> ConditionalDensityEstimator:
+    ) -> TransformedConditionalZukoFlow:
         """Build a conditional Zuko flow for amortized variational inference.
 
         Args:
@@ -427,7 +427,7 @@ class VIPosterior(NeuralPosterior):
                 structured data like images.
 
         Returns:
-            ConditionalDensityEstimator: The constructed conditional flow q(θ|x).
+            TransformedConditionalZukoFlow: The conditional flow q(θ|x) in prior space.
 
         Raises:
             ValueError: If flow_type is not supported.
@@ -442,15 +442,20 @@ class VIPosterior(NeuralPosterior):
                     f"Supported types: {[t.name for t in ZukoFlowType]}."
                 ) from e
 
-        return build_zuko_flow(
+        # The flow models θ in unconstrained space; the wrapper maps it to the prior
+        # support so that bounded priors are not evaluated outside their support.
+        flow = build_zuko_flow(
             flow_type.value.upper(),
-            batch_x=theta,  # θ is what we model
+            batch_x=self.link_transform.inv(theta),  # θ is what we model
             batch_y=x,  # x is the condition
             z_score_x=z_score_theta,  # z-score for θ (naming mismatch)
             z_score_y=z_score_x,  # z-score for x condition
             num_transforms=num_transforms,
             hidden_features=hidden_features,
-        ).to(self._device)
+        )
+        return TransformedConditionalZukoFlow(flow, self.link_transform).to(
+            self._device
+        )
 
     @property
     def q(
