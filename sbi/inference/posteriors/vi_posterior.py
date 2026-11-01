@@ -278,6 +278,8 @@ class VIPosterior(NeuralPosterior):
             self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
+            self._amortized_q._link_transform = self.link_transform
+            self._amortized_q._support = getattr(self._prior, "support", None)
 
         return self
 
@@ -453,9 +455,9 @@ class VIPosterior(NeuralPosterior):
             num_transforms=num_transforms,
             hidden_features=hidden_features,
         )
-        return TransformedConditionalZukoFlow(flow, self.link_transform).to(
-            self._device
-        )
+        return TransformedConditionalZukoFlow(
+            flow, self.link_transform, getattr(self._prior, "support", None)
+        ).to(self._device)
 
     @property
     def q(

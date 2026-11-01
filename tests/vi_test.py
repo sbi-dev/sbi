@@ -893,6 +893,8 @@ def test_amortized_vi_with_bounded_prior():
     assert torch.isfinite(samples).all()
     assert (samples.abs() <= 3).all()
     assert torch.isfinite(posterior.log_prob(samples, x=x[:1])).all()
+    outside = torch.tensor([[4.0, 0.0]])
+    assert posterior.log_prob(outside, x=x[:1]).item() == -torch.inf
 
 
 @pytest.mark.slow
