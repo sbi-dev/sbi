@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pickle
+import warnings
 
 import pytest
 import torch
@@ -25,6 +26,7 @@ from sbi.inference import (
     ImportanceSamplingPosterior,
     VectorFieldPosterior,
 )
+from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -883,3 +885,71 @@ def test_posterior_mcmc_iid_sampling(iid_batch_size: int, mcmc_params_fast):
     assert torch.allclose(sample_mean, true_mean, atol=0.5), (
         f"MCMC sample mean {sample_mean} too far from true mean {true_mean}"
     )
+
+
+@pytest.fixture(scope="module")
+def npe_and_nle_for_iid_x():
+    """NPE and NLE, trained briefly on a 2-D Gaussian with a box prior."""
+    torch.manual_seed(0)
+    prior = BoxUniform(-3 * ones(2), 3 * ones(2))
+    theta = prior.sample((300,))
+    x = theta + 0.3 * torch.randn_like(theta)
+    trainers = {}
+    for name, method in (("npe", NPE_C), ("nle", NLE_A)):
+        trainer = method(prior=prior, show_progress_bars=False)
+        trainer.append_simulations(theta, x).train(max_num_epochs=3)
+        trainers[name] = trainer
+    return prior, trainers
+
+
+@pytest.mark.parametrize(
+    "method, sample_with",
+    [
+        ("npe", "importance"),
+        ("npe", "rejection"),
+        pytest.param("npe", "mcmc", marks=pytest.mark.mcmc),
+        ("npe", "vi"),
+        ("npe", "ensemble"),
+        pytest.param("nle", "mcmc", marks=pytest.mark.mcmc),
+    ],
+)
+def test_posteriors_combine_several_observations_as_iid_trials(
+    method, sample_with, npe_and_nle_for_iid_x, mcmc_params_fast
+):
+    """Several observations are iid trials in potential(), sample() and map().
+
+    NPE posteriors warn that they combine the observations, NLE posteriors do not.
+    """
+    prior, trainers = npe_and_nle_for_iid_x
+    trainer = trainers[method]
+    if sample_with == "ensemble":
+        component = trainer.build_posterior(sample_with="rejection")
+        posterior = EnsemblePosterior([component, component])
+    else:
+        params = mcmc_params_fast if sample_with == "mcmc" else None
+        posterior = trainer.build_posterior(
+            sample_with=sample_with, posterior_parameters=params
+        )
+    x_o = torch.tensor([[0.0, 0.0], [0.5, -0.5], [1.0, 0.0]])
+    theta = zeros(4, 2)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        potential = posterior.potential(theta, x=x_o)
+    iid_warnings = [w for w in caught if "x holds 3 observations" in str(w.message)]
+    assert len(iid_warnings) == (1 if method == "npe" else 0)
+    expected = posterior.potential_fn.bind(x_o, x_is_iid=True)(theta)
+    assert torch.allclose(potential, expected)
+
+    posterior.set_default_x(x_o)
+    if sample_with == "vi":
+        posterior.train(
+            max_num_iters=2,
+            min_num_iters=1,
+            warm_up_rounds=1,
+            show_progress_bar=False,
+            quality_control=False,
+        )
+    assert posterior.sample((5,), show_progress_bars=False).shape == (5, 2)
+    map_ = posterior.map(init_method=prior.sample((10,)), num_iter=2, num_to_optimize=2)
+    assert torch.isfinite(map_).all()

@@ -187,7 +187,13 @@ class VectorFieldBasedPotential(BasePotential):
         guidance_params: Optional[Dict[str, Any]] = None,
         **ode_kwargs,
     ) -> "VectorFieldBasedPotential":
-        """Create new potential with x bound, without mutable state."""
+        """Create new potential with x bound, without mutable state.
+
+        With a single observation, `x_is_iid=True` is the same as `False`.
+        """
+        x_o = self._prepare_x_o(x_o)
+        if x_o is not None and x_o.shape[0] == 1:
+            x_is_iid = False
         # IID and guidance require transforming the prior to standardized space.
         if self.vector_field_estimator.compose_enabled:
             if x_is_iid:
@@ -211,7 +217,7 @@ class VectorFieldBasedPotential(BasePotential):
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)
-        bound._x_o = self._prepare_x_o(x_o)
+        bound._x_o = x_o
         bound._x_is_iid = x_is_iid
         bound.guidance_method = guidance_method
         bound.guidance_params = guidance_params

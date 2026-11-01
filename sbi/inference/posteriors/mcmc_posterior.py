@@ -227,7 +227,7 @@ class MCMCPosterior(NeuralPosterior):
         warn("The log-probability is unnormalized!", stacklevel=2)
 
         x = self._x_else_default_x(x)
-        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
+        self.potential_fn = self._bind_iid(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -286,7 +286,7 @@ class MCMCPosterior(NeuralPosterior):
         """
 
         x = self._x_else_default_x(x)
-        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
+        self.potential_fn = self._bind_iid(x)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method

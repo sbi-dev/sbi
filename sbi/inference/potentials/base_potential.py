@@ -51,6 +51,15 @@ class BasePotential(metaclass=ABCMeta):
         return None
 
     @property
+    def warns_on_implicit_iid(self) -> bool:
+        """Whether posteriors warn when they combine several observations as iid.
+
+        Posteriors bind several observations as iid trials. For estimators that are
+        mostly used with one observation (NPE), this can be unintended.
+        """
+        return False
+
+    @property
     def x_event_shape(self) -> Optional[torch.Size]:
         """Shape of one observation `x`, without batch dimension.
 

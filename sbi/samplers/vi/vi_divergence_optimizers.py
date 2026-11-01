@@ -482,7 +482,7 @@ class ElboOptimizer(DivergenceOptimizer):
             samples = self.q.rsample(torch.Size((num_samples,)))
             log_q = self.q.log_prob(samples)
 
-        self.potential_fn = self.potential_fn.bind(x_o)
+        self.potential_fn = self.potential_fn.bind(x_o, x_is_iid=True)
         log_potential = self.potential_fn(samples)
         elbo = log_potential - log_q
         return elbo
@@ -640,7 +640,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         if hasattr(self.q, "clear_cache"):
             self.q.clear_cache()
         logq = self.q.log_prob(samples)
-        self.potential_fn = self.potential_fn.bind(x_o)
+        self.potential_fn = self.potential_fn.bind(x_o, x_is_iid=True)
         logp = self.potential_fn(samples)
         with torch.no_grad():
             logweights = logp - logq

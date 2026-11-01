@@ -10,7 +10,6 @@ from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched, process_device
@@ -348,7 +347,7 @@ class EnsemblePosterior(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -433,7 +432,7 @@ class EnsemblePosterior(NeuralPosterior):
 
         else:
             x = self._x_else_default_x(x)
-            self.potential_fn = self.potential_fn.bind(x)
+            self.potential_fn = self._bind_iid(x)
             inits = self._map_inits(init_method, num_init_samples, x)
             # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(
@@ -503,13 +502,10 @@ class EnsemblePotential(BasePotential):
         """Shape of one observation, as the first component sees it."""
         return self.potential_fns[0].x_event_shape
 
-    def allow_iid_x(self) -> bool:
-        # in case there is different kinds of posteriors, this will produce an error
-        # in `set_x()`
-        return any(
-            isinstance(potential, PosteriorBasedPotential)
-            for potential in self.potential_fns
-        )
+    @property
+    def warns_on_implicit_iid(self) -> bool:
+        """Whether any component warns on iid observations."""
+        return any(p.warns_on_implicit_iid for p in self.potential_fns)
 
     def set_x(self, x_o: Optional[Tensor]):
         """Check the shape of the observed data and, if valid, set it.

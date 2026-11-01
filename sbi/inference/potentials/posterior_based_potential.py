@@ -97,6 +97,11 @@ class PosteriorBasedPotential(BasePotential):
         return self.posterior_estimator.embedding_net
 
     @property
+    def warns_on_implicit_iid(self) -> bool:
+        """NPE is mostly used with one observation, so iid trials can be unintended."""
+        return True
+
+    @property
     def x_event_shape(self) -> torch.Size:
         """Shape of one observation: the condition shape of the estimator."""
         return self.posterior_estimator.condition_shape

@@ -122,7 +122,7 @@ class NeuralPosterior:
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -204,6 +204,12 @@ class NeuralPosterior:
         NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
+        Several observations, of shape `(num_observations, *x_event_shape)`, are iid
+        trials of one parameter set. `.potential()` combines them, and so do the
+        other methods of posteriors that support iid trials (e.g. MCMC, importance,
+        rejection and VI); the direct posterior raises. With NPE, posteriors warn
+        when they combine observations, because NPE is mostly used with one.
+
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
         Returns:
@@ -222,6 +228,23 @@ class NeuralPosterior:
         x = process_x(x, x_event_shape=self.potential_fn.x_event_shape)
         self._assert_finite_x(x)
         return x.to(self._device)
+
+    def _bind_iid(self, x: Tensor) -> BasePotential:
+        """Return the potential bound to `x`, with its observations as iid trials.
+
+        Warns if the potential marks iid trials as possibly unintended (NPE).
+        """
+        bound = self.potential_fn.bind(x, x_is_iid=True)
+        num_observations = bound.x_o.shape[0]
+        if num_observations > 1 and bound.warns_on_implicit_iid:
+            # One location for all callers: Python's default filter shows it once.
+            warn(
+                f"x holds {num_observations} observations, which are combined as iid "
+                "trials of one parameter set. For separate posteriors of several "
+                "observations, use `sample_batched()` or `log_prob_batched()`.",
+                stacklevel=1,
+            )
+        return bound
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
@@ -404,7 +427,7 @@ class NeuralPosterior:
             )
 
         if self._map is None or force_update:
-            self.potential_fn = self.potential_fn.bind(self.default_x)
+            self.potential_fn = self._bind_iid(self.default_x)
             self._map = self._calculate_map(
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,

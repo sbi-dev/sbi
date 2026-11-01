@@ -894,6 +894,8 @@ class VIPosterior(NeuralPosterior):
         )
         if not torch.isfinite(x).all():
             raise ValueError("x contains NaN or Inf values.")
+        # Bound to the trained x, so that the potential can be used after training.
+        self.potential_fn = self._bind_iid(x)
 
         already_trained = self._trained_on is not None and (x == self._trained_on).all()
 
@@ -932,9 +934,6 @@ class VIPosterior(NeuralPosterior):
                 break
         # Training finished:
         self._trained_on = x
-
-        # Bind potential_fn to the trained x so it can be used for sampling/evaluation
-        self.potential_fn = self.potential_fn.bind(x)
 
         if self._mode == "amortized":
             warnings.warn(

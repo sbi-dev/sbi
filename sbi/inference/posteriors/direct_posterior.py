@@ -184,7 +184,9 @@ class DirectPosterior(NeuralPosterior):
                 "to sample multiple observations, use `.sample_batched()`. "
                 "If you intend to sample i.i.d. observations, set up the "
                 "posterior density estimator with an appropriate permutation "
-                "invariant embedding net."
+                "invariant embedding net, or build the posterior with "
+                "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'`, "
+                "which combine the observations as iid trials."
             )
 
         max_sampling_batch_size = (
@@ -366,7 +368,9 @@ class DirectPosterior(NeuralPosterior):
                 "to evaluate given multiple observations, use `.log_prob_batched()`. "
                 "If you intend to evaluate given i.i.d. observations, set up the "
                 "posterior density estimator with an appropriate permutation "
-                "invariant embedding net."
+                "invariant embedding net, or build the posterior with "
+                "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'`, "
+                "which combine the observations as iid trials."
             )
 
         self.posterior_estimator.eval()

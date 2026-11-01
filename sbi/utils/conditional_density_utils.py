@@ -264,6 +264,11 @@ class ConditionedPotential(BasePotential):
         return self.potential_fn.x_event_shape
 
     @property
+    def warns_on_implicit_iid(self) -> bool:
+        """Delegate to the wrapped potential."""
+        return self.potential_fn.warns_on_implicit_iid
+
+    @property
     def x_is_iid(self) -> bool:
         """If x has batch dimension greater than 1, whether to intepret the batch as iid
         samples or batch of data points."""
