@@ -167,8 +167,9 @@ class BasePotential(metaclass=ABCMeta):
 
 def unpaired_batch_error(num_theta: int, num_x: int) -> ValueError:
     """Return the error for a theta batch that does not pair with the x batch."""
+    observations = "observation" if num_x == 1 else "observations"
     return ValueError(
-        f"theta has {num_theta} rows and x has {num_x} observations. Without iid "
+        f"theta has {num_theta} rows and x has {num_x} {observations}. Without iid "
         "trials, each theta pairs with one observation, so the numbers must match. "
         "To combine the observations as iid trials of one theta, bind x with "
         "`x_is_iid=True`."

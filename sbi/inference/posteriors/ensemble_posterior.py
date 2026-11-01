@@ -246,7 +246,7 @@ class EnsemblePosterior(NeuralPosterior):
         **kwargs,
     ) -> Tensor:
         # Guard here so validation of `x` does not depend on the component draw.
-        self._assert_finite_x(x)
+        x = self._process_x(x)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True

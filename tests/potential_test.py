@@ -12,6 +12,7 @@ from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import (
+    DirectPosterior,
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
@@ -353,6 +354,9 @@ def test_x_that_contradicts_the_estimator_raises_a_clear_error(method):
     for wrong_x in (zeros(1, 3), zeros(2, 3, 2)):
         with pytest.raises(ValueError, match=r"one observation has shape \(2,\)"):
             posterior.set_default_x(wrong_x)
+    if method == "npe":
+        with pytest.raises(ValueError, match=r"one observation has shape \(2,\)"):
+            DirectPosterior(estimator, prior).sample_batched((2,), zeros(2, 3))
     unpaired = potential_fn.bind(zeros(3, 2), x_is_iid=False)
     with pytest.raises(ValueError, match="theta has 4 rows and x has 3 observations"):
         unpaired(zeros(4, 2))

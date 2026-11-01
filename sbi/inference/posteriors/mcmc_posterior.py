@@ -17,7 +17,6 @@ from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 from sbi.samplers.mcmc import (
     IterateParameters,
     SliceSamplerSerial,
@@ -409,7 +408,7 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
-        self._assert_finite_x(x)
+        x = self._process_x(x)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -439,13 +438,7 @@ class MCMCPosterior(NeuralPosterior):
             )
             num_chains = torch.Size(sample_shape).numel()
 
-        # custom shape handling to make sure to match the batch size of x and theta
-        # without unnecessary combinations.
-        if len(x.shape) == 1:
-            x = x.unsqueeze(0)
         batch_size = x.shape[0]
-
-        x = reshape_to_batch_event(x, event_shape=x.shape[1:])
 
         # For batched sampling, we want `num_chains` for each observation in the batch.
         # Here we repeat the observations ABC -> AAABBBCCC, so that the chains are
