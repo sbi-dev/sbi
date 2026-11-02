@@ -571,6 +571,11 @@ class VectorFieldPosterior(NeuralPosterior):
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
         x = self._x_else_default_x(x)
+        if x.shape[0] > 1:
+            raise ValueError(
+                f"x holds {x.shape[0]} observations, but `leakage_correction()` of a "
+                "vector field posterior takes one observation."
+            )
 
         def acceptance() -> Tensor:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
@@ -807,8 +812,8 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if x is not None:
             raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated."
-                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+                "Passing `x` directly to `.map()` has been deprecated. "
+                "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 
         if self.default_x is None:
@@ -818,8 +823,9 @@ class VectorFieldPosterior(NeuralPosterior):
             )
         if self.default_x.shape[0] > 1:
             raise ValueError(
-                f"x holds {self.default_x.shape[0]} observations, but `.map()` of a "
-                "vector field posterior takes one observation."
+                f"The default x holds {self.default_x.shape[0]} observations, but "
+                "`.map()` of a vector field posterior takes one. Set one observation "
+                "with `.set_default_x()`."
             )
 
         if self._map is None or force_update:

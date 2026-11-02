@@ -123,6 +123,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
+            x: Observation. If not provided, uses the default `x`. Several
+                observations are combined as iid trials.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -228,7 +230,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Args:
             sample_shape: Shape of samples that are drawn from posterior.
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
-                set via `.set_default_x()`.
+                set via `.set_default_x()`. Several observations are combined as iid
+                trials.
             method: Either of [`sir`|`importance`]. This sets the behavior of the
                 `.sample()` method. With `sir`, approximate posterior samples are
                 generated with sampling importance resampling (SIR). With
@@ -269,7 +272,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         raise NotImplementedError(
             "Batched sampling is not implemented for ImportanceSamplingPosterior. \
            Alternatively you can use `sample` in a loop \
-           [posterior.sample(theta, x_o) for x_o in x]."
+           [posterior.sample(sample_shape, x=x_o) for x_o in x]."
         )
 
     def _importance_sample(

@@ -211,6 +211,8 @@ class MCMCPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
+            x: Observation. If not provided, uses the default `x`. Several
+                observations are combined as iid trials.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -255,7 +257,8 @@ class MCMCPosterior(NeuralPosterior):
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
-                set via `.set_default_x()`.
+                set via `.set_default_x()`. Several observations are combined as iid
+                trials.
             method: MCMC method to use. One of `slice_np`, `slice_np_vectorized`,
                 `hmc_pyro`, `nuts_pyro`, `slice_pymc`, `hmc_pymc`, `nuts_pymc`.
                 If not provided, uses the method specified at initialization.

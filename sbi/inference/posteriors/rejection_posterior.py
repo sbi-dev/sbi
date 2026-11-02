@@ -107,6 +107,8 @@ class RejectionPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
+            x: Observation. If not provided, uses the default `x`. Several
+                observations are combined as iid trials.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -148,7 +150,8 @@ class RejectionPosterior(NeuralPosterior):
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
-                set via `.set_default_x()`.
+                set via `.set_default_x()`. Several observations are combined as iid
+                trials.
             max_sampling_batch_size: Maximum batch size for rejection sampling.
                 If not provided, uses the value specified at initialization.
             num_samples_to_find_max: Number of samples to find the maximum of the
@@ -235,7 +238,7 @@ class RejectionPosterior(NeuralPosterior):
         raise NotImplementedError(
             "Batched sampling is not implemented for RejectionPosterior. \
             Alternatively you can use `sample` in a loop \
-            [posterior.sample(theta, x_o) for x_o in x]."
+            [posterior.sample(sample_shape, x=x_o) for x_o in x]."
         )
 
     def map(

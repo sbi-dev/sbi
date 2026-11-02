@@ -690,9 +690,9 @@ class VIPosterior(NeuralPosterior):
             return self.sample(sample_shape, x=x, show_progress_bars=show_progress_bars)
         else:
             raise NotImplementedError(
-                "Batched sampling is not implemented for single-x VI mode. "
-                "Use train_amortized() to train an amortized posterior, or "
-                "call sample() in a loop: [posterior.sample(shape, x_o) for x_o in x]."
+                "Batched sampling is not implemented for single-x VI mode, because q "
+                "is fit to one observed data set. Use train_amortized() to train an "
+                "amortized posterior, or train a posterior for each observation."
             )
 
     def log_prob(
@@ -804,10 +804,11 @@ class VIPosterior(NeuralPosterior):
         quality_control_metric: str = "psis",
         **kwargs,
     ) -> "VIPosterior":
-        """This method trains the variational posterior for a single observation.
+        """This method trains the variational posterior for one observed data set.
 
         Args:
-            x: The observation, optional, defaults to self._x.
+            x: The observation, optional, defaults to self._x. Several observations
+                are combined as iid trials.
             n_particles: Number of samples to approximate expectations within the
                 variational bounds. The larger the more accurate are gradient
                 estimates, but the computational cost per iteration increases.

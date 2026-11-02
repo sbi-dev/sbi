@@ -210,7 +210,8 @@ class NeuralPosterior:
         Several observations, of shape `(num_observations, *x_event_shape)`, are iid
         trials of one parameter set. MCMC, importance, rejection and VI posteriors
         combine them; with NPE they warn, because NPE is mostly used with one
-        observation. The direct posterior takes one observation and raises.
+        observation. The direct posterior takes one observation: its `sample()`,
+        `log_prob()`, `potential()` and `map()` raise for several.
 
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
@@ -227,6 +228,8 @@ class NeuralPosterior:
         Raises if `x` does not match the shape of one observation of the potential,
         or holds NaN or Inf values that the net embedding `x` does not accept.
         """
+        if x is None:
+            raise ValueError("x is None. Pass an observation.")
         x = process_x(x, x_event_shape=self.potential_fn.x_event_shape)
         self._assert_finite_x(x)
         return x.to(self._device)
@@ -264,7 +267,13 @@ class NeuralPosterior:
         bound = self.potential_fn.bind(x, x_is_iid=True)
         num_observations = bound.x_o.shape[0]
         self._check_num_observations(num_observations)
-        if num_observations > 1 and bound.warns_on_implicit_iid:
+        previous_x = self.potential_fn.return_x_o()
+        already_iid = (
+            self.potential_fn.x_is_iid
+            and previous_x is not None
+            and torch.equal(previous_x, bound.x_o)
+        )
+        if num_observations > 1 and bound.warns_on_implicit_iid and not already_iid:
             # One location for all callers: Python's default filter shows it once.
             warn(
                 f"x holds {num_observations} observations, which are combined as iid "
@@ -446,8 +455,8 @@ class NeuralPosterior:
         """
         if x is not None:
             raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated."
-                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+                "Passing `x` directly to `.map()` has been deprecated. "
+                "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 
         if self.default_x is None:

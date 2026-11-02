@@ -491,7 +491,7 @@ class DirectPosterior(NeuralPosterior):
             rejection_sampling_batch_size: Batch size for rejection sampling.
 
         Returns:
-            Saved or newly-estimated correction factor (as a scalar `Tensor`).
+            Saved or newly-estimated correction factor, one per observation in `x`.
         """
         x = self._x_else_default_x(x)
 
