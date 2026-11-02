@@ -1702,7 +1702,8 @@ def sbc_rank_plot(
         fig, ax: figure and axis objects.
 
     Raises:
-        ValueError: If a rank lies outside [0, num_posterior_samples].
+        ValueError: If a rank lies outside [0, num_posterior_samples], or if
+            plot_type is not "hist", "cdf" or "cdf-diff".
 
     """
 
