@@ -624,6 +624,41 @@ def test_lc2st_runs_on_requested_device(cal_data, device):
     assert len(lc2st.trained_clfs) > 0
 
 
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "device",
+    [
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="cuda is not available"
+            ),
+        ),
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not (
+                    hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+                ),
+                reason="mps is not available",
+            ),
+        ),
+    ],
+)
+def test_lc2st_cross_validation_with_accelerator_tensors(cal_data, device):
+    """`num_folds > 1` must split samples that live on an accelerator."""
+    lc2st = LC2ST(
+        cal_data.thetas.to(device),
+        cal_data.xs.to(device),
+        cal_data.posterior_samples.to(device),
+        classifier="mlp",
+        num_folds=2,
+        device=device,
+    )
+    lc2st.train_on_observed_data()
+    assert len(lc2st.trained_clfs) == 2
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("method", [LC2ST, LC2ST_NF])
 def test_lc2st_true_positive_rate(method, sim_setup, badly_trained_npe):
