@@ -16,9 +16,6 @@ from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_batch_event,
-)
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score.correctors import Corrector
 from sbi.samplers.score.diffuser import Diffuser
@@ -248,7 +245,6 @@ class VectorFieldPosterior(NeuralPosterior):
             )
 
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
         # IID and guidance require transforming the prior to standardized space.
         if self.vector_field_estimator.compose_enabled and (
@@ -519,7 +515,6 @@ class VectorFieldPosterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
         if self.vector_field_estimator.compose_enabled and is_iid:
             raise NotImplementedError(
@@ -571,6 +566,11 @@ class VectorFieldPosterior(NeuralPosterior):
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
         x = self._x_else_default_x(x)
+        if x.shape[0] > 1:
+            raise ValueError(
+                f"x holds {x.shape[0]} observations, but `leakage_correction()` of a "
+                "vector field posterior takes one observation."
+            )
 
         def acceptance() -> Tensor:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
@@ -659,7 +659,7 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
-        self._assert_finite_x(x)
+        x = self._process_x(x)
         if self.vector_field_estimator.compose_enabled:
             raise NotImplementedError(
                 "compose_standardization does not yet support sample_batched "
@@ -667,7 +667,6 @@ class VectorFieldPosterior(NeuralPosterior):
                 "via sample(), or disable compose_standardization."
             )
         num_samples = torch.Size(sample_shape).numel()
-        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()
@@ -807,14 +806,20 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if x is not None:
             raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated."
-                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+                "Passing `x` directly to `.map()` has been deprecated. "
+                "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 
         if self.default_x is None:
             raise ValueError(
                 "Default `x` has not been set."
                 "To set the default, use the `.set_default_x()` method."
+            )
+        if self.default_x.shape[0] > 1:
+            raise ValueError(
+                f"The default x holds {self.default_x.shape[0]} observations, but "
+                "`.map()` of a vector field posterior takes one. Set one observation "
+                "with `.set_default_x()`."
             )
 
         if self._map is None or force_update:

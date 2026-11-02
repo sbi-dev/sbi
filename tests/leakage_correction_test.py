@@ -45,6 +45,15 @@ def test_log_prob_is_normalized_inside_bounded_prior(estimator_type):
     assert abs(integral - 1.0) < 0.1
 
 
+@pytest.mark.parametrize("estimator_type", ["flow", "score"])
+def test_vector_field_leakage_correction_takes_one_observation(estimator_type):
+    """Several observations raise instead of adding up their masses above one."""
+    prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
+    posterior = _posterior(estimator_type, prior)
+    with pytest.raises(ValueError, match="takes one observation"):
+        posterior.leakage_correction(x=torch.zeros(3, 2), num_rejection_samples=10)
+
+
 @pytest.mark.parametrize("estimator_type", ["direct", "npe_a", "flow"])
 def test_leakage_correction_caching(estimator_type, monkeypatch):
     """The factor is saved for the last `x` and number of samples only, and samples at

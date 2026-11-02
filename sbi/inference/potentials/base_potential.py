@@ -32,9 +32,7 @@ class BasePotential(metaclass=ABCMeta):
         """
         self.device = process_device(device)
         self.prior = prior
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        self._x_o = x_o
+        self._x_o = self._prepare_x_o(x_o)
         self._x_is_iid = True
 
     @abstractmethod
@@ -51,6 +49,35 @@ class BasePotential(metaclass=ABCMeta):
         """Return the net that embeds `x`; `None` (default) means no net is
         known to consume `x`, so posteriors validate `x_o` strictly."""
         return None
+
+    @property
+    def warns_on_implicit_iid(self) -> bool:
+        """Whether posteriors warn when they combine several observations as iid.
+
+        Posteriors bind several observations as iid trials. For estimators that are
+        mostly used with one observation (NPE), this can be unintended.
+        """
+        return False
+
+    @property
+    def x_event_shape(self) -> Optional[torch.Size]:
+        """Shape of one observation `x`, without batch dimension.
+
+        `None` (default) means the shape is unknown and `x_o` is not checked.
+        `__init__` reads it to bind `x_o`, so a subclass that derives it from its
+        estimator sets the estimator before calling `super().__init__()`.
+        """
+        return None
+
+    def _prepare_x_o(self, x_o: Optional[Tensor]) -> Optional[Tensor]:
+        """Return `x_o` with shape `(num_observations, *x_event_shape)`.
+
+        An `x_o` of shape `x_event_shape` is one observation, also if it has several
+        dimensions (e.g. trials that a permutation-invariant embedding net combines).
+        """
+        if x_o is None:
+            return None
+        return process_x(x_o, x_event_shape=self.x_event_shape).to(self.device)
 
     @property
     def x_is_iid(self) -> bool:
@@ -107,9 +134,7 @@ class BasePotential(metaclass=ABCMeta):
             New potential instance with x bound.
         """
         bound = copy.copy(self)
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        bound._x_o = x_o
+        bound._x_o = self._prepare_x_o(x_o)
         bound._x_is_iid = x_is_iid
         return bound
 
@@ -140,6 +165,17 @@ class BasePotential(metaclass=ABCMeta):
         if self._x_o is not None:
             self._x_o = self._x_o.to(device)
         return self
+
+
+def unpaired_batch_error(num_theta: int, num_x: int) -> ValueError:
+    """Return the error for a theta batch that does not pair with the x batch."""
+    observations = "observation" if num_x == 1 else "observations"
+    return ValueError(
+        f"theta has {num_theta} rows and x has {num_x} {observations}. Without iid "
+        "trials, each theta pairs with one observation, so the numbers must match. "
+        "To combine the observations as iid trials of one theta, bind x with "
+        "`x_is_iid=True`."
+    )
 
 
 class CustomPotential(Protocol):

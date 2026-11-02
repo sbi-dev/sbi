@@ -130,10 +130,12 @@ def test_embedding_api_with_multiple_trials(
         s = posterior.sample((1,), x=x_o)
         _ = posterior.potential(s)
     else:
-        s = posterior.sample_batched((1,), x=x_o).squeeze(0)
-        # potentials take `theta` as (batch_shape, event_shape), so squeeze sample_dim
-        s = s.squeeze(0)
-        _ = posterior.potential(s)
+        s = posterior.sample_batched((1,), x=x_o)
+        if posterior_method == "direct":
+            _ = posterior.log_prob_batched(s, x=x_o)
+        else:
+            # The sets of trials are combined as iid observations.
+            _ = posterior.potential(s.squeeze(0))
 
 
 @pytest.mark.parametrize("input_shape", [(32,), (32, 32), (32, 64)])

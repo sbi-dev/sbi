@@ -117,12 +117,15 @@ class NeuralPosterior:
         posterior.
 
         Args:
-            theta: Parameters $\theta$.
+            theta: Parameters $\theta$, each evaluated given all of `x`.
+            x: Observation. If None, the default `x`. Several observations, of shape
+                `(num_observations, *x_event_shape)`, are combined as iid trials;
+                posteriors that take one observation (e.g. direct) raise.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -204,26 +207,100 @@ class NeuralPosterior:
         NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
+        Several observations, of shape `(num_observations, *x_event_shape)`, are iid
+        trials: MCMC, importance, rejection, single-x VI and vector field posteriors
+        combine them (NPE warns). The direct posterior raises; amortized VI raises in
+        `potential()` and `map()`.
+
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        x = process_x(x, x_event_shape=None)
-        self._assert_finite_x(x)
-
-        self._x = x.to(self._device)
+        self._x = self._process_x(x)
         self._map = None
         return self
+
+    def _process_x(self, x: Optional[Array]) -> Tensor:
+        """Return `x` with shape `(num_observations, *x_event_shape)` on the device.
+
+        Raises if `x` does not match the shape of one observation of the potential,
+        or holds NaN or Inf values that the net embedding `x` does not accept.
+        """
+        if x is None:
+            raise ValueError("x is None. Pass an observation.")
+        x = process_x(x, x_event_shape=self.potential_fn.x_event_shape)
+        self._assert_finite_x(x)
+        return x.to(self._device)
+
+    @property
+    def _takes_one_observation(self) -> bool:
+        """Whether this posterior takes exactly one observation `x`.
+
+        A posterior that evaluates its estimator directly cannot combine several
+        observations as iid trials.
+        """
+        return False
+
+    def _check_num_observations(self, num_observations: int) -> None:
+        """Raise if this posterior takes one observation and gets several."""
+        if num_observations == 1 or not self._takes_one_observation:
+            return
+        raise ValueError(
+            f"{type(self).__name__} takes one observation, but x holds "
+            f"{num_observations}. For a separate posterior of each observation, pass "
+            "one observation at a time, or use `sample_batched()` and "
+            "`log_prob_batched()` where available. To combine them as iid trials, "
+            "use a posterior built with "
+            "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'` (trained "
+            "with `train()`). For a "
+            "direct posterior of several trials, train with a permutation-invariant "
+            "embedding net on sets of trials, and pass each set as one observation."
+        )
+
+    def _bind_iid(
+        self, x: Tensor, check_num_observations: bool = True
+    ) -> BasePotential:
+        """Return the potential bound to `x`, with its observations as iid trials.
+
+        Warns if the potential marks iid trials as possibly unintended (NPE), unless
+        the potential was already bound to this `x` as iid trials.
+
+        Args:
+            x: Observations, of shape `(num_observations, *x_event_shape)`.
+            check_num_observations: Whether to raise if this posterior takes one
+                observation and `x` holds several. VI `train()` skips the check,
+                because the single-x q it fits combines observations.
+        """
+        bound = self.potential_fn.bind(x, x_is_iid=True)
+        num_observations = bound.x_o.shape[0]
+        if check_num_observations:
+            self._check_num_observations(num_observations)
+        previous_x = self.potential_fn.return_x_o()
+        already_iid = (
+            self.potential_fn.x_is_iid
+            and previous_x is not None
+            and previous_x.shape == bound.x_o.shape
+            # Exact, but NaN-padded trials count as equal.
+            and torch.allclose(previous_x, bound.x_o, rtol=0, atol=0, equal_nan=True)
+        )
+        if num_observations > 1 and bound.warns_on_implicit_iid and not already_iid:
+            # One location for all callers: Python's default filter shows it once.
+            warn(
+                f"x holds {num_observations} observations, which are combined as iid "
+                "trials of one parameter set. For a separate posterior of each "
+                "observation, pass one observation at a time, or use "
+                "`sample_batched()` of a posterior that supports it (e.g. direct "
+                "or MCMC).",
+                stacklevel=1,
+            )
+        return bound
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
-            x = process_x(x, x_event_shape=None)
-            self._assert_finite_x(x)
-
-            return x.to(self._device)
+            return self._process_x(x)
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."
@@ -389,8 +466,8 @@ class NeuralPosterior:
         """
         if x is not None:
             raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated."
-                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+                "Passing `x` directly to `.map()` has been deprecated. "
+                "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 
         if self.default_x is None:
@@ -400,7 +477,7 @@ class NeuralPosterior:
             )
 
         if self._map is None or force_update:
-            self.potential_fn = self.potential_fn.bind(self.default_x)
+            self.potential_fn = self._bind_iid(self.default_x)
             self._map = self._calculate_map(
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,

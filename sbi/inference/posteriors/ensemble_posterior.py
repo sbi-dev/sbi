@@ -10,11 +10,9 @@ from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched, process_device
-from sbi.utils.user_input_checks import process_x
 
 
 class EnsemblePosterior(NeuralPosterior):
@@ -172,6 +170,11 @@ class EnsemblePosterior(NeuralPosterior):
         return devices[0]
 
     @property
+    def _takes_one_observation(self) -> bool:
+        """Whether any posterior of the ensemble takes exactly one observation."""
+        return any(posterior._takes_one_observation for posterior in self.posteriors)
+
+    @property
     def weights(self) -> Tensor:
         return self._weights
 
@@ -223,10 +226,14 @@ class EnsemblePosterior(NeuralPosterior):
         Returns:
             Samples drawn from the ensemble distribution.
         """
-        # Components are drawn randomly; guard here so validation of `x` does
-        # not depend on the draw.
-        if x is not None:
-            self._assert_finite_x(x)
+        # Components are drawn randomly; validate `x` here so that errors do not
+        # depend on the draw. Without `x`, each component uses its own default.
+        if x is not None or self.default_x is not None:
+            self._check_num_observations(self._x_else_default_x(x).shape[0])
+        else:
+            for posterior in self.posteriors:
+                if posterior.default_x is not None:
+                    posterior._check_num_observations(posterior.default_x.shape[0])
         num_samples = torch.Size(sample_shape).numel()
         posterior_indizes = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -248,7 +255,7 @@ class EnsemblePosterior(NeuralPosterior):
         **kwargs,
     ) -> Tensor:
         # Guard here so validation of `x` does not depend on the component draw.
-        self._assert_finite_x(x)
+        x = self._process_x(x)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -329,12 +336,9 @@ class EnsemblePosterior(NeuralPosterior):
             `EnsemblePosterior` that will use a default `x` when not explicitly
             passed.
         """
-        x = process_x(x, x_event_shape=None)
-        self._assert_finite_x(x)
-        self._x = x.to(self._device)
-
+        self._x = self._process_x(x)
         for posterior in self.posteriors:
-            posterior.set_default_x(x)
+            posterior.set_default_x(self._x)
 
         return self
 
@@ -345,12 +349,14 @@ class EnsemblePosterior(NeuralPosterior):
         The potential is the unnormalized log-probability of $\theta$ under the
         posterior.
         Args:
-            theta: Parameters $\theta$.
+            theta: Parameters $\theta$, each evaluated given all of `x`.
+            x: Observation. If None, the default `x`. Several observations are
+                combined as iid trials; an ensemble with a direct posterior raises.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -435,7 +441,7 @@ class EnsemblePosterior(NeuralPosterior):
 
         else:
             x = self._x_else_default_x(x)
-            self.potential_fn = self.potential_fn.bind(x)
+            self.potential_fn = self._bind_iid(x)
             inits = self._map_inits(init_method, num_init_samples, x)
             # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(
@@ -500,13 +506,15 @@ class EnsemblePotential(BasePotential):
             potential_fn.to(self.device)
         self._weights = self._weights.to(self.device)
 
-    def allow_iid_x(self) -> bool:
-        # in case there is different kinds of posteriors, this will produce an error
-        # in `set_x()`
-        return any(
-            isinstance(potential, PosteriorBasedPotential)
-            for potential in self.potential_fns
-        )
+    @property
+    def x_event_shape(self) -> Optional[torch.Size]:
+        """Shape of one observation, as the first component sees it."""
+        return self.potential_fns[0].x_event_shape
+
+    @property
+    def warns_on_implicit_iid(self) -> bool:
+        """Whether any component warns on iid observations."""
+        return any(p.warns_on_implicit_iid for p in self.potential_fns)
 
     def set_x(self, x_o: Optional[Tensor]):
         """Check the shape of the observed data and, if valid, set it.
@@ -542,8 +550,7 @@ class EnsemblePotential(BasePotential):
         Returns:
             A new EnsemblePotential with bound components.
         """
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
+        x_o = self._prepare_x_o(x_o)
 
         iid_kwargs = {} if x_is_iid is None else {"x_is_iid": x_is_iid}
         bound_potentials = [

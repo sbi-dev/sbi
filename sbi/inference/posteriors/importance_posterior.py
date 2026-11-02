@@ -123,6 +123,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
+            x: Observation. If not provided, uses the default `x`. Several
+                observations are combined as iid trials.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -133,7 +135,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         x = self._x_else_default_x(x)
-        self.potential_fn = self.potential_fn.bind(x)
+        self.potential_fn = self._bind_iid(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -166,6 +168,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             The normalization constant as a scalar tensor.
         """
         x = self._x_else_default_x(x)
+        self.potential_fn = self._bind_iid(x)
         return torch.exp(
             self._estimate_log_normalization_constant(x, num_samples, force_update)
         )
@@ -186,7 +189,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             )
         if log_normalization_constant is None:
             _, log_importance_weights = importance_sample(
-                self.potential_fn.bind(x),
+                self._bind_iid(x),
                 proposal=self.proposal,
                 num_samples=num_samples,
             )
@@ -226,7 +229,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Args:
             sample_shape: Shape of samples that are drawn from posterior.
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
-                set via `.set_default_x()`.
+                set via `.set_default_x()`. Several observations are combined as iid
+                trials.
             method: Either of [`sir`|`importance`]. This sets the behavior of the
                 `.sample()` method. With `sir`, approximate posterior samples are
                 generated with sampling importance resampling (SIR). With
@@ -243,7 +247,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         method = self.method if method is None else method
 
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
         if method == "sir":
             return self._sir_sample(
@@ -267,7 +271,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         raise NotImplementedError(
             "Batched sampling is not implemented for ImportanceSamplingPosterior. \
            Alternatively you can use `sample` in a loop \
-           [posterior.sample(theta, x_o) for x_o in x]."
+           [posterior.sample(sample_shape, x=x_o) for x_o in x]."
         )
 
     def _importance_sample(

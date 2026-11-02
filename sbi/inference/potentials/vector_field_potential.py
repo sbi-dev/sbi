@@ -23,7 +23,6 @@ from sbi.samplers.ode_solvers import build_neural_ode
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
-from sbi.utils.user_input_checks import process_x
 
 
 class VectorFieldBasedPotential(BasePotential):
@@ -90,6 +89,11 @@ class VectorFieldBasedPotential(BasePotential):
     def x_embedding_net(self) -> nn.Module:
         """Return the net embedding `x`: the estimator's condition is `x`."""
         return self.vector_field_estimator.embedding_net
+
+    @property
+    def x_event_shape(self) -> torch.Size:
+        """Shape of one observation: the condition shape of the estimator."""
+        return self.vector_field_estimator.condition_shape
 
     @property
     def num_iid_observations(self) -> int:
@@ -168,7 +172,7 @@ class VectorFieldBasedPotential(BasePotential):
         self.iid_params = bound.iid_params
         self.guidance_method = bound.guidance_method
         self.guidance_params = bound.guidance_params
-        if not x_is_iid and (bound._x_o is not None):
+        if not bound._x_is_iid and (bound._x_o is not None):
             self.flow = bound.flow
         elif bound._x_o is not None:
             self.flows = bound.flows
@@ -183,7 +187,13 @@ class VectorFieldBasedPotential(BasePotential):
         guidance_params: Optional[Dict[str, Any]] = None,
         **ode_kwargs,
     ) -> "VectorFieldBasedPotential":
-        """Create new potential with x bound, without mutable state."""
+        """Create new potential with x bound, without mutable state.
+
+        With a single observation, `x_is_iid=True` is the same as `False`.
+        """
+        x_o = self._prepare_x_o(x_o)
+        if x_o is not None and x_o.shape[0] == 1:
+            x_is_iid = False
         # IID and guidance require transforming the prior to standardized space.
         if self.vector_field_estimator.compose_enabled:
             if x_is_iid:
@@ -207,8 +217,6 @@ class VectorFieldBasedPotential(BasePotential):
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
         bound._x_is_iid = x_is_iid
         bound.guidance_method = guidance_method

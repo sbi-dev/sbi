@@ -9,7 +9,10 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    unpaired_batch_error,
+)
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -21,7 +24,6 @@ from sbi.utils.sbiutils import (
     within_support,
 )
 from sbi.utils.torchutils import ensure_theta_batched, infer_module_device
-from sbi.utils.user_input_checks import process_x
 
 
 def posterior_estimator_based_potential(
@@ -84,15 +86,25 @@ class PosteriorBasedPotential(BasePotential):
         Returns:
             The potential function.
         """
-        super().__init__(prior, x_o, device)
-        self._x_is_iid = False
         self.posterior_estimator = posterior_estimator
         self.posterior_estimator.eval()
+        super().__init__(prior, x_o, device)
+        self._x_is_iid = False
 
     @property
     def x_embedding_net(self) -> Optional[nn.Module]:
         """Return the net embedding `x`: the estimator's condition is `x`."""
         return self.posterior_estimator.embedding_net
+
+    @property
+    def warns_on_implicit_iid(self) -> bool:
+        """NPE is mostly used with one observation, so iid trials can be unintended."""
+        return True
+
+    @property
+    def x_event_shape(self) -> torch.Size:
+        """Shape of one observation: the condition shape of the estimator."""
+        return self.posterior_estimator.condition_shape
 
     def to(self, device: Union[str, torch.device]) -> "PosteriorBasedPotential":
         """Move posterior estimator, prior and x_o to the given device.
@@ -117,9 +129,7 @@ class PosteriorBasedPotential(BasePotential):
             x_o=None,
             device=self.device,
         )
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        bound._x_o = x_o
+        bound._x_o = self._prepare_x_o(x_o)
         bound._x_is_iid = x_is_iid
         return bound
 
@@ -192,12 +202,8 @@ class PosteriorBasedPotential(BasePotential):
                 )
                 theta_batch_size = theta.shape[0]
                 x_batch_size = x.shape[0]
-
-                assert theta_batch_size == x_batch_size or x_batch_size == 1, (
-                    f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
-                    When performing batched sampling for multiple `x`, the batch size\
-                    of `theta` must match the batch size of `x`."
-                )
+                if theta_batch_size != x_batch_size and x_batch_size != 1:
+                    raise unpaired_batch_error(theta_batch_size, x_batch_size)
 
                 if x_batch_size == 1:
                     # If a single `x` is passed (i.e. batchsize==1), we squeeze

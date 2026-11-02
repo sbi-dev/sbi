@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pickle
+import warnings
 
 import pytest
 import torch
@@ -25,6 +26,7 @@ from sbi.inference import (
     ImportanceSamplingPosterior,
     VectorFieldPosterior,
 )
+from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -806,24 +808,6 @@ def test_posterior_based_potential_iid_log_prob(iid_batch_size: int):
     )
 
 
-def test_direct_posterior_raises_on_iid_x():
-    """Direct posterior sampling should raise for multi-observation x."""
-    num_dim = 2
-    num_simulations = 500
-
-    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    inference = NPE_C(prior=prior, show_progress_bars=False)
-    theta = prior.sample((num_simulations,))
-    x = diagonal_linear_gaussian(theta)
-    inference.append_simulations(theta, x).train(max_num_epochs=3)
-
-    posterior = inference.build_posterior(sample_with="direct")
-
-    x_o_iid = ones(3, num_dim)
-    with pytest.raises(ValueError, match="batchsize == 1"):
-        posterior.sample((10,), x=x_o_iid)
-
-
 @pytest.mark.gpu
 @pytest.mark.parametrize("method", ["log_prob", "log_prob_batched"])
 def test_direct_posterior_log_prob_with_theta_on_cpu(method: str):
@@ -883,3 +867,81 @@ def test_posterior_mcmc_iid_sampling(iid_batch_size: int, mcmc_params_fast):
     assert torch.allclose(sample_mean, true_mean, atol=0.5), (
         f"MCMC sample mean {sample_mean} too far from true mean {true_mean}"
     )
+
+
+@pytest.fixture(scope="module")
+def npe_for_iid_x():
+    """NPE, trained briefly on a 2-D Gaussian with a box prior."""
+    torch.manual_seed(0)
+    prior = BoxUniform(-3 * ones(2), 3 * ones(2))
+    theta = prior.sample((300,))
+    x = theta + 0.3 * torch.randn_like(theta)
+    trainer = NPE_C(prior=prior, show_progress_bars=False)
+    trainer.append_simulations(theta, x).train(max_num_epochs=3)
+    return prior, trainer
+
+
+@pytest.mark.parametrize(
+    "ensemble, method",
+    [
+        (None, "sample"),
+        (None, "log_prob"),
+        (None, "potential"),
+        ("direct", "potential"),
+        ("mixed", "sample"),
+    ],
+)
+def test_direct_posterior_takes_one_observation(ensemble, method, npe_for_iid_x):
+    """The direct posterior, and an ensemble with it, raise for several observations.
+
+    A mixed ensemble raises before it draws components, also when the draw would only
+    pick the posterior that combines observations.
+    """
+    _, trainer = npe_for_iid_x
+    posterior = trainer.build_posterior(sample_with="direct")
+    if ensemble == "direct":
+        posterior = EnsemblePosterior([posterior, posterior])
+    elif ensemble == "mixed":
+        importance = trainer.build_posterior(sample_with="importance")
+        # The draw never picks the direct posterior.
+        posterior = EnsemblePosterior([posterior, importance], weights=[0.0, 1.0])
+    x_o = zeros(3, 2)
+    theta = zeros(4, 2)
+    calls = {
+        "sample": lambda: posterior.sample((5,), x=x_o, show_progress_bars=False),
+        "log_prob": lambda: posterior.log_prob(theta, x=x_o),
+        "potential": lambda: posterior.potential(theta, x=x_o),
+    }
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        calls[method]()
+
+
+@pytest.mark.parametrize(
+    "sample_with, method",
+    [("importance", "potential"), ("rejection", "log_prob"), ("ensemble", "potential")],
+)
+def test_posteriors_combine_several_observations_as_iid_trials(
+    sample_with, method, npe_for_iid_x
+):
+    """Each theta is evaluated given all observations as iid trials, also with as many
+    theta as observations, where main paired them. NPE posteriors warn."""
+    prior, trainer = npe_for_iid_x
+    component = trainer.build_posterior(
+        sample_with="rejection" if method == "log_prob" else "importance"
+    )
+    posterior = component
+    if sample_with == "ensemble":
+        # Equal components: the mixture equals each of them.
+        posterior = EnsemblePosterior([component, component])
+    x_o = torch.tensor([[0.0, 0.0], [0.5, -0.5], [1.0, 0.0]])
+    theta = torch.tensor([[0.0, 0.0], [0.5, 0.5], [-0.5, 1.0]])
+    # iid trials: the sum of single-observation potentials, prior counted once.
+    singles = torch.stack([component.potential(theta, x=x_i) for x_i in x_o])
+    expected = singles.sum(0) - 2 * prior.log_prob(theta)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        value = getattr(posterior, method)(theta, x=x_o)
+    iid_warnings = [w for w in caught if "x holds 3 observations" in str(w.message)]
+    assert len(iid_warnings) == 1
+    assert torch.allclose(value, expected, atol=1e-4)
