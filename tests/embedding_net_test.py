@@ -89,6 +89,13 @@ def test_embedding_net_api(
     )
 
 
+def test_fc_embedding_output_takes_negative_values():
+    """A final ReLU would make every output non-negative."""
+    embedding = FCEmbedding(input_dim=2, output_dim=20)
+
+    assert (embedding(torch.randn(100, 2)) < 0).any()
+
+
 @pytest.mark.parametrize("num_xo_batch", [1, 2])
 @pytest.mark.parametrize("num_trials", [1, 2])
 @pytest.mark.parametrize("num_dim", [1, 2])
@@ -489,7 +496,7 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     num_thetas = 5000 + trial_factor * max_num_trials
 
     theta = prior.sample(sample_shape=torch.Size((num_thetas,)))
-    num_trials = torch.randint(1, max_num_trials, size=(num_thetas,))
+    num_trials = torch.randint(1, max_num_trials + 1, size=(num_thetas,))
 
     # simulate iid x, pad smaller number of trials with nans.
     x = ones(num_thetas, max_num_trials, 2) * float("nan")
