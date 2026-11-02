@@ -977,6 +977,43 @@ def test_amortized_vi_requires_training(linear_gaussian_setup):
         posterior.sample((100,))
 
 
+def test_amortized_vi_takes_one_observation(linear_gaussian_setup):
+    """Amortized q, like a direct posterior, takes one observation in `potential()`
+    and `map()`; after `train()`, the single-x q combines several as iid trials."""
+    setup = linear_gaussian_setup
+    num_dim = setup["num_dim"]
+    posterior = VIPosterior(potential_fn=setup["potential_fn"], prior=setup["prior"])
+    posterior.train_amortized(
+        theta=setup["theta"],
+        x=setup["x"],
+        max_num_iters=5,
+        show_progress_bar=False,
+        flow_type=ZukoFlowType.NSF,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    x_o = zeros(3, num_dim)
+    theta = zeros(4, num_dim)
+
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        posterior.potential(theta, x=x_o)
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        posterior.set_default_x(x_o).map(num_iter=2, num_to_optimize=2)
+    # Batched sampling of the amortized q stays as documented.
+    assert posterior.sample((5,), x=x_o).shape == (5, 3, num_dim)
+
+    with pytest.warns(UserWarning, match="Switching from amortized to single-x"):
+        posterior.train(
+            x=x_o,
+            max_num_iters=2,
+            min_num_iters=1,
+            warm_up_rounds=1,
+            show_progress_bar=False,
+            quality_control=False,
+        )
+    assert posterior.potential(theta, x=x_o).shape == (4,)
+
+
 @pytest.mark.slow
 def test_amortized_vi_map(linear_gaussian_setup):
     """Test that MAP estimation returns high-density region."""

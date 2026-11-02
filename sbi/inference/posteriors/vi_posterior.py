@@ -773,6 +773,11 @@ class VIPosterior(NeuralPosterior):
                     )
                 return self.q.log_prob(theta)
 
+    @property
+    def _takes_one_observation(self) -> bool:
+        """The amortized q(θ|x), like a direct posterior, takes one observation."""
+        return self._mode == "amortized"
+
     def _is_trained_on(self, x: Tensor) -> bool:
         """Whether q was trained on `x`: the same shape and the same values.
 
@@ -903,6 +908,17 @@ class VIPosterior(NeuralPosterior):
                 **kwargs,
             )
 
+        # Switch before binding x: only the single-x q combines several observations.
+        if self._mode == "amortized":
+            warnings.warn(
+                "Switching from amortized to single-x mode. "
+                "The previously trained amortized model will be discarded.",
+                UserWarning,
+                stacklevel=2,
+            )
+            self._amortized_q = None
+        self._mode = "single_x"
+
         # Check context
         x = self._x_else_default_x(x)
         if not torch.isfinite(x).all():
@@ -947,16 +963,6 @@ class VIPosterior(NeuralPosterior):
                 break
         # Training finished:
         self._trained_on = x
-
-        if self._mode == "amortized":
-            warnings.warn(
-                "Switching from amortized to single-x mode. "
-                "The previously trained amortized model will be discarded.",
-                UserWarning,
-                stacklevel=2,
-            )
-            self._amortized_q = None
-        self._mode = "single_x"
 
         # Evaluate quality
         if quality_control:
