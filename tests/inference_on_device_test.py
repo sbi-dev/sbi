@@ -410,9 +410,6 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str):
         def __call__(self, theta, **kwargs):
             return torch.ones(len(theta), dtype=torch.float32, device=device)
 
-        def allow_iid_x(self) -> bool:
-            return True
-
         def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
             """Create new potential with x bound, without mutable state."""
 
@@ -472,9 +469,6 @@ def test_amortized_vi_on_gpu(num_dim: int, flow_type: str):
     class FakePotential(BasePotential):
         def __call__(self, theta, **kwargs):
             return torch.ones(len(theta), dtype=torch.float32, device=device)
-
-        def allow_iid_x(self) -> bool:
-            return True
 
         def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
             """Create new potential with x bound, without mutable state."""

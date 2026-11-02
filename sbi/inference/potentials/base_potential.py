@@ -64,6 +64,8 @@ class BasePotential(metaclass=ABCMeta):
         """Shape of one observation `x`, without batch dimension.
 
         `None` (default) means the shape is unknown and `x_o` is not checked.
+        `__init__` reads it to bind `x_o`, so a subclass that derives it from its
+        estimator sets the estimator before calling `super().__init__()`.
         """
         return None
 

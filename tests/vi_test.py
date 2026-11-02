@@ -61,9 +61,6 @@ class FakePotential(BasePotential):
     def __call__(self, theta, **kwargs):
         return self.prior.log_prob(theta)
 
-    def allow_iid_x(self) -> bool:
-        return True
-
     def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
         """Create new potential with x bound, without mutable state."""
 
@@ -82,9 +79,6 @@ def make_tractable_potential(target_distribution, prior):
             return target_distribution.log_prob(
                 torch.as_tensor(theta, dtype=torch.float32)
             )
-
-        def allow_iid_x(self) -> bool:
-            return True
 
         def bind(
             self, x_o: torch.Tensor, x_is_iid: bool = True
