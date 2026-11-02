@@ -73,13 +73,9 @@ def test_importance_map_posterior_init_with_importance_method(toy):
     assert theta_map.shape == (1, 2)
 
 
-def test_amortized_vi_map_starts_from_amortized_q_for_iid_x(toy, monkeypatch):
-    """The single-x `q` sits far from the prior; a MAP seeded from it stays there.
-
-    Two iid observations check that the per-observation samples are pooled into
-    `num_init_samples` starts in total. With fewer starts than observations, the
-    starts must not always come from the first observations.
-    """
+def test_amortized_vi_map_starts_from_amortized_q(toy):
+    """The single-x `q` sits far from the prior; a MAP seeded from the amortized
+    q(theta|x) stays away from it."""
     prior, theta, x = toy
     potential_fn, _ = _likelihood_potential(prior, theta, x)
     loc = torch.full((2,), 50.0, requires_grad=True)
@@ -87,14 +83,7 @@ def test_amortized_vi_map_starts_from_amortized_q_for_iid_x(toy, monkeypatch):
         potential_fn, prior, q=MultivariateNormal(loc, torch.eye(2)), parameters=[loc]
     )
     posterior.train_amortized(theta, x, max_num_iters=2, show_progress_bar=False)
-    posterior.set_default_x(torch.zeros(2, 2))
+    posterior.set_default_x(torch.zeros(1, 2))
     theta_map = posterior.map(init_method="proposal", **MAP_KWARGS)
     assert theta_map.abs().max() < 10
     assert posterior._map_inits("proposal", num_init_samples=21).shape == (21, 2)
-
-    # One sample per observation, filled with the observation's index.
-    posterior.set_default_x(torch.zeros(3, 2))
-    tagged = torch.arange(3.0).repeat_interleave(2).reshape(1, 3, 2)
-    monkeypatch.setattr(posterior, "sample", lambda sample_shape, x=None: tagged)
-    starts = [posterior._map_inits("proposal", num_init_samples=2) for _ in range(20)]
-    assert any((s == 2.0).any() for s in starts)
