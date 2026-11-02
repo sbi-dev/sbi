@@ -117,7 +117,10 @@ class NeuralPosterior:
         posterior.
 
         Args:
-            theta: Parameters $\theta$.
+            theta: Parameters $\theta$, each evaluated given all of `x`.
+            x: Observation. If None, the default `x`. Several observations, of shape
+                `(num_observations, *x_event_shape)`, are combined as iid trials;
+                posteriors that take one observation (e.g. direct) raise.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -205,10 +208,9 @@ class NeuralPosterior:
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
         Several observations, of shape `(num_observations, *x_event_shape)`, are iid
-        trials of one parameter set. `.potential()` combines them, and so do the
-        other methods of posteriors that support iid trials (e.g. MCMC, importance,
-        rejection and VI); the direct posterior raises. With NPE, posteriors warn
-        when they combine observations, because NPE is mostly used with one.
+        trials of one parameter set. MCMC, importance, rejection and VI posteriors
+        combine them; with NPE they warn, because NPE is mostly used with one
+        observation. The direct posterior takes one observation and raises.
 
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
@@ -229,13 +231,42 @@ class NeuralPosterior:
         self._assert_finite_x(x)
         return x.to(self._device)
 
+    @property
+    def _takes_one_observation(self) -> bool:
+        """Whether this posterior takes exactly one observation `x`.
+
+        A posterior that evaluates its estimator directly cannot combine several
+        observations as iid trials.
+        """
+        return False
+
+    def _check_num_observations(self, num_observations: int) -> None:
+        """Raise if this posterior takes one observation and gets several."""
+        if num_observations == 1 or not self._takes_one_observation:
+            return
+        batched = " or ".join(
+            f"`{name}()`"
+            for name in ("sample_batched", "log_prob_batched")
+            if hasattr(self, name)
+        )
+        raise ValueError(
+            f"{type(self).__name__} takes one observation, but x holds "
+            f"{num_observations}. For a separate posterior of each observation, use "
+            f"{batched}. To combine them as iid trials, use a posterior built with "
+            "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'`. For a "
+            "direct posterior of several trials, train with a permutation-invariant "
+            "embedding net on sets of trials, and pass each set as one observation."
+        )
+
     def _bind_iid(self, x: Tensor) -> BasePotential:
         """Return the potential bound to `x`, with its observations as iid trials.
 
-        Warns if the potential marks iid trials as possibly unintended (NPE).
+        Raises if this posterior takes one observation and `x` holds several. Warns if
+        the potential marks iid trials as possibly unintended (NPE).
         """
         bound = self.potential_fn.bind(x, x_is_iid=True)
         num_observations = bound.x_o.shape[0]
+        self._check_num_observations(num_observations)
         if num_observations > 1 and bound.warns_on_implicit_iid:
             # One location for all callers: Python's default filter shows it once.
             warn(

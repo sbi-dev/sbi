@@ -170,6 +170,11 @@ class EnsemblePosterior(NeuralPosterior):
         return devices[0]
 
     @property
+    def _takes_one_observation(self) -> bool:
+        """Whether any posterior of the ensemble takes exactly one observation."""
+        return any(posterior._takes_one_observation for posterior in self.posteriors)
+
+    @property
     def weights(self) -> Tensor:
         return self._weights
 

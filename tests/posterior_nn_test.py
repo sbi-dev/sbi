@@ -808,24 +808,6 @@ def test_posterior_based_potential_iid_log_prob(iid_batch_size: int):
     )
 
 
-def test_direct_posterior_raises_on_iid_x():
-    """Direct posterior sampling should raise for multi-observation x."""
-    num_dim = 2
-    num_simulations = 500
-
-    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    inference = NPE_C(prior=prior, show_progress_bars=False)
-    theta = prior.sample((num_simulations,))
-    x = diagonal_linear_gaussian(theta)
-    inference.append_simulations(theta, x).train(max_num_epochs=3)
-
-    posterior = inference.build_posterior(sample_with="direct")
-
-    x_o_iid = ones(3, num_dim)
-    with pytest.raises(ValueError, match="batchsize == 1"):
-        posterior.sample((10,), x=x_o_iid)
-
-
 @pytest.mark.gpu
 @pytest.mark.parametrize("method", ["log_prob", "log_prob_batched"])
 def test_direct_posterior_log_prob_with_theta_on_cpu(method: str):
@@ -900,6 +882,39 @@ def npe_and_nle_for_iid_x():
         trainer.append_simulations(theta, x).train(max_num_epochs=3)
         trainers[name] = trainer
     return prior, trainers
+
+
+@pytest.mark.parametrize(
+    "ensemble, method",
+    [
+        (False, "sample"),
+        (False, "log_prob"),
+        (False, "potential"),
+        (False, "map"),
+        (True, "sample"),
+        (True, "log_prob"),
+        (True, "potential"),
+        (True, "map"),
+    ],
+)
+def test_direct_posterior_takes_one_observation(
+    ensemble, method, npe_and_nle_for_iid_x
+):
+    """The direct posterior, and an ensemble of it, raise for several observations."""
+    _, trainers = npe_and_nle_for_iid_x
+    posterior = trainers["npe"].build_posterior(sample_with="direct")
+    if ensemble:
+        posterior = EnsemblePosterior([posterior, posterior])
+    x_o = zeros(3, 2)
+    theta = zeros(4, 2)
+    calls = {
+        "sample": lambda: posterior.sample((5,), x=x_o, show_progress_bars=False),
+        "log_prob": lambda: posterior.log_prob(theta, x=x_o),
+        "potential": lambda: posterior.potential(theta, x=x_o),
+        "map": lambda: posterior.set_default_x(x_o).map(num_iter=2),
+    }
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        calls[method]()
 
 
 @pytest.mark.parametrize(

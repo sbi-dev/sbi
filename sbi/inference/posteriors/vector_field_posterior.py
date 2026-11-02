@@ -816,6 +816,11 @@ class VectorFieldPosterior(NeuralPosterior):
                 "Default `x` has not been set."
                 "To set the default, use the `.set_default_x()` method."
             )
+        if self.default_x.shape[0] > 1:
+            raise ValueError(
+                f"x holds {self.default_x.shape[0]} observations, but `.map()` of a "
+                "vector field posterior takes one observation."
+            )
 
         if self._map is None or force_update:
             # rebuild coarse flow fast for MAP optimization.

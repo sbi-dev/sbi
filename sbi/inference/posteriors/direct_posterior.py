@@ -139,6 +139,10 @@ class DirectPosterior(NeuralPosterior):
         if x_o is not None:
             self.set_default_x(x_o)
 
+    @property
+    def _takes_one_observation(self) -> bool:
+        return True
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -178,16 +182,7 @@ class DirectPosterior(NeuralPosterior):
         x = reshape_to_batch_event(
             x, event_shape=self.posterior_estimator.condition_shape
         )
-        if x.shape[0] > 1:
-            raise ValueError(
-                ".sample() supports only `batchsize == 1`. If you intend "
-                "to sample multiple observations, use `.sample_batched()`. "
-                "If you intend to sample i.i.d. observations, set up the "
-                "posterior density estimator with an appropriate permutation "
-                "invariant embedding net, or build the posterior with "
-                "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'`, "
-                "which combine the observations as iid trials."
-            )
+        self._check_num_observations(x.shape[0])
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -362,16 +357,7 @@ class DirectPosterior(NeuralPosterior):
         x_density_estimator = reshape_to_batch_event(
             x, event_shape=self.posterior_estimator.condition_shape
         )
-        if x_density_estimator.shape[0] > 1:
-            raise ValueError(
-                ".log_prob() supports only `batchsize == 1`. If you intend "
-                "to evaluate given multiple observations, use `.log_prob_batched()`. "
-                "If you intend to evaluate given i.i.d. observations, set up the "
-                "posterior density estimator with an appropriate permutation "
-                "invariant embedding net, or build the posterior with "
-                "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'`, "
-                "which combine the observations as iid trials."
-            )
+        self._check_num_observations(x_density_estimator.shape[0])
 
         self.posterior_estimator.eval()
 
