@@ -228,7 +228,19 @@ class EnsemblePosterior(NeuralPosterior):
         """
         # Components are drawn randomly; validate `x` here so that errors do not
         # depend on the draw.
-        self._check_num_observations(self._x_else_default_x(x).shape[0])
+        if x is not None or self.default_x is not None:
+            num_observations = self._x_else_default_x(x).shape[0]
+        else:
+            # Each component samples with its own default `x`.
+            num_observations = max(
+                (
+                    p.default_x.shape[0]
+                    for p in self.posteriors
+                    if p.default_x is not None
+                ),
+                default=1,
+            )
+        self._check_num_observations(num_observations)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indizes = torch.multinomial(
             self._weights, num_samples, replacement=True

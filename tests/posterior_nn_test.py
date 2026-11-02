@@ -928,6 +928,16 @@ def test_direct_posterior_takes_one_observation(
         calls[method]()
 
 
+def test_ensemble_samples_with_the_default_x_of_its_components(npe_and_nle_for_iid_x):
+    """Without an ensemble default x, each component samples with its own."""
+    _, trainers = npe_and_nle_for_iid_x
+    components = [
+        trainers["npe"].build_posterior().set_default_x(zeros(2)) for _ in range(2)
+    ]
+    samples = EnsemblePosterior(components).sample((3,), show_progress_bars=False)
+    assert samples.shape == (3, 2)
+
+
 @pytest.mark.parametrize(
     "method, sample_with",
     [
