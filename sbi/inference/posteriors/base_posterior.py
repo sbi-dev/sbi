@@ -244,15 +244,12 @@ class NeuralPosterior:
         """Raise if this posterior takes one observation and gets several."""
         if num_observations == 1 or not self._takes_one_observation:
             return
-        batched = " or ".join(
-            f"`{name}()`"
-            for name in ("sample_batched", "log_prob_batched")
-            if hasattr(self, name)
-        )
         raise ValueError(
             f"{type(self).__name__} takes one observation, but x holds "
-            f"{num_observations}. For a separate posterior of each observation, use "
-            f"{batched}. To combine them as iid trials, use a posterior built with "
+            f"{num_observations}. For a separate posterior of each observation, pass "
+            "one observation at a time, or use `sample_batched()` and "
+            "`log_prob_batched()` where available. To combine them as iid trials, "
+            "use a posterior built with "
             "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'`. For a "
             "direct posterior of several trials, train with a permutation-invariant "
             "embedding net on sets of trials, and pass each set as one observation."

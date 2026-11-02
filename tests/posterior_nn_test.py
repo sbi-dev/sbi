@@ -887,24 +887,35 @@ def npe_and_nle_for_iid_x():
 @pytest.mark.parametrize(
     "ensemble, method",
     [
-        (False, "sample"),
-        (False, "log_prob"),
-        (False, "potential"),
-        (False, "map"),
-        (True, "sample"),
-        (True, "log_prob"),
-        (True, "potential"),
-        (True, "map"),
+        (None, "sample"),
+        (None, "log_prob"),
+        (None, "potential"),
+        (None, "map"),
+        ("direct", "sample"),
+        ("direct", "log_prob"),
+        ("direct", "potential"),
+        ("direct", "map"),
+        ("mixed", "sample"),
+        ("mixed", "potential"),
+        ("mixed", "map"),
     ],
 )
 def test_direct_posterior_takes_one_observation(
     ensemble, method, npe_and_nle_for_iid_x
 ):
-    """The direct posterior, and an ensemble of it, raise for several observations."""
+    """The direct posterior, and an ensemble with it, raise for several observations.
+
+    A mixed ensemble raises before it draws components, also when the draw would only
+    pick the posterior that combines observations.
+    """
     _, trainers = npe_and_nle_for_iid_x
     posterior = trainers["npe"].build_posterior(sample_with="direct")
-    if ensemble:
+    if ensemble == "direct":
         posterior = EnsemblePosterior([posterior, posterior])
+    elif ensemble == "mixed":
+        importance = trainers["npe"].build_posterior(sample_with="importance")
+        # The draw never picks the direct posterior.
+        posterior = EnsemblePosterior([posterior, importance], weights=[0.0, 1.0])
     x_o = zeros(3, 2)
     theta = zeros(4, 2)
     calls = {
