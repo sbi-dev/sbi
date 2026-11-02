@@ -210,3 +210,31 @@ def test_ensemble_samples_are_not_sorted_by_component(method: str):
     samples = getattr(ensemble, method)((10, 100), x=zeros(1, 1))
 
     assert ((samples < 0).any(dim=1) & (samples > 0).any(dim=1)).all()
+
+
+class _TimedOutTractablePosterior(TractablePosterior):
+    """Returns 3 samples, like a sampler that timed out with partial results."""
+
+    def sample(self, sample_shape, x=None, **kwargs):
+        return self.potential_fn.posterior.sample((3,))
+
+    def sample_batched(self, sample_shape, x, **kwargs):
+        return self.potential_fn.posterior.sample((3, x.shape[0]))
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_partial_samples_stay_flat(method: str):
+    """Like in `DirectPosterior`, a partial result on timeout is not reshaped."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    posteriors = [
+        _TimedOutTractablePosterior(
+            PosteriorPotential(MultivariateNormal(zeros(2), eye(2)), prior)
+        )
+        for _ in range(2)
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+
+    samples = getattr(ensemble, method)((10, 10), x=zeros(1, 2))
+
+    # Each of the two components returns 3 samples.
+    assert samples.shape[0] == 6 and samples.shape[-1] == 2
