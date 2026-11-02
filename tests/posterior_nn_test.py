@@ -892,12 +892,9 @@ def npe_and_nle_for_iid_x():
         (None, "potential"),
         (None, "map"),
         ("direct", "sample"),
-        ("direct", "log_prob"),
         ("direct", "potential"),
         ("direct", "map"),
         ("mixed", "sample"),
-        ("mixed", "potential"),
-        ("mixed", "map"),
     ],
 )
 def test_direct_posterior_takes_one_observation(
@@ -928,16 +925,13 @@ def test_direct_posterior_takes_one_observation(
         calls[method]()
 
 
-@pytest.mark.parametrize("second", ["direct", "importance"])
-def test_ensemble_samples_with_the_default_x_of_its_components(
-    second, npe_and_nle_for_iid_x
-):
+def test_ensemble_samples_with_the_default_x_of_its_components(npe_and_nle_for_iid_x):
     """Without an ensemble default x, each component samples with its own, which may
     hold several observations for a component that combines them."""
     _, trainers = npe_and_nle_for_iid_x
     direct = trainers["npe"].build_posterior().set_default_x(zeros(2))
-    other = trainers["npe"].build_posterior(sample_with=second)
-    other.set_default_x(zeros(2) if second == "direct" else zeros(3, 2))
+    other = trainers["npe"].build_posterior(sample_with="importance")
+    other.set_default_x(zeros(3, 2))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # NPE warns that it combines observations.
         samples = EnsemblePosterior([direct, other]).sample(

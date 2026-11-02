@@ -208,10 +208,8 @@ class NeuralPosterior:
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
         Several observations, of shape `(num_observations, *x_event_shape)`, are iid
-        trials of one parameter set. MCMC, importance, rejection and VI posteriors
-        combine them; with NPE they warn, because NPE is mostly used with one
-        observation. The direct posterior takes one observation: its `sample()`,
-        `log_prob()`, `potential()` and `map()` raise for several.
+        trials: MCMC, importance, rejection and VI posteriors combine them (NPE warns),
+        and the direct posterior raises.
 
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.

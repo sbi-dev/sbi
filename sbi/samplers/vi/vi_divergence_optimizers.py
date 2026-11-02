@@ -645,8 +645,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         logp = self.potential_fn(samples)
         with torch.no_grad():
             logweights = logp - logq
-            # The potential is unnormalized, so only relative weights matter. The
-            # shift keeps exp() from underflowing to zero for low potentials.
+            # Only relative weights matter; the shift keeps exp() from underflowing.
             weights = self.weight_transform((logweights - logweights.max()).exp())
             weights /= weights.sum()
 

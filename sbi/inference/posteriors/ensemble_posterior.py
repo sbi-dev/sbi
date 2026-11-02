@@ -174,20 +174,6 @@ class EnsemblePosterior(NeuralPosterior):
         """Whether any posterior of the ensemble takes exactly one observation."""
         return any(posterior._takes_one_observation for posterior in self.posteriors)
 
-    def _check_x_before_components(self, x: Optional[Tensor]) -> None:
-        """Raise if a posterior that takes one observation would get several.
-
-        Args:
-            x: Observation passed to the ensemble. If None, the ensemble default `x`,
-                or else the default `x` of each component, checked per component.
-        """
-        if x is not None or self.default_x is not None:
-            self._check_num_observations(self._x_else_default_x(x).shape[0])
-            return
-        for posterior in self.posteriors:
-            if posterior.default_x is not None:
-                posterior._check_num_observations(posterior.default_x.shape[0])
-
     @property
     def weights(self) -> Tensor:
         return self._weights
@@ -241,8 +227,13 @@ class EnsemblePosterior(NeuralPosterior):
             Samples drawn from the ensemble distribution.
         """
         # Components are drawn randomly; validate `x` here so that errors do not
-        # depend on the draw.
-        self._check_x_before_components(x)
+        # depend on the draw. Without `x`, each component uses its own default.
+        if x is not None or self.default_x is not None:
+            self._check_num_observations(self._x_else_default_x(x).shape[0])
+        else:
+            for posterior in self.posteriors:
+                if posterior.default_x is not None:
+                    posterior._check_num_observations(posterior.default_x.shape[0])
         num_samples = torch.Size(sample_shape).numel()
         posterior_indizes = torch.multinomial(
             self._weights, num_samples, replacement=True
