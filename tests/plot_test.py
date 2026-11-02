@@ -391,6 +391,16 @@ def test_sbc_rank_plot_rejects_ranks_outside_0_to_n(bad_rank):
         sbc_rank_plot(np.full((10, 1), bad_rank), 10)
 
 
+def test_sbc_rank_plot_bins_float32_ranks_like_the_bands():
+    """float32 ranks, as returned by run_sbc, fall into the same bins as the band."""
+    # For N = 14 and 50 bins, rank 7 lies on a bin edge that rounds differently
+    # in float32 and float64.
+    ranks = torch.arange(15, dtype=torch.float32).repeat(10)[:, None]
+    _, ax = sbc_rank_plot(ranks, 14, num_bins=50, plot_type="cdf-diff")
+    np.testing.assert_allclose(ax.lines[0].get_ydata(), 0, atol=1e-12)
+    close()
+
+
 def test_plotting_dataclass_overrides_defaults(mocker):
     """
     Verify that custom keyword arguments in `HistOffDiagOptions` correctly

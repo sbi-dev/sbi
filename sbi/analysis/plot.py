@@ -1788,7 +1788,8 @@ def _sbc_rank_plot(
         ranks_list = ranks
     for idx, rank in enumerate(ranks_list):
         assert isinstance(rank, (Tensor, np.ndarray))
-        ranks_list[idx] = ensure_numpy(rank)
+        # Bin in float64, like the bands: float32 edges can shift a rank by one bin.
+        ranks_list[idx] = ensure_numpy(rank).astype(np.float64)
     if not all(((r >= 0) & (r <= num_posterior_samples)).all() for r in ranks_list):
         raise ValueError(
             f"Ranks must lie in [0, num_posterior_samples={num_posterior_samples}]. "
