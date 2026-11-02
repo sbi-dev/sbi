@@ -978,6 +978,18 @@ def test_amortized_vi_requires_training(linear_gaussian_setup):
         posterior.sample((100,))
 
 
+def test_single_x_vi_without_default_x_uses_the_trained_x():
+    """`train(x=x_o)` without a default x passes quality control, and `sample()` and
+    `log_prob()` without x use x_o."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    posterior = VIPosterior(potential_fn=FakePotential(prior=prior), prior=prior)
+    x_o = zeros(1, 2)
+    posterior.train(x=x_o, max_num_iters=20, show_progress_bar=False)
+    assert posterior.default_x is None
+    assert posterior.sample((5,)).shape == (5, 2)
+    assert posterior.log_prob(zeros(3, 2)).shape == (3,)
+
+
 def test_amortized_vi_takes_one_observation(linear_gaussian_setup):
     """Amortized q, like a direct posterior, takes one observation in `potential()`
     and `map()`; after `train()`, the single-x q combines several as iid trials."""

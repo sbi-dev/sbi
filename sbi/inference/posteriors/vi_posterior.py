@@ -648,7 +648,7 @@ class VIPosterior(NeuralPosterior):
             return samples
         else:
             # Single-x mode: sample from unconditional flow q(θ)
-            x = self._x_else_default_x(x)
+            x = self._x_else_trained_x(x)
             if not self._is_trained_on(x):
                 raise ValueError(
                     f"The variational posterior was not fit on the specified "
@@ -764,7 +764,7 @@ class VIPosterior(NeuralPosterior):
                 return log_probs.squeeze(0)
             else:
                 # Single-x mode: evaluate log q(θ)
-                x = self._x_else_default_x(x)
+                x = self._x_else_trained_x(x)
                 if not self._is_trained_on(x):
                     raise ValueError(
                         f"The variational posterior was not fit on the specified "
@@ -776,6 +776,12 @@ class VIPosterior(NeuralPosterior):
     def _takes_one_observation(self) -> bool:
         """The amortized q(θ|x), like a direct posterior, takes one observation."""
         return self._mode == "amortized"
+
+    def _x_else_trained_x(self, x: Optional[Tensor]) -> Tensor:
+        """Return `x`, else the default `x`, else the `x` the single-x q was fit to."""
+        if x is None and self.default_x is None and self._trained_on is not None:
+            return self._trained_on
+        return self._x_else_default_x(x)
 
     def _is_trained_on(self, x: Tensor) -> bool:
         """Whether q was trained on `x`: the same shape and the same values.
@@ -977,6 +983,7 @@ class VIPosterior(NeuralPosterior):
                     f"\nThe error that occured is: {e}"
                 )
                 self.train(
+                    x=x,
                     learning_rate=learning_rate * 0.1,
                     retrain_from_scratch=True,
                     reset_optimizer=True,
