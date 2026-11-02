@@ -20,7 +20,6 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 if TYPE_CHECKING:
     from sbi.inference.posteriors.posterior_parameters import VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.neural_nets.net_builders.flow import (
@@ -32,6 +31,7 @@ from sbi.samplers.vi.vi_quality_control import get_quality_metric
 from sbi.samplers.vi.vi_utils import (
     AdaptedVariationalDistribution,
     LearnableGaussian,
+    TransformedConditionalZukoFlow,
     TransformedZukoFlow,
     check_variational_distribution,
     detach_and_deepcopy,
@@ -46,6 +46,7 @@ from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
+    move_all_tensor_to_device,
     process_device,
 )
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
@@ -208,7 +209,7 @@ class VIPosterior(NeuralPosterior):
         self._mode: Optional[Literal["single_x", "amortized"]] = None
 
         # Amortized mode: conditional flow q(θ|x)
-        self._amortized_q: Optional[ConditionalDensityEstimator] = None
+        self._amortized_q: Optional[TransformedConditionalZukoFlow] = None
 
         self._num_transforms: int = num_transforms
         self._hidden_features: int = hidden_features
@@ -278,8 +279,28 @@ class VIPosterior(NeuralPosterior):
             self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
+            # Keep the trained link: rebuilding it can re-estimate prior moments.
+            link_transform = self._amortized_q._link_transform
+            move_all_tensor_to_device(link_transform, device)
+            self._rebind_amortized_q(self._prior, link_transform)
 
         return self
+
+    @staticmethod
+    def _prior_support(prior: Distribution):
+        """Support of the prior, or None if it does not define one."""
+        try:
+            return prior.support
+        except (AttributeError, NotImplementedError):
+            return None
+
+    def _rebind_amortized_q(
+        self, prior: Distribution, link_transform: TorchTransform
+    ) -> None:
+        """Point the amortized flow's link and support at tensors on this device."""
+        assert self._amortized_q is not None
+        self._amortized_q._link_transform = link_transform
+        self._amortized_q._support = self._prior_support(prior)
 
     def _build_unconditional_flow(
         self,
@@ -411,7 +432,7 @@ class VIPosterior(NeuralPosterior):
         hidden_features: int = 32,
         z_score_theta: Literal["none", "independent", "structured"] = "independent",
         z_score_x: Literal["none", "independent", "structured"] = "independent",
-    ) -> ConditionalDensityEstimator:
+    ) -> TransformedConditionalZukoFlow:
         """Build a conditional Zuko flow for amortized variational inference.
 
         Args:
@@ -427,7 +448,7 @@ class VIPosterior(NeuralPosterior):
                 structured data like images.
 
         Returns:
-            ConditionalDensityEstimator: The constructed conditional flow q(θ|x).
+            TransformedConditionalZukoFlow: The conditional flow q(θ|x) in prior space.
 
         Raises:
             ValueError: If flow_type is not supported.
@@ -442,14 +463,19 @@ class VIPosterior(NeuralPosterior):
                     f"Supported types: {[t.name for t in ZukoFlowType]}."
                 ) from e
 
-        return build_zuko_flow(
+        # The flow models θ in unconstrained space; the wrapper maps it to the prior
+        # support so that bounded priors are not evaluated outside their support.
+        flow = build_zuko_flow(
             flow_type.value.upper(),
-            batch_x=theta,  # θ is what we model
+            batch_x=self.link_transform.inv(theta),  # θ is what we model
             batch_y=x,  # x is the condition
             z_score_x=z_score_theta,  # z-score for θ (naming mismatch)
             z_score_y=z_score_x,  # z-score for x condition
             num_transforms=num_transforms,
             hidden_features=hidden_features,
+        )
+        return TransformedConditionalZukoFlow(
+            flow, self.link_transform, self._prior_support(self._prior)
         ).to(self._device)
 
     @property
@@ -561,6 +587,17 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
             if self._amortized_q is not None:
                 self._amortized_q.to(self._device)
+                # Link and support come from the source posterior's prior (not this
+                # one's), copied so that the source stays on its own device.
+                prior = move_distribution_to_device(
+                    detach_and_deepcopy(q._prior), self._device
+                )
+                if q.theta_transform is None:
+                    theta_transform = mcmc_transform(prior, device=self._device)
+                else:
+                    theta_transform = detach_and_deepcopy(q.theta_transform)
+                    move_all_tensor_to_device(theta_transform, self._device)
+                self._rebind_amortized_q(prior, theta_transform.inv)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x

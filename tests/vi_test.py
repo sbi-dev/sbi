@@ -37,7 +37,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import MultipleIndependent
+from sbi.utils import BoxUniform, MultipleIndependent
 from sbi.utils.metrics import c2st, check_c2st
 from sbi.utils.user_input_checks import process_x
 
@@ -876,6 +876,25 @@ def test_amortized_vi_batched_sampling(linear_gaussian_setup):
     samples = posterior.sample_batched((num_samples,), x=x_batch)
 
     assert samples.shape == (num_samples, num_obs, setup["num_dim"])
+
+
+def test_amortized_vi_with_bounded_prior():
+    """Amortized VI trains and samples inside the support of a `BoxUniform` prior."""
+    prior = BoxUniform(-3 * ones(2), 3 * ones(2))
+    theta = prior.sample((300,))
+    x = theta + 0.3 * torch.randn_like(theta)
+    nle = NLE(prior, show_progress_bars=False)
+    nle.append_simulations(theta, x).train(max_num_epochs=3)
+    posterior = nle.build_posterior(sample_with="vi")
+
+    posterior.train_amortized(theta, x, max_num_iters=5, show_progress_bar=False)
+
+    samples = posterior.sample((50,), x=x[:1], show_progress_bars=False)
+    assert torch.isfinite(samples).all()
+    assert (samples.abs() <= 3).all()
+    assert torch.isfinite(posterior.log_prob(samples, x=x[:1])).all()
+    outside = torch.tensor([[4.0, 0.0]])
+    assert posterior.log_prob(outside, x=x[:1]).item() == -torch.inf
 
 
 @pytest.mark.slow
