@@ -1002,6 +1002,11 @@ def test_amortized_vi_takes_one_observation(linear_gaussian_setup):
     # Batched sampling of the amortized q stays as documented.
     assert posterior.sample((5,), x=x_o).shape == (5, 3, num_dim)
 
+    # A failed `train()` keeps the amortized q.
+    with pytest.raises(ValueError):
+        posterior.train(x=torch.full((1, num_dim), float("nan")))
+    assert posterior.sample((5,), x=x_o).shape == (5, 3, num_dim)
+
     with pytest.warns(UserWarning, match="Switching from amortized to single-x"):
         posterior.train(
             x=x_o,

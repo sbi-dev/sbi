@@ -908,23 +908,14 @@ class VIPosterior(NeuralPosterior):
                 **kwargs,
             )
 
-        # Switch before binding x: only the single-x q combines several observations.
-        if self._mode == "amortized":
-            warnings.warn(
-                "Switching from amortized to single-x mode. "
-                "The previously trained amortized model will be discarded.",
-                UserWarning,
-                stacklevel=2,
-            )
-            self._amortized_q = None
-        self._mode = "single_x"
-
         # Check context
         x = self._x_else_default_x(x)
         if not torch.isfinite(x).all():
             raise ValueError("x contains NaN or Inf values.")
         # Bound to the trained x, so that the potential can be used after training.
-        self.potential_fn = self._bind_iid(x)
+        # The single-x q combines several observations, also while an amortized q
+        # (which takes one) is still in place until training succeeds.
+        self.potential_fn = self._bind_iid(x, check_num_observations=False)
 
         already_trained = self._is_trained_on(x)
 
@@ -963,6 +954,16 @@ class VIPosterior(NeuralPosterior):
                 break
         # Training finished:
         self._trained_on = x
+
+        if self._mode == "amortized":
+            warnings.warn(
+                "Switching from amortized to single-x mode. "
+                "The previously trained amortized model will be discarded.",
+                UserWarning,
+                stacklevel=2,
+            )
+            self._amortized_q = None
+        self._mode = "single_x"
 
         # Evaluate quality
         if quality_control:

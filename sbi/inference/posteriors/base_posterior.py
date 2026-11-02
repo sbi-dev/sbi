@@ -258,15 +258,19 @@ class NeuralPosterior:
             "embedding net on sets of trials, and pass each set as one observation."
         )
 
-    def _bind_iid(self, x: Tensor) -> BasePotential:
+    def _bind_iid(
+        self, x: Tensor, check_num_observations: bool = True
+    ) -> BasePotential:
         """Return the potential bound to `x`, with its observations as iid trials.
 
-        Raises if this posterior takes one observation and `x` holds several. Warns if
-        the potential marks iid trials as possibly unintended (NPE).
+        Raises if this posterior takes one observation and `x` holds several, unless
+        `check_num_observations=False`. Warns if the potential marks iid trials as
+        possibly unintended (NPE).
         """
         bound = self.potential_fn.bind(x, x_is_iid=True)
         num_observations = bound.x_o.shape[0]
-        self._check_num_observations(num_observations)
+        if check_num_observations:
+            self._check_num_observations(num_observations)
         previous_x = self.potential_fn.return_x_o()
         already_iid = (
             self.potential_fn.x_is_iid
