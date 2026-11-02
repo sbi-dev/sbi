@@ -175,23 +175,18 @@ class EnsemblePosterior(NeuralPosterior):
         return any(posterior._takes_one_observation for posterior in self.posteriors)
 
     def _check_x_before_components(self, x: Optional[Tensor]) -> None:
-        """Raise if the ensemble takes one observation and `x` holds several.
+        """Raise if a posterior that takes one observation would get several.
 
-        Without `x` and without an ensemble default, each component uses its own
-        default `x`.
+        Args:
+            x: Observation passed to the ensemble. If None, the ensemble default `x`,
+                or else the default `x` of each component, checked per component.
         """
         if x is not None or self.default_x is not None:
-            num_observations = self._x_else_default_x(x).shape[0]
-        else:
-            num_observations = max(
-                (
-                    p.default_x.shape[0]
-                    for p in self.posteriors
-                    if p.default_x is not None
-                ),
-                default=1,
-            )
-        self._check_num_observations(num_observations)
+            self._check_num_observations(self._x_else_default_x(x).shape[0])
+            return
+        for posterior in self.posteriors:
+            if posterior.default_x is not None:
+                posterior._check_num_observations(posterior.default_x.shape[0])
 
     @property
     def weights(self) -> Tensor:
@@ -317,7 +312,6 @@ class EnsemblePosterior(NeuralPosterior):
             isinstance(posterior, type(self.posteriors[0]))
             for posterior in self.posteriors
         ), "`log_prob()` only works for ensembles of the same type of posterior."
-        self._check_x_before_components(x)
 
         log_probs = torch.stack([
             posterior.log_prob(theta, x=x, **kwargs) for posterior in self.posteriors

@@ -222,7 +222,7 @@ class NeuralPosterior:
         self._map = None
         return self
 
-    def _process_x(self, x: Array) -> Tensor:
+    def _process_x(self, x: Optional[Array]) -> Tensor:
         """Return `x` with shape `(num_observations, *x_event_shape)` on the device.
 
         Raises if `x` does not match the shape of one observation of the potential,
@@ -263,9 +263,14 @@ class NeuralPosterior:
     ) -> BasePotential:
         """Return the potential bound to `x`, with its observations as iid trials.
 
-        Raises if this posterior takes one observation and `x` holds several, unless
-        `check_num_observations=False`. Warns if the potential marks iid trials as
-        possibly unintended (NPE).
+        Warns if the potential marks iid trials as possibly unintended (NPE), unless
+        the potential was already bound to this `x` as iid trials.
+
+        Args:
+            x: Observations, of shape `(num_observations, *x_event_shape)`.
+            check_num_observations: Whether to raise if this posterior takes one
+                observation and `x` holds several. VI `train()` skips the check,
+                because the single-x q it fits combines observations.
         """
         bound = self.potential_fn.bind(x, x_is_iid=True)
         num_observations = bound.x_o.shape[0]

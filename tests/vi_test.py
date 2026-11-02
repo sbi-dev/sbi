@@ -23,6 +23,7 @@ from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
 from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
 from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
+from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
@@ -1001,6 +1002,10 @@ def test_amortized_vi_takes_one_observation(linear_gaussian_setup):
         posterior.set_default_x(x_o).map(num_iter=2, num_to_optimize=2)
     # Batched sampling of the amortized q stays as documented.
     assert posterior.sample((5,), x=x_o).shape == (5, 3, num_dim)
+
+    # An ensemble evaluates the batch of each amortized q, as documented.
+    ensemble = EnsemblePosterior([posterior, posterior])
+    assert ensemble.log_prob(zeros(3, num_dim), x=x_o).shape == (3,)
 
     # A failed `train()` keeps the amortized q.
     with pytest.raises(ValueError):

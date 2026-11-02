@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import math
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, replace
@@ -912,10 +911,8 @@ class VIPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         if not torch.isfinite(x).all():
             raise ValueError("x contains NaN or Inf values.")
-        # Bound to the trained x, so that the potential can be used after training.
-        # The single-x q combines several observations, also while an amortized q
-        # (which takes one) is still in place until training succeeds.
-        self.potential_fn = self._bind_iid(x, check_num_observations=False)
+        # The single-x q combines observations, also while an amortized q is in place.
+        bound_potential = self._bind_iid(x, check_num_observations=False)
 
         already_trained = self._is_trained_on(x)
 
@@ -954,6 +951,7 @@ class VIPosterior(NeuralPosterior):
                 break
         # Training finished:
         self._trained_on = x
+        self.potential_fn = bound_potential
 
         if self._mode == "amortized":
             warnings.warn(
@@ -1355,14 +1353,9 @@ class VIPosterior(NeuralPosterior):
         num_init_samples: int,
         x: Optional[TorchTensor] = None,
     ) -> Tensor:
-        # Amortized training leaves `q` untouched. Pool `num_init_samples` starts in
-        # total over the observations in `x`.
+        # Amortized training leaves `q` untouched, so draw from q(θ|x).
         if self._mode == "amortized" and init_method in ("posterior", "proposal"):
-            num_obs = self._x_else_default_x(x).shape[0]
-            samples = self.sample((math.ceil(num_init_samples / num_obs),), x=x)
-            samples = samples.reshape(-1, samples.shape[-1])
-            keep = torch.randperm(samples.shape[0], device=samples.device)
-            return samples[keep[:num_init_samples]]
+            return self.sample((num_init_samples,), x=x)
         return super()._map_inits(init_method, num_init_samples, x)
 
     def map(
@@ -1401,7 +1394,7 @@ class VIPosterior(NeuralPosterior):
                 it is a string, it can be either `posterior` or `proposal`. For
                 `VIPosterior` both draw `num_init_samples` samples from the variational
                 distribution, not the prior (in amortized mode, from q(θ|x) for the
-                observations in the default `x`). If it is a tensor, the tensor is used
+                default `x`). If it is a tensor, the tensor is used
                 as the initial locations, so prior-based initialization can be done by
                 passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
