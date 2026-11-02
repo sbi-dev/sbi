@@ -21,14 +21,21 @@ import torch.distributions.transforms as torch_tf
 from torch import eye, ones, zeros
 from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
-from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
+from sbi.inference import (
+    NLE,
+    NRE,
+    VectorFieldPosterior,
+    likelihood_estimator_based_potential,
+)
 from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
+from sbi.neural_nets import posterior_flow_nn
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.samplers.vi.vi_divergence_optimizers import (
+    ElboOptimizer,
     ForwardKLOptimizer,
     IWElboOptimizer,
     RenyiDivergenceOptimizer,
@@ -629,6 +636,46 @@ class _OffsetPotential(BasePotential):
 
     def __call__(self, theta, track_gradients: bool = True):
         return self.prior.log_prob(theta) + self.offset
+
+
+class _ZeroPotential(BasePotential):
+    """A constant potential: the ELBO gradient is the one of the entropy alone."""
+
+    def __call__(self, theta, track_gradients: bool = True):
+        return torch.zeros(theta.shape[0])
+
+
+def test_elbo_differentiates_a_vector_field_potential():
+    """The ELBO gradient includes the potential, also for a vector field potential,
+    which does not track gradients by default."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    estimator = posterior_flow_nn(hidden_features=8, num_layers=1)(
+        theta, theta + 0.1 * torch.randn_like(theta)
+    )
+    potentials = {
+        "vector field": VectorFieldPosterior(estimator, prior).potential_fn,
+        "zero": _ZeroPotential(prior),
+    }
+
+    def location_gradient(potential_fn):
+        torch.manual_seed(0)
+        q = LearnableGaussian(dim=2, full_covariance=False)
+        optimizer = ElboOptimizer(
+            potential_fn=potential_fn,
+            q=q,
+            prior=prior,
+            n_particles=8,
+            lr=1e-3,
+            gamma=0.999,
+        )
+        surrogate, _ = optimizer.loss(zeros(1, 2))
+        return torch.autograd.grad(surrogate, next(q.parameters()))[0]
+
+    assert not torch.allclose(
+        location_gradient(potentials["vector field"]),
+        location_gradient(potentials["zero"]),
+    )
 
 
 def test_forward_kl_loss_ignores_a_constant_in_the_potential():

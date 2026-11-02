@@ -180,8 +180,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         """Returns the log normalization constant, cached per x and sample count.
 
         The estimate is computed in log space, because the importance weights of
-        e.g. many iid observations underflow when exponentiated. Expects
-        `self.potential_fn` to be bound to `x`.
+        e.g. many iid observations underflow when exponentiated.
         """
         log_normalization_constant = None
         if not force_update:
@@ -190,7 +189,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             )
         if log_normalization_constant is None:
             _, log_importance_weights = importance_sample(
-                self.potential_fn,
+                self._bind_iid(x),
                 proposal=self.proposal,
                 num_samples=num_samples,
             )

@@ -349,7 +349,9 @@ class EnsemblePosterior(NeuralPosterior):
         The potential is the unnormalized log-probability of $\theta$ under the
         posterior.
         Args:
-            theta: Parameters $\theta$.
+            theta: Parameters $\theta$, each evaluated given all of `x`.
+            x: Observation. If None, the default `x`. Several observations are
+                combined as iid trials; an ensemble with a direct posterior raises.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.

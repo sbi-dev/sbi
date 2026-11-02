@@ -16,9 +16,6 @@ from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_batch_event,
-)
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score.correctors import Corrector
 from sbi.samplers.score.diffuser import Diffuser
@@ -248,7 +245,6 @@ class VectorFieldPosterior(NeuralPosterior):
             )
 
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
         # IID and guidance require transforming the prior to standardized space.
         if self.vector_field_estimator.compose_enabled and (
@@ -519,7 +515,6 @@ class VectorFieldPosterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
         if self.vector_field_estimator.compose_enabled and is_iid:
             raise NotImplementedError(
@@ -672,7 +667,6 @@ class VectorFieldPosterior(NeuralPosterior):
                 "via sample(), or disable compose_standardization."
             )
         num_samples = torch.Size(sample_shape).numel()
-        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()

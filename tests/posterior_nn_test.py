@@ -870,18 +870,15 @@ def test_posterior_mcmc_iid_sampling(iid_batch_size: int, mcmc_params_fast):
 
 
 @pytest.fixture(scope="module")
-def npe_and_nle_for_iid_x():
-    """NPE and NLE, trained briefly on a 2-D Gaussian with a box prior."""
+def npe_for_iid_x():
+    """NPE, trained briefly on a 2-D Gaussian with a box prior."""
     torch.manual_seed(0)
     prior = BoxUniform(-3 * ones(2), 3 * ones(2))
     theta = prior.sample((300,))
     x = theta + 0.3 * torch.randn_like(theta)
-    trainers = {}
-    for name, method in (("npe", NPE_C), ("nle", NLE_A)):
-        trainer = method(prior=prior, show_progress_bars=False)
-        trainer.append_simulations(theta, x).train(max_num_epochs=3)
-        trainers[name] = trainer
-    return prior, trainers
+    trainer = NPE_C(prior=prior, show_progress_bars=False)
+    trainer.append_simulations(theta, x).train(max_num_epochs=3)
+    return prior, trainer
 
 
 @pytest.mark.parametrize(
@@ -894,20 +891,18 @@ def npe_and_nle_for_iid_x():
         ("mixed", "sample"),
     ],
 )
-def test_direct_posterior_takes_one_observation(
-    ensemble, method, npe_and_nle_for_iid_x
-):
+def test_direct_posterior_takes_one_observation(ensemble, method, npe_for_iid_x):
     """The direct posterior, and an ensemble with it, raise for several observations.
 
     A mixed ensemble raises before it draws components, also when the draw would only
     pick the posterior that combines observations.
     """
-    _, trainers = npe_and_nle_for_iid_x
-    posterior = trainers["npe"].build_posterior(sample_with="direct")
+    _, trainer = npe_for_iid_x
+    posterior = trainer.build_posterior(sample_with="direct")
     if ensemble == "direct":
         posterior = EnsemblePosterior([posterior, posterior])
     elif ensemble == "mixed":
-        importance = trainers["npe"].build_posterior(sample_with="importance")
+        importance = trainer.build_posterior(sample_with="importance")
         # The draw never picks the direct posterior.
         posterior = EnsemblePosterior([posterior, importance], weights=[0.0, 1.0])
     x_o = zeros(3, 2)
@@ -922,16 +917,18 @@ def test_direct_posterior_takes_one_observation(
 
 
 @pytest.mark.parametrize(
-    "method, sample_with",
-    [("npe", "importance"), ("nle", "importance"), ("npe", "ensemble")],
+    "sample_with, method",
+    [("importance", "potential"), ("rejection", "log_prob"), ("ensemble", "potential")],
 )
 def test_posteriors_combine_several_observations_as_iid_trials(
-    method, sample_with, npe_and_nle_for_iid_x
+    sample_with, method, npe_for_iid_x
 ):
-    """`potential()` evaluates each theta given all observations as iid trials, also
-    with as many theta as observations. NPE posteriors warn, NLE posteriors do not."""
-    prior, trainers = npe_and_nle_for_iid_x
-    component = trainers[method].build_posterior(sample_with="importance")
+    """Each theta is evaluated given all observations as iid trials, also with as many
+    theta as observations, where main paired them. NPE posteriors warn."""
+    prior, trainer = npe_for_iid_x
+    component = trainer.build_posterior(
+        sample_with="rejection" if method == "log_prob" else "importance"
+    )
     posterior = component
     if sample_with == "ensemble":
         # Equal components: the mixture equals each of them.
@@ -944,7 +941,7 @@ def test_posteriors_combine_several_observations_as_iid_trials(
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        potential = posterior.potential(theta, x=x_o)
+        value = getattr(posterior, method)(theta, x=x_o)
     iid_warnings = [w for w in caught if "x holds 3 observations" in str(w.message)]
-    assert len(iid_warnings) == (1 if method == "npe" else 0)
-    assert torch.allclose(potential, expected, atol=1e-4)
+    assert len(iid_warnings) == 1
+    assert torch.allclose(value, expected, atol=1e-4)

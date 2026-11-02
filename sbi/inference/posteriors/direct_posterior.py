@@ -179,9 +179,6 @@ class DirectPosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(
-            x, event_shape=self.posterior_estimator.condition_shape
-        )
         self._check_num_observations(x.shape[0])
 
         max_sampling_batch_size = (
@@ -263,8 +260,6 @@ class DirectPosterior(NeuralPosterior):
         """
         x = self._process_x(x)
         num_samples = torch.Size(sample_shape).numel()
-        condition_shape = self.posterior_estimator.condition_shape
-        x = reshape_to_batch_event(x, event_shape=condition_shape)
         num_xos = x.shape[0]
 
         # throw warning if num_x * num_samples is too large
@@ -354,17 +349,14 @@ class DirectPosterior(NeuralPosterior):
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
-        x_density_estimator = reshape_to_batch_event(
-            x, event_shape=self.posterior_estimator.condition_shape
-        )
-        self._check_num_observations(x_density_estimator.shape[0])
+        self._check_num_observations(x.shape[0])
 
         self.posterior_estimator.eval()
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
             unnorm_log_prob = self.posterior_estimator.log_prob(
-                theta_density_estimator, condition=x_density_estimator
+                theta_density_estimator, condition=x
             )
             # `log_prob` supports only a single observation (i.e. `batchsize==1`).
             # We now remove this additional dimension.

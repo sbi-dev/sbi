@@ -483,7 +483,7 @@ class ElboOptimizer(DivergenceOptimizer):
             log_q = self.q.log_prob(samples)
 
         self.potential_fn = self.potential_fn.bind(x_o, x_is_iid=True)
-        log_potential = self.potential_fn(samples)
+        log_potential = self.potential_fn(samples, track_gradients=True)
         elbo = log_potential - log_q
         return elbo
 

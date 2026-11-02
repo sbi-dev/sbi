@@ -208,8 +208,9 @@ class NeuralPosterior:
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
         Several observations, of shape `(num_observations, *x_event_shape)`, are iid
-        trials: MCMC, importance, rejection and VI posteriors combine them (NPE warns),
-        and the direct posterior raises.
+        trials: MCMC, importance, rejection, single-x VI and vector field posteriors
+        combine them (NPE warns). The direct posterior raises; amortized VI raises in
+        `potential()` and `map()`.
 
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
@@ -251,7 +252,8 @@ class NeuralPosterior:
             "one observation at a time, or use `sample_batched()` and "
             "`log_prob_batched()` where available. To combine them as iid trials, "
             "use a posterior built with "
-            "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'`. For a "
+            "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'` (trained "
+            "with `train()`). For a "
             "direct posterior of several trials, train with a permutation-invariant "
             "embedding net on sets of trials, and pass each set as one observation."
         )
