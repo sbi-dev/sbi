@@ -29,6 +29,7 @@ from sbi.inference.potentials.ratio_based_potential import (
 )
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.samplers.vi.vi_divergence_optimizers import (
+    ForwardKLOptimizer,
     IWElboOptimizer,
     RenyiDivergenceOptimizer,
 )
@@ -623,6 +624,43 @@ def test_iwelbo_optimizer_uses_importance_weighted_loss(
     )
     _, loss = optimizer.loss(zeros(1))
     assert torch.allclose(loss, torch.tensor(-offset))
+
+
+class _OffsetPotential(BasePotential):
+    """The prior log probability plus a constant, an unnormalized potential."""
+
+    def __init__(self, prior, offset: float):
+        super().__init__(prior)
+        self.offset = offset
+
+    def __call__(self, theta, track_gradients: bool = True):
+        return self.prior.log_prob(theta) + self.offset
+
+
+def test_forward_kl_loss_ignores_a_constant_in_the_potential():
+    """Self-normalized fKL weights do not depend on a constant in the potential.
+
+    With an offset of -200, exp() of every log weight underflows in float32.
+    """
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def loss_with_offset(offset: float):
+        torch.manual_seed(0)
+        optimizer = ForwardKLOptimizer(
+            potential_fn=_OffsetPotential(prior, offset),
+            q=LearnableGaussian(dim=2, full_covariance=False),
+            prior=prior,
+            n_particles=64,
+            lr=1e-3,
+            gamma=0.999,
+        )
+        return optimizer.loss(zeros(2))
+
+    surrogate, loss = loss_with_offset(0.0)
+    surrogate_low, loss_low = loss_with_offset(-200.0)
+    assert torch.isfinite(surrogate_low)
+    assert torch.allclose(surrogate_low, surrogate)
+    assert torch.allclose(loss_low, loss - 200.0)
 
 
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])

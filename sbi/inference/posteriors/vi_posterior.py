@@ -843,7 +843,8 @@ class VIPosterior(NeuralPosterior):
                 stick_the_landing: If one should use the STL estimator (only for rKL,
                     IW, alpha).
                 dreg: If one should use the DREG estimator (only for rKL, IW, alpha).
-                weight_transform: Callable applied to importance weights (only for fKL)
+                weight_transform: Callable applied to importance weights (only for
+                    fKL), scaled so that the largest weight is 1.
         Returns:
             VIPosterior: `VIPosterior` (can be used to chain calls).
 

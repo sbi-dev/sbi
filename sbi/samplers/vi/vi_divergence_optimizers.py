@@ -609,8 +609,9 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         Args:
             proposal: The proposal used we currently support only [`q`]
             weight_transform: This is a transformation that is applied to the importance
-                weight $w(\theta) = p(\theta, x_o)/q(\theta)$. For example it may be
-                usefull to clamp the weights by a certain rule to reduce variance.
+                weight $w(\theta) = p(\theta, x_o)/q(\theta)$, scaled so that the
+                largest weight of the particles is 1. For example it may be usefull to
+                clamp the weights by a certain rule to reduce variance.
 
 
         """
@@ -644,7 +645,9 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         logp = self.potential_fn(samples)
         with torch.no_grad():
             logweights = logp - logq
-            weights = self.weight_transform(logweights.exp())
+            # The potential is unnormalized, so only relative weights matter. The
+            # shift keeps exp() from underflowing to zero for low potentials.
+            weights = self.weight_transform((logweights - logweights.max()).exp())
             weights /= weights.sum()
 
         surrogate = -torch.sum(weights * logq)
