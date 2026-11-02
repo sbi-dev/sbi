@@ -1,7 +1,18 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Optional, Protocol, Sequence, Tuple, TypeAlias, TypeVar, Union
+from typing import (
+    Any,
+    List,
+    Literal,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    TypeAlias,
+    TypeVar,
+    Union,
+)
 
 import numpy as np
 import torch
@@ -12,6 +23,9 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 Array = Union[np.ndarray, torch.Tensor]
 Shape = Union[torch.Size, Tuple[int, ...]]
+SimulationOutput = Union[torch.Tensor, np.ndarray, List[Any]]
+OnError = Literal["raise", "nan"]
+SimulationBatchSize = Union[int, Literal["auto"], None]
 
 T = TypeVar("T")
 OneOrMore = Union[T, Sequence[T]]

@@ -28,6 +28,7 @@ Prior and simulator
 
 - :doc:`how_to_guide/00_custom_prior`
 - :doc:`how_to_guide/01_crafting_summary_statistics`
+- :doc:`how_to_guide/27_running_simulations_in_parallel`
 
 
 Neural nets
