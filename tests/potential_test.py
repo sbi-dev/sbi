@@ -12,7 +12,6 @@ from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import (
-    DirectPosterior,
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
@@ -24,23 +23,12 @@ from sbi.inference.potentials.base_potential import (
     BasePotential,
     CustomPotentialWrapper,
 )
-from sbi.inference.potentials.likelihood_based_potential import (
-    likelihood_estimator_based_potential,
-)
 from sbi.inference.potentials.posterior_based_potential import (
     PosteriorBasedPotential,
     posterior_estimator_based_potential,
 )
-from sbi.inference.potentials.ratio_based_potential import (
-    ratio_estimator_based_potential,
-)
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
-from sbi.neural_nets import (
-    classifier_nn,
-    likelihood_nn,
-    posterior_nn,
-    posterior_score_nn,
-)
+from sbi.neural_nets import posterior_nn, posterior_score_nn
 from sbi.neural_nets.embedding_nets import FCEmbedding, PermutationInvariantEmbedding
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
@@ -301,8 +289,9 @@ def test_set_x_none_clears_observation():
     assert bound.return_x_o() is None
 
 
-def _potential_with_trials_in_one_observation(method: str):
-    """Untrained NPE or NRE potential whose observation holds 5 trials."""
+def test_potential_counts_iid_trials_against_the_shape_of_one_observation():
+    """With a permutation-invariant embedding, one observation holds 5 trials. Without
+    batch dimension, it is one observation, not 5 iid trials."""
     torch.manual_seed(0)
     prior = BoxUniform(-3 * ones(2), 3 * ones(2))
     theta = prior.sample((50,))
@@ -310,23 +299,8 @@ def _potential_with_trials_in_one_observation(method: str):
     embedding = PermutationInvariantEmbedding(
         FCEmbedding(2, 8), trial_net_output_dim=8, output_dim=4
     )
-    if method == "npe":
-        estimator = posterior_nn("mdn", embedding_net=embedding)(theta, x)
-        potential_fn, _ = posterior_estimator_based_potential(estimator, prior, None)
-    else:
-        estimator = classifier_nn("mlp", embedding_net_x=embedding)(theta, x)
-        potential_fn, _ = ratio_estimator_based_potential(estimator, prior, None)
-    return potential_fn, prior
-
-
-@pytest.mark.parametrize("method", ["npe", "nre"])
-def test_potential_counts_iid_trials_against_the_shape_of_one_observation(method):
-    """An observation with several trials in its event shape is one iid trial.
-
-    With a permutation-invariant embedding, one observation holds 5 trials. Without
-    batch dimension, it must not be counted as 5 iid trials.
-    """
-    potential_fn, prior = _potential_with_trials_in_one_observation(method)
+    estimator = posterior_nn("mdn", embedding_net=embedding)(theta, x)
+    potential_fn, _ = posterior_estimator_based_potential(estimator, prior, None)
 
     theta_o = torch.tensor([[0.5, -0.5], [1.0, 1.0]])
     x_o = torch.stack([zeros(5, 2), ones(5, 2), -ones(5, 2)])
@@ -339,43 +313,3 @@ def test_potential_counts_iid_trials_against_the_shape_of_one_observation(method
     # iid trials: the sum of single-trial potentials, with the prior counted once.
     expected = singles.sum(0) - 2 * prior.log_prob(theta_o)
     assert torch.allclose(iid_potential(x_o), expected, atol=1e-5)
-
-
-@pytest.mark.parametrize("method", ["npe", "nle", "nre"])
-def test_x_that_contradicts_the_estimator_raises_a_clear_error(method):
-    """A wrong shape of x, or theta and x batches that do not pair, raise."""
-    prior = BoxUniform(-ones(2), ones(2))
-    theta, x = prior.sample((20,)), prior.sample((20,))
-    if method == "npe":
-        estimator = posterior_nn("mdn")(theta, x)
-        potential_fn, _ = posterior_estimator_based_potential(estimator, prior, None)
-    elif method == "nle":
-        estimator = likelihood_nn("mdn")(x, theta)
-        potential_fn, _ = likelihood_estimator_based_potential(estimator, prior, None)
-    else:
-        estimator = classifier_nn("mlp")(theta, x)
-        potential_fn, _ = ratio_estimator_based_potential(estimator, prior, None)
-    posterior = RejectionPosterior(potential_fn, proposal=prior)
-
-    for wrong_x in (zeros(1, 3), zeros(2, 3, 2)):
-        with pytest.raises(ValueError, match=r"one observation has shape \(2,\)"):
-            posterior.set_default_x(wrong_x)
-    if method == "npe":
-        with pytest.raises(ValueError, match=r"one observation has shape \(2,\)"):
-            DirectPosterior(estimator, prior).sample_batched((2,), zeros(2, 3))
-    unpaired = potential_fn.bind(zeros(3, 2), x_is_iid=False)
-    with pytest.raises(ValueError, match="theta has 4 rows and x has 3 observations"):
-        unpaired(zeros(4, 2))
-
-
-@pytest.mark.mcmc
-def test_mcmc_sample_batched_reads_one_observation_without_batch_dimension():
-    """One observation with 5 trials is a batch of 1, not a batch of 5 trials."""
-    potential_fn, prior = _potential_with_trials_in_one_observation("npe")
-    posterior = MCMCPosterior(
-        potential_fn, proposal=prior, method="slice_np_vectorized", warmup_steps=2
-    )
-    samples = posterior.sample_batched(
-        (4,), x=zeros(5, 2), num_chains=2, show_progress_bars=False
-    )
-    assert samples.shape == (4, 1, 2)

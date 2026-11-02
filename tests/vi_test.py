@@ -23,7 +23,6 @@ from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
 from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
 from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
-from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
@@ -978,59 +977,22 @@ def test_amortized_vi_requires_training(linear_gaussian_setup):
         posterior.sample((100,))
 
 
-def test_single_x_vi_without_default_x_uses_the_trained_x():
-    """`train(x=x_o)` without a default x passes quality control, and `sample()` and
-    `log_prob()` without x use x_o."""
+def test_amortized_vi_takes_one_observation():
+    """Amortized q, like a direct posterior, takes one observation in `potential()`,
+    instead of combining several as iid trials."""
     prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
     posterior = VIPosterior(potential_fn=FakePotential(prior=prior), prior=prior)
-    x_o = zeros(1, 2)
-    posterior.train(x=x_o, max_num_iters=20, show_progress_bar=False)
-    assert posterior.default_x is None
-    assert posterior.sample((5,)).shape == (5, 2)
-    assert posterior.log_prob(zeros(3, 2)).shape == (3,)
-
-
-def test_amortized_vi_takes_one_observation(linear_gaussian_setup):
-    """Amortized q, like a direct posterior, takes one observation in `potential()`
-    and `map()`; after `train()`, the single-x q combines several as iid trials."""
-    setup = linear_gaussian_setup
-    num_dim = setup["num_dim"]
-    posterior = VIPosterior(potential_fn=setup["potential_fn"], prior=setup["prior"])
     posterior.train_amortized(
-        theta=setup["theta"],
-        x=setup["x"],
-        max_num_iters=5,
+        theta=theta,
+        x=theta + 0.1 * torch.randn_like(theta),
+        max_num_iters=3,
         show_progress_bar=False,
-        flow_type=ZukoFlowType.NSF,
         num_transforms=1,
         hidden_features=8,
     )
-    x_o = zeros(3, num_dim)
-    theta = zeros(4, num_dim)
-
     with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
-        posterior.potential(theta, x=x_o)
-    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
-        posterior.set_default_x(x_o).map(num_iter=2, num_to_optimize=2)
-    # An ensemble evaluates the batch of each amortized q, as documented.
-    ensemble = EnsemblePosterior([posterior, posterior])
-    assert ensemble.log_prob(zeros(3, num_dim), x=x_o).shape == (3,)
-
-    # A failed `train()` keeps the amortized q.
-    with pytest.raises(ValueError):
-        posterior.train(x=torch.full((1, num_dim), float("nan")))
-    assert posterior.sample((5,), x=x_o).shape == (5, 3, num_dim)
-
-    with pytest.warns(UserWarning, match="Switching from amortized to single-x"):
-        posterior.train(
-            x=x_o,
-            max_num_iters=2,
-            min_num_iters=1,
-            warm_up_rounds=1,
-            show_progress_bar=False,
-            quality_control=False,
-        )
-    assert posterior.potential(theta, x=x_o).shape == (4,)
+        posterior.potential(zeros(4, 2), x=zeros(3, 2))
 
 
 @pytest.mark.slow

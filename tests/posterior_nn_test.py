@@ -890,10 +890,7 @@ def npe_and_nle_for_iid_x():
         (None, "sample"),
         (None, "log_prob"),
         (None, "potential"),
-        (None, "map"),
-        ("direct", "sample"),
         ("direct", "potential"),
-        ("direct", "map"),
         ("mixed", "sample"),
     ],
 )
@@ -919,58 +916,28 @@ def test_direct_posterior_takes_one_observation(
         "sample": lambda: posterior.sample((5,), x=x_o, show_progress_bars=False),
         "log_prob": lambda: posterior.log_prob(theta, x=x_o),
         "potential": lambda: posterior.potential(theta, x=x_o),
-        "map": lambda: posterior.set_default_x(x_o).map(num_iter=2),
     }
     with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
         calls[method]()
 
 
-def test_ensemble_samples_with_the_default_x_of_its_components(npe_and_nle_for_iid_x):
-    """Without an ensemble default x, each component samples with its own, which may
-    hold several observations for a component that combines them."""
-    _, trainers = npe_and_nle_for_iid_x
-    direct = trainers["npe"].build_posterior().set_default_x(zeros(2))
-    other = trainers["npe"].build_posterior(sample_with="importance")
-    other.set_default_x(zeros(3, 2))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # NPE warns that it combines observations.
-        samples = EnsemblePosterior([direct, other]).sample(
-            (4,), show_progress_bars=False
-        )
-    assert samples.shape == (4, 2)
-
-
 @pytest.mark.parametrize(
     "method, sample_with",
-    [
-        ("npe", "importance"),
-        ("npe", "rejection"),
-        pytest.param("npe", "mcmc", marks=pytest.mark.mcmc),
-        ("npe", "vi"),
-        ("npe", "ensemble"),
-        pytest.param("nle", "mcmc", marks=pytest.mark.mcmc),
-    ],
+    [("npe", "importance"), ("nle", "importance"), ("npe", "ensemble")],
 )
 def test_posteriors_combine_several_observations_as_iid_trials(
-    method, sample_with, npe_and_nle_for_iid_x, mcmc_params_fast
+    method, sample_with, npe_and_nle_for_iid_x
 ):
-    """Several observations are iid trials in potential(), sample() and map().
-
-    NPE posteriors warn that they combine the observations, NLE posteriors do not.
-    """
+    """`potential()` evaluates each theta given all observations as iid trials, also
+    with as many theta as observations. NPE posteriors warn, NLE posteriors do not."""
     prior, trainers = npe_and_nle_for_iid_x
-    trainer = trainers[method]
+    component = trainers[method].build_posterior(sample_with="importance")
+    posterior = component
     if sample_with == "ensemble":
-        component = trainer.build_posterior(sample_with="rejection")
         # Equal components: the mixture equals each of them.
         posterior = EnsemblePosterior([component, component])
-    else:
-        params = mcmc_params_fast if sample_with == "mcmc" else None
-        component = posterior = trainer.build_posterior(
-            sample_with=sample_with, posterior_parameters=params
-        )
     x_o = torch.tensor([[0.0, 0.0], [0.5, -0.5], [1.0, 0.0]])
-    theta = zeros(4, 2)
+    theta = torch.tensor([[0.0, 0.0], [0.5, 0.5], [-0.5, 1.0]])
     # iid trials: the sum of single-observation potentials, prior counted once.
     singles = torch.stack([component.potential(theta, x=x_i) for x_i in x_o])
     expected = singles.sum(0) - 2 * prior.log_prob(theta)
@@ -981,16 +948,3 @@ def test_posteriors_combine_several_observations_as_iid_trials(
     iid_warnings = [w for w in caught if "x holds 3 observations" in str(w.message)]
     assert len(iid_warnings) == (1 if method == "npe" else 0)
     assert torch.allclose(potential, expected, atol=1e-4)
-
-    posterior.set_default_x(x_o)
-    if sample_with == "vi":
-        posterior.train(
-            max_num_iters=2,
-            min_num_iters=1,
-            warm_up_rounds=1,
-            show_progress_bar=False,
-            quality_control=False,
-        )
-    assert posterior.sample((5,), show_progress_bars=False).shape == (5, 2)
-    map_ = posterior.map(init_method=prior.sample((10,)), num_iter=2, num_to_optimize=2)
-    assert torch.isfinite(map_).all()

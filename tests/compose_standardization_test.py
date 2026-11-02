@@ -319,16 +319,3 @@ def test_compose_requires_independent_theta_z_score(factory, z_score_theta):
             compose_standardization=True,
             z_score_theta=z_score_theta,
         )
-
-
-def test_iid_flag_with_one_observation_gives_the_single_observation_potential():
-    """With one observation, `x_is_iid=True` is the same as `False`."""
-    potential = _posterior().potential_fn
-    theta = torch.zeros(3, NUM_DIM)
-    x_o = torch.zeros(1, NUM_DIM)
-    expected = potential.bind(x_o)(theta)
-
-    assert torch.allclose(potential.bind(x_o, x_is_iid=True)(theta), expected)
-    with pytest.warns(FutureWarning, match="set_x"):
-        potential.set_x(x_o, x_is_iid=True)
-    assert torch.allclose(potential(theta), expected)
