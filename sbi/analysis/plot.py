@@ -2078,7 +2078,7 @@ def _plot_ranks_as_cdf(
     histcs = hist.cumsum()
     # Plot cdf and repeat each stair step
     plt.plot(
-        np.linspace(0, num_posterior_samples, num_repeats * num_bins),
+        _cdf_x(num_bins, num_posterior_samples, num_repeats),
         np.repeat(histcs / histcs.max(), num_repeats),
         label=ranks_label,
         color=color,
@@ -2135,7 +2135,7 @@ def _plot_ranks_as_cdf_diff(
     diff = ecdf - uniform_cdf
 
     plt.plot(
-        np.linspace(0, num_posterior_samples, num_repeats * num_bins),
+        _cdf_x(num_bins, num_posterior_samples, num_repeats),
         np.repeat(diff, num_repeats),
         label=ranks_label,
         color=color,
@@ -2169,6 +2169,24 @@ def _uniform_rank_bin_probs(num_bins: int, num_posterior_samples: int) -> np.nda
     return counts / (num_posterior_samples + 1)
 
 
+def _cdf_x(num_bins: int, num_posterior_samples: int, num_repeats: int) -> np.ndarray:
+    """x positions of the CDF steps in rank units, num_repeats per bin."""
+    return np.linspace(0, num_posterior_samples, num_repeats * num_bins)
+
+
+def _uniform_cdf_band(
+    num_sbc_runs: int, num_bins: int, num_posterior_samples: int
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Uniform CDF at each bin, and the 99% band of the empirical CDF around it."""
+    uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
+    # Decrease the last entry by epsilon to find valid confidence intervals.
+    p = uniform_cdf.copy()
+    p[-1] -= 1e-9
+    lower = binom(num_sbc_runs, p).ppf(0.005)
+    upper = binom(num_sbc_runs, p).ppf(0.995)
+    return uniform_cdf, lower / lower.max(), upper / upper.max()
+
+
 def _plot_cdf_region_expected_under_uniformity(
     num_sbc_runs: int,
     num_bins: int,
@@ -2179,19 +2197,13 @@ def _plot_cdf_region_expected_under_uniformity(
 ) -> None:
     """Plot region of empirical cdfs expected under uniformity on the current axis."""
 
-    uni_bins_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
-    # Decrease value one in last entry by epsilon to find valid
-    # confidence intervals.
-    uni_bins_cdf[-1] -= 1e-9
-
-    lower = [binom(num_sbc_runs, p=p).ppf(0.005) for p in uni_bins_cdf]
-    upper = [binom(num_sbc_runs, p=p).ppf(0.995) for p in uni_bins_cdf]
+    _, lower, upper = _uniform_cdf_band(num_sbc_runs, num_bins, num_posterior_samples)
 
     # Plot grey area with expected ECDF.
     plt.fill_between(
-        x=np.linspace(0, num_posterior_samples, num_repeats * num_bins),
-        y1=np.repeat(lower / np.max(lower), num_repeats),
-        y2=np.repeat(upper / np.max(upper), num_repeats),  # pyright: ignore[reportArgumentType]
+        x=_cdf_x(num_bins, num_posterior_samples, num_repeats),
+        y1=np.repeat(lower, num_repeats),
+        y2=np.repeat(upper, num_repeats),
         color=color,
         alpha=alpha,
         label="expected under uniformity",
@@ -2208,17 +2220,14 @@ def _plot_cdf_diff_region_expected_under_uniformity(
 ) -> None:
     """Plot region of empirical CDF differences expected under uniformity."""
 
-    uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
-    uni_bins_cdf = uniform_cdf.copy()
-    uni_bins_cdf[-1] -= 1e-9
-
-    lower = [binom(num_sbc_runs, p=p).ppf(0.005) for p in uni_bins_cdf]
-    upper = [binom(num_sbc_runs, p=p).ppf(0.995) for p in uni_bins_cdf]
+    uniform_cdf, lower, upper = _uniform_cdf_band(
+        num_sbc_runs, num_bins, num_posterior_samples
+    )
 
     plt.fill_between(
-        x=np.linspace(0, num_posterior_samples, num_repeats * num_bins),
-        y1=np.repeat(np.array(lower) / np.max(lower) - uniform_cdf, num_repeats),
-        y2=np.repeat(np.array(upper) / np.max(upper) - uniform_cdf, num_repeats),
+        x=_cdf_x(num_bins, num_posterior_samples, num_repeats),
+        y1=np.repeat(lower - uniform_cdf, num_repeats),
+        y2=np.repeat(upper - uniform_cdf, num_repeats),
         color=color,
         alpha=alpha,
         label="expected under uniformity",
