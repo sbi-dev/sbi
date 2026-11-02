@@ -271,7 +271,9 @@ class NeuralPosterior:
         already_iid = (
             self.potential_fn.x_is_iid
             and previous_x is not None
-            and torch.equal(previous_x, bound.x_o)
+            and previous_x.shape == bound.x_o.shape
+            # Exact, but NaN-padded trials count as equal.
+            and torch.allclose(previous_x, bound.x_o, rtol=0, atol=0, equal_nan=True)
         )
         if num_observations > 1 and bound.warns_on_implicit_iid and not already_iid:
             # One location for all callers: Python's default filter shows it once.
