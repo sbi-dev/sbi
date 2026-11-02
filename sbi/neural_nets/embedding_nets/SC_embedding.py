@@ -325,9 +325,8 @@ class SpectralConvEmbedding(nn.Module):
 
         n_points = x.shape[1]
 
-        assert self.modes <= n_points // 2 + 1, (
-            "Modes should be at most floor(n_points/2) + 1"
-        )
+        if self.modes > n_points // 2 + 1:
+            raise ValueError("Modes should be at most floor(n_points/2) + 1")
 
         x = self.fc0(x)  # (batch_size, n_points, in_channels)
 
