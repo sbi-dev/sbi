@@ -1494,7 +1494,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         """Sets the state when being loaded from pickle.
 
         Also creates a new tracker (because the previous one was set to `None`
-        during serializing, see `__get_state__()`).
+        during serializing, see `__getstate__()`).
 
         Args:
             state_dict: State to be restored.
