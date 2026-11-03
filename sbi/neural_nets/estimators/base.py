@@ -293,7 +293,8 @@ class ConditionalDensityEstimator(ConditionalEstimator):
             condition: Conditions of shape `(batch_dim, *event_shape_condition)`.
 
         Returns:
-            Samples and associated log probabilities.
+            Samples of shape `(*sample_shape, batch_dim, *event_shape_input)` and
+            their log probabilities of shape `(*sample_shape, batch_dim)`.
 
         Note:
             For some density estimators, computing log_probs for samples is
@@ -301,9 +302,16 @@ class ConditionalDensityEstimator(ConditionalEstimator):
             then be overwritten to provide a more efficient implementation.
         """
 
+        sample_shape = torch.Size(sample_shape)
         samples = self.sample(sample_shape, condition, **kwargs)
-        log_probs = self.log_prob(samples, condition, **kwargs)
-        return samples, log_probs
+        # `log_prob` takes a single sample dimension.
+        num_sample_dims = len(sample_shape)
+        log_probs = self.log_prob(
+            samples.reshape(sample_shape.numel(), *samples.shape[num_sample_dims:]),
+            condition,
+            **kwargs,
+        )
+        return samples, log_probs.reshape(samples.shape[: num_sample_dims + 1])
 
 
 class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
