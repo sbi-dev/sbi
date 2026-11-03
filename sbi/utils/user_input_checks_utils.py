@@ -151,8 +151,7 @@ def convert_distribution_to_float32(
 ) -> Distribution:
     """Convert a distribution so that ``sample()`` returns float32.
 
-    First tries ``.to(dtype=float32)`` when that method accepts a dtype.
-    Next tries to rebuild the distribution by casting its float parameters to float32.
+    First tries to rebuild the distribution by casting its float parameters to float32.
     If ``sample().dtype`` is still not float32, wraps the distribution in a
     ``PytorchReturnTypeWrapper`` as a last resort.
 
@@ -164,16 +163,6 @@ def convert_distribution_to_float32(
         cases succeeded, this may be the same object, a new object, or a
         ``PytorchReturnTypeWrapper`` of the original distribution.
     """
-    # Attempt to convert the distribution to float32 using `.to()`.
-    converted = None
-    try:
-        # Not all distributions implement `.to()`, and some accept only a device.
-        converted = dist.to(dtype=float32)  # type: ignore[call-arg]
-        if converted is not None and converted.sample().dtype == float32:
-            return converted
-    except (AttributeError, TypeError):
-        converted = None
-
     # Attempt to rebuild the distribution by casting its float parameters to float32.
     rebuilt = None
     try:
@@ -199,8 +188,6 @@ def convert_distribution_to_float32(
     # a last resort.
     if rebuilt is not None:
         dist = rebuilt
-    elif converted is not None:
-        dist = converted
     return PytorchReturnTypeWrapper(dist, return_type=float32, validate_args=False)
 
 

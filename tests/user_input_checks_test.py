@@ -348,11 +348,20 @@ def test_prior_rebuild_does_not_reset_parameters_to_default(dtype: torch.dtype):
     """
     prior = Multinomial(10, probs=torch.tensor([0.3, 0.7], dtype=dtype))
     processed, _, _ = process_prior(prior)
-    assert processed.total_count == prior.total_count
+
+    if dtype == torch.float32:
+        assert processed.total_count == prior.total_count
+    else:
+        # Wrapped in PytorchReturnTypeWrapper, so we need to access the prior.
+        assert processed.prior.total_count == prior.total_count
 
     moved = move_distribution_to_device(processed, "cpu")
 
-    assert moved.total_count == prior.total_count
+    if dtype == torch.float32:
+        assert moved.total_count == prior.total_count
+    else:
+        # Wrapped in PytorchReturnTypeWrapper, so we need to access the prior.
+        assert moved.prior.total_count == prior.total_count
 
 
 def test_process_prior_warns_and_keeps_shapes_for_float64_prior():
