@@ -9,7 +9,7 @@ from dataclasses import asdict
 import pytest
 import torch
 from torch import Tensor, eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import Independent, MultivariateNormal, Normal
 
 from sbi.inference import (
     ImportanceSamplingPosterior,
@@ -23,11 +23,21 @@ from sbi.inference.potentials.base_potential import (
     BasePotential,
     CustomPotentialWrapper,
 )
+from sbi.inference.potentials.likelihood_based_potential import (
+    LikelihoodBasedPotential,
+)
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
+from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
-from sbi.neural_nets import posterior_nn, posterior_score_nn
+from sbi.neural_nets import (
+    classifier_nn,
+    likelihood_nn,
+    posterior_nn,
+    posterior_score_nn,
+)
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
+from sbi.utils.vector_field_utils import marginalize
 
 
 @pytest.mark.parametrize(
@@ -186,6 +196,49 @@ def _build_potential(potential_type: str, x_o: Tensor | None = None) -> BasePote
     if potential_type == "posterior":
         return PosteriorBasedPotential(posterior_nn("mdn")(theta, x), prior, x_o=x_o)
     return VectorFieldBasedPotential(posterior_score_nn()(theta, x), prior, x_o=x_o)
+
+
+@pytest.mark.parametrize("potential_type", ("likelihood", "ratio"))
+def test_potential_with_1d_prior_gives_one_value_per_theta(potential_type: str):
+    """Test the potential for a 1-D prior with batch shape (1,).
+
+    Its log prob has shape (N, 1). Added to the (N,) log likelihood or log ratio, it
+    would broadcast to (N, N).
+    """
+    theta, x = torch.randn(20, 1), torch.randn(20, 2)
+    prior = Normal(zeros(1), ones(1))
+    independent_prior = Independent(Normal(zeros(1), ones(1)), 1)
+
+    if potential_type == "likelihood":
+        estimator = likelihood_nn("mdn")(theta, x)
+        potential_class = LikelihoodBasedPotential
+    else:
+        estimator = classifier_nn("mlp")(theta, x)
+        potential_class = RatioBasedPotential
+    potential = potential_class(estimator, prior, x_o=zeros(1, 2))
+    reference = potential_class(estimator, independent_prior, x_o=zeros(1, 2))
+
+    test_theta = torch.randn(3, 1)
+    values = potential(test_theta)
+    assert values.shape == (3,)
+    assert torch.allclose(values, reference(test_theta))
+
+
+def test_vector_field_potential_keeps_exact_formulas_for_1d_prior():
+    """Test that the stored 1-D prior keeps the exact marginal prior.
+
+    The iid and guidance methods choose exact prior formulas by the prior's type and
+    fall back to a fitted Gaussian mixture for types they do not know.
+    """
+    theta, x = torch.randn(20, 1), torch.randn(20, 2)
+    prior = Normal(zeros(1), ones(1))
+    potential = VectorFieldBasedPotential(posterior_score_nn()(theta, x), prior)
+
+    m, s = torch.tensor(0.7), torch.tensor(0.5)
+    test_theta = torch.randn(3, 1)
+    marginal = marginalize(potential.prior, m, s).log_prob(test_theta)
+    exact = marginalize(prior, m, s).log_prob(test_theta).sum(-1)
+    assert torch.allclose(marginal, exact)
 
 
 @pytest.mark.parametrize("potential_type", ("posterior", "vector_field"))

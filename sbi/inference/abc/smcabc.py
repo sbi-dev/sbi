@@ -588,8 +588,11 @@ class SMCABC(ABCBASE):
     ) -> Tensor:
         """Return new log weights following formulas in publications A,B anc C."""
 
-        # Prior can be batched across new particles.
-        prior_log_probs = self.prior.log_prob(new_particles)
+        # Prior can be batched across new particles. A 1-D prior without `Independent`
+        # returns shape (N, 1).
+        prior_log_probs = self.prior.log_prob(new_particles).reshape(
+            new_particles.shape[0]
+        )
 
         # Contstruct function to get kernel log prob for given old particle.
         # The kernel is centered on each old particle as in all three variants (A,B,C).

@@ -10,7 +10,7 @@ from torch import Tensor, nn
 from torch.distributions import Distribution
 
 from sbi.utils.torchutils import process_device
-from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks import maybe_wrap_batched_1d_prior, process_x
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
@@ -26,12 +26,13 @@ class BasePotential(metaclass=ABCMeta):
         This parent class takes care of setting `x_o`.
 
         Args:
-            prior: Prior distribution.
+            prior: Prior distribution. A 1-D prior with batch shape (1,) is stored as
+                `Independent(prior, 1)`, so that its log prob has one value per sample.
             x_o: Observed data.
             device: Device on which to evaluate the potential function.
         """
         self.device = process_device(device)
-        self.prior = prior
+        self.prior = maybe_wrap_batched_1d_prior(prior)
         if x_o is not None:
             x_o = process_x(x_o).to(self.device)
         self._x_o = x_o

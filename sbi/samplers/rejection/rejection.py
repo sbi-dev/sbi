@@ -81,8 +81,12 @@ def rejection_sample(
         samples_to_find_max = proposal.sample((num_samples_to_find_max,))
 
     # Define a potential as the ratio between target distribution and proposal.
+    # One value per sample: a 1-D proposal without `Independent` returns (N, 1).
     def potential_over_proposal(theta):
-        return potential_fn(theta) - proposal.log_prob(theta)
+        num_theta = theta.shape[0]
+        return potential_fn(theta).reshape(num_theta) - proposal.log_prob(
+            theta
+        ).reshape(num_theta)
 
     # Search for the maximum of the ratio.
     _, max_log_ratio = gradient_ascent(
@@ -176,7 +180,8 @@ def rejection_sample(
                 )
 
             target_proposal_ratio = torch.exp(
-                potential_fn(candidates) - proposal.log_prob(candidates)
+                potential_fn(candidates).reshape(sampling_batch_size)
+                - proposal.log_prob(candidates).reshape(sampling_batch_size)
             )
             uniform_rand = torch.rand(target_proposal_ratio.shape).to(device)
             samples = candidates[target_proposal_ratio > uniform_rand]
