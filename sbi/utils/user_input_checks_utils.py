@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import inspect
 import warnings
 from typing import Dict, Optional, Sequence, Union
 
@@ -37,6 +38,38 @@ def _remove_non_constructor_arguments(params: dict, dist: Distribution) -> dict:
     elif isinstance(dist, (Binomial, Bernoulli, Categorical, Multinomial)):
         params["logits"] = None
     return params
+
+
+def _constructor_matches_arg_constraints(dist: Distribution) -> bool:
+    """Return whether `dist` can be rebuilt from its `arg_constraints` parameters.
+
+    Args:
+        dist: The distribution to check.
+
+    Returns:
+        True if the constructor's parameters match the `arg_constraints` keys. False if
+        they differ, if the constructor takes `*args` or `**kwargs`, or if either
+        cannot be inspected.
+    """
+    try:
+        signature = inspect.signature(type(dist).__init__)
+        arg_constraint_names = set(dist.arg_constraints)
+    except Exception:
+        # Cannot inspect the constructor
+        return False
+
+    # Extract the constructor arguments
+    constructor_names = set()
+    for name, parameter in signature.parameters.items():
+        if name in ("self", "validate_args"):
+            continue
+        if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD):
+            # Cannot tell which arguments the constructor accepts as
+            # using *args or **kwargs
+            return False
+
+        constructor_names.add(name)
+    return constructor_names == arg_constraint_names
 
 
 def get_distribution_parameters(
@@ -76,30 +109,41 @@ def move_distribution_to_device(
 
     If the distribution has a `.to()` method (e.g. sbi prior wrappers like
     ``PytorchReturnTypeWrapper`` or ``BoxUniform``), it is called directly.
-    Otherwise, the distribution is reconstructed on the target device by
-    extracting its parameters via ``get_distribution_parameters()``.
+    Otherwise, if its constructor's parameters match its ``arg_constraints``, the
+    distribution is reconstructed on the target device by extracting its parameters
+    via ``get_distribution_parameters()``. If they do not match, or the rebuild fails,
+    the distribution's tensors are moved in place, so that constructor state not
+    listed in ``arg_constraints`` is kept.
 
     Args:
         dist: The distribution to move.
         device: The target device.
 
     Returns:
-        The distribution on the target device. If `.to()` was used, this is the
-        same object; otherwise it is a newly constructed instance.
+        The distribution on the target device. If `.to()` was used or the tensors were
+        moved in place, this is the same object; otherwise it is a newly constructed
+        instance.
     """
+    # Try direct move
     if hasattr(dist, "to"):
         dist.to(device)  # type: ignore
         return dist
-    else:
+
+    # Try rebuilding the distribution
+    if _constructor_matches_arg_constraints(dist):
         try:
-            params = get_distribution_parameters(dist, device)
-            rebuilt = type(dist)(**params)
+            rebuilt = type(dist)(**get_distribution_parameters(dist, device))
         except Exception:
-            move_all_tensor_to_device(dist, device)
-            return dist
-        # Not a constructor argument: a user subclass need not accept `validate_args`.
-        set_validate_args(rebuilt, dist._validate_args)
-        return rebuilt
+            rebuilt = None
+
+        if rebuilt is not None:
+            # Not a constructor argument: a user subclass need not accept it.
+            set_validate_args(rebuilt, dist._validate_args)
+            return rebuilt
+
+    # Fall back to moving all tensors to the device
+    move_all_tensor_to_device(dist, device)
+    return dist
 
 
 def convert_distribution_to_float32(
@@ -133,19 +177,21 @@ def convert_distribution_to_float32(
     # Attempt to rebuild the distribution by casting its float parameters to float32.
     rebuilt = None
     try:
-        if isinstance(dist, Independent):
+        # Exact type, subclasses might expect other constructor arguments.
+        if type(dist) is Independent:
             # Need to apply to base distributions within Independent.
             rebuilt = Independent(
                 convert_distribution_to_float32(dist.base_dist),
                 dist.reinterpreted_batch_ndims,
             )
-        else:
+        elif _constructor_matches_arg_constraints(dist):
             rebuilt = type(dist)(**cast_distribution_parameters_to_float32(dist))
 
-        # Not a constructor argument: a user subclass need not accept it.
-        set_validate_args(rebuilt, dist._validate_args)
-        if rebuilt.sample().dtype == float32:
-            return rebuilt
+        if rebuilt is not None:
+            # Not a constructor argument: a user subclass need not accept it.
+            set_validate_args(rebuilt, dist._validate_args)
+            if rebuilt.sample().dtype == float32:
+                return rebuilt
     except Exception:
         rebuilt = None
 

@@ -18,6 +18,7 @@ from torch.distributions import (
     Gamma,
     Independent,
     MixtureSameFamily,
+    Multinomial,
     MultivariateNormal,
     Normal,
     Pareto,
@@ -62,6 +63,7 @@ from sbi.utils.user_input_checks_utils import (
     MultipleIndependent,
     OneDimPriorWrapper,
     PytorchReturnTypeWrapper,
+    move_distribution_to_device,
 )
 
 
@@ -331,6 +333,26 @@ def test_process_prior_casts_support_dtype(prior):
     """
     prior, _, _ = process_prior(prior)  # output prior
     assert prior.sample().dtype == _support_lower_bound(prior).dtype
+
+
+@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
+def test_prior_rebuild_does_not_reset_parameters_to_default(dtype: torch.dtype):
+    """Regression test where prior rebuilds reset parameters to their default value.
+
+    This could previously happen when processing a prior that was float64 or when
+    moving a prior to a different device. Specifically, it happened in the case
+    of priors who had parameters not in `arg_constraints` such as
+    `Multinomial.total_count` that had default values. These parameters were not
+    passed on rebuilding so they got reset to their default value. Such
+    distributions are no longer rebuilt so this should no longer happen.
+    """
+    prior = Multinomial(10, probs=torch.tensor([0.3, 0.7], dtype=dtype))
+    processed, _, _ = process_prior(prior)
+    assert processed.total_count == prior.total_count
+
+    moved = move_distribution_to_device(processed, "cpu")
+
+    assert moved.total_count == prior.total_count
 
 
 def test_process_prior_warns_and_keeps_shapes_for_float64_prior():
