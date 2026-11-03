@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from functools import partial
 from typing import Optional, Union
 from warnings import warn
 
@@ -177,8 +176,6 @@ class RejectionPosterior(NeuralPosterior):
         num_samples = torch.Size(sample_shape).numel()
         self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
-        potential = partial(self.potential_fn, track_gradients=True)
-
         # Replace arguments that were not passed with their default.
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -199,7 +196,7 @@ class RejectionPosterior(NeuralPosterior):
 
         if reject_outside_prior:
             samples, _ = rejection_sample(
-                potential,
+                self.potential_fn,
                 proposal=self.proposal,
                 theta_transform=self.theta_transform,
                 num_samples=num_samples,

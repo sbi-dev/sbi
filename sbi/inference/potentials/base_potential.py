@@ -14,6 +14,11 @@ from sbi.utils.user_input_checks import process_x
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
+def resolve_track_gradients(track_gradients: Optional[bool]) -> bool:
+    """Return `track_gradients`, or the current grad mode if it is `None`."""
+    return torch.is_grad_enabled() if track_gradients is None else track_gradients
+
+
 class BasePotential(metaclass=ABCMeta):
     def __init__(
         self,
@@ -38,7 +43,15 @@ class BasePotential(metaclass=ABCMeta):
         self._x_is_iid = True
 
     @abstractmethod
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
+        """Return the potential at `theta`.
+
+        Args:
+            theta: The parameters at which to evaluate the potential.
+            track_gradients: Whether to track gradients. `None` keeps the caller's
+                grad mode, so the potential tracks no gradients inside
+                `torch.no_grad()`.
+        """
         raise NotImplementedError
 
     def gradient(
@@ -187,12 +200,12 @@ class CustomPotentialWrapper(BasePotential):
         super().to(device)
         return self
 
-    def __call__(self, theta, track_gradients: bool = True):
+    def __call__(self, theta, track_gradients: Optional[bool] = None):
         """Calls the custom potential function on given theta.
 
         Note, x_o is re-used from the initialization of the potential function.
         """
-        with torch.set_grad_enabled(track_gradients):
+        with torch.set_grad_enabled(resolve_track_gradients(track_gradients)):
             return self.potential_fn(theta, self.x_o)
 
     def bind(

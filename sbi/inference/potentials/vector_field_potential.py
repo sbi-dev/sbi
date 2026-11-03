@@ -9,7 +9,10 @@ from torch import Tensor, nn
 from torch.distributions import Distribution
 from zuko.distributions import NormalizingFlow
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    resolve_track_gradients,
+)
 from sbi.inference.potentials.vector_field_adaptor import (
     get_guidance_method,
     get_iid_method,
@@ -222,14 +225,15 @@ class VectorFieldBasedPotential(BasePotential):
     def __call__(
         self,
         theta: Tensor,
-        track_gradients: bool = False,
+        track_gradients: Optional[bool] = None,
     ) -> Tensor:
         """
         Return the potential (posterior log prob) via probability flow ODE.
 
         Args:
             theta: The parameters at which to evaluate the potential.
-            track_gradients: Whether to track gradients. Default is False.
+            track_gradients: Whether to track gradients. `None` keeps the caller's
+                grad mode.
 
         Returns:
             The potential function, i.e., the log probability of the posterior.
@@ -240,20 +244,20 @@ class VectorFieldBasedPotential(BasePotential):
                 "Potential evaluation for guidance is not supported yet."
             )
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-        theta_density_estimator = reshape_to_sample_batch_event(
-            theta, theta.shape[1:], leading_is_sample=True
-        )
-        self.vector_field_estimator.eval()
+        with torch.set_grad_enabled(resolve_track_gradients(track_gradients)):
+            theta = ensure_theta_batched(torch.as_tensor(theta))
+            theta_density_estimator = reshape_to_sample_batch_event(
+                theta, theta.shape[1:], leading_is_sample=True
+            )
+            self.vector_field_estimator.eval()
 
-        compose = self.vector_field_estimator.compose_enabled
-        if compose:
-            flow_input = self.vector_field_estimator.to_z(theta_density_estimator)
-            log_abs_det = self.vector_field_estimator.log_abs_det()
-        else:
-            flow_input = theta_density_estimator
+            compose = self.vector_field_estimator.compose_enabled
+            if compose:
+                flow_input = self.vector_field_estimator.to_z(theta_density_estimator)
+                log_abs_det = self.vector_field_estimator.log_abs_det()
+            else:
+                flow_input = theta_density_estimator
 
-        with torch.set_grad_enabled(track_gradients):
             if self.x_is_iid:
                 assert self.prior is not None, (
                     "Prior is required for evaluating log_prob with iid observations."

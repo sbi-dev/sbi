@@ -7,7 +7,10 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    resolve_track_gradients,
+)
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, mcmc_transform
 from sbi.utils.torchutils import atleast_2d
@@ -104,41 +107,43 @@ class RatioBasedPotential(BasePotential):
         bound._x_is_iid = x_is_iid
         return bound
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
         r"""Returns the potential for likelihood-ratio-based methods.
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
-            track_gradients: Whether to track the gradients.
+            track_gradients: Whether to track the gradients. `None` keeps the
+                caller's grad mode.
 
         Returns:
             The potential.
         """
-        if self.x_is_iid:
-            # For each theta, calculate likelihood ratio sum over all x in batch.
-            log_ratio_trial_sum = _log_ratios_over_trials(
-                x=self.x_o,
-                theta=theta.to(self.device),
-                net=self.ratio_estimator,
-                track_gradients=track_gradients,
-            )
+        track_gradients = resolve_track_gradients(track_gradients)
+        with torch.set_grad_enabled(track_gradients):
+            if self.x_is_iid:
+                # For each theta, calculate likelihood ratio sum over all x in batch.
+                log_ratio_trial_sum = _log_ratios_over_trials(
+                    x=self.x_o,
+                    theta=theta.to(self.device),
+                    net=self.ratio_estimator,
+                    track_gradients=track_gradients,
+                )
 
-            # Move to cpu for comparison with prior.
-            return log_ratio_trial_sum + self.prior.log_prob(theta)  # type: ignore
-        else:
-            # Calculate likelihood ratio for each (theta,x) pair separately
+                # Move to cpu for comparison with prior.
+                return log_ratio_trial_sum + self.prior.log_prob(theta)  # type: ignore
+            else:
+                # Calculate likelihood ratio for each (theta,x) pair separately
 
-            theta_batch_size = theta.shape[0]
-            x_batch_size = self.x_o.shape[0]
-            assert theta_batch_size == x_batch_size, (
-                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
-                When performing batched sampling for multiple `x`, the batch size of\
-                `theta` must match the batch size of `x`."
-            )
-            with torch.set_grad_enabled(track_gradients):
+                theta_batch_size = theta.shape[0]
+                x_batch_size = self.x_o.shape[0]
+                assert theta_batch_size == x_batch_size, (
+                    f"Batch size mismatch: {theta_batch_size} and {x_batch_size}. "
+                    "When performing batched sampling for multiple `x`, the batch size "
+                    "of `theta` must match the batch size of `x`."
+                )
                 log_ratio_batches = self.ratio_estimator(theta, self.x_o)
                 log_ratio_batches = log_ratio_batches.reshape(-1)
-            return log_ratio_batches + self.prior.log_prob(theta)  # type: ignore
+                return log_ratio_batches + self.prior.log_prob(theta)  # type: ignore
 
 
 def _log_ratios_over_trials(
