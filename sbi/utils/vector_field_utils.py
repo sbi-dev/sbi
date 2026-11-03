@@ -821,7 +821,7 @@ def fit_gmm(
         distribution: The distribution to fit the GMM to.
         num_components: Number of GMM components. Defaults to 10.
         num_samples: Number of samples to draw from the distribution.
-            Defaults to 10_000.
+            If None, uses 1000 * d * num_components, where d is the dimension.
         random_state: Random state for reproducibility. Defaults to 0.
 
     Returns:
