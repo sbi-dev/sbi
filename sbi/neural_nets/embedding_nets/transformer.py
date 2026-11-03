@@ -128,7 +128,7 @@ class RotaryEncoder(nn.Module):
 
 
 class FullAttention(nn.Module):
-    # Adapted from https://github.com/huggingface/transformers/main/src/transformers/
+    # Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/
     # models/phi3/modeling_phi3.py
 
     def __init__(self, config):
@@ -272,7 +272,7 @@ class FullAttention(nn.Module):
 
 
 class MLP(nn.Module):
-    # Adapted from https://github.com/huggingface/transformers/main/src/
+    # Adapted from https://github.com/huggingface/transformers/blob/main/src/
     # transformers/models/phi3/modeling_phi3.py
 
     def __init__(self, config):
