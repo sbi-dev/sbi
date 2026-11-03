@@ -239,7 +239,13 @@ class EnsemblePosterior(NeuralPosterior):
             samples.append(
                 self.posteriors[posterior_index].sample(sample_shape_c, x=x, **kwargs)
             )
-        return torch.vstack(samples).reshape(*sample_shape, -1)
+        # Shuffle, as the samples are sorted by component.
+        samples = torch.vstack(samples)
+        samples = samples[torch.randperm(samples.shape[0], device=samples.device)]
+        # Like in `DirectPosterior`, a partial result on timeout stays flat.
+        if samples.shape[0] != num_samples:
+            return samples
+        return samples.reshape(*sample_shape, -1)
 
     def sample_batched(
         self,
@@ -263,7 +269,12 @@ class EnsemblePosterior(NeuralPosterior):
                     sample_shape_c, x=x, **kwargs
                 )
             )
+        # Shuffle, as the samples are sorted by component.
         samples = torch.vstack(samples)
+        samples = samples[torch.randperm(samples.shape[0], device=samples.device)]
+        # Like in `DirectPosterior`, a partial result on timeout stays flat.
+        if samples.shape[0] != num_samples:
+            return samples
         return samples.reshape(sample_shape + samples.shape[1:])
 
     def log_prob(
