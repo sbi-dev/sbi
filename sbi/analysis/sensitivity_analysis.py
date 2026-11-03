@@ -416,11 +416,11 @@ class ActiveSubspace:
             raise ValueError(
                 "You have not yet passed an emergent property whose "
                 "sensitivity you would like to analyse. Please use "
-                "`.add_emergent_property().train()` to do so. If you want "
+                "`.add_property().train()` to do so. If you want "
                 "to use all features that had also been used to infer the "
                 "posterior distribution (i.e. you want to analyse the "
                 "sensitivity of the posterior probability), use: "
-                "`.find_active(posterior_log_prob_as_property=True)`."
+                "`.find_directions(posterior_log_prob_as_property=True)`."
             )
         if self._emergent_property is not None and posterior_log_prob_as_property:
             warn(

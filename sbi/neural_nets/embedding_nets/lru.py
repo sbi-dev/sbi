@@ -190,7 +190,7 @@ class LRUBlock(nn.Module):
         connection.
 
         Args:
-            inputs: Sequential data of shape (batch_size, sequence_length,
+            input: Sequential data of shape (batch_size, sequence_length,
                 hidden_dim)
 
         Returns:
