@@ -78,8 +78,7 @@ def resample_given_potential_fn(
     The difference to actually performing SIR is that the weights are given only
     by the `potential_fn`, whereas SIR corrects for the `proposal.log_prob()`.
 
-    Up to `sbi` v0.18.0, this method was the default. As of `sbi` v0.19.0, the default
-    is SIR (i.e., with correction).
+    This method (`resample`) is the default.
 
     Args:
         proposal: Proposal distribution, candidate samples are drawn from it.

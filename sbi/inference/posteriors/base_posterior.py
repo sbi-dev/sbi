@@ -390,7 +390,7 @@ class NeuralPosterior:
         if x is not None:
             raise ValueError(
                 "Passing `x` directly to `.map()` has been deprecated."
-                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+                "Use `.set_default_x()` to set `x`, and then run `.map()` "
             )
 
         if self.default_x is None:
