@@ -31,7 +31,7 @@ from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     OneDimPriorWrapper,
-    PytorchReturnTypeWrapper,
+    convert_distribution_to_float32,
 )
 
 if TYPE_CHECKING:
@@ -245,13 +245,12 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     prior_dtype = prior.sample().dtype
     if prior_dtype != float32:
         warnings.warn(
-            f"Prior has dtype {prior_dtype}. sbi casts the samples and log probs of "
-            "the prior to float32.",
+            f"Prior has dtype {prior_dtype}. sbi will try to rebuild the prior as a "
+            "float32 dtype. If this fails, sbi will wrap the prior and cast the "
+            "samples and log probs of the prior to float32.",
             stacklevel=2,
         )
-        prior = PytorchReturnTypeWrapper(
-            prior, return_type=float32, validate_args=False
-        )
+        prior = convert_distribution_to_float32(prior)
 
     # This will fail for float64 priors.
     check_prior_return_type(prior)
