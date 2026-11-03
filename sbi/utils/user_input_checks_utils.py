@@ -33,8 +33,9 @@ def _remove_non_constructor_arguments(params: dict, dist: Distribution) -> dict:
     if isinstance(dist, MultivariateNormal):
         params["precision_matrix"] = None
         params["scale_tril"] = None
-    # MultivariateNormal calculates logits from probabilities, and stores it in the
-    # arg_constraints. When reinstantiating, we must provide only one of them.
+    # Binomial, Bernoulli, Categorical and Multinomial calculate logits from
+    # probabilities, and store them in the arg_constraints. When reinstantiating, we
+    # must provide only one of them.
     elif isinstance(dist, (Binomial, Bernoulli, Categorical, Multinomial)):
         params["logits"] = None
     return params
@@ -87,9 +88,17 @@ def get_distribution_parameters(
 def cast_distribution_parameters_to_float32(
     dist: Distribution,
 ) -> Dict:
-    """Used to get the tensors of the parameters in torch distributions.
+    """Get the constructor parameters of a torch distribution, cast to float32.
 
-    Returns the tensors relocated to device.
+    Floating point parameters are cast to float32. Other tensors, such as integer
+    tensors, are left unchanged.
+
+    Args:
+        dist: The distribution whose parameters to get.
+
+    Returns:
+        A dictionary mapping constructor argument names to parameter tensors, which can
+        be passed to the distribution's constructor to rebuild it in float32.
     """
     params = {}
     for param in dist.arg_constraints:
