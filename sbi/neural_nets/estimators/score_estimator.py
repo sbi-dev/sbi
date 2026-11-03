@@ -524,7 +524,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: variable whose distribution is estimated.
             condition: Conditioning variable.
-            t: Time.
+            times: Time.
 
         Returns:
             ODE flow function value at a given time.

@@ -931,8 +931,6 @@ class TransformerEmbedding(nn.Module):
                 or `(batch, num_channels, height, width)` if using ViT
             attention_mask:
                 attention mask of size `(batch_size, sequence_length)`
-            output_attentions:
-                Whether or not to return the attention tensors
             cache_attention_mask:
                 Whether or not to cache the expanded attention mask, useful if using
                 multiple batched with identical input shapes

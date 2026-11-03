@@ -457,7 +457,6 @@ def denoise_general(
         m: The scaling factor m.
         s: The standard deviation of the noise s.
         x_t: The observed data.
-        num_particles: Number of particles to sample. Defaults to 5000.
 
     Returns:
         The posterior empirical distribution.
