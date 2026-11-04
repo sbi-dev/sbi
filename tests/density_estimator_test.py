@@ -549,6 +549,68 @@ def test_mixed_density_estimator(
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
 
 
+def test_categorical_mass_estimator_rejects_unseen_values():
+    codes = torch.tensor([[0.0, 10.0], [2.0, 20.0], [5.0, 30.0]])
+    estimator = build_categoricalmassestimator(
+        batch_x=codes,
+        batch_y=torch.randn(3, 1),
+        num_categories_per_variable=torch.tensor([3, 3]),
+    )
+    condition = torch.zeros(1, 1)
+
+    for value in (-1.0, 1.0, 3.0, 6.0):
+        with pytest.raises(ValueError, match="values not seen during training"):
+            estimator.log_prob(torch.tensor([[value, 10.0]]), condition=condition)
+
+    valid_log_probs = torch.stack([
+        estimator.log_prob(torch.tensor([[value, 10.0]]), condition=condition)
+        for value in (0.0, 2.0, 5.0)
+    ])
+    assert torch.isfinite(valid_log_probs).all()
+
+
+def test_categorical_mass_estimator_rejects_values_rounded_to_categories():
+    codes = torch.tensor([[0.0, 10.0], [2.0, 20.0], [5.0, 30.0]])
+    estimator = build_categoricalmassestimator(
+        batch_x=codes,
+        batch_y=torch.randn(3, 1),
+        num_categories_per_variable=torch.tensor([3, 3]),
+    )
+    condition = torch.zeros(1, 1)
+
+    with pytest.raises(ValueError, match="values not seen during training"):
+        estimator.log_prob(
+            torch.tensor([[2.00000001, 10.0]], dtype=torch.float64),
+            condition=condition,
+        )
+
+    log_prob = estimator.log_prob(
+        torch.tensor([[2.0, 10.0]], dtype=torch.float64), condition=condition
+    )
+    assert torch.isfinite(log_prob).all()
+
+
+def test_categorical_mass_estimator_maps_categories_across_dtypes():
+    codes = torch.tensor([[16777219, 10], [16777220, 20]], dtype=torch.int64)
+    estimator = build_categoricalmassestimator(
+        batch_x=codes,
+        batch_y=torch.randn(2, 1),
+        num_categories_per_variable=torch.tensor([2, 2]),
+    )
+    condition = torch.zeros(1, 1)
+
+    float32_observation = torch.tensor([[16777220.0, 10.0]], dtype=torch.float32)
+    assert estimator.net._map_values_to_indices(float32_observation).tolist() == [
+        [1, 0]
+    ]
+
+    float32_log_prob = estimator.log_prob(float32_observation, condition=condition)
+    int64_log_prob = estimator.log_prob(
+        torch.tensor([[16777220, 10]], dtype=torch.int64), condition=condition
+    )
+    assert torch.equal(float32_log_prob, int64_log_prob)
+
+
 @pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
 @pytest.mark.parametrize(
     "x_dist",
