@@ -757,9 +757,12 @@ class UniformNormalConvolution(Distribution):
         self.scale = torch.as_tensor(scale)
         self.noise = torch.as_tensor(noise)
 
-        # Determine batch_shape from broadcasting low and high (assumes low/high
-        # are tensors or scalars)
-        batch_shape = self.low.shape
+        batch_shape = torch.broadcast_shapes(
+            self.low.shape,
+            self.high.shape,
+            self.scale.shape,
+            self.noise.shape,
+        )
 
         event_shape = torch.Size()
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
