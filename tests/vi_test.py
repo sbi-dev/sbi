@@ -605,6 +605,17 @@ def _count_train_calls(monkeypatch) -> list:
     return calls
 
 
+def test_quality_control_checks_the_trained_observation():
+    """The checks sampled at the default x, which differs from an `x` passed to
+    `train`, and the failure retrained `q` on the default x instead."""
+    posterior = _make_posterior("flow")
+    x = 3 * ones(1, 2)
+
+    posterior.train(x=x, max_num_iters=10, show_progress_bar=False)
+
+    assert torch.equal(posterior._trained_on, x)
+
+
 def test_failed_quality_control_retrains_once_with_the_callers_settings(monkeypatch):
     """A check that kept failing retrained until the recursion limit, and each retry
     dropped the caller's `x` and training settings."""

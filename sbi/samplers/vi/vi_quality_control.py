@@ -69,8 +69,10 @@ def basic_checks(posterior, N: int = int(5e4)):
     """
     prior = posterior._prior
     assert prior is not None, "Posterior has no `._prior` attribute."
+    # Check at the observation `q` was trained on, which can differ from the default.
+    x = posterior._trained_on
     prior_samples = prior.sample(Size((N,)))
-    samples = posterior.sample(Size((N,)))
+    samples = posterior.sample(Size((N,)), x=x)
     if not torch.isfinite(samples).all():
         raise QualityControlError("Some of the samples are not finite.")
     try:
@@ -82,9 +84,9 @@ def basic_checks(posterior, N: int = int(5e4)):
         raise QualityControlError(
             "Some of the samples are not within the prior support."
         )
-    if not torch.isfinite(posterior.log_prob(samples)).all():
+    if not torch.isfinite(posterior.log_prob(samples, x=x)).all():
         raise QualityControlError("The log probability is not finite for some samples.")
-    if not torch.isfinite(posterior.log_prob(prior_samples)).all():
+    if not torch.isfinite(posterior.log_prob(prior_samples, x=x)).all():
         raise QualityControlError(
             "The log probability is not finite for some prior samples."
         )
