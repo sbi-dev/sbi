@@ -229,6 +229,50 @@ def test_masked_vector_field_estimator_loss_shapes(
     assert losses.shape == (batch_dim,), "Loss shape mismatch."
 
 
+@pytest.mark.parametrize("sde_type", ["ve", "vp"])
+@pytest.mark.parametrize("trailing_feature_dim", [False, True])
+def test_masked_score_control_variate_reduces_variance(sde_type, trailing_feature_dim):
+    """The control variate must keep the masked score loss unbiased and reduce its
+    variance at small diffusion times, for [B, T] and [B, T, 1] inputs alike."""
+    torch.manual_seed(0)
+    num_nodes, batch_dim = 6, 64
+    shape = (num_nodes, 1) if trailing_feature_dim else (num_nodes,)
+    estimator = build_masked_score_matching_estimator(
+        torch.randn(100, *shape), torch.randn(100, *shape), sde_type=sde_type
+    )
+    estimator.eval()
+    inputs = torch.randn(batch_dim, *shape)
+    condition_mask = torch.zeros(batch_dim, num_nodes, dtype=torch.bool)
+    condition_mask[:, num_nodes // 2 :] = True
+    # Small time, so that std_t is below the control variate threshold.
+    times = torch.full((batch_dim,), 0.05)
+    assert (estimator.std_fn(times) < 0.3).all()
+
+    losses = {}
+    with torch.no_grad():
+        for control_variate in (False, True):
+            losses[control_variate] = torch.stack([
+                estimator.loss(
+                    inputs,
+                    condition_mask,
+                    None,
+                    times=times,
+                    control_variate=control_variate,
+                )
+                for _ in range(32)
+            ])  # [num_repeats, batch_dim]
+
+    var_plain = losses[False].var(dim=0).mean()
+    var_cv = losses[True].var(dim=0).mean()
+    assert var_cv < 0.1 * var_plain, (
+        f"Control variate did not reduce variance: {var_cv:.3e} vs {var_plain:.3e}."
+    )
+    # Unbiased: averages over noise draws agree up to Monte Carlo error.
+    mean_plain, mean_cv = losses[False].mean(), losses[True].mean()
+    se = (var_plain / (32 * batch_dim)).sqrt()
+    assert (mean_plain - mean_cv).abs() < 5 * se
+
+
 @pytest.mark.gpu
 @pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp", "flow"])
 @pytest.mark.parametrize("device", ["cpu", "cuda"])

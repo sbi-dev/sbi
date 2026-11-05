@@ -900,26 +900,21 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
                 mean_t, times, condition_mask, edge_mask
             )  # [B, T, F]
 
-            # Compute terms for control variate
-            # Only apply to unobserved (latent) nodes
-            mask_f = ~condition_mask_broadcast.expand_as(eps)  # [B, T, F]
+            # Control variate terms, computed element-wise and only for unobserved
+            # (latent) entries. Summing them over all entries below matches the
+            # per-entry reduction of the MSE above, for both [B, T] and [B, T, F]
+            # inputs. (Reducing over the last dim first and broadcasting back would
+            # count each term T times for [B, T] inputs and inflate the variance.)
+            mask_f = ~condition_mask_broadcast  # [B, T] or [B, T, F]
 
-            # D: number of features per node
-            D = eps.shape[-1]
+            # term 1: 2/s * eps * score_mean_pred
+            term1 = 2 / std_t * eps * score_mean_pred
+            # term 2: eps^2 / s^2
+            term2 = eps**2 / std_t**2
+            # term 3: analytical expectation of term 2, E[eps^2 / s^2] = 1 / s^2
+            term3 = 1.0 / std_t**2
 
-            # term 1: 2/s * sum(eps * score_mean_pred) over F, masked
-            term1 = (
-                2
-                / std_t
-                * torch.sum(eps * score_mean_pred * mask_f, dim=-1).unsqueeze(-1)
-            )
-            # term 2: sum(eps^2) over F, masked, divided by s^2
-            term2 = torch.sum((eps**2) * mask_f, dim=-1).unsqueeze(-1) / (std_t**2)
-            # term 3: D / s^2, but only for unobserved nodes
-            term3 = mask_f * (D / (std_t**2))
-
-            # Sum over features, keep [B, T]
-            control_variate_term = term3 - term1 - term2
+            control_variate_term = (term3 - term1 - term2) * mask_f
 
             # Only apply control variate where std is small
             control_variate_term = torch.where(
