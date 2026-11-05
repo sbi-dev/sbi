@@ -7,7 +7,6 @@ from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import numpy as np
-import six
 import torch
 
 from sbi.utils.torchutils import tensor2numpy
@@ -68,7 +67,7 @@ def to_list_kwargs(x: "KwargsType", len: int) -> List[Optional[Dict]]:
 def update(d: Dict, u: Optional[Dict]) -> Dict:
     """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
     if u is not None:
-        for k, v in six.iteritems(u):
+        for k, v in u.items():
             dv = d.get(k, {})
             if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
                 d[k] = v
