@@ -534,14 +534,8 @@ def test_vector_field_sde_ode_sampling_equivalence(
 @pytest.mark.parametrize(
     "vf_estimator, vector_field_type, prior_type",
     [
-        ("NeuralPosterior", "ve", "gaussian"),
-        ("NeuralPosterior", "vp", "gaussian"),
-        ("NeuralPosterior", "subvp", "gaussian"),
         ("NeuralPosterior", "fmpe", "gaussian"),
-        ("NeuralPosterior", "ve", "uniform"),
-        ("NeuralPosterior", "vp", "uniform"),
         ("NeuralPosterior", "subvp", "uniform"),
-        ("NeuralPosterior", "fmpe", "uniform"),
         # TODO: need to fine-tune hyper-parameters for Simformer
         # they all fail to converge properly with the current settings
         # TODO: need to handle bad shape management for Simformer

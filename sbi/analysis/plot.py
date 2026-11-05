@@ -49,6 +49,7 @@ from sbi.utils.plotting_helpers import (
     to_list_string,
     update,
 )
+from sbi.utils.torchutils import infer_tensor_device
 
 UpperLiteral = Literal["hist", "scatter", "contour", "kde"]
 LowerLiteral = Literal["hist", "scatter", "contour", "kde"]
@@ -209,7 +210,7 @@ def pairplot(
             if they exist, the 4th, 5th and so on).
         upper: Plotting style for upper diagonal, {hist, scatter, contour, kde,
             None}.
-        lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
+        lower: Plotting style for lower diagonal, {hist, scatter, contour, kde,
             None}.
         diag: Plotting style for diagonal, {hist, scatter, kde, bar}.
         figsize: Size of the entire figure.
@@ -861,7 +862,7 @@ def prepare_for_plot(
 
     samples = convert_to_list_of_numpy(samples)
     if points is not None:
-        points = convert_to_list_of_numpy(points)
+        points = [np.atleast_2d(p) for p in convert_to_list_of_numpy(points)]
 
     samples = handle_nan_infs(samples)
 
@@ -872,9 +873,10 @@ def prepare_for_plot(
     if limits is None or len(limits) == 0:
         limits = infer_limits(samples, dim, points)
     else:
+        limits = [ensure_numpy(lim) for lim in limits]
         limits = [limits[0] for _ in range(dim)] if len(limits) == 1 else limits
 
-    limits = torch.as_tensor(limits)
+    limits = torch.as_tensor(np.array(limits))
     return samples, dim, limits
 
 
@@ -927,12 +929,16 @@ def prepare_for_conditional_plot(condition, opts):
     # Dimensions
     dim = condition.shape[-1]
 
+    # Both the diagonal and the off-diagonal evaluate on the density's device.
+    density = opts["density"]
+    device = getattr(density, "_device", None) or infer_tensor_device(density)
+    opts["condition"] = condition.to(device or condition.device)
+
     # Prepare limits
-    if len(opts["limits"]) == 1:
-        limits = [opts["limits"][0] for _ in range(dim)]
-    else:
-        limits = opts["limits"]
-    limits = torch.as_tensor(limits)
+    limits = [ensure_numpy(lim) for lim in opts["limits"]]
+    if len(limits) == 1:
+        limits = [limits[0] for _ in range(dim)]
+    limits = torch.as_tensor(np.array(limits))
 
     # Infer the margin. This is to avoid that we evaluate the posterior **exactly**
     # at the boundary.
@@ -949,7 +955,7 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
     """
 
     def diag_func(row, **kwargs):
-        p_vector = (
+        p_vector = ensure_numpy(
             eval_conditional_density(
                 opts["density"],
                 opts["condition"],
@@ -960,8 +966,6 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[row],
             )
-            .to("cpu")
-            .numpy()
         )
         plt.plot(
             np.linspace(
@@ -1277,8 +1281,6 @@ def conditional_pairplot(
 
     Returns: figure and axis of posterior distribution plot
     """
-    device = density._device if hasattr(density, "_device") else "cpu"
-
     # Setting these is required because _pairplot_scaffold will check if opts['diag'] is
     # `None`. This would break if opts has no key 'diag'. Same for 'upper'.
     diag = "cond"
@@ -1295,19 +1297,17 @@ def conditional_pairplot(
     diag_func = get_conditional_diag_func(opts, limits, eps_margins, resolution)
 
     def offdiag_func(row, col, **kwargs):
-        p_image = (
+        p_image = ensure_numpy(
             eval_conditional_density(
                 opts["density"],
-                opts["condition"].to(device),
-                limits.to(device),
+                opts["condition"],
+                limits,
                 row,
                 col,
                 resolution=resolution,
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[col],
             )
-            .to("cpu")
-            .numpy()
         )
         plt.imshow(
             p_image.T,
@@ -1439,11 +1439,7 @@ def _arrange_grid(
     # Prepare points
     if points is None:
         points = []
-    if not isinstance(points, list):
-        points = ensure_numpy(points)  # type: ignore
-        points = [points]
-    points = [np.atleast_2d(p) for p in points]
-    points = [np.atleast_2d(ensure_numpy(p)) for p in points]
+    points = [np.atleast_2d(p) for p in convert_to_list_of_numpy(points)]
     # TODO: add asserts checking compatibility of dimensions
 
     # Prepare labels
@@ -1452,6 +1448,7 @@ def _arrange_grid(
 
     # Prepare ticks
     if ticks is not None:
+        ticks = [ensure_numpy(t) for t in ticks]
         if len(ticks) == 1:
             ticks = [ticks[0] for _ in range(dim)]
         elif ticks == []:
@@ -1575,25 +1572,27 @@ def _arrange_grid(
                 if fig_kwargs.legend and col == subset[0]:
                     _legend_handles = ax.get_legend_handles_labels()  # pyright: ignore reportOptionalMemberAccess
 
-            # Off-diagonals
-
-            # upper
-            elif current == "upper":
-                if excl_upper:
+            # Off-diagonals: both triangles plot x = column, y = row.
+            else:
+                if current == "upper":
+                    funcs, kwargs, excluded = upper_funcs, upper_kwargs, excl_upper
+                else:
+                    funcs, kwargs, excluded = lower_funcs, lower_kwargs, excl_lower
+                if excluded:
                     ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
                     col_discrete = col in discrete_set
                     row_discrete = row in discrete_set
                     for sample_ind, sample in enumerate(samples):
-                        upper_f = upper_funcs[sample_ind]
-                        upper_kw = upper_kwargs[sample_ind]
+                        offdiag_f = funcs[sample_ind]
+                        offdiag_kw = kwargs[sample_ind]
                         samples_col = sample[:, col]
                         samples_row = sample[:, row]
                         if col_discrete or row_discrete:
-                            upper_f, upper_kw, samples_col, samples_row = (
+                            offdiag_f, offdiag_kw, samples_col, samples_row = (
                                 _discrete_offdiag_override(
-                                    upper_f,
-                                    upper_kw,
+                                    offdiag_f,
+                                    offdiag_kw,
                                     samples_col,
                                     samples_row,
                                     col_discrete,
@@ -1601,55 +1600,14 @@ def _arrange_grid(
                                     sample_ind,
                                 )
                             )
-                        if callable(upper_f):
-                            upper_f(
+                        if callable(offdiag_f):
+                            offdiag_f(
                                 ax,
                                 samples_col,
                                 samples_row,
                                 limits[col],
                                 limits[row],
-                                upper_kw,
-                            )
-                    if len(points) > 0:
-                        for n, v in enumerate(points):
-                            ax.plot(  # pyright: ignore reportOptionalMemberAccess
-                                v[:, col],
-                                v[:, row],
-                                color=fig_kwargs.points_colors[n],
-                                **fig_kwargs.points_offdiag,
-                            )
-            # lower
-            elif current == "lower":
-                if excl_lower:
-                    ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
-                else:
-                    row_discrete = row in discrete_set
-                    col_discrete = col in discrete_set
-                    for sample_ind, sample in enumerate(samples):
-                        lower_f = lower_funcs[sample_ind]
-                        lower_kw = lower_kwargs[sample_ind]
-                        samples_row_l = sample[:, row]
-                        samples_col_l = sample[:, col]
-                        if row_discrete or col_discrete:
-                            lower_f, lower_kw, samples_row_l, samples_col_l = (
-                                _discrete_offdiag_override(
-                                    lower_f,
-                                    lower_kw,
-                                    samples_row_l,
-                                    samples_col_l,
-                                    row_discrete,
-                                    col_discrete,
-                                    sample_ind,
-                                )
-                            )
-                        if callable(lower_f):
-                            lower_f(
-                                ax,
-                                samples_row_l,
-                                samples_col_l,
-                                limits[row],
-                                limits[col],
-                                lower_kw,
+                                offdiag_kw,
                             )
                     if len(points) > 0:
                         for n, v in enumerate(points):
@@ -1735,6 +1693,8 @@ def sbc_rank_plot(
         ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters), or
             list of Tensors when comparing several sets of ranks, e.g., set of ranks
             obtained from different methods.
+        num_posterior_samples: number of posterior samples used to compute the
+            ranks. Ranks must lie in [0, num_posterior_samples].
         num_bins: number of bins used for binning the ranks, default is
             num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
             histograms.
@@ -1746,6 +1706,10 @@ def sbc_rank_plot(
 
     Returns:
         fig, ax: figure and axis objects.
+
+    Raises:
+        ValueError: If a rank lies outside [0, num_posterior_samples], or if
+            plot_type is not "hist", "cdf" or "cdf-diff".
 
     """
 
@@ -1792,6 +1756,8 @@ def _sbc_rank_plot(
         ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters), or
             list of Tensors when comparing several sets of ranks, e.g., set of ranks
             obtained from different methods.
+        num_posterior_samples: number of posterior samples used to compute the
+            ranks. Ranks must lie in [0, num_posterior_samples].
         num_bins: number of bins used for binning the ranks, default is
             num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
             histograms.
@@ -1829,8 +1795,13 @@ def _sbc_rank_plot(
         ranks_list = ranks
     for idx, rank in enumerate(ranks_list):
         assert isinstance(rank, (Tensor, np.ndarray))
-        if isinstance(rank, Tensor):
-            ranks_list[idx]: np.ndarray = rank.numpy()  # type: ignore
+        # Bin in float64, like the bands: float32 edges can shift a rank by one bin.
+        ranks_list[idx] = ensure_numpy(rank).astype(np.float64)
+    if not all(((r >= 0) & (r <= num_posterior_samples)).all() for r in ranks_list):
+        raise ValueError(
+            f"Ranks must lie in [0, num_posterior_samples={num_posterior_samples}]. "
+            "Pass the number of posterior samples used to compute the ranks."
+        )
 
     plot_types = ["hist", "cdf", "cdf-diff"]
     if plot_type not in plot_types:
@@ -1897,6 +1868,7 @@ def _sbc_rank_plot(
                     _plot_ranks_as_cdf(
                         ranki[:, jj],  # type: ignore
                         num_bins,
+                        num_posterior_samples,
                         num_repeats,
                         ranks_label=ranks_labels[ii],
                         color=f"C{ii}" if colors is None else colors[ii],
@@ -1909,6 +1881,7 @@ def _sbc_rank_plot(
                         _plot_cdf_region_expected_under_uniformity(
                             num_sbc_runs,
                             num_bins,
+                            num_posterior_samples,
                             num_repeats,
                             alpha=uniform_region_alpha,
                         )
@@ -1940,6 +1913,7 @@ def _sbc_rank_plot(
                     _plot_ranks_as_cdf_diff(
                         ranki[:, jj],  # type: ignore
                         num_bins,
+                        num_posterior_samples,
                         num_repeats,
                         ranks_label=ranks_labels[ii],
                         color=f"C{ii}" if colors is None else colors[ii],
@@ -1951,6 +1925,7 @@ def _sbc_rank_plot(
                         _plot_cdf_diff_region_expected_under_uniformity(
                             num_sbc_runs,
                             num_bins,
+                            num_posterior_samples,
                             num_repeats,
                             alpha=uniform_region_alpha,
                         )
@@ -1977,6 +1952,7 @@ def _sbc_rank_plot(
                 _plot_ranks_as_cdf(
                     ranki[:, jj],  # type: ignore
                     num_bins,
+                    num_posterior_samples,
                     num_repeats,
                     ranks_label=parameter_labels[jj],
                     color=f"C{jj}" if colors is None else colors[jj],
@@ -1989,6 +1965,7 @@ def _sbc_rank_plot(
                 _plot_ranks_as_cdf_diff(
                     ranki[:, jj],  # type: ignore
                     num_bins,
+                    num_posterior_samples,
                     num_repeats,
                     ranks_label=parameter_labels[jj],
                     color=f"C{jj}" if colors is None else colors[jj],
@@ -2006,6 +1983,7 @@ def _sbc_rank_plot(
                 _plot_cdf_region_expected_under_uniformity(
                     num_sbc_runs,
                     num_bins,
+                    num_posterior_samples,
                     num_repeats,
                     alpha=uniform_region_alpha,
                 )
@@ -2013,6 +1991,7 @@ def _sbc_rank_plot(
                 _plot_cdf_diff_region_expected_under_uniformity(
                     num_sbc_runs,
                     num_bins,
+                    num_posterior_samples,
                     num_repeats,
                     alpha=uniform_region_alpha,
                 )
@@ -2054,6 +2033,7 @@ def _plot_ranks_as_hist(
     plt.hist(
         ranks,
         bins=num_bins,
+        range=(0, num_posterior_samples),
         label=ranks_label,
         color=color,
         alpha=alpha,
@@ -2072,6 +2052,7 @@ def _plot_ranks_as_hist(
 def _plot_ranks_as_cdf(
     ranks: np.ndarray,
     num_bins: int,
+    num_posterior_samples: int,
     num_repeats: int,
     ranks_label: Optional[str] = None,
     xlabel: Optional[str] = None,
@@ -2086,6 +2067,7 @@ def _plot_ranks_as_cdf(
         ranks: SBC ranks in shape (num_sbc_runs, ).
         num_bins: number of bins for the histogram, recommendation is
             num_sbc_runs / 10.
+        num_posterior_samples: number of posterior samples used for ranking.
         num_repeats: number of repeats of each CDF step, i.e., resolution of the
             empirical CDF.
         ranks_label: label for the ranks, e.g., when comparing ranks of different
@@ -2098,12 +2080,12 @@ def _plot_ranks_as_cdf(
 
     """
     # Generate histogram of ranks.
-    hist, *_ = np.histogram(ranks, bins=num_bins, density=False)
+    hist, *_ = np.histogram(ranks, bins=num_bins, range=(0, num_posterior_samples))
     # Construct empirical CDF.
     histcs = hist.cumsum()
     # Plot cdf and repeat each stair step
     plt.plot(
-        np.linspace(0, num_bins, num_repeats * num_bins),
+        _cdf_x(num_bins, num_posterior_samples, num_repeats),
         np.repeat(histcs / histcs.max(), num_repeats),
         label=ranks_label,
         color=color,
@@ -2118,14 +2100,15 @@ def _plot_ranks_as_cdf(
         plt.yticks(np.linspace(0, 1, 3), [])
 
     plt.ylim(0, 1)
-    plt.xlim(0, num_bins)
-    plt.xticks(np.linspace(0, num_bins, num_ticks))
+    plt.xlim(0, num_posterior_samples)
+    plt.xticks(np.linspace(0, num_posterior_samples, num_ticks))
     plt.xlabel("posterior rank" if xlabel is None else xlabel)
 
 
 def _plot_ranks_as_cdf_diff(
     ranks: np.ndarray,
     num_bins: int,
+    num_posterior_samples: int,
     num_repeats: int,
     ranks_label: Optional[str] = None,
     xlabel: Optional[str] = None,
@@ -2141,6 +2124,7 @@ def _plot_ranks_as_cdf_diff(
     Args:
         ranks: SBC ranks in shape (num_sbc_runs, )
         num_bins: number of bins for the histogram.
+        num_posterior_samples: number of posterior samples used for ranking.
         num_repeats: number of repeats of each CDF step, i.e., resolution of the
             empirical CDF.
         ranks_label: label for the ranks, e.g., when comparing ranks of different
@@ -2151,14 +2135,14 @@ def _plot_ranks_as_cdf_diff(
         show_ylabel: whether to show y-label.
         num_ticks: number of ticks on the x-axis.
     """
-    hist, *_ = np.histogram(ranks, bins=num_bins, density=False)
+    hist, *_ = np.histogram(ranks, bins=num_bins, range=(0, num_posterior_samples))
     histcs = hist.cumsum()
     ecdf = histcs / histcs.max()
-    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
+    uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
     diff = ecdf - uniform_cdf
 
     plt.plot(
-        np.linspace(0, num_bins, num_repeats * num_bins),
+        _cdf_x(num_bins, num_posterior_samples, num_repeats),
         np.repeat(diff, num_repeats),
         label=ranks_label,
         color=color,
@@ -2173,35 +2157,60 @@ def _plot_ranks_as_cdf_diff(
 
     plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
     plt.ylim(-0.5, 0.5)
-    plt.xlim(0, num_bins)
-    plt.xticks(np.linspace(0, num_bins, num_ticks))
+    plt.xlim(0, num_posterior_samples)
+    plt.xticks(np.linspace(0, num_posterior_samples, num_ticks))
     plt.xlabel("posterior rank" if xlabel is None else xlabel)
+
+
+def _uniform_rank_bin_probs(num_bins: int, num_posterior_samples: int) -> np.ndarray:
+    """Probability of each bin when the ranks are uniform on 0, ..., N.
+
+    Bins over [0, N] can hold different numbers of the N + 1 integer ranks: for
+    N = 10 and 10 bins, the last bin holds ranks 9 and 10.
+    """
+    counts, _ = np.histogram(
+        np.arange(num_posterior_samples + 1),
+        bins=num_bins,
+        range=(0, num_posterior_samples),
+    )
+    return counts / (num_posterior_samples + 1)
+
+
+def _cdf_x(num_bins: int, num_posterior_samples: int, num_repeats: int) -> np.ndarray:
+    """x positions of the CDF steps in rank units, num_repeats per bin."""
+    return np.linspace(0, num_posterior_samples, num_repeats * num_bins)
+
+
+def _uniform_cdf_band(
+    num_sbc_runs: int, num_bins: int, num_posterior_samples: int
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Uniform CDF at each bin, and the 99% band of the empirical CDF around it."""
+    uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
+    # Decrease the last entry by epsilon to find valid confidence intervals.
+    p = uniform_cdf.copy()
+    p[-1] -= 1e-9
+    lower = binom(num_sbc_runs, p).ppf(0.005)
+    upper = binom(num_sbc_runs, p).ppf(0.995)
+    return uniform_cdf, lower / lower.max(), upper / upper.max()
 
 
 def _plot_cdf_region_expected_under_uniformity(
     num_sbc_runs: int,
     num_bins: int,
+    num_posterior_samples: int,
     num_repeats: int,
     alpha: float = 0.2,
     color: str = "gray",
 ) -> None:
     """Plot region of empirical cdfs expected under uniformity on the current axis."""
 
-    # Construct uniform histogram.
-    uni_bins = binom(num_sbc_runs, p=1 / num_bins).ppf(0.5) * np.ones(num_bins)
-    uni_bins_cdf = uni_bins.cumsum() / uni_bins.sum()
-    # Decrease value one in last entry by epsilon to find valid
-    # confidence intervals.
-    uni_bins_cdf[-1] -= 1e-9
-
-    lower = [binom(num_sbc_runs, p=p).ppf(0.005) for p in uni_bins_cdf]
-    upper = [binom(num_sbc_runs, p=p).ppf(0.995) for p in uni_bins_cdf]
+    _, lower, upper = _uniform_cdf_band(num_sbc_runs, num_bins, num_posterior_samples)
 
     # Plot grey area with expected ECDF.
     plt.fill_between(
-        x=np.linspace(0, num_bins, num_repeats * num_bins),
-        y1=np.repeat(lower / np.max(lower), num_repeats),
-        y2=np.repeat(upper / np.max(upper), num_repeats),  # pyright: ignore[reportArgumentType]
+        x=_cdf_x(num_bins, num_posterior_samples, num_repeats),
+        y1=np.repeat(lower, num_repeats),
+        y2=np.repeat(upper, num_repeats),
         color=color,
         alpha=alpha,
         label="expected under uniformity",
@@ -2211,24 +2220,21 @@ def _plot_cdf_region_expected_under_uniformity(
 def _plot_cdf_diff_region_expected_under_uniformity(
     num_sbc_runs: int,
     num_bins: int,
+    num_posterior_samples: int,
     num_repeats: int,
     alpha: float = 0.2,
     color: str = "gray",
 ) -> None:
     """Plot region of empirical CDF differences expected under uniformity."""
 
-    uni_bins = binom(num_sbc_runs, p=1 / num_bins).ppf(0.5) * np.ones(num_bins)
-    uni_bins_cdf = uni_bins.cumsum() / uni_bins.sum()
-    uni_bins_cdf[-1] -= 1e-9
+    uniform_cdf, lower, upper = _uniform_cdf_band(
+        num_sbc_runs, num_bins, num_posterior_samples
+    )
 
-    lower = [binom(num_sbc_runs, p=p).ppf(0.005) for p in uni_bins_cdf]
-    upper = [binom(num_sbc_runs, p=p).ppf(0.995) for p in uni_bins_cdf]
-
-    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
     plt.fill_between(
-        x=np.linspace(0, num_bins, num_repeats * num_bins),
-        y1=np.repeat(np.array(lower) / np.max(lower) - uniform_cdf, num_repeats),
-        y2=np.repeat(np.array(upper) / np.max(upper) - uniform_cdf, num_repeats),
+        x=_cdf_x(num_bins, num_posterior_samples, num_repeats),
+        y1=np.repeat(lower - uniform_cdf, num_repeats),
+        y2=np.repeat(upper - uniform_cdf, num_repeats),
         color=color,
         alpha=alpha,
         label="expected under uniformity",
@@ -2242,10 +2248,12 @@ def _plot_hist_region_expected_under_uniformity(
     alpha: float = 0.2,
     color: str = "gray",
 ) -> None:
-    """Plot region of empirical cdfs expected under uniformity."""
+    """Plot one flat band that holds the 99% interval of every bin under uniformity."""
 
-    lower = binom(num_sbc_runs, p=1 / (num_bins + 1)).ppf(0.005)
-    upper = binom(num_sbc_runs, p=1 / (num_bins + 1)).ppf(0.995)
+    # Binomial quantiles grow with p, so this band holds every bin's interval.
+    p = _uniform_rank_bin_probs(num_bins, num_posterior_samples)
+    lower = binom(num_sbc_runs, p=p.min()).ppf(0.005)
+    upper = binom(num_sbc_runs, p=p.max()).ppf(0.995)
 
     # Plot grey area with expected ECDF.
     plt.fill_between(
@@ -2518,8 +2526,9 @@ def plot_tarp(
     fig = plt.figure(figsize=(6, 6))
     ax: Axes = plt.gca()
 
-    ax.plot(alpha, ecp, color="blue", label="TARP")
-    ax.plot(alpha, alpha, color="black", linestyle="--", label="ideal")
+    ecp_np, alpha_np = ensure_numpy(ecp), ensure_numpy(alpha)
+    ax.plot(alpha_np, ecp_np, color="blue", label="TARP")
+    ax.plot(alpha_np, alpha_np, color="black", linestyle="--", label="ideal")
     ax.set_xlabel(r"Credibility Level $\alpha$")
     ax.set_ylabel(r"Expected Coverage Probability")
     ax.set_xlim(0.0, 1.0)
@@ -2859,11 +2868,7 @@ def _arrange_plots(
     # Prepare points
     if points is None:
         points = []
-    if not isinstance(points, list):
-        points = ensure_numpy(points)  # type: ignore
-        points = [points]
-    points = [np.atleast_2d(p) for p in points]
-    points = [np.atleast_2d(ensure_numpy(p)) for p in points]
+    points = [np.atleast_2d(p) for p in convert_to_list_of_numpy(points)]
 
     # TODO: add asserts checking compatibility of dimensions
 
@@ -2877,10 +2882,9 @@ def _arrange_plots(
     if opts["ticks"] == [] or opts["ticks"] is None:
         ticks = None
     else:
-        if len(opts["ticks"]) == 1:
-            ticks = [opts["ticks"][0] for _ in range(dim)]
-        else:
-            ticks = opts["ticks"]
+        ticks = [ensure_numpy(t) for t in opts["ticks"]]
+        if len(ticks) == 1:
+            ticks = [ticks[0] for _ in range(dim)]
 
     # Figure out if we subset the plot
     subset = opts["subset"]

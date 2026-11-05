@@ -11,6 +11,7 @@ from typing import (
     Dict,
     Literal,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Union,
@@ -21,7 +22,6 @@ from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import Self
 
 from sbi import utils as utils
 from sbi.inference import MaskedNeuralInference, NeuralInference
@@ -44,7 +44,7 @@ from sbi.neural_nets.estimators.base import (
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
-    _ESTIMATOR_CONFIG_BASES,
+    _PerModelConfigBase,
 )
 from sbi.neural_nets.net_builders.vector_field_nets import VectorFieldConfigBase
 from sbi.sbi_types import TorchTransform, Tracker
@@ -191,7 +191,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
 
         check_estimator_arg(vector_field_estimator_builder)
 
-        if isinstance(vector_field_estimator_builder, _ESTIMATOR_CONFIG_BASES):
+        if isinstance(vector_field_estimator_builder, _PerModelConfigBase):
             if not isinstance(
                 vector_field_estimator_builder, self._ALLOWED_CONFIG_TYPE
             ):

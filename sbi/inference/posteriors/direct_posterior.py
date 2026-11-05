@@ -143,7 +143,7 @@ class DirectPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -158,6 +158,7 @@ class DirectPosterior(NeuralPosterior):
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
                 set via `.set_default_x()`.
             max_sampling_batch_size: Maximum batch size for rejection sampling.
+                If not provided, uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
@@ -195,7 +196,7 @@ class DirectPosterior(NeuralPosterior):
         if reject_outside_prior:
             # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
-                proposal=self._sample_estimator,
+                proposal=self.posterior_estimator.sample,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
@@ -207,7 +208,7 @@ class DirectPosterior(NeuralPosterior):
             )[0]
         else:
             # Bypass rejection sampling entirely.
-            samples = self._sample_estimator(
+            samples = self.posterior_estimator.sample(
                 torch.Size([num_samples]),
                 condition=x,
             )
@@ -230,7 +231,7 @@ class DirectPosterior(NeuralPosterior):
         self,
         sample_shape: Shape,
         x: Tensor,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -247,6 +248,7 @@ class DirectPosterior(NeuralPosterior):
             x: A batch of observations, of shape `(batch_dim, event_shape_x)`.
                 `batch_dim` corresponds to the number of observations to be drawn.
             max_sampling_batch_size: Maximum batch size for rejection sampling.
+                If not provided, uses the value specified at initialization.
             show_progress_bars: Whether to show sampling progress monitor.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
@@ -297,7 +299,7 @@ class DirectPosterior(NeuralPosterior):
         if reject_outside_prior:
             # Normal rejection behavior.
             samples = rejection.accept_reject_sample(
-                proposal=self._sample_estimator,
+                proposal=self.posterior_estimator.sample,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
@@ -309,7 +311,7 @@ class DirectPosterior(NeuralPosterior):
             )[0]
         else:
             # Bypass rejection sampling entirely.
-            samples = self._sample_estimator(
+            samples = self.posterior_estimator.sample(
                 torch.Size([num_samples]),
                 condition=x,
             )
@@ -351,7 +353,7 @@ class DirectPosterior(NeuralPosterior):
         """
         x = self._x_else_default_x(x)
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
@@ -371,8 +373,8 @@ class DirectPosterior(NeuralPosterior):
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self._log_prob_estimator(
-                theta_density_estimator, x_density_estimator
+            unnorm_log_prob = self.posterior_estimator.log_prob(
+                theta_density_estimator, condition=x_density_estimator
             )
             # `log_prob` supports only a single observation (i.e. `batchsize==1`).
             # We now remove this additional dimension.
@@ -437,7 +439,7 @@ class DirectPosterior(NeuralPosterior):
         """
 
         self._assert_finite_x(x)
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
         x = x.to(self._device)
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
@@ -454,8 +456,8 @@ class DirectPosterior(NeuralPosterior):
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self._log_prob_estimator(
-                theta_density_estimator, x_density_estimator
+            unnorm_log_prob = self.posterior_estimator.log_prob(
+                theta_density_estimator, condition=x_density_estimator
             )
 
             # Force probability to be zero outside prior support.
@@ -490,7 +492,7 @@ class DirectPosterior(NeuralPosterior):
 
         The factor is estimated from the acceptance probability during rejection
         sampling from the posterior. It is saved for the last `x` and re-estimated
-        whenever `x` changes. It is 1 for unbounded priors.
+        whenever `x` or `num_rejection_samples` changes. It is 1 for unbounded priors.
 
         Arguments:
             x: Observation at which to estimate the factor.
@@ -502,10 +504,11 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
+        x = self._x_else_default_x(x)
 
         def acceptance() -> Tensor:
             return rejection.accept_reject_sample(
-                proposal=self._sample_estimator,
+                proposal=self.posterior_estimator.sample,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_rejection_samples,
                 show_progress_bars=show_progress_bars,
@@ -518,13 +521,9 @@ class DirectPosterior(NeuralPosterior):
                 },
             )[1]
 
-        return self._cached_leakage_factor(x, self.prior, acceptance, force_update)
-
-    def _sample_estimator(self, sample_shape: torch.Size, **kwargs: Tensor) -> Tensor:
-        return self.posterior_estimator.sample(sample_shape, **kwargs)
-
-    def _log_prob_estimator(self, theta: Tensor, condition: Tensor) -> Tensor:
-        return self.posterior_estimator.log_prob(theta, condition=condition)
+        return self._cached_leakage_factor(
+            x, num_rejection_samples, self.prior, acceptance, force_update
+        )
 
     def map(
         self,
@@ -559,9 +558,10 @@ class DirectPosterior(NeuralPosterior):
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it must be `posterior`, which samples the
+                posterior `num_init_samples` times. If it is a tensor, the tensor is
+                used as the initial locations, so prior-based initialization can be
+                done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the

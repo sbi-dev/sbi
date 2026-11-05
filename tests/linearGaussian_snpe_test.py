@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from copy import deepcopy
 from dataclasses import asdict
 
@@ -27,11 +28,17 @@ from sbi.inference import (
     posterior_estimator_based_potential,
 )
 from sbi.inference.posteriors.filtered_direct_posterior import FilteredDirectPosterior
+from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.posteriors.posterior_parameters import (
     FilteredDirectPosteriorParameters,
     MCMCPosteriorParameters,
 )
 from sbi.neural_nets import posterior_nn
+from sbi.neural_nets.estimators.mixture_density_estimator import (
+    MixtureDensityEstimator,
+    MultivariateGaussianMDN,
+)
+from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -458,17 +465,15 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         _ = inference.append_simulations(theta, x, proposal=posterior1).train()
         posterior = inference.build_posterior().set_default_x(x_o)
     elif method_str == "snpe_a":
-        # Use 3 components with 2 rounds to test multi-component MDN.
-        # Component growth: round 1 = 3, round 2 = 3×3 = 9 components.
         snpe_a_args = {**creation_args, "num_components": 3}
         inference = NPE_A(**snpe_a_args)
         proposal = prior
         num_rounds = 2
-        for _ in range(num_rounds):
+        for r in range(num_rounds):
             theta = proposal.sample((1000,))
             x = simulator(theta)
             inference = inference.append_simulations(theta, x, proposal=proposal)
-            _ = inference.train()
+            _ = inference.train(final_round=(r == num_rounds - 1))
             posterior = inference.build_posterior().set_default_x(x_o)
             proposal = posterior
     elif method_str.startswith("tsnpe"):
@@ -496,6 +501,46 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=method_str)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("widen", [False, True], ids=["posterior", "widened"])
+def test_multi_round_npe_a_matches_true_posterior_moments(widen):
+    """Two NPE-A rounds with a final round recover the true mean and std, with the
+    posterior or a widened Gaussian fitted to it as the second proposal.
+
+    c2st misses moment errors of this size, so the moments are checked directly.
+    The bounds are about twice the spread over seeds 0 to 5.
+    """
+    prior = MultivariateNormal(zeros(2), eye(2))
+    likelihood_shift, likelihood_cov = -1.0 * ones(2), 0.3 * eye(2)
+    x_o = zeros(1, 2)
+    true_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o[0], likelihood_shift, likelihood_cov, zeros(2), eye(2)
+    )
+    true_std = true_posterior.covariance_matrix.diagonal().sqrt()
+
+    inference = NPE_A(prior, num_components=5, show_progress_bars=False)
+    proposal = prior
+    for r in range(2):
+        theta = proposal.sample((3000,))
+        x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+        inference.append_simulations(theta, x, proposal=proposal).train(
+            final_round=(r == 1)
+        )
+        posterior = inference.build_posterior().set_default_x(x_o)
+        if r == 0:
+            if widen:
+                samples = posterior.sample((10_000,))
+                proposal = MultivariateNormal(samples.mean(0), 2 * torch.cov(samples.T))
+            else:
+                proposal = posterior
+
+    samples = posterior.sample((10_000,))
+    mean_error = (samples.mean(0) - true_posterior.mean) / true_std
+    std_ratio = samples.std(0) / true_std
+    assert mean_error.abs().max() < 0.3, f"mean error {mean_error} posterior stds"
+    assert ((std_ratio > 0.8) & (std_ratio < 1.25)).all(), f"std ratio {std_ratio}"
 
 
 # Testing rejection and mcmc sampling methods.
@@ -843,6 +888,189 @@ def test_multiround_mog_training():
         proposal = posterior
 
 
+def _npe_c_with_mog_loss_state(prior, num_components=3, transform_input=None):
+    """Return NPE-C with an MDN, ready to evaluate the closed-form MoG loss."""
+    estimator = MixtureDensityEstimator(
+        MultivariateGaussianMDN(
+            features=2,
+            context_features=2,
+            hidden_features=10,
+            num_components=num_components,
+        ),
+        input_shape=torch.Size([2]),
+        condition_shape=torch.Size([2]),
+        transform_input=transform_input,
+    )
+    inference = NPE_C(prior, density_estimator=lambda theta, x: estimator)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta + torch.randn_like(theta))
+    inference.train(max_num_epochs=1)
+    inference._set_prior_state()
+    return inference, estimator
+
+
+@pytest.mark.parametrize("wrap_prior", (False, True))
+def test_npe_c_prior_as_proposal_gives_density_estimator(wrap_prior: bool):
+    """With the prior as proposal, the proposal posterior is the density estimator.
+
+    pp(theta|x) is proportional to q(theta|x) * proposal(theta) / prior(theta), so it
+    equals q when the proposal is the prior. Uses a correlated prior and a z-score
+    that differs from the prior's moments.
+    """
+    prior_mean = torch.tensor([1.0, -1.0])
+    prior_cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
+    prior = MultivariateNormal(prior_mean, prior_cov)
+    if wrap_prior:
+        prior = MultivariateNormal(prior_mean.double(), prior_cov.double())
+        prior = process_prior(prior)[0]
+    shift = torch.tensor([0.5, -1.5])
+    scale = torch.tensor([1.5, 2.5])
+    inference, estimator = _npe_c_with_mog_loss_state(
+        prior, transform_input=torch.stack([shift, scale])
+    )
+
+    prior_mean_z = (prior_mean - shift) / scale
+    prior_prec_z = torch.inverse(prior_cov / torch.outer(scale, scale))
+    mog_d = estimator.get_uncorrected_mog(torch.zeros(1, 2))
+    logits_pp, means_pp, precs_pp, _ = inference._automatic_posterior_transformation(
+        torch.zeros(1, 1),
+        prior_mean_z.reshape(1, 1, 2),
+        prior_prec_z.reshape(1, 1, 2, 2),
+        mog_d.log_weights,
+        mog_d.means,
+        mog_d.precisions,
+    )
+
+    assert torch.allclose(precs_pp, mog_d.precisions, atol=1e-4)
+    assert torch.allclose(means_pp, mog_d.means, atol=1e-4)
+    assert torch.allclose(logits_pp.log_softmax(-1), mog_d.log_weights, atol=1e-4)
+
+
+def test_npe_c_drops_non_normalizable_component_pairs():
+    """A component pair wider than the prior gets zero weight in the MoG loss.
+
+    With prior precision I and proposal precision 0.5 I, an estimator component with
+    precision diag(0.2, 4) gives the indefinite pair precision diag(-0.3, 3.5).
+    """
+    inference, _ = _npe_c_with_mog_loss_state(
+        MultivariateNormal(torch.zeros(2), torch.eye(2)), num_components=2
+    )
+    proposal = (torch.zeros(1, 1), torch.zeros(1, 1, 2), 0.5 * torch.eye(2)[None, None])
+    narrow = (torch.ones(1, 1, 2), 4.0 * torch.eye(2)[None, None])
+    wide = (-torch.ones(1, 1, 2), torch.diag(torch.tensor([0.2, 4.0]))[None, None])
+    both = (
+        torch.log(torch.tensor([[0.7, 0.3]])),
+        torch.cat([narrow[0], wide[0]], dim=1),
+        torch.cat([narrow[1], wide[1]], dim=1),
+    )
+
+    logits_pp, means_pp, precs_pp, _ = inference._automatic_posterior_transformation(
+        *proposal, *both
+    )
+    _, means_narrow, precs_narrow, _ = inference._automatic_posterior_transformation(
+        *proposal, torch.zeros(1, 1), *narrow
+    )
+
+    assert torch.allclose(logits_pp.softmax(-1), torch.tensor([[1.0, 0.0]]))
+    assert torch.allclose(means_pp[:, :1], means_narrow)
+    assert torch.allclose(precs_pp[:, :1], precs_narrow)
+    # The MoG loss factorizes every returned precision.
+    assert torch.linalg.cholesky_ex(precs_pp).info.eq(0).all()
+    with pytest.raises(ValueError, match="normalizable"):
+        inference._automatic_posterior_transformation(
+            *proposal, torch.zeros(1, 1), *wide
+        )
+
+
+@pytest.mark.parametrize("prior_var, warns", ((1e-4, True), (1e4, False)))
+def test_npe_c_warns_if_trained_estimator_has_non_normalizable_pairs(
+    prior_var: float, warns: bool
+):
+    """Pairs that are left out of the MoG loss after training raise a warning.
+
+    A prior much narrower than the untrained estimator makes every pair wider than
+    the prior; a much wider prior makes every pair normalizable.
+    """
+    prior = MultivariateNormal(torch.zeros(2), prior_var * torch.eye(2))
+    inference, estimator = _npe_c_with_mog_loss_state(prior)
+    proposal = DirectPosterior(estimator, prior).set_default_x(torch.zeros(1, 2))
+    inference._proposal_mog = inference._proposal_mog_in_z_space(proposal)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        inference._warn_if_pairs_not_normalizable(batch_size=50)
+
+    assert any("infinite mass" in str(w.message) for w in caught) == warns
+
+
+@pytest.mark.parametrize("force_first_round_loss", (False, True))
+def test_npe_c_checks_pairs_after_a_round_with_the_mog_loss(
+    force_first_round_loss: bool, monkeypatch
+):
+    """NPE-C checks the trained estimator only if the round used the MoG loss."""
+    calls = []
+    monkeypatch.setattr(
+        NPE_C, "_warn_if_pairs_not_normalizable", lambda *args: calls.append(args)
+    )
+    prior = MultivariateNormal(torch.zeros(2), 4 * torch.eye(2))
+    inference, _ = _npe_c_with_mog_loss_state(prior)
+    proposal = inference.build_posterior().set_default_x(torch.zeros(1, 2))
+    theta = proposal.sample((100,), show_progress_bars=False)
+    inference.append_simulations(
+        theta, theta + torch.randn_like(theta), proposal=proposal
+    )
+    inference.train(max_num_epochs=1, force_first_round_loss=force_first_round_loss)
+
+    assert len(calls) == int(not force_first_round_loss)
+
+
+def test_npe_c_uses_atomic_loss_for_corrected_npe_a_proposal():
+    """From round 2 on, an NPE-A proposal needs the atomic loss, because the MoG loss
+    would read the uncorrected density of its wrapped estimator."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    inference, estimator = _npe_c_with_mog_loss_state(prior)
+    round_1 = NPE_A_Posterior(estimator, prior)
+    round_2 = NPE_A_Posterior(
+        estimator, prior, proposal_mog=MoG.from_gaussian(ones(2), 2 * eye(2))
+    )
+
+    assert inference._multiround_loss_is_per_row(round_1)
+    assert not inference._multiround_loss_is_per_row(round_2)
+
+
+@pytest.mark.slow
+def test_npe_c_mog_loss_with_retrain_from_scratch():
+    """With `retrain_from_scratch=True`, the round-2 posterior has the true moments.
+
+    The retrained network has its own z-score, so the MoG loss must map the proposal
+    and the prior into it.
+    """
+    prior_cov = torch.tensor([[4.0, 3.6], [3.6, 4.0]])
+    prior = MultivariateNormal(torch.tensor([1.0, -1.0]), prior_cov)
+    x_o = zeros(1, 2)
+    # x = theta + N(0, I), so the posterior precision is the prior precision + I.
+    post_cov = torch.inverse(torch.inverse(prior_cov) + eye(2))
+    post_mean = post_cov @ torch.linalg.solve(prior_cov, prior.mean)
+    post_std = post_cov.diag().sqrt()
+
+    inference = NPE_C(prior, density_estimator="mdn", show_progress_bars=False)
+    proposal = prior
+    for round_ in range(2):
+        theta = proposal.sample((1000,))
+        inference.append_simulations(
+            theta, theta + torch.randn_like(theta), proposal=proposal
+        )
+        inference.train(retrain_from_scratch=round_ > 0)
+        proposal = inference.build_posterior().set_default_x(x_o)
+    samples = proposal.sample((5000,), show_progress_bars=False)
+
+    # Loose bounds: the spread of the retrained posterior varies between seeds.
+    assert ((samples.mean(0) - post_mean).abs() / post_std).max() < 0.5
+    std_ratio = samples.std(0) / post_std
+    assert std_ratio.min() > 0.7 and std_ratio.max() < 1.75
+    assert (torch.cov(samples.T)[0, 1] - post_cov[0, 1]).abs() < 0.6
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "num_dim",
@@ -929,3 +1157,24 @@ def test_npe_a_rejects_unconstrained_transform_after_first_round(prior):
     )
     with pytest.raises(NotImplementedError, match="affine z-score"):
         inference.build_posterior()
+
+
+def test_npe_a_gaussian_proposal_equal_to_prior_keeps_the_density():
+    """The correction maps a Gaussian proposal into the z-scored space. With the
+    proposal equal to the prior, it leaves the network's density unchanged."""
+    prior = MultivariateNormal(torch.tensor([1.0, -1.0]), 4 * eye(2))
+    inference = NPE_A(prior, num_components=1, show_progress_bars=False)
+    theta = prior.sample((100,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=1)
+
+    proposal = MultivariateNormal(torch.tensor([1.0, -1.0]), 4 * eye(2))
+    theta = proposal.sample((100,))
+    inference.append_simulations(theta, theta, proposal=proposal).train(
+        max_num_epochs=1
+    )
+    estimator = inference.build_posterior().posterior_estimator
+    theta, x = prior.sample((5,)), zeros(5, 2)
+    with torch.no_grad():
+        assert torch.allclose(
+            estimator.log_prob(theta, x), estimator.net.log_prob(theta, x), atol=1e-3
+        )
