@@ -552,7 +552,7 @@ def standardizing_net(
             t_std = torch.std(batch_t[is_valid_t], dim=0)
             t_std[t_std < min_std] = min_std
     else:
-        t_std = torch.ones(1)
+        t_std = torch.ones_like(t_mean)
         logging.warning(
             """Using a one-dimensional batch will instantiate a Standardize transform
             with (mean, std) parameters which are not representative of the data. We

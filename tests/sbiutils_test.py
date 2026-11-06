@@ -29,9 +29,11 @@ from sbi.utils.sbiutils import (
     Standardize,
     gradient_ascent,
     mcmc_transform,
+    standardizing_net,
     warn_if_invalid_for_zscoring,
     z_score_parser,
 )
+from sbi.utils.torchutils import process_device
 
 
 def test_conditional_density_1d():
@@ -490,6 +492,20 @@ def test_z_score_parser_rejects_bool(z_score_flag):
     """Booleans were deprecated in v0.18.0 and are no longer accepted."""
     with pytest.raises(ValueError, match="Invalid z-scoring option"):
         z_score_parser(z_score_flag)
+
+
+@pytest.mark.parametrize("structured", (False, True))
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
+def test_standardizing_net_from_one_row_loads_trained_state(structured, device):
+    """A net built from one row exists to load a trained net's state into."""
+    device = process_device(device)
+    trained = standardizing_net(torch.randn(100, 3, device=device), structured)
+    one_row = standardizing_net(torch.randn(1, 3, device=device), structured)
+
+    one_row.load_state_dict(trained.state_dict())
+
+    batch = torch.randn(5, 3, device=device)
+    assert torch.equal(one_row(batch), trained(batch))
 
 
 @pytest.mark.parametrize("layer_cls", (Standardize, Destandardize))
