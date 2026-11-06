@@ -4,6 +4,7 @@
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
     ConditionalVectorFieldEstimator,
+    MaskedConditionalVectorFieldEstimator,
     UnconditionalDensityEstimator,
 )
 from sbi.neural_nets.estimators.categorical_net import (
@@ -18,5 +19,8 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
 )
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.neural_nets.estimators.nflows_flow import NFlowsFlow
-from sbi.neural_nets.estimators.score_estimator import ConditionalScoreEstimator
+from sbi.neural_nets.estimators.score_estimator import (
+    ConditionalScoreEstimator,
+    MaskedConditionalScoreEstimator,
+)
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow, ZukoUnconditionalFlow

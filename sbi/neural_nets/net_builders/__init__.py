@@ -69,4 +69,6 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     VPScoreConfig,
     VectorFieldConfigBase,
     VectorFieldNetConfigBase,
+    build_masked_flow_matching_estimator,
+    build_masked_score_matching_estimator,
 )

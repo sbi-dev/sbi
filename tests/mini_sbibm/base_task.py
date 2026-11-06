@@ -44,9 +44,12 @@ class Task(ABC):
         pass
 
     @abstractmethod
-    def get_prior(self) -> Distribution:
+    def get_prior(self, device=None) -> Distribution:
         """
         Returns the prior distribution over parameters.
+
+        Args:
+            device (str or torch.device, optional): The device to initialize tensors on.
 
         Returns:
             Distribution: The prior distribution.
@@ -54,35 +57,40 @@ class Task(ABC):
         pass
 
     @abstractmethod
-    def get_simulator(self) -> Callable:
+    def get_simulator(self, device=None) -> Callable:
         """
         Returns the simulator function.
+
+        Args:
+            device (str or torch.device, optional): The device to initialize tensors on.
 
         Returns:
             Callable: The simulator function.
         """
         pass
 
-    def get_data(self, num_sims: int):
+    def get_data(self, num_sims: int, device=None):
         """
         Generates data by sampling from the prior and simulating observations.
 
         Args:
             num_sims (int): The number of simulations to run.
+            device (str or torch.device, optional): The device to initialize tensors on.
 
         Returns:
             tuple: A tuple containing the sampled parameters and simulated observations.
         """
-        thetas = self.get_prior().sample((num_sims,))
-        xs = self.get_simulator()(thetas)
+        thetas = self.get_prior(device=device).sample((num_sims,))
+        xs = self.get_simulator(device=device)(thetas)
         return thetas, xs
 
-    def get_observation(self, idx: int) -> torch.Tensor:
+    def get_observation(self, idx: int, device=None) -> torch.Tensor:
         """
         Loads a specific observation from file.
 
         Args:
             idx (int): The index of the observation to load.
+            device (str or torch.device, optional): The device to move the tensor to.
 
         Returns:
             torch.Tensor: The loaded observation.
@@ -91,22 +99,28 @@ class Task(ABC):
             PATH + os.sep + "files" + os.sep + f"{self.name}{os.sep}x_o_{idx}.pt",
             weights_only=False,
         )
+        if device is not None:
+            x_o = x_o.to(device)
         return x_o
 
-    def get_true_parameters(self, idx: int) -> torch.Tensor:
+    def get_true_parameters(self, idx: int, device=None) -> torch.Tensor:
         """
         Loads the true parameters for a specific observation from file.
 
         Args:
-            idx (int): The index of the parameters to load.
+            idx (int): The index of the observation to load.
+            device (str or torch.device, optional): The device to move the tensor to.
 
         Returns:
             torch.Tensor: The loaded true parameters.
         """
-        theta = torch.load(
-            PATH + os.sep + "files" + os.sep + f"{self.name}{os.sep}theta_{idx}.pt"
+        theta_o = torch.load(
+            PATH + os.sep + "files" + os.sep + f"{self.name}{os.sep}theta_o_{idx}.pt",
+            weights_only=False,
         )
-        return theta
+        if device is not None:
+            theta_o = theta_o.to(device)
+        return theta_o
 
     def get_reference_posterior_samples(self, idx: int) -> torch.Tensor:
         """

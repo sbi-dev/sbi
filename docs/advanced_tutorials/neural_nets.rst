@@ -11,3 +11,4 @@ Neural nets
    03_density_estimators.ipynb
    12_iid_data_and_permutation_invariant_embeddings.ipynb
    19_vector_field_methods.ipynb
+   22_simformer.ipynb

@@ -352,6 +352,8 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         Returns: Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
 
         if self.use_non_atomic_loss:
             return self._log_prob_proposal_posterior_mog(theta, x)
@@ -380,6 +382,8 @@ class NPE_C(PosteriorEstimatorTrainer):
         Returns:
             Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         batch_size = theta.shape[0]
 
         num_atoms = int(

@@ -516,4 +516,6 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         Returns: Log-probability of the proposal posterior.
         """
+        if self._neural_net is None:
+            raise RuntimeError("Neural net not initialized.")
         return self._neural_net.log_prob(theta, x)

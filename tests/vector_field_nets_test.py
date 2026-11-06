@@ -13,7 +13,9 @@ from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders.vector_field_nets import (
     AdaMLPConfig,
     FlowMatchingConfig,
+    VectorFieldSimformer,
     build_adamlp_network,
+    build_simformer_network,
     build_standard_mlp_network,
     build_transformer_network,
 )
@@ -140,6 +142,59 @@ def test_vector_field_builders_shape_and_build(
     assert out.shape == inputs.shape
 
 
+SIMFORMER_CASE = [
+    pytest.param(
+        build_simformer_network,
+        kw,
+        id="simformer-" + "-".join(f"{k}={v}" for k, v in kw.items()),
+    )
+    for kw in _grid(
+        hidden_features=[64, 128],
+        num_layers=[2, 4],
+        num_heads=[4, 8],
+        mlp_ratio=[2, 4, 8],
+        ada_time=[True, False],
+    )
+]
+
+
+@pytest.mark.parametrize("builder, builder_kwargs", SIMFORMER_CASE)
+@pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
+@pytest.mark.parametrize("time_embedding_dim", [8, 16])
+@pytest.mark.parametrize("batch_dim", [1, 3])
+@pytest.mark.parametrize("input_dim", [(1,), (3,), (1, 1), (2, 1), (3, 5)])
+def test_simformer_builder_shape_and_build(
+    builder,
+    builder_kwargs,
+    time_emb_type,
+    time_embedding_dim,
+    batch_dim,
+    input_dim,
+):
+    # Inputs / conditions
+    x = torch.randn(10, *input_dim)
+
+    net = builder(
+        batch_x=x,
+        batch_y=x,
+        time_embedding_dim=time_embedding_dim,
+        time_emb_type=time_emb_type,
+        **builder_kwargs,
+    )
+
+    # Forward pass
+    inputs = torch.randn(batch_dim, *input_dim)
+    t = torch.rand(batch_dim)
+    condition_mask = torch.ones(input_dim[0], dtype=torch.bool)
+
+    out = net(
+        inputs,
+        t,
+        condition_mask=condition_mask,
+    )
+    assert out.shape == inputs.shape
+
+
 def test_mlp_ratio_reaches_the_ada_mlp_global_mlp():
     """`mlp_ratio` controls the width of the global MLP's intermediate blocks."""
     estimator = FlowMatchingConfig(
@@ -147,3 +202,18 @@ def test_mlp_ratio_reaches_the_ada_mlp_global_mlp():
     ).build(torch.randn(10, 2), torch.randn(10, 3))
     expand = estimator.net.global_mlp.mlp_blocks[0][1]
     assert expand.out_features == 8 * expand.in_features
+
+
+@pytest.mark.parametrize("ada_time", [False, True])
+def test_simformer_edge_mask_without_self_edges_has_no_nan(ada_time):
+    """A DAG without self-edges leaves sink nodes with no key to attend to."""
+    net = VectorFieldSimformer(in_features=2, num_nodes=3, ada_time=ada_time)
+    # Chain 0 -> 1 -> 2: node 2 has an empty row.
+    edge_mask = torch.tensor([[0, 1, 0], [0, 0, 1], [0, 0, 0]], dtype=torch.bool)
+    out = net(
+        torch.randn(4, 3, 2),
+        torch.rand(4),
+        condition_mask=torch.zeros(3, dtype=torch.bool),
+        edge_mask=edge_mask.expand(4, 3, 3),
+    )
+    assert not out.isnan().any()
