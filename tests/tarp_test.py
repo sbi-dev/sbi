@@ -11,6 +11,7 @@ from torch.nn import L1Loss
 from sbi.analysis.plot import plot_tarp
 from sbi.diagnostics.tarp import _run_tarp, check_tarp, get_tarp_references, run_tarp
 from sbi.inference import NPE
+from sbi.neural_nets import MAFConfig
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform
 from sbi.utils.metrics import l1, l2
@@ -390,7 +391,7 @@ def test_consistent_run_tarp_results_with_posterior(method):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inferer = method(prior, show_progress_bars=True, density_estimator="maf")
+    inferer = method(prior, show_progress_bars=True, density_estimator=MAFConfig())
 
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
