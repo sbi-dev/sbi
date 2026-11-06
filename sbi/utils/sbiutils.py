@@ -482,8 +482,8 @@ class _MeanStdBuffers(nn.Module):
         return self._std
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
-        # Pickles from older sbi versions also hold plain `mean`/`std` copies that
-        # `.to()` never moved.
+        # Older pickles carry plain `mean`/`std` attributes; drop them so only the
+        # buffers remain.
         state.pop("mean", None)
         state.pop("std", None)
         super().__setstate__(state)

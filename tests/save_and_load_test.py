@@ -22,7 +22,12 @@ from sbi.inference.posteriors.posterior_parameters import (
     VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.neural_nets import classifier_nn, posterior_flow_nn, posterior_nn
+from sbi.neural_nets import (
+    classifier_nn,
+    likelihood_nn,
+    posterior_flow_nn,
+    posterior_nn,
+)
 from sbi.utils.sbiutils import load_with_version
 from sbi.utils.torchutils import process_device
 
@@ -259,11 +264,12 @@ def _saved_locations(net) -> set:
 @pytest.mark.parametrize(
     "build",
     [
-        pytest.param(lambda t, x: posterior_nn("maf")(t, x), id="maf"),
-        pytest.param(lambda t, x: posterior_nn("mdn")(t, x), id="mdn"),
-        pytest.param(lambda t, x: posterior_nn("zuko_nsf")(t, x), id="zuko_nsf"),
-        pytest.param(lambda t, x: classifier_nn("resnet")(t, x), id="classifier"),
-        pytest.param(lambda t, x: posterior_flow_nn("mlp")(t, x), id="flow_matching"),
+        pytest.param(posterior_nn("maf"), id="maf"),
+        pytest.param(posterior_nn("mdn"), id="mdn"),
+        pytest.param(posterior_nn("zuko_nsf"), id="zuko_nsf"),
+        pytest.param(likelihood_nn("maf"), id="likelihood_maf"),
+        pytest.param(classifier_nn("resnet"), id="classifier"),
+        pytest.param(posterior_flow_nn("mlp"), id="flow_matching"),
         pytest.param(lambda t, x: destandardizing_net(x), id="destandardizing_net"),
     ],
 )
