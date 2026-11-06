@@ -464,14 +464,33 @@ def z_standardization(
     return t_mean, t_std
 
 
-class Standardize(nn.Module):
+class _MeanStdBuffers(nn.Module):
+    """Holds `mean` and `std` as buffers, so `.to()` moves and casts them."""
+
     def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
-        super(Standardize, self).__init__()
+        super().__init__()
         mean, std = map(torch.as_tensor, (mean, std))
-        self.mean = mean
-        self.std = std
         self.register_buffer("_mean", mean)
         self.register_buffer("_std", std)
+
+    @property
+    def mean(self) -> Tensor:
+        return self._mean
+
+    @property
+    def std(self) -> Tensor:
+        return self._std
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        # Pickles from older sbi versions also hold plain `mean`/`std` copies that
+        # `.to()` never moved.
+        state.pop("mean", None)
+        state.pop("std", None)
+        super().__setstate__(state)
+
+
+class Standardize(_MeanStdBuffers):
+    """Z-scores its input: `(input - mean) / std`."""
 
     def forward(self, tensor):
         return (tensor - self._mean) / self._std

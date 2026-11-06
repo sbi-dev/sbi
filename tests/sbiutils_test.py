@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import pickle
 import warnings
 from typing import Tuple
 
@@ -20,10 +21,12 @@ from sbi.analysis import (
     eval_conditional_density,
     sensitivity_analysis,
 )
+from sbi.analysis.sensitivity_analysis import Destandardize
 from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
+    Standardize,
     gradient_ascent,
     mcmc_transform,
     warn_if_invalid_for_zscoring,
@@ -487,6 +490,27 @@ def test_z_score_parser_rejects_bool(z_score_flag):
     """Booleans were deprecated in v0.18.0 and are no longer accepted."""
     with pytest.raises(ValueError, match="Invalid z-scoring option"):
         z_score_parser(z_score_flag)
+
+
+@pytest.mark.parametrize("layer_cls", (Standardize, Destandardize))
+def test_mean_and_std_follow_dtype_cast(layer_cls):
+    """`mean` and `std` must be the buffers that `.to()` casts, not stale copies."""
+    layer = layer_cls(torch.zeros(2), torch.ones(2)).double()
+
+    assert layer.mean.dtype == layer.std.dtype == torch.float64
+
+
+@pytest.mark.parametrize("layer_cls", (Standardize, Destandardize))
+def test_older_pickle_loads_without_stale_mean_and_std(layer_cls):
+    """Older sbi versions pickled plain `mean`/`std` copies beside the buffers."""
+    layer = layer_cls(torch.zeros(2), 2 * torch.ones(2))
+    layer.__dict__.update(mean=torch.ones(2), std=torch.ones(2))
+
+    loaded = pickle.loads(pickle.dumps(layer))
+
+    assert "mean" not in vars(loaded) and "std" not in vars(loaded)
+    assert torch.equal(loaded.mean, torch.zeros(2))
+    assert torch.equal(loaded.std, 2 * torch.ones(2))
 
 
 @pytest.mark.parametrize(

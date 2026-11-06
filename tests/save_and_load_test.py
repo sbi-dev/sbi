@@ -9,6 +9,7 @@ import torch
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
+from sbi.analysis.sensitivity_analysis import destandardizing_net
 from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
@@ -21,7 +22,9 @@ from sbi.inference.posteriors.posterior_parameters import (
     VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.neural_nets import classifier_nn, posterior_flow_nn, posterior_nn
 from sbi.utils.sbiutils import load_with_version
+from sbi.utils.torchutils import process_device
 
 
 def _assert_survives_pickling(posterior, num_dim: int) -> None:
@@ -236,6 +239,43 @@ def test_torch_load_map_location_same_device_is_passthrough():
     assert loaded._device == "cpu"
     assert loaded.device == "cpu"
     assert loaded.sample((10,)).shape == (10, 2)
+
+
+def _saved_locations(net) -> set:
+    """Devices of the tensors in the file that `torch.save(net)` writes."""
+    buffer, locations = io.BytesIO(), set()
+    torch.save(net, buffer)
+    buffer.seek(0)
+
+    def record(storage, location):
+        locations.add(location)
+        return storage
+
+    torch.load(buffer, weights_only=False, map_location=record)
+    return locations
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "build",
+    [
+        pytest.param(lambda t, x: posterior_nn("maf")(t, x), id="maf"),
+        pytest.param(lambda t, x: posterior_nn("zuko_nsf")(t, x), id="zuko_nsf"),
+        pytest.param(lambda t, x: classifier_nn("resnet")(t, x), id="classifier"),
+        pytest.param(lambda t, x: posterior_flow_nn("mlp")(t, x), id="flow_matching"),
+        pytest.param(lambda t, x: destandardizing_net(x), id="destandardizing_net"),
+    ],
+)
+def test_net_built_on_gpu_saves_no_gpu_tensor_after_cpu(build):
+    """A net built from GPU data and moved with `.cpu()` must load on a CPU machine.
+
+    Plain tensor attributes are not moved by `.cpu()`; a GPU tensor left in the file
+    makes `torch.load` fail without `map_location` where no GPU is available.
+    """
+    theta = torch.randn(100, 2, device=process_device("gpu"))
+    net = build(theta, theta + 0.1 * torch.randn_like(theta))
+
+    assert _saved_locations(net.cpu()) == {"cpu"}
 
 
 @pytest.mark.parametrize("kind", ["direct", "vector_field"])
