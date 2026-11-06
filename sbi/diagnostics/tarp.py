@@ -65,7 +65,10 @@ def run_tarp(
         use_batched_sampling: whether to use batched sampling for posterior samples.
 
     Returns:
-        ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
+        ecp: Expected coverage probability (``ecp``), see equation 4 of the paper,
+            at each credibility value in ``alpha``. The coverage values behind it
+            carry uniform noise, so that they are uniform on ``[0, 1]`` for a
+            calibrated posterior and any ``num_posterior_samples``.
         alpha: credibility values, ``num_bins + 1`` points evenly spaced over
             ``[0, 1]``, see equation 2 of the paper
     """
@@ -145,7 +148,9 @@ def _run_tarp(
         z_score_theta : whether to normalize parameters before coverage test.
 
     Returns:
-        ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
+        ecp: Expected coverage probability (``ecp``), see equation 4 of the paper,
+            at each credibility value in ``alpha``, computed from noisy coverage
+            values as in ``run_tarp``.
         alpha: grid of credibility values, ``num_bins + 1`` points evenly spaced over
             ``[0, 1]``, see equation 2 of the paper
 
@@ -173,9 +178,14 @@ def _run_tarp(
     # distances between references and true values
     theta_dists = distance(references, thetas)
 
-    # compute coverage, f in algorithm 2
-    coverage_values = (
-        torch.sum(sample_dists < theta_dists, dim=0) / num_posterior_samples
+    # number of posterior samples closer to the reference than theta, f in algorithm 2
+    # times num_posterior_samples
+    counts = torch.sum(sample_dists < theta_dists, dim=0)
+
+    # Under calibration the counts are uniform on 0, ..., num_posterior_samples, so
+    # the noisy counts below are uniform on [0, 1) for any num_posterior_samples.
+    coverage_values = (counts + torch.rand_like(counts, dtype=torch.float32)) / (
+        num_posterior_samples + 1
     )
 
     # enforce execution on the CPU due to

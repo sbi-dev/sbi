@@ -253,6 +253,23 @@ def test_run_tarp_alpha_grid_spans_unit_interval():
     assert allclose(ecp, tensor([0.0, 0.0, 0.5, 1.0, 1.0]))
 
 
+def test_run_tarp_calibrated_with_few_posterior_samples():
+    """ECP matches alpha for a calibrated posterior with few posterior samples.
+
+    Without noise, the coverage values are k / 10 and the ECP at alpha = 0.9 is
+    P(k < 9) = 9 / 11 for uniform k in 0, ..., 10.
+    """
+    num_posterior_samples, num_tarp_samples = 10, 2000
+    # The posterior is the prior, which is calibrated when x carries no information.
+    thetas = Normal(0.0, 1.0).sample((num_tarp_samples, 1))
+    samples = Normal(0.0, 1.0).sample((num_posterior_samples, num_tarp_samples, 1))
+    references = get_tarp_references(thetas)
+
+    ecp, alpha = _run_tarp(samples, thetas, references, num_bins=10)
+
+    assert (ecp - alpha).abs().max() < 0.05
+
+
 def test_check_tarp_correct(accurate_samples):
     """Test TARP on correct samples."""
     theta, samples = accurate_samples
