@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from math import isnan
+
 import pytest
 from torch import allclose, device, exp, eye, ones, tensor, zeros
 from torch.distributions import Normal, Uniform
@@ -185,9 +187,9 @@ def test_run_tarp_correct_on_gpu_device(accurate_samples):
         ecp - alpha
     ).abs().sum() < 1.05  # integral of residuals should vanish, fig.2 in paper
 
-    atc, kspvals = check_tarp(ecp, alpha)
+    atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
     assert -0.75 < atc < 0.75, "TARP should not detect bias"
-    assert kspvals > 0.5
+    assert kspvals > 0.05
 
 
 @pytest.mark.parametrize("distance", (l1, l2))
@@ -276,10 +278,10 @@ def test_check_tarp_correct(accurate_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(samples, theta, references)
-    atc, kspvals = check_tarp(ecp, alpha)
+    atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
 
     assert -0.75 < atc < 0.75, "TARP should not detect bias"
-    assert kspvals > 0.5  # samples are likely from the same PDF
+    assert kspvals > 0.05
 
 
 def test_check_tarp_underdispersed(underdispersed_samples):
@@ -288,7 +290,7 @@ def test_check_tarp_underdispersed(underdispersed_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(samples, theta, references, num_bins=30)
-    atc, kspvals = check_tarp(ecp, alpha)
+    atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
 
     # TARP should detect that the posterior is underdispersed (atc < 0)
     assert atc < -0.05
@@ -301,7 +303,7 @@ def test_check_tarp_overdispersed(overdispersed_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(samples, theta, references, num_bins=50, z_score_theta=False)
-    atc, kspvals = check_tarp(ecp, alpha)
+    atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
 
     assert atc > 0.02
 
@@ -313,13 +315,57 @@ def test_check_tarp_detect_bias(biased_samples):
     references = get_tarp_references(theta)
 
     ecp, alpha = _run_tarp(samples, theta, references, z_score_theta=True)
-    _, kspvals = check_tarp(ecp, alpha)
+    _, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
 
     # Unlike over/underdispersion, bias doesn't have a predictable ATC direction—
     # it depends on the geometry of bias vs reference points. So we only check
     # that the KS test rejects uniformity (the sum > 3.0 check is already covered
     # by test_run_tarp_detect_bias).
     assert kspvals < 0.05  # samples are unlikely from the same PDF
+
+
+def test_check_tarp_false_alarm_rate_when_calibrated():
+    """The p-value rejects a calibrated posterior in at most about 5% of runs.
+
+    Few posterior samples make the coverage values discrete, which a KS test
+    against a continuous uniform would flag without the noise in `_run_tarp`.
+    """
+    num_posterior_samples, num_tarp_samples, num_runs = 10, 500, 200
+    pvals = []
+    for _ in range(num_runs):
+        thetas = Normal(0.0, 1.0).sample((num_tarp_samples, 1))
+        samples = Normal(0.0, 1.0).sample((num_posterior_samples, num_tarp_samples, 1))
+        references = get_tarp_references(thetas)
+        ecp, alpha = _run_tarp(samples, thetas, references)
+        pvals.append(check_tarp(ecp, alpha, num_tarp_samples=num_tarp_samples)[1])
+
+    assert (tensor(pvals) < 0.05).float().mean() <= 0.08
+
+
+def test_check_tarp_detects_moderate_overdispersion():
+    """A posterior 1.5 times too wide gives a small p-value.
+
+    The two-sample KS test between ecp and alpha used before gave p > 0.7 here.
+    """
+    theta, samples = generate_toy_gaussian(nsamples=100, nsims=500, covfactor=1.5)
+    references = get_tarp_references(theta)
+
+    ecp, alpha = _run_tarp(samples, theta, references)
+    atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
+
+    assert atc > 0
+    assert kspvals < 0.05
+
+
+def test_check_tarp_without_num_tarp_samples_warns_and_returns_nan(accurate_samples):
+    theta, samples = accurate_samples
+    ecp, alpha = _run_tarp(samples, theta, get_tarp_references(theta))
+
+    with pytest.warns(FutureWarning, match="num_tarp_samples"):
+        atc, kspvals = check_tarp(ecp, alpha)
+
+    assert -0.75 < atc < 0.75
+    assert isnan(kspvals)
 
 
 ######################################################################
@@ -362,7 +408,7 @@ def test_consistent_run_tarp_results_with_posterior(method):
         num_posterior_samples=num_posterior_samples,
     )
 
-    atc, kspvals = check_tarp(ecp, alpha)
+    atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=num_tarp_sims)
     assert -0.1 < atc < 0.1
     assert kspvals > 0.05
 

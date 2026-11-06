@@ -13,7 +13,7 @@ import warnings
 from typing import Callable, Optional, Tuple
 
 import torch
-from scipy.stats import kstest
+from scipy.stats import kstwo
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -222,30 +222,31 @@ def get_tarp_references(thetas: Tensor) -> Tensor:
 def check_tarp(
     ecp: Tensor,
     alpha: Tensor,
+    num_tarp_samples: Optional[int] = None,
 ) -> Tuple[float, float]:
-    r"""check the obtained TARP credibitlity levels and
-    expected coverage probabilities. This will help to uncover underdispersed,
-    well covering or overdispersed posteriors.
+    r"""Return the area to curve and a calibration test for the TARP results.
 
     Args:
         ecp: expected coverage probabilities computed with the TARP method,
             i.e. first output of ``run_tarp``.
         alpha: credibility levels $\alpha$, i.e. second output of ``run_tarp``.
+        num_tarp_samples: number of simulations ``run_tarp`` used: the number of
+            ``thetas`` minus those it dropped because their ``xs`` contain NaN or
+            inf (it warns when it drops any). Needed for the p-value.
 
     Returns:
-        atc: area to curve, the difference between the ecp and alpha curve for
-            alpha values larger than 0.5. This number should be close to ``0``.
-            Values larger than ``0`` indicated overdispersed distributions (i.e.
-            the estimated posterior is too wide). Values smaller than ``0``
-            indicate underdispersed distributions (i.e. the estimated posterior
-            is too narrow). Note, this property of the ecp curve can also
-            indicate if the posterior is biased, see figure 2 of the paper for
-            details (https://arxiv.org/abs/2302.03026).
-        ks prob: p-value for a two sample Kolmogorov-Smirnov test. The null
-             hypothesis of this test is that the two distributions (ecp and
-             alpha) are identical, i.e. are produced by one common CDF. If they
-             were, the p-value should be close to ``1``. Commonly, people reject
-             the null if p-value is below 0.05!
+        atc: area to curve, the area between the ecp curve and the diagonal for
+            alpha values larger than 0.5. Values larger than ``0`` suggest an
+            overdispersed posterior (too wide), values smaller than ``0`` an
+            underdispersed one (too narrow). The ATC is a signed summary: it can be
+            close to ``0`` for a biased posterior or when deviations from the
+            diagonal cancel, so read it together with ``ks_pval`` and ``plot_tarp``.
+        ks_pval: p-value of a Kolmogorov-Smirnov test of the null hypothesis that
+            the coverage values are uniform on ``[0, 1]``, which holds for a
+            calibrated posterior. Small values (commonly below 0.05) indicate
+            miscalibration. The KS distance is taken on the ``alpha`` grid only, so
+            the test is conservative and gains power with more bins. NaN if
+            ``num_tarp_samples`` is not given.
     """
 
     # get the index of the middle of the alpha grid
@@ -253,7 +254,23 @@ def check_tarp(
     dalpha = alpha[1] - alpha[0]
     atc = ((ecp[midindex:] - alpha[midindex:]) * dalpha).sum().item()
 
-    # Kolmogorov-Smirnov test between ecp and alpha
-    kstest_pvals: float = kstest(ecp.cpu().numpy(), alpha.cpu().numpy())[1]  # type: ignore
+    if num_tarp_samples is None:
+        warnings.warn(
+            "check_tarp needs num_tarp_samples, the number of simulations used by "
+            "run_tarp, to compute the KS p-value, and returns NaN without it. "
+            "sbi 0.27 and earlier returned a p-value that compared the ecp values "
+            "with the alpha grid and did not test calibration. num_tarp_samples "
+            "will become a required argument.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        return atc, float("nan")
+    if num_tarp_samples < 1:
+        raise ValueError(f"num_tarp_samples must be positive, got {num_tarp_samples}.")
 
-    return atc, kstest_pvals
+    # ecp at each alpha is the empirical CDF of the coverage values just below
+    # alpha, so this is the KS distance on the grid, a lower bound of the full one.
+    ks_distance = (ecp - alpha).abs().max().item()
+    ks_pval = float(kstwo(num_tarp_samples).sf(ks_distance))
+
+    return atc, ks_pval
