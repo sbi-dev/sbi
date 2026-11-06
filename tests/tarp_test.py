@@ -137,7 +137,7 @@ def test_distances(accurate_samples):
 def test_run_tarp_correct(distance, z_score_theta, accurate_samples):
     theta, samples = accurate_samples
 
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(
         samples,
@@ -172,7 +172,7 @@ def test_run_tarp_correct_on_gpu_device(accurate_samples):
 
             histogram(zeros((3,)).to(dev), bins=4)
 
-    references = get_tarp_references(theta).to(dev)
+    references = get_tarp_references(theta, samples).to(dev)
 
     ecp, alpha = _run_tarp(
         samples,
@@ -196,7 +196,7 @@ def test_run_tarp_correct_on_gpu_device(accurate_samples):
 @pytest.mark.parametrize("distance", (l1, l2))
 def test_run_tarp_detect_overdispersed(distance, overdispersed_samples):
     theta, samples = overdispersed_samples
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(
         samples, theta, references, num_bins=30, z_score_theta=True, distance=distance
@@ -211,7 +211,7 @@ def test_run_tarp_detect_overdispersed(distance, overdispersed_samples):
 @pytest.mark.parametrize("distance", (l1, l2))
 def test_run_tarp_detect_underdispersed(distance, underdispersed_samples):
     theta, samples = underdispersed_samples
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(
         samples, theta, references, num_bins=30, z_score_theta=True, distance=distance
@@ -226,7 +226,7 @@ def test_run_tarp_detect_underdispersed(distance, underdispersed_samples):
 @pytest.mark.parametrize("distance", (l1, l2))
 def test_run_tarp_detect_bias(distance, biased_samples):
     theta, samples = biased_samples
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(
         samples, theta, references, distance=distance, z_score_theta=True
@@ -267,7 +267,7 @@ def test_run_tarp_calibrated_with_few_posterior_samples():
     # The posterior is the prior, which is calibrated when x carries no information.
     thetas = Normal(0.0, 1.0).sample((num_tarp_samples, 1))
     samples = Normal(0.0, 1.0).sample((num_posterior_samples, num_tarp_samples, 1))
-    references = get_tarp_references(thetas)
+    references = get_tarp_references(thetas, samples)
 
     ecp, alpha = _run_tarp(samples, thetas, references, num_bins=10)
 
@@ -277,7 +277,7 @@ def test_run_tarp_calibrated_with_few_posterior_samples():
 def test_check_tarp_correct(accurate_samples):
     """Test TARP on correct samples."""
     theta, samples = accurate_samples
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(samples, theta, references)
     atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
@@ -289,7 +289,7 @@ def test_check_tarp_correct(accurate_samples):
 def test_check_tarp_underdispersed(underdispersed_samples):
     """Test TARP on underdispersed samples."""
     theta, samples = underdispersed_samples
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(samples, theta, references, num_bins=30)
     atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
@@ -302,7 +302,7 @@ def test_check_tarp_underdispersed(underdispersed_samples):
 
 def test_check_tarp_overdispersed(overdispersed_samples):
     theta, samples = overdispersed_samples
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(samples, theta, references, num_bins=50, z_score_theta=False)
     atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
@@ -314,7 +314,7 @@ def test_check_tarp_overdispersed(overdispersed_samples):
 
 def test_check_tarp_detect_bias(biased_samples):
     theta, samples = biased_samples
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(samples, theta, references, z_score_theta=True)
     _, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
@@ -337,7 +337,7 @@ def test_check_tarp_false_alarm_rate_when_calibrated():
     for _ in range(num_runs):
         thetas = Normal(0.0, 1.0).sample((num_tarp_samples, 1))
         samples = Normal(0.0, 1.0).sample((num_posterior_samples, num_tarp_samples, 1))
-        references = get_tarp_references(thetas)
+        references = get_tarp_references(thetas, samples)
         ecp, alpha = _run_tarp(samples, thetas, references)
         pvals.append(check_tarp(ecp, alpha, num_tarp_samples=num_tarp_samples)[1])
 
@@ -347,24 +347,23 @@ def test_check_tarp_false_alarm_rate_when_calibrated():
 class _PriorAsPosterior:
     """Samples N(0, I) whatever x is: calibrated when theta ~ N(0, I) and x is noise."""
 
+    def __init__(self, num_dims):
+        self.num_dims = num_dims
+
     def sample_batched(self, sample_shape, x, show_progress_bars=False):
-        return randn(*sample_shape, *x.shape)
+        return randn(*sample_shape, x.shape[0], self.num_dims)
 
 
 def test_run_tarp_defaults_calibrated_in_high_dimensions():
-    """With run_tarp's default references and z-scoring, the p-value keeps its level.
-
-    Bounds taken from thetas alone put each theta at the edge of its own box in some
-    dimensions, which inflates the rejection rate for a calibrated posterior.
-    """
+    """With run_tarp's default references and z-scoring, the p-value keeps its level."""
     num_dims, num_tarp_samples, num_runs = 250, 100, 100
     pvals = []
     for _ in range(num_runs):
         thetas = randn(num_tarp_samples, num_dims)
         ecp, alpha = run_tarp(
             thetas,
-            randn(num_tarp_samples, num_dims),
-            _PriorAsPosterior(),  # type: ignore[arg-type]
+            randn(num_tarp_samples, 3),
+            _PriorAsPosterior(num_dims),  # type: ignore[arg-type]
             num_posterior_samples=10,
             show_progress_bar=False,
         )
@@ -376,7 +375,7 @@ def test_run_tarp_defaults_calibrated_in_high_dimensions():
 def test_check_tarp_detects_moderate_overdispersion():
     """A posterior 1.5 times too wide gives a small p-value."""
     theta, samples = generate_toy_gaussian(nsamples=100, nsims=500, covfactor=1.5)
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(samples, theta, references)
     atc, kspvals = check_tarp(ecp, alpha, num_tarp_samples=theta.shape[0])
@@ -387,7 +386,7 @@ def test_check_tarp_detects_moderate_overdispersion():
 
 def test_check_tarp_without_num_tarp_samples_warns_and_returns_nan(accurate_samples):
     theta, samples = accurate_samples
-    ecp, alpha = _run_tarp(samples, theta, get_tarp_references(theta))
+    ecp, alpha = _run_tarp(samples, theta, get_tarp_references(theta, samples))
 
     with pytest.warns(FutureWarning, match="num_tarp_samples"):
         atc, kspvals = check_tarp(ecp, alpha)
@@ -445,7 +444,7 @@ def test_consistent_run_tarp_results_with_posterior(method):
 @pytest.mark.parametrize("title", ["Correct", None])
 def test_tarp_plotting(title: str, accurate_samples):
     theta, samples = accurate_samples
-    references = get_tarp_references(theta)
+    references = get_tarp_references(theta, samples)
 
     ecp, alpha = _run_tarp(samples, theta, references)
 
