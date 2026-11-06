@@ -4,7 +4,7 @@
 from math import isnan
 
 import pytest
-from torch import allclose, device, exp, eye, ones, randn, tensor, zeros
+from torch import allclose, device, exp, eye, ones, randint, randn, tensor, zeros
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
@@ -270,6 +270,18 @@ def test_run_tarp_calibrated_with_few_posterior_samples():
     references = get_tarp_references(thetas, samples)
 
     ecp, alpha = _run_tarp(samples, thetas, references, num_bins=10)
+
+    assert (ecp - alpha).abs().max() < 0.05
+
+
+def test_run_tarp_calibrated_with_discrete_parameters():
+    """ECP matches alpha when theta ties with posterior samples in distance."""
+    num_tarp_samples = 2000
+    # Bernoulli parameter, the posterior is the prior, one posterior sample.
+    thetas = randint(0, 2, (num_tarp_samples, 1)).float()
+    samples = randint(0, 2, (1, num_tarp_samples, 1)).float()
+
+    ecp, alpha = _run_tarp(samples, thetas, zeros(num_tarp_samples, 1), num_bins=10)
 
     assert (ecp - alpha).abs().max() < 0.05
 

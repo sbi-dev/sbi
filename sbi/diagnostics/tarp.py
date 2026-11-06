@@ -49,10 +49,10 @@ def run_tarp(
         xs: observed data for tarp, simulated from thetas.
         posterior: a posterior obtained from sbi.
         references: reference points, one per theta, of shape
-            ``(num_tarp_samples, num_dims)``. A reference must not depend on its theta
-            in another way than on that theta's posterior samples, e.g. draw them from
-            the prior. If ``None``, they are drawn uniformly from the box spanned by
-            ``thetas`` and the posterior samples, see ``get_tarp_references``.
+            ``(num_tarp_samples, num_dims)``. Draw each reference independently of
+            its theta and of the posterior samples, e.g. from the prior. If
+            ``None``, they are drawn uniformly from a box that treats ``thetas`` and
+            posterior samples alike, see ``get_tarp_references``.
         num_posterior_samples: number of approximate posterior samples used for ranking.
         num_workers: number of CPU cores to use for running inference in parallel.
         show_progress_bar: whether to display a progress over sbc runs.
@@ -183,14 +183,16 @@ def _run_tarp(
     theta_dists = distance(references, thetas)
 
     # number of posterior samples closer to the reference than theta (f in algorithm 2
-    # is this count divided by num_posterior_samples)
-    counts = torch.sum(sample_dists < theta_dists, dim=0)
+    # is this count divided by num_posterior_samples); theta takes a random position
+    # among posterior samples at the same distance
+    ties = torch.sum(sample_dists == theta_dists, dim=0)
+    counts = torch.sum(sample_dists < theta_dists, dim=0) + torch.floor(
+        torch.rand_like(ties, dtype=torch.float32) * (ties + 1)
+    )
 
     # Under calibration the counts are uniform on 0, ..., num_posterior_samples, so
     # the noisy counts below are uniform on [0, 1) for any num_posterior_samples.
-    coverage_values = (counts + torch.rand_like(counts, dtype=torch.float32)) / (
-        num_posterior_samples + 1
-    )
+    coverage_values = (counts + torch.rand_like(counts)) / (num_posterior_samples + 1)
 
     # enforce execution on the CPU due to
     # https://github.com/pytorch/pytorch/issues/69519
@@ -268,8 +270,9 @@ def check_tarp(
             calibrated posterior. Small values (commonly below 0.05) indicate
             miscalibration. The KS distance is taken on the ``alpha`` grid only, so
             the test is conservative and loses power with fewer bins than
-            simulations. NaN if
-            ``num_tarp_samples`` is not given.
+            simulations. The test assumes independent posterior samples: for MCMC
+            posteriors, thin the chains until the samples are close to independent.
+            NaN if ``num_tarp_samples`` is not given.
     """
 
     # get the index of the middle of the alpha grid
