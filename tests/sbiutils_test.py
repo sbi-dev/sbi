@@ -21,7 +21,7 @@ from sbi.analysis import (
     eval_conditional_density,
     sensitivity_analysis,
 )
-from sbi.analysis.sensitivity_analysis import Destandardize
+from sbi.analysis.sensitivity_analysis import Destandardize, destandardizing_net
 from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
@@ -494,13 +494,20 @@ def test_z_score_parser_rejects_bool(z_score_flag):
         z_score_parser(z_score_flag)
 
 
-@pytest.mark.parametrize("structured", (False, True))
+@pytest.mark.parametrize(
+    "build",
+    [
+        pytest.param(lambda batch: standardizing_net(batch), id="independent"),
+        pytest.param(lambda batch: standardizing_net(batch, True), id="structured"),
+        pytest.param(destandardizing_net, id="destandardizing_net"),
+    ],
+)
 @pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
-def test_standardizing_net_from_one_row_loads_trained_state(structured, device):
+def test_net_from_one_row_loads_trained_state(build, device):
     """A net built from one row exists to load a trained net's state into."""
     device = process_device(device)
-    trained = standardizing_net(torch.randn(100, 3, device=device), structured)
-    one_row = standardizing_net(torch.randn(1, 3, device=device), structured)
+    trained = build(torch.randn(100, 3, device=device))
+    one_row = build(torch.randn(1, 3, device=device))
 
     one_row.load_state_dict(trained.state_dict())
 
