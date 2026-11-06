@@ -72,7 +72,8 @@ def run_tarp(
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper,
             at each credibility value in ``alpha``. The coverage values behind it
             carry uniform noise, so that they are uniform on ``[0, 1]`` for a
-            calibrated posterior and any ``num_posterior_samples``.
+            calibrated posterior and any ``num_posterior_samples``; ``ecp`` varies
+            between calls unless the torch seed is fixed.
         alpha: credibility values, ``num_bins + 1`` points evenly spaced over
             ``[0, 1]``, see equation 2 of the paper
     """
@@ -179,8 +180,8 @@ def _run_tarp(
     # distances between references and true values
     theta_dists = distance(references, thetas)
 
-    # number of posterior samples closer to the reference than theta, f in algorithm 2
-    # times num_posterior_samples
+    # number of posterior samples closer to the reference than theta (f in algorithm 2
+    # is this count divided by num_posterior_samples)
     counts = torch.sum(sample_dists < theta_dists, dim=0)
 
     # Under calibration the counts are uniform on 0, ..., num_posterior_samples, so
@@ -284,7 +285,7 @@ def check_tarp(
         warnings.warn(
             "check_tarp needs num_tarp_samples, the number of simulations used by "
             "run_tarp, to compute the KS p-value, and returns NaN without it. "
-            "sbi 0.27 and earlier returned a p-value that compared the ecp values "
+            "Earlier sbi versions returned a p-value that compared the ecp values "
             "with the alpha grid and did not test calibration. num_tarp_samples "
             "will become a required argument.",
             FutureWarning,

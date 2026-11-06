@@ -245,7 +245,8 @@ def test_run_tarp_alpha_grid_spans_unit_interval():
     references = zeros((num_tarp_samples, 1))
 
     # k of the 10 samples lie closer to the reference than theta, so the coverage
-    # values are k / 10 for k in (3, 4, 6, 7), all inside [0.3, 0.7].
+    # values are (k + u) / 11 for k in (3, 4, 6, 7) and u in [0, 1), all inside
+    # [0.27, 0.73).
     samples = 2.0 * ones((num_posterior_samples, num_tarp_samples, 1))
     for idx, k in enumerate((3, 4, 6, 7) * (num_tarp_samples // 4)):
         samples[:k, idx] = 0.5
@@ -328,8 +329,8 @@ def test_check_tarp_detect_bias(biased_samples):
 def test_check_tarp_false_alarm_rate_when_calibrated():
     """The p-value rejects a calibrated posterior in at most about 5% of runs.
 
-    Few posterior samples make the coverage values discrete, which a KS test
-    against a continuous uniform would flag without the noise in `_run_tarp`.
+    Few posterior samples make the counts behind the coverage values discrete; the
+    test must still keep its level.
     """
     num_posterior_samples, num_tarp_samples, num_runs = 10, 500, 200
     pvals = []
@@ -373,10 +374,7 @@ def test_run_tarp_defaults_calibrated_in_high_dimensions():
 
 
 def test_check_tarp_detects_moderate_overdispersion():
-    """A posterior 1.5 times too wide gives a small p-value.
-
-    The two-sample KS test between ecp and alpha used before gave p > 0.7 here.
-    """
+    """A posterior 1.5 times too wide gives a small p-value."""
     theta, samples = generate_toy_gaussian(nsamples=100, nsims=500, covfactor=1.5)
     references = get_tarp_references(theta)
 
