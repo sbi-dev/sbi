@@ -70,7 +70,7 @@ def accurate_samples():
 
 @pytest.fixture
 def underdispersed_samples():
-    # taken from the paper page 7, section 4.1 Gaussian Toy Model underconfident case
+    # too narrow, the overconfident case of the paper's Gaussian toy model (sec. 4.1)
 
     nsamples = 100  # samples per simulation
     nsims = 100
@@ -81,7 +81,7 @@ def underdispersed_samples():
 
 @pytest.fixture
 def overdispersed_samples():
-    # taken from the paper page 7, section 4.1 Gaussian Toy Model overconfident case
+    # too wide, the underconfident case of the paper's Gaussian toy model (sec. 4.1)
 
     nsamples = 100  # samples per simulation
     nsims = 100

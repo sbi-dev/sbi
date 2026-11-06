@@ -49,10 +49,11 @@ def run_tarp(
         xs: observed data for tarp, simulated from thetas.
         posterior: a posterior obtained from sbi.
         references: reference points, one per theta, of shape
-            ``(num_tarp_samples, num_dims)``. Draw each reference independently of
-            its theta and of the posterior samples, e.g. from the prior. If
-            ``None``, they are drawn uniformly from a box that treats ``thetas`` and
-            posterior samples alike, see ``get_tarp_references``.
+            ``(num_tarp_samples, num_dims)``. Given its x, draw each reference
+            independently of its theta and of the posterior samples, e.g. from the
+            prior or from a distribution that depends on x. If ``None``, they are
+            drawn uniformly from a box that treats ``thetas`` and posterior samples
+            alike, see ``get_tarp_references``.
         num_posterior_samples: number of approximate posterior samples used for ranking.
         num_workers: number of CPU cores to use for running inference in parallel.
         show_progress_bar: whether to display a progress over sbc runs.
