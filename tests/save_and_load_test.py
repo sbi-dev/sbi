@@ -260,6 +260,7 @@ def _saved_locations(net) -> set:
     "build",
     [
         pytest.param(lambda t, x: posterior_nn("maf")(t, x), id="maf"),
+        pytest.param(lambda t, x: posterior_nn("mdn")(t, x), id="mdn"),
         pytest.param(lambda t, x: posterior_nn("zuko_nsf")(t, x), id="zuko_nsf"),
         pytest.param(lambda t, x: classifier_nn("resnet")(t, x), id="classifier"),
         pytest.param(lambda t, x: posterior_flow_nn("mlp")(t, x), id="flow_matching"),

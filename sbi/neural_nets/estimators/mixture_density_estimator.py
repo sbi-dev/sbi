@@ -12,6 +12,7 @@ with code originally developed by Conor M. Durkan et al.
 Based on: C. M. Bishop, "Mixture Density Networks", NCRG Report (1994)
 """
 
+from itertools import chain
 from typing import Optional, Tuple
 
 import torch
@@ -411,8 +412,14 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
         # Validate that embedding_net output matches MDN input if embedding is provided
         if embedding_net is not None:
+            tensors = chain(
+                self._embedding_net.parameters(), self._embedding_net.buffers()
+            )
+            first = next(tensors, None)
             with torch.no_grad():
-                test_input = torch.randn(1, *condition_shape)
+                test_input = torch.randn(
+                    1, *condition_shape, device=None if first is None else first.device
+                )
                 test_output = self._embedding_net(test_input)
                 embedded_dim = test_output.shape[-1]
             if embedded_dim != net.context_features:
