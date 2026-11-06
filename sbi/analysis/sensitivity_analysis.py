@@ -15,17 +15,15 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from sbi.utils.sbiutils import handle_invalid_x, standardizing_net
+from sbi.utils.sbiutils import (
+    _MeanStdBuffers,
+    handle_invalid_x,
+    standardizing_net,
+)
 
 
-class Destandardize(nn.Module):
-    def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
-        super(Destandardize, self).__init__()
-        mean, std = map(torch.as_tensor, (mean, std))
-        self.mean = mean
-        self.std = std
-        self.register_buffer("_mean", mean)
-        self.register_buffer("_std", std)
+class Destandardize(_MeanStdBuffers):
+    """Undoes z-scoring: `input * std + mean`."""
 
     def forward(self, tensor):
         return tensor * self._std + self._mean
@@ -53,7 +51,7 @@ def destandardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
         t_std = torch.std(batch_t[is_valid_t], dim=0)
         t_std[t_std < min_std] = min_std
     else:
-        t_std = 1
+        t_std = torch.ones_like(t_mean)
         logging.warning(
             """Using a one-dimensional batch will instantiate a Standardize transform
             with (mean, std) parameters which are not representative of the data. We

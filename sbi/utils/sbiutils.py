@@ -464,14 +464,33 @@ def z_standardization(
     return t_mean, t_std
 
 
-class Standardize(nn.Module):
+class _MeanStdBuffers(nn.Module):
+    """Holds `mean` and `std` as buffers, so `.to()` moves and casts them."""
+
     def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
-        super(Standardize, self).__init__()
+        super().__init__()
         mean, std = map(torch.as_tensor, (mean, std))
-        self.mean = mean
-        self.std = std
         self.register_buffer("_mean", mean)
         self.register_buffer("_std", std)
+
+    @property
+    def mean(self) -> Tensor:
+        return self._mean
+
+    @property
+    def std(self) -> Tensor:
+        return self._std
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        # Older pickles carry plain `mean`/`std` attributes; drop them so only the
+        # buffers remain.
+        state.pop("mean", None)
+        state.pop("std", None)
+        super().__setstate__(state)
+
+
+class Standardize(_MeanStdBuffers):
+    """Z-scores its input: `(input - mean) / std`."""
 
     def forward(self, tensor):
         return (tensor - self._mean) / self._std
@@ -533,7 +552,7 @@ def standardizing_net(
             t_std = torch.std(batch_t[is_valid_t], dim=0)
             t_std[t_std < min_std] = min_std
     else:
-        t_std = torch.ones(1)
+        t_std = torch.ones_like(t_mean)
         logging.warning(
             """Using a one-dimensional batch will instantiate a Standardize transform
             with (mean, std) parameters which are not representative of the data. We

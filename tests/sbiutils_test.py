@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import pickle
 import warnings
 from typing import Tuple
 
@@ -20,15 +21,19 @@ from sbi.analysis import (
     eval_conditional_density,
     sensitivity_analysis,
 )
+from sbi.analysis.sensitivity_analysis import Destandardize, destandardizing_net
 from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
+    Standardize,
     gradient_ascent,
     mcmc_transform,
+    standardizing_net,
     warn_if_invalid_for_zscoring,
     z_score_parser,
 )
+from sbi.utils.torchutils import process_device
 
 
 def test_conditional_density_1d():
@@ -487,6 +492,48 @@ def test_z_score_parser_rejects_bool(z_score_flag):
     """Booleans were deprecated in v0.18.0 and are no longer accepted."""
     with pytest.raises(ValueError, match="Invalid z-scoring option"):
         z_score_parser(z_score_flag)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        pytest.param(lambda batch: standardizing_net(batch), id="independent"),
+        pytest.param(lambda batch: standardizing_net(batch, True), id="structured"),
+        pytest.param(destandardizing_net, id="destandardizing_net"),
+    ],
+)
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
+def test_net_from_one_row_loads_trained_state(build, device):
+    """A net built from one row exists to load a trained net's state into."""
+    device = process_device(device)
+    trained = build(torch.randn(100, 3, device=device))
+    one_row = build(torch.randn(1, 3, device=device))
+
+    one_row.load_state_dict(trained.state_dict())
+
+    batch = torch.randn(5, 3, device=device)
+    assert torch.equal(one_row(batch), trained(batch))
+
+
+@pytest.mark.parametrize("layer_cls", (Standardize, Destandardize))
+def test_mean_and_std_follow_dtype_cast(layer_cls):
+    """`mean` and `std` must be the buffers that `.to()` casts, not stale copies."""
+    layer = layer_cls(torch.zeros(2), torch.ones(2)).double()
+
+    assert layer.mean.dtype == layer.std.dtype == torch.float64
+
+
+@pytest.mark.parametrize("layer_cls", (Standardize, Destandardize))
+def test_older_pickle_loads_without_stale_mean_and_std(layer_cls):
+    """Older sbi versions pickled plain `mean`/`std` copies beside the buffers."""
+    layer = layer_cls(torch.zeros(2), 2 * torch.ones(2))
+    layer.__dict__.update(mean=torch.ones(2), std=torch.ones(2))
+
+    loaded = pickle.loads(pickle.dumps(layer))
+
+    assert "mean" not in vars(loaded) and "std" not in vars(loaded)
+    assert torch.equal(loaded.mean, torch.zeros(2))
+    assert torch.equal(loaded.std, 2 * torch.ones(2))
 
 
 @pytest.mark.parametrize(
