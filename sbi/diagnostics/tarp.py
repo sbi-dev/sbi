@@ -63,9 +63,9 @@ def run_tarp(
             return ``(batch,1)`` distance values.
             Possible values: ``sbi.utils.metrics.l1`` or
             ``sbi.utils.metrics.l2``. ``l2`` is the default.
-        num_bins: number of bins to use for the credibility values.
-            If ``None``, then ``num_tarp_samples // 10`` bins are used, which targets
-            at least 10 samples per bin (requires ``num_tarp_samples >= 100``).
+        num_bins: number of bins to use for the credibility values. If ``None``,
+            one bin per simulation, so that the KS test in ``check_tarp``, which
+            sees the coverage values only at the bin edges, loses little power.
         z_score_theta : whether to rescale each parameter dimension to ``[0, 1]``,
             using the minimum and maximum over thetas and posterior samples.
         use_batched_sampling: whether to use batched sampling for posterior samples.
@@ -148,7 +148,7 @@ def _run_tarp(
                 Possible values: ``sbi.utils.metrics.l1`` or
                 ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
-                If ``None``, then ``num_tarp_samples // 10`` bins are used.
+                If ``None``, one bin per simulation.
         z_score_theta : whether to rescale each parameter dimension to ``[0, 1]``,
                 using the minimum and maximum over thetas and posterior samples.
 
@@ -168,7 +168,7 @@ def _run_tarp(
     )
 
     if num_bins is None:
-        num_bins = num_tarp_samples // 10
+        num_bins = num_tarp_samples
 
     if z_score_theta:
         lo, hi = _get_tarp_bounds(thetas, posterior_samples)
@@ -267,7 +267,8 @@ def check_tarp(
             the coverage values are uniform on ``[0, 1]``, which holds for a
             calibrated posterior. Small values (commonly below 0.05) indicate
             miscalibration. The KS distance is taken on the ``alpha`` grid only, so
-            the test is conservative and gains power with more bins. NaN if
+            the test is conservative and loses power with fewer bins than
+            simulations. NaN if
             ``num_tarp_samples`` is not given.
     """
 
