@@ -4,7 +4,7 @@
 from math import isnan
 
 import pytest
-from torch import allclose, device, exp, eye, ones, tensor, zeros
+from torch import allclose, device, exp, eye, ones, randn, tensor, zeros
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
@@ -341,6 +341,35 @@ def test_check_tarp_false_alarm_rate_when_calibrated():
         pvals.append(check_tarp(ecp, alpha, num_tarp_samples=num_tarp_samples)[1])
 
     assert (tensor(pvals) < 0.05).float().mean() <= 0.08
+
+
+class _PriorAsPosterior:
+    """Samples N(0, I) whatever x is: calibrated when theta ~ N(0, I) and x is noise."""
+
+    def sample_batched(self, sample_shape, x, show_progress_bars=False):
+        return randn(*sample_shape, *x.shape)
+
+
+def test_run_tarp_defaults_calibrated_in_high_dimensions():
+    """With run_tarp's default references and z-scoring, the p-value keeps its level.
+
+    Bounds taken from thetas alone put each theta at the edge of its own box in some
+    dimensions, which inflates the rejection rate for a calibrated posterior.
+    """
+    num_dims, num_tarp_samples, num_runs = 250, 100, 100
+    pvals = []
+    for _ in range(num_runs):
+        thetas = randn(num_tarp_samples, num_dims)
+        ecp, alpha = run_tarp(
+            thetas,
+            randn(num_tarp_samples, num_dims),
+            _PriorAsPosterior(),  # type: ignore[arg-type]
+            num_posterior_samples=10,
+            show_progress_bar=False,
+        )
+        pvals.append(check_tarp(ecp, alpha, num_tarp_samples=num_tarp_samples)[1])
+
+    assert (tensor(pvals) < 0.05).float().mean() <= 0.1
 
 
 def test_check_tarp_detects_moderate_overdispersion():

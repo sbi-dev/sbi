@@ -48,6 +48,10 @@ def run_tarp(
         thetas: ground-truth parameters for tarp, simulated from the prior.
         xs: observed data for tarp, simulated from thetas.
         posterior: a posterior obtained from sbi.
+        references: reference points, one per theta, of shape
+            ``(num_tarp_samples, num_dims)``. They must be drawn independently of
+            ``thetas``. If ``None``, they are drawn uniformly from the box spanned by
+            ``thetas`` and the posterior samples, see ``get_tarp_references``.
         num_posterior_samples: number of approximate posterior samples used for ranking.
         num_workers: number of CPU cores to use for running inference in parallel.
         show_progress_bar: whether to display a progress over sbc runs.
@@ -100,7 +104,7 @@ def run_tarp(
 
     # Sample reference points uniformly if not provided
     if references is None:
-        references = get_tarp_references(thetas)
+        references = get_tarp_references(thetas, posterior_samples)
 
     return _run_tarp(
         posterior_samples, thetas, references, distance, num_bins, z_score_theta
@@ -131,11 +135,8 @@ def _run_tarp(
         theta: The true parameter value theta. Theta is expected to
                  have shape ``(num_tarp_samples, num_dims)``.
         references: the reference points to use for the coverage regions, with
-                shape ``(1, num_tarp_samples, num_dims)``, or ``None``.
-                If ``None``, then reference points are chosen randomly from
-                the unit hypercube over the parameter space given by theta.
-                In other words, reference samples are drawn from the
-                following ``Uniform(low=theta.min(dim=-1),high=theta.max(dim=-1))``.
+                shape ``(num_tarp_samples, num_dims)``, e.g. from
+                ``get_tarp_references``.
         distance: the distance metric to use when computing the distance.
                 Should be a callable function that accepts two tensors and
                 computes the distance between them, e.g. given two tensors
@@ -145,7 +146,8 @@ def _run_tarp(
                 ``sbi.utils.metrics.l2``. ``l2`` is the default.
         num_bins: number of bins to use for the credibility values.
                 If ``None``, then ``num_tarp_samples // 10`` bins are used.
-        z_score_theta : whether to normalize parameters before coverage test.
+        z_score_theta : whether to rescale each parameter dimension to ``[0, 1]``,
+                using the minimum and maximum over thetas and posterior samples.
 
     Returns:
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper,
@@ -166,8 +168,7 @@ def _run_tarp(
         num_bins = num_tarp_samples // 10
 
     if z_score_theta:
-        lo = thetas.min(dim=0, keepdim=True).values  # min over batch
-        hi = thetas.max(dim=0, keepdim=True).values  # max over batch
+        lo, hi = _get_tarp_bounds(thetas, posterior_samples)
         posterior_samples = (posterior_samples - lo) / (hi - lo + 1e-10)
         thetas = (thetas - lo) / (hi - lo + 1e-10)
         references = (references - lo) / (hi - lo + 1e-10)
@@ -206,17 +207,42 @@ def _run_tarp(
     return ecp, alpha_grid
 
 
-def get_tarp_references(thetas: Tensor) -> Tensor:
-    """Returns reference points for the TARP diagnostic, sampled from a uniform."""
+def get_tarp_references(
+    thetas: Tensor, posterior_samples: Optional[Tensor] = None
+) -> Tensor:
+    """Returns one TARP reference point per theta, uniform on a box.
 
-    # obtain min/max per dimension of theta
-    lo = thetas.min(dim=0).values  # min for each theta dimension
-    hi = thetas.max(dim=0).values  # max for each theta dimension
+    Args:
+        thetas: ground-truth parameters, of shape ``(num_tarp_samples, num_dims)``.
+        posterior_samples: posterior samples for each theta, of shape
+            ``(num_posterior_samples, num_tarp_samples, num_dims)``. If given, the
+            box spans thetas and posterior samples; otherwise thetas only.
+
+    Returns:
+        Reference points of shape ``(num_tarp_samples, num_dims)``.
+    """
+    if posterior_samples is None:
+        lo, hi = thetas.min(dim=0).values, thetas.max(dim=0).values
+    else:
+        lo, hi = _get_tarp_bounds(thetas, posterior_samples)
 
     refpdf = torch.distributions.Uniform(low=lo, high=hi)
 
-    # sample one reference point for each entry in theta
     return refpdf.sample(torch.Size([thetas.shape[0]]))
+
+
+def _get_tarp_bounds(
+    thetas: Tensor, posterior_samples: Tensor
+) -> Tuple[Tensor, Tensor]:
+    """Returns the per-dimension minimum and maximum over thetas and posterior samples.
+
+    Bounds that depend on each theta and its posterior samples alike keep them
+    exchangeable, so the coverage values stay uniform under calibration. Bounds from
+    thetas alone place each theta at the edge of its own box in some dimensions.
+    """
+    lo = torch.minimum(thetas.amin(dim=0), posterior_samples.amin(dim=(0, 1)))
+    hi = torch.maximum(thetas.amax(dim=0), posterior_samples.amax(dim=(0, 1)))
+    return lo, hi
 
 
 def check_tarp(
