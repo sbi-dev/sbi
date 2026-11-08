@@ -70,18 +70,20 @@ def calculate_baseline_mmd(
             used to determine the number of samples for one set
         y: synthetic data
         n_shuffle: number of shuffles
-        max_samples: maximum number of samples to use
+        max_samples: maximum number of samples in the second set, i.e. the number
+            of synthetic samples compared to the ``n_obs`` samples of the first set
         mode: mode of MMD calculation
     """
     mmds = torch.zeros(n_shuffle)
-    if n_obs > y.shape[0]:
+    if n_obs >= y.shape[0]:
         raise ValueError(
             "n of observed samples should be less than n of synthetic samples"
         )
+    n_synthetic = min(max_samples, y.shape[0] - n_obs)
     for i in range(n_shuffle):
-        idx = torch.randperm(y.shape[0])[:max_samples]
+        idx = torch.randperm(y.shape[0])
         mmds[i] = compute_rbf_mmd_median_heuristic(
-            y[idx[:n_obs]], y[idx[n_obs:]], mode=mode
+            y[idx[:n_obs]], y[idx[n_obs : n_obs + n_synthetic]], mode=mode
         )
     return mmds
 
@@ -99,13 +101,17 @@ def calculate_p_misspecification(
         x_obs: observed data
         x: synthetic data
         n_shuffle: number of shuffles
-        max_samples: maximum number of samples to use
+        max_samples: maximum number of synthetic samples to compare to the observed
+            data
         mode: mode of MMD calculation ("biased" or "unbiased")
     """
     mmds_baseline = calculate_baseline_mmd(
         x_obs.shape[0], x, n_shuffle=n_shuffle, max_samples=max_samples, mode=mode
     )
-    mmd = compute_rbf_mmd_median_heuristic(x_obs, x[:max_samples], mode=mode)
+    # Use as many synthetic samples as the baseline does, so that the observed MMD
+    # and the MMDs under H_0 are computed from sets of the same sizes.
+    n_synthetic = min(max_samples, x.shape[0] - x_obs.shape[0])
+    mmd = compute_rbf_mmd_median_heuristic(x_obs, x[:n_synthetic], mode=mode)
     p_val = 1 - (mmds_baseline < mmd).sum().item() / n_shuffle
     return p_val, (mmds_baseline, mmd)
 
