@@ -609,14 +609,15 @@ class AcceptRejectFunction:
         logits = self._classifier.forward(theta.to(classifier_device))
         pred = F.softmax(logits, dim=1)[:, 1]
         if self._reweigh_factor is None:
-            threshold = self._classifier_thr
-            # Inclusive: a classifier certain of every valid sample sets it to 1.0.
-            predictions = pred >= threshold
+            # Inclusive: on the quantile path, the threshold is the
+            # (floor(n * a) + 1)-th smallest P(valid) of the n valid validation
+            # samples, so `>=` rejects at most floor(n * a) of them. A classifier
+            # certain of every valid sample sets it to 1.0.
+            predictions = pred >= self._classifier_thr
         else:
-            # `pred` is the probability of a valid simulation.
-            probs_valid = pred * (1 - self._reweigh_factor)
-            probs_invalid = (1 - pred) * self._reweigh_factor
-            predictions = probs_valid > probs_invalid
+            # Reweighing the odds of `pred` = P(valid) by (1 - r) / r and accepting
+            # above 0.5 reduces to p * (1 - r) > (1 - p) * r  <=>  p > r.
+            predictions = pred > self._reweigh_factor
         return predictions.bool().to(theta.device)
 
     def print_false_positive_rate(
