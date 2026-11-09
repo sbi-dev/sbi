@@ -1042,6 +1042,24 @@ def test_amortized_vi_takes_one_observation():
         posterior.potential(zeros(4, 2), x=zeros(3, 2))
 
 
+def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
+    """Amortized q(theta|x) needs an x; it ignores the x of a stale single-x fit."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    with pytest.raises(ValueError, match="Context `x` needed"):
+        posterior.sample((5,))
+
+
 @pytest.mark.slow
 def test_amortized_vi_map(linear_gaussian_setup):
     """Test that MAP estimation returns high-density region."""
@@ -1175,20 +1193,30 @@ class _CenteredPotential(BasePotential):
         return -0.5 * ((theta - self.x_o) ** 2).sum(-1)
 
 
-def test_map_follows_a_retrain_on_another_observation():
+@pytest.mark.parametrize("refit", ["train", "set_q"])
+def test_map_follows_a_refit_on_another_observation(refit):
     """Without a default x, `map()` uses the x that q was last fit to, not a cached
     MAP of an earlier fit."""
     prior = MultivariateNormal(zeros(2), eye(2))
-    posterior = VIPosterior(
-        _CenteredPotential(prior),
-        prior,
-        q="gaussian",
-        theta_transform=torch_tf.identity_transform,
-    )
+
+    def make_posterior():
+        return VIPosterior(
+            _CenteredPotential(prior),
+            prior,
+            q="gaussian",
+            theta_transform=torch_tf.identity_transform,
+        )
+
+    posterior = make_posterior()
     map_kwargs = dict(init_method=zeros(1, 2), num_iter=300, learning_rate=0.1)
     posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
     posterior.map(**map_kwargs)
-    posterior.train(x=3 * ones(1, 2), **TRAIN_KWARGS)
+    if refit == "train":
+        posterior.train(x=3 * ones(1, 2), **TRAIN_KWARGS)
+    else:
+        other = make_posterior()
+        other.train(x=3 * ones(1, 2), **TRAIN_KWARGS)
+        posterior.set_q(other)
 
     assert torch.allclose(posterior.map(**map_kwargs), 3 * ones(1, 2), atol=0.3)
 

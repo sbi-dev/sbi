@@ -564,6 +564,7 @@ class VIPosterior(NeuralPosterior):
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
+            self._map = None
             q = detach_and_deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
             if hasattr(q, "to"):
@@ -784,8 +785,9 @@ class VIPosterior(NeuralPosterior):
         A single-x q answers for one observation only, so `sample()`, `log_prob()`,
         `potential()` and `map()` fall back to it when no `x` is given.
         """
-        if x is None and self.default_x is None and self._trained_on is not None:
-            return self._trained_on
+        trained_on = self._trained_on if self._mode == "single_x" else None
+        if x is None and self.default_x is None and trained_on is not None:
+            return trained_on
         return super()._x_else_default_x(x)
 
     def _is_trained_on(self, x: Tensor) -> bool:
