@@ -8,7 +8,10 @@ import pytest
 import torch
 from torch import eye, ones, zeros
 
-from sbi.inference.posteriors.mcmc_posterior import build_from_potential
+from sbi.inference.posteriors.mcmc_posterior import (
+    MCMCPosterior,
+    build_from_potential,
+)
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
@@ -148,6 +151,23 @@ def test_slice_np_serial_thins_once(monkeypatch):
     assert samples.shape == (1, num_steps // thin, num_dim)
     # One update per dimension in each tuning step and each MCMC step.
     assert len(num_updates) == num_dim * (tuning + num_steps)
+
+
+def test_mcmc_method_sets_the_sampling_method():
+    prior = BoxUniform(-ones(2), ones(2))
+    posterior = MCMCPosterior(
+        lambda theta, x_o: prior.log_prob(theta),
+        proposal=prior,
+        method="slice_np_vectorized",
+    )
+
+    posterior.mcmc_method = "slice_np"
+    assert posterior.method == posterior.mcmc_method == "slice_np"
+    assert posterior.set_mcmc_method("slice_np_vectorized") is posterior
+    assert posterior.method == "slice_np_vectorized"
+    with pytest.raises(NotImplementedError):
+        posterior.set_mcmc_method("slice_typo")
+    assert posterior.method == "slice_np_vectorized"
 
 
 @pytest.mark.mcmc

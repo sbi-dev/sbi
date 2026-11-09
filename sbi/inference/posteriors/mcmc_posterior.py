@@ -181,7 +181,7 @@ class MCMCPosterior(NeuralPosterior):
     @property
     def mcmc_method(self) -> str:
         """Returns MCMC method."""
-        return self._mcmc_method
+        return self.method
 
     @mcmc_method.setter
     def mcmc_method(self, method: str) -> None:
@@ -201,8 +201,12 @@ class MCMCPosterior(NeuralPosterior):
 
         Returns:
             `NeuralPosterior` for chainable calls.
+
+        Raises:
+            NotImplementedError: If `method` is not an MCMC method of sbi.
         """
-        self._mcmc_method = method
+        self.potential_ = self._prepare_potential(method)
+        self.method = method
         return self
 
     def log_prob(
