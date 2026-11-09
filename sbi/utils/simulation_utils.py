@@ -37,6 +37,10 @@ from sbi.sbi_types import (
 )
 from sbi.utils.sbiutils import seed_all_backends
 
+# Several tasks per worker balance uneven run times; few tasks keep the cost of
+# sending the simulator to the workers low.
+_TASKS_PER_WORKER = 4
+
 
 def simulate_for_sbi(
     simulator: Callable,
@@ -323,20 +327,23 @@ class _Settings:
                 f'`on_error` must be "raise" or "nan", got {self.on_error!r}.'
             )
 
-    def batch_size(self, num_simulations: int) -> int:
+    def task_size(self, num_simulations: int) -> int:
+        """Returns the number of parameter sets that one process runs at a time."""
         if self.simulation_batch_size != "auto":
             return int(self.simulation_batch_size)
         if self.num_workers == 1:
             return 1
-        return ceil(num_simulations / (4 * effective_n_jobs(self.num_workers)))
+        num_tasks = _TASKS_PER_WORKER * effective_n_jobs(self.num_workers)
+        return ceil(num_simulations / num_tasks)
 
 
-class _Batch(NamedTuple):
-    """Parameter sets `theta[start : start + len(theta)]` and their call seeds."""
+class _Task(NamedTuple):
+    """Parameter sets `theta[start : start + len(theta)]`, run in one process."""
 
     theta: Array
     start: int
-    seeds: Optional[np.ndarray]
+    call_seeds: Optional[np.ndarray]  # One per simulator call.
+    worker_seed: Optional[int]  # Seeds the worker if the calls get no seeds.
 
 
 class _Failure(NamedTuple):
@@ -345,7 +352,7 @@ class _Failure(NamedTuple):
     error: Exception
 
 
-class _BatchResult(NamedTuple):
+class _TaskResult(NamedTuple):
     output: Any
     num_failed: int
     first_failure: Optional[_Failure]
@@ -367,61 +374,79 @@ def _simulate(
             f"{tuple(theta.shape)}. For one parameter set, pass `theta[None]`; for "
             "one parameter, `theta[:, None]`."
         )
-    num_simulations = len(theta)
-    if num_simulations == 0:
+    if len(theta) == 0:
         if isinstance(theta, Tensor):
             return torch.empty(0, dtype=float32, device=theta.device)
         return np.empty(0)
 
     device = theta.device if isinstance(theta, Tensor) else None
+    uses_threads = _check_backend(seed, settings.num_workers)
+    tasks = _plan_tasks(theta, settings, seed, uses_threads)
+    if seed is not None:
+        # Leaves this process seeded also when only workers reseed.
+        seed_all_backends(seed)
+
     run = partial(
         _run_batched if settings.simulator_is_batched else _run_rows,
         simulator,
         on_error=settings.on_error,
     )
-    batch_size = settings.batch_size(num_simulations)
-    starts = range(0, num_simulations, batch_size)
-    sizes = [min(batch_size, num_simulations - start) for start in starts]
-    uses_threads = _check_backend(seed, settings.num_workers)
-    call_seeds = [None] * len(starts)
-    if seed is not None and settings.simulator_is_batched:
-        call_seeds = _distinct_seeds(len(starts), seed)[:, None]
-    elif seed is not None:
-        call_seeds = np.split(_distinct_seeds(num_simulations, seed), starts[1:])
-    if seed is not None:
-        # Leaves this process seeded also when only workers reseed.
-        seed_all_backends(seed)
-
-    if settings.num_workers != 1 and isinstance(theta, Tensor):
-        theta = theta.detach().cpu()
-    batches = map(_Batch, _split(theta, batch_size), starts, call_seeds)
-    results: Generator[Any, None, None]
+    results: Generator[_TaskResult, None, None]
     if settings.num_workers == 1:
-        results = (run(batch) for batch in batches)
+        results = (run(task) for task in tasks)
     else:
-        worker_seeds = (
-            [None] * len(starts) if uses_threads else _distinct_seeds(len(starts), seed)
-        )
         parallel = Parallel(n_jobs=settings.num_workers, return_as="generator")
         results = cast(
-            Generator,
-            parallel(
-                delayed(_run_in_worker)(run, batch, worker_seed)
-                for batch, worker_seed in zip(batches, worker_seeds, strict=True)
-            ),
+            Generator, parallel(delayed(_run_in_worker)(run, task) for task in tasks)
         )
+    outputs, num_failed, first_failure = _collect(results, tasks, show_progress_bar)
 
+    if first_failure is not None:
+        _report_failures(first_failure, num_failed, len(theta))
+    x = _concatenate(outputs, fill_failed=num_failed > 0)
+    return x if device is None else _to_device(x, device)
+
+
+def _plan_tasks(
+    theta: Array, settings: _Settings, seed: Optional[int], uses_threads: bool
+) -> List[_Task]:
+    """Splits `theta` into tasks and seeds their calls, or else their workers."""
+    num_simulations = len(theta)
+    task_size = settings.task_size(num_simulations)
+    starts = range(0, num_simulations, task_size)
+    if settings.num_workers != 1 and isinstance(theta, Tensor):
+        theta = theta.detach().cpu()
+    thetas = _split(theta, task_size)
+
+    call_seeds = [None] * len(starts)
+    if seed is not None:
+        num_calls = [1 if settings.simulator_is_batched else len(t) for t in thetas]
+        seeds = _distinct_seeds(sum(num_calls), seed)
+        call_seeds = np.split(seeds, np.cumsum(num_calls)[:-1])
+    worker_seeds = [None] * len(starts)
+    if seed is None and settings.num_workers != 1 and not uses_threads:
+        worker_seeds = _distinct_seeds(len(starts), None)
+    return list(map(_Task, thetas, starts, call_seeds, worker_seeds))
+
+
+def _collect(
+    results: Generator[_TaskResult, None, None],
+    tasks: List[_Task],
+    show_progress_bar: bool,
+) -> Tuple[List[Any], int, Optional[_Failure]]:
+    """Returns the outputs of the tasks in order, the number of failed simulations
+    and the first failure."""
     outputs = []
     num_failed, first_failure = 0, None
+    num_simulations = sum(len(task.theta) for task in tasks)
     try:
         with tqdm(total=num_simulations, disable=not show_progress_bar) as pbar:
-            for size, result in zip(sizes, results, strict=True):
-                output = result.output
-                _check_num_outputs(output, size)
-                outputs.append(output)
+            for task, result in zip(tasks, results, strict=True):
+                _check_num_outputs(result.output, len(task.theta))
+                outputs.append(result.output)
                 num_failed += result.num_failed
                 first_failure = first_failure or result.first_failure
-                pbar.update(size)
+                pbar.update(len(task.theta))
     except pickle.PicklingError as error:
         error.add_note(
             "Workers need the simulator and its inputs pickled. See the FAQ on "
@@ -433,11 +458,7 @@ def _simulate(
             # Closing joblib's generator cancels the simulations not yet run.
             warnings.filterwarnings("ignore", ".*tasks", module="joblib")
             results.close()
-
-    if first_failure is not None:
-        _report_failures(first_failure, num_failed, num_simulations)
-    x = _concatenate(outputs, fill_failed=num_failed > 0)
-    return x if device is None else _to_device(x, device)
+    return outputs, num_failed, first_failure
 
 
 def _to_device(value: Any, device: torch.device) -> Any:
@@ -450,14 +471,14 @@ def _to_device(value: Any, device: torch.device) -> Any:
     return value.to(device)
 
 
-def _run_batched(simulator: Callable, batch: _Batch, on_error: OnError) -> _BatchResult:
-    """Runs a batched simulator on one batch; a failure fails the whole batch."""
-    if batch.seeds is not None:
-        seed_all_backends(batch.seeds[0])
+def _run_batched(simulator: Callable, task: _Task, on_error: OnError) -> _TaskResult:
+    """Runs a batched simulator on one task; a failure fails the whole task."""
+    if task.call_seeds is not None:
+        seed_all_backends(task.call_seeds[0])
     try:
-        return _BatchResult(_call(simulator, batch.theta), 0, None)
+        return _TaskResult(_call(simulator, task.theta), 0, None)
     except Exception as error:
-        where = f"theta[{batch.start}:{batch.start + len(batch.theta)}]"
+        where = f"theta[{task.start}:{task.start + len(task.theta)}]"
         hint = (
             "It was called with a batch of parameter sets; if it takes one per "
             "call, pass `simulator_is_batched=False`."
@@ -466,20 +487,20 @@ def _run_batched(simulator: Callable, batch: _Batch, on_error: OnError) -> _Batc
         if on_error == "raise":
             error.add_note(failure.note)
             raise
-        return _BatchResult([None] * len(batch.theta), len(batch.theta), failure)
+        return _TaskResult([None] * len(task.theta), len(task.theta), failure)
 
 
-def _run_rows(simulator: Callable, batch: _Batch, on_error: OnError) -> _BatchResult:
-    """Runs a simulator that is not batched on each parameter set of a batch."""
+def _run_rows(simulator: Callable, task: _Task, on_error: OnError) -> _TaskResult:
+    """Runs a simulator that is not batched on each parameter set of a task."""
     outputs = []
     num_failed, first_failure = 0, None
-    for i, theta in enumerate(batch.theta):
-        if batch.seeds is not None:
-            seed_all_backends(batch.seeds[i])
+    for i, theta in enumerate(task.theta):
+        if task.call_seeds is not None:
+            seed_all_backends(task.call_seeds[i])
         try:
             outputs.append(_call(simulator, theta))
         except Exception as error:
-            where = f"theta[{batch.start + i}] = {theta.tolist()}"
+            where = f"theta[{task.start + i}] = {theta.tolist()}"
             failure = _Failure(where, _failure_note(where, error), error)
             if on_error == "raise":
                 error.add_note(failure.note)
@@ -488,7 +509,7 @@ def _run_rows(simulator: Callable, batch: _Batch, on_error: OnError) -> _BatchRe
             num_failed += 1
             first_failure = first_failure or failure
 
-    return _BatchResult(outputs, num_failed, first_failure)
+    return _TaskResult(outputs, num_failed, first_failure)
 
 
 def _call(simulator: Callable, theta: Array) -> Any:
@@ -509,14 +530,12 @@ def _snapshot(output: Any) -> Any:
     return output
 
 
-def _run_in_worker(
-    run: Callable, batch: _Batch, worker_seed: Optional[int]
-) -> _BatchResult:
+def _run_in_worker(run: Callable, task: _Task) -> _TaskResult:
     # Without this, worker results would not follow the caller's random state.
-    if worker_seed is not None:
-        seed_all_backends(worker_seed)
+    if task.worker_seed is not None:
+        seed_all_backends(task.worker_seed)
     try:
-        result = run(batch)
+        result = run(task)
     except Exception as error:
         sendable = _sendable(error)
         if sendable is error:
