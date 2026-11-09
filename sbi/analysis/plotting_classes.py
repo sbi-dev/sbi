@@ -3,6 +3,7 @@
 
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+from warnings import warn
 
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -165,7 +166,16 @@ class ContourOffDiagOptions(OffDiagOptions):
 
 @dataclass(frozen=True)
 class PlotOffDiagOptions(OffDiagOptions):
+    """Deprecated, will be removed in sbi v0.29.0. No `pairplot` style uses it."""
+
     def __post_init__(self):
+        # stacklevel=3 skips the dataclass `__init__` and points at the caller.
+        warn(
+            "`PlotOffDiagOptions` is deprecated since sbi v0.28.0 and will be "
+            "removed in v0.29.0. No `pairplot` style uses it.",
+            FutureWarning,
+            stacklevel=3,
+        )
         mpl_kwargs_defaults = {"aspect": "auto"}
         updated = {**mpl_kwargs_defaults, **self.mpl_kwargs}
         object.__setattr__(self, "mpl_kwargs", updated)
