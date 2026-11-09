@@ -124,6 +124,33 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
 
 
 @pytest.mark.mcmc
+def test_slice_np_serial_thins_once(monkeypatch):
+    """`SliceSamplerSerial.run(n)` takes n steps per chain, like the vectorized one."""
+    num_dim, num_steps, tuning, thin = 2, 30, 10, 3
+    num_updates = []
+    sample_from_conditional = SliceSampler._sample_from_conditional
+
+    def counted(self, *args, **kwargs):
+        num_updates.append(1)
+        return sample_from_conditional(self, *args, **kwargs)
+
+    monkeypatch.setattr(SliceSampler, "_sample_from_conditional", counted)
+    sampler = SliceSamplerSerial(
+        log_prob_fn=lambda theta: -0.5 * np.sum(theta**2),
+        init_params=np.zeros((1, num_dim)),
+        num_chains=1,
+        thin=thin,
+        tuning=tuning,
+        verbose=False,
+    )
+    samples = sampler.run(num_steps)
+
+    assert samples.shape == (1, num_steps // thin, num_dim)
+    # One update per dimension in each tuning step and each MCMC step.
+    assert len(num_updates) == num_dim * (tuning + num_steps)
+
+
+@pytest.mark.mcmc
 @pytest.mark.slow
 @pytest.mark.parametrize("step", ("nuts", "hmc", "slice"))
 @pytest.mark.parametrize("num_chains", (1, 3))

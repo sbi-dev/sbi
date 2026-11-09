@@ -314,7 +314,7 @@ class SliceSamplerSerial:
             lp_f=self._log_prob_fn,
             max_width=self.max_width,
             init_width=self.init_width,
-            thin=self.thin,
+            thin=1,  # `run()` thins the chains, as in `SliceSamplerVectorized`.
             tuning=self.tuning,
             verbose=False,
         )
