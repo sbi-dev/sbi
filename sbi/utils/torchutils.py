@@ -320,6 +320,23 @@ def all_tensors_on_device(obj: Any, device: Union[str, torch.device]) -> bool:
     return found
 
 
+def move_tensors(value: Any, device: Union[str, torch.device]) -> Any:
+    """Move every tensor in `value`, also inside nested tuples and lists.
+
+    Args:
+        value: A tensor, a tuple or list that may hold tensors, or any other value.
+        device: Device to move the tensors to.
+
+    Returns:
+        `value` with its tensors on `device`; other values are returned unchanged.
+    """
+    if isinstance(value, Tensor):
+        return value.to(device)
+    if isinstance(value, (tuple, list)):
+        return type(value)(move_tensors(v, device) for v in value)
+    return value
+
+
 def tile(x: Tensor, n: int) -> Tensor:
     """Tiles a tensor `x` by repeating it `n` times along a new leading dimension.
 

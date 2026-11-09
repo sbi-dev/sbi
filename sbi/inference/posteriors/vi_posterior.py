@@ -55,6 +55,7 @@ from sbi.utils.sbiutils import _apply_to_transform, mcmc_transform
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
+    move_tensors,
 )
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
@@ -262,8 +263,7 @@ class VIPosterior(NeuralPosterior):
         super().to(device)
         device = self._device
         _apply_to_transform(self.link_transform, lambda t: t.to(device))
-        if self._trained_on is not None:
-            self._trained_on = self._trained_on.to(device)
+        self._trained_on = move_tensors(self._trained_on, device)
 
         if hasattr(self, "_q") and hasattr(self._q, "to"):
             self._q.to(device)  # type: ignore[union-attr]

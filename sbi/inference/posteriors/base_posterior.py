@@ -30,6 +30,7 @@ from sbi.utils.torchutils import (
     canonical_device,
     ensure_theta_batched,
     infer_tensor_device,
+    move_tensors,
     process_device,
 )
 from sbi.utils.user_input_checks import process_x
@@ -142,13 +143,9 @@ class NeuralPosterior:
 
         if self.theta_transform is not None:
             _apply_to_transform(self.theta_transform, lambda t: t.to(device))
-        if self._x is not None:
-            self._x = self._x.to(device)
-        if self._map is not None:
-            self._map = self._map.to(device)
-        if self._leakage_cache is not None:
-            cached_x, num_samples, factor = self._leakage_cache
-            self._leakage_cache = (cached_x.to(device), num_samples, factor.to(device))
+        self._x, self._map, self._leakage_cache = move_tensors(
+            (self._x, self._map, self._leakage_cache), device
+        )
 
         self._device = device
         self.device = device

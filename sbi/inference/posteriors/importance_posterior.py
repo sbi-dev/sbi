@@ -12,7 +12,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Proposal, Shape, TorchTransform
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched, move_tensors
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
@@ -81,13 +81,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
     def to(self, device: Union[str, torch.device]) -> Self:
         super().to(device)
-        if self._log_normalization_cache is not None:
-            cached_x, num_samples, log_z = self._log_normalization_cache
-            self._log_normalization_cache = (
-                cached_x.to(self._device),
-                num_samples,
-                log_z.to(self._device),
-            )
+        self._log_normalization_cache = move_tensors(
+            self._log_normalization_cache, self._device
+        )
         return self
 
     def log_prob(
