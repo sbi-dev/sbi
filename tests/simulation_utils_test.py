@@ -146,6 +146,30 @@ def test_list_of_tensors_becomes_one_tensor():
     assert x.shape == (3, 2)
 
 
+@pytest.mark.parametrize("num_workers", [1, 2])
+def test_list_of_tensors_becomes_one_tensor_despite_failures(num_workers):
+    def simulator(theta):
+        if (theta < 0).any():
+            raise ValueError("negative parameter")
+        return [[row[0], row[1]] for row in theta]
+
+    theta = torch.ones(40, 2)
+    theta[7] = -1.0
+    with pytest.warns(UserWarning, match="1 of 40 simulations failed"):
+        x = simulate_from_theta(
+            simulator,
+            theta,
+            num_workers=num_workers,
+            simulator_is_batched=True,
+            on_error="nan",
+            show_progress_bar=False,
+        )
+
+    assert isinstance(x, torch.Tensor)
+    assert torch.isnan(x[7]).all()
+    assert torch.equal(x[8:], theta[8:])
+
+
 def test_simulator_without_return_raises():
     with pytest.raises(ValueError, match="miss a `return`"):
         simulate_from_theta(lambda t: None, torch.ones(3, 2), show_progress_bar=False)

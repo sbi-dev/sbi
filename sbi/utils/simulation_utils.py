@@ -518,9 +518,8 @@ def _run_batched(
             _check_num_outputs(output, len(theta))
         outputs.append(output)
 
-    output = (
-        outputs[0] if len(outputs) == 1 else _concatenate(outputs, fill_failed=False)
-    )
+    # Rows as one call per task would give them, so that tasks join alike.
+    output = outputs[0] if len(outputs) == 1 else _join(outputs)
     return _TaskResult(output, num_failed, first_failure)
 
 
@@ -709,12 +708,8 @@ def _is_numeric(output: Any) -> bool:
         return False
 
 
-def _concatenate(outputs: List[Any], fill_failed: bool) -> SimulationOutput:
-    """Concatenates per-batch outputs along the first dimension.
-
-    With `fill_failed`, failed outputs (None) become NaN if the others are numeric.
-    Other outputs, e.g. paths, are returned as a list.
-    """
+def _join(outputs: List[Any]) -> Any:
+    """Concatenates outputs along the first dimension, or else lists their rows."""
     try:
         if all(isinstance(output, Tensor) for output in outputs):
             return torch.cat(outputs)
@@ -722,10 +717,21 @@ def _concatenate(outputs: List[Any], fill_failed: bool) -> SimulationOutput:
             return np.concatenate(outputs)
     except (RuntimeError, ValueError):  # Outputs of different shapes.
         pass
-    rows = [row for batch in outputs for row in batch]
-    if all(type(row) in (list, tuple) and _all_tensors(row) for row in rows):
+    return [row for output in outputs for row in output]
+
+
+def _concatenate(outputs: List[Any], fill_failed: bool) -> SimulationOutput:
+    """Concatenates per-task outputs along the first dimension.
+
+    With `fill_failed`, failed outputs (None) become NaN if the others are numeric.
+    Other outputs, e.g. paths, are returned as a list.
+    """
+    rows = _join(outputs)
+    if not isinstance(rows, list):
+        return rows
+    if all(row is None or _is_tensor_list(row) for row in rows):
         with suppress(RuntimeError):  # Items of different shapes stay lists.
-            rows = [torch.stack(list(row)) for row in rows]
+            rows = [None if row is None else torch.stack(list(row)) for row in rows]
     if fill_failed:
         rows = _fill_failed(rows)
     if isinstance(rows[0], Tensor):
@@ -741,8 +747,12 @@ def _concatenate(outputs: List[Any], fill_failed: bool) -> SimulationOutput:
     return rows
 
 
-def _all_tensors(row: Any) -> bool:
-    return len(row) > 0 and all(isinstance(item, Tensor) for item in row)
+def _is_tensor_list(row: Any) -> bool:
+    return (
+        type(row) in (list, tuple)
+        and len(row) > 0
+        and all(isinstance(item, Tensor) for item in row)
+    )
 
 
 def _fill_failed(rows: List[Any]) -> List[Any]:
