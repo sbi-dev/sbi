@@ -78,11 +78,13 @@ def simulate_for_sbi(
             worker. For all parameter sets in one call, pass their number; None
             does the same but is deprecated.
         seed: Seed for reproducibility. It seeds the global random state before
-            the parameters are sampled and leaves it seeded. A simulator that is not
-            batched is also reseeded before each simulation, see
-            :func:`simulate_from_theta`. A batched simulator continues the seeded
-            random state on one worker; with more workers, each batch gets its own
-            seed, so `x` differs between one worker and more.
+            the parameters are sampled. A simulator that is not batched is also
+            reseeded before each simulation, see :func:`simulate_from_theta`. A
+            batched simulator continues the seeded random state on one worker; with
+            more workers, each task gets its own seed, so `x` differs between one
+            worker and more. Afterwards, the global random state is seeded with a
+            seed derived from `seed`, the same for any `num_workers`, so later
+            draws do not repeat those of this call.
         show_progress_bar: Whether to show a progress bar for simulating. This will not
             affect whether there will be a progressbar while drawing samples from the
             proposal.
@@ -121,6 +123,8 @@ def simulate_for_sbi(
         seed=None if simulator_is_batched else seed,
         show_progress_bar=show_progress_bar,
     )
+    if seed is not None:
+        _seed_after_call(seed)
     real = (isinstance(x, Tensor) and not x.is_complex()) or (
         isinstance(x, np.ndarray) and x.dtype.kind in "biuf"
     )
@@ -168,13 +172,16 @@ def simulate_from_theta(
             per call: indexing such as `theta[:, 0]` raises, and outputs sized by
             `len(theta)` gain a dimension.
         seed: Seed for reproducibility. The simulator is reseeded before each
-            simulation, or before each batch if it is batched. So for noise drawn on
-            the CPU and a fixed `simulation_batch_size`, the outputs do not depend
-            on `num_workers`; if the simulator is not batched, not on
-            `simulation_batch_size` either. It leaves the random state seeded. If
-            None, the current random state is used, and seeding before the call
-            reproduces it. Seeding needs joblib's default process
-            workers: with a thread backend, a seed raises an error.
+            call: before each simulation, or before each batch of a batched
+            simulator. So for noise drawn on the CPU, the outputs do not depend on
+            `num_workers`; for a simulator that is not batched, not on
+            `simulation_batch_size` either. Afterwards, the global random state is
+            seeded with a seed derived from `seed`, the same for any
+            `num_workers`. If None, the current random state is used; with more
+            than one worker, the workers are seeded from numpy's global random
+            state, so seed it before the call to reproduce the outputs, e.g. with
+            :func:`sbi.utils.seed_all_backends`. Seeding needs joblib's default
+            process workers: with a thread backend, a seed raises an error.
         on_error: What to do when the simulator raises an exception. "raise" stops
             all simulations and raises it. "nan" keeps going: a failed simulation
             returns NaN in the shape of the first successful output, or None for
@@ -197,7 +204,10 @@ def simulate_from_theta(
     settings = _Settings(
         num_workers, simulation_batch_size, simulator_is_batched, on_error
     )
-    return _simulate(simulator, theta, settings, seed, show_progress_bar)
+    x = _simulate(simulator, theta, settings, seed, show_progress_bar)
+    if seed is not None:
+        _seed_after_call(seed)
+    return x
 
 
 @overload
@@ -245,9 +255,11 @@ def parallelize_simulator(
     `@parallelize_simulator` or `@parallelize_simulator(num_workers=4)`. By default,
     the simulator takes one parameter set per call and runs on all CPUs.
 
-    Calls are not reseeded. To reproduce a call, seed beforehand, e.g. with
-    :func:`sbi.utils.sbiutils.seed_all_backends`; consecutive calls still draw
-    different noise. This needs joblib's default process workers.
+    Calls take no seed. To reproduce a call, seed beforehand with
+    :func:`sbi.utils.seed_all_backends`: with one worker, the simulator draws from
+    the global random states; with more, the workers are seeded from numpy's.
+    Consecutive calls still draw different noise. This needs joblib's default
+    process workers.
 
     Each call sends the simulator to the workers; for slow calls, see the how-to
     guide "How to run simulations in parallel".
@@ -386,10 +398,6 @@ def _simulate(
     device = theta.device if isinstance(theta, Tensor) else None
     uses_threads = _check_backend(seed, settings.num_workers)
     tasks = _plan_tasks(theta, settings, seed, uses_threads)
-    if seed is not None:
-        # Leaves this process seeded also when only workers reseed.
-        seed_all_backends(seed)
-
     run = partial(_run_rows, simulator, on_error=settings.on_error)
     if settings.simulator_is_batched:
         call_size = settings.call_size(len(theta))
@@ -663,6 +671,16 @@ def _split(theta: Array, batch_size: int) -> List[Array]:
     if isinstance(theta, Tensor):
         return list(theta.split(batch_size))
     return [theta[i : i + batch_size] for i in range(0, len(theta), batch_size)]
+
+
+def _seed_after_call(seed: int) -> None:
+    """Seeds the global random state with a seed derived from `seed`.
+
+    A child sequence of `seed` keeps later draws from repeating the parameters or
+    the noise of the seeded call.
+    """
+    child = np.random.SeedSequence(seed).spawn(1)[0]
+    seed_all_backends(int(child.generate_state(1)[0]))
 
 
 def _distinct_seeds(num_seeds: int, seed: Optional[int]) -> np.ndarray:

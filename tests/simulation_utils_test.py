@@ -199,13 +199,40 @@ def test_simulate_for_sbi_reproducible_with_seed(prior):
     assert not torch.equal(run(seed=0), run(seed=1))
 
 
-@pytest.mark.parametrize("num_workers", [1, 2])
-def test_seed_leaves_random_state_seeded(num_workers):
-    def draw_after_seeded_call():
-        simulate_from_theta(double, np.zeros((4, 2)), num_workers=num_workers, seed=0)
+@pytest.mark.parametrize("simulator_is_batched", [False, True])
+def test_seeded_run_leaves_a_new_random_state_for_any_num_workers(
+    prior, simulator_is_batched
+):
+    def run(num_workers):
+        theta, _ = simulate_for_sbi(
+            numpy_noise,
+            prior,
+            10,
+            num_workers=num_workers,
+            seed=0,
+            simulator_is_batched=simulator_is_batched,
+            show_progress_bar=False,
+        )
+        return theta, prior.sample((10,))
+
+    (theta, after), (_, after_with_workers) = run(1), run(2)
+
+    assert not torch.equal(after, theta)
+    assert torch.equal(after, after_with_workers)
+
+
+def test_seed_leaves_the_same_random_state_for_any_num_workers():
+    def draw_after_seeded_call(num_workers):
+        simulate_from_theta(
+            numpy_noise,
+            np.zeros((4, 2)),
+            num_workers=num_workers,
+            seed=0,
+            show_progress_bar=False,
+        )
         return np.random.rand()
 
-    assert draw_after_seeded_call() == draw_after_seeded_call()
+    assert draw_after_seeded_call(1) == draw_after_seeded_call(2)
 
 
 @pytest.mark.parametrize(
