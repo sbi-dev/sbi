@@ -1168,6 +1168,31 @@ def test_learnable_gaussian_ignores_the_upper_triangle_of_scale_tril():
     assert torch.equal(scale_tril, scale_tril.tril())
 
 
+class _CenteredPotential(BasePotential):
+    """A potential with its mode at the bound observation."""
+
+    def __call__(self, theta, track_gradients: bool = True):
+        return -0.5 * ((theta - self.x_o) ** 2).sum(-1)
+
+
+def test_map_follows_a_retrain_on_another_observation():
+    """Without a default x, `map()` uses the x that q was last fit to, not a cached
+    MAP of an earlier fit."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    posterior = VIPosterior(
+        _CenteredPotential(prior),
+        prior,
+        q="gaussian",
+        theta_transform=torch_tf.identity_transform,
+    )
+    map_kwargs = dict(init_method=zeros(1, 2), num_iter=300, learning_rate=0.1)
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior.map(**map_kwargs)
+    posterior.train(x=3 * ones(1, 2), **TRAIN_KWARGS)
+
+    assert torch.allclose(posterior.map(**map_kwargs), 3 * ones(1, 2), atol=0.3)
+
+
 def test_q_fit_on_one_observation_rejects_copies_of_it():
     """A q fit on one observation is not the posterior of several iid copies."""
     posterior = _make_posterior("gaussian")

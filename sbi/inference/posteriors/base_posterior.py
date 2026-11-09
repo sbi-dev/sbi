@@ -303,7 +303,7 @@ class NeuralPosterior:
             return self._process_x(x)
         elif self.default_x is None:
             raise ValueError(
-                "Context `x` needed when a default has not been set."
+                "Context `x` needed when a default has not been set. "
                 "If you'd like to have a default, use the `.set_default_x()` method."
             )
         else:
@@ -470,14 +470,9 @@ class NeuralPosterior:
                 "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 
-        if self.default_x is None:
-            raise ValueError(
-                "Default `x` has not been set."
-                "To set the default, use the `.set_default_x()` method."
-            )
-
+        x_o = self._x_else_default_x(None)
         if self._map is None or force_update:
-            self.potential_fn = self._bind_iid(self.default_x)
+            self.potential_fn = self._bind_iid(x_o)
             self._map = self._calculate_map(
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,
