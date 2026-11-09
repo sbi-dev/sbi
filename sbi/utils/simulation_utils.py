@@ -64,7 +64,8 @@ def simulate_for_sbi(
         simulator: A function that takes parameters $\theta$ and maps them to
             simulations, or observations, `x`, $\text{sim}(\theta)\to x$. Any
             regular Python callable (i.e. function or class with `__call__` method)
-            can be used. It receives the sampled parameters as a tensor and must
+            can be used. It receives the sampled parameters as a tensor, on the
+            proposal's device with one worker and on the CPU with more, and must
             return numbers: a tensor, a numpy array, or a list of numbers per
             parameter set.
         proposal: Probability distribution that the parameters $\theta$ are sampled
@@ -94,9 +95,10 @@ def simulate_for_sbi(
         on_error: What to do when the simulator raises an exception, "raise" or
             "nan", see :func:`simulate_from_theta`.
 
-    Returns: Sampled parameters $\theta$ and simulation-outputs $x$, both float32
-    tensors on the device of $\theta$. One number per simulation gives $x$ of shape
-    (num_simulations, 1).
+    Returns:
+        Sampled parameters $\theta$ and simulation outputs $x$, both float32
+        tensors on the device of $\theta$. One number per simulation gives $x$ of
+        shape (num_simulations, 1).
     """
     settings = _Settings(
         num_workers, simulation_batch_size, simulator_is_batched, on_error
@@ -452,8 +454,7 @@ def _collect(
     tasks: List[_Task],
     show_progress_bar: bool,
 ) -> Tuple[List[Any], int, Optional[_Failure]]:
-    """Returns the outputs of the tasks in order, the number of failed simulations
-    and the first failure."""
+    """Returns the task outputs in order, the number of failures and the first."""
     outputs = []
     num_failed, first_failure = 0, None
     num_simulations = sum(len(task.theta) for task in tasks)
@@ -643,7 +644,7 @@ def _report_failures(
 def _failure_note(where: str, error: Exception, hint: str = "") -> str:
     note = f"The simulator failed for {where}."
     if isinstance(error, AttributeError) and "'Tensor' object" in str(error):
-        note += " It receives tensors; convert them with `np.asarray(theta)`."
+        note += " It receives tensors; convert them with `np.asarray(theta.cpu())`."
     return f"{note} {hint}".rstrip()
 
 
