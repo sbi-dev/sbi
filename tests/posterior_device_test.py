@@ -28,6 +28,12 @@ NUM_DIM = 2
 MCMC_FAST = MCMCPosteriorParameters(
     num_chains=1, thin=1, warmup_steps=1, init_strategy="proposal"
 )
+# `log_prob()` arguments that fill the posterior's cache of a normalization estimate.
+CACHED_LOG_PROB_KWARGS = {
+    "direct": dict(leakage_correction_params=dict(num_rejection_samples=100)),
+    "importance": dict(normalization_constant_params=dict(num_samples=100)),
+    "vector_field": dict(leakage_correction_params=dict(num_rejection_samples=100)),
+}
 
 
 def _prior(name: str):
@@ -120,6 +126,10 @@ def test_to_moves_posterior_and_keeps_state(
     posterior.set_default_x(x_o)
     map_kwargs = dict(num_iter=2, num_to_optimize=1, num_init_samples=1)
     map_ = posterior.map(init_method=torch.zeros(1, NUM_DIM), **map_kwargs)
+    theta = torch.zeros(1, NUM_DIM)
+    log_prob_kwargs = CACHED_LOG_PROB_KWARGS.get(kind)
+    if log_prob_kwargs is not None:
+        log_prob = posterior.log_prob(theta, **log_prob_kwargs)
     description = str(posterior)
     transform = posterior.theta_transform
     iid_method = getattr(posterior.potential_fn, "iid_method", None)
@@ -138,6 +148,10 @@ def test_to_moves_posterior_and_keeps_state(
     cached_map = posterior.map(init_method=new_init, **map_kwargs)
     assert torch.equal(cached_map, map_.to(device))
     assert str(posterior) == description
+    if log_prob_kwargs is not None:
+        # A new estimate from 100 samples would differ.
+        moved_log_prob = posterior.log_prob(theta.to(device), **log_prob_kwargs)
+        assert torch.allclose(moved_log_prob.cpu(), log_prob, atol=1e-4)
     assert posterior.theta_transform is transform
     assert getattr(posterior.potential_fn, "iid_method", None) == iid_method
     for attr, shared in shares_prior.items():
