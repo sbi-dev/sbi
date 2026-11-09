@@ -212,7 +212,7 @@ def test_seed_leaves_random_state_seeded(num_workers):
     "simulator_is_batched, runs",
     [
         (False, [(1, 1), (2, 7)]),
-        (True, [(1, 7), (2, 7)]),
+        (True, [(1, "auto"), (2, "auto")]),
     ],
 )
 def test_seeded_outputs_do_not_depend_on_workers_or_batch_size(
@@ -314,20 +314,11 @@ def test_simulator_error_keeps_type_and_names_parameter_set(on_error, num_worker
     assert "theta[" in " ".join(error.value.__notes__)
 
 
-def test_auto_batch_size_splits_simulations_across_workers():
-    x = simulate_from_theta(
-        batch_sizes,
-        np.zeros((40, 1)),
-        num_workers=2,
-        simulator_is_batched=True,
-        show_progress_bar=False,
+@pytest.mark.parametrize("num_workers", [1, 2])
+def test_auto_gives_a_batched_simulator_one_parameter_set_per_call(prior, num_workers):
+    _, x = simulate_for_sbi(
+        batch_sizes, prior, 40, num_workers=num_workers, show_progress_bar=False
     )
-
-    assert torch.all(x == 40 / (4 * 2))
-
-
-def test_auto_batch_size_is_one_on_one_worker(prior):
-    _, x = simulate_for_sbi(batch_sizes, prior, 10, show_progress_bar=False)
 
     assert torch.all(x == 1.0)
 

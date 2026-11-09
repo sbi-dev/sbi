@@ -72,11 +72,11 @@ def simulate_for_sbi(
         num_simulations: Number of simulations that are run.
         num_workers: Number of parallel joblib workers; -1 uses all CPUs, -2 all
             but one, and so on.
-        simulation_batch_size: Number of parameter sets per simulator call, or per
-            worker task for a simulator that is not batched. "auto" uses one
-            parameter set per call with one worker, and four tasks per worker with
-            more workers. For all parameter sets in one call, pass their number.
-            None is deprecated and means "auto".
+        simulation_batch_size: Number of parameter sets per worker task, and per
+            call of a batched simulator. "auto" gives each call one parameter set
+            and, with more than one worker, groups the calls into four tasks per
+            worker. For all parameter sets in one call, pass their number; None
+            does the same but is deprecated.
         seed: Seed for reproducibility. It seeds the global random state before
             the parameters are sampled and leaves it seeded. A simulator that is not
             batched is also reseeded before each simulation, see
@@ -158,11 +158,11 @@ def simulate_from_theta(
             but one, and so on. The simulator receives parameters of the same type
             as `theta` for any number of workers; with more than one worker, tensors
             are on the CPU.
-        simulation_batch_size: Number of parameter sets per simulator call, or per
-            worker task for a simulator that is not batched. "auto" uses one
-            parameter set per call with one worker, and four tasks per worker with
-            more workers. For all parameter sets in one call, pass their number.
-            None is deprecated and means "auto".
+        simulation_batch_size: Number of parameter sets per worker task, and per
+            call of a batched simulator. "auto" gives each call one parameter set
+            and, with more than one worker, groups the calls into four tasks per
+            worker. For all parameter sets in one call, pass their number; None
+            does the same but is deprecated.
         simulator_is_batched: Whether the simulator takes a batch of parameter sets
             per call. A batched simulator passed with False gets one parameter set
             per call: indexing such as `theta[:, 0]` raises, and outputs sized by
@@ -178,9 +178,9 @@ def simulate_from_theta(
         on_error: What to do when the simulator raises an exception. "raise" stops
             all simulations and raises it. "nan" keeps going: a failed simulation
             returns NaN in the shape of the first successful output, or None for
-            outputs that are not numeric (for a batched
-            simulator, the whole batch), with one warning at the end; integer
-            outputs then become float64 (float32 on MPS). If all simulations
+            outputs that are not numeric (for a batched simulator, all parameter
+            sets of the call), with one warning at the end; integer outputs then
+            become float64 (float32 on MPS). If all simulations
             fail, the first exception is raised. With more than one worker, an
             exception that the workers cannot send back, e.g. one whose class is
             defined in a script, arrives as a RuntimeError with its type and
@@ -257,9 +257,8 @@ def parallelize_simulator(
             :func:`simulate_from_theta`. If None, returns a decorator.
         num_workers: Number of parallel joblib workers; -1 uses all CPUs, -2 all
             but one, and so on.
-        simulation_batch_size: Number of parameter sets per simulator call, or per
-            worker task for a simulator that is not batched, see
-            :func:`simulate_from_theta`.
+        simulation_batch_size: Number of parameter sets per worker task, and per
+            call of a batched simulator, see :func:`simulate_from_theta`.
         simulator_is_batched: Whether the simulator takes a batch of parameter sets
             per call.
         on_error: What to do when the simulator raises an exception, "raise" or
@@ -307,15 +306,12 @@ class _Settings:
             )
         if self.simulation_batch_size is None:
             warnings.warn(
-                '`simulation_batch_size=None` is deprecated and now means "auto": '
-                "one parameter set per call with one worker, four tasks per worker "
-                "with more workers. For all parameter sets in one call, pass their "
-                "number.",
+                "`simulation_batch_size=None` is deprecated. For all parameter sets "
+                "in one call, pass their number.",
                 FutureWarning,
                 stacklevel=4,
             )
-            object.__setattr__(self, "simulation_batch_size", "auto")
-        if self.simulation_batch_size != "auto" and (
+        elif self.simulation_batch_size != "auto" and (
             not _is_int(self.simulation_batch_size) or self.simulation_batch_size < 1
         ):
             raise ValueError(
@@ -329,12 +325,20 @@ class _Settings:
 
     def task_size(self, num_simulations: int) -> int:
         """Returns the number of parameter sets that one process runs at a time."""
+        if self.simulation_batch_size is None:
+            return num_simulations
         if self.simulation_batch_size != "auto":
             return int(self.simulation_batch_size)
         if self.num_workers == 1:
             return 1
         num_tasks = _TASKS_PER_WORKER * effective_n_jobs(self.num_workers)
         return ceil(num_simulations / num_tasks)
+
+    def call_size(self, num_simulations: int) -> int:
+        """Returns the number of parameter sets per call of a batched simulator."""
+        if self.simulation_batch_size == "auto":
+            return 1
+        return self.task_size(num_simulations)
 
 
 class _Task(NamedTuple):
@@ -386,11 +390,10 @@ def _simulate(
         # Leaves this process seeded also when only workers reseed.
         seed_all_backends(seed)
 
-    run = partial(
-        _run_batched if settings.simulator_is_batched else _run_rows,
-        simulator,
-        on_error=settings.on_error,
-    )
+    run = partial(_run_rows, simulator, on_error=settings.on_error)
+    if settings.simulator_is_batched:
+        call_size = settings.call_size(len(theta))
+        run = partial(_run_batched, simulator, call_size, on_error=settings.on_error)
     results: Generator[_TaskResult, None, None]
     if settings.num_workers == 1:
         results = (run(task) for task in tasks)
@@ -420,7 +423,10 @@ def _plan_tasks(
 
     call_seeds = [None] * len(starts)
     if seed is not None:
-        num_calls = [1 if settings.simulator_is_batched else len(t) for t in thetas]
+        call_size = 1
+        if settings.simulator_is_batched:
+            call_size = settings.call_size(num_simulations)
+        num_calls = [ceil(len(t) / call_size) for t in thetas]
         seeds = _distinct_seeds(sum(num_calls), seed)
         call_seeds = np.split(seeds, np.cumsum(num_calls)[:-1])
     worker_seeds = [None] * len(starts)
@@ -442,7 +448,6 @@ def _collect(
     try:
         with tqdm(total=num_simulations, disable=not show_progress_bar) as pbar:
             for task, result in zip(tasks, results, strict=True):
-                _check_num_outputs(result.output, len(task.theta))
                 outputs.append(result.output)
                 num_failed += result.num_failed
                 first_failure = first_failure or result.first_failure
@@ -471,23 +476,39 @@ def _to_device(value: Any, device: torch.device) -> Any:
     return value.to(device)
 
 
-def _run_batched(simulator: Callable, task: _Task, on_error: OnError) -> _TaskResult:
-    """Runs a batched simulator on one task; a failure fails the whole task."""
-    if task.call_seeds is not None:
-        seed_all_backends(task.call_seeds[0])
-    try:
-        return _TaskResult(_call(simulator, task.theta), 0, None)
-    except Exception as error:
-        where = f"theta[{task.start}:{task.start + len(task.theta)}]"
-        hint = (
-            "It was called with a batch of parameter sets; if it takes one per "
-            "call, pass `simulator_is_batched=False`."
-        )
-        failure = _Failure(where, _failure_note(where, error, hint), error)
-        if on_error == "raise":
-            error.add_note(failure.note)
-            raise
-        return _TaskResult([None] * len(task.theta), len(task.theta), failure)
+def _run_batched(
+    simulator: Callable, call_size: int, task: _Task, on_error: OnError
+) -> _TaskResult:
+    """Runs a batched simulator on the calls of a task; a failure fails its call."""
+    outputs = []
+    num_failed, first_failure = 0, None
+    for i, theta in enumerate(_split(task.theta, call_size)):
+        if task.call_seeds is not None:
+            seed_all_backends(task.call_seeds[i])
+        try:
+            output = _call(simulator, theta)
+        except Exception as error:
+            start = task.start + i * call_size
+            where = f"theta[{start}:{start + len(theta)}]"
+            hint = (
+                "It was called with a batch of parameter sets; if it takes one per "
+                "call, pass `simulator_is_batched=False`."
+            )
+            failure = _Failure(where, _failure_note(where, error, hint), error)
+            if on_error == "raise":
+                error.add_note(failure.note)
+                raise
+            output = [None] * len(theta)
+            num_failed += len(theta)
+            first_failure = first_failure or failure
+        else:
+            _check_num_outputs(output, len(theta))
+        outputs.append(output)
+
+    output = (
+        outputs[0] if len(outputs) == 1 else _concatenate(outputs, fill_failed=False)
+    )
+    return _TaskResult(output, num_failed, first_failure)
 
 
 def _run_rows(simulator: Callable, task: _Task, on_error: OnError) -> _TaskResult:
