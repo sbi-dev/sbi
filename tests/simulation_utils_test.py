@@ -437,11 +437,16 @@ def test_simulator_that_reuses_an_array_inside_a_list(container):
     assert np.array_equal(np.asarray(x).ravel(), np.arange(4.0))
 
 
-def test_failed_simulations_keep_integer_outputs_exact():
+@pytest.mark.parametrize(
+    "output, dtype",
+    [(torch.tensor([2**24 + 1]), torch.float64), (np.float32([0.5]), np.float32)],
+    ids=["integer_tensor", "float32_array"],
+)
+def test_failed_simulations_keep_outputs_exact(output, dtype):
     def simulator(theta):
         if theta[0] < 0:
             raise ValueError("negative parameter")
-        return torch.tensor([2**24 + 1])
+        return output
 
     with pytest.warns(UserWarning, match="1 of 2 simulations failed"):
         x = simulate_from_theta(
@@ -451,8 +456,9 @@ def test_failed_simulations_keep_integer_outputs_exact():
             show_progress_bar=False,
         )
 
-    assert x[0].item() == 2**24 + 1
-    assert torch.isnan(x[1]).all()
+    assert x.dtype == dtype
+    assert x[0].item() == output.item()
+    assert np.isnan(x[1].item())
 
 
 def test_thread_workers_run_without_seed_and_reject_one():

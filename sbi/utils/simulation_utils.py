@@ -755,5 +755,7 @@ def _fill_failed(rows: List[Any]) -> List[Any]:
         return [nan if row is None else row.to(dtype) for row in rows]
     if template is None or not _is_numeric(template):
         return rows
-    nan = np.full(np.shape(template), np.nan)
+    dtype = np.asarray(template).dtype
+    nan_dtype = dtype if dtype.kind in "fc" else np.float64  # Integers stay exact.
+    nan = np.full(np.shape(template), np.nan, dtype=nan_dtype)
     return [nan if row is None else row for row in rows]
