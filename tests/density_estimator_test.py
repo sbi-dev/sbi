@@ -16,6 +16,7 @@ from sbi.inference.trainers.vfpe.fmpe import FMPE
 from sbi.inference.trainers.vfpe.npse import NPSE
 from sbi.neural_nets import FlowMatchingConfig, VEScoreConfig
 from sbi.neural_nets.embedding_nets import CNNEmbedding
+from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
 from sbi.neural_nets.net_builders import (
@@ -413,6 +414,26 @@ def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
     assert torch.allclose(
         log_probs, density_estimator.log_prob(samples, condition=condition), atol=1e-3
     ), "Batched sample_and_log_prob is not consistent with log_prob."
+
+
+def test_unconditional_density_estimator_default_methods():
+    """The base class methods work for subclasses that do not override them."""
+
+    class GaussianNet(torch.nn.Module):
+        def log_prob(self, x: Tensor) -> Tensor:
+            return MultivariateNormal(zeros(2), eye(2)).log_prob(x)
+
+        def sample(self, sample_shape: torch.Size) -> Tensor:
+            return MultivariateNormal(zeros(2), eye(2)).sample(sample_shape)
+
+    class GaussianEstimator(UnconditionalDensityEstimator):
+        def loss(self, input: Tensor, **kwargs) -> Tensor:
+            return -self.log_prob(input)
+
+    estimator = GaussianEstimator(GaussianNet(), input_shape=torch.Size((2,)))
+    samples, log_probs = estimator.sample_and_log_prob(torch.Size((5,)))
+    assert samples.shape == (5, 2)
+    assert log_probs.shape == (5,)
 
 
 def _build_density_estimator_and_tensors(
