@@ -425,9 +425,13 @@ def _plan_tasks(
     num_simulations = len(theta)
     task_size = settings.task_size(num_simulations)
     starts = range(0, num_simulations, task_size)
-    if settings.num_workers != 1 and isinstance(theta, Tensor):
-        theta = theta.detach().cpu()
     thetas = _split(theta, task_size)
+    if settings.num_workers != 1:
+        # Copies, as a pickled view of a tensor sends all of `theta`.
+        thetas = [
+            t.detach().to("cpu", copy=True) if isinstance(t, Tensor) else t
+            for t in thetas
+        ]
 
     call_seeds = [None] * len(starts)
     if seed is not None:
