@@ -404,6 +404,16 @@ def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
         "Batched log_prob is not consistent with separate log_prob."
     )
 
+    # Batched sample_and_log_prob: each log prob belongs to its sample and condition.
+    samples, log_probs = density_estimator.sample_and_log_prob(
+        sample_shape, condition=condition
+    )
+    samples = samples.reshape(-1, batch_dim, *input_event_shape)
+    log_probs = log_probs.reshape(-1, batch_dim)
+    assert torch.allclose(
+        log_probs, density_estimator.log_prob(samples, condition=condition), atol=1e-3
+    ), "Batched sample_and_log_prob is not consistent with log_prob."
+
 
 def _build_density_estimator_and_tensors(
     density_estimator_build_fn: Callable,
