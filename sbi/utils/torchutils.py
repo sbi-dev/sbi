@@ -288,20 +288,19 @@ def infer_tensor_device(obj: Any) -> Optional[str]:
 
 
 def all_tensors_on_device(obj: Any, device: Union[str, torch.device]) -> bool:
-    """Return whether `obj` reaches at least one tensor, and all of them on `device`.
+    """Return whether every tensor reachable from `obj` lives on `device`.
 
     Args:
         obj: Root object of the graph to inspect.
         device: Device to compare with.
 
     Returns:
-        True if every reachable tensor lives on `device`, False otherwise or if no
-        tensor is reachable.
+        False if a reachable tensor lives elsewhere, True otherwise, also if `obj`
+        reaches no tensor.
     """
     target = canonical_device(device)
     seen: set = set()
     stack = [obj]
-    found = False
     while stack:
         current = stack.pop()
         if id(current) in seen:
@@ -310,14 +309,13 @@ def all_tensors_on_device(obj: Any, device: Union[str, torch.device]) -> bool:
         if isinstance(current, Tensor):
             if canonical_device(current.device) != target:
                 return False
-            found = True
         elif isinstance(current, dict):
             stack.extend(current.values())
         elif isinstance(current, (list, tuple)):
             stack.extend(current)
         elif hasattr(current, "__dict__"):
             stack.extend(vars(current).values())
-    return found
+    return True
 
 
 def move_tensors(value: Any, device: Union[str, torch.device]) -> Any:

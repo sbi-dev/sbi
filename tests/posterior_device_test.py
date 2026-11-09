@@ -11,7 +11,7 @@ from dataclasses import asdict
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
-from torch.distributions import MultivariateNormal
+from torch.distributions import Distribution, MultivariateNormal, Normal, constraints
 
 from sbi.inference import FMPE, NPE, EnsemblePosterior, MCMCPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -23,6 +23,7 @@ from sbi.inference.posteriors.posterior_parameters import (
 )
 from sbi.utils import BoxUniform
 from sbi.utils.torchutils import process_device
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 NUM_DIM = 2
 MCMC_FAST = MCMCPosteriorParameters(
@@ -205,3 +206,24 @@ def test_to_keeps_ode_options_of_bound_vector_field_potential(trained_on_cpu):
 
     torch.manual_seed(0)
     assert torch.equal(potential(theta), before)
+
+
+class _ScalarNormal(Distribution):
+    """A custom prior configured by Python floats, so it holds no tensors."""
+
+    arg_constraints = {}
+    support = constraints.real_vector
+
+    def __init__(self, loc: float = 0.0, scale: float = 1.0):
+        self.loc, self.scale = loc, scale
+        super().__init__(event_shape=torch.Size([NUM_DIM]), validate_args=False)
+
+    def log_prob(self, value):
+        return Normal(self.loc, self.scale).log_prob(value).sum(-1)
+
+
+def test_move_keeps_tensor_free_custom_prior():
+    """A prior without tensors has nothing to move and must not be rebuilt."""
+    prior = _ScalarNormal(loc=4.0, scale=2.0)
+
+    assert move_distribution_to_device(prior, "cpu") is prior
