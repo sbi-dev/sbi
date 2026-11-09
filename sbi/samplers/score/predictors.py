@@ -118,3 +118,51 @@ class EulerMaruyama(Predictor):
         f_backward = f - (1 + self.eta**2) / 2 * g**2 * score
         g_backward = self.eta * g
         return theta - f_backward * dt + g_backward * torch.randn_like(theta) * dt_sqrt
+
+
+@register_predictor("heun")
+class Heun(Predictor):
+    def __init__(
+        self,
+        potential_fn: 'VectorFieldBasedPotential ',  # noqa: F821 # type: ignore
+    ):
+        """Heun's method, a second-order Runge-Kutta integrator for the
+        probability flow ODE (the deterministic sampler of EDM [1]). It solves the
+        same ODE as `sample_with="ode"`, but on the fixed time grid of `steps` or
+        `ts`.
+
+        Each step evaluates the network twice, so a grid of `steps` points costs
+        `2 * (steps - 1)` evaluations. At equal evaluations, it is less accurate
+        than first-order Euler on the same ODE (`euler_maruyama` with a small
+        `eta`) at low budgets and more accurate from about 50 to 100 evaluations
+        on, depending on the SDE. With NPSE on two moons, about 100 evaluations
+        came close to the `sample_with="ode"` solution at less than half its cost.
+
+        [1] Karras et al., Elucidating the Design Space of Diffusion-Based
+        Generative Models, NeurIPS 2022.
+
+        Args:
+            potential_fn: Score-based potential to predict.
+        """
+        super().__init__(potential_fn)
+
+    def _probability_flow_drift(
+        self, theta: Tensor, t: Tensor, device: torch.device
+    ) -> Tensor:
+        """Drift of the probability flow ODE, i.e. the Euler-Maruyama drift at
+        eta = 0."""
+        f = self.drift(theta, t).to(device)
+        g = self.diffusion(theta, t).to(device)
+        score = self.potential_fn.gradient(theta, t).to(device)
+        return f - 0.5 * g**2 * score
+
+    def predict(self, theta: Tensor, t1: Tensor, t0: Tensor) -> Tensor:
+        dt = t1 - t0
+        k1 = self._probability_flow_drift(theta, t1, dt.device)
+        theta_predicted = theta - k1 * dt
+        if t0 == 0:
+            # The VP and sub-VP scores diverge at t=0, so skip the correction and
+            # keep the Euler step, which evaluates only at t1.
+            return theta_predicted
+        k2 = self._probability_flow_drift(theta_predicted, t0, dt.device)
+        return theta - 0.5 * (k1 + k2) * dt

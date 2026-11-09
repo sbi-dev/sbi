@@ -10,11 +10,14 @@ import pytest
 import torch
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import (
+    Bernoulli,
     Beta,
+    Categorical,
     Distribution,
     Exponential,
     Gamma,
     Independent,
+    MixtureSameFamily,
     MultivariateNormal,
     Normal,
     Uniform,
@@ -785,7 +788,19 @@ JOINT_COMPONENTS = [
 
 
 @pytest.mark.parametrize("sample_shape", [(), (5,), (2, 3)])
-@pytest.mark.parametrize("dists", JOINT_COMPONENTS)
+@pytest.mark.parametrize(
+    "dists",
+    [
+        *JOINT_COMPONENTS,
+        # Not in JOINT_COMPONENTS: torch cannot sample an empty batch from a mixture.
+        [
+            Gamma(ones(1), ones(1)),
+            MixtureSameFamily(
+                Categorical(ones(1, 2)), Bernoulli(probs=torch.tensor([[0.2, 0.7]]))
+            ),
+        ],
+    ],
+)
 def test_independent_joint_sample_shape(dists, sample_shape):
     joint = MultipleIndependent(dists)
     sample_shape = torch.Size(sample_shape)
@@ -1025,3 +1040,24 @@ def test_proposal_sharing_weights_with_trainer_raises():
 
     with pytest.raises(ValueError, match="same object"):
         inference.append_simulations(theta, x, proposal=unsafe_proposal)
+
+
+def test_proposal_wrapping_the_trainers_network_raises():
+    """From round 2 on, an NPE-A posterior wraps its network in the proposal
+    correction. The check must also find the trainer's network inside it."""
+    prior = BoxUniform(low=zeros(2), high=ones(2))
+    inference = NPE_A(prior=prior, num_components=1, show_progress_bars=False)
+    x_o = 0.5 * ones(1, 2)
+    theta = prior.sample((50,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=1)
+    proposal = inference.build_posterior().set_default_x(x_o)
+    theta = proposal.sample((50,))
+    net_reference = inference.append_simulations(theta, theta, proposal=proposal).train(
+        max_num_epochs=1
+    )
+
+    unsafe_proposal = inference.build_posterior(net_reference).set_default_x(x_o)
+    theta = unsafe_proposal.sample((50,))
+
+    with pytest.raises(ValueError, match="same object"):
+        inference.append_simulations(theta, theta, proposal=unsafe_proposal)

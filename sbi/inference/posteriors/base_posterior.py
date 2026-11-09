@@ -87,7 +87,7 @@ class NeuralPosterior:
             self.theta_transform = theta_transform
 
         self._map = None
-        self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
+        self._leakage_cache: Optional[Tuple[Tensor, int, Tensor]] = None
         self._purpose = ""
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
@@ -235,6 +235,7 @@ class NeuralPosterior:
     def _cached_leakage_factor(
         self,
         x: Tensor,
+        num_samples: int,
         prior: Any,
         estimate_fn: Callable[[], Tensor],
         force_update: bool = False,
@@ -243,20 +244,70 @@ class NeuralPosterior:
         """Return the leakage correction factor saved for `x`, or estimate it.
 
         The factor is 1 for priors with unbounded support. Otherwise, one factor is
-        saved, for the last `x`, unless `use_cache=False`.
+        saved, for the last `x` and `num_samples`, unless `use_cache=False`.
         """
         if prior_support_is_bounded(prior) is False:
             return torch.ones((), device=self._device)
-        if self._leakage_cache is not None and use_cache and not force_update:
-            cached_x, factor = self._leakage_cache
-            if cached_x.shape == x.shape and torch.allclose(
-                cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
-            ):
+        if use_cache and not force_update:
+            factor = self._cached_value(self._leakage_cache, x, num_samples)
+            if factor is not None:
                 return factor
         factor = estimate_fn()
         if use_cache:
-            self._leakage_cache = (x.detach().clone(), factor)
+            self._leakage_cache = (x.detach().clone(), num_samples, factor)
         return factor
+
+    @staticmethod
+    def _cached_value(
+        cache: Optional[Tuple[Tensor, int, Tensor]], x: Tensor, num_samples: int
+    ) -> Optional[Tensor]:
+        """Return the value of an `(x, num_samples, value)` cache for these arguments.
+
+        `x` matches on any device and with NaN entries. Returns None on a miss.
+        """
+        if cache is None:
+            return None
+        cached_x, cached_num_samples, value = cache
+        if cached_num_samples != num_samples or cached_x.shape != x.shape:
+            return None
+        same_x = torch.allclose(
+            cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
+        )
+        return value if same_x else None
+
+    def _map_inits(
+        self,
+        init_method: Union[str, Tensor],
+        num_init_samples: int,
+        x: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Returns the starting points of the MAP optimization.
+
+        Args:
+            init_method: `posterior`, `proposal` or a tensor of starting points, see
+                `map()` of the child classes.
+            num_init_samples: Number of samples to draw for a string `init_method`.
+            x: Observation for `posterior` samples. If None, the default `x`.
+        """
+        has_proposal = getattr(self, "proposal", None) is not None
+        if init_method == "posterior":
+            return self.sample((num_init_samples,), x=x)
+        elif init_method == "proposal":
+            if not has_proposal:
+                raise ValueError(
+                    f"init_method='proposal' is not available for "
+                    f"{type(self).__name__}, which has no proposal distribution. "
+                    "Use 'posterior', or pass initial locations as a tensor "
+                    "(for example prior samples)."
+                )
+            return self.proposal.sample((num_init_samples,))
+        elif isinstance(init_method, Tensor):
+            return init_method.to(self._device)
+        valid = "'posterior', 'proposal'" if has_proposal else "'posterior'"
+        raise ValueError(
+            f"Invalid init_method '{init_method}'. Use {valid}, or pass "
+            "initial locations as a tensor (for example prior samples)."
+        )
 
     def _calculate_map(
         self,
@@ -271,16 +322,8 @@ class NeuralPosterior:
         """Calculates the maximum-a-posteriori estimate (MAP).
         See `map()` method of child classes for docstring.
         """
-
-        if init_method == "posterior":
-            inits = self.sample((num_init_samples,))
-        elif init_method == "proposal":
-            inits = self.proposal.sample((num_init_samples,))  # type: ignore
-        elif isinstance(init_method, Tensor):
-            inits = init_method
-        else:
-            raise ValueError
-
+        inits = self._map_inits(init_method, num_init_samples)
+        # Read after `_map_inits()`, whose `sample()` may rebind the potential.
         return gradient_ascent(
             potential_fn=self.potential_fn,
             inits=inits,
@@ -326,9 +369,11 @@ class NeuralPosterior:
                 for the optimization.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be `posterior` or, for posteriors that
+                have a proposal, `proposal`, which samples the respective
+                distribution `num_init_samples` times. If it is a tensor, the tensor
+                is used as the initial locations, so prior-based initialization can
+                be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             save_best_every: The best log-probability is computed, saved in the
@@ -424,8 +469,10 @@ class NeuralPosterior:
         Args:
             state_dict: State to be restored.
         """
-        # Posteriors pickled by older sbi versions can miss this key.
-        state_dict.setdefault("_leakage_cache", None)
+        # Posteriors pickled by older sbi versions can miss this key, or save it
+        # without the number of samples.
+        if len(state_dict.get("_leakage_cache") or ()) != 3:
+            state_dict["_leakage_cache"] = None
         self.__dict__ = state_dict
 
         actual_device = infer_tensor_device(self)

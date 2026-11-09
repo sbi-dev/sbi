@@ -153,7 +153,7 @@ def samples_true_posterior_gaussian_mixture_uniform_prior(
                 scale=torch.tensor(mixture_scales)[idx],
             ),
         )
-        is_outside_prior = torch.isinf(prior_dist.log_prob(sample).sum())
+        is_outside_prior = not prior_dist.support.check(sample).all()
 
         if len(posterior_samples) > 0:
             is_duplicate = sample in torch.cat(posterior_samples)

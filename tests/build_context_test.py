@@ -4,8 +4,7 @@
 """Tests for the builder-pattern foundation types.
 
 Covers ``ZScoreConfig``, ``ZScoreStats``, ``BuildContext``,
-``compute_z_score_stats``, the ``_EstimatorBuilderBase`` base class, and the
-``ConditionalEstimatorBuildFn`` protocol rename.
+``compute_z_score_stats``, and the ``ConditionalEstimatorBuildFn`` protocol rename.
 """
 
 import pytest
@@ -18,7 +17,6 @@ from sbi.neural_nets.build_context import (
     compute_z_score_stats,
 )
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
-from sbi.neural_nets.net_builders.estimator_configs import MarginalFlowConfig
 
 
 def test_zscore_config_defaults():
@@ -137,29 +135,6 @@ def test_compute_z_score_stats_matches_z_standardization():
     torch.testing.assert_close(stats.theta_std, expected_t_std)
     torch.testing.assert_close(stats.x_mean, expected_x_mean)
     torch.testing.assert_close(stats.x_std, expected_x_std)
-
-
-def test_estimator_builder_base_build_raises():
-    """Subclasses that don't override build() raise NotImplementedError."""
-    cfg = MarginalFlowConfig(hidden_features=64)
-    theta = torch.randn(10, 5)
-    x = torch.randn(10, 3)
-    with pytest.raises(NotImplementedError, match="does not implement build"):
-        cfg.build(theta, x)
-
-
-def test_estimator_builder_base_from_kwargs():
-    """The existing from_kwargs() + to_dict() contract is preserved."""
-    cfg = MarginalFlowConfig(hidden_features=64)
-    d = cfg.to_dict()
-    assert d == {"hidden_features": 64}
-
-
-def test_estimator_builder_base_extra_warns():
-    with pytest.warns(UserWarning, match="Unknown kwargs"):
-        cfg = MarginalFlowConfig.from_kwargs(hidden_features=64, some_zuko_param=True)
-    d = cfg.to_dict()
-    assert d == {"hidden_features": 64, "some_zuko_param": True}
 
 
 def test_deprecated_alias_works_with_future_warning():

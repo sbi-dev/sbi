@@ -82,18 +82,29 @@ class EnsemblePosterior(NeuralPosterior):
             theta_transform: If passed, this transformation will be applied during the
                 optimization performed when obtaining the map. It does not affect the
                 `.sample()` and `.log_prob()` methods.
+            device: Device of the component posteriors. If None, infer it from them.
+                To move an ensemble, construct it on its components' device and then
+                call `.to(device)`.
+
+        Raises:
+            ValueError: If device differs from the component posteriors' device.
+            AssertionError: If component posteriors are on different devices.
         """
         self.posteriors = posteriors
         self.num_components = len(posteriors)
-        self.weights = weights
         self.theta_transform = theta_transform
         # Take first prior as reference
         self.prior = posteriors[0].potential_fn.prior
-        self.device = device
+        component_device = self.ensure_same_device(posteriors)
+        self.device = process_device(component_device if device is None else device)
+        if self.device != component_device:
+            raise ValueError(
+                f"Ensemble device {self.device} does not match component device "
+                f"{component_device}. Construct the ensemble without device, then "
+                "call ensemble.to(device) to move it."
+            )
 
-        if self.device is None:
-            self.device = self.ensure_same_device(posteriors)
-
+        self.weights = weights
         self._build_potential_fns()
 
     def to(self, device: Union[str, torch.device]) -> None:
@@ -112,7 +123,7 @@ class EnsemblePosterior(NeuralPosterior):
             self.posteriors[i].to(device)
         self.prior.to(device)
         self.theta_transform = mcmc_transform(self.prior, device=device)
-        self._weights.to(device)
+        self._weights = self._weights.to(device)
         self._build_potential_fns()
 
     def _build_potential_fns(self):
@@ -126,7 +137,9 @@ class EnsemblePosterior(NeuralPosterior):
                 f"{potential.prior} {self.prior}"
             )
 
-        potential_fn = EnsemblePotential(potential_fns, self._weights, self.prior, None)
+        potential_fn = EnsemblePotential(
+            potential_fns, self._weights, self.prior, None, device=self.device
+        )
 
         super().__init__(
             potential_fn=potential_fn,
@@ -182,6 +195,11 @@ class EnsemblePosterior(NeuralPosterior):
             self._weights = torch.tensor(weights) / sum(weights)
         else:
             raise TypeError
+        self._weights = self._weights.to(self.device)
+
+        # `__init__` sets the weights before it builds the potential.
+        if hasattr(self, "potential_fn"):
+            self.potential_fn._weights = self._weights
 
     def sample(
         self, sample_shape: Shape = torch.Size(), x: Optional[Tensor] = None, **kwargs
@@ -372,10 +390,13 @@ class EnsemblePosterior(NeuralPosterior):
             num_to_optimize: From the drawn `num_init_samples`, use the
                 `num_to_optimize` with highest log-probability as the initial points
             learning_rate: Learning rate of the optimizer.
-            init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+            init_method: How to select the starting parameters for the optimization.
+                For the joint ensemble MAP it must be `posterior`, which samples the
+                posterior `num_init_samples` times. With `individually=True` it is
+                passed to each component, so the supported strings depend on the
+                component (for example `MCMCPosterior` also accepts `proposal`). If it
+                is a tensor, the tensor is used as the initial locations, so
+                prior-based initialization can be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
                 for the optimization.
@@ -413,15 +434,10 @@ class EnsemblePosterior(NeuralPosterior):
             return log_weights, maps
 
         else:
-            self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
-
-            if init_method == "posterior":
-                inits = self.sample((num_init_samples,), self._x_else_default_x(x))
-            elif isinstance(init_method, Tensor):
-                inits = init_method
-            else:
-                raise ValueError
-
+            x = self._x_else_default_x(x)
+            self.potential_fn = self.potential_fn.bind(x)
+            inits = self._map_inits(init_method, num_init_samples, x)
+            # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(
                 potential_fn=self.potential_fn,
                 inits=inits,

@@ -39,7 +39,6 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 if TYPE_CHECKING:
     from sbi.neural_nets.net_builders.estimator_configs import (
-        _EstimatorBuilderBase,
         _PerModelConfigBase,
     )
 
@@ -339,7 +338,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
 
     @classmethod
     def _wrap_builder(
-        cls, builder: Union["_PerModelConfigBase", "_EstimatorBuilderBase"]
+        cls, builder: "_PerModelConfigBase"
     ) -> Callable[[Tensor, Tensor], ConditionalEstimatorType]:
         """Wrap an estimator config as a ``(batch_theta, batch_x)`` callable."""
         input_is_theta = cls._INPUT_IS_THETA
