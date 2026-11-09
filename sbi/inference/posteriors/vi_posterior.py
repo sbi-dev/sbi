@@ -552,8 +552,12 @@ class VIPosterior(NeuralPosterior):
                 q = self._build_q_from_spec()
             self._trained_on = None
         elif isinstance(q, VIPosterior):
-            # A copy, so that later `set_q` calls on one posterior stay local to it.
-            self._q_spec = replace(q._q_spec)
+            # A copy, so that later `set_q` or `to` calls on one posterior stay local
+            # to it.
+            snapshot = q._q_spec.init_snapshot
+            if snapshot is not None:
+                snapshot = detach_and_deepcopy(snapshot)
+            self._q_spec = replace(q._q_spec, init_snapshot=snapshot)
             self._trained_on = q._trained_on
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
