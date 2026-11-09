@@ -9,4 +9,4 @@ Prior and simulator
 
    00_custom_prior.ipynb
    01_crafting_summary_statistics.ipynb
-   27_running_simulations_in_parallel.ipynb
+   28_running_simulations_in_parallel.ipynb

@@ -58,4 +58,4 @@ simulators, see [here](https://github.com/sbi-dev/sbi/issues/317).
 ## See also
 
 For how to run simulations in parallel with `sbi`, see the how-to guide
-[How to run simulations in parallel](../how_to_guide/27_running_simulations_in_parallel.ipynb).
+[How to run simulations in parallel](../how_to_guide/28_running_simulations_in_parallel.ipynb).
