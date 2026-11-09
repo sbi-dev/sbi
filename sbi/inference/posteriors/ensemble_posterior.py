@@ -342,6 +342,25 @@ class EnsemblePosterior(NeuralPosterior):
 
         return self
 
+    def _bind_mixture(self, x: Optional[Tensor]) -> Tensor:
+        """Bind the weighted mixture of component potentials to `x`, else the default.
+
+        For several observations, each NPE component's iid potential has its own
+        normalizing constant, which the mixture would count as part of its weight.
+        """
+        x = self._x_else_default_x(x)
+        self._check_num_observations(x.shape[0])
+        if x.shape[0] > 1 and self.potential_fn.warns_on_implicit_iid:
+            raise NotImplementedError(
+                "`potential()` and the joint `map()` of an ensemble with NPE "
+                f"posteriors take one observation, but x holds {x.shape[0]}. For "
+                "several observations, the normalizing constants of the components "
+                "would skew the ensemble weights. Use `sample()`, or "
+                "`map(individually=True)`."
+            )
+        self.potential_fn = self._bind_iid(x)
+        return x
+
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:
@@ -351,12 +370,12 @@ class EnsemblePosterior(NeuralPosterior):
         Args:
             theta: Parameters $\theta$, each evaluated given all of `x`.
             x: Observation. If None, the default `x`. Several observations are
-                combined as iid trials; an ensemble with a direct posterior raises.
+                combined as iid trials; an ensemble with NPE posteriors raises.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
+        self._bind_mixture(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -390,7 +409,8 @@ class EnsemblePosterior(NeuralPosterior):
         self.posteriors[idx].
 
         Args:
-            x: Observed data at which to evaluate the MAP.
+            x: Observed data at which to evaluate the MAP. The joint MAP of an
+                ensemble with NPE posteriors takes one observation.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -440,8 +460,7 @@ class EnsemblePosterior(NeuralPosterior):
             return log_weights, maps
 
         else:
-            x = self._x_else_default_x(x)
-            self.potential_fn = self._bind_iid(x)
+            x = self._bind_mixture(x)
             inits = self._map_inits(init_method, num_init_samples, x)
             # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(

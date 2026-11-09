@@ -916,9 +916,24 @@ def test_direct_posterior_takes_one_observation(ensemble, method, npe_for_iid_x)
         calls[method]()
 
 
+@pytest.mark.parametrize("method", ["potential", "map"])
+def test_npe_ensemble_mixture_takes_one_observation(method, npe_for_iid_x):
+    """For several observations, the normalizing constants of the NPE components
+    would skew the weights of the mixture."""
+    _, trainer = npe_for_iid_x
+    component = trainer.build_posterior(sample_with="importance")
+    posterior = EnsemblePosterior([component, component])
+    x_o = zeros(3, 2)
+    calls = {
+        "potential": lambda: posterior.potential(zeros(4, 2), x=x_o),
+        "map": lambda: posterior.map(x=x_o),
+    }
+    with pytest.raises(NotImplementedError, match="x holds 3"):
+        calls[method]()
+
+
 @pytest.mark.parametrize(
-    "sample_with, method",
-    [("importance", "potential"), ("rejection", "log_prob"), ("ensemble", "potential")],
+    "sample_with, method", [("importance", "potential"), ("rejection", "log_prob")]
 )
 def test_posteriors_combine_several_observations_as_iid_trials(
     sample_with, method, npe_for_iid_x
@@ -926,17 +941,11 @@ def test_posteriors_combine_several_observations_as_iid_trials(
     """Each theta is evaluated given all observations as iid trials, also with as many
     theta as observations, where main paired them. NPE posteriors warn."""
     prior, trainer = npe_for_iid_x
-    component = trainer.build_posterior(
-        sample_with="rejection" if method == "log_prob" else "importance"
-    )
-    posterior = component
-    if sample_with == "ensemble":
-        # Equal components: the mixture equals each of them.
-        posterior = EnsemblePosterior([component, component])
+    posterior = trainer.build_posterior(sample_with=sample_with)
     x_o = torch.tensor([[0.0, 0.0], [0.5, -0.5], [1.0, 0.0]])
     theta = torch.tensor([[0.0, 0.0], [0.5, 0.5], [-0.5, 1.0]])
     # iid trials: the sum of single-observation potentials, prior counted once.
-    singles = torch.stack([component.potential(theta, x=x_i) for x_i in x_o])
+    singles = torch.stack([posterior.potential(theta, x=x_i) for x_i in x_o])
     expected = singles.sum(0) - 2 * prior.log_prob(theta)
 
     with warnings.catch_warnings(record=True) as caught:
