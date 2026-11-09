@@ -5,11 +5,13 @@
 
 import os
 import warnings
+from itertools import chain
 from typing import (
     Any,
     Callable,
     Dict,
     Generator,
+    Iterator,
     List,
     Optional,
     OrderedDict,
@@ -238,6 +240,38 @@ def infer_module_device(module: torch.nn.Module, fallback: str) -> str:
             return fallback
 
 
+def _iter_tensors(obj: Any) -> Iterator[Tensor]:
+    """Yield every tensor reachable from `obj` via attributes, dicts and sequences.
+
+    Depth first, in attribute order; a module yields its parameters and buffers
+    before its other attributes.
+    """
+    seen: set = set()
+
+    def _walk(current: Any) -> Iterator[Tensor]:
+        if id(current) in seen:
+            return
+        seen.add(id(current))
+        if isinstance(current, Module):
+            for tensor in chain(current.parameters(), current.buffers()):
+                if id(tensor) not in seen:
+                    seen.add(id(tensor))
+                    yield tensor
+        if isinstance(current, Tensor):
+            yield current
+        elif isinstance(current, dict):
+            for value in current.values():
+                yield from _walk(value)
+        elif isinstance(current, (list, tuple)):
+            for value in current:
+                yield from _walk(value)
+        elif hasattr(current, "__dict__"):
+            for value in vars(current).values():
+                yield from _walk(value)
+
+    yield from _walk(obj)
+
+
 def infer_tensor_device(obj: Any) -> Optional[str]:
     """Return the device of the first tensor or module parameter reachable from `obj`.
 
@@ -248,43 +282,7 @@ def infer_tensor_device(obj: Any) -> Optional[str]:
         Device string, e.g. `"cpu"`, `"cuda:0"` or `"mps:0"`, or `None` if the graph
         contains no tensor or module with parameters or buffers.
     """
-
-    def _infer(current: Any, seen: set) -> Optional[str]:
-        if id(current) in seen:
-            return None
-        seen.add(id(current))
-
-        if isinstance(current, Module):
-            try:
-                return str(next(current.parameters()).device)
-            except StopIteration:
-                try:
-                    return str(next(current.buffers()).device)
-                except StopIteration:
-                    pass
-
-        if isinstance(current, Tensor):
-            return str(current.device)
-
-        if isinstance(current, dict):
-            for value in current.values():
-                device = _infer(value, seen)
-                if device is not None:
-                    return device
-        elif isinstance(current, (list, tuple)):
-            for value in current:
-                device = _infer(value, seen)
-                if device is not None:
-                    return device
-        elif hasattr(current, "__dict__"):
-            for value in vars(current).values():
-                device = _infer(value, seen)
-                if device is not None:
-                    return device
-
-        return None
-
-    return _infer(obj, set())
+    return next((str(tensor.device) for tensor in _iter_tensors(obj)), None)
 
 
 def all_tensors_on_device(obj: Any, device: Union[str, torch.device]) -> bool:
@@ -299,23 +297,7 @@ def all_tensors_on_device(obj: Any, device: Union[str, torch.device]) -> bool:
         reaches no tensor.
     """
     target = canonical_device(device)
-    seen: set = set()
-    stack = [obj]
-    while stack:
-        current = stack.pop()
-        if id(current) in seen:
-            continue
-        seen.add(id(current))
-        if isinstance(current, Tensor):
-            if canonical_device(current.device) != target:
-                return False
-        elif isinstance(current, dict):
-            stack.extend(current.values())
-        elif isinstance(current, (list, tuple)):
-            stack.extend(current)
-        elif hasattr(current, "__dict__"):
-            stack.extend(vars(current).values())
-    return True
+    return all(canonical_device(t.device) == target for t in _iter_tensors(obj))
 
 
 def move_tensors(value: Any, device: Union[str, torch.device]) -> Any:
