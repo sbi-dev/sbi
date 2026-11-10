@@ -8,7 +8,10 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import (
+    NeuralPosterior,
+    _require_one_observation,
+)
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
@@ -289,7 +292,8 @@ class EnsemblePosterior(NeuralPosterior):
         Args:
             theta: Parameters $\theta$.
             x: Conditioning context.If none is provided and no default context is set,
-                an error will be raised.
+                an error will be raised. The mixture of an ensemble with NPE
+                posteriors takes one observation, unless `individually=True`.
             individually: If true, returns log weights and log_probs individually.
 
         Raises:
@@ -303,6 +307,20 @@ class EnsemblePosterior(NeuralPosterior):
             isinstance(posterior, type(self.posteriors[0]))
             for posterior in self.posteriors
         ), "`log_prob()` only works for ensembles of the same type of posterior."
+        if not individually:
+            if x is not None or self.default_x is not None:
+                num_observations = self._x_else_default_x(x).shape[0]
+            else:
+                # Without `x`, each component uses its own default.
+                num_observations = max(
+                    (
+                        p.default_x.shape[0]
+                        for p in self.posteriors
+                        if p.default_x is not None
+                    ),
+                    default=1,
+                )
+            self._check_mixture_observations(num_observations, "log_prob")
 
         log_probs = torch.stack([
             posterior.log_prob(theta, x=x, **kwargs) for posterior in self.posteriors
@@ -342,22 +360,32 @@ class EnsemblePosterior(NeuralPosterior):
 
         return self
 
-    def _bind_mixture(self, x: Optional[Tensor]) -> Tensor:
-        """Bind the weighted mixture of component potentials to `x`, else the default.
+    def _check_mixture_observations(self, num_observations: int, method: str) -> None:
+        """Raise if a weighted mixture of NPE components gets several observations.
 
         For several observations, each NPE component's iid potential has its own
         normalizing constant, which the mixture would count as part of its weight.
+        Components that take one observation are left to their own check.
         """
+        if any(
+            posterior.potential_fn.warns_on_implicit_iid
+            and not posterior._takes_one_observation
+            for posterior in self.posteriors
+        ):
+            _require_one_observation(
+                num_observations,
+                f"`{method}()` of an ensemble with NPE posteriors",
+                "The normalizing constants of the components would skew the ensemble "
+                "weights (issue #2135). Use `sample()`, or set the observations with "
+                "`set_default_x()` and call `map(individually=True)` or "
+                "`log_prob(individually=True)`.",
+            )
+
+    def _bind_mixture(self, x: Optional[Tensor], method: str) -> Tensor:
+        """Bind the mixture of component potentials to `x`, else the default `x`."""
         x = self._x_else_default_x(x)
         self._check_num_observations(x.shape[0])
-        if x.shape[0] > 1 and self.potential_fn.warns_on_implicit_iid:
-            raise NotImplementedError(
-                "`potential()` and the joint `map()` of an ensemble with NPE "
-                f"posteriors take one observation, but x holds {x.shape[0]}. For "
-                "several observations, the normalizing constants of the components "
-                "would skew the ensemble weights. Use `sample()`, or "
-                "`map(individually=True)`."
-            )
+        self._check_mixture_observations(x.shape[0], method)
         self.potential_fn = self._bind_iid(x)
         return x
 
@@ -375,7 +403,7 @@ class EnsemblePosterior(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self._bind_mixture(x)
+        self._bind_mixture(x, "potential")
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -460,7 +488,7 @@ class EnsemblePosterior(NeuralPosterior):
             return log_weights, maps
 
         else:
-            x = self._bind_mixture(x)
+            x = self._bind_mixture(x, "map")
             inits = self._map_inits(init_method, num_init_samples, x)
             # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(

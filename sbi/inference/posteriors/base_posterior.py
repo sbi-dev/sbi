@@ -208,9 +208,9 @@ class NeuralPosterior:
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
         Several observations, of shape `(num_observations, *x_event_shape)`, are iid
-        trials: MCMC, importance, rejection, single-x VI and vector field posteriors
-        combine them (NPE warns). The direct posterior raises; amortized VI raises in
-        `potential()` and `map()`.
+        trials. Posteriors that sample with a potential combine them; methods that
+        take one observation raise and name the alternatives. The how-to guide on iid
+        observations lists which posterior does what.
 
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
@@ -244,19 +244,18 @@ class NeuralPosterior:
 
     def _check_num_observations(self, num_observations: int) -> None:
         """Raise if this posterior takes one observation and gets several."""
-        if num_observations == 1 or not self._takes_one_observation:
-            return
-        raise ValueError(
-            f"{type(self).__name__} takes one observation, but x holds "
-            f"{num_observations}. For a separate posterior of each observation, pass "
-            "one observation at a time, or use `sample_batched()` and "
-            "`log_prob_batched()` where available. To combine them as iid trials, "
-            "use a posterior built with "
-            "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'` (trained "
-            "with `train()`). For a "
-            "direct posterior of several trials, train with a permutation-invariant "
-            "embedding net on sets of trials, and pass each set as one observation."
-        )
+        if self._takes_one_observation:
+            _require_one_observation(
+                num_observations,
+                type(self).__name__,
+                "For a separate posterior of each observation, pass one observation "
+                "at a time, or use `sample_batched()` and `log_prob_batched()` where "
+                "available. To combine them as iid trials, use a posterior built with "
+                "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'` "
+                "(trained with `train()`). For a direct posterior of several trials, "
+                "train with a permutation-invariant embedding net on sets of trials, "
+                "and pass each set as one observation.",
+            )
 
     def _bind_iid(
         self, x: Tensor, check_num_observations: bool = True
@@ -558,3 +557,20 @@ class NeuralPosterior:
                 setattr(self, attr, self.potential_fn.prior)  # type: ignore[union-attr]
             elif isinstance(value, Distribution):
                 setattr(self, attr, move_distribution_to_device(value, actual_device))
+
+
+def _require_one_observation(num_observations: int, subject: str, hint: str) -> None:
+    """Raise a ValueError if `subject`, which takes one observation, gets several.
+
+    Every posterior method that takes one observation raises through this function,
+    so that all of them give the same message.
+
+    Args:
+        num_observations: Number of observations in `x`.
+        subject: What takes one observation, e.g. a posterior class or a method.
+        hint: What to do instead.
+    """
+    if num_observations > 1:
+        raise ValueError(
+            f"{subject} takes one observation, but x holds {num_observations}. {hint}"
+        )

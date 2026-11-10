@@ -9,7 +9,10 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import (
+    NeuralPosterior,
+    _require_one_observation,
+)
 from sbi.inference.potentials.vector_field_potential import (
     CallableDifferentiablePotentialFunction,
     VectorFieldBasedPotential,
@@ -566,11 +569,11 @@ class VectorFieldPosterior(NeuralPosterior):
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
         x = self._x_else_default_x(x)
-        if x.shape[0] > 1:
-            raise ValueError(
-                f"x holds {x.shape[0]} observations, but `leakage_correction()` of a "
-                "vector field posterior takes one observation."
-            )
+        _require_one_observation(
+            x.shape[0],
+            "`leakage_correction()` of a vector field posterior",
+            "Pass one observation.",
+        )
 
         def acceptance() -> Tensor:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
@@ -815,12 +818,11 @@ class VectorFieldPosterior(NeuralPosterior):
                 "Default `x` has not been set."
                 "To set the default, use the `.set_default_x()` method."
             )
-        if self.default_x.shape[0] > 1:
-            raise ValueError(
-                f"The default x holds {self.default_x.shape[0]} observations, but "
-                "`.map()` of a vector field posterior takes one. Set one observation "
-                "with `.set_default_x()`."
-            )
+        _require_one_observation(
+            self.default_x.shape[0],
+            "`map()` of a vector field posterior",
+            "Set one observation with `set_default_x()`.",
+        )
 
         if self._map is None or force_update:
             # rebuild coarse flow fast for MAP optimization.
