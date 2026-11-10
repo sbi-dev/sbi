@@ -230,13 +230,13 @@ def test_masked_vector_field_estimator_loss_shapes(
 
 
 @pytest.mark.parametrize("sde_type", ["ve", "vp"])
-@pytest.mark.parametrize("trailing_feature_dim", [False, True])
-def test_masked_score_control_variate_reduces_variance(sde_type, trailing_feature_dim):
+@pytest.mark.parametrize("num_features", [None, 1, 3])
+def test_masked_score_control_variate_reduces_variance(sde_type, num_features):
     """The control variate must keep the masked score loss unbiased and reduce its
-    variance at small diffusion times, for [B, T] and [B, T, 1] inputs alike."""
+    variance at small diffusion times, for [B, T], [B, T, 1] and [B, T, F] inputs."""
     torch.manual_seed(0)
     num_nodes, batch_dim = 6, 64
-    shape = (num_nodes, 1) if trailing_feature_dim else (num_nodes,)
+    shape = (num_nodes,) if num_features is None else (num_nodes, num_features)
     estimator = build_masked_score_matching_estimator(
         torch.randn(100, *shape), torch.randn(100, *shape), sde_type=sde_type
     )
@@ -271,6 +271,53 @@ def test_masked_score_control_variate_reduces_variance(sde_type, trailing_featur
     mean_plain, mean_cv = losses[False].mean(), losses[True].mean()
     se = (var_plain / (32 * batch_dim)).sqrt()
     assert (mean_plain - mean_cv).abs() < 5 * se
+
+
+@pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp"])
+@pytest.mark.parametrize("control_variate", [False, True])
+def test_masked_score_loss_same_for_2d_and_trailing_feature_inputs(
+    sde_type, control_variate
+):
+    """[B, T] and [B, T, 1] inputs describe the same data, so with the same weights
+    and the same noise they must give the same loss (with or without the control
+    variate)."""
+    torch.manual_seed(0)
+    num_nodes, batch_dim = 6, 16
+    data = torch.randn(100, num_nodes)
+    estimator_2d = build_masked_score_matching_estimator(
+        data, data, sde_type=sde_type
+    ).eval()
+    estimator_3d = build_masked_score_matching_estimator(
+        data.unsqueeze(-1), data.unsqueeze(-1), sde_type=sde_type
+    ).eval()
+    # Share the weights; only the z-scoring buffers differ in shape.
+    target_state = estimator_3d.state_dict()
+    estimator_3d.load_state_dict({
+        key: value.reshape(target_state[key].shape)
+        for key, value in estimator_2d.state_dict().items()
+    })
+
+    inputs = torch.randn(batch_dim, num_nodes)
+    condition_mask = torch.zeros(batch_dim, num_nodes, dtype=torch.bool)
+    condition_mask[:, num_nodes // 2 :] = True
+    # Small times, so that the control variate is active.
+    times = torch.rand(batch_dim) * 0.2
+
+    with torch.no_grad():
+        torch.manual_seed(1)
+        loss_2d = estimator_2d.loss(
+            inputs, condition_mask, None, times=times, control_variate=control_variate
+        )
+        torch.manual_seed(1)
+        loss_3d = estimator_3d.loss(
+            inputs.unsqueeze(-1),
+            condition_mask,
+            None,
+            times=times,
+            control_variate=control_variate,
+        )
+
+    assert torch.allclose(loss_2d, loss_3d, rtol=1e-5, atol=1e-5)
 
 
 @pytest.mark.gpu

@@ -895,9 +895,12 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         # NOTE: As it is a Taylor expansion, it will only work well for small std.
 
         if control_variate:
-            # Compute score at the mean (mean_t), with same masks
+            # Compute the score at the noise-free network input (eps = 0): latent
+            # entries at their mean, observed entries at their clean values, exactly
+            # as in `input_noised` above.
+            input_mean = torch.where(condition_mask_broadcast, input, mean_t)
             score_mean_pred = self.forward(
-                mean_t, times, condition_mask, edge_mask
+                input_mean, times, condition_mask, edge_mask
             )  # [B, T, F]
 
             # Control variate terms, computed element-wise and only for unobserved
