@@ -80,6 +80,10 @@ def move_distribution_to_device(
         return dist
     if all_tensors_on_device(dist, device):
         return dist
+    if not dist.arg_constraints:
+        # Without declared parameters, a rebuild would use the constructor defaults.
+        move_all_tensor_to_device(dist, device)
+        return dist
     try:
         params = get_distribution_parameters(dist, device)
         rebuilt = type(dist)(**params)

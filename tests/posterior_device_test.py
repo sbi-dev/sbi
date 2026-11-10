@@ -214,13 +214,13 @@ def test_to_keeps_ode_options_of_bound_vector_field_potential(trained_on_cpu):
     assert torch.equal(potential(theta), before)
 
 
-class _ScalarNormal(Distribution):
-    """A custom prior configured by Python floats, so it holds no tensors."""
+class _CustomNormal(Distribution):
+    """A custom prior that declares no parameters in `arg_constraints`."""
 
     arg_constraints = {}
     support = constraints.real_vector
 
-    def __init__(self, loc: float = 0.0, scale: float = 1.0):
+    def __init__(self, loc: float | torch.Tensor = 0.0, scale: float = 1.0):
         self.loc, self.scale = loc, scale
         super().__init__(event_shape=torch.Size([NUM_DIM]), validate_args=False)
 
@@ -228,11 +228,12 @@ class _ScalarNormal(Distribution):
         return Normal(self.loc, self.scale).log_prob(value).sum(-1)
 
 
-def test_move_keeps_tensor_free_custom_prior():
-    """A prior without tensors has nothing to move and must not be rebuilt."""
-    prior = _ScalarNormal(loc=4.0, scale=2.0)
+@pytest.mark.parametrize("loc", [4.0, torch.full((NUM_DIM,), 4.0)])
+def test_move_keeps_custom_prior_without_declared_parameters(loc):
+    """Such a prior moves in place and is not rebuilt with its default arguments."""
+    prior = _CustomNormal(loc=loc, scale=2.0)
 
-    assert move_distribution_to_device(prior, "cpu") is prior
+    assert move_distribution_to_device(prior, "meta") is prior
 
 
 @pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
