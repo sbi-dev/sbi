@@ -129,15 +129,18 @@ def test_c2st_vector_field_on_linearGaussian(
     num_dim: int,
     prior_str: str,
     sample_with: List[Literal["sde", "ode"]],
+    request,
 ):
     """
     Test whether NPSE and FMPE infer well a simple example with available ground truth.
+
+    Cases marked `gpu` run on the GPU, all others on the CPU.
     """
 
     num_samples = 1000
     num_simulations = 2500
     max_num_epochs = 100
-    device = "cpu"
+    device = "gpu" if request.node.get_closest_marker("gpu") else "cpu"
     tol = 0.15
 
     if vf_estimator == "Simformer":
@@ -221,8 +224,8 @@ def test_c2st_vector_field_on_linearGaussian(
 
         # Compute the c2st and assert it is near chance level of 0.5.
         check_c2st(
-            samples,
-            target_samples,
+            samples.cpu(),
+            target_samples.cpu(),
             alg=f"vector_field-{vector_field_type}-{prior_str}-{num_dim}D-{method}",
             tol=tol,
         )
