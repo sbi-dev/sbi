@@ -916,19 +916,20 @@ def test_direct_posterior_takes_one_observation(ensemble, method, npe_for_iid_x)
         calls[method]()
 
 
-@pytest.mark.parametrize("method", ["potential", "map"])
+@pytest.mark.parametrize("method", ["potential", "map", "log_prob"])
 def test_npe_ensemble_mixture_takes_one_observation(method, npe_for_iid_x):
     """For several observations, the normalizing constants of the NPE components
     would skew the weights of the mixture."""
     _, trainer = npe_for_iid_x
-    component = trainer.build_posterior(sample_with="importance")
+    component = trainer.build_posterior(sample_with="rejection")
     posterior = EnsemblePosterior([component, component])
     x_o = zeros(3, 2)
     calls = {
         "potential": lambda: posterior.potential(zeros(4, 2), x=x_o),
         "map": lambda: posterior.map(x=x_o),
+        "log_prob": lambda: posterior.log_prob(zeros(4, 2), x=x_o),
     }
-    with pytest.raises(NotImplementedError, match="x holds 3"):
+    with pytest.raises(ValueError, match=f"`{method}\\(\\)` of an ensemble"):
         calls[method]()
 
 
@@ -954,3 +955,24 @@ def test_posteriors_combine_several_observations_as_iid_trials(
     iid_warnings = [w for w in caught if "x holds 3 observations" in str(w.message)]
     assert len(iid_warnings) == 1
     assert torch.allclose(value, expected, atol=1e-4)
+
+
+@pytest.mark.parametrize(
+    "sample_with",
+    [pytest.param("mcmc", marks=pytest.mark.mcmc), "rejection", "importance"],
+)
+def test_npe_posteriors_sample_and_map_with_iid_x(
+    sample_with, npe_for_iid_x, mcmc_params_fast
+):
+    """sample() and map() combine several NPE observations as iid trials."""
+    _, trainer = npe_for_iid_x
+    if sample_with == "mcmc":
+        posterior = trainer.build_posterior(posterior_parameters=mcmc_params_fast)
+    else:
+        posterior = trainer.build_posterior(sample_with=sample_with)
+    posterior.set_default_x(zeros(2, 2))
+    with pytest.warns(UserWarning, match="x holds 2 observations"):
+        samples = posterior.sample((10,), show_progress_bars=False)
+    theta_map = posterior.map(num_iter=10, num_init_samples=20, num_to_optimize=2)
+    assert samples.shape == (10, 2)
+    assert theta_map.shape == (1, 2)
