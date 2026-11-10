@@ -267,17 +267,11 @@ def test_reinterpreted_batch_dim_prior():
             ),
             Uniform(zeros(1), ones(1)),
         ],  # multiple independent prior with mixed dtypes and event shapes
-        pytest.param(
-            [
-                UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
-                UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
-                Uniform(zeros(1), ones(1)),
-            ],  # combination of multiple independent custom priors
-            marks=pytest.mark.xfail(
-                reason="custom priors cannot be used in MultipleIndependent priors "
-                "(unless they support .to)."
-            ),
-        ),
+        [
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
+            Uniform(zeros(1), ones(1)),
+        ],  # combination of multiple independent custom priors
     ),
 )
 def test_process_prior(prior):
