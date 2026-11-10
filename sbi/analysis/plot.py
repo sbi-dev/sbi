@@ -741,10 +741,13 @@ def _format_subplot(
 
 
 def _place_legend_in_empty_cell(ax, handles, labels, legend_kw):
-    """Place a legend in an empty off-diagonal cell, hiding spines and ticks."""
+    """Place a legend in an empty off-diagonal cell, hiding spines, ticks and labels."""
     ax.axis("on")
     ax.set_xticks([])
     ax.set_yticks([])
+    # A bottom-row cell got its x-label before it was turned off.
+    ax.set_xlabel("")
+    ax.set_ylabel("")
     for spine in ax.spines.values():
         spine.set_visible(False)
     ax.legend(handles, labels, **legend_kw)

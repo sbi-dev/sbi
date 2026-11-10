@@ -567,6 +567,19 @@ def test_pairplot_legend_labels_from_labeled_samples(samples_labels, expected):
 
 
 @pytest.mark.parametrize(
+    "triangles, legend_cell",
+    ((dict(upper="hist"), (-1, 0)), (dict(upper=None, lower="hist"), (0, -1))),
+)
+def test_pairplot_legend_cell_has_no_axis_labels(triangles, legend_cell):
+    """The legend goes into an empty cell without that cell's axis labels."""
+    _, axes = pairplot(torch.randn(100, 3), fig_kwargs=dict(legend=True), **triangles)
+    legend_ax = axes[legend_cell]
+    assert legend_ax.get_legend() is not None
+    assert (legend_ax.get_xlabel(), legend_ax.get_ylabel()) == ("", "")
+    close()
+
+
+@pytest.mark.parametrize(
     "kwargs", (dict(dim_labels=["a"]), dict(limits=[(-1.0, 1.0)] * 3))
 )
 def test_labeled_samples_validation(kwargs):
