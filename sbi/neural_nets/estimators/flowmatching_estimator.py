@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -591,10 +591,17 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         input_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         noise_scale: float = 1e-3,
-        z_score_shift: Optional[Tensor] = None,
-        z_score_scale: Optional[Tensor] = None,
+        mean_0: Union[float, Tensor] = 0.0,
+        std_0: Union[float, Tensor] = 1.0,
+        gaussian_baseline: bool = False,
     ) -> None:
         r"""Creates a masked vector field estimator for Flow Matching.
+
+        As in `FlowMatchingEstimator`, the network works with normalized inputs and
+        velocities, while `forward`, `ode_fn` and `score` act in the original space:
+        latent entries are z-scored with the time-dependent marginal statistics of
+        the probability path, observed (clean) entries with `mean_0` and `std_0`,
+        and the network output is mapped back with the velocity statistics.
 
         Args:
             net: Neural network that estimates the vector field.
@@ -602,15 +609,11 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             embedding_net: Embedding network for the condition.
             noise_scale: Scale of the noise added to the vector field
                 (:math:`\sigma_{min}` in [2]_).
-            z_score_shift: Per-entry shift of the inputs, given together with
-                `z_score_scale`. If given, the estimator is trained on and works with
-                standardized inputs `(input - z_score_shift) / z_score_scale`: the
-                loss standardizes its (original-space) input, and `forward`,
-                `ode_fn` and `score` act on standardized inputs. The fixed-mask
-                wrapper maps the latent entries back to the original space (see
-                `compose_standardization` of the unmasked estimators).
-            z_score_scale: Positive per-entry scale of the inputs, given together
-                with `z_score_shift`.
+            mean_0: Mean of the data (t=0), per entry or scalar.
+            std_0: Standard deviation of the data (t=0), per entry or scalar.
+            gaussian_baseline: If True, add the analytical velocity of a Gaussian
+                with mean `mean_0` and std `std_0`, so that the network only learns
+                the residual (see `FlowMatchingEstimator`).
         """
 
         super().__init__(
@@ -619,46 +622,43 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             embedding_net=embedding_net,
         )
         self.noise_scale = noise_scale
+        self.gaussian_baseline = gaussian_baseline
 
-        if (z_score_shift is None) != (z_score_scale is None):
-            raise ValueError(
-                "`z_score_shift` and `z_score_scale` have to be given together."
-            )
-        shift = torch.zeros(1, *self.input_shape)
-        scale = torch.ones(1, *self.input_shape)
-        if z_score_shift is not None and z_score_scale is not None:
-            shift = torch.as_tensor(z_score_shift, dtype=torch.float32)
-            scale = torch.as_tensor(z_score_scale, dtype=torch.float32)
-            shift = torch.broadcast_to(shift, self.input_shape).reshape(
-                1, *self.input_shape
-            )
-            scale = torch.broadcast_to(scale, self.input_shape).reshape(
-                1, *self.input_shape
-            )
-            if not torch.isfinite(shift).all() or not torch.isfinite(scale).all():
-                raise ValueError("The z-score shift and scale must be finite.")
-            if not (scale > 0).all():
-                raise ValueError("The z-score scale must be strictly positive.")
-        self.register_buffer("_z_score_shift", shift.clone())
-        self.register_buffer("_z_score_scale", scale.clone())
-        self.register_buffer(
-            "_z_score_enabled", torch.tensor(z_score_shift is not None)
-        )
+        mean_0 = torch.as_tensor(mean_0, dtype=torch.float32)
+        std_0 = torch.as_tensor(std_0, dtype=torch.float32)
+        self.register_buffer("mean_0", mean_0.expand(self.input_shape).clone())
+        self.register_buffer("std_0", std_0.expand(self.input_shape).clone())
 
-    @property
-    def z_score_enabled(self) -> bool:
-        r"""Whether the estimator works with standardized inputs."""
-        return bool(self._z_score_enabled)
+    def _broadcast_condition_mask(self, condition_mask: Tensor, num: int) -> Tensor:
+        """Return the condition mask as `(num, T)` or `(num, T, F)` booleans."""
+        condition_mask = condition_mask.bool()
+        if condition_mask.dim() == 1:
+            condition_mask = condition_mask.unsqueeze(0)
+        condition_mask = condition_mask.reshape(-1, self.input_shape[0])
+        if condition_mask.shape[0] != num:
+            condition_mask = condition_mask.repeat(num // condition_mask.shape[0], 1)
+        if len(self.input_shape) == 2:
+            condition_mask = condition_mask.unsqueeze(-1)
+        return condition_mask
 
-    @property
-    def z_score_shift(self) -> Tensor:
-        r"""Per-entry shift of the standardization, shape `(1, *input_shape)`."""
-        return self._z_score_shift
+    def _time_dependent_stats(self, time: Tensor) -> tuple[Tensor, Tensor]:
+        """Marginal mean and std of the path `(1-t) x_0 + t x_1` with
+        `x_0 ~ N(mean_0, std_0^2)` and `x_1 ~ N(0, 1)`; time of shape `(N,)`."""
+        t = time.view(-1, *([1] * len(self.input_shape)))
+        mean_t = (1 - t) * self.mean_0
+        std_t = torch.sqrt(((1 - t) * self.std_0) ** 2 + t**2 + 1e-6)
+        return mean_t, std_t
 
-    @property
-    def z_score_scale(self) -> Tensor:
-        r"""Per-entry scale of the standardization, shape `(1, *input_shape)`."""
-        return self._z_score_scale
+    def _velocity_stats(self) -> tuple[Tensor, Tensor]:
+        """Mean and std of the velocity target `x_1 - x_0`."""
+        return -self.mean_0, torch.sqrt(1 + self.std_0**2)
+
+    def _velocity_baseline(self, input: Tensor, time: Tensor) -> Tensor:
+        """Analytical velocity for Gaussian data, see `FlowMatchingEstimator`."""
+        t = time.view(-1, *([1] * len(self.input_shape)))
+        mean_t, std_t = self._time_dependent_stats(time)
+        factor = (t - (1 - t) * self.std_0**2) / std_t**2
+        return factor * (input - mean_t) - self.mean_0
 
     def forward(
         self,
@@ -694,7 +694,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
                     to save memory resources
 
         Returns:
-            The estimated vector field.
+            The estimated vector field, in the original space.
         """
         # Continue with standard processing (broadcast shapes etc.)
         batch_shape = input.shape[: -len(self.input_shape)]
@@ -707,11 +707,24 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         input = input.reshape(-1, *input.shape[len(batch_shape) :])
         time = time.reshape(-1)
 
-        # call the network to get the estimated vector field
-        v = self.net(input, time, condition_mask, edge_mask)
-        v = v.reshape(*batch_shape + self.input_shape)
+        # Normalize: latent entries with the marginal statistics at time t, observed
+        # (clean) entries with the data statistics.
+        mean_t, std_t = self._time_dependent_stats(time)
+        is_observed = self._broadcast_condition_mask(condition_mask, input.shape[0])
+        input_norm = torch.where(
+            is_observed,
+            (input - self.mean_0) / self.std_0,
+            (input - mean_t) / std_t,
+        )
 
-        return v
+        # The network predicts the normalized velocity (or residual).
+        v_out = self.net(input_norm, time, condition_mask, edge_mask)
+        v_mean, v_std = self._velocity_stats()
+        if self.gaussian_baseline:
+            v = self._velocity_baseline(input, time) + v_out * v_std
+        else:
+            v = v_out * v_std + v_mean
+        return v.reshape(*batch_shape + self.input_shape)
 
     def loss(
         self,
@@ -786,9 +799,6 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             Loss value.
         """
 
-        if self.z_score_enabled:
-            input = (input - self._z_score_shift) / self._z_score_scale
-
         input_shape = input.shape
         B = input_shape[0]  # Batch size
         T = input_shape[1]  # Variables (nodes)
@@ -857,8 +867,10 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         # Pass masks to the forward method
         predicted_vector_field = self.forward(input_t, times, condition_mask, edge_mask)
 
-        # compute the mean squared error between the vector fields
-        loss = (predicted_vector_field - vector_field_target) ** 2.0
+        # Mean squared error in normalized velocity space (as in
+        # `FlowMatchingEstimator`), so that all entries have comparable scale.
+        _, v_std = self._velocity_stats()
+        loss = ((predicted_vector_field - vector_field_target) / v_std) ** 2.0
 
         # Apply condition mask: loss is only computed for latent variables
         loss = torch.where(condition_mask_broadcast, torch.zeros_like(loss), loss)

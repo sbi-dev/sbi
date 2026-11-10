@@ -690,7 +690,7 @@ def simformer_score_nn(
 
 def simformer_flow_nn(
     model: str = "simformer",
-    z_score_inputs: Optional[str] = None,
+    z_score_inputs: Optional[str] = "independent",
     hidden_features: int = 100,
     num_heads: int = 4,
     num_layers: int = 4,
@@ -715,10 +715,9 @@ def simformer_flow_nn(
 
     Args:
         model (str): Name of the model architecture to use. Default is "simformer".
-        z_score_inputs (str): Whether to z-score the inputs, "independent",
-            "structured" or None (default). With z-scoring the estimator works in
-            standardized space, which does not yet support iid observations,
-            batched sampling or MAP (as `compose_standardization` for FMPE).
+        z_score_inputs (str): Whether to z-score the inputs, "independent"
+            (default), "structured" or None. The standardization is internal to
+            the estimator, as for FMPE.
         hidden_features (int): Number of hidden features in each layer. Default is 100.
         num_heads (int): Number of attention heads in the transformer layers.
         num_layers (int): Number of transformer layers. Default is 4.
@@ -739,8 +738,7 @@ def simformer_flow_nn(
 
     """
 
-    if z_score_inputs is not None:
-        kwargs["z_score_x"] = z_score_inputs
+    kwargs["z_score_x"] = z_score_inputs
 
     kwargs = dict(
         zip(

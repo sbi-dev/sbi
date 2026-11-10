@@ -684,8 +684,17 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         while std.dim() < input.dim():
             std = std.unsqueeze(-1)
 
-        # Z-score the input
+        # Z-score the input: latent entries with the marginal statistics at time t,
+        # observed (clean, never noised) entries with the data statistics.
         input_enc = (input - mean) / std
+        is_observed = condition_mask.bool()
+        if is_observed.dim() == 1:  # [T] -> [1, T]
+            is_observed = is_observed.unsqueeze(0)
+        if input.dim() == 3:  # [B, T] -> [B, T, 1] for inputs with features
+            is_observed = is_observed.unsqueeze(-1)
+        input_enc = torch.where(
+            is_observed, (input - self.mean_0) / self.std_0, input_enc
+        )
 
         # "Skip connection" Gaussian score
         score_gaussian = (input - mean) / (std**2)

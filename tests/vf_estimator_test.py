@@ -842,6 +842,7 @@ def test_simformer_iid_sampling_runs(iid_method, num_features):
         ("vp", dict(beta_max=5.0, t_max=0.9), dict(beta_max=5.0, t_max=0.9)),
         ("subvp", dict(beta_min=0.2), dict(beta_min=0.2)),
         ("flow", dict(noise_scale=1e-2), dict(noise_scale=1e-2)),
+        ("flow", dict(gaussian_baseline=True), dict(gaussian_baseline=True)),
     ],
 )
 def test_simformer_factory_passes_estimator_options(
@@ -912,9 +913,12 @@ def test_finite_z_score_stats_ignore_nans_per_entry():
 
 
 def test_flow_simformer_z_scoring_samples_in_original_space():
-    """With z-scoring, the flow Simformer is trained in standardized space; the
-    posterior must still return samples in the original space."""
+    """With z-scoring, the flow Simformer normalizes internally; posterior samples
+    must come out in the original space, also with iid observations."""
     from sbi.inference import FlowMatchingSimformer
+    from sbi.inference.posteriors.posterior_parameters import (
+        VectorFieldPosteriorParameters,
+    )
 
     torch.manual_seed(0)
     num_sims = 500
@@ -923,25 +927,31 @@ def test_flow_simformer_z_scoring_samples_in_original_space():
     inference = FlowMatchingSimformer(
         posterior_latent_idx=[0, 1],
         posterior_observed_idx=[2, 3],
-        z_score_inputs="independent",
         hidden_features=32,
         num_layers=2,
         show_progress_bars=False,
     )
     inference.append_simulations(torch.cat([theta, x], dim=1))
-    estimator = inference.train(max_num_epochs=30)
-    assert estimator.z_score_enabled
+    estimator = inference.train(max_num_epochs=200)
+    assert (estimator.std_0 > 1.0).all(), "z-scoring is on by default"
 
     posterior = inference.build_posterior(sample_with="ode")
     samples = posterior.sample((200,), x=x[:1], show_progress_bars=False)
     assert torch.isfinite(samples).all()
     # theta is about (x - 1000) / 5 + 100; samples must be on that scale.
     expected = (x[0] - 1000.0) / 5.0 + 100.0
-    assert (samples.mean(0) - expected).abs().max() < 20.0
+    assert (samples.mean(0) - expected).abs().max() < 2.0
 
-    # Standardized space does not support iid observations yet; it must say so.
-    with pytest.raises(NotImplementedError):
-        posterior.sample((5,), x=x[:2], show_progress_bars=False)
+    prior = torch.distributions.Independent(
+        torch.distributions.Normal(100.0 * torch.ones(2), 20.0 * torch.ones(2)), 1
+    )
+    iid_posterior = inference.build_posterior(
+        prior=prior,
+        sample_with="sde",
+        posterior_parameters=VectorFieldPosteriorParameters(iid_method="auto_gauss"),
+    )
+    iid_samples = iid_posterior.sample((20,), x=x[:2], show_progress_bars=False)
+    assert torch.isfinite(iid_samples).all()
 
 
 def test_finite_z_score_stats_fall_back_for_too_few_values():

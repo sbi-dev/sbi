@@ -1566,10 +1566,9 @@ def _build_masked_vector_field_estimator(
         estimator_type: Either "masked-flow" or "masked-score".
         z_score_x: Whether to z-score the inputs: "independent" (per entry),
             "structured" (one statistic for all entries), or None. Statistics use
-            the finite values only. For score matching the standardization is
-            internal to the estimator. For flow matching the estimator works in
-            standardized space, which (as `compose_standardization` for FMPE) does
-            not yet support iid observations, batched sampling or MAP.
+            the finite values only. The standardization is internal to the
+            estimator (as for NPSE and FMPE); inputs and outputs stay in the
+            original space.
         embedding_net: Embedding network for the inputs.
         sde_type: SDE type for the score estimator, one of "vp", "subvp", or "ve".
         net: "simformer" or a custom network following the MaskedVectorFieldNet
@@ -1623,20 +1622,6 @@ def _build_masked_vector_field_estimator(
 
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     input_shape = batch_x[0].shape
-
-    if estimator_cls is MaskedFlowMatchingEstimator:
-        z_score_kwargs = {}
-        if z_score_x_bool:
-            shift, scale = _finite_z_score_stats(batch_x, structured_x)
-            z_score_kwargs = dict(z_score_shift=shift, z_score_scale=scale)
-        return MaskedFlowMatchingEstimator(
-            net=vectorfield_net,  # type: ignore
-            input_shape=input_shape,
-            embedding_net=embedding_net,
-            **z_score_kwargs,
-            **estimator_kwargs,
-        )
-
     mean_0, std_0 = (
         _finite_z_score_stats(batch_x, structured_x) if z_score_x_bool else (0, 1)
     )
@@ -1653,10 +1638,11 @@ def _build_masked_vector_field_estimator(
 def build_masked_flow_matching_estimator(*args, **kwargs):
     """Builds a masked flow matching estimator for the Simformer.
 
-    Inputs are not z-scored by default (see `z_score_x` of
-    `_build_masked_vector_field_estimator`).
+    Inputs are z-scored per entry by default (`z_score_x="independent"`), as for
+    FMPE.
     """
     kwargs.pop("sde_type", None)  # The Simformer flow factory passes "flow".
+    kwargs.setdefault("z_score_x", "independent")
     return _build_masked_vector_field_estimator(
         *args, estimator_type="masked-flow", **kwargs
     )
