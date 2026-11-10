@@ -3,7 +3,7 @@
 
 from abc import abstractmethod
 from copy import deepcopy
-from dataclasses import asdict, replace
+from dataclasses import replace
 from typing import (
     Any,
     Callable,
@@ -32,7 +32,12 @@ from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
-from sbi.inference.trainers._contracts import LossArgsVF, StartIndexContext, TrainConfig
+from sbi.inference.trainers._contracts import (
+    LossArgsVF,
+    StartIndexContext,
+    TrainConfig,
+    loss_args_to_kwargs,
+)
 from sbi.inference.trainers.base import LossArgs
 from sbi.neural_nets.estimators import (
     ConditionalVectorFieldEstimator,
@@ -579,7 +584,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
             theta=theta_batch,
             x=x_batch,
             prior_masks=prior_masks_batch,
-            **asdict(loss_args),
+            **loss_args_to_kwargs(loss_args),
         )
 
         return losses
@@ -1306,7 +1311,7 @@ class MaskedVectorFieldTrainer(
             condition_masks=condition_masks_batch,
             edge_masks=edge_masks_batch,
             prior_masks=prior_masks_batch,
-            **asdict(loss_args),
+            **loss_args_to_kwargs(loss_args),
         )
 
         return losses

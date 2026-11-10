@@ -17,7 +17,7 @@ from typing import (
 import torch
 from numpy import ndarray
 from torch import Tensor, float32, nn
-from torch.distributions import Distribution, Uniform
+from torch.distributions import Distribution, Independent, Uniform
 
 from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
@@ -257,9 +257,13 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     check_prior_return_type(prior)
 
     # Potentially required wrapper if the prior returns an additional sample dimension
-    # for `.log_prob()`.
+    # for `.log_prob()`. Prefer `Independent`: the vector field methods recognise it
+    # and use exact formulas for it.
     if prior.log_prob(prior.sample(torch.Size((10,)))).shape == torch.Size([10, 1]):
-        prior = OneDimPriorWrapper(prior, validate_args=False)
+        if prior.batch_shape == torch.Size([1]):
+            prior = Independent(prior, 1, validate_args=False)
+        else:
+            prior = OneDimPriorWrapper(prior, validate_args=False)
 
     theta_numel = prior.sample().numel()
 

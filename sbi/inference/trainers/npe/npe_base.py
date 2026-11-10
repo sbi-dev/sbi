@@ -3,7 +3,6 @@
 
 import warnings
 from abc import abstractmethod
-from dataclasses import asdict
 from typing import (
     Any,
     Callable,
@@ -36,6 +35,7 @@ from sbi.inference.trainers._contracts import (
     LossArgsNPE,
     StartIndexContext,
     TrainConfig,
+    loss_args_to_kwargs,
 )
 from sbi.inference.trainers.base import (
     LossArgs,
@@ -743,7 +743,9 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator]):
             )
 
         # Take negative loss here to get validation log_prob.
-        losses = self._loss(theta_batch, x_batch, masks_batch, **asdict(loss_args))
+        losses = self._loss(
+            theta_batch, x_batch, masks_batch, **loss_args_to_kwargs(loss_args)
+        )
 
         return losses
 
