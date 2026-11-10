@@ -762,7 +762,6 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
             Sample-wise log probabilities.
         """
 
-        self.net.eval()
         return self.net.log_prob(x)
 
     def sample(self, sample_shape: torch.Size) -> Tensor:

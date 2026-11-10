@@ -434,6 +434,7 @@ def test_unconditional_density_estimator_default_methods():
     samples, log_probs = estimator.sample_and_log_prob(torch.Size((5,)))
     assert samples.shape == (5, 2)
     assert log_probs.shape == (5,)
+    assert estimator.net.training, "log_prob must leave the train/eval mode as is."
 
 
 def _build_density_estimator_and_tensors(
