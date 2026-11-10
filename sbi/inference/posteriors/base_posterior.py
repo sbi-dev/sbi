@@ -242,19 +242,24 @@ class NeuralPosterior:
         """
         return False
 
+    @property
+    def _one_observation_hint(self) -> str:
+        """What to do instead when this posterior takes one observation."""
+        return (
+            "For a separate posterior of each observation, pass one observation "
+            "at a time, or use `sample_batched()` and `log_prob_batched()` where "
+            "available. To combine them as iid trials, use a posterior built with "
+            "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'` "
+            "(trained with `train()`). For a direct posterior of several trials, "
+            "train with a permutation-invariant embedding net on sets of trials, "
+            "and pass each set as one observation."
+        )
+
     def _check_num_observations(self, num_observations: int) -> None:
         """Raise if this posterior takes one observation and gets several."""
         if self._takes_one_observation:
             _require_one_observation(
-                num_observations,
-                type(self).__name__,
-                "For a separate posterior of each observation, pass one observation "
-                "at a time, or use `sample_batched()` and `log_prob_batched()` where "
-                "available. To combine them as iid trials, use a posterior built with "
-                "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'` "
-                "(trained with `train()`). For a direct posterior of several trials, "
-                "train with a permutation-invariant embedding net on sets of trials, "
-                "and pass each set as one observation.",
+                num_observations, type(self).__name__, self._one_observation_hint
             )
 
     def _bind_iid(
@@ -286,18 +291,23 @@ class NeuralPosterior:
             )
         return bound
 
+    @property
+    def _implicit_x(self) -> Optional[Tensor]:
+        """The `x` that methods use when they get none: the default `x`."""
+        return self.default_x
+
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
             return self._process_x(x)
-        elif self.default_x is None:
+        implicit_x = self._implicit_x
+        if implicit_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set. "
                 "If you'd like to have a default, use the `.set_default_x()` method."
             )
-        else:
-            return self.default_x
+        return implicit_x
 
     def _cached_leakage_factor(
         self,

@@ -36,7 +36,6 @@ from sbi.samplers.vi.vi_utils import (
     detach_and_deepcopy,
 )
 from sbi.sbi_types import (
-    Array,
     Shape,
     TorchDistribution,
     TorchTensor,
@@ -779,16 +778,24 @@ class VIPosterior(NeuralPosterior):
         """The amortized q(θ|x), like a direct posterior, takes one observation."""
         return self._mode == "amortized"
 
-    def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
-        """Return `x`, else the default `x`, else the `x` the single-x q was fit to.
+    @property
+    def _one_observation_hint(self) -> str:
+        return (
+            "For a separate posterior of each observation, pass one observation at "
+            "a time, or use `sample_batched()`. To combine them as iid trials, fit "
+            "q to all of them with `train(x=x)`."
+        )
+
+    @property
+    def _implicit_x(self) -> Optional[Tensor]:
+        """The default `x`, else the `x` the single-x q was fit to.
 
         A single-x q answers for one observation only, so `sample()`, `log_prob()`,
         `potential()` and `map()` fall back to it when no `x` is given.
         """
-        trained_on = self._trained_on if self._mode == "single_x" else None
-        if x is None and self.default_x is None and trained_on is not None:
-            return trained_on
-        return super()._x_else_default_x(x)
+        if self.default_x is None and self._mode == "single_x":
+            return self._trained_on
+        return self.default_x
 
     def _is_trained_on(self, x: Tensor) -> bool:
         """Whether q was trained on `x`: the same shape and the same values.
@@ -921,7 +928,14 @@ class VIPosterior(NeuralPosterior):
             )
 
         # Check context. Training does not fall back to the x of an earlier fit.
-        x = super()._x_else_default_x(x)
+        if x is not None:
+            x = self._process_x(x)
+        elif self.default_x is not None:
+            x = self.default_x
+        else:
+            raise ValueError(
+                "Pass `x` to `train()`, or set a default with `.set_default_x()`."
+            )
         if not torch.isfinite(x).all():
             raise ValueError("x contains NaN or Inf values.")
         # The single-x q combines observations, also while an amortized q is in place.

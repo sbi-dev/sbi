@@ -24,6 +24,7 @@ from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 from sbi.inference import (
     NLE,
     NRE,
+    EnsemblePosterior,
     VectorFieldPosterior,
     likelihood_estimator_based_potential,
 )
@@ -1231,3 +1232,37 @@ def test_q_fit_on_one_observation_rejects_copies_of_it():
         posterior.sample((5,), x=copies)
     with pytest.raises(ValueError, match="not fit on the specified observation"):
         posterior.log_prob(zeros(1, 2), x=copies)
+
+
+def test_ensemble_of_vi_fits_to_different_x_raises():
+    """Without an x, an ensemble of q fit to different observations would mix their
+    posteriors. With one shared x, it uses that x."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    fits = []
+    for x_o in (2 * ones(1, 2), -2 * ones(1, 2)):
+        posterior = VIPosterior(_CenteredPotential(prior), prior, q="gaussian")
+        posterior.train(x=x_o, **TRAIN_KWARGS)
+        fits.append(posterior)
+
+    with pytest.raises(ValueError, match="use different observations"):
+        EnsemblePosterior(fits).sample((5,))
+    assert EnsemblePosterior([fits[0], fits[0]]).sample((5,)).shape == (5, 2)
+
+
+def test_ensemble_of_amortized_vi_takes_one_observation_in_log_prob():
+    """`log_prob()` of the ensemble raises like `sample()`, instead of pairing each
+    theta with one observation."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    ensemble = EnsemblePosterior([posterior, posterior])
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        ensemble.log_prob(zeros(3, 2), x=zeros(3, 2))

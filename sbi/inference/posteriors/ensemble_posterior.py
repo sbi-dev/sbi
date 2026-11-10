@@ -178,6 +178,50 @@ class EnsemblePosterior(NeuralPosterior):
         return any(posterior._takes_one_observation for posterior in self.posteriors)
 
     @property
+    def _one_observation_hint(self) -> str:
+        names = sorted({
+            type(p).__name__ for p in self.posteriors if p._takes_one_observation
+        })
+        return (
+            f"Its posteriors of type {' and '.join(names)} take one observation. "
+            "For a separate posterior of each observation, pass one observation at "
+            "a time. To combine them as iid trials, build the ensemble from "
+            "posteriors with `sample_with='mcmc'`, `'importance'`, `'rejection'` or "
+            "`'vi'` (trained with `train()`)."
+        )
+
+    @property
+    def _implicit_x(self) -> Optional[Tensor]:
+        """The default `x` of the ensemble, else the `x` all its posteriors use.
+
+        Raises if the posteriors use different observations, since their mixture
+        would mix posteriors of different observations.
+        """
+        if self.default_x is not None:
+            return self.default_x
+        component_xs = [posterior._implicit_x for posterior in self.posteriors]
+        if all(x is None for x in component_xs):
+            return None
+        self._require_posteriors_use(component_xs[0])
+        return component_xs[0]
+
+    def _require_posteriors_use(self, x: Tensor) -> None:
+        """Raise unless every posterior of the ensemble uses `x` when it gets none."""
+        for posterior in self.posteriors:
+            implicit_x = posterior._implicit_x
+            if (
+                implicit_x is None
+                or implicit_x.shape != x.shape
+                or not torch.equal(implicit_x, x)
+            ):
+                raise ValueError(
+                    "The posteriors of the ensemble use different observations "
+                    "(their default x, or for VI the x q was fit to). Pass `x`, or set "
+                    "one observation for all of them with `set_default_x()` of the "
+                    "ensemble."
+                )
+
+    @property
     def weights(self) -> Tensor:
         return self._weights
 
@@ -223,20 +267,16 @@ class EnsemblePosterior(NeuralPosterior):
             sample_shape: Desired shape of samples that are drawn from posterior
                 ensemble. If sample_shape is multidimensional we simply draw
                 `sample_shape.numel()` samples and then reshape into the desired shape.
-            x: Conditioning context. If none is provided and no default context is set,
-                an error will be raised.
+            x: Conditioning context. If None, the default `x` of the ensemble, else
+                the `x` that all its posteriors use.
 
         Returns:
             Samples drawn from the ensemble distribution.
         """
         # Components are drawn randomly; validate `x` here so that errors do not
-        # depend on the draw. Without `x`, each component uses its own default.
-        if x is not None or self.default_x is not None:
-            self._check_num_observations(self._x_else_default_x(x).shape[0])
-        else:
-            for posterior in self.posteriors:
-                if posterior.default_x is not None:
-                    posterior._check_num_observations(posterior.default_x.shape[0])
+        # depend on the draw.
+        x = self._x_else_default_x(x)
+        self._check_num_observations(x.shape[0])
         num_samples = torch.Size(sample_shape).numel()
         posterior_indizes = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -291,9 +331,9 @@ class EnsemblePosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
-            x: Conditioning context.If none is provided and no default context is set,
-                an error will be raised. The mixture of an ensemble with NPE
-                posteriors takes one observation, unless `individually=True`.
+            x: Conditioning context. If None, the default `x` of the ensemble, else
+                the `x` that all its posteriors use. The mixture of an ensemble with
+                NPE posteriors takes one observation, unless `individually=True`.
             individually: If true, returns log weights and log_probs individually.
 
         Raises:
@@ -307,20 +347,10 @@ class EnsemblePosterior(NeuralPosterior):
             isinstance(posterior, type(self.posteriors[0]))
             for posterior in self.posteriors
         ), "`log_prob()` only works for ensembles of the same type of posterior."
+        x = self._x_else_default_x(x)
+        self._check_num_observations(x.shape[0])
         if not individually:
-            if x is not None or self.default_x is not None:
-                num_observations = self._x_else_default_x(x).shape[0]
-            else:
-                # Without `x`, each component uses its own default.
-                num_observations = max(
-                    (
-                        p.default_x.shape[0]
-                        for p in self.posteriors
-                        if p.default_x is not None
-                    ),
-                    default=1,
-                )
-            self._check_mixture_observations(num_observations, "log_prob")
+            self._check_mixture_observations(x.shape[0], "log_prob")
 
         log_probs = torch.stack([
             posterior.log_prob(theta, x=x, **kwargs) for posterior in self.posteriors
@@ -372,13 +402,21 @@ class EnsemblePosterior(NeuralPosterior):
             and not posterior._takes_one_observation
             for posterior in self.posteriors
         ):
+            same_type = all(
+                isinstance(posterior, type(self.posteriors[0]))
+                for posterior in self.posteriors
+            )
+            alternatives = (
+                "`sample()`, `log_prob(individually=True)`"
+                if same_type
+                else "`sample()`"
+            )
             _require_one_observation(
                 num_observations,
                 f"`{method}()` of an ensemble with NPE posteriors",
                 "The normalizing constants of the components would skew the ensemble "
-                "weights (issue #2135). Use `sample()`, or set the observations with "
-                "`set_default_x()` and call `map(individually=True)` or "
-                "`log_prob(individually=True)`.",
+                f"weights (issue #2135). Use {alternatives}, or set the observations "
+                "with `set_default_x()` and call `map(individually=True)`.",
             )
 
     def _bind_mixture(self, x: Optional[Tensor], method: str) -> Tensor:
@@ -397,8 +435,9 @@ class EnsemblePosterior(NeuralPosterior):
         posterior.
         Args:
             theta: Parameters $\theta$, each evaluated given all of `x`.
-            x: Observation. If None, the default `x`. Several observations are
-                combined as iid trials; an ensemble with NPE posteriors raises.
+            x: Observation. If None, the default `x` of the ensemble, else the `x`
+                that all its posteriors use. Several observations are combined as
+                iid trials; an ensemble with NPE posteriors raises.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -437,8 +476,11 @@ class EnsemblePosterior(NeuralPosterior):
         self.posteriors[idx].
 
         Args:
-            x: Observed data at which to evaluate the MAP. The joint MAP of an
-                ensemble with NPE posteriors takes one observation.
+            x: Observed data at which to evaluate the joint MAP. If None, the default
+                `x` of the ensemble, else the `x` that all its posteriors use. The
+                joint MAP of an ensemble with NPE posteriors takes one observation.
+                With `individually=True`, each posterior uses its default `x`, which
+                must be the same for all of them.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -468,13 +510,18 @@ class EnsemblePosterior(NeuralPosterior):
         """
 
         if individually:
+            if x is not None:
+                raise ValueError(
+                    "`map(individually=True)` uses the default `x` of each posterior. "
+                    "Set it with `set_default_x()` of the ensemble."
+                )
+            self._require_posteriors_use(self._x_else_default_x(None))
             maps = []
             log_weights = torch.log(self._weights).reshape(-1, 1)
 
             for posterior in self.posteriors:
                 maps.append(
                     posterior.map(
-                        x=x,
                         num_iter=num_iter,
                         num_to_optimize=num_to_optimize,
                         learning_rate=learning_rate,

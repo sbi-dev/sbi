@@ -934,6 +934,43 @@ def test_npe_ensemble_mixture_takes_one_observation(method, npe_for_iid_x):
 
 
 @pytest.mark.parametrize(
+    "method", ["sample", "log_prob", "potential", "map_individually"]
+)
+def test_ensemble_raises_when_its_posteriors_use_different_observations(
+    method, npe_for_iid_x
+):
+    """Without an x of its own, the ensemble would mix posteriors of different
+    observations."""
+    _, trainer = npe_for_iid_x
+    components = [trainer.build_posterior(sample_with="rejection") for _ in range(2)]
+    components[0].set_default_x(zeros(1, 2))
+    components[1].set_default_x(ones(1, 2))
+    posterior = EnsemblePosterior(components)
+    theta = zeros(4, 2)
+    calls = {
+        "sample": lambda: posterior.sample((5,), show_progress_bars=False),
+        "log_prob": lambda: posterior.log_prob(theta),
+        "potential": lambda: posterior.potential(theta),
+        "map_individually": lambda: posterior.map(individually=True, num_iter=2),
+    }
+    with pytest.raises(ValueError, match="use different observations"):
+        calls[method]()
+
+
+def test_ensemble_evaluates_its_posteriors_at_its_default_x(npe_for_iid_x):
+    """A default x set on one posterior after the ensemble's does not change what the
+    ensemble evaluates."""
+    _, trainer = npe_for_iid_x
+    components = [trainer.build_posterior(sample_with="rejection") for _ in range(2)]
+    posterior = EnsemblePosterior(components).set_default_x(zeros(1, 2))
+    theta = torch.tensor([[0.0, 0.0], [0.5, -0.5]])
+    expected = posterior.log_prob(theta)
+
+    components[0].set_default_x(ones(1, 2))
+    assert torch.allclose(posterior.log_prob(theta), expected)
+
+
+@pytest.mark.parametrize(
     "sample_with, method", [("importance", "potential"), ("rejection", "log_prob")]
 )
 def test_posteriors_combine_several_observations_as_iid_trials(
