@@ -624,7 +624,7 @@ def simformer_score_nn(
         sde_type (str): Type of stochastic differential equation (SDE) to use.
         hidden_features (int): Number of hidden features in each layer. Default is 100.
         num_heads (int): Number of attention heads in the transformer layers.
-        num_layers (int): Number of transformer layers. Default is 8.
+        num_layers (int): Number of transformer layers. Default is 4.
         mlp_ratio (int): Ratio of MLP hidden dimension to embedding dimension.
         time_embedding_dim (int): Dimension of the time embedding.
         embedding_net (nn.Module): Optional embedding network to preprocess inputs.
@@ -632,8 +632,10 @@ def simformer_score_nn(
         dim_id (int): Dimension of identifier embeddings.
         dim_cond (int): Dimension of conditional embeddings.
         ada_time (bool): Whether to use adaptive time embeddings.
-        **kwargs (Any): Additional keyword arguments passed to the underlying estimator
-            builder.
+        **kwargs (Any): Further arguments of the estimator (e.g. `z_score_x`,
+            `sigma_min`, `sigma_max`, `beta_min`, `beta_max`, `t_min`, `t_max`,
+            `weight_fn` for score matching, `noise_scale` for flow matching) or of
+            `build_simformer_network`. Unknown arguments raise an error.
     Returns:
         Callable: A function that takes batch inputs and returns a masked score
         matching estimator.
@@ -713,9 +715,13 @@ def simformer_flow_nn(
 
     Args:
         model (str): Name of the model architecture to use. Default is "simformer".
+        z_score_inputs (str): Whether to z-score the inputs, "independent",
+            "structured" or None (default). With z-scoring the estimator works in
+            standardized space, which does not yet support iid observations,
+            batched sampling or MAP (as `compose_standardization` for FMPE).
         hidden_features (int): Number of hidden features in each layer. Default is 100.
         num_heads (int): Number of attention heads in the transformer layers.
-        num_layers (int): Number of transformer layers. Default is 8.
+        num_layers (int): Number of transformer layers. Default is 4.
         mlp_ratio (int): Ratio of MLP hidden dimension to embedding dimension.
         time_embedding_dim (int): Dimension of the time embedding.
         embedding_net (nn.Module): Optional embedding network to preprocess inputs.
@@ -723,8 +729,10 @@ def simformer_flow_nn(
         dim_id (int): Dimension of identifier embeddings.
         dim_cond (int): Dimension of conditional embeddings.
         ada_time (bool): Whether to use adaptive time embeddings.
-        **kwargs (Any): Additional keyword arguments passed to the underlying estimator
-            builder.
+        **kwargs (Any): Further arguments of the estimator (e.g. `z_score_x`,
+            `sigma_min`, `sigma_max`, `beta_min`, `beta_max`, `t_min`, `t_max`,
+            `weight_fn` for score matching, `noise_scale` for flow matching) or of
+            `build_simformer_network`. Unknown arguments raise an error.
     Returns:
         Callable: A function that takes batch inputs and returns a masked score
         matching estimator.
@@ -732,11 +740,7 @@ def simformer_flow_nn(
     """
 
     if z_score_inputs is not None:
-        raise ValueError(
-            "z_score_inputs is not supported for FM Simformer. You can z-score"
-            "the inputs manually but doing so in the forward pass can"
-            "negatively impact performance."
-        )
+        kwargs["z_score_x"] = z_score_inputs
 
     kwargs = dict(
         zip(

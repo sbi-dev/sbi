@@ -591,6 +591,8 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         input_shape: torch.Size,
         embedding_net: Optional[nn.Module] = None,
         noise_scale: float = 1e-3,
+        z_score_shift: Optional[Tensor] = None,
+        z_score_scale: Optional[Tensor] = None,
     ) -> None:
         r"""Creates a masked vector field estimator for Flow Matching.
 
@@ -600,8 +602,15 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             embedding_net: Embedding network for the condition.
             noise_scale: Scale of the noise added to the vector field
                 (:math:`\sigma_{min}` in [2]_).
-            zscore_transform_input: Whether to z-score the input.
-                This is ignored and will be removed.
+            z_score_shift: Per-entry shift of the inputs, given together with
+                `z_score_scale`. If given, the estimator is trained on and works with
+                standardized inputs `(input - z_score_shift) / z_score_scale`: the
+                loss standardizes its (original-space) input, and `forward`,
+                `ode_fn` and `score` act on standardized inputs. The fixed-mask
+                wrapper maps the latent entries back to the original space (see
+                `compose_standardization` of the unmasked estimators).
+            z_score_scale: Positive per-entry scale of the inputs, given together
+                with `z_score_shift`.
         """
 
         super().__init__(
@@ -610,6 +619,46 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
             embedding_net=embedding_net,
         )
         self.noise_scale = noise_scale
+
+        if (z_score_shift is None) != (z_score_scale is None):
+            raise ValueError(
+                "`z_score_shift` and `z_score_scale` have to be given together."
+            )
+        shift = torch.zeros(1, *self.input_shape)
+        scale = torch.ones(1, *self.input_shape)
+        if z_score_shift is not None and z_score_scale is not None:
+            shift = torch.as_tensor(z_score_shift, dtype=torch.float32)
+            scale = torch.as_tensor(z_score_scale, dtype=torch.float32)
+            shift = torch.broadcast_to(shift, self.input_shape).reshape(
+                1, *self.input_shape
+            )
+            scale = torch.broadcast_to(scale, self.input_shape).reshape(
+                1, *self.input_shape
+            )
+            if not torch.isfinite(shift).all() or not torch.isfinite(scale).all():
+                raise ValueError("The z-score shift and scale must be finite.")
+            if not (scale > 0).all():
+                raise ValueError("The z-score scale must be strictly positive.")
+        self.register_buffer("_z_score_shift", shift.clone())
+        self.register_buffer("_z_score_scale", scale.clone())
+        self.register_buffer(
+            "_z_score_enabled", torch.tensor(z_score_shift is not None)
+        )
+
+    @property
+    def z_score_enabled(self) -> bool:
+        r"""Whether the estimator works with standardized inputs."""
+        return bool(self._z_score_enabled)
+
+    @property
+    def z_score_shift(self) -> Tensor:
+        r"""Per-entry shift of the standardization, shape `(1, *input_shape)`."""
+        return self._z_score_shift
+
+    @property
+    def z_score_scale(self) -> Tensor:
+        r"""Per-entry scale of the standardization, shape `(1, *input_shape)`."""
+        return self._z_score_scale
 
     def forward(
         self,
@@ -734,6 +783,9 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         Returns:
             Loss value.
         """
+
+        if self.z_score_enabled:
+            input = (input - self._z_score_shift) / self._z_score_scale
 
         input_shape = input.shape
         B = input_shape[0]  # Batch size

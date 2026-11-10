@@ -829,3 +829,128 @@ def test_simformer_iid_sampling_runs(iid_method, num_features):
     samples = posterior.sample((10,), x=x_o, steps=5, show_progress_bars=False)
     assert samples.shape == (10, num_theta * (num_features or 1))
     assert torch.isfinite(samples).all()
+
+
+@pytest.mark.parametrize(
+    "sde_type, estimator_kwargs, expected",
+    [
+        (
+            "ve",
+            dict(sigma_max=50.0, t_min=0.1, weight_fn="identity"),
+            dict(sigma_max=50.0, t_min=0.1),
+        ),
+        ("vp", dict(beta_max=5.0, t_max=0.9), dict(beta_max=5.0, t_max=0.9)),
+        ("subvp", dict(beta_min=0.2), dict(beta_min=0.2)),
+        ("flow", dict(noise_scale=1e-2), dict(noise_scale=1e-2)),
+    ],
+)
+def test_simformer_factory_passes_estimator_options(
+    sde_type, estimator_kwargs, expected
+):
+    """Estimator options given to the Simformer factories must reach the estimator
+    (they used to be silently dropped), and network options the network."""
+    from sbi.neural_nets.factory import simformer_flow_nn, simformer_score_nn
+
+    if sde_type == "flow":
+        build_fn = simformer_flow_nn(hidden_features=24, **estimator_kwargs)
+    else:
+        build_fn = simformer_score_nn(
+            sde_type=sde_type, hidden_features=24, **estimator_kwargs
+        )
+    estimator = build_fn(torch.randn(50, 4))
+
+    for name, value in expected.items():
+        assert getattr(estimator, name) == pytest.approx(value), name
+    if "weight_fn" in estimator_kwargs:
+        weights = torch.as_tensor(estimator.weight_fn(torch.rand(5)), dtype=torch.float)
+        assert torch.allclose(weights, torch.ones(()))
+    # The network option reached the network: a narrower net has fewer parameters.
+    default_net = (simformer_flow_nn() if sde_type == "flow" else simformer_score_nn())(
+        torch.randn(50, 4)
+    ).net
+    num_params = sum(p.numel() for p in estimator.net.parameters())
+    assert num_params < sum(p.numel() for p in default_net.parameters())
+
+
+@pytest.mark.parametrize("sde_type", ["ve", "flow"])
+def test_masked_builder_rejects_unknown_and_unused_options(sde_type):
+    """Typos and options a custom network cannot use must raise, not be dropped."""
+    builder = (
+        build_masked_flow_matching_estimator
+        if sde_type == "flow"
+        else build_masked_score_matching_estimator
+    )
+    data = torch.randn(50, 4)
+    with pytest.raises(ValueError, match="sigma_maxx"):
+        builder(data, data, sigma_maxx=3.0)
+
+    custom_net = builder(data, data).net
+    with pytest.raises(ValueError, match="hidden_features"):
+        builder(data, data, net=custom_net, hidden_features=8)
+
+
+def test_finite_z_score_stats_ignore_nans_per_entry():
+    """Z-scoring statistics use the finite values of each entry, so they also work
+    when every row has a missing value, and match `z_standardization` without
+    NaNs."""
+    from sbi.neural_nets.net_builders.vector_field_nets import _finite_z_score_stats
+    from sbi.utils.sbiutils import z_standardization
+
+    torch.manual_seed(0)
+    data = torch.randn(400, 3) * torch.tensor([1.0, 10.0, 0.1]) + 5.0
+    mean, std = _finite_z_score_stats(data, structured=False)
+    ref_mean, ref_std = z_standardization(data, structured_dims=False)
+    assert torch.allclose(mean, ref_mean, atol=1e-5)
+    assert torch.allclose(std, ref_std, atol=1e-5)
+
+    with_nans = data.clone()
+    with_nans[torch.arange(400), torch.arange(400) % 3] = float("nan")  # every row
+    mean_nan, std_nan = _finite_z_score_stats(with_nans, structured=False)
+    assert torch.isfinite(mean_nan).all() and torch.isfinite(std_nan).all()
+    assert torch.allclose(mean_nan, mean, rtol=0.1)
+    assert torch.allclose(std_nan, std, rtol=0.15)
+
+
+def test_flow_simformer_z_scoring_samples_in_original_space():
+    """With z-scoring, the flow Simformer is trained in standardized space; the
+    posterior must still return samples in the original space."""
+    from sbi.inference import FlowMatchingSimformer
+
+    torch.manual_seed(0)
+    num_sims = 500
+    theta = 100.0 + 20.0 * torch.randn(num_sims, 2)
+    x = 1000.0 + 5.0 * (theta - 100.0) + torch.randn(num_sims, 2)
+    inference = FlowMatchingSimformer(
+        posterior_latent_idx=[0, 1],
+        posterior_observed_idx=[2, 3],
+        z_score_inputs="independent",
+        hidden_features=32,
+        num_layers=2,
+        show_progress_bars=False,
+    )
+    inference.append_simulations(torch.cat([theta, x], dim=1))
+    estimator = inference.train(max_num_epochs=30)
+    assert estimator.z_score_enabled
+
+    posterior = inference.build_posterior(sample_with="ode")
+    samples = posterior.sample((200,), x=x[:1], show_progress_bars=False)
+    assert torch.isfinite(samples).all()
+    # theta is about (x - 1000) / 5 + 100; samples must be on that scale.
+    expected = (x[0] - 1000.0) / 5.0 + 100.0
+    assert (samples.mean(0) - expected).abs().max() < 20.0
+
+    # Standardized space does not support iid observations yet; it must say so.
+    with pytest.raises(NotImplementedError):
+        posterior.sample((5,), x=x[:2], show_progress_bars=False)
+
+
+def test_finite_z_score_stats_fall_back_for_too_few_values():
+    """Entries with fewer than two finite values are left unscaled, with a
+    warning, so that building an estimator from tiny batches still works."""
+    from sbi.neural_nets.net_builders.vector_field_nets import _finite_z_score_stats
+
+    data = torch.tensor([[1.0, 2.0], [3.0, float("nan")]])
+    with pytest.warns(UserWarning, match="fewer than two finite values"):
+        mean, std = _finite_z_score_stats(data, structured=False)
+    assert torch.allclose(mean, torch.tensor([2.0, 2.0]))
+    assert torch.allclose(std, torch.tensor([2.0**0.5, 1.0]))

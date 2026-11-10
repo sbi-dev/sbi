@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import inspect
 import math
 import warnings
 from dataclasses import dataclass, field, fields, replace
@@ -1450,7 +1451,10 @@ def build_simformer_network(
         A Simformer vector field network.
     """
 
-    del kwargs  # Unused
+    if kwargs:
+        raise ValueError(
+            f"Unknown argument(s) {sorted(kwargs)} for the Simformer network."
+        )
     del batch_y  # Unused
     del embedding_net  # Unused
 
@@ -1479,6 +1483,63 @@ def build_simformer_network(
     return vectorfield_net
 
 
+_MASKED_SCORE_ESTIMATORS = {
+    "ve": MaskedVEScoreEstimator,
+    "vp": MaskedVPScoreEstimator,
+    "subvp": MaskedSubVPScoreEstimator,
+}
+
+# Arguments of the masked estimators that the builder sets itself.
+_MASKED_BUILDER_MANAGED_ARGS = frozenset({
+    "self",
+    "net",
+    "input_shape",
+    "embedding_net",
+    "mean_0",
+    "std_0",
+    "z_score_shift",
+    "z_score_scale",
+})
+
+
+def _finite_z_score_stats(
+    batch_x: Tensor, structured: bool, min_std: float = 1e-14
+) -> tuple[Tensor, Tensor]:
+    """Mean and standard deviation for z-scoring, from the finite entries only.
+
+    Unlike `z_standardization`, rows that contain NaN or Inf are not dropped as a
+    whole: every entry uses all of its finite values. This keeps z-scoring usable
+    when every simulation has at least one missing entry.
+
+    Args:
+        batch_x: Batch of inputs, shape `(N, *input_shape)`.
+        structured: Whether to use one mean and std over all entries ("structured")
+            instead of one per entry ("independent").
+        min_std: Lower bound of the returned standard deviation.
+
+    Returns:
+        Mean and standard deviation, of shape `input_shape` (independent) or
+        scalars (structured).
+    """
+    batch_x = batch_x.float()
+    finite = torch.isfinite(batch_x)
+    values = torch.where(finite, batch_x, torch.zeros_like(batch_x))
+    dims = tuple(range(batch_x.dim())) if structured else (0,)
+    count = finite.sum(dim=dims)
+    too_few = count < 2
+    if too_few.any():
+        warnings.warn(
+            "Some entries have fewer than two finite values in the data used for "
+            "z-scoring; they are not rescaled (std 1).",
+            stacklevel=3,
+        )
+    mean = values.sum(dim=dims) / count.clamp(min=1)
+    centered = torch.where(finite, batch_x - mean, torch.zeros_like(batch_x))
+    std = (centered.pow(2).sum(dim=dims) / (count - 1).clamp(min=1)).sqrt()
+    std = torch.where(too_few, torch.ones_like(std), std.clamp(min=min_std))
+    return mean, std
+
+
 def _build_masked_vector_field_estimator(
     batch_x: Tensor,
     batch_y: Tensor,
@@ -1492,55 +1553,109 @@ def _build_masked_vector_field_estimator(
     """Builds a masked vector field estimator (flow or score matching) for the
     Simformer.
 
+    Keyword arguments are routed by name: arguments of the estimator class (e.g.,
+    `sigma_min`, `sigma_max`, `beta_min`, `t_min`, `weight_fn` for score matching,
+    `noise_scale` for flow matching) go to the estimator, arguments of
+    `build_simformer_network` go to the network. Any other argument raises an error
+    instead of being silently ignored.
+
     Args:
-        batch_x: Batch of inputs, used to infer dimensionality.
+        batch_x: Batch of inputs, used to infer dimensionality and z-scoring
+            statistics.
         batch_y: Unused, kept for compatibility.
         estimator_type: Either "masked-flow" or "masked-score".
-        z_score_x: Whether to z-score the inputs (score matching only).
+        z_score_x: Whether to z-score the inputs: "independent" (per entry),
+            "structured" (one statistic for all entries), or None. Statistics use
+            the finite values only. For score matching the standardization is
+            internal to the estimator. For flow matching the estimator works in
+            standardized space, which (as `compose_standardization` for FMPE) does
+            not yet support iid observations, batched sampling or MAP.
         embedding_net: Embedding network for the inputs.
         sde_type: SDE type for the score estimator, one of "vp", "subvp", or "ve".
         net: "simformer" or a custom network following the MaskedVectorFieldNet
             protocol.
-        **kwargs: Additional arguments forwarded to `build_simformer_network`.
+        **kwargs: Arguments of the estimator class or of `build_simformer_network`.
 
     Returns:
         A masked vector field estimator.
     """
+    if estimator_type == "masked-flow":
+        estimator_cls = MaskedFlowMatchingEstimator
+    elif sde_type in _MASKED_SCORE_ESTIMATORS:
+        estimator_cls = _MASKED_SCORE_ESTIMATORS[sde_type]
+    else:
+        raise ValueError(
+            f"Unknown SDE type: {sde_type}. Must be one of "
+            f"{sorted(_MASKED_SCORE_ESTIMATORS)}."
+        )
+
+    estimator_args = (
+        set(inspect.signature(estimator_cls.__init__).parameters)
+        - _MASKED_BUILDER_MANAGED_ARGS
+    )
+    network_args = set(inspect.signature(build_simformer_network).parameters) - {
+        "batch_x",
+        "batch_y",
+        "embedding_net",
+    }
+    estimator_kwargs = {k: v for k, v in kwargs.items() if k in estimator_args}
+    network_kwargs = {k: v for k, v in kwargs.items() if k not in estimator_args}
+
+    unknown = set(network_kwargs) - network_args
+    if unknown:
+        raise ValueError(
+            f"Unknown argument(s) {sorted(unknown)} for {estimator_cls.__name__} "
+            f"with the Simformer network. Estimator arguments: "
+            f"{sorted(estimator_args)}; network arguments: {sorted(network_args)}."
+        )
     if net == "simformer":
-        vectorfield_net = build_simformer_network(batch_x, batch_y, **kwargs)
+        vectorfield_net = build_simformer_network(batch_x, batch_y, **network_kwargs)
     elif isinstance(net, nn.Module):
+        if network_kwargs:
+            raise ValueError(
+                f"Argument(s) {sorted(network_kwargs)} configure the Simformer "
+                "network and would be ignored for a custom network. Configure the "
+                "network before passing it."
+            )
         vectorfield_net = net
     else:
         raise ValueError(f"Unknown architecture: {net}")
 
-    if estimator_type == "masked-flow":
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    input_shape = batch_x[0].shape
+
+    if estimator_cls is MaskedFlowMatchingEstimator:
+        z_score_kwargs = {}
+        if z_score_x_bool:
+            shift, scale = _finite_z_score_stats(batch_x, structured_x)
+            z_score_kwargs = dict(z_score_shift=shift, z_score_scale=scale)
         return MaskedFlowMatchingEstimator(
             net=vectorfield_net,  # type: ignore
-            input_shape=batch_x[0].shape,
+            input_shape=input_shape,
             embedding_net=embedding_net,
+            **z_score_kwargs,
+            **estimator_kwargs,
         )
 
-    masked_score_estimators = {
-        "ve": MaskedVEScoreEstimator,
-        "vp": MaskedVPScoreEstimator,
-        "subvp": MaskedSubVPScoreEstimator,
-    }
-    if sde_type not in masked_score_estimators:
-        raise ValueError(f"Unknown SDE type: {sde_type}")
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
     mean_0, std_0 = (
-        z_standardization(batch_x, structured_x) if z_score_x_bool else (0, 1)
+        _finite_z_score_stats(batch_x, structured_x) if z_score_x_bool else (0, 1)
     )
-    return masked_score_estimators[sde_type](
+    return estimator_cls(
         net=vectorfield_net,  # type: ignore
-        input_shape=batch_x[0].shape,
+        input_shape=input_shape,
         embedding_net=embedding_net,
         mean_0=mean_0,
         std_0=std_0,
+        **estimator_kwargs,
     )
 
 
 def build_masked_flow_matching_estimator(*args, **kwargs):
+    """Builds a masked flow matching estimator for the Simformer.
+
+    Inputs are not z-scored by default (see `z_score_x` of
+    `_build_masked_vector_field_estimator`).
+    """
     kwargs.pop("sde_type", None)  # The Simformer flow factory passes "flow".
     return _build_masked_vector_field_estimator(
         *args, estimator_type="masked-flow", **kwargs
@@ -1548,6 +1663,12 @@ def build_masked_flow_matching_estimator(*args, **kwargs):
 
 
 def build_masked_score_matching_estimator(*args, **kwargs):
+    """Builds a masked score matching estimator for the Simformer.
+
+    Inputs are z-scored per entry by default (`z_score_x="independent"`), as for
+    NPSE.
+    """
+    kwargs.setdefault("z_score_x", "independent")
     return _build_masked_vector_field_estimator(
         *args, estimator_type="masked-score", **kwargs
     )

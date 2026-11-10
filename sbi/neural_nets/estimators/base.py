@@ -1035,13 +1035,30 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         self._new_input_shape = torch.Size((num_latent * F,))
         self._new_condition_shape = torch.Size((num_observed * F,))
 
+        # If the masked estimator works with standardized inputs, the latent entries
+        # are sampled in standardized space and mapped back by the posterior
+        # (composed standardization); the observed entries are standardized here.
+        compose_shift = compose_scale = observed_shift = observed_scale = None
+        if getattr(original_estimator, "z_score_enabled", False):
+            shift = original_estimator.z_score_shift[0]  # (T,) or (T, F)
+            scale = original_estimator.z_score_scale[0]
+            is_latent = (fixed_condition_mask == 0).to(shift.device)
+            compose_shift = shift[is_latent].reshape(-1)
+            compose_scale = scale[is_latent].reshape(-1)
+            observed_shift = shift[~is_latent].reshape(-1)
+            observed_scale = scale[~is_latent].reshape(-1)
+
         super().__init__(
             net=original_estimator.net,
             input_shape=self._new_input_shape,
             condition_shape=self._new_condition_shape,
             t_min=original_estimator.t_min,
             t_max=original_estimator.t_max,
+            compose_shift=compose_shift,
+            compose_scale=compose_scale,
         )
+        self.register_buffer("_observed_shift", observed_shift)
+        self.register_buffer("_observed_scale", observed_scale)
 
         self.SCORE_DEFINED = original_estimator.SCORE_DEFINED
         self.SDE_DEFINED = original_estimator.SDE_DEFINED
@@ -1285,6 +1302,8 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
             batch shape (with `N` elements) of the outputs.
         """
         node_shape = () if self.is_features_dim_missing else (self._original_F,)
+        if self._observed_shift is not None and self._observed_scale is not None:
+            condition = (condition - self._observed_shift) / self._observed_scale
         try:
             batch_shape = torch.broadcast_shapes(input.shape[:-1], condition.shape[:-1])
             input = input.expand(*batch_shape, input.shape[-1])
