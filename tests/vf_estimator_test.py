@@ -519,6 +519,80 @@ def test_unmasked_wrapper_vector_field_estimator_on_device(sde_type, device, net
     assert str(out.device).split(":")[0] == device, "Output device mismatch."
 
 
+@pytest.mark.gpu
+@pytest.mark.parametrize("sde_type", ["ve", "flow"])
+def test_unmasked_wrapper_moves_its_index_buffers(sde_type):
+    """Moving the wrapper after it was built must also move the latent/observed
+    indices, otherwise its forward pass mixes devices."""
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available.")
+    building_inputs = torch.randn(100, 5)
+    builder = (
+        build_masked_flow_matching_estimator
+        if sde_type == "flow"
+        else build_masked_score_matching_estimator
+    )
+    kwargs = {} if sde_type == "flow" else {"sde_type": sde_type}
+    condition_mask = torch.tensor([0, 1, 1, 0, 1], dtype=torch.bool)
+    wrapper = builder(
+        building_inputs, building_inputs, **kwargs
+    ).build_conditional_vector_field_estimator(condition_mask, None)
+
+    wrapper = wrapper.to("cuda")
+    for name in ("_latent_idx", "_observed_idx", "_assemble_perm"):
+        assert getattr(wrapper, name).is_cuda, f"{name} stayed on the CPU."
+    out = wrapper(
+        torch.randn(7, 2, device="cuda"),
+        torch.randn(7, 3, device="cuda"),
+        torch.rand(1, device="cuda"),
+    )
+    assert out.shape == (7, 2) and out.is_cuda
+
+
+@pytest.mark.parametrize("input_event_shape", ((5,), (5, 3)))
+def test_unmasked_wrapper_assembles_inputs_in_node_order(input_event_shape):
+    """The out-of-place assembly must place latent and observed entries exactly
+    where the condition mask says, and must work under `torch.func.vmap`."""
+    torch.manual_seed(0)
+    estimator = build_masked_score_matching_estimator(
+        torch.randn(50, *input_event_shape), torch.randn(50, *input_event_shape)
+    )
+    condition_mask = torch.tensor([0, 1, 1, 0, 1], dtype=torch.bool)
+    wrapper = estimator.build_conditional_vector_field_estimator(condition_mask, None)
+    feat = input_event_shape[1:]
+    num_features = feat[0] if feat else 1
+    latent = torch.randn(4, 2 * num_features)
+    observed = torch.randn(4, 3 * num_features)
+
+    full, batch_shape = wrapper._assemble_full_inputs(latent, observed)
+
+    expected = torch.zeros(4, 5, *feat)
+    expected[:, ~condition_mask] = latent.reshape(4, 2, *feat)
+    expected[:, condition_mask] = observed.reshape(4, 3, *feat)
+    assert batch_shape == (4,)
+    assert torch.equal(full, expected)
+
+    # A single latent row is broadcast against several conditions, as the unmasked
+    # estimators do (this is what `jac_gauss` relies on).
+    full_b, batch_shape_b = wrapper._assemble_full_inputs(latent[0], observed)
+    assert batch_shape_b == (4,)
+    assert torch.equal(
+        full_b[:, ~condition_mask], latent[0].reshape(1, 2, *feat).expand(4, 2, *feat)
+    )
+    assert torch.equal(full_b[:, condition_mask], expected[:, condition_mask])
+
+    # In-place index writes into a fresh tensor break under vmap; the out-of-place
+    # assembly must not.
+    batched = torch.func.vmap(
+        lambda lat, obs: wrapper._assemble_full_inputs(lat, obs)[0], in_dims=(0, None)
+    )(latent, observed)
+    assert batched.shape == (4, 4, 5, *feat)
+    for i in range(4):
+        assert torch.equal(
+            batched[i], wrapper._assemble_full_inputs(latent[i], observed)[0]
+        )
+
+
 @pytest.mark.parametrize("sde_type", ["ve", "vp", "subvp", "flow"])
 @pytest.mark.parametrize("input_sample_dim", (1, 2, 3))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,), (3, 5), (3, 1)))
@@ -710,3 +784,48 @@ def test_ve_lognormal_no_nan_with_extreme_params():
     )
     assert torch.all(times >= estimator.t_min), "Times below t_min"
     assert torch.all(times <= estimator.t_max), "Times above t_max"
+
+
+@pytest.mark.parametrize("iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss"])
+@pytest.mark.parametrize("num_features", [None, 2])
+def test_simformer_iid_sampling_runs(iid_method, num_features):
+    """Posterior sampling with several iid observations must work for every iid
+    method, including `jac_gauss`, which vmaps through the fixed-mask wrapper."""
+    from sbi.inference import Simformer
+    from sbi.inference.posteriors.posterior_parameters import (
+        VectorFieldPosteriorParameters,
+    )
+
+    torch.manual_seed(0)
+    num_theta, num_x = 2, 3
+    shape = () if num_features is None else (num_features,)
+    theta = torch.randn(200, num_theta, *shape)
+    x = theta.sum(1, keepdim=True).expand(-1, num_x, *shape) + 0.1 * torch.randn(
+        200, num_x, *shape
+    )
+    inference = Simformer(
+        posterior_latent_idx=list(range(num_theta)),
+        posterior_observed_idx=list(range(num_theta, num_theta + num_x)),
+        hidden_features=16,
+        num_layers=1,
+        show_progress_bars=False,
+    )
+    inference.append_simulations(torch.cat([theta, x], dim=1))
+    inference.train(max_num_epochs=2)
+    num_latent_entries = num_theta * (num_features or 1)
+    prior = torch.distributions.Independent(
+        torch.distributions.Normal(
+            torch.zeros(num_latent_entries), torch.ones(num_latent_entries)
+        ),
+        1,
+    )
+    posterior = inference.build_posterior(
+        prior=prior,  # The iid methods need the prior.
+        sample_with="sde",
+        posterior_parameters=VectorFieldPosteriorParameters(iid_method=iid_method),
+    )
+
+    x_o = x[:3].reshape(3, -1)  # three iid observations
+    samples = posterior.sample((10,), x=x_o, steps=5, show_progress_bars=False)
+    assert samples.shape == (10, num_theta * (num_features or 1))
+    assert torch.isfinite(samples).all()

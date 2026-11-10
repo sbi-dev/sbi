@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import math
 from abc import ABC, abstractmethod
 from typing import Optional, Protocol, Tuple, TypeVar, Union
 
@@ -1064,10 +1065,20 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         else:
             self.register_buffer("_fixed_edge_mask", None)
 
-        # Extract indices for latent (0) and observed (1) nodes
-        # from the fixed_condition_mask
-        self._latent_idx = (self._fixed_condition_mask == 0).nonzero(as_tuple=True)[0]
-        self._observed_idx = (self._fixed_condition_mask == 1).nonzero(as_tuple=True)[0]
+        # Indices of the latent (0) and observed (1) nodes. They are buffers so that
+        # they follow the wrapper to another device; non-persistent, because they are
+        # derived from the condition mask.
+        latent_idx = (self._fixed_condition_mask == 0).nonzero(as_tuple=True)[0]
+        observed_idx = (self._fixed_condition_mask == 1).nonzero(as_tuple=True)[0]
+        self.register_buffer("_latent_idx", latent_idx, persistent=False)
+        self.register_buffer("_observed_idx", observed_idx, persistent=False)
+        # Permutation that puts `cat([latent, observed])` back into node order. It
+        # lets us assemble the full input out of place (vmap-safe, no index writes).
+        self.register_buffer(
+            "_assemble_perm",
+            torch.argsort(torch.cat([latent_idx, observed_idx])),
+            persistent=False,
+        )
 
         # Get the mean/std for the latent nodes from the original estimator
         if len(original_estimator.input_shape) == 1:
@@ -1142,7 +1153,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
             )
 
         # Assemble full input from given input and condition
-        full_inputs_tensor = self._assemble_full_inputs(input, condition)
+        full_inputs_tensor, batch_shape = self._assemble_full_inputs(input, condition)
 
         # Prepare condition and edge masks
         B = full_inputs_tensor.shape[0]
@@ -1162,7 +1173,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         )
 
         # Take (B, T, F) or (B, T) and return (B, num_latent*F) and (B, num_observed*F)
-        latent_out = self._disassemble_full_outputs(full_outputs, input)
+        latent_out = self._disassemble_full_outputs(full_outputs, batch_shape)
         return latent_out
 
     def loss(
@@ -1184,7 +1195,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
 
     def ode_fn(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
         # Assemble full input from given input and condition
-        full_inputs_tensor = self._assemble_full_inputs(input, condition)
+        full_inputs_tensor, batch_shape = self._assemble_full_inputs(input, condition)
 
         # Prepare condition and edge masks
         B = full_inputs_tensor.shape[0]
@@ -1202,9 +1213,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
             expanded_edge_mask,
         )
         # Disassemble and flatten the output
-        latent_out = self._disassemble_full_outputs(
-            full_outputs_ode, input
-        )  # Returns (B, num_latent*F)
+        latent_out = self._disassemble_full_outputs(full_outputs_ode, batch_shape)
         return latent_out
 
     # -------------------------- SDE METHODS --------------------------
@@ -1216,7 +1225,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
 
         # Assemble full input from give input and condition
         # input: (B, num_latent * F), condition: (B, num_observed * F)
-        full_inputs_tensor = self._assemble_full_inputs(input, condition)
+        full_inputs_tensor, batch_shape = self._assemble_full_inputs(input, condition)
 
         # Prepare condition and edge masks
         B = full_inputs_tensor.shape[0]
@@ -1235,7 +1244,7 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         )
 
         # Take B, T, F or B, T and return (B, num_latent*F) and (B, num_observed*F)
-        latent_score = self._disassemble_full_outputs(full_score_outputs, input)
+        latent_score = self._disassemble_full_outputs(full_score_outputs, batch_shape)
         # Returns (B, num_latent * F)
         return latent_score
 
@@ -1253,96 +1262,70 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
 
     # ------------------------- UTILITIES ------------------------------
 
-    def _assemble_full_inputs(self, input, condition):
-        # Get batch shape of input and condition, until nodes dimension
-        B = int(torch.prod(torch.tensor(input.shape[:-1])).item())
-        C = int(torch.prod(torch.tensor(condition.shape[:-1])).item())
+    def _assemble_full_inputs(
+        self, input: Tensor, condition: Tensor
+    ) -> Tuple[Tensor, torch.Size]:
+        """Place the latent `input` and the observed `condition` into one tensor.
 
-        # If the Wrapper is working with tensors missing feature dimension
-        # (B, num_latent) instead of (B, num_latent, F)
-        if self.is_features_dim_missing:
-            # Reshape input
-            input_part_unflattened = input.reshape(B, self._num_latent)
+        The batch shapes of `input` and `condition` are broadcast against each other
+        (as in the unmasked vector field estimators). If they do not broadcast, the
+        condition is tiled along the batch, which requires the batch size of `input`
+        to be a multiple of the one of `condition`.
 
-            # Adapt condition tensor to a compatible number of entries with the input
-            # Since condition is usually provided with a lower number of samples w.r.t.
-            # batch dimension
-            # we need to repeat it so that we can assemble a full input tensor
-            # where both these will fill in
-            # e.g. if one provides input as shape [10000, 3], condition as shape [5, 2]
-            # then we need to repeat condition 10000/5 = 2000 times so to obtain a
-            # condition tensor which will be 10000 on batch dim too: [10000, 2]
-            # thus, we can merge input ([10000, 3]) and condition ([10000, 2])
-            # to obtain full input ([10000, 5])
-            if self._num_observed == 0:
-                # Handle degenerate case where there are no observed nodes
-                # it can actually happen when using the Simformer in "full latent"
-                # (i.e., as a data generator)
-                condition_part_unflattened = torch.empty(
-                    B, 0, dtype=condition.dtype, device=condition.device
-                )
-            else:
-                condition_part_unflattened = condition.reshape(
-                    -1, self._num_observed
-                ).repeat(B // C, 1)
+        The assembly is out of place (concatenate, then reorder with a fixed
+        permutation), so it also works under `torch.func.vmap`, e.g. for the
+        `jac_gauss` iid method.
 
-            # Prepare full inputs tensor (will be filled with latent and condition)
-            # Note: "condition" means "observed"
-            full_inputs = torch.zeros(
-                B,
-                self._original_T,
-                dtype=input.dtype,
-                device=input.device,
-            )
-            # Place unflattened parts into the correct positions
-            full_inputs[:, self._latent_idx] = input_part_unflattened
-            full_inputs[:, self._observed_idx] = condition_part_unflattened
-        else:
-            # Reshape input
-            input_part_unflattened = input.reshape(
-                B, self._num_latent, self._original_F
+        Args:
+            input: Latent entries, shape `(*batch_input, num_latent * F)`.
+            condition: Observed entries, shape `(*batch_condition, num_observed * F)`.
+
+        Returns:
+            The full input of shape `(N, T)` (no feature dim) or `(N, T, F)`, and the
+            batch shape (with `N` elements) of the outputs.
+        """
+        node_shape = () if self.is_features_dim_missing else (self._original_F,)
+        try:
+            batch_shape = torch.broadcast_shapes(input.shape[:-1], condition.shape[:-1])
+            input = input.expand(*batch_shape, input.shape[-1])
+            condition = condition.expand(*batch_shape, condition.shape[-1])
+        except RuntimeError:
+            batch_shape = input.shape[:-1]
+            num_input = math.prod(batch_shape)
+            num_condition = math.prod(condition.shape[:-1])
+            if num_condition == 0 or num_input % num_condition != 0:
+                raise ValueError(
+                    f"The batch shape of the input {tuple(input.shape[:-1])} and of "
+                    f"the condition {tuple(condition.shape[:-1])} neither broadcast "
+                    "nor is the input batch a multiple of the condition batch."
+                ) from None
+            condition = condition.reshape(num_condition, -1).repeat(
+                num_input // num_condition, 1
             )
 
-            # Adapt condition tensor to a compatible number of entries with the input
-            # Same reasoning as above, but with an extra feature dimension at the end
-            if self._num_observed == 0:
-                # Handle degenerate case where there are no observed nodes
-                condition_part_unflattened = torch.empty(
-                    B,
-                    0,
-                    self._original_F,
-                    dtype=condition.dtype,
-                    device=condition.device,
-                )
-            else:
-                condition_part_unflattened = condition.reshape(
-                    -1, self._num_observed, self._original_F
-                ).repeat(B // C, 1, 1)
+        num_batch = math.prod(batch_shape)
+        latent_part = input.reshape(num_batch, self._num_latent, *node_shape)
+        observed_part = condition.reshape(
+            num_batch, self._num_observed, *node_shape
+        ).to(latent_part.dtype)
 
-            # Prepare full inputs tensor (will be filled with latent and condition)
-            # Note: "condition" means "observed"
-            full_inputs = torch.zeros(
-                B,
-                self._original_T,
-                self._original_F,
-                dtype=input.dtype,
-                device=input.device,
-            )
-            # Place unflattened parts into the correct positions
-            full_inputs[:, self._latent_idx, :] = input_part_unflattened
-            full_inputs[:, self._observed_idx, :] = condition_part_unflattened
+        full_inputs = torch.cat([latent_part, observed_part], dim=1)
+        return full_inputs.index_select(1, self._assemble_perm), batch_shape
 
-        return full_inputs
+    def _disassemble_full_outputs(
+        self, full_outputs: Tensor, batch_shape: torch.Size
+    ) -> Tensor:
+        """Return the latent part of `full_outputs`, flattened over the nodes.
 
-    def _disassemble_full_outputs(self, full_outputs, original_latent_tensor):
-        # We only care about the latent part of the tensor
-        # (i.e., thetas for the posterior)
-        if self.is_features_dim_missing:
-            latent_part = full_outputs[:, self._latent_idx]  # (B, num_latent)
-        else:
-            latent_part = full_outputs[:, self._latent_idx, :]  # (B, num_latent, F)
+        Args:
+            full_outputs: Output of the masked estimator, `(N, T)` or `(N, T, F)`.
+            batch_shape: Batch shape returned by `_assemble_full_inputs`.
 
-        return latent_part.reshape_as(original_latent_tensor)
+        Returns:
+            Latent part of shape `(*batch_shape, num_latent * F)`.
+        """
+        latent_part = full_outputs.index_select(1, self._latent_idx)
+        return latent_part.reshape(*batch_shape, self._num_latent * self._original_F)
 
     def solve_schedule(
         self,
