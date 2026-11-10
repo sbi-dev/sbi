@@ -12,7 +12,7 @@ from sbi.neural_nets.estimators import (
 )
 from sbi.neural_nets.estimators.mixed_density_estimator import _is_discrete
 from sbi.utils.nn_utils import get_numel
-from sbi.utils.sbiutils import standardizing_net, z_score_parser
+from sbi.utils.sbiutils import build_z_scored_embedding_net
 from sbi.utils.user_input_checks import check_data_device
 
 
@@ -51,13 +51,9 @@ def build_categoricalmassestimator(
 
     check_data_device(batch_x, batch_y)
 
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
     y_numel = get_numel(batch_y, embedding_net=embedding_net)
 
-    if z_score_y_bool:
-        embedding_net = nn.Sequential(
-            standardizing_net(batch_y, structured_y), embedding_net
-        )
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     if num_categories_per_variable is None:
         batch_x_discrete = batch_x[:, _is_discrete(batch_x)]

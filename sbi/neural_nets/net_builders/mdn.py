@@ -13,8 +13,8 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
 )
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
+    build_z_scored_embedding_net,
     mcmc_transform,
-    standardizing_net,
     z_score_parser,
     z_standardization,
 )
@@ -79,11 +79,7 @@ def build_mdn(
         transform_input = torch.stack([x_mean, x_std], dim=0)
 
     # Handle z-scoring for y (condition) via embedding net
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
-    if z_score_y_bool:
-        embedding_net = nn.Sequential(
-            standardizing_net(batch_y, structured_y), embedding_net
-        )
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     # Create the MDN network
     mdn_net = MultivariateGaussianMDN(

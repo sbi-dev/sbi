@@ -24,7 +24,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
-    standardizing_net,
+    build_z_scored_embedding_net,
     z_score_parser,
     z_standardization,
 )
@@ -1345,15 +1345,9 @@ class VectorFieldConfigBase(_PerModelConfigBase):
             batch_input, self.z_score_input, self.compose_standardization
         )
 
-        z_score_condition_bool, structured_condition = z_score_parser(
-            self.z_score_condition
+        embedding_net = build_z_scored_embedding_net(
+            batch_condition, self.z_score_condition, self.embedding_net
         )
-        embedding_net = self.embedding_net
-        if z_score_condition_bool:
-            embedding_net = nn.Sequential(
-                standardizing_net(batch_condition, structured_condition),
-                embedding_net,
-            )
 
         self._warn_unknown_extra_kwargs(self._ESTIMATOR_CLS.__init__)
         return self._ESTIMATOR_CLS(
