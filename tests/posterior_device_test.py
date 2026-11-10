@@ -11,9 +11,15 @@ from dataclasses import asdict
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
-from torch.distributions import Distribution, MultivariateNormal, Normal, constraints
+from torch.distributions import (
+    Distribution,
+    Independent,
+    MultivariateNormal,
+    Normal,
+    constraints,
+)
 
-from sbi.inference import FMPE, NPE, EnsemblePosterior, MCMCPosterior
+from sbi.inference import FMPE, NPE, EnsemblePosterior, MCMCPosterior, VIPosterior
 from sbi.inference.posteriors.posterior_parameters import (
     ImportanceSamplingPosteriorParameters,
     MCMCPosteriorParameters,
@@ -227,3 +233,35 @@ def test_move_keeps_tensor_free_custom_prior():
     prior = _ScalarNormal(loc=4.0, scale=2.0)
 
     assert move_distribution_to_device(prior, "cpu") is prior
+
+
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
+def test_vi_posterior_with_user_q_retrains_after_move(trained_on_cpu, device: str):
+    """A VI posterior with a user `q` retrains from scratch after `.to()`, and moving a
+    posterior built from it leaves the source's initial distribution in place."""
+    npe, _ = trained_on_cpu("box")
+    loc = torch.zeros(NUM_DIM, requires_grad=True)
+    scale = torch.ones(NUM_DIM, requires_grad=True)
+    q = Independent(Normal(loc, scale), 1)
+    train_kwargs = dict(
+        max_num_iters=2,
+        check_for_convergence=False,
+        quality_control=False,
+        show_progress_bar=False,
+    )
+    potential_fn = npe.build_posterior().potential_fn
+    prior = potential_fn.prior
+    x_o = torch.zeros(1, NUM_DIM)
+    source = VIPosterior(potential_fn, prior, q=q, parameters=[loc, scale])
+    source.set_default_x(x_o).train(**train_kwargs)
+    copy = VIPosterior(potential_fn, prior, q=source).set_default_x(x_o)
+    device = process_device(device)
+
+    copy.to(device)
+
+    source_snapshot = source._q_spec.init_snapshot
+    assert source_snapshot is not copy._q_spec.init_snapshot
+    assert all(p.device.type == "cpu" for p in source_snapshot.parameters())
+    copy.train(retrain_from_scratch=True, **train_kwargs)
+    samples = copy.sample((2,), show_progress_bars=False)
+    assert samples.device.type == torch.device(device).type
