@@ -1,12 +1,14 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-"""Supporting types for the Builder pattern: configuration, data-derived state,
-and z-score computation.
+"""Internal types for building estimators from precomputed z-score statistics.
 
-``ZScoreConfig`` captures the user's preprocessing choice (per-axis z-score mode).
-``ZScoreStats`` holds the computed statistics. ``BuildContext`` bundles all
-data-derived state needed to build an estimator.
+Not part of the public API, and no builder uses them yet: they are kept for a
+planned pre-pass that computes the z-score statistics outside the builders.
+
+``ZScoreConfig`` holds the z-score mode per axis. ``ZScoreStats`` holds the computed
+statistics. ``BuildContext`` bundles all data-derived state needed to build an
+estimator.
 
 ``compute_z_score_stats`` is a pure helper that bridges config + data → stats.
 """
@@ -22,7 +24,7 @@ from sbi.utils.sbiutils import z_standardization
 
 @dataclass(frozen=True)
 class ZScoreConfig:
-    """User-facing choice for z-score preprocessing per axis.
+    """Z-score preprocessing mode per axis.
 
     Attributes:
         theta: Z-score mode for parameters. One of ``"none"``,
