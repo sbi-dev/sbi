@@ -920,7 +920,9 @@ def _apply_to_transform(
     """Apply fn to all tensors in a transform tree.
 
     Walks ComposeTransform.parts, IndependentTransform.base_transform,
-    etc., so .to() calls propagate into the transform.
+    etc., so .to() calls propagate into the transform. A transform that is also
+    an `nn.Module` (e.g. a Pyro `TransformModule`) gets `fn` applied to its
+    parameters and buffers as well.
 
     Args:
         transform: Root of the transform tree.
@@ -928,13 +930,24 @@ def _apply_to_transform(
     """
     seen = set()
 
+    def _apply_to_tensor(val: Tensor) -> Tensor:
+        moved = fn(val)
+        if not (val.is_leaf and val.requires_grad) or moved.is_leaf:
+            return moved
+        # A moved parameter stays a leaf; a non-leaf breaks `copy.deepcopy`.
+        if isinstance(val, nn.Parameter):
+            return nn.Parameter(moved.detach())
+        return moved.detach().requires_grad_(True)
+
     def _walk(t):
         if id(t) in seen:
             return
         seen.add(id(t))
+        if isinstance(t, nn.Module):
+            t._apply(fn)
         for key, val in list(t.__dict__.items()):
             if isinstance(val, Tensor):
-                object.__setattr__(t, key, fn(val))
+                object.__setattr__(t, key, _apply_to_tensor(val))
             elif isinstance(val, (list, tuple)):
                 for item in val:
                     if isinstance(item, TorchTransform):
@@ -1270,13 +1283,16 @@ def gradient_ascent(
     # is `(1,)` on every return path, as in the loop below.
     best_log_prob_iter = init_probs[sort_indices[-1:]]
     best_theta_iter = sorted_inits[-1:]
-    best_theta_overall = theta_transform(best_theta_iter.detach().clone())
+    # Without gradients: a transform with parameters would attach its graph to the
+    # returned MAP, which the posterior caches.
+    with torch.no_grad():
+        best_theta_overall = theta_transform(best_theta_iter.detach().clone())
+        argmax_ = theta_transform.inv(best_theta_overall)
     best_log_prob_overall = best_log_prob_iter.detach().clone()
-
-    argmax_ = theta_transform.inv(best_theta_overall)
     max_val = best_log_prob_overall
 
-    optimize_inits = theta_transform(optimize_inits)
+    # Detached: a transform with parameters would make the inits non-leaf tensors.
+    optimize_inits = theta_transform(optimize_inits).detach()  # type: ignore
     optimize_inits.requires_grad_(True)  # type: ignore
     optimizer = Adam([optimize_inits], lr=learning_rate)  # type: ignore
 
@@ -1328,7 +1344,9 @@ def gradient_ascent(
         print(interruption + interruption_note)
         return argmax_, max_val  # type: ignore
 
-    return theta_transform.inv(best_theta_overall), max_val  # type: ignore
+    with torch.no_grad():
+        argmax_ = theta_transform.inv(best_theta_overall)
+    return argmax_, max_val  # type: ignore
 
 
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:

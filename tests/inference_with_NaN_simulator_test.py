@@ -7,7 +7,7 @@ import warnings
 
 import pytest
 import torch
-from torch import eye, ones, zeros
+from torch import eye, nn, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
@@ -302,6 +302,54 @@ def test_inference_with_restriction_estimator():
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"{NPE_C}")
+
+
+def _restricted_box_prior(num_simulations: int = 300, max_num_epochs: int = 2):
+    prior = utils.BoxUniform(-2 * ones(2), 2 * ones(2))
+    theta = prior.sample((num_simulations,))
+    x = theta.clone()
+    x[theta[:, 0] > 1.0] = float("nan")
+    restriction_estimator = RestrictionEstimator(prior=prior)
+    restriction_estimator.append_simulations(theta, x).train(
+        max_num_epochs=max_num_epochs
+    )
+    return restriction_estimator
+
+
+def test_restrict_prior_uses_the_passed_classifier():
+    """`restrict_prior(classifier=...)` decides with the classifier it is given.
+
+    The given classifier predicts `valid` exactly where theta_0 < 0, while the
+    trained one accepts up to theta_0 = 1.
+    """
+    restriction_estimator = _restricted_box_prior()
+    classifier = nn.Linear(2, 2)
+    with torch.no_grad():
+        classifier.weight.copy_(torch.tensor([[0.0, 0.0], [-100.0, 0.0]]))
+        classifier.bias.zero_()
+
+    restricted_prior = restriction_estimator.restrict_prior(
+        classifier=classifier, reweigh_factor=0.5
+    )
+    samples = restricted_prior.sample((200,), print_rejected_frac=False)
+
+    assert (samples[:, 0] < 0.0).all()
+
+
+def test_restrict_prior_with_reweigh_factor():
+    """With `reweigh_factor`, samples lie where simulations are valid (theta_0 <= 1),
+    and a larger factor accepts fewer parameter sets."""
+    restriction_estimator = _restricted_box_prior(1000, max_num_epochs=20)
+
+    restricted_prior = restriction_estimator.restrict_prior(reweigh_factor=0.5)
+    samples = restricted_prior.sample((500,), print_rejected_frac=False)
+    assert (samples[:, 0] > 1.0).float().mean() < 0.05
+
+    acceptance = [
+        restriction_estimator.restrict_prior(reweigh_factor=factor).prior_acceptance()
+        for factor in (0.1, 0.9)
+    ]
+    assert acceptance[1] < acceptance[0]
 
 
 @pytest.mark.parametrize("prior", ("uniform", "gaussian"))

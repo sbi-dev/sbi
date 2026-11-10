@@ -85,8 +85,8 @@ class NeuralODE(LazyDistribution):
         self.condition_shape = condition_shape
         self.t_min = t_min
         self.t_max = t_max
-        self.mean_base = mean_base
-        self.std_base = std_base
+        self.register_buffer("mean_base", mean_base)
+        self.register_buffer("std_base", std_base)
         self.params: Dict[str, Any] = kwargs
 
     def update_params(self, **kwargs) -> None:
