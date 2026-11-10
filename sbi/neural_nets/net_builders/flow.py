@@ -903,64 +903,6 @@ def build_zuko_unaf(
     return flow
 
 
-def build_zuko_cnf(
-    batch_x: Tensor,
-    batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
-    hidden_features: Union[Sequence[int], int] = 50,
-    num_transforms: int = 5,
-    embedding_net: nn.Module = nn.Identity(),
-    **kwargs,
-) -> ZukoFlow:
-    """
-    Build a Continuous Normalizing Flow (CNF) with a free-form Jacobian transformation.
-
-    References:
-        | Neural Ordinary Differential Equations (Chen el al., 2018)
-        | https://arxiv.org/abs/1806.07366
-
-        | FFJORD: Free-form Continuous Dynamics for Scalable Reversible
-        | Generative Models (Grathwohl et al., 2018)
-        | https://arxiv.org/abs/1810.01367
-
-    Arguments:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network, can be one of:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean and std
-            over the entire batch, instead of per-dimension. Should be used when each
-            sample is, for example, a time series or an image.
-        z_score_y: Whether to z-score ys passing into the network, same options as
-            z_score_x.
-        hidden_features: The number of hidden features in the flow. Defaults to 50.
-        num_transforms: The number of transformations in the flow. Defaults to 5.
-        embedding_net: The embedding network to use. Defaults to nn.Identity().
-        **kwargs: Additional keyword arguments to pass to the flow constructor.
-    """
-    which_nf = "CNF"
-    additional_kwargs = {**kwargs}
-    flow = build_zuko_flow(
-        which_nf,
-        batch_x,
-        batch_y,
-        z_score_x,
-        z_score_y,
-        hidden_features,
-        num_transforms,
-        embedding_net,
-        **additional_kwargs,
-    )
-
-    return flow
-
-
 def build_zuko_gf(
     batch_x: Tensor,
     batch_y: Tensor,
