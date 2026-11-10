@@ -309,6 +309,39 @@ def test_check_tarp_detect_bias(biased_samples):
 ## Check TARP with SBI
 
 
+def test_run_tarp_with_references_and_invalid_x():
+    """User-given references are filtered like thetas when some xs are invalid."""
+
+    num_dim = 2
+    prior = BoxUniform(-ones(num_dim), ones(num_dim))
+
+    def simulator(theta):
+        return linear_gaussian(theta, zeros(num_dim), eye(num_dim))
+
+    theta = prior.sample((200,))
+    inferer = NPE(prior, show_progress_bars=False)
+    inferer.append_simulations(theta, simulator(theta)).train(max_num_epochs=1)
+    posterior = inferer.build_posterior()
+
+    thetas = prior.sample((100,))
+    xs = simulator(thetas)
+    xs[0, 0] = float("nan")
+    xs[1, 1] = float("inf")
+    references = get_tarp_references(thetas)
+
+    with pytest.warns(UserWarning, match="Found 1 NaNs and 1 Infs"):
+        ecp, alpha = run_tarp(
+            thetas,
+            xs,
+            posterior=posterior,
+            references=references,
+            num_posterior_samples=50,
+            show_progress_bar=False,
+        )
+
+    assert ecp.shape == alpha.shape
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("method", [NPE])
 def test_consistent_run_tarp_results_with_posterior(method):

@@ -22,6 +22,7 @@ from sbi.utils.diagnostics_utils import (
     remove_nans_and_infs_in_x,
 )
 from sbi.utils.metrics import l2
+from sbi.utils.sbiutils import handle_invalid_x
 
 
 def run_tarp(
@@ -69,6 +70,15 @@ def run_tarp(
         alpha: credibility values, ``num_bins + 1`` points evenly spaced over
             ``[0, 1]``, see equation 2 of the paper
     """
+
+    if references is not None:
+        assert references.shape == thetas.shape, (
+            "references must have the same shape as thetas"
+        )
+        # Drop the same rows that are dropped from thetas and xs below, so that
+        # each reference stays paired with its theta.
+        is_valid_x, _, _ = handle_invalid_x(xs, exclude_invalid_x=True)
+        references = references[is_valid_x]
 
     thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
 
