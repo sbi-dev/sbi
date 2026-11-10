@@ -444,6 +444,7 @@ class RestrictionEstimator:
         else:
             classifier_ = classifier
 
+        classifier_.eval()
         classifier_.zero_grad(set_to_none=True)
 
         accept_reject_fn = AcceptRejectFunction(
