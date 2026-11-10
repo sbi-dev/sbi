@@ -1373,6 +1373,9 @@ class VIPosterior(NeuralPosterior):
         quality_control_fn, quality_control_msg = get_quality_metric(
             quality_control_metric
         )
+        if self._mode == "single_x" and self._trained_on is not None:
+            # Score q against the x it was fit to, not the x bound last.
+            self.potential_fn = self._bind_iid(self._trained_on)
         metric = round(float(quality_control_fn(self, N=N)), 3)
         print(f"Quality Score: {metric} " + quality_control_msg)
 

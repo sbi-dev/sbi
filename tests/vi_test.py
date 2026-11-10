@@ -1266,3 +1266,18 @@ def test_ensemble_of_amortized_vi_takes_one_observation_in_log_prob():
     ensemble = EnsemblePosterior([posterior, posterior])
     with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
         ensemble.log_prob(zeros(3, 2), x=zeros(3, 2))
+
+
+def test_evaluate_scores_q_at_the_x_it_was_fit_to(capsys):
+    """A potential evaluated at another x does not change the quality score of q."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    posterior = VIPosterior(_CenteredPotential(prior), prior, q="gaussian")
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    torch.manual_seed(0)
+    posterior.evaluate(quality_control_metric="prop", N=1000)
+    expected = capsys.readouterr().out
+
+    posterior.potential(zeros(1, 2), x=3 * ones(1, 2))
+    torch.manual_seed(0)
+    posterior.evaluate(quality_control_metric="prop", N=1000)
+    assert capsys.readouterr().out == expected
