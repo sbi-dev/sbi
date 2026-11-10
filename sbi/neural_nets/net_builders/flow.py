@@ -22,8 +22,8 @@ from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
     assert_transform_to_unconstrained_supported,
     biject_transform_zuko,
+    build_z_scored_embedding_net,
     mcmc_transform,
-    standardizing_net,
     standardizing_transform,
     standardizing_transform_zuko,
     z_score_parser,
@@ -91,7 +91,7 @@ def build_made(
         transform_zx = standardizing_transform(batch_x, structured_x)
         transform = transforms.CompositeTransform([transform_zx, transform])
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     distribution = MADEMoGWrapper(
         features=x_numel,
@@ -196,7 +196,7 @@ def build_maf(
             standardizing_transform(batch_x, structured_x)
         ] + transform_list
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     # Combine transforms
     transform = transforms.CompositeTransform(transform_list)
@@ -315,7 +315,7 @@ def build_maf_rqs(
             standardizing_transform(batch_x, structured_x)
         ] + transform_list
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
@@ -443,7 +443,7 @@ def build_nsf(
             standardizing_transform(batch_x, structured_x)
         ] + transform_list
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     distribution = get_base_dist(x_numel, **kwargs)
 
@@ -1107,7 +1107,7 @@ def build_zuko_flow(
     transforms = x_transforms + base_transforms
 
     # Maybe add y-z-scoring via embedding network
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     # Create final neural network
     neural_net = zuko.flows.Flow(transforms, base)
@@ -1167,7 +1167,7 @@ def build_tabpfn_flow(
             f"got '{z_score_x}'. TabPFN performs extensive preprocessing internally."
         )
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
     flow = TabPFNFlow(
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
@@ -1343,30 +1343,6 @@ def build_zuko_unconditional_flow(
     )
 
     return flow
-
-
-def _prepare_y_embedding(
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ],
-    batch_y: Tensor,
-    embedding_net: nn.Module,
-) -> nn.Module:
-    """
-    Prepend the embedding network for y, adding z-scoring if needed.
-
-    Args:
-        z_score_y: Type of y preprocessing.
-        batch_y: Batch of y data.
-        embedding_net: Original embedding network.
-
-    Returns:
-        Modified embedding network.
-    """
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
-    if z_score_y_bool:
-        return nn.Sequential(standardizing_net(batch_y, structured_y), embedding_net)
-    return embedding_net
 
 
 class ContextSplineMap(nn.Module):
