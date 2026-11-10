@@ -263,8 +263,7 @@ class NeuralPosterior:
     ) -> BasePotential:
         """Return the potential bound to `x`, with its observations as iid trials.
 
-        Warns if the potential marks iid trials as possibly unintended (NPE), unless
-        the potential was already bound to this `x` as iid trials.
+        Warns if the potential marks iid trials as possibly unintended (NPE).
 
         Args:
             x: Observations, of shape `(num_observations, *x_event_shape)`.
@@ -276,15 +275,7 @@ class NeuralPosterior:
         num_observations = bound.x_o.shape[0]
         if check_num_observations:
             self._check_num_observations(num_observations)
-        previous_x = self.potential_fn.return_x_o()
-        already_iid = (
-            self.potential_fn.x_is_iid
-            and previous_x is not None
-            and previous_x.shape == bound.x_o.shape
-            # Exact, but NaN-padded trials count as equal.
-            and torch.allclose(previous_x, bound.x_o, rtol=0, atol=0, equal_nan=True)
-        )
-        if num_observations > 1 and bound.warns_on_implicit_iid and not already_iid:
+        if num_observations > 1 and bound.warns_on_implicit_iid:
             # One location for all callers: Python's default filter shows it once.
             warn(
                 f"x holds {num_observations} observations, which are combined as iid "
