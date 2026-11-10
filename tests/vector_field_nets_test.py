@@ -208,7 +208,7 @@ def test_mlp_ratio_reaches_the_ada_mlp_global_mlp():
 def test_simformer_edge_mask_without_self_edges_has_no_nan(ada_time):
     """A DAG without self-edges leaves sink nodes with no key to attend to."""
     net = VectorFieldSimformer(in_features=2, num_nodes=3, ada_time=ada_time)
-    # Chain 0 -> 1 -> 2: node 2 has an empty row.
+    # Node 0 attends to node 1, node 1 to node 2; node 2 has an empty row.
     edge_mask = torch.tensor([[0, 1, 0], [0, 0, 1], [0, 0, 0]], dtype=torch.bool)
     out = net(
         torch.randn(4, 3, 2),
@@ -217,3 +217,26 @@ def test_simformer_edge_mask_without_self_edges_has_no_nan(ada_time):
         edge_mask=edge_mask.expand(4, 3, 3),
     )
     assert not out.isnan().any()
+
+
+@pytest.mark.parametrize("ada_time", [False, True])
+def test_simformer_edge_mask_direction(ada_time):
+    """`edge_mask[i, j] = True` means node `i` depends on (attends to) node `j`.
+
+    For the DAG edge `0 -> 1`, only `edge_mask[1, 0]` is set: the output of node 1
+    must depend on the input of node 0, but not the other way around.
+    """
+    torch.manual_seed(0)
+    net = VectorFieldSimformer(in_features=1, num_nodes=2, ada_time=ada_time)
+    edge_mask = torch.tensor([[0, 0], [1, 0]], dtype=torch.bool)
+    inputs = torch.randn(1, 2, 1, requires_grad=True)
+    out = net(
+        inputs,
+        torch.rand(1),
+        condition_mask=torch.zeros(1, 2, dtype=torch.bool),
+        edge_mask=edge_mask.unsqueeze(0),
+    )
+    grad_node0 = torch.autograd.grad(out[0, 0].sum(), inputs, retain_graph=True)[0]
+    grad_node1 = torch.autograd.grad(out[0, 1].sum(), inputs)[0]
+    assert grad_node0[0, 1].abs().item() == 0.0, "node 0 must not see node 1"
+    assert grad_node1[0, 0].abs().item() > 0.0, "node 1 must see node 0"

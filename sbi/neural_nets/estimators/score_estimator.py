@@ -662,7 +662,9 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
                 parameters are subject to inference.
             edge_masks: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among nodes.
-                - `True` (or `1`): An edge exists from the row node to the column node.
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these nodes.
 
         Returns:
@@ -723,8 +725,9 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
-                - `True` (or `1`): An edge exists from the row variable to the column
-                variable.
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
                 mask, we suggest you to use None instead of ones
@@ -766,8 +769,9 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
-                - `True` (or `1`): An edge exists from the row variable to the column
-                variable.
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
                 mask, we suggest you to use None instead of ones

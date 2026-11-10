@@ -1069,9 +1069,10 @@ class MaskedVectorFieldTrainer(
         Args:
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
-                Expected shape: `(batch_size, num_variables, num_variables)`.
-                - `True` (or `1`): An edge exists from the row variable to the column
-                  variable.
+                Expected shape: `(num_variables, num_variables)`, used for all samples.
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if `None`, it will be equivalent to a full attention (i.e., full ones)
                   mask, we suggest you to use `None` instead of ones
@@ -1082,10 +1083,9 @@ class MaskedVectorFieldTrainer(
                 If a callable, `__call__` must accept `inputs`, and return
                 a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
                 underlying trained neural net.
-            prior: Prior distribution. Its primary use is for rejecting samples that
-                fall outside its defined support. For the core inference process,
-                this prior is ignored, as the actual "prior" over which the diffusion
-                model operates is standard Gaussian noise.
+            prior: Distribution over the latent variables. It is used to reject
+                samples outside its support and by the iid sampling methods; the
+                learned conditional does not depend on it.
             sample_with: Method to use for sampling from the posterior. Can be one of
                 'sde' (default) or 'ode'. The 'sde' method uses the score to
                 do a Langevin diffusion step, while the 'ode' method solves a
@@ -1128,10 +1128,11 @@ class MaskedVectorFieldTrainer(
         Args:
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
-                Expected shape: `(batch_size, num_variables, num_variables)`.
+                Expected shape: `(num_variables, num_variables)`, used for all samples.
 
-                - `True` (or `1`): An edge exists from the row variable to the column
-                  variable.
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if `None`, it will be equivalent to a full attention (i.e., full ones)
                   mask, we suggest you to use `None` instead of ones
@@ -1143,10 +1144,9 @@ class MaskedVectorFieldTrainer(
                 If a callable, `__call__` must accept `inputs`, and return
                 a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
                 underlying trained neural net.
-            prior: Prior distribution. Its primary use is for rejecting samples that
-                fall outside its defined support. For the core inference process,
-                this prior is ignored, as the actual "prior" over which the diffusion
-                model operates is standard Gaussian noise.
+            prior: Distribution over the latent variables. It is used to reject
+                samples outside its support and by the iid sampling methods; the
+                learned conditional does not depend on it.
             sample_with: Method to use for sampling from the posterior. Can be one of
                 'sde' (default) or 'ode'. The 'sde' method uses the score to
                 do a Langevin diffusion step, while the 'ode' method solves a

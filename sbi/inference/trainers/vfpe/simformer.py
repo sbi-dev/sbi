@@ -29,14 +29,19 @@ class Simformer(MaskedVectorFieldTrainer):
     are specified by a boolean mask `condition_mask`. Dependencies among variables are
     defined by a boolean adjacency matrix `edge_mask`.
 
-    Mask semantics: - ``condition_mask`` [B, T]: boolean per variable.
-      - ``True``/1 → observed (conditioned on).
-      - ``False``/0 → latent (to be inferred).
-    - ``edge_mask`` [B, T, T]: boolean adjacency describing allowed attention. -
-      ``True``/1 → attention from query i to key j is allowed (edge i→j). - ``False``/0
-      → attention is disallowed. - If ``None``, full attention is used. Prefer passing
-      ``None`` over
-        an all-ones tensor to save memory.
+    Mask semantics:
+
+    - ``condition_mask`` of shape ``(T,)`` (or ``(B, T)`` during training), one
+      boolean per variable:
+
+      - ``True``/1: observed (conditioned on).
+      - ``False``/0: latent (to be inferred).
+
+    - ``edge_mask`` of shape ``(T, T)`` (or ``(B, T, T)`` during training):
+      ``edge_mask[i, j] = True`` means that variable ``i`` depends on variable ``j``,
+      i.e., node ``i`` attends to node ``j``. For a DAG edge ``j -> i``, set
+      ``edge_mask[i, j] = True``. Self-edges are always added. If ``None``, full
+      attention is used; prefer ``None`` over an all-ones tensor to save memory.
 
     NOTE:
         This is the score-based implementation of the Simformer; sbi also provides a

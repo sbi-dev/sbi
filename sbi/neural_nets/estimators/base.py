@@ -972,8 +972,9 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
                 observed/conditioned on (1) or latent/to be inferred (0).
             fixed_edge_mask: 2D tensor indicating dependencies among input
               variables
-                - `True` (or `1`): An edge exists from the row variable to the
-                     column variable
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
                     mask, we suggest you to use None instead of ones
