@@ -209,10 +209,11 @@ class EnsemblePosterior(NeuralPosterior):
         """Raise unless every posterior of the ensemble uses `x` when it gets none."""
         for posterior in self.posteriors:
             implicit_x = posterior._implicit_x
+            # NaN entries pad sets of trials for permutation-invariant embeddings.
             if (
                 implicit_x is None
                 or implicit_x.shape != x.shape
-                or not torch.equal(implicit_x, x)
+                or not torch.allclose(implicit_x, x, rtol=0, atol=0, equal_nan=True)
             ):
                 raise ValueError(
                     "The posteriors of the ensemble use different observations "
