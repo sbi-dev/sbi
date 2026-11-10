@@ -1905,7 +1905,7 @@ def _sbc_rank_plot(
                     # show legend only in first subplot.
                     if jj == 0 and ranks_labels[ii] is not None:
                         plt.legend(**legend_kwargs)
-                # Remove empty subplots.
+        # Remove empty subplots.
         col_idx += 1
         while num_rows > 1 and col_idx < num_cols:
             ax[row_idx, col_idx].axis("off")
