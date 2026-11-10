@@ -286,7 +286,9 @@ class NeuralPosterior:
                 "trials of one parameter set. For a separate posterior of each "
                 "observation, pass one observation at a time, or use "
                 "`sample_batched()` of a posterior that supports it (e.g. direct "
-                "or MCMC).",
+                "or MCMC). With many observations, the product amplifies errors in "
+                "the tails of the NPE posteriors; prefer NLE or NRE, or train NPE "
+                "with a permutation-invariant embedding net on sets of trials.",
                 stacklevel=1,
             )
         return bound
