@@ -1871,7 +1871,7 @@ class MaskedNeuralInference(
 
         Args:
             condition_masks: A boolean mask indicating the role of each variable.
-            Expected shape: `(batch_size, num_variables)`.
+            Expected shape: `(num_variables,)`, used for all samples.
             - `True` (or `1`): The variable at this position is observed and its
                 features will be used for conditioning.
             - `False` (or `0`): The variable at this position is latent and its
@@ -1936,7 +1936,7 @@ class MaskedNeuralInference(
         Args:
             estimator: Optional estimator to use.
             fixed_condition_mask: A boolean mask indicating the role of each variable.
-                Expected shape: `(batch_size, num_variables)`.
+                Expected shape: `(num_variables,)`, used for all samples.
                 - `True` (or `1`): The variable at this position is observed and its
                     features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
