@@ -229,8 +229,8 @@ def test_cnn_embedding_errors_name_arguments(input_shape, kwargs, match):
         ({"num_conv_layers": 0}, "num_conv_layers must be at least 1"),
         ({"out_channels_per_layer": [16, 16]}, "num_conv_layers is 5"),
         ({"dilation": [1, 2]}, "dilation has 2 entries"),
-        ({"pool_kernel_size": 128}, "pool_kernel_size"),
-        ({"pool_kernel_size": 64}, "pool_kernel_size"),
+        ({"pool_kernel_size": 128}, r"pool_kernel_size \(128\) must not be larger"),
+        ({"pool_kernel_size": 64}, "the default aggregator needs at least 2"),
     ],
 )
 def test_causal_cnn_embedding_errors_name_arguments(kwargs, match):
