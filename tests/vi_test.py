@@ -12,6 +12,7 @@ This module tests both:
 from __future__ import annotations
 
 import pickle
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -587,13 +588,23 @@ def test_retrain_fails_after_setting_an_already_built_q():
 
 
 def _count_train_calls(monkeypatch) -> list:
-    """Make `quality_control_metric="always_fails"` fail and record `train` calls."""
+    """Register the metrics `"always_fails"` and `"fails_once"` and record `train`
+    calls."""
 
     def always_fails(posterior, N):
         raise QualityControlError("Broken on purpose.")
 
-    monkeypatch.setitem(_QUALITY_METRIC, "always_fails", always_fails)
-    monkeypatch.setitem(_METRIC_MESSAGE, "always_fails", "")
+    checks = []
+
+    def fails_once(posterior, N):
+        checks.append(None)
+        if len(checks) == 1:
+            raise QualityControlError("Broken on purpose.")
+        return 0.0
+
+    for name, metric in [("always_fails", always_fails), ("fails_once", fails_once)]:
+        monkeypatch.setitem(_QUALITY_METRIC, name, metric)
+        monkeypatch.setitem(_METRIC_MESSAGE, name, "")
     calls = []
     train = VIPosterior.train
 
@@ -635,6 +646,29 @@ def test_failed_quality_control_retrains_once_with_the_callers_settings(monkeypa
     assert len(calls) == 2
     assert calls[1]["max_num_iters"] == 10
     assert calls[1]["learning_rate"] == pytest.approx(1e-4)
+    assert torch.equal(posterior._trained_on, x)
+
+
+def test_failed_quality_control_accepts_a_retrained_q_that_passes(monkeypatch):
+    """A check that fails once retrains once and then accepts the retrained `q`."""
+    calls = _count_train_calls(monkeypatch)
+    posterior = _make_posterior("flow")
+    x = 3 * ones(1, 2)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        posterior.train(
+            x=x,
+            max_num_iters=10,
+            check_for_convergence=False,
+            show_progress_bar=False,
+            quality_control_metric="fails_once",
+        )
+
+    messages = [str(w.message) for w in caught]
+    assert any("Retraining the variational posterior" in m for m in messages)
+    assert not any("may be unreliable" in m for m in messages)
+    assert len(calls) == 2
     assert torch.equal(posterior._trained_on, x)
 
 
