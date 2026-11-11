@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import logging
 import warnings
 from unittest.mock import patch
 
@@ -148,6 +149,32 @@ def test_accept_reject_sample_partial_return():
         # Should have issued a warning
         assert len(w) == 1
         assert "partial results" in str(w[0].message).lower()
+
+
+@pytest.mark.parametrize(
+    ("num_samples", "expect_warning"),
+    (
+        # The second batch finishes sampling with 48 samples to spare. The warning
+        # used to fire anyway, about "the remaining -48 samples".
+        (10, False),
+        (1000, True),
+    ),
+)
+def test_low_acceptance_warning_only_while_samples_remain(
+    caplog, num_samples, expect_warning
+):
+    torch.manual_seed(0)
+    proposal = Uniform(-torch.ones(1), torch.ones(1))
+
+    with caplog.at_level(logging.WARNING):
+        samples, _ = accept_reject_sample(
+            proposal=proposal.sample,
+            accept_reject_fn=lambda theta: theta[:, 0] > 0.99,  # About 0.5 %.
+            num_samples=num_samples,
+        )
+
+    assert samples.shape == (num_samples, 1)
+    assert ("It may take a long time" in caplog.text) is expect_warning
 
 
 def test_warn_if_outside_prior_support():

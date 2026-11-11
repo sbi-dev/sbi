@@ -205,6 +205,7 @@ def rejection_sample(
                 num_sampled_total > 1000
                 and acceptance_rate < warn_acceptance
                 and not leakage_warning_raised
+                and num_remaining > 0
             ):
                 logger.warning(
                     f"""Only {acceptance_rate:.3%} proposal samples were accepted. It
@@ -419,6 +420,7 @@ def accept_reject_sample(
             num_samples_possible > (sampling_batch_size - 1)
             and min_acceptance_rate < warn_acceptance
             and not leakage_warning_raised
+            and num_remaining > 0
         ):
             if sample_for_correction_factor:
                 idx_min = acceptance_rate.argmin().item()
