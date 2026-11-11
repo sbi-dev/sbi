@@ -435,6 +435,8 @@ def test_nflows_dtype_reaches_the_base_distribution(batches):
 
 # An int is two hidden layers of that width, a list one layer per entry.
 ZUKO_WIDTH_CASES = [(24, [24, 24]), ([24, 32, 16], [24, 32, 16])]
+# Two values, because a depth computed from one `num_transforms` can match by chance.
+ZUKO_NUM_TRANSFORMS = [3, 5]
 
 
 def _zuko_hidden_layer_widths(estimator: nn.Module) -> list[list[int]]:
@@ -454,40 +456,43 @@ def _zuko_hidden_layer_widths(estimator: nn.Module) -> list[list[int]]:
     ]
 
 
+@pytest.mark.parametrize("num_transforms", ZUKO_NUM_TRANSFORMS)
 @pytest.mark.parametrize("hidden_features, widths", ZUKO_WIDTH_CASES)
 @pytest.mark.parametrize("model", ZUKO_DENSITY_MODELS)
 def test_zuko_hidden_features_set_the_hidden_layers(
-    model, hidden_features, widths, batches
+    model, hidden_features, widths, num_transforms, batches
 ):
     """The depth must not follow `num_transforms`."""
     theta, x = batches
     estimator = _DENSITY_CONFIGS[model](
-        hidden_features=hidden_features, num_transforms=3
+        hidden_features=hidden_features, num_transforms=num_transforms
     ).build(batch_input=theta, batch_condition=x)
 
-    assert _zuko_hidden_layer_widths(estimator) == [widths] * 3
+    assert _zuko_hidden_layer_widths(estimator) == [widths] * num_transforms
 
 
+@pytest.mark.parametrize("num_transforms", ZUKO_NUM_TRANSFORMS)
 @pytest.mark.parametrize("hidden_features, widths", ZUKO_WIDTH_CASES)
 def test_zuko_cnf_hidden_features_set_the_hidden_layers(
-    hidden_features, widths, batches
+    hidden_features, widths, num_transforms, batches
 ):
     theta, x = batches
     estimator = build_zuko_flow(
-        "CNF", theta, x, hidden_features=hidden_features, num_transforms=3
+        "CNF", theta, x, hidden_features=hidden_features, num_transforms=num_transforms
     )
 
     assert _zuko_hidden_layer_widths(estimator) == [widths]
 
 
+@pytest.mark.parametrize("num_transforms", ZUKO_NUM_TRANSFORMS)
 @pytest.mark.parametrize("hidden_features, widths", ZUKO_WIDTH_CASES)
 @pytest.mark.parametrize("model", ZUKO_MARGINAL_MODELS)
 def test_zuko_marginal_hidden_features_set_the_hidden_layers(
-    model, hidden_features, widths, batches
+    model, hidden_features, widths, num_transforms, batches
 ):
     theta, _ = batches
     estimator = _MARGINAL_CONFIGS[model](
-        hidden_features=hidden_features, num_transforms=3
+        hidden_features=hidden_features, num_transforms=num_transforms
     ).build(theta)
 
-    assert _zuko_hidden_layer_widths(estimator) == [widths] * 3
+    assert _zuko_hidden_layer_widths(estimator) == [widths] * num_transforms
