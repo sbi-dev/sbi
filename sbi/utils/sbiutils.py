@@ -41,6 +41,7 @@ from sbi.utils.pbar import print_progress
 from sbi.utils.torchutils import unwrap_mixture_support
 
 _T = TypeVar("_T")
+logger = logging.getLogger(__name__)
 
 
 def save_with_version(obj: Any, filename: Union[str, Path]) -> None:
@@ -195,7 +196,7 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     """Return clamped value, logging an informative warning if different from value."""
     clamped_val = max(min_val, min(value, max_val))
     if clamped_val != value:
-        logging.warning(
+        logger.warning(
             f"{name}={value} was clamped to {clamped_val}; "
             f"must be in [{min_val},{max_val}] range"
         )
@@ -535,7 +536,7 @@ def standardizing_net(
             t_std[t_std < min_std] = min_std
     else:
         t_std = torch.ones(1)
-        logging.warning(
+        logger.warning(
             """Using a one-dimensional batch will instantiate a Standardize transform
             with (mean, std) parameters which are not representative of the data. We
             allow this behavior because you might be loading a pre-trained net.
@@ -600,12 +601,12 @@ def npe_msg_on_invalid_x(
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
-            logging.warning(
+            logger.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 "They will be excluded from training."
             )
         else:
-            logging.warning(
+            logger.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 "They are not excluded from training due to `exclude_invalid_x=False`. "
                 "Training will likely fail, we strongly recommend "
@@ -626,7 +627,7 @@ def nle_nre_apt_msg_on_invalid_x(
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
-            logging.warning(
+            logger.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"These will be discarded from training due to "
                 f"`exclude_invalid_x=True`. Please be aware that this gives "

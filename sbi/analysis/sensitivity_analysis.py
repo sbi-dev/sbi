@@ -18,6 +18,8 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from sbi.utils.pbar import print_progress
 from sbi.utils.sbiutils import handle_invalid_x, standardizing_net
 
+logger = logging.getLogger(__name__)
+
 
 class Destandardize(nn.Module):
     def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
@@ -55,7 +57,7 @@ def destandardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
         t_std[t_std < min_std] = min_std
     else:
         t_std = 1
-        logging.warning(
+        logger.warning(
             """Using a one-dimensional batch will instantiate a Standardize transform
             with (mean, std) parameters which are not representative of the data. We
             allow this behavior because you might be loading a pre-trained. If this is

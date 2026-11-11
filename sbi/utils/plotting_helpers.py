@@ -12,6 +12,8 @@ import torch
 
 from sbi.utils.torchutils import tensor2numpy
 
+logger = logging.getLogger(__name__)
+
 try:
     collectionsAbc = collections.abc  # type: ignore
 except AttributeError:
@@ -95,9 +97,9 @@ def handle_nan_infs(samples: List[np.ndarray]) -> List[np.ndarray]:
     """Check if there are NaNs or Infs in the samples."""
     for i in range(len(samples)):
         if np.isnan(samples[i]).any():
-            logging.warning("NaNs found in samples, omitting datapoints.")
+            logger.warning("NaNs found in samples, omitting datapoints.")
         if np.isinf(samples[i]).any():
-            logging.warning("Infs found in samples, omitting datapoints.")
+            logger.warning("Infs found in samples, omitting datapoints.")
             # cast inf to nan, so they are omitted in the next step
             samples[i] = np.nan_to_num(
                 samples[i], nan=np.nan, posinf=np.nan, neginf=np.nan
