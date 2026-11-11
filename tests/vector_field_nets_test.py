@@ -240,3 +240,29 @@ def test_simformer_edge_mask_direction(ada_time):
     grad_node1 = torch.autograd.grad(out[0, 1].sum(), inputs)[0]
     assert grad_node0[0, 1].abs().item() == 0.0, "node 0 must not see node 1"
     assert grad_node1[0, 0].abs().item() > 0.0, "node 1 must see node 0"
+
+
+@pytest.mark.parametrize("ada_time", [False, True])
+def test_simformer_shared_and_per_sample_edge_masks_agree(ada_time):
+    """A `(T, T)` edge mask, the same mask repeated over the batch, and a batch of
+    different masks give the outputs of the corresponding per-sample evaluations."""
+    torch.manual_seed(0)
+    net = VectorFieldSimformer(in_features=2, num_nodes=3, ada_time=ada_time).eval()
+    inputs, times = torch.randn(4, 3, 2), torch.rand(4)
+    condition_mask = torch.zeros(4, 3, dtype=torch.bool)
+    chain = torch.tensor([[1, 0, 0], [1, 1, 0], [0, 1, 1]], dtype=torch.bool)
+
+    shared = net(inputs, times, condition_mask, edge_mask=chain)
+    repeated = net(inputs, times, condition_mask, edge_mask=chain.expand(4, 3, 3))
+    assert torch.allclose(shared, repeated, atol=1e-6)
+
+    per_sample = torch.stack([chain, chain.T, torch.ones(3, 3).bool(), chain])
+    batched = net(inputs, times, condition_mask, edge_mask=per_sample)
+    for i in range(4):
+        single = net(
+            inputs[i : i + 1],
+            times[i : i + 1],
+            condition_mask[i : i + 1],
+            edge_mask=per_sample[i],
+        )
+        assert torch.allclose(batched[i : i + 1], single, atol=1e-5)

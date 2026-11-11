@@ -595,15 +595,52 @@ def posterior_flow_nn(
     return build_fn
 
 
+def _simformer_builder_kwargs(
+    model: str,
+    z_score_x: Optional[str],
+    hidden_features: int,
+    num_heads: int,
+    num_layers: int,
+    mlp_ratio: int,
+    time_embedding_dim: int,
+    dim_val: int,
+    dim_id: int,
+    dim_cond: int,
+    ada_time: bool,
+    kwargs: dict,
+) -> dict:
+    """Collect the keyword arguments of the masked estimator builders."""
+    if "embedding_net" in kwargs:
+        raise ValueError(
+            "The Simformer does not support an `embedding_net`: every variable is a "
+            "token of the transformer, and the vector field is defined on the raw "
+            "variables. Pass already embedded (summarized) data instead."
+        )
+    return dict(
+        net=model,
+        z_score_x=z_score_x,
+        hidden_features=hidden_features,
+        num_heads=num_heads,
+        num_layers=num_layers,
+        mlp_ratio=mlp_ratio,
+        time_embedding_dim=time_embedding_dim,
+        dim_val=dim_val,
+        dim_id=dim_id,
+        dim_cond=dim_cond,
+        ada_time=ada_time,
+        **kwargs,
+    )
+
+
 def simformer_score_nn(
     model: str = "simformer",
     sde_type: str = "ve",
+    z_score_x: Optional[str] = "independent",
     hidden_features: int = 100,
     num_heads: int = 4,
     num_layers: int = 4,
     mlp_ratio: int = 2,
     time_embedding_dim: int = 32,
-    embedding_net: nn.Module = nn.Identity(),
     dim_val: int = 64,
     dim_id: int = 32,
     dim_cond: int = 16,
@@ -622,67 +659,46 @@ def simformer_score_nn(
     Args:
         model (str): Name of the model architecture to use. Default is "simformer".
         sde_type (str): Type of stochastic differential equation (SDE) to use.
+        z_score_x (str): Whether to z-score the inputs, "independent" (default),
+            "structured" or None. The standardization is internal to the
+            estimator, as for NPSE.
         hidden_features (int): Number of hidden features in each layer. Default is 100.
         num_heads (int): Number of attention heads in the transformer layers.
         num_layers (int): Number of transformer layers. Default is 4.
         mlp_ratio (int): Ratio of MLP hidden dimension to embedding dimension.
         time_embedding_dim (int): Dimension of the time embedding.
-        embedding_net (nn.Module): Optional embedding network to preprocess inputs.
         dim_val (int): Dimension of value embeddings.
         dim_id (int): Dimension of identifier embeddings.
         dim_cond (int): Dimension of conditional embeddings.
         ada_time (bool): Whether to use adaptive time embeddings.
-        **kwargs (Any): Further arguments of the estimator (e.g. `z_score_x`,
-            `sigma_min`, `sigma_max`, `beta_min`, `beta_max`, `t_min`, `t_max`,
-            `weight_fn` for score matching, `noise_scale` for flow matching) or of
-            `build_simformer_network`. Unknown arguments raise an error.
+        **kwargs (Any): Further arguments of the estimator (e.g. `sigma_min`,
+            `sigma_max`, `beta_min`, `beta_max`, `t_min`, `t_max`, `weight_fn`) or
+            of `build_simformer_network`. Unknown arguments raise an error.
     Returns:
         Callable: A function that takes batch inputs and returns a masked score
         matching estimator.
     """
-
-    kwargs = dict(
-        zip(
-            (
-                "hidden_features",
-                "num_heads",
-                "num_layers",
-                "mlp_ratio",
-                "embedding_net",
-                "time_embedding_dim",
-                "dim_val",
-                "dim_id",
-                "dim_cond",
-                "ada_time",
-                "net",
-            ),
-            (
-                hidden_features,
-                num_heads,
-                num_layers,
-                mlp_ratio,
-                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-                time_embedding_dim,
-                dim_val,
-                dim_id,
-                dim_cond,
-                ada_time,
-                model,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    builder_kwargs = _simformer_builder_kwargs(
+        model,
+        z_score_x,
+        hidden_features,
+        num_heads,
+        num_layers,
+        mlp_ratio,
+        time_embedding_dim,
+        dim_val,
+        dim_id,
+        dim_cond,
+        ada_time,
+        kwargs,
     )
 
-    def build_fn(
-        batch_inputs,
-    ):
-        # Build the score matching estimator
+    def build_fn(batch_inputs):
         return build_masked_score_matching_estimator(
             batch_x=batch_inputs,
             batch_y=batch_inputs,  # Unused, only for compatibility
             sde_type=sde_type,
-            **kwargs,
+            **builder_kwargs,
         )
 
     return build_fn
@@ -690,13 +706,12 @@ def simformer_score_nn(
 
 def simformer_flow_nn(
     model: str = "simformer",
-    z_score_inputs: Optional[str] = "independent",
+    z_score_x: Optional[str] = "independent",
     hidden_features: int = 100,
     num_heads: int = 4,
     num_layers: int = 4,
     mlp_ratio: int = 2,
     time_embedding_dim: int = 32,
-    embedding_net: nn.Module = nn.Identity(),
     dim_val: int = 64,
     dim_id: int = 32,
     dim_cond: int = 16,
@@ -715,73 +730,45 @@ def simformer_flow_nn(
 
     Args:
         model (str): Name of the model architecture to use. Default is "simformer".
-        z_score_inputs (str): Whether to z-score the inputs, "independent"
-            (default), "structured" or None. The standardization is internal to
-            the estimator, as for FMPE.
+        z_score_x (str): Whether to z-score the inputs, "independent" (default),
+            "structured" or None. The standardization is internal to the
+            estimator, as for FMPE.
         hidden_features (int): Number of hidden features in each layer. Default is 100.
         num_heads (int): Number of attention heads in the transformer layers.
         num_layers (int): Number of transformer layers. Default is 4.
         mlp_ratio (int): Ratio of MLP hidden dimension to embedding dimension.
         time_embedding_dim (int): Dimension of the time embedding.
-        embedding_net (nn.Module): Optional embedding network to preprocess inputs.
         dim_val (int): Dimension of value embeddings.
         dim_id (int): Dimension of identifier embeddings.
         dim_cond (int): Dimension of conditional embeddings.
         ada_time (bool): Whether to use adaptive time embeddings.
-        **kwargs (Any): Further arguments of the estimator (e.g. `z_score_x`,
-            `sigma_min`, `sigma_max`, `beta_min`, `beta_max`, `t_min`, `t_max`,
-            `weight_fn` for score matching, `noise_scale` for flow matching) or of
-            `build_simformer_network`. Unknown arguments raise an error.
+        **kwargs (Any): Further arguments of the estimator (e.g. `noise_scale`,
+            `gaussian_baseline`) or of `build_simformer_network`. Unknown arguments
+            raise an error.
     Returns:
-        Callable: A function that takes batch inputs and returns a masked score
+        Callable: A function that takes batch inputs and returns a masked flow
         matching estimator.
-
     """
-
-    kwargs["z_score_x"] = z_score_inputs
-
-    kwargs = dict(
-        zip(
-            (
-                "hidden_features",
-                "num_heads",
-                "num_layers",
-                "mlp_ratio",
-                "embedding_net",
-                "time_embedding_dim",
-                "dim_val",
-                "dim_id",
-                "dim_cond",
-                "ada_time",
-                "net",
-            ),
-            (
-                hidden_features,
-                num_heads,
-                num_layers,
-                mlp_ratio,
-                check_net_device(embedding_net, "cpu", embedding_net_warn_msg),
-                time_embedding_dim,
-                dim_val,
-                dim_id,
-                dim_cond,
-                ada_time,
-                model,
-            ),
-            strict=False,
-        ),
-        **kwargs,
+    builder_kwargs = _simformer_builder_kwargs(
+        model,
+        z_score_x,
+        hidden_features,
+        num_heads,
+        num_layers,
+        mlp_ratio,
+        time_embedding_dim,
+        dim_val,
+        dim_id,
+        dim_cond,
+        ada_time,
+        kwargs,
     )
 
-    def build_fn(
-        batch_inputs,
-    ):
-        # Build the flow matching estimator
+    def build_fn(batch_inputs):
         return build_masked_flow_matching_estimator(
             batch_x=batch_inputs,
             batch_y=batch_inputs,  # Unused, only for compatibility
-            sde_type="flow",
-            **kwargs,
+            **builder_kwargs,
         )
 
     return build_fn

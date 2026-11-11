@@ -160,10 +160,11 @@ def infer(
             distribution) can be used.
         method: What inference method to use, case-insensitively: any neural
             trainer `sbi.inference` exports, for example 'npe', 'nle', 'nre',
-            'npe_a', 'fmpe' or 'npse'. The legacy names 'snpe', 'snle' and 'snre'
-            still work but emit a `FutureWarning`. The ABC methods are not
-            supported, because they take the simulator at construction; call
-            `MCABC`/`SMCABC` directly.
+            'npe_a', 'fmpe', 'npse' or 'simformer'. For the Simformer, `theta`
+            and `x` are concatenated into one joint input (theta first). The
+            legacy names 'snpe', 'snle' and 'snre' still work but emit a
+            `FutureWarning`. The ABC methods are not supported, because they take
+            the simulator at construction; call `MCABC`/`SMCABC` directly.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
@@ -202,8 +203,12 @@ def infer(
             stacklevel=2,
         )
 
+    # Exported names are mixed case (e.g. `Simformer`), so match case-insensitively.
+    exported = {
+        exported_name.upper(): exported_name for exported_name in sbi.inference.__all__
+    }
     try:
-        method_fun: Callable = getattr(sbi.inference, resolved)
+        method_fun: Callable = getattr(sbi.inference, exported.get(resolved, resolved))
     except AttributeError as err:
         raise NameError(
             f"Method '{method}' not available. `method` must name a neural trainer "
@@ -235,14 +240,27 @@ def infer(
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
     check_sbi_inputs(simulator, prior)
 
-    inference = method_fun(prior=prior, **init_kwargs)
     theta, x = simulate_for_sbi(
         simulator=simulator,
         proposal=prior,
         num_simulations=num_simulations,
         num_workers=num_workers,
     )
-    _ = inference.append_simulations(theta, x).train(**train_kwargs)
+    if isinstance(method_fun, type) and issubclass(method_fun, MaskedNeuralInference):
+        # Masked trainers learn the joint of all variables: theta first, then x.
+        num_theta, num_x = theta.shape[1], x.shape[1]
+        init_kwargs = {
+            "posterior_latent_idx": list(range(num_theta)),
+            "posterior_observed_idx": list(range(num_theta, num_theta + num_x)),
+            **init_kwargs,
+        }
+        inference = method_fun(prior=prior, **init_kwargs)
+        _ = inference.append_simulations(torch.cat([theta, x], dim=1)).train(
+            **train_kwargs
+        )
+    else:
+        inference = method_fun(prior=prior, **init_kwargs)
+        _ = inference.append_simulations(theta, x).train(**train_kwargs)
     posterior = inference.build_posterior(**build_posterior_kwargs)
 
     return posterior
@@ -251,7 +269,6 @@ def infer(
 class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
     "Mixin for NeuralInference objects"
 
-    _neural_net: Optional[BaseConditionalEstimatorType]
     _train_loss: float
     _val_loss: float
     _prior: Distribution
@@ -1026,7 +1043,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             else:
                 train_losses = self._get_losses(batch=batch, loss_args=loss_args)
             train_loss = torch.mean(train_losses)
-            train_loss_sum += train_loss.item()
+            train_loss_sum += train_losses.sum().item()
 
             train_loss.backward()
             if clip_max_norm is not None:
@@ -1037,7 +1054,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             self.optimizer.step()
 
         train_loss_average = train_loss_sum / (
-            len(train_loader)  # type: ignore
+            len(train_loader) * train_loader.batch_size  # type: ignore
         )
 
         return train_loss_average
@@ -1069,11 +1086,11 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                     val_losses = self._get_losses(batch=batch)
                 else:
                     val_losses = self._get_losses(batch=batch, loss_args=loss_args)
-                val_loss_sum += val_losses.mean().item()
+                val_loss_sum += val_losses.sum().item()
 
         # Take mean over all validation samples.
         val_loss = val_loss_sum / (
-            len(val_loader)  # type: ignore
+            len(val_loader) * val_loader.batch_size  # type: ignore
         )
 
         return val_loss
@@ -1525,6 +1542,7 @@ class NeuralInference(
 
         prior = self._resolve_prior(prior, sample_with)
         estimator, device = self._resolve_estimator(estimator)
+        estimator = deepcopy(estimator)
 
         posterior_parameters = self._resolve_posterior_parameters(
             sample_with, posterior_parameters, **kwargs
@@ -1538,7 +1556,7 @@ class NeuralInference(
             posterior_parameters,
         )
 
-        return deepcopy(self._posterior)
+        return self._posterior
 
     def _resolve_estimator(
         self, estimator: Optional[ConditionalEstimator]
@@ -1572,10 +1590,13 @@ class MaskedNeuralInference(
 ):
     """Abstract base class for masked neural inference methods."""
 
+    _neural_net: Optional[MaskedConditionalEstimatorType]
+
     def __init__(
         self,
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
+        prior: Optional[Distribution] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -1585,9 +1606,14 @@ class MaskedNeuralInference(
         r"""Base class for masked inference methods.
 
         Args:
-            prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
-                distribution, see FAQ for details on how to use custom distributions.
+            posterior_latent_idx: Indices of the variables that are latent in the
+                posterior, i.e., those that correspond to $\theta$.
+            posterior_observed_idx: Indices of the variables that are observed in the
+                posterior, i.e., those that correspond to $x$.
+            prior: Optional distribution over the posterior latent variables (those
+                in `posterior_latent_idx`). It is the default prior of
+                `build_posterior`, where it is used to reject samples outside its
+                support and by the iid sampling methods. Training does not use it.
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
             logging_level: Minimum severity of messages to log. One of the strings
@@ -1599,7 +1625,7 @@ class MaskedNeuralInference(
         """
 
         super().__init__(
-            prior=None,
+            prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -1660,38 +1686,30 @@ class MaskedNeuralInference(
         """Set the condition mask generator.
 
         The condition mask generator is a callable that generates the condition masks
-        thay will be employed at training time. It can otherwise also accept a fixed
-        condition mask or a set of condition masks which will be drawn uniformly.
+        that will be employed at training time. It can otherwise also accept a fixed
+        condition mask or a collection of condition masks which will be drawn
+        uniformly for every sample.
 
-        If a callable is passed it must accept as parameter the `input` Tensor to inform
-        it about the shapes that should be used to generate the masks.
+        If a callable is passed it must accept as parameter the `inputs` batch of
+        shape `(batch_size, num_variables, ...)` and return either a batch of masks
+        of shape `(batch_size, num_variables)` or one mask of shape
+        `(num_variables,)` that is used for the whole batch. A callable must be
+        defined at module level (not a lambda or a local function) for the trainer
+        to remain picklable, e.g. for `save()`.
 
         Args:
             condition_mask_generator: Callable that takes `inputs` and returns a
-                boolean tensor, or a fixed boolean tensor, or a list/tuple/set of
-                boolean tensors from which to randomly sample.
+                boolean tensor, or a fixed boolean tensor of shape
+                `(num_variables,)`, or a list/tuple/set of such tensors from which to
+                randomly sample. A set is sorted by its mask values, so that the draws
+                do not depend on the iteration order of the set.
 
         Returns:
             MaskedNeuralInference object (returned so that this function is chainable).
         """
-        if isinstance(condition_mask_generator, Callable):
-            self._condition_mask_generator = condition_mask_generator
-        elif isinstance(condition_mask_generator, Tensor):
-            # A fixed mask is a single unbatched mask, expand it to the batch size.
-            self._condition_mask_generator = lambda inputs: (
-                condition_mask_generator.expand(
-                    inputs.shape[0], *condition_mask_generator.shape
-                )
-            )
-        elif isinstance(condition_mask_generator, (list, tuple, set)):
-            masks_list = list(condition_mask_generator)
-
-            def generator(inputs):
-                idx = torch.randint(len(masks_list), (inputs.shape[0],))
-                masks = [masks_list[i] for i in idx]
-                return torch.stack(masks)
-
-            self._condition_mask_generator = generator
+        self._condition_mask_generator = _as_mask_generator(
+            condition_mask_generator, "condition_mask_generator"
+        )
         return self  # Chainable
 
     def set_edge_masks_generator(
@@ -1700,41 +1718,38 @@ class MaskedNeuralInference(
         """Set the edge mask generator.
 
         The edge mask generator is a callable that generates the edge masks
-        thay will be employed at training time. It can otherwise also accept a fixed
-        edge mask or a set of edge masks which will be drawn uniformly.
+        that will be employed at training time. It can otherwise also accept a fixed
+        edge mask or a collection of edge masks which will be drawn uniformly for
+        every sample.
 
-        Usually, the edge mask is defined based on the condition_mask itself, which also
-        informs for the inputs shapes. Thus, you should pass a callable that accept
-        a condition_mask as parameter.
+        `edge_mask[i, j] = True` means that variable `i` depends on (attends to)
+        variable `j`; for a DAG edge `j -> i`, set `edge_mask[i, j] = True`.
 
-        If a callable is passed it must accept as parameter the input tensor to inform
-        it about the shapes that should be used to generate the masks.
+        If a callable is passed it must accept the batch of condition masks of shape
+        `(batch_size, num_variables)` and return either a batch of edge masks of shape
+        `(batch_size, num_variables, num_variables)`, one edge mask of shape
+        `(num_variables, num_variables)` for the whole batch, or `None` for full
+        attention. A callable must be defined at module level (not a lambda or a
+        local function) for the trainer to remain picklable.
+
+        The edge mask generator is also used by `build_conditional`,
+        `build_posterior` and `build_likelihood` when no `edge_mask` is passed:
+        it is called with the fixed condition mask, so it should be deterministic
+        given the condition mask. If several fixed edge masks are drawn at random,
+        the `edge_mask` must be passed explicitly when building a conditional.
 
         Args:
             edge_mask_generator: Callable that takes `condition_mask` and returns a
-                boolean tensor, or a fixed boolean tensor, or a list/tuple/set of
-                boolean tensors from which to randomly sample.
+                boolean tensor (or `None`), or a fixed boolean tensor of shape
+                `(num_variables, num_variables)`, or a list/tuple/set of such tensors
+                from which to randomly sample. A set is sorted by its mask values.
 
         Returns:
             MaskedNeuralInference object (returned so that this function is chainable).
         """
-        if isinstance(edge_mask_generator, Callable):
-            self._edge_mask_generator = edge_mask_generator
-        elif isinstance(edge_mask_generator, Tensor):
-            self._edge_mask_generator = lambda condition_mask: (
-                edge_mask_generator.expand(
-                    condition_mask.shape[0], *edge_mask_generator.shape
-                )
-            )
-        elif isinstance(edge_mask_generator, (list, tuple, set)):
-            masks_list = list(edge_mask_generator)
-
-            def generator(inputs):
-                idx = torch.randint(len(masks_list), (inputs.shape[0],))
-                masks = [masks_list[i] for i in idx]
-                return torch.stack(masks)
-
-            self._edge_mask_generator = generator
+        self._edge_mask_generator = _as_mask_generator(
+            edge_mask_generator, "edge_mask_generator"
+        )
         return self  # Chainable
 
     def _default_condition_masks_generator(self, inputs):
@@ -1821,8 +1836,9 @@ class MaskedNeuralInference(
         """Generates a condition mask from the idexes passed as parameters. Can be used
         as a static method for any latent and observed index passed as parameters."""
 
-        latent_idx = torch.as_tensor(latent_idx, dtype=torch.long)
-        observed_idx = torch.as_tensor(observed_idx, dtype=torch.long)
+        # Index checks run on the CPU, whatever the device of the passed indices.
+        latent_idx = torch.as_tensor(latent_idx, dtype=torch.long).cpu()
+        observed_idx = torch.as_tensor(observed_idx, dtype=torch.long).cpu()
 
         # Check for overlap
         if torch.any(torch.isin(latent_idx, observed_idx)):
@@ -1843,10 +1859,9 @@ class MaskedNeuralInference(
             )
 
         # If checks pass we can generate the condition mask
-        condition_mask = torch.zeros(num_nodes, dtype=torch.bool, device=self._device)
-        condition_mask[latent_idx] = False
+        condition_mask = torch.zeros(num_nodes, dtype=torch.bool)
         condition_mask[observed_idx] = True
-        return condition_mask
+        return condition_mask.to(self._device)
 
     def build_conditional(
         self,
@@ -1870,13 +1885,19 @@ class MaskedNeuralInference(
         mask passed.
 
         Args:
-            condition_masks: A boolean mask indicating the role of each variable.
-            Expected shape: `(num_variables,)`, used for all samples.
-            - `True` (or `1`): The variable at this position is observed and its
-                features will be used for conditioning.
-            - `False` (or `0`): The variable at this position is latent and its
-                features are subject to inference.
-            estimator: The estimator that the conditional is based on.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(num_variables,)`, used for all samples.
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask of shape `(num_variables, num_variables)`
+                defining which variables attend to which (`edge_mask[i, j] = True`
+                means that `i` depends on `j`). If `None`, the edge mask generator
+                used in training is evaluated at `condition_mask` (full attention
+                by default).
+            mvf_estimator: The estimator that the conditional is based on. If `None`,
+                the trained network is used.
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
                 distribution, see FAQ for details on how to use custom distributions.
@@ -1889,18 +1910,22 @@ class MaskedNeuralInference(
             NeuralPosterior object.
         """
 
-        condition_mask = torch.as_tensor(condition_mask)
-        if edge_mask is not None:
+        condition_mask = torch.as_tensor(condition_mask, dtype=torch.bool)
+        if edge_mask is None:
+            edge_mask = self._edge_mask_for_conditional(condition_mask)
+        else:
             edge_mask = torch.as_tensor(edge_mask)
 
-        # Sampling with "sde" / "ode" needs no prior, so it may stay None.
-        prior = self._prior if prior is None else prior
+        # Sampling with "sde" / "ode" needs no prior, so it may stay None. The prior
+        # stored at initialization is over the posterior latents only, so it is
+        # not a default here (see `build_posterior`).
         check_prior(prior)
         vf_estimator, device = self._resolve_estimator(
             mvf_estimator,
             condition_mask,
             edge_mask,
         )
+        vf_estimator = deepcopy(vf_estimator)
 
         conditional_parameters = self._resolve_posterior_parameters(
             sample_with, conditional_parameters, **kwargs
@@ -1914,7 +1939,40 @@ class MaskedNeuralInference(
             conditional_parameters,
         )
 
-        return deepcopy(self._posterior)
+        return self._posterior
+
+    def _edge_mask_for_conditional(self, condition_mask: Tensor) -> Optional[Tensor]:
+        """Edge mask of a conditional, taken from the training edge mask generator.
+
+        Args:
+            condition_mask: Fixed condition mask of shape `(num_variables,)`.
+
+        Returns:
+            Edge mask of shape `(num_variables, num_variables)`, or `None` for full
+            attention.
+        """
+        generator = self._edge_mask_generator
+        if isinstance(generator, UniformMaskGenerator):
+            if torch.unique(generator.masks, dim=0).shape[0] > 1:
+                raise ValueError(
+                    "The network was trained with several edge masks drawn at random, "
+                    "so the edge mask of a conditional is ambiguous. Pass `edge_mask` "
+                    "explicitly."
+                )
+            return generator.masks[0]
+
+        edge_mask = generator(condition_mask.unsqueeze(0).to(self._device))
+        if edge_mask is None:
+            return None
+        edge_mask = torch.as_tensor(edge_mask, dtype=torch.bool)
+        if edge_mask.dim() == 3:
+            if edge_mask.shape[0] != 1:
+                raise ValueError(
+                    "The edge mask generator returned a batch of "
+                    f"{edge_mask.shape[0]} edge masks for a single condition mask."
+                )
+            edge_mask = edge_mask[0]
+        return edge_mask
 
     def _resolve_estimator(
         self,
@@ -1998,3 +2056,56 @@ def check_if_proposal_has_default_x(
             "x_o for training. Set it with "
             "`posterior.set_default_x(x_o)`."
         )
+
+
+class FixedMaskGenerator:
+    """Mask generator that returns one fixed mask for every element of a batch.
+
+    Defined at module level so that trainers using it can be pickled.
+    """
+
+    def __init__(self, mask: Tensor):
+        self.mask = torch.as_tensor(mask, dtype=torch.bool)
+
+    def __call__(self, inputs: Tensor) -> Tensor:
+        mask = self.mask.to(inputs.device)
+        return mask.expand(inputs.shape[0], *mask.shape)
+
+
+class UniformMaskGenerator:
+    """Mask generator that draws one of several masks uniformly for every element of
+    a batch.
+
+    Defined at module level so that trainers using it can be pickled.
+    """
+
+    def __init__(self, masks: Sequence[Tensor]):
+        if len(masks) == 0:
+            raise ValueError("At least one mask is required.")
+        self.masks = torch.stack([torch.as_tensor(m, dtype=torch.bool) for m in masks])
+
+    def __call__(self, inputs: Tensor) -> Tensor:
+        idx = torch.randint(len(self.masks), (inputs.shape[0],))
+        return self.masks[idx].to(inputs.device)
+
+
+def _as_mask_generator(
+    generator: Union[Callable[[Tensor], Optional[Tensor]], Tensor, list, tuple, set],
+    name: str,
+) -> Callable[[Tensor], Optional[Tensor]]:
+    """Turn a mask, a collection of masks or a callable into a mask generator."""
+    if isinstance(generator, Tensor):
+        return FixedMaskGenerator(generator)
+    if isinstance(generator, (list, tuple, set)):
+        masks = [torch.as_tensor(m, dtype=torch.bool) for m in generator]
+        if isinstance(generator, set):
+            # Sets iterate in hash (memory address) order, which differs between
+            # runs. Sort by mask values so that seeded training is reproducible.
+            masks = sorted(masks, key=lambda m: m.flatten().int().tolist())
+        return UniformMaskGenerator(masks)
+    if callable(generator):
+        return generator
+    raise TypeError(
+        f"`{name}` must be a callable, a tensor, or a list, tuple or set of tensors, "
+        f"but got {type(generator).__name__}."
+    )

@@ -5,6 +5,7 @@ import warnings
 from typing import Literal, Optional, Union
 
 from torch import Tensor
+from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers.vfpe.base_vf_inference import MaskedVectorFieldTrainer
@@ -64,6 +65,7 @@ class Simformer(MaskedVectorFieldTrainer):
         sde_type: Literal["vp", "ve", "subvp"] = "ve",
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
+        prior: Optional[Distribution] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -86,6 +88,9 @@ class Simformer(MaskedVectorFieldTrainer):
             posterior_observed_idx: List or Tensor of indices identifying which
                 variables are observed (to be conditioned on) in a posterior,
                 i.e., those that correspond to $x$.
+            prior: Optional distribution over the posterior latent variables. It is
+                the default prior of `build_posterior` (rejection of samples outside
+                its support, iid sampling). Training does not use it.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -100,6 +105,7 @@ class Simformer(MaskedVectorFieldTrainer):
             mvf_estimator_builder=mvf_estimator,
             posterior_latent_idx=posterior_latent_idx,
             posterior_observed_idx=posterior_observed_idx,
+            prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -142,6 +148,7 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
         ] = "simformer",
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
+        prior: Optional[Distribution] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -163,6 +170,9 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             posterior_observed_idx: List or Tensor of indices identifying which
                 variables are observed (to be conditioned on) in a posterior,
                 i.e., those that correspond to $x$.
+            prior: Optional distribution over the posterior latent variables. It is
+                the default prior of `build_posterior` (rejection of samples outside
+                its support, iid sampling). Training does not use it.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -184,6 +194,7 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             mvf_estimator_builder=mvf_estimator,
             posterior_latent_idx=posterior_latent_idx,
             posterior_observed_idx=posterior_observed_idx,
+            prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,

@@ -1219,3 +1219,55 @@ def test_simformer_append_simulations_with_nan_in_every_row():
     inputs = torch.randn(10, 3, 2)
     inputs[:, 0, 0] = float("nan")
     Simformer().append_simulations(inputs)
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+@pytest.mark.parametrize("method", ["ve", "flow"])
+def test_simformer_with_dag_edge_mask_is_accurate(method):
+    """A Simformer trained with the edge mask of a Markov chain theta - x1 - x2
+    recovers the analytic posterior p(theta | x1, x2) = p(theta | x1).
+
+    theta ~ N(0, I), x1 = theta + 0.5 eps1, x2 = x1 + 0.5 eps2, every node has two
+    features. Every node attends only to its chain neighbours (and itself), so
+    theta never attends to x2 directly. `build_posterior` must take the edge mask
+    from the training generator.
+    """
+    seed_all_backends(0)
+    device = process_device("gpu")
+    num_simulations, noise = 10_000, 0.5
+    theta = torch.randn(num_simulations, 2)
+    x1 = theta + noise * torch.randn_like(theta)
+    x2 = x1 + noise * torch.randn_like(x1)
+    inputs = torch.stack([theta, x1, x2], dim=1)  # (N, 3 nodes, 2 features)
+
+    chain = torch.tensor([
+        [True, True, False],
+        [True, True, True],
+        [False, True, True],
+    ])
+    if method == "flow":
+        inference = FlowMatchingSimformer(
+            posterior_latent_idx=[0], posterior_observed_idx=[1, 2], device=device
+        )
+    else:
+        inference = Simformer(
+            sde_type=method,
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1, 2],
+            device=device,
+        )
+    inference.set_edge_masks_generator(chain)
+    inference.append_simulations(inputs).train(training_batch_size=500)
+    posterior = inference.build_posterior()
+
+    x1_o, x2_o = torch.tensor([0.5, -1.0]), torch.tensor([1.0, -0.5])
+    x_o = torch.cat([x1_o, x2_o]).to(device)
+    samples = posterior.sample((1_000,), x=x_o).cpu()
+
+    # Gaussian conjugacy: posterior precision 1 + 1 / noise^2.
+    posterior_var = 1.0 / (1.0 + 1.0 / noise**2)
+    target = MultivariateNormal(
+        posterior_var / noise**2 * x1_o, posterior_var * eye(2)
+    ).sample((1_000,))
+    check_c2st(samples, target, alg=f"simformer-{method}-dag-edge-mask")

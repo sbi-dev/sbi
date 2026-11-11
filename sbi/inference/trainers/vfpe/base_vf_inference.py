@@ -9,6 +9,7 @@ from typing import (
     Callable,
     ClassVar,
     Dict,
+    List,
     Literal,
     Optional,
     Self,
@@ -142,9 +143,128 @@ def _converged_on_noisy_loss(self, epoch: int, stop_after_epochs: int) -> bool:
     return converged
 
 
-class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
-    _converged = _converged_on_noisy_loss
+class _VectorFieldTrainingMixin:
+    """Training-loop pieces shared by the vector field trainers (NPSE, FMPE) and
+    the masked vector field trainers (Simformer).
 
+    The losses of these methods are noisy: convergence and the logged losses use an
+    exponential moving average, and the validation loss is evaluated at a fixed set
+    of times.
+    """
+
+    _converged = _converged_on_noisy_loss
+    _summary: Dict[str, list]
+
+    @staticmethod
+    def _repeat_for_validation_times(
+        tensors: Sequence[Optional[Tensor]], validation_times: Tensor
+    ) -> Tuple[List[Optional[Tensor]], Tensor]:
+        """Repeat a validation batch once per validation time.
+
+        Args:
+            tensors: Batch tensors with the batch in the first dimension (or None).
+            validation_times: Times `(num_times,)` at which to evaluate the loss.
+
+        Returns:
+            The repeated tensors and the matching times, both with
+            `num_times * batch_size` elements.
+        """
+        num_times = validation_times.shape[0]
+        repeated = [
+            None if t is None else t.repeat(num_times, *([1] * (t.ndim - 1)))
+            for t in tensors
+        ]
+        batch_size = next(t for t in tensors if t is not None).shape[0]
+        return repeated, validation_times.repeat_interleave(batch_size, dim=0)
+
+    def _train_epoch(
+        self,
+        train_loader: data.DataLoader,
+        clip_max_norm: Optional[float],
+        loss_args: LossArgs | None,
+    ) -> float:
+        """
+        Override the parent method for performing a single training epoch over the
+        provided training data to set `times` to None as it is only used
+        when calculating the validation loss.
+
+        Args:
+            train_loader: Dataloader for training.
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
+            loss_args: Additional arguments passed to self._loss fn.
+
+        Returns:
+            The average training loss over all samples in the epoch.
+        """
+
+        if not isinstance(loss_args, LossArgsVF):
+            raise TypeError(
+                "Expected type of loss_args to be LossArgsVF,"
+                f" but got {type(loss_args)}"
+            )
+
+        loss_args = replace(loss_args, **dict(times=None))
+
+        return super()._train_epoch(  # type: ignore[misc]
+            train_loader=train_loader,
+            clip_max_norm=clip_max_norm,
+            loss_args=loss_args,
+        )
+
+    def _summarize_epoch(
+        self,
+        train_loss: float,
+        val_loss: float,
+        epoch_start_time: float,
+        summarization_kwargs: Dict[str, Any],
+    ) -> None:
+        """
+        Override base class method to pass additional arguments through
+        summarization_kwargs and log exponential moving average for the validation
+        and training losses.
+
+        Args:
+            train_loss: The average training loss for the epoch.
+            val_loss: The average validation loss for the epoch.
+            epoch_start_time: Timestamp when the epoch started, used to compute
+                duration.
+            summarization_kwargs: Additional keyword arguments for customizing
+                the summarization.
+        """
+
+        ema_loss_decay = summarization_kwargs.get("ema_loss_decay")
+        assert ema_loss_decay is not None and isinstance(ema_loss_decay, float)
+
+        # NOTE: Due to the inherently noisy nature we do instead log a exponential
+        # moving average of the training loss.
+        if len(self._summary["training_loss"]) == 0:
+            train_loss_ema = train_loss
+        else:
+            previous_loss = self._summary["training_loss"][-1]
+            train_loss_ema = (
+                1.0 - ema_loss_decay
+            ) * previous_loss + ema_loss_decay * train_loss
+
+        if len(self._summary["validation_loss"]) == 0:
+            val_loss_ema = val_loss
+        else:
+            previous_loss = self._summary["validation_loss"][-1]
+            val_loss_ema = (
+                1 - ema_loss_decay
+            ) * previous_loss + ema_loss_decay * val_loss
+
+        super()._summarize_epoch(  # type: ignore[misc]
+            train_loss=train_loss_ema,
+            val_loss=val_loss_ema,
+            epoch_start_time=epoch_start_time,
+            summarization_kwargs=summarization_kwargs,
+        )
+
+
+class VectorFieldTrainer(
+    _VectorFieldTrainingMixin, NeuralInference[ConditionalVectorFieldEstimator]
+):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
@@ -257,10 +377,11 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
             VectorFieldTrainer object (returned so that this function is chainable).
         """
         inference_name = self.__class__.__name__
-        assert proposal is None, (
-            f"Multi-round {inference_name} is not yet implemented. "
-            f"Please use single-round {inference_name}."
-        )
+        if proposal is not None:
+            raise NotImplementedError(
+                f"Multi-round {inference_name} is not yet implemented. "
+                f"Please use single-round {inference_name} (`proposal=None`)."
+            )
         current_round = 0
 
         if exclude_invalid_x is None:
@@ -564,20 +685,11 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
             # the variance in the validation loss, for improved convergence
             # checks. We evaluate the entire validation batch at all times, so
             # we repeat the batches here to match.
-            val_batch_size = theta_batch.shape[0]
-            times_batch = validation_times.shape[0]
-            theta_batch = theta_batch.repeat(
-                times_batch, *([1] * (theta_batch.ndim - 1))
+            (theta_batch, x_batch, prior_masks_batch), validation_times_rep = (
+                self._repeat_for_validation_times(
+                    (theta_batch, x_batch, prior_masks_batch), validation_times
+                )
             )
-            x_batch = x_batch.repeat(times_batch, *([1] * (x_batch.ndim - 1)))
-            prior_masks_batch = prior_masks_batch.repeat(
-                times_batch, *([1] * (prior_masks_batch.ndim - 1))
-            )
-
-            validation_times_rep = validation_times.repeat_interleave(
-                val_batch_size, dim=0
-            )
-
             loss_args = replace(loss_args, times=validation_times_rep)
 
         losses = self._loss(
@@ -588,90 +700,6 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
         )
 
         return losses
-
-    def _train_epoch(
-        self,
-        train_loader: data.DataLoader,
-        clip_max_norm: Optional[float],
-        loss_args: LossArgs | None,
-    ) -> float:
-        """
-        Override the parent method for performing a single training epoch over the
-        provided training data to set `times` to None as it is only used
-        when calculating the validation loss.
-
-        Args:
-            train_loader: Dataloader for training.
-            clip_max_norm: Value at which to clip the total gradient norm in order to
-                prevent exploding gradients. Use None for no clipping.
-            loss_args: Additional arguments passed to self._loss fn.
-
-        Returns:
-            The average training loss over all samples in the epoch.
-        """
-
-        if not isinstance(loss_args, LossArgsVF):
-            raise TypeError(
-                "Expected type of loss_args to be LossArgsVF,"
-                f" but got {type(loss_args)}"
-            )
-
-        loss_args = replace(loss_args, **dict(times=None))
-
-        return super()._train_epoch(
-            train_loader=train_loader,
-            clip_max_norm=clip_max_norm,
-            loss_args=loss_args,
-        )
-
-    def _summarize_epoch(
-        self,
-        train_loss: float,
-        val_loss: float,
-        epoch_start_time: float,
-        summarization_kwargs: Dict[str, Any],
-    ) -> None:
-        """
-        Override base class method to pass additional arguments through
-        summarization_kwargs and log exponential moving average for the validation
-        and training losses.
-
-        Args:
-            train_loss: The average training loss for the epoch.
-            val_loss: The average validation loss for the epoch.
-            epoch_start_time: Timestamp when the epoch started, used to compute
-                duration.
-            summarization_kwargs: Additional keyword arguments for customizing
-                the summarization.
-        """
-
-        ema_loss_decay = summarization_kwargs.get("ema_loss_decay")
-        assert ema_loss_decay is not None and isinstance(ema_loss_decay, float)
-
-        # NOTE: Due to the inherently noisy nature we do instead log a exponential
-        # moving average of the training loss.
-        if len(self._summary["training_loss"]) == 0:
-            train_loss_ema = train_loss
-        else:
-            previous_loss = self._summary["training_loss"][-1]
-            train_loss_ema = (
-                1.0 - ema_loss_decay
-            ) * previous_loss + ema_loss_decay * train_loss
-
-        if len(self._summary["validation_loss"]) == 0:
-            val_loss_ema = val_loss
-        else:
-            previous_loss = self._summary["validation_loss"][-1]
-            val_loss_ema = (
-                1 - ema_loss_decay
-            ) * previous_loss + ema_loss_decay * val_loss
-
-        super()._summarize_epoch(
-            train_loss=train_loss_ema,
-            val_loss=val_loss_ema,
-            epoch_start_time=epoch_start_time,
-            summarization_kwargs=summarization_kwargs,
-        )
 
     def _get_start_index(self, context: StartIndexContext) -> int:
         """
@@ -746,10 +774,9 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator]):
 
 
 class MaskedVectorFieldTrainer(
-    MaskedNeuralInference[MaskedConditionalVectorFieldEstimator]
+    _VectorFieldTrainingMixin,
+    MaskedNeuralInference[MaskedConditionalVectorFieldEstimator],
 ):
-    _converged = _converged_on_noisy_loss
-
     def __init__(
         self,
         mvf_estimator_builder: Union[
@@ -758,6 +785,7 @@ class MaskedVectorFieldTrainer(
         ] = "simformer",
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
+        prior: Optional[Distribution] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -777,6 +805,13 @@ class MaskedVectorFieldTrainer(
                 or a callable that implements the `MaskedConditionalEstimatorBuilder`
                 protocol with `__call__` that receives `inputs`
                 and returns a `MaskedConditionalVectorFieldEstimator`.
+            posterior_latent_idx: Indices of the variables that are latent in the
+                posterior, i.e., those that correspond to $\theta$.
+            posterior_observed_idx: Indices of the variables that are observed in the
+                posterior, i.e., those that correspond to $x$.
+            prior: Optional distribution over the posterior latent variables. It is
+                the default prior of `build_posterior` (rejection of samples outside
+                its support, iid sampling). Training does not use it.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
@@ -788,12 +823,10 @@ class MaskedVectorFieldTrainer(
                 `mvf_estimator_builder` is a string.
         """
 
-        # Unused at initialization, try to catch possible mistakenly use by the user
-        kwargs.pop("prior", None)
-
         super().__init__(
             posterior_latent_idx=posterior_latent_idx,
             posterior_observed_idx=posterior_observed_idx,
+            prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -1074,9 +1107,8 @@ class MaskedVectorFieldTrainer(
                     attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
                     set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
-                - if `None`, it will be equivalent to a full attention (i.e., full ones)
-                  mask, we suggest you to use `None` instead of ones
-                  to save memory resources.
+                - if `None`, the edge mask generator used in training is evaluated at
+                  the condition mask; by default this is full attention.
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
                 the `MaskedConditionalEstimatorBuilder` protocol.
@@ -1085,15 +1117,14 @@ class MaskedVectorFieldTrainer(
                 underlying trained neural net.
             prior: Distribution over the latent variables. It is used to reject
                 samples outside its support and by the iid sampling methods; the
-                learned conditional does not depend on it.
+                learned conditional does not depend on it. Defaults to the prior
+                passed at initialization.
             sample_with: Method to use for sampling from the posterior. Can be one of
                 'sde' (default) or 'ode'. The 'sde' method uses the score to
                 do a Langevin diffusion step, while the 'ode' method solves a
                 probabilistic ODE with a numerical ODE solver.
-            vectorfield_sampling_parameters: Additional keyword arguments passed to
+            posterior_parameters: Additional parameters passed to
                 `VectorFieldPosterior`.
-            **kwargs: Additional keyword arguments passed to
-                `VectorFieldBasedPotential`.
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
@@ -1105,7 +1136,7 @@ class MaskedVectorFieldTrainer(
             condition_mask=condition_mask,
             edge_mask=edge_mask,
             mvf_estimator=mvf_estimator,
-            prior=prior,
+            prior=self._prior if prior is None else prior,
             sample_with=sample_with,
             conditional_parameters=posterior_parameters,
         )
@@ -1134,9 +1165,8 @@ class MaskedVectorFieldTrainer(
                     attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
                     set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
-                - if `None`, it will be equivalent to a full attention (i.e., full ones)
-                  mask, we suggest you to use `None` instead of ones
-                  to save memory resources.
+                - if `None`, the edge mask generator used in training is evaluated at
+                  the condition mask; by default this is full attention.
 
             mvf_estimator: Neural network architecture for the masked
                 vector field estimator. Can be a callable that implements
@@ -1144,17 +1174,16 @@ class MaskedVectorFieldTrainer(
                 If a callable, `__call__` must accept `inputs`, and return
                 a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
                 underlying trained neural net.
-            prior: Distribution over the latent variables. It is used to reject
-                samples outside its support and by the iid sampling methods; the
-                learned conditional does not depend on it.
+            prior: Distribution over the latent variables of the likelihood, i.e.,
+                over $x$. It is used to reject samples outside its support and by the
+                iid sampling methods; the learned conditional does not depend on it.
+                The prior passed at initialization is over $\theta$ and is not used.
             sample_with: Method to use for sampling from the posterior. Can be one of
                 'sde' (default) or 'ode'. The 'sde' method uses the score to
                 do a Langevin diffusion step, while the 'ode' method solves a
                 probabilistic ODE with a numerical ODE solver.
-            vectorfield_sampling_parameters: Additional keyword arguments passed to
+            likelihood_parameters: Additional parameters passed to
                 `VectorFieldPosterior`.
-            **kwargs: Additional keyword arguments passed to
-                `VectorFieldBasedPotential`.
         Returns:
             Likelihood $p(x|\theta)$  with `.sample()` and `.log_prob()` methods.
         """
@@ -1212,6 +1241,7 @@ class MaskedVectorFieldTrainer(
         calibration_kernel: Callable,
         times: Optional[Tensor] = None,
         force_first_round_loss: bool = False,
+        loss_mask: Optional[Tensor] = None,
     ) -> Tensor:
         if times is not None:
             times = times.to(self._device)
@@ -1223,7 +1253,7 @@ class MaskedVectorFieldTrainer(
             if self._neural_net is None:
                 raise AttributeError("Initialize self._neural_net.")
             loss = self._neural_net.loss(
-                inputs, condition_masks, edge_masks, times=times
+                inputs, condition_masks, edge_masks, times=times, loss_mask=loss_mask
             )
         else:
             raise NotImplementedError(
@@ -1257,26 +1287,30 @@ class MaskedVectorFieldTrainer(
                 f" but got {type(loss_args)}"
             )
 
-        condition_masks_batch = (self._condition_mask_generator(inputs_batch)).to(
-            self._device
-        )
+        batch_size, num_nodes = inputs_batch.shape[0], inputs_batch.shape[1]
+        condition_masks_batch = _batch_mask(
+            self._condition_mask_generator(inputs_batch),
+            (batch_size, num_nodes),
+            "condition mask",
+        ).to(self._device)
 
         # Differently from other sbi methods, we can still allow invalid values
-        inputs_batch, condition_masks_batch = handle_invalid_inputs_for_simformer(
-            inputs_batch,
-            condition_masks_batch,
-            exclude_invalid_x=self._exclude_invalid_x,
+        # Invalid (NaN/Inf) entries are made latent and excluded from the loss.
+        inputs_batch, condition_masks_batch, valid_batch = (
+            handle_invalid_inputs_for_simformer(
+                inputs_batch,
+                condition_masks_batch,
+                exclude_invalid_x=self._exclude_invalid_x,
+            )
         )
 
-        assert condition_masks_batch is not None, (
-            "During training a condition mask was encountered to be None. "
-            "This is likely due to the condition mask generator not being "
-            "properly defined. Please fix your generator."
-        )
+        assert condition_masks_batch is not None
 
         edge_masks_batch = self._edge_mask_generator(condition_masks_batch)
         if edge_masks_batch is not None:
-            edge_masks_batch = edge_masks_batch.to(self._device)
+            edge_masks_batch = _batch_mask(
+                edge_masks_batch, (batch_size, num_nodes, num_nodes), "edge mask"
+            ).to(self._device)
 
         validation_times = loss_args.times
         if validation_times is not None:
@@ -1284,26 +1318,23 @@ class MaskedVectorFieldTrainer(
             # the variance in the validation loss, for improved convergence
             # checks. We evaluate the entire validation batch at all times, so
             # we repeat the batches here to match.
-            val_batch_size = inputs_batch.shape[0]
-            times_batch = validation_times.shape[0]
-            inputs_batch = inputs_batch.repeat(
-                times_batch, *([1] * (inputs_batch.ndim - 1))
+            repeated, validation_times_rep = self._repeat_for_validation_times(
+                (
+                    inputs_batch,
+                    condition_masks_batch,
+                    edge_masks_batch,
+                    prior_masks_batch,
+                    valid_batch,
+                ),
+                validation_times,
             )
-            condition_masks_batch = condition_masks_batch.repeat(
-                times_batch, *([1] * (condition_masks_batch.ndim - 1))
-            )
-            if edge_masks_batch is not None:
-                edge_masks_batch = edge_masks_batch.repeat(
-                    times_batch, *([1] * (edge_masks_batch.ndim - 1))
-                )
-            prior_masks_batch = prior_masks_batch.repeat(
-                times_batch, *([1] * (prior_masks_batch.ndim - 1))
-            )
-
-            validation_times_rep = validation_times.repeat_interleave(
-                val_batch_size, dim=0
-            )
-
+            (
+                inputs_batch,
+                condition_masks_batch,
+                edge_masks_batch,
+                prior_masks_batch,
+                valid_batch,
+            ) = repeated
             loss_args = replace(loss_args, times=validation_times_rep)
 
         losses = self._loss(
@@ -1311,129 +1342,33 @@ class MaskedVectorFieldTrainer(
             condition_masks=condition_masks_batch,
             edge_masks=edge_masks_batch,
             prior_masks=prior_masks_batch,
+            loss_mask=valid_batch,
             **loss_args_to_kwargs(loss_args),
         )
 
         return losses
 
-    def _train_epoch(
-        self,
-        train_loader: data.DataLoader,
-        clip_max_norm: Optional[float],
-        loss_args: LossArgs | None,
-    ) -> float:
-        """
-        Override the parent method for performing a single training epoch over the
-        provided training data to set `times` to None as it is only used
-        when calculating the validation loss.
-
-        Args:
-            train_loader: Dataloader for training.
-            clip_max_norm: Value at which to clip the total gradient norm in order to
-                prevent exploding gradients. Use None for no clipping.
-            loss_args: Additional arguments passed to self._loss fn.
-
-        Returns:
-            The average training loss over all samples in the epoch.
-        """
-
-        if not isinstance(loss_args, LossArgsVF):
-            raise TypeError(
-                "Expected type of loss_args to be LossArgsVF,"
-                f" but got {type(loss_args)}"
-            )
-
-        loss_args = replace(loss_args, **dict(times=None))
-
-        return super()._train_epoch(
-            train_loader=train_loader,
-            clip_max_norm=clip_max_norm,
-            loss_args=loss_args,
-        )
-
-    def _summarize_epoch(
-        self,
-        train_loss: float,
-        val_loss: float,
-        epoch_start_time: float,
-        summarization_kwargs: Dict[str, Any],
-    ) -> None:
-        """
-        Override base class method to pass additional arguments through
-        summarization_kwargs and log exponential moving average for the validation
-        and training losses.
-
-        Args:
-            train_loss: The average training loss for the epoch.
-            val_loss: The average validation loss for the epoch.
-            epoch_start_time: Timestamp when the epoch started, used to compute
-                duration.
-            summarization_kwargs: Additional keyword arguments for customizing
-                the summarization.
-        """
-
-        ema_loss_decay = summarization_kwargs.get("ema_loss_decay")
-        assert ema_loss_decay is not None and isinstance(ema_loss_decay, float)
-
-        # NOTE: Due to the inherently noisy nature we do instead log a exponential
-        # moving average of the training loss.
-        if len(self._summary["training_loss"]) == 0:
-            train_loss_ema = train_loss
-        else:
-            previous_loss = self._summary["training_loss"][-1]
-            train_loss_ema = (
-                1.0 - ema_loss_decay
-            ) * previous_loss + ema_loss_decay * train_loss
-
-        if len(self._summary["validation_loss"]) == 0:
-            val_loss_ema = val_loss
-        else:
-            previous_loss = self._summary["validation_loss"][-1]
-            val_loss_ema = (
-                1 - ema_loss_decay
-            ) * previous_loss + ema_loss_decay * val_loss
-
-        super()._summarize_epoch(
-            train_loss=train_loss_ema,
-            val_loss=val_loss_ema,
-            epoch_start_time=epoch_start_time,
-            summarization_kwargs=summarization_kwargs,
-        )
-
     def _get_start_index(self, context: StartIndexContext) -> int:
-        """
-        Determine the starting index for training based on previous rounds.
+        """Starting index of the training set; only single-round is supported.
 
         Args:
             context: StartIndexContext dataclass values used to determine the starting
                 index of the training set.
-        Returns:
-            The method will return 1 to skip samples from round 0; otherwise,
-            it returns 0.
-        """
 
-        # Load data from most recent round.
+        Returns:
+            0, as there is only one round.
+        """
         self._round = max(self._data_round_index)
 
-        if self._round == 0 and self._neural_net is not None:
-            assert context.force_first_round_loss or context.resume_training, (
-                "You have already trained this neural network. After you had trained "
-                "the network, you again appended simulations with `append_simulations"
-                "(theta, x)`, but you did not provide a proposal. If the new "
-                "simulations are sampled from the prior, you can set "
-                "`.train(..., force_first_round_loss=True`). However, if the new "
-                "simulations were not sampled from the prior, you should pass the "
-                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
-                "your samples are not sampled from the prior and you do not pass a "
-                "proposal and you set `force_first_round_loss=True`, the result of "
-                "NPSE will not be the true posterior. Instead, it will be the proposal "
-                "posterior, which (usually) is more narrow than the true posterior."
+        if self._neural_net is not None and not (
+            context.force_first_round_loss or context.resume_training
+        ):
+            raise ValueError(
+                "This network has already been trained. To continue training on "
+                "the appended simulations, call `.train(force_first_round_loss=True)` "
+                "or `.train(resume_training=True)`, or create a new trainer."
             )
-
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(context.discard_prior_samples and self._round > 0)
-
-        return start_idx
+        return 0
 
     def _initialize_neural_network(
         self,
@@ -1462,3 +1397,33 @@ class MaskedVectorFieldTrainer(
             )
 
             del inputs
+
+
+def _batch_mask(
+    mask: Optional[Tensor], batch_shape: Tuple[int, ...], name: str
+) -> Tensor:
+    """Expand a mask from a mask generator to a batch and check its shape.
+
+    Args:
+        mask: Batched mask of shape `batch_shape`, or one mask of shape
+            `batch_shape[1:]` that is used for the whole batch.
+        batch_shape: Expected shape `(batch_size, *mask_shape)`.
+        name: Name of the mask, used in error messages.
+
+    Returns:
+        Boolean mask of shape `batch_shape`.
+    """
+    if mask is None:
+        raise ValueError(
+            f"The {name} generator returned None. Please fix your generator."
+        )
+    mask = torch.as_tensor(mask).bool()
+    if tuple(mask.shape) == tuple(batch_shape[1:]):
+        mask = mask.expand(*batch_shape)
+    if tuple(mask.shape) != tuple(batch_shape):
+        raise ValueError(
+            f"The {name} generator must return a mask of shape "
+            f"{tuple(batch_shape[1:])} or {tuple(batch_shape)}, but returned shape "
+            f"{tuple(mask.shape)}."
+        )
+    return mask

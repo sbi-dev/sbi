@@ -1159,10 +1159,8 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         # Prepare condition and edge masks
         B = full_inputs_tensor.shape[0]
         expanded_cond_mask = self._fixed_condition_mask.unsqueeze(0).expand(B, -1)
-        if self._fixed_edge_mask is not None:
-            expanded_edge_mask = self._fixed_edge_mask.unsqueeze(0).expand(B, -1, -1)
-        else:
-            expanded_edge_mask = None
+        # The fixed (T, T) edge mask is shared by the batch; attention broadcasts it.
+        expanded_edge_mask = self._fixed_edge_mask
 
         # Call the original masked estimator's forward method
         full_outputs = self._original_estimator.forward(
@@ -1201,10 +1199,8 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         # Prepare condition and edge masks
         B = full_inputs_tensor.shape[0]
         expanded_cond_mask = self._fixed_condition_mask.unsqueeze(0).expand(B, -1)
-        if self._fixed_edge_mask is not None:
-            expanded_edge_mask = self._fixed_edge_mask.unsqueeze(0).expand(B, -1, -1)
-        else:
-            expanded_edge_mask = None
+        # The fixed (T, T) edge mask is shared by the batch; attention broadcasts it.
+        expanded_edge_mask = self._fixed_edge_mask
 
         # Call original estimator ode
         full_outputs_ode = self._original_estimator.ode_fn(
@@ -1231,10 +1227,8 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         # Prepare condition and edge masks
         B = full_inputs_tensor.shape[0]
         expanded_cond_mask = self._fixed_condition_mask.unsqueeze(0).expand(B, -1)
-        if self._fixed_edge_mask is not None:
-            expanded_edge_mask = self._fixed_edge_mask.unsqueeze(0).expand(B, -1, -1)
-        else:
-            expanded_edge_mask = None
+        # The fixed (T, T) edge mask is shared by the batch; attention broadcasts it.
+        expanded_edge_mask = self._fixed_edge_mask
 
         # Call the original estimator's score
         full_score_outputs = self._original_estimator.score(
@@ -1250,10 +1244,10 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         return latent_score
 
     def mean_t_fn(self, times: Tensor) -> Tensor:
-        return self._original_estimator.mean_t_fn(times)
+        return self._latent_time_statistic(self._original_estimator.mean_t_fn(times))
 
     def std_fn(self, times: Tensor) -> Tensor:
-        return self._original_estimator.std_fn(times)
+        return self._latent_time_statistic(self._original_estimator.std_fn(times))
 
     def drift_fn(self, input: Tensor, times: Tensor) -> Tensor:
         return self._original_estimator.drift_fn(input, times)
@@ -1262,6 +1256,31 @@ class MaskedConditionalVectorFieldEstimatorWrapper(ConditionalVectorFieldEstimat
         return self._original_estimator.diffusion_fn(input, times)
 
     # ------------------------- UTILITIES ------------------------------
+
+    def _latent_time_statistic(self, statistic: Tensor) -> Tensor:
+        """Reshape a time-dependent statistic of the masked estimator to the wrapper.
+
+        The masked estimator appends one trailing dimension per dimension of its
+        input shape (`(T,)` or `(T, F)`), whereas the wrapper's input shape is
+        `(num_latent * F,)`, so it needs exactly one trailing dimension.
+
+        Args:
+            statistic: Output of the masked estimator's `mean_t_fn`/`std_fn`, shape
+                `(*time_shape, *trailing)`, where `trailing` is either all ones or
+                the masked input shape.
+
+        Returns:
+            Statistic of shape `(*time_shape, 1)` or `(*time_shape, num_latent * F)`.
+        """
+        num_trailing = len(self._original_estimator.input_shape)
+        time_shape = statistic.shape[: statistic.dim() - num_trailing]
+        trailing = statistic.shape[statistic.dim() - num_trailing :]
+        if all(size == 1 for size in trailing):
+            return statistic.reshape(*time_shape, 1)
+        statistic = statistic.expand(
+            *time_shape, *self._original_estimator.input_shape
+        ).index_select(len(time_shape), self._latent_idx)
+        return statistic.reshape(*time_shape, -1)
 
     def _assemble_full_inputs(
         self, input: Tensor, condition: Tensor
@@ -1509,3 +1528,26 @@ def __getattr__(name: str):
         )
         return ConditionalEstimatorBuildFn
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def entries_in_masked_loss(
+    condition_mask_broadcast: Tensor, loss_mask: Optional[Tensor]
+) -> Tensor:
+    """Entries that enter a masked loss: latent, and valid according to `loss_mask`.
+
+    Args:
+        condition_mask_broadcast: Condition mask broadcast to the input shape,
+            `(B, T)` or `(B, T, F)`; True for observed entries.
+        loss_mask: Optional boolean mask of the input shape, or `(B, T)` for
+            `(B, T, F)` inputs; False for entries that must not enter the loss.
+
+    Returns:
+        Boolean mask of the input shape.
+    """
+    in_loss = ~condition_mask_broadcast
+    if loss_mask is None:
+        return in_loss
+    loss_mask = loss_mask.bool()
+    if loss_mask.dim() < in_loss.dim():
+        loss_mask = loss_mask.unsqueeze(-1)
+    return in_loss & loss_mask

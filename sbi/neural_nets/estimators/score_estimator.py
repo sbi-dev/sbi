@@ -11,6 +11,7 @@ from torch import Tensor, nn
 from sbi.neural_nets.estimators.base import (
     ConditionalVectorFieldEstimator,
     MaskedConditionalVectorFieldEstimator,
+    entries_in_masked_loss,
 )
 from sbi.utils.vector_field_utils import MaskedVectorFieldNet, VectorFieldNet
 
@@ -758,6 +759,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
         control_variate: bool = True,
         control_variate_threshold: float = 0.3,
         rebalance_loss: bool = True,
+        loss_mask: Optional[Tensor] = None,
     ) -> Tensor:
         r"""Defines the denoising score matching loss (e.g., from Song et al., ICLR
         2021). A random diffusion time is sampled from [0,1], and the network is trained
@@ -792,9 +794,14 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
                 the control variate assumes a Taylor expansion of the score around the
                 mean, which is not valid for large std.
             rebalance_loss: If True, the loss for each batch item is divided by the
-                number of latent (unobserved) variables in that item. This is useful
-                when the number of latent variables varies across the batch, as it
-                prevents items with more latent variables from dominating the loss.
+                number of latent (unobserved) entries in that item (nodes times
+                features). This is useful when the number of latent variables varies
+                across the batch, as it prevents items with more latent variables
+                from dominating the loss.
+            loss_mask: Optional boolean mask of the shape of `input` (or
+                `(batch_size, num_variables)`); entries that are `False` (e.g.,
+                missing values) are excluded from the loss. If None, all latent
+                entries count.
 
         Returns:
             MSE between target score and network output, scaled by the weight function.
@@ -887,9 +894,10 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             edge_mask,  # [B, T, T]
         )  # [B, T, F]
 
-        # Compute MSE loss, mask out observed entries
+        # Compute MSE loss over the latent entries that are valid
+        in_loss = entries_in_masked_loss(condition_mask_broadcast, loss_mask)
         loss = (score_pred - score_target) ** 2.0
-        loss = torch.where(condition_mask_broadcast, torch.zeros_like(loss), loss)
+        loss = torch.where(in_loss, loss, torch.zeros_like(loss))
 
         # Since sbi expects loss-per-batch, I sum on both T and F
         if loss.dim() == 3:
@@ -921,7 +929,9 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             # per-entry reduction of the MSE above, for both [B, T] and [B, T, F]
             # inputs. (Reducing over the last dim first and broadcasting back would
             # count each term T times for [B, T] inputs and inflate the variance.)
-            mask_f = ~condition_mask_broadcast  # [B, T] or [B, T, F]
+            # Same entries as the MSE: an entry without an MSE term would only add
+            # variance.
+            mask_f = in_loss  # [B, T] or [B, T, F]
 
             # term 1: 2/s * eps * score_mean_pred
             term1 = 2 / std_t * eps * score_mean_pred
@@ -951,12 +961,9 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             loss = loss + control_variate_term  # [B, 1, 1]
 
         if rebalance_loss:
-            # Count number of unobserved (latent) elements per batch
-            num_elements = (~condition_mask).sum(dim=-1, keepdim=True).clamp(min=1)
-            if loss.dim() == 3:
-                loss = loss / num_elements.unsqueeze(-1)
-            else:
-                loss = loss / num_elements
+            # Number of entries (nodes times features) in the loss, per batch item
+            num_elements = in_loss.flatten(1).sum(-1).clamp(min=1)
+            loss = loss / num_elements.view(-1, *([1] * (loss.dim() - 1)))
 
         # Compute weights
         weights = self.weight_fn(times)

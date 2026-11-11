@@ -537,6 +537,34 @@ class VectorFieldAdaMLP(VectorFieldNet):
         return h
 
 
+def _per_head_attn_mask(
+    mask: Optional[Tensor], batch_size: int, num_heads: int
+) -> Optional[Tensor]:
+    """Bring an attention mask into the shape `nn.MultiheadAttention` accepts.
+
+    Args:
+        mask: `None`, a mask `(T, T)` shared by the batch, a per-sample mask
+            `(B, T, T)`, or an already per-head mask `(B * num_heads, T, T)`.
+        batch_size: Batch size `B`.
+        num_heads: Number of attention heads.
+
+    Returns:
+        `None`, a `(T, T)` mask, or a `(B * num_heads, T, T)` mask.
+    """
+    if mask is None or mask.dim() == 2:
+        return mask
+    if mask.dim() != 3:
+        raise ValueError(f"Unsupported attention mask shape: {tuple(mask.shape)}.")
+    if mask.shape[0] == batch_size * num_heads:
+        return mask
+    seq_length = mask.shape[-1]
+    return (
+        mask.unsqueeze(1)
+        .expand(batch_size, num_heads, seq_length, seq_length)
+        .reshape(batch_size * num_heads, seq_length, seq_length)
+    )
+
+
 class TimeAdditiveBlock(nn.Module):
     def __init__(
         self,
@@ -572,16 +600,10 @@ class TimeAdditiveBlock(nn.Module):
         # First LayerNorm and self-attention with masking
         x_norm = self.norm1(x)
 
-        if mask is not None and mask.dim() == 3:
-            # mask: [B, T, T] -> [B * num_heads, T, T]
-            batch_size, seq_length, _ = mask.shape
-            mask = (
-                mask.unsqueeze(1)
-                .expand(batch_size, self.attn.num_heads, seq_length, seq_length)
-                .reshape(batch_size * self.attn.num_heads, seq_length, seq_length)
-            )
-
-        attn_out, _ = self.attn(query=x_norm, key=x_norm, value=x_norm, attn_mask=mask)
+        mask = _per_head_attn_mask(mask, batch_size, self.attn.num_heads)
+        attn_out, _ = self.attn(
+            query=x_norm, key=x_norm, value=x_norm, attn_mask=mask, need_weights=False
+        )
         x = x + attn_out
 
         # Second LayerNorm and MLP with time conditioning
@@ -687,24 +709,11 @@ class DiTBlock(nn.Module):
         x_norm = self.norm1(x)
         x_norm = x_norm * (attn_scale + 1) + attn_shift
 
-        # Prepare attention mask
-        if mask is not None:
-            if mask.dim() == 3:
-                # mask: [B, T, T] -> [B * num_heads, T, T]
-                seq_length = mask.shape[1]
-                mask = (
-                    mask.unsqueeze(1)
-                    .expand(batch_size, self.attn.num_heads, seq_length, seq_length)
-                    .reshape(batch_size * self.attn.num_heads, seq_length, seq_length)
-                )
-            elif mask.dim() == 2:
-                # [T, T], pass as-is
-                pass
-            else:
-                raise ValueError(f"Unsupported mask shape for DiT Block: {mask.shape}")
-
         # self-attention
-        attn_out, _ = self.attn(x_norm, x_norm, x_norm, attn_mask=mask)
+        mask = _per_head_attn_mask(mask, batch_size, self.attn.num_heads)
+        attn_out, _ = self.attn(
+            x_norm, x_norm, x_norm, attn_mask=mask, need_weights=False
+        )
         x = x + attn_gate * attn_out
 
         # mlp with adaptive ln
@@ -1103,7 +1112,8 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
                     features are subject to inference.
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
-                Expected shape: `(batch_size, num_variables, num_variables)`.
+                Expected shape: `(batch_size, num_variables, num_variables)`, or
+                `(num_variables, num_variables)` for one mask shared by the batch.
                     - `True` (or `1`): Attention from query index i to key index j is
                     allowed (i attends to j). See note below.
                     - `False` (or `0`): No edge exists between these variables.
@@ -1180,10 +1190,18 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         #   it to the blocks.
         # - Self-edges are always added: a node with no allowed key would get a fully
         #   masked attention row, which yields NaN.
+        # - A `(T, T)` mask (or a batch of identical masks) is passed as one `(T, T)`
+        #   mask, which attention broadcasts over batch and heads; a batch of
+        #   different masks is expanded to all heads once, not in every block.
         attn_mask = None
         if edge_mask is not None:
+            edge_mask = edge_mask.bool()
+            if edge_mask.dim() == 3 and bool((edge_mask == edge_mask[:1]).all()):
+                edge_mask = edge_mask[0]
             self_edges = torch.eye(T, dtype=torch.bool, device=device)
-            attn_mask = ~(edge_mask.bool() | self_edges)
+            attn_mask = ~(edge_mask | self_edges)
+            if attn_mask.dim() == 3:
+                attn_mask = _per_head_attn_mask(attn_mask, B, self.num_heads)
         t_h = t_h.expand(B, t_h.shape[1])
         for block in self.blocks:
             h = block(h, t_h, attn_mask)
@@ -1420,7 +1438,6 @@ def build_simformer_network(
     num_heads: int = 4,
     mlp_ratio: int = 2,
     time_embedding_dim: int = 32,
-    embedding_net: nn.Module = nn.Identity(),
     dim_val: int = 64,
     dim_id: int = 32,
     dim_cond: int = 16,
@@ -1441,7 +1458,6 @@ def build_simformer_network(
         num_heads: Number of attention heads per block.
         mlp_ratio: Ratio for MLP hidden dimension in transformer blocks.
         time_embedding_dim: Number of dimensions for time embedding (dim_t).
-        embedding_net: Embedding network for batch_y, unused, kept for compatibility.
         dim_val: Dimension of value token for each node.
         dim_id: Dimension of id embedding for each node.
         dim_cond: Dimension of conditioning token for each node.
@@ -1456,7 +1472,6 @@ def build_simformer_network(
             f"Unknown argument(s) {sorted(kwargs)} for the Simformer network."
         )
     del batch_y  # Unused
-    del embedding_net  # Unused
 
     in_features = 1 if batch_x.dim() == 2 else batch_x.shape[-1]
     num_nodes = batch_x.shape[1]
@@ -1545,7 +1560,6 @@ def _build_masked_vector_field_estimator(
     batch_y: Tensor,
     estimator_type: Literal["masked-flow", "masked-score"],
     z_score_x: Optional[str] = None,
-    embedding_net: nn.Module = nn.Identity(),
     sde_type: str = "ve",
     net: Union[Literal["simformer"], MaskedVectorFieldNet] = "simformer",
     **kwargs,
@@ -1569,7 +1583,6 @@ def _build_masked_vector_field_estimator(
             the finite values only. The standardization is internal to the
             estimator (as for NPSE and FMPE); inputs and outputs stay in the
             original space.
-        embedding_net: Embedding network for the inputs.
         sde_type: SDE type for the score estimator, one of "vp", "subvp", or "ve".
         net: "simformer" or a custom network following the MaskedVectorFieldNet
             protocol.
@@ -1595,7 +1608,6 @@ def _build_masked_vector_field_estimator(
     network_args = set(inspect.signature(build_simformer_network).parameters) - {
         "batch_x",
         "batch_y",
-        "embedding_net",
     }
     estimator_kwargs = {k: v for k, v in kwargs.items() if k in estimator_args}
     network_kwargs = {k: v for k, v in kwargs.items() if k not in estimator_args}
@@ -1628,7 +1640,6 @@ def _build_masked_vector_field_estimator(
     return estimator_cls(
         net=vectorfield_net,  # type: ignore
         input_shape=input_shape,
-        embedding_net=embedding_net,
         mean_0=mean_0,
         std_0=std_0,
         **estimator_kwargs,

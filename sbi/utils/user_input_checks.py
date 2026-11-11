@@ -791,40 +791,32 @@ def validate_inputs(
     data_device: str = "cpu",
     training_device: str = "cpu",
 ) -> Tensor:
-    r"""
-    Checks if the passed inputs, condition_masks, and edge_masks are valid.
+    r"""Check the inputs of a masked (Simformer-style) trainer and move them to
+    `data_device`.
 
-    Specifically, we check:
-    1) If they are (torch) tensors.
-    2) If they all have the same batch size.
-    3) If their dtypes are appropriate (float32 for inputs, bool/int for masks).
-
-    Additionally, we move all data to the specified `data_device`. This is where the
-    data is stored and can be separate from `training_device`, where the
-    computations for training are performed.
-
-    Raises:
-        AssertionError: If any input is not a torch.Tensor,
-        if they do not yield the same batch size, or if their dtypes are incorrect.
+    Checks that `inputs` is a float32 tensor of shape `(batch_size, num_variables)`
+    or `(batch_size, num_variables, num_features)`.
 
     Args:
-        inputs: Full graph inputs, containing both latent parameters and observed data.
-            Expected shape: `(batch_size, num_nodes, num_node_features)`.
-        condition_masks: A mask indicating which nodes are latent or observed.
-            Expected shape: `(batch_size, num_nodes)`.
-        edge_masks: A mask defining dependencies between nodes (adjacency matrix).
-            Expected shape: `(batch_size, num_nodes, num_nodes)`.
+        inputs: Joint inputs of all variables (latent and observed).
         data_device: Device where data is stored.
         training_device: Training device for neural network computations.
 
     Returns:
-        Validated inputs, condition_masks, and edge_masks on the `data_device`.
+        The validated inputs on `data_device`.
+
+    Raises:
+        ValueError: If `inputs` does not have 2 or 3 dimensions.
     """
-    # Validate and move each tensor individually
     inputs = _validate_tensor_properties_and_device(
         inputs, "inputs", data_device, training_device, torch.float32
     )
-
+    if inputs.dim() not in (2, 3):
+        raise ValueError(
+            "inputs must have shape (batch_size, num_variables) or "
+            "(batch_size, num_variables, num_features), but got shape "
+            f"{tuple(inputs.shape)}."
+        )
     return inputs
 
 

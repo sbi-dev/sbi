@@ -11,6 +11,7 @@ from torch import Tensor
 from sbi.neural_nets.estimators.base import (
     ConditionalVectorFieldEstimator,
     MaskedConditionalVectorFieldEstimator,
+    entries_in_masked_loss,
 )
 from sbi.utils.vector_field_utils import MaskedVectorFieldNet, VectorFieldNet
 
@@ -733,6 +734,7 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         edge_mask: Optional[Tensor],
         times: Optional[Tensor] = None,
         rebalance_loss: bool = True,
+        loss_mask: Optional[Tensor] = None,
         **kwargs,
     ) -> Tensor:
         r"""Return the loss for training the density estimator.
@@ -791,9 +793,14 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
                     mask, we suggest you to use None instead of ones
                     to save memory resources
             rebalance_loss: If True, the loss for each batch item is divided by the
-                number of latent (unobserved) variables in that item. This is useful
-                when the number of latent variables varies across the batch, as it
-                prevents items with more latent variables from dominating the loss.
+                number of latent (unobserved) entries in that item (nodes times
+                features). This is useful when the number of latent variables varies
+                across the batch, as it prevents items with more latent variables
+                from dominating the loss.
+            loss_mask: Optional boolean mask of the shape of `input` (or
+                `(batch_size, num_variables)`); entries that are `False` (e.g.,
+                missing values) are excluded from the loss. If None, all latent
+                entries count.
 
         Returns:
             Loss value.
@@ -872,8 +879,9 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
         _, v_std = self._velocity_stats()
         loss = ((predicted_vector_field - vector_field_target) / v_std) ** 2.0
 
-        # Apply condition mask: loss is only computed for latent variables
-        loss = torch.where(condition_mask_broadcast, torch.zeros_like(loss), loss)
+        # Loss is only computed for latent entries that are valid
+        in_loss = entries_in_masked_loss(condition_mask_broadcast, loss_mask)
+        loss = torch.where(in_loss, loss, torch.zeros_like(loss))
 
         # Since sbi expects loss-per-batch, I sum on both T and F
         if loss.dim() == 3:
@@ -885,13 +893,9 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
 
         # Rebalance loss if desired (similar to MaskedConditionalScoreEstimator)
         if rebalance_loss:
-            # Count number of unobserved (latent) elements per batch
-            # (~condition_mask) computes the boolean negation
-            num_elements = (~condition_mask).sum(dim=-1, keepdim=True).clamp(min=1)
-            if loss.dim() == 3:
-                loss = loss / num_elements.unsqueeze(-1)
-            else:
-                loss = loss / num_elements
+            # Number of entries (nodes times features) in the loss, per batch item
+            num_elements = in_loss.flatten(1).sum(-1).clamp(min=1)
+            loss = loss / num_elements.view(-1, *([1] * (loss.dim() - 1)))
 
         if loss.dim() == 3:
             loss = loss.squeeze(dim=(-2, -1))
