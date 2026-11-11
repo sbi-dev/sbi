@@ -211,8 +211,8 @@ def infer(
         or train_kwargs is not None
     ):
         warn(
-            "We discourage the use the simple interface in more complicated settings. "
-            "Have a look into the flexible interface, e.g. in our tutorial "
+            "We discourage the use of the simple interface in more complicated "
+            "settings. Have a look into the flexible interface, e.g. in our tutorial "
             "(https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html).",
             stacklevel=2,
         )
