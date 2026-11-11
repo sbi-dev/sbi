@@ -77,6 +77,7 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
+from sbi.utils.removed_names import RENAMED_METHODS
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
     get_simulations_since_round,
@@ -157,10 +158,9 @@ def infer(
             distribution) can be used.
         method: What inference method to use, case-insensitively: any neural
             trainer `sbi.inference` exports, for example 'npe', 'nle', 'nre',
-            'npe_a', 'fmpe' or 'npse'. The legacy names 'snpe', 'snle' and 'snre'
-            still work but emit a `FutureWarning`. The ABC methods are not
-            supported, because they take the simulator at construction; call
-            `MCABC`/`SMCABC` directly.
+            'npe_a', 'fmpe' or 'npse'. The ABC methods are not supported, because
+            they take the simulator at construction; call `MCABC`/`SMCABC`
+            directly.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
@@ -175,14 +175,12 @@ def infer(
     # Moved here to avoid circular imports at initialization.
     import sbi.inference  # noqa: R0401
 
-    # Resolve legacy method strings here: going through the module `__getattr__`
-    # would attribute the warning to this file instead of the caller.
     name = method.upper()
-    canonical = sbi.inference._DEPRECATED_ALIASES.get(name)
-    resolved = canonical if canonical is not None else name
+    renamed = RENAMED_METHODS.get(name)
+    resolved = renamed if renamed is not None else name
 
-    # Before the deprecation warning: advising a spelling `infer` cannot run either
-    # would only send the user around the loop again.
+    # Before the removal error: advising a spelling `infer` cannot run either would
+    # only send the user around the loop again.
     if resolved in sbi.inference._abc_family:
         raise ValueError(
             f"`infer` does not support '{method}'. It trains a neural network on "
@@ -191,12 +189,10 @@ def infer(
             f"Its `__call__` docstring shows an example."
         )
 
-    if canonical is not None:
-        warn(
-            f"method='{method}' is deprecated since sbi v0.27.0 and will be "
-            f"removed in v0.28.0. Use method='{canonical.lower()}' instead.",
-            FutureWarning,
-            stacklevel=2,
+    if renamed is not None:
+        raise ValueError(
+            f"method='{method}' was removed from sbi. "
+            f"Use method='{renamed.lower()}' instead."
         )
 
     try:

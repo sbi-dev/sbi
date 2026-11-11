@@ -112,7 +112,7 @@ class ActiveSubspace:
             Deistler et al. 2021, in preparation.
 
         Args:
-            posterior: Posterior distribution obtained with `SNPE`, `SNLE`, or `SNRE`.
+            posterior: Posterior distribution obtained with NPE, NLE or NRE.
                 Needs to have a `.sample()` method. If we want to analyse the
                 sensitivity of the posterior probability, it also must have a
                 `.potential()` method.
