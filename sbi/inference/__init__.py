@@ -16,13 +16,13 @@ from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C  # noqa: F401
 from sbi.inference.trainers.vfpe import FMPE, NPSE
 
 NLE = NLE_A
-_nle_family = ["NLE_A", "MNLE"]
+_nle_family = ["NLE", "NLE_A", "MNLE"]
 
 NPE = NPE_C
-_npe_family = ["NPE_A", "NPE_B", "NPE_C", "NPE_PFN", "MNPE"]
+_npe_family = ["NPE", "NPE_A", "NPE_B", "NPE_C", "NPE_PFN", "MNPE"]
 
 NRE = NRE_B
-_nre_family = ["NRE_A", "NRE_B", "NRE_C", "BNRE"]
+_nre_family = ["NRE", "NRE_A", "NRE_B", "NRE_C", "BNRE"]
 
 _abc_family = ["MCABC", "SMCABC"]
 

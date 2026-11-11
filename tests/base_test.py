@@ -176,12 +176,13 @@ def test_infer_rejects_abc_methods(method):
 
 
 def test_canonical_shorthands_do_not_warn():
-    """`NPE`, `NLE` and `NRE` stay silent: their fate is a separate naming decision."""
+    """`NPE`, `NLE` and `NRE` are the recommended names: exported and silent."""
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
         assert sbi.inference.NPE is sbi.inference.NPE_C
         assert sbi.inference.NLE is sbi.inference.NLE_A
         assert sbi.inference.NRE is sbi.inference.NRE_B
+    assert {"NPE", "NLE", "NRE"} <= set(sbi.inference.__all__)
 
 
 def test_package_docstring_imports_still_exist():
