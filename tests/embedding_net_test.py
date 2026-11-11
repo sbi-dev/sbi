@@ -662,6 +662,35 @@ def test_permutation_invariant_embedding_warns_on_invalid_padding(
         assert torch.allclose(output[1], embedding.fc_subnet(torch.zeros(1, 5))[0])
 
 
+@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
+@pytest.mark.parametrize("with_padding", (False, True))
+@pytest.mark.parametrize("inf", (float("inf"), float("-inf")))
+def test_permutation_invariant_embedding_rejects_inf(inf, with_padding, aggregation_fn):
+    """Inf in a real trial raises instead of passing as a huge finite embedding."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4),
+        trial_net_output_dim=4,
+        aggregation_fn=aggregation_fn,
+    )
+    x = torch.randn(2, 3, 2)
+    x[0, 1, 0] = inf
+    if with_padding:
+        x[:, 2] = float("nan")
+
+    with pytest.raises(ValueError, match="Input contains inf"):
+        embedding(x)
+
+
+def test_permutation_invariant_embedding_rejects_non_finite_trial_net_output():
+    """A trial_net that returns inf for finite input raises."""
+    embedding = PermutationInvariantEmbedding(nn.Linear(2, 4), trial_net_output_dim=4)
+    with torch.no_grad():
+        embedding.trial_net.bias.fill_(float("inf"))
+
+    with pytest.raises(ValueError, match="trial_net returned NaN or inf"):
+        embedding(torch.randn(2, 3, 2))
+
+
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 @pytest.mark.parametrize("change_c_mode", ["conv", "zeros"])

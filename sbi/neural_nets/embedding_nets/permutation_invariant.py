@@ -119,6 +119,8 @@ class PermutationInvariantEmbedding(nn.Module):
             x: Input tensor (batch_size, permutation_dim, input_dim)
         Returns:
             Network output (batch_size, output_dim).
+        Raises:
+            ValueError: If `x` contains inf, or the trial_net returns NaN or inf.
         """
 
         if not getattr(self, "_warned_nan_padding", False):
@@ -134,6 +136,12 @@ class PermutationInvariantEmbedding(nn.Module):
         # A trial is padding if all its features are NaN.
         is_real_trial = ~torch.isnan(x).all(-1)
         trial_counts = is_real_trial.sum(dim=self.aggregation_dim).unsqueeze(-1)
+
+        # nan_to_num below would turn inf into a finite number.
+        if torch.isinf(x).any():
+            raise ValueError(
+                "Input contains inf. Only NaN is allowed, to mark padded trials."
+            )
 
         # apply trial net with nan entries replaced with 0
         masked_x = torch.nan_to_num(x, nan=0.0)
@@ -151,10 +159,10 @@ class PermutationInvariantEmbedding(nn.Module):
         else:
             combined_embedding = trial_embeddings.sum(dim=self.aggregation_dim)
 
-        if torch.isnan(combined_embedding).any():
+        if not torch.isfinite(combined_embedding).all():
             raise ValueError(
-                "NaNs in embedding: the trial_net returned NaN or inf, e.g., because "
-                "the input contains inf."
+                "Non-finite value in the aggregated trial embedding: the trial_net "
+                "returned NaN or inf."
             )
 
         # add number of trials as additional input
