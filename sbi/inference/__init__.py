@@ -62,6 +62,7 @@ __all__ = (
         "VIPosterior",
         "VectorFieldPosterior",
         "simulate_for_sbi",
+        "infer",
         "likelihood_estimator_based_potential",
         "mixed_likelihood_estimator_based_potential",
         "posterior_estimator_based_potential",
