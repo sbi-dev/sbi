@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 # NOTE: This is inspired by the sbibm-package <https://github.com/sbi-benchmark/sbibm>
 
-from functools import partial
 from typing import Callable
 
 import torch
@@ -98,26 +97,35 @@ class GaussianLinear(Task):
         x_o = self.get_simulator()(theta_o[None, :])[0]
         return x_o
 
-    def get_prior(self) -> Distribution:
+    def get_prior(self, device=None) -> Distribution:
         """
         Returns the prior distribution over parameters.
+
+        Args:
+            device (str or torch.device, optional): The device to initialize tensors on.
 
         Returns:
             Distribution: The prior distribution.
         """
         return MultivariateNormal(
-            torch.zeros(self.dim),
-            self.prior_var * torch.eye(self.dim),
+            torch.zeros(self.dim, device=device),
+            self.prior_var * torch.eye(self.dim, device=device),
         )
 
-    def get_simulator(self) -> Callable:
+    def get_simulator(self, device=None) -> Callable:
         """
         Returns the simulator function.
+
+        Args:
+            device (str or torch.device, optional): The device to initialize tensors on.
 
         Returns:
             Callable: The simulator function.
         """
-        return partial(
-            diagonal_linear_gaussian,
-            std=self.simulator_var**0.5,
-        )
+
+        def sim(theta):
+            return diagonal_linear_gaussian(
+                theta.to(device), std=self.simulator_var**0.5
+            )
+
+        return sim

@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 # NOTE: This is inspired by the sbibm-package <https://github.com/sbi-benchmark/sbibm>
 
+from functools import partial
 from typing import Callable
 
 import torch
@@ -10,25 +11,24 @@ from torch.distributions import Distribution, Independent, MultivariateNormal, U
 from .base_task import Task
 
 
-def simulator(theta, num_data=4):
+def simulator(theta, num_data=4, device=None):
+    theta = theta.to(device)
     num_samples = theta.shape[0]
 
-    m = torch.stack((theta[:, [0]].squeeze(), theta[:, [1]].squeeze())).T
-    if m.dim() == 1:
-        m.unsqueeze_(0)
+    m = theta[:, :2]
 
     s1 = theta[:, [2]].squeeze() ** 2
     s2 = theta[:, [3]].squeeze() ** 2
     rho = torch.nn.Tanh()(theta[:, [4]]).squeeze()
 
-    S = torch.empty((num_samples, 2, 2))
+    S = torch.empty((num_samples, 2, 2), device=theta.device, dtype=theta.dtype)
     S[:, 0, 0] = s1**2
     S[:, 0, 1] = rho * s1 * s2
     S[:, 1, 0] = rho * s1 * s2
     S[:, 1, 1] = s2**2
 
     # Add eps to diagonal to ensure PSD
-    eps = 0.000001
+    eps = torch.tensor(0.000001, device=theta.device, dtype=theta.dtype)
     S[:, 0, 0] += eps
     S[:, 1, 1] += eps
 
@@ -49,8 +49,9 @@ class Slcp(Task):
     def x_dim(self) -> int:
         return 8
 
-    def get_prior(self) -> Distribution:
-        return Independent(Uniform(-3 * torch.ones(5), 3 * torch.ones(5)), 1)
+    def get_prior(self, device=None) -> Distribution:
+        ones = torch.ones(5, device=device)
+        return Independent(Uniform(-3 * ones, 3 * ones), 1)
 
-    def get_simulator(self) -> Callable:
-        return simulator
+    def get_simulator(self, device=None) -> Callable:
+        return partial(simulator, device=device)

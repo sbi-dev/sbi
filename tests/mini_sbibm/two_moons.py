@@ -3,6 +3,7 @@
 # NOTE: This is inspired by the sbibm-package <https://github.com/sbi-benchmark/sbibm>
 
 import math
+from functools import partial
 from typing import Callable
 
 import torch
@@ -22,11 +23,14 @@ def _map_fun(parameters: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
     Returns:
         torch.Tensor: The mapped points.
     """
-    ang = torch.tensor([-math.pi / 4.0])
+    ang = torch.tensor(
+        [-math.pi / 4.0], device=parameters.device, dtype=parameters.dtype
+    )
     c = torch.cos(ang)
     s = torch.sin(ang)
     z0 = (c * parameters[:, 0] - s * parameters[:, 1]).reshape(-1, 1)
     z1 = (s * parameters[:, 0] + c * parameters[:, 1]).reshape(-1, 1)
+    p = p.to(parameters.device)
     return p + torch.cat((-torch.abs(z0), z1), dim=1)
 
 
@@ -37,6 +41,7 @@ def simulator(
     a_low: float = -math.pi / 2.0,
     a_high: float = math.pi / 2.0,
     base_offset: float = 0.25,
+    device=None,
 ) -> torch.Tensor:
     """
     Simulator function for the Two Moons task.
@@ -56,14 +61,17 @@ def simulator(
         torch.Tensor: The simulated data.
     """
     num_samples = parameters.shape[0]
-
+    parameters = parameters.to(device)
+    device = parameters.device
     a_dist = Uniform(
-        low=a_low,
-        high=a_high,
+        low=torch.tensor(a_low, device=device),
+        high=torch.tensor(a_high, device=device),
     )
     a = a_dist.sample((num_samples, 1))
 
-    r_dist = Normal(r_loc, r_scale)
+    r_dist = Normal(
+        torch.tensor(r_loc, device=device), torch.tensor(r_scale, device=device)
+    )
     r = r_dist.sample((num_samples, 1))
 
     p = torch.cat(
@@ -108,20 +116,28 @@ class TwoMoons(Task):
         """
         return 2
 
-    def get_prior(self) -> Distribution:
+    def get_prior(self, device=None) -> Distribution:
         """
         Returns the prior distribution over parameters.
+
+        Args:
+            device (str or torch.device, optional): The device to initialize tensors on.
 
         Returns:
             Distribution: The prior distribution.
         """
-        return Independent(Uniform(-torch.ones(2), torch.ones(2)), 1)
+        ones = torch.ones(2, device=device)
+        return Independent(Uniform(-ones, ones), 1)
 
-    def get_simulator(self) -> Callable:
+    def get_simulator(self, device=None) -> Callable:
         """
         Returns the simulator function.
+
+        Args:
+            device (str or torch.device, optional): The device to initialize tensors on.
 
         Returns:
             Callable: The simulator function.
         """
-        return simulator
+
+        return partial(simulator, device=device)

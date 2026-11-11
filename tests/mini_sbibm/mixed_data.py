@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from functools import partial
 from typing import Callable, Union
 
 import torch
@@ -49,7 +48,7 @@ class MixedData(Task):
         """Return the single trial observation dimensionality."""
         return 2
 
-    def get_prior(self) -> Distribution:
+    def get_prior(self, device=None) -> Distribution:
         """Return the Gamma and Beta prior used by the MNLE tests."""
         return MultipleIndependent(
             [
@@ -57,11 +56,16 @@ class MixedData(Task):
                 Beta(torch.tensor([2.0]), torch.tensor([2.0])),
             ],
             validate_args=False,
+            device=device,
         )
 
-    def get_simulator(self) -> Callable:
+    def get_simulator(self, device=None) -> Callable:
         """Return the mixed data simulator at the task's stimulus condition."""
-        return partial(mixed_simulator, stimulus_condition=self.stimulus_condition)
+
+        def simulator(theta: Tensor) -> Tensor:
+            return mixed_simulator(theta.to(device), self.stimulus_condition)
+
+        return simulator
 
     def get_true_parameters(self, idx: int) -> Tensor:
         """Generate reproducible true parameters for an observation."""

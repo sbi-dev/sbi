@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 from functools import partial
+from typing import Optional
 
 import pytest
 import torch
@@ -244,19 +245,23 @@ def task(request) -> Task:
     return request.param()
 
 
-def eval_observations(posterior: NeuralPosterior, task: Task) -> dict[str, float]:
+def eval_observations(
+    posterior: NeuralPosterior, task: Task, device: str = "cpu"
+) -> dict[str, float]:
     """
     Evaluates the posterior on the first `NUM_EVALUATION_OBS` observations.
 
     Args:
         posterior: The posterior distribution.
         task: The task object.
+        device: The device the posterior lives on.
 
     Returns:
         The metrics of `eval_observation`, averaged over the observations.
     """
     metrics = [
-        eval_observation(posterior, task, i) for i in range(1, NUM_EVALUATION_OBS + 1)
+        eval_observation(posterior, task, i, device=device)
+        for i in range(1, NUM_EVALUATION_OBS + 1)
     ]
     return {key: sum(m[key] for m in metrics) / len(metrics) for key in metrics[0]}
 
@@ -266,6 +271,7 @@ def eval_observation(
     task: Task,
     idx_observation: int,
     num_samples: int = 1000,
+    device: str = "cpu",
 ) -> dict[str, float]:
     """
     Compares posterior samples with reference samples for one observation.
@@ -280,15 +286,17 @@ def eval_observation(
         task: The task object.
         idx_observation: The observation index.
         num_samples: The number of posterior samples.
+        device: The device the posterior lives on.
 
     Returns:
         The C2ST value and the mean and std errors.
     """
-    x_o = task.get_observation(idx_observation)
+    x_o = task.get_observation(idx_observation).to(device)
     reference_samples = task.get_reference_posterior_samples(idx_observation)
     samples = posterior.sample((num_samples,), x=x_o)
     if isinstance(samples, tuple):
         samples = samples[0]
+    samples = samples.cpu()
     assert reference_samples.shape[0] >= num_samples, "Not enough reference samples"
 
     reference_std = reference_samples.std(0)
@@ -322,8 +330,9 @@ def train_and_eval_amortized_inference(
         The metrics, averaged over the evaluation observations.
     """
     torch.manual_seed(seed)
+    device = extra_kwargs.get("device", "cpu")
     thetas, xs = task.get_data(benchmark_num_simulations)
-    prior = task.get_prior()
+    prior = task.get_prior(device=device)
 
     inference = inference_class(
         prior, **_estimator_kwargs(inference_class, extra_kwargs)
@@ -332,7 +341,7 @@ def train_and_eval_amortized_inference(
 
     posterior = inference.build_posterior()
 
-    return eval_observations(posterior, task)
+    return eval_observations(posterior, task, device=device)
 
 
 def train_and_eval_sequential_inference(
@@ -357,11 +366,12 @@ def train_and_eval_sequential_inference(
     """
     idx_eval = NUM_EVALUATION_OBS_SEQ
     # Load x_o before seeding: the Gaussian tasks reseed torch in get_observation.
-    x_o = task.get_observation(idx_eval)
+    device = extra_kwargs.get("device", "cpu")
+    x_o = task.get_observation(idx_eval).to(device)
     torch.manual_seed(seed)
     num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
     thetas, xs = task.get_data(num_simulations)
-    prior = task.get_prior()
+    prior = task.get_prior(device=device)
     simulator = task.get_simulator()
 
     # Round 1
@@ -384,7 +394,7 @@ def train_and_eval_sequential_inference(
 
     posterior = inference.build_posterior()
 
-    return eval_observation(posterior, task, idx_eval)
+    return eval_observation(posterior, task, idx_eval, device=device)
 
 
 @pytest.mark.benchmark
@@ -394,6 +404,7 @@ def test_run_benchmark(
     results_bag: ResultsBag,
     extra_kwargs: dict,
     benchmark_num_simulations: int,
+    benchmark_device: Optional[str],
     benchmark_seed: int,
     request: pytest.FixtureRequest,
 ) -> None:
@@ -407,6 +418,7 @@ def test_run_benchmark(
             but allows item assignment with dot notation.
         extra_kwargs: Additional keyword arguments for the method.
         benchmark_num_simulations: The number of training simulations.
+        benchmark_device: The training device from `--bm-device`, CPU if unset.
         benchmark_seed: The training seed.
         request: The pytest request, to read the benchmark mode.
     """
@@ -422,11 +434,12 @@ def test_run_benchmark(
         train_and_eval = train_and_eval_sequential_inference
     else:
         train_and_eval = train_and_eval_amortized_inference
+    # The device is added after the label is set, so it does not change the label.
     metrics = train_and_eval(
         inference_class,
         task,
         benchmark_num_simulations,
-        extra_kwargs,
+        {**extra_kwargs, "device": benchmark_device or "cpu"},
         benchmark_seed,
     )
 
