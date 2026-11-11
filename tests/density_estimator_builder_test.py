@@ -32,7 +32,11 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     _UnconstrainedCapableConfigBase,
     _ZukoDensityConfigBase,
 )
-from sbi.neural_nets.net_builders.flow import build_zuko_flow, get_base_dist
+from sbi.neural_nets.net_builders.flow import (
+    _zuko_hidden_layers,
+    build_zuko_flow,
+    get_base_dist,
+)
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils import BoxUniform
 
@@ -496,3 +500,10 @@ def test_zuko_marginal_hidden_features_set_the_hidden_layers(
     ).build(theta)
 
     assert _zuko_hidden_layer_widths(estimator) == [widths] * num_transforms
+
+
+def test_zuko_hidden_layers_copies_a_list():
+    widths = [24, 32]
+    _zuko_hidden_layers(widths).append(16)
+
+    assert widths == [24, 32]

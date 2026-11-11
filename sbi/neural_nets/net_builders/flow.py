@@ -1252,14 +1252,15 @@ def build_tabpfn_flow(
     return flow
 
 
-def _zuko_hidden_layers(hidden_features: Union[Sequence[int], int]) -> Sequence[int]:
+def _zuko_hidden_layers(hidden_features: Union[Sequence[int], int]) -> List[int]:
     """Return the hidden-layer widths that zuko expects for each transform's network.
 
-    An int is the width of two hidden layers, zuko's own default depth.
+    An int is the width of two hidden layers, zuko's own default depth. A sequence
+    is copied, so that changing the result leaves the caller's config unchanged.
     """
     if isinstance(hidden_features, int):
         return [hidden_features] * 2
-    return hidden_features
+    return list(hidden_features)
 
 
 def _get_base_and_transforms(
