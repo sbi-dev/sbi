@@ -9,8 +9,8 @@ import joblib
 import torch
 from joblib import Parallel, delayed
 from torch import Tensor
-from tqdm.auto import tqdm
 
+from sbi.utils.pbar import tqdm
 from sbi.utils.sbiutils import seed_all_backends
 
 

@@ -6,7 +6,6 @@ import threading
 import pytest
 import torch
 from torch.distributions import MultivariateNormal
-from tqdm.auto import tqdm
 
 from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.posteriors.mcmc_posterior import build_from_potential
@@ -17,7 +16,14 @@ from sbi.samplers.mcmc import slice_numpy
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score import diffuser
 from sbi.utils import BoxUniform
-from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
+from sbi.utils.pbar import (
+    is_nested,
+    nested_pbar_context,
+    print_progress,
+    sampling_desc,
+    tqdm,
+    trange,
+)
 
 
 class TestNestedPbarContext:
@@ -285,3 +291,23 @@ def test_batched_mcmc_bar_counts_per_observation(recorded_bars):
     assert shown(recorded_bars) == [
         "Drawing 3 samples for each of 2 observations [slice_np_vectorized, 2 chains]"
     ]
+
+
+@pytest.mark.parametrize("tqdm_disable", (None, "1"))
+def test_tqdm_disable_turns_off_all_progress_output(monkeypatch, capsys, tqdm_disable):
+    """sbi passes `disable=` to every bar, which plain tqdm prefers to the variable."""
+    if tqdm_disable is None:
+        monkeypatch.delenv("TQDM_DISABLE", raising=False)
+    else:
+        monkeypatch.setenv("TQDM_DISABLE", tqdm_disable)
+
+    for _ in tqdm(range(3), disable=False):
+        pass
+    for _ in trange(3, disable=False):
+        pass
+    print_progress("Training neural network. Epochs trained: 3")
+
+    captured = capsys.readouterr()
+    shows_output = tqdm_disable is None
+    assert bool(captured.err) is shows_output  # The bars.
+    assert bool(captured.out) is shows_output  # The progress message.

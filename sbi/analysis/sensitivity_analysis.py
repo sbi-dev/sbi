@@ -15,6 +15,7 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 
+from sbi.utils.pbar import print_progress
 from sbi.utils.sbiutils import handle_invalid_x, standardizing_net
 
 
@@ -329,7 +330,7 @@ class ActiveSubspace:
             self._val_log_prob = -val_loss / num_validation_examples
             self._validation_log_probs.append(self._val_log_prob)
 
-            print("\r", "Training neural network. Epochs trained: ", epoch, end="")
+            print_progress(f"Training neural network. Epochs trained: {epoch}")
 
         return deepcopy(self._regression_net)
 

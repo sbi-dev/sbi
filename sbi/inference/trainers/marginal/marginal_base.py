@@ -31,6 +31,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.sbi_types import Tracker
 from sbi.utils import check_estimator_arg, get_log_root
+from sbi.utils.pbar import print_progress
 from sbi.utils.torchutils import assert_all_finite, process_device
 from sbi.utils.tracking import TensorBoardTracker
 
@@ -491,7 +492,4 @@ class MarginalTrainer:
     @staticmethod
     def _maybe_show_progress(show: bool, epoch: int) -> None:
         if show:
-            # end="\r" deletes the print statement when a new one appears.
-            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
-            # to #330.
-            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
+            print_progress(f"Training neural network. Epochs trained: {epoch}")

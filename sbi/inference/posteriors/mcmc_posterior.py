@@ -13,7 +13,6 @@ from joblib import Parallel, delayed
 from numpy import ndarray
 from torch import Tensor
 from torch import multiprocessing as mp
-from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -28,7 +27,7 @@ from sbi.samplers.mcmc import (
 )
 from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.pbar import sampling_desc
+from sbi.utils.pbar import sampling_desc, tqdm
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import (
     ensure_theta_batched,

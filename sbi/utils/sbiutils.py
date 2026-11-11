@@ -37,6 +37,7 @@ from torch.optim.adam import Adam
 
 from sbi import __version__
 from sbi.sbi_types import TorchTransform
+from sbi.utils.pbar import print_progress
 from sbi.utils.torchutils import unwrap_mixture_support
 
 _T = TypeVar("_T")
@@ -1325,14 +1326,12 @@ def gradient_ascent(
                         best_log_prob_overall = best_log_prob_iter.detach().clone()
 
                 if show_progress_bars:
-                    print(
-                        "\r",
+                    print_progress(
                         f"Optimizing MAP estimate. Iterations: {iter_ + 1} / "
                         f"{num_iter}. Performance in iteration "
                         f"{divmod(iter_ + 1, save_best_every)[0] * save_best_every}: "
                         f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob). "
                         "Press Ctrl-C to interrupt.",
-                        end="",
                     )
                 argmax_ = theta_transform.inv(best_theta_overall)
                 max_val = best_log_prob_overall

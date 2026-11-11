@@ -1,7 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-"""Progress bar helpers shared by the samplers.
+"""Progress output helpers.
+
+All of sbi's progress bars use `tqdm` and `trange` from this module, and all other
+progress messages use `print_progress()`, so that the `TQDM_DISABLE` environment
+variable turns off all of them. Plain tqdm ignores the variable for bars that pass
+`disable=`, and sbi passes it to every bar.
 
 Samplers that draw from a proposal, e.g. `accept_reject_sample` or SIR, show a
 progress bar of their own. If the proposal is itself a sampler with a progress bar,
@@ -12,9 +17,12 @@ in `nested_pbar_context()`, and every sampler disables its bar if `is_nested()`.
 All sampling bars build their description with `sampling_desc()`.
 """
 
+import os
 import threading
 from contextlib import contextmanager
 from typing import Iterator, Optional
+
+from tqdm.auto import tqdm as _tqdm  # noqa: TID251
 
 _state = threading.local()
 
@@ -79,3 +87,30 @@ def sampling_desc(
 
 def _count(count: int, noun: str) -> str:
     return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
+
+
+def progress_disabled() -> bool:
+    """Returns True if `TQDM_DISABLE` is set to any non-empty value, as in tqdm."""
+    return bool(os.environ.get("TQDM_DISABLE"))
+
+
+class tqdm(_tqdm):
+    """`tqdm.auto.tqdm` that `TQDM_DISABLE` turns off even if `disable=` is passed."""
+
+    def __init__(self, *args, **kwargs):
+        if progress_disabled():
+            kwargs["disable"] = True
+        super().__init__(*args, **kwargs)
+
+
+def trange(*args, **kwargs) -> tqdm:
+    """`tqdm(range(*args), **kwargs)`, like `tqdm.trange`."""
+    return tqdm(range(*args), **kwargs)
+
+
+def print_progress(message: str) -> None:
+    """Overwrites the current line with `message`, unless `TQDM_DISABLE` is set."""
+    if not progress_disabled():
+        # The leading `\r` returns to the line start also where `end="\r"` would not
+        # (#330); the next message then overwrites this one.
+        print("\r", message, end="")

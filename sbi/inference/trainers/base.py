@@ -77,6 +77,7 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
+from sbi.utils.pbar import print_progress
 from sbi.utils.removed_names import RENAMED_METHODS
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
@@ -1320,11 +1321,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         # flip its own verdict.
         converged = epoch <= max_num_epochs
         if converged:
-            print(
-                "\r",
-                f"Neural network successfully converged after {epoch} epochs.",
-                end="",
-            )
+            print("\r", f"Neural network successfully converged after {epoch} epochs.")
         else:
             warn(
                 f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached, "
@@ -1422,10 +1419,7 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     @staticmethod
     def _maybe_show_progress(show: bool, epoch: int) -> None:
         if show:
-            # end="\r" deletes the print statement when a new one appears.
-            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
-            # to #330.
-            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
+            print_progress(f"Training neural network. Epochs trained: {epoch}")
 
     def save(self, filename: Union[str, Path]) -> None:
         """Save the inference object to a file. Load it with `load()`.

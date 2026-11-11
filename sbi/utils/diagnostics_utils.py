@@ -7,13 +7,13 @@ from typing import Tuple
 import torch
 from joblib import Parallel, delayed
 from torch import Tensor
-from tqdm import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.sbi_types import Shape
 from sbi.utils import handle_invalid_x
+from sbi.utils.pbar import tqdm
 
 
 def get_posterior_samples_on_batch(

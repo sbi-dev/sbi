@@ -9,10 +9,9 @@ from typing import Callable, Dict, Optional, Tuple
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, as_tensor
-from tqdm.auto import tqdm
 
 from sbi.sbi_types import AcceptRejectFn, Proposal, SampleProposal
-from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
+from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc, tqdm
 from sbi.utils.sbiutils import gradient_ascent
 
 
