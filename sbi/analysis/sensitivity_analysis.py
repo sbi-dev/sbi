@@ -15,7 +15,7 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from sbi.utils.pbar import print_progress
+from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.sbiutils import handle_invalid_x, standardizing_net
 
 logger = logging.getLogger(__name__)
@@ -334,6 +334,7 @@ class ActiveSubspace:
 
             print_progress(f"Training neural network. Epochs trained: {epoch}")
 
+        end_progress_line()
         return deepcopy(self._regression_net)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:

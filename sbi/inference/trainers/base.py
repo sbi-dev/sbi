@@ -77,7 +77,7 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
-from sbi.utils.pbar import print_progress
+from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.removed_names import RENAMED_METHODS
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
@@ -1323,6 +1323,8 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         if converged:
             print("\r", f"Neural network successfully converged after {epoch} epochs.")
         else:
+            if self._show_progress_bars:
+                end_progress_line()
             warn(
                 f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached, "
                 "but network has not yet fully converged. Consider increasing it.",

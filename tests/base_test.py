@@ -273,6 +273,28 @@ def test_summary_records_why_training_stopped(losses, max_num_epochs, converged)
     assert budget_warned is not converged
 
 
+@pytest.mark.parametrize(
+    "train_kwargs",
+    (
+        {"max_num_epochs": 2},  # Stops at the budget.
+        {"stop_after_epochs": 1},  # Converges.
+    ),
+)
+def test_training_output_ends_with_a_newline(monkeypatch, capsys, train_kwargs):
+    """Output after `train()` must not continue the epoch counter's line."""
+    monkeypatch.delenv("TQDM_DISABLE", raising=False)
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+    theta = prior.sample((100,))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)  # The epoch budget warning.
+        NPE(prior=prior).append_simulations(theta, theta).train(**train_kwargs)
+
+    out = capsys.readouterr().out
+    assert "Epochs trained" in out
+    assert out.endswith("\n")
+
+
 def test_vector_field_converged_resets_between_runs():
     """A stale best-val-loss from run one must not leak into run two.
 

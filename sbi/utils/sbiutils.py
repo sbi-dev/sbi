@@ -37,7 +37,7 @@ from torch.optim.adam import Adam
 
 from sbi import __version__
 from sbi.sbi_types import TorchTransform
-from sbi.utils.pbar import print_progress
+from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.torchutils import unwrap_mixture_support
 
 _T = TypeVar("_T")
@@ -1340,10 +1340,14 @@ def gradient_ascent(
             iter_ += 1
 
     except KeyboardInterrupt:
+        if show_progress_bars:
+            end_progress_line()
         interruption = f"Optimization was interrupted after {iter_} iterations. "
         print(interruption + interruption_note)
         return argmax_, max_val  # type: ignore
 
+    if show_progress_bars:
+        end_progress_line()
     with torch.no_grad():
         argmax_ = theta_transform.inv(best_theta_overall)
     return argmax_, max_val  # type: ignore

@@ -31,7 +31,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.sbi_types import Tracker
 from sbi.utils import check_estimator_arg, get_log_root
-from sbi.utils.pbar import print_progress
+from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.torchutils import assert_all_finite, process_device
 from sbi.utils.tracking import TensorBoardTracker
 
@@ -351,6 +351,8 @@ class MarginalTrainer:
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
+        if self._show_progress_bars:
+            end_progress_line()
         if self.epoch > max_num_epochs:
             # The `and` above short-circuits on the last check, so `_converged` never
             # saw the final epoch. Score it here before choosing the weights to keep.

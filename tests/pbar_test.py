@@ -17,6 +17,7 @@ from sbi.samplers.rejection import rejection
 from sbi.samplers.score import diffuser
 from sbi.utils import BoxUniform
 from sbi.utils.pbar import (
+    end_progress_line,
     is_nested,
     nested_pbar_context,
     print_progress,
@@ -306,8 +307,11 @@ def test_tqdm_disable_turns_off_all_progress_output(monkeypatch, capsys, tqdm_di
     for _ in trange(3, disable=False):
         pass
     print_progress("Training neural network. Epochs trained: 3")
+    end_progress_line()
 
     captured = capsys.readouterr()
     shows_output = tqdm_disable is None
     assert bool(captured.err) is shows_output  # The bars.
-    assert bool(captured.out) is shows_output  # The progress message.
+    # The progress message, ended by a newline so that later output starts on its own.
+    expected_out = "\r Training neural network. Epochs trained: 3\n"
+    assert captured.out == (expected_out if shows_output else "")
