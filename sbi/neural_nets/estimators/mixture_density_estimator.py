@@ -415,10 +415,13 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             tensors = chain(
                 self._embedding_net.parameters(), self._embedding_net.buffers()
             )
-            first = next(tensors, None)
+            first = next((t for t in tensors if t.is_floating_point()), None)
             with torch.no_grad():
                 test_input = torch.randn(
-                    1, *condition_shape, device=None if first is None else first.device
+                    1,
+                    *condition_shape,
+                    device=None if first is None else first.device,
+                    dtype=None if first is None else first.dtype,
                 )
                 test_output = self._embedding_net(test_input)
                 embedded_dim = test_output.shape[-1]

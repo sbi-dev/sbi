@@ -403,6 +403,17 @@ class TestMixtureDensityEstimatorFunctional:
 # ============================================================================
 
 
+class _SelectDims(nn.Module):
+    """Parameter-free embedding net whose only tensor is an integer buffer."""
+
+    def __init__(self, index: torch.Tensor):
+        super().__init__()
+        self.register_buffer("index", index)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x[..., self.index]
+
+
 class TestMixtureDensityEstimatorCreation:
     """Test MixtureDensityEstimator creation and initialization."""
 
@@ -427,6 +438,25 @@ class TestMixtureDensityEstimatorCreation:
 
         assert estimator.embedding_net is embedding_net
         assert estimator.condition_shape == torch.Size([10])
+
+    @pytest.mark.parametrize(
+        "embedding_net",
+        [
+            pytest.param(nn.Linear(10, 5).double(), id="float64"),
+            pytest.param(_SelectDims(torch.arange(5)), id="integer_buffer_only"),
+        ],
+    )
+    def test_estimator_creation_probes_embedding_net_in_its_dtype(self, embedding_net):
+        """The probe input matches the embedding net's floating-point dtype."""
+        mdn_net = MultivariateGaussianMDN(
+            features=3, context_features=5, hidden_features=20, num_components=4
+        )
+        MixtureDensityEstimator(
+            net=mdn_net,
+            input_shape=torch.Size([3]),
+            condition_shape=torch.Size([10]),
+            embedding_net=embedding_net,
+        )
 
     def test_estimator_creation_mismatched_embedding_raises(self):
         """Test that mismatched embedding dimensions raise error."""
