@@ -5,7 +5,16 @@ import math
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, Literal, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    Iterable,
+    Literal,
+    Optional,
+    Self,
+    Union,
+)
 
 import numpy as np
 import torch
@@ -28,7 +37,10 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unconditional_flow,
 )
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
-from sbi.samplers.vi.vi_quality_control import get_quality_metric
+from sbi.samplers.vi.vi_quality_control import (
+    QualityControlError,
+    get_quality_metric,
+)
 from sbi.samplers.vi.vi_utils import (
     AdaptedVariationalDistribution,
     LearnableGaussian,
@@ -42,11 +54,11 @@ from sbi.sbi_types import (
     TorchTensor,
     TorchTransform,
 )
-from sbi.utils.sbiutils import mcmc_transform
+from sbi.utils.sbiutils import _apply_to_transform, mcmc_transform
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
-    process_device,
+    move_tensors,
 )
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
@@ -240,45 +252,34 @@ class VIPosterior(NeuralPosterior):
             "can evaluate the _normalized_ posterior density with .log_prob()."
         )
 
-    def to(self, device: Union[str, torch.device]) -> "VIPosterior":
-        """Move all components to the given device.
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the posterior and its variational distributions to `device` in place.
+
+        The optimizer is reset; `train()` builds a new one.
 
         Args:
             device: The device to move the posterior to.
 
         Returns:
-            self for method chaining.
+            The posterior itself.
         """
-        device = process_device(device)
-        self._device = device
+        super().to(device)
+        device = self._device
+        _apply_to_transform(self.link_transform, lambda t: t.to(device))
+        self._trained_on = move_tensors(self._trained_on, device)
 
-        # Move potential (which moves prior, x_o, and estimator).
-        self.potential_fn.to(device)  # type: ignore
-        self._prior = move_distribution_to_device(self._prior, device)
-
-        # Rebuild link_transform on new device (same logic as __init__).
-        if self.theta_transform is None:
-            self.link_transform = mcmc_transform(self._prior, device=device).inv
-        else:
-            self.link_transform = self.theta_transform.inv
-
-        # Move cached tensors.
-        if self._x is not None:
-            self._x = self._x.to(device)
-        if self._map is not None:
-            self._map = self._map.to(device)
-        if self._trained_on is not None:
-            self._trained_on = self._trained_on.to(device)
-
-        # Move variational distributions.
         if hasattr(self, "_q") and hasattr(self._q, "to"):
             self._q.to(device)  # type: ignore[union-attr]
-        # Update link_transform reference on q if it caches one.
         if hasattr(self, "_q") and hasattr(self._q, "_link_transform"):
             self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
-
+        q_spec = getattr(self, "_q_spec", None)
+        if q_spec is not None and q_spec.init_snapshot is not None:
+            q_spec.init_snapshot = move_distribution_to_device(
+                q_spec.init_snapshot, device
+            )
+        self._optimizer = None
         return self
 
     def _build_unconditional_flow(
@@ -554,8 +555,12 @@ class VIPosterior(NeuralPosterior):
                 q = self._build_q_from_spec()
             self._trained_on = None
         elif isinstance(q, VIPosterior):
-            # A copy, so that later `set_q` calls on one posterior stay local to it.
-            self._q_spec = replace(q._q_spec)
+            # A copy, so that later `set_q` or `to` calls on one posterior stay local
+            # to it.
+            snapshot = q._q_spec.init_snapshot
+            if snapshot is not None:
+                snapshot = detach_and_deepcopy(snapshot)
+            self._q_spec = replace(q._q_spec, init_snapshot=snapshot)
             self._trained_on = q._trained_on
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
@@ -946,26 +951,53 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = None
         self._mode = "single_x"
 
-        # Evaluate quality
+        # Evaluate quality; retrain once if q fails it and can be rebuilt.
         if quality_control:
-            try:
-                self.evaluate(quality_control_metric=quality_control_metric)
-            except Exception as e:
-                print(
-                    f"Quality control showed a low quality of the variational "
-                    f"posterior. We are automatically retraining the variational "
-                    f"posterior from scratch with a smaller learning rate. "
-                    f"Alternatively, if you want to skip quality control, please "
-                    f"retrain with `VIPosterior.train(..., quality_control=False)`. "
-                    f"\nThe error that occured is: {e}"
+            error = self._quality_control_error(quality_control_metric)
+            if error is not None and self._q_spec.kind != "instance":
+                warnings.warn(
+                    f"Quality control failed: {error} Retraining the variational "
+                    "posterior from scratch, once, with a 10 times smaller learning "
+                    "rate. To skip quality control, pass `quality_control=False`.",
+                    UserWarning,
+                    stacklevel=2,
                 )
                 self.train(
+                    x=x,
+                    n_particles=n_particles,
                     learning_rate=learning_rate * 0.1,
+                    gamma=gamma,
+                    max_num_iters=max_num_iters,
+                    min_num_iters=min_num_iters,
+                    clip_value=clip_value,
+                    warm_up_rounds=warm_up_rounds,
                     retrain_from_scratch=True,
                     reset_optimizer=True,
+                    show_progress_bar=show_progress_bar,
+                    check_for_convergence=check_for_convergence,
+                    quality_control=False,
+                    **kwargs,
+                )
+                error = self._quality_control_error(quality_control_metric)
+            if error is not None:
+                warnings.warn(
+                    f"Quality control failed: {error} The variational posterior may "
+                    "be unreliable.",
+                    UserWarning,
+                    stacklevel=2,
                 )
 
         return self
+
+    def _quality_control_error(
+        self, quality_control_metric: str
+    ) -> Optional[QualityControlError]:
+        """Return the error of the quality control's basic checks, if any."""
+        try:
+            self.evaluate(quality_control_metric=quality_control_metric)
+        except QualityControlError as error:
+            return error
+        return None
 
     def train_amortized(
         self,

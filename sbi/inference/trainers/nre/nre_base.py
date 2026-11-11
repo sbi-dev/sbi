@@ -3,7 +3,7 @@
 
 import warnings
 from abc import ABC, abstractmethod
-from dataclasses import asdict, replace
+from dataclasses import replace
 from typing import Any, ClassVar, Dict, Literal, Optional, Self, Sequence, Tuple, Union
 
 import torch
@@ -24,6 +24,7 @@ from sbi.inference.trainers._contracts import (
     LossArgsNRE,
     StartIndexContext,
     TrainConfig,
+    loss_args_to_kwargs,
 )
 from sbi.inference.trainers.base import (
     LossArgs,
@@ -508,6 +509,6 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
                 f" but got {type(loss_args)}"
             )
 
-        losses = self._loss(theta_batch, x_batch, **asdict(loss_args))
+        losses = self._loss(theta_batch, x_batch, **loss_args_to_kwargs(loss_args))
 
         return losses
