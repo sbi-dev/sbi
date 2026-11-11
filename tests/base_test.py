@@ -184,6 +184,16 @@ def test_canonical_shorthands_do_not_warn():
         assert sbi.inference.NRE is sbi.inference.NRE_B
 
 
+def test_package_docstring_imports_still_exist():
+    """`help(sbi)` shows a workflow; its imports must keep working as names change."""
+    lines = [line.strip() for line in (sbi.__doc__ or "").splitlines()]
+    imports = [line for line in lines if line.startswith(("import ", "from "))]
+
+    assert len(imports) >= 2
+    for line in imports:
+        exec(line, {})
+
+
 def test_vector_field_posterior_sample_with_warns():
     """Passing `sample_with` to `sample()` warns; setting it at construction is the
     supported path and must stay silent."""
