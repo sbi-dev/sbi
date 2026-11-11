@@ -14,21 +14,22 @@ path that calls `raise_removed_module(__name__)`.
 
 from typing import Callable, NoReturn
 
-# Old trainer and ABC names. `infer(method=...)` accepted them as well.
+# Old trainer and ABC names. `infer(method=...)` accepted them as well. Each maps to
+# the shortest current name of the same class, e.g. `NPE` rather than `NPE_C`.
 RENAMED_METHODS = {
-    "SNL": "NLE_A",
-    "SNLE": "NLE_A",
-    "SNLE_A": "NLE_A",
+    "SNL": "NLE",
+    "SNLE": "NLE",
+    "SNLE_A": "NLE",
     "SNPE_A": "NPE_A",
     "SNPE_B": "NPE_B",
-    "SNPE": "NPE_C",
-    "SNPE_C": "NPE_C",
-    "APT": "NPE_C",
+    "SNPE": "NPE",
+    "SNPE_C": "NPE",
+    "APT": "NPE",
     "AALR": "NRE_A",
     "SNRE_A": "NRE_A",
-    "SRE": "NRE_B",
-    "SNRE": "NRE_B",
-    "SNRE_B": "NRE_B",
+    "SRE": "NRE",
+    "SNRE": "NRE",
+    "SNRE_B": "NRE",
     "CNRE": "NRE_C",
     "SNRE_C": "NRE_C",
     "ABC": "MCABC",
@@ -45,9 +46,9 @@ REMOVED_NAMES = {
 
 REMOVED_MODULES = {
     "sbi.inference.base": "from sbi.inference import infer",
-    "sbi.inference.snpe": "from sbi.inference import NPE_C",
-    "sbi.inference.snle": "from sbi.inference import NLE_A",
-    "sbi.inference.snre": "from sbi.inference import NRE_B",
+    "sbi.inference.snpe": "from sbi.inference import NPE",
+    "sbi.inference.snle": "from sbi.inference import NLE",
+    "sbi.inference.snre": "from sbi.inference import NRE",
     "sbi.utils.posterior_ensemble": "from sbi.inference import EnsemblePosterior",
 }
 

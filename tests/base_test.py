@@ -116,7 +116,7 @@ def test_removed_names_name_their_replacement(name, replacement):
 )
 def test_every_package_that_exported_removed_names_raises(package):
     """Each package that exported a removed name needs its own `__getattr__`."""
-    with pytest.raises(ImportError, match=r"from sbi\.inference import NPE_C"):
+    with pytest.raises(ImportError, match=r"from sbi\.inference import NPE`"):
         exec(f"from {package} import SNPE", {})
 
 
@@ -146,7 +146,7 @@ def test_unknown_names_still_raise_attribute_error():
 
 def test_infer_rejects_removed_method_names():
     prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
-    with pytest.raises(ValueError, match=r"Use method='npe_c' instead"):
+    with pytest.raises(ValueError, match=r"Use method='npe' instead"):
         infer(lambda theta: theta, prior, method="snpe", num_simulations=10)
 
 
