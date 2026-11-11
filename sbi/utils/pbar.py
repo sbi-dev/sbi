@@ -113,7 +113,7 @@ def print_progress(message: str) -> None:
     if not progress_disabled():
         # The leading `\r` returns to the line start also where `end="\r"` would not
         # (#330); the next message then overwrites this one.
-        print("\r", message, end="")
+        print("\r", message, end="", flush=True)
 
 
 def end_progress_line() -> None:

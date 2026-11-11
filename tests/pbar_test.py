@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import io
+import sys
 import threading
 
 import pytest
@@ -315,3 +317,20 @@ def test_tqdm_disable_turns_off_all_progress_output(monkeypatch, capsys, tqdm_di
     # The progress message, ended by a newline so that later output starts on its own.
     expected_out = "\r Training neural network. Epochs trained: 3\n"
     assert captured.out == (expected_out if shows_output else "")
+
+
+def test_print_progress_flushes_each_message(monkeypatch):
+    """A terminal flushes at the leading `\\r`, before the message, so without a flush
+    each message showed up only with the next one."""
+    monkeypatch.delenv("TQDM_DISABLE", raising=False)
+
+    class RecordingStdout(io.StringIO):
+        flushed = ""
+
+        def flush(self):
+            self.flushed = self.getvalue()
+
+    stdout = RecordingStdout()
+    monkeypatch.setattr(sys, "stdout", stdout)
+    print_progress("Training neural network. Epochs trained: 1")
+    assert stdout.flushed.endswith("Epochs trained: 1")
