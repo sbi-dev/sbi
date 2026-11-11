@@ -68,7 +68,6 @@ def basic_checks(posterior, N: int = int(5e4)):
         N: Number of samples that are checked.
     """
     prior = posterior._prior
-    assert prior is not None, "Posterior has no `._prior` attribute."
     # Check at the observation `q` was trained on, which can differ from the default.
     x = posterior._trained_on
     prior_samples = prior.sample(Size((N,)))
