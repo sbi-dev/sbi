@@ -121,10 +121,10 @@ class LangevinCorrector(Corrector):
     def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
         """Correct the samples using unadjusted Langevin dynamics.
 
-        Does not explicitly depend on the current time.
+        Evaluates the score at the samples' current time ``t0``.
         """
         for _ in range(self.num_steps):
-            score = self.predictor.potential_fn.gradient(theta, t1)
+            score = self.predictor.potential_fn.gradient(theta, t0)
             eps = self.std * torch.randn_like(theta, device=self.device)
             theta = theta + self.step_size * score + eps
 
