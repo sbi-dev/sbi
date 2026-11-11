@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import pickle
 from dataclasses import asdict
 
 import pytest
 import torch
 from torch import Tensor, eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import MultivariateNormal, Normal
 
 from sbi.inference import (
     ImportanceSamplingPosterior,
@@ -27,6 +28,8 @@ from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPote
 from sbi.neural_nets import posterior_nn, posterior_score_nn
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
+from sbi.utils.user_input_checks import process_prior
+from sbi.utils.vector_field_utils import marginalize
 
 
 @pytest.mark.parametrize(
@@ -81,6 +84,79 @@ def test_callable_potential(
     assert torch.allclose(sample_std, torch.sqrt(torch.as_tensor(cov)), atol=0.1)
 
 
+def _gaussian_iid_potential_and_posterior():
+    """Return the potential of x_i ~ N(theta, I), theta ~ N(0, I) and its posterior."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def potential(theta, x_o):
+        likelihood = MultivariateNormal(theta.unsqueeze(1), eye(2))
+        return likelihood.log_prob(x_o.unsqueeze(0)).sum(-1) + prior.log_prob(theta)
+
+    def true_posterior(x_o):
+        num_trials = x_o.shape[0]
+        return MultivariateNormal(
+            x_o.sum(0) / (num_trials + 1), eye(2) / (num_trials + 1)
+        )
+
+    return prior, potential, true_posterior
+
+
+def test_importance_posterior_log_prob_after_changing_default_x():
+    """The normalization constant must not be reused for another default x, also not
+    for more trials of the same value."""
+    torch.manual_seed(0)
+    prior, potential, true_posterior = _gaussian_iid_potential_and_posterior()
+    posterior = ImportanceSamplingPosterior(potential, proposal=prior)
+    theta = zeros(1, 2)
+
+    for x_o in [3 * ones(1, 2), zeros(1, 2), zeros(3, 2)]:
+        log_prob = posterior.set_default_x(x_o).log_prob(theta)
+        assert torch.allclose(log_prob, true_posterior(x_o).log_prob(theta), atol=0.2)
+
+
+def test_importance_posterior_log_prob_with_many_iid_trials():
+    """The normalization constant must not underflow for a sharp potential."""
+    torch.manual_seed(0)
+    prior, potential, true_posterior = _gaussian_iid_potential_and_posterior()
+    x_o = torch.randn(500, 2) + 0.5
+    posterior = ImportanceSamplingPosterior(potential, proposal=prior)
+    theta = x_o.mean(0, keepdim=True)
+
+    log_prob = posterior.set_default_x(x_o).log_prob(theta)
+    assert torch.isfinite(log_prob).all()
+    assert torch.allclose(log_prob, true_posterior(x_o).log_prob(theta), atol=0.5)
+
+
+def test_importance_posterior_normalization_constant_is_estimated_at_given_x():
+    """The public estimate must use the x and number of samples it is given, not
+    those of the last estimate."""
+    torch.manual_seed(0)
+    prior, potential, _ = _gaussian_iid_potential_and_posterior()
+    posterior = ImportanceSamplingPosterior(potential, proposal=prior)
+    x_a, x_b = zeros(1, 2), 3 * ones(1, 2)
+
+    posterior.log_prob(zeros(1, 2), x=x_a)
+    posterior.estimate_normalization_constant(x_b, num_samples=1)
+    log_z = torch.log(posterior.estimate_normalization_constant(x_b))
+    true_log_z = MultivariateNormal(zeros(2), 2 * eye(2)).log_prob(x_b)
+    assert torch.allclose(log_z, true_log_z, atol=0.2)
+
+
+def _quadratic_potential(theta, x_o):
+    return -((theta - x_o) ** 2).sum(-1)
+
+
+def test_importance_posterior_pickled_before_log_space_cache():
+    """Posteriors pickled by sbi 0.27 saved Z as `_normalization_constant`."""
+    proposal = MultivariateNormal(zeros(2), eye(2))
+    posterior = ImportanceSamplingPosterior(_quadratic_potential, proposal=proposal)
+    del posterior._log_normalization_cache
+    posterior._normalization_constant = None
+
+    loaded = pickle.loads(pickle.dumps(posterior))
+    assert torch.isfinite(loaded.log_prob(zeros(1, 2), x=zeros(1, 2))).all()
+
+
 @pytest.mark.parametrize(
     "condition",
     [
@@ -133,6 +209,20 @@ def test_bind_preserves_estimator(potential_type: str):
 
     assert bound is not potential
     assert bound.x_o is not None
+
+
+def test_vector_field_potential_marginalizes_1d_prior_exactly():
+    """A processed 1-D prior keeps the exact marginal, not a Gaussian mixture fit."""
+    prior, _, _ = process_prior(Normal(zeros(1), ones(1)))
+    theta = prior.sample((20,))
+    potential = VectorFieldBasedPotential(
+        posterior_score_nn()(theta, torch.randn(20, 2)), prior
+    )
+    m, s = torch.tensor(0.7), torch.tensor(0.5)
+    t = torch.linspace(-3, 3, 7).unsqueeze(-1)
+
+    exact = marginalize(Normal(zeros(1), ones(1)), m, s).log_prob(t).sum(-1)
+    assert torch.allclose(marginalize(potential.prior, m, s).log_prob(t), exact)
 
 
 @pytest.mark.parametrize("potential_type", ("posterior", "vector_field"))

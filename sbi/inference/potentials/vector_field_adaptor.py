@@ -16,6 +16,7 @@ from torch.distributions import Distribution
 
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 from sbi.utils.vector_field_utils import (
     add_diag_or_dense,
     denoise,
@@ -151,8 +152,8 @@ class ScoreAdaptation(ABC):
     def to(self, device: Union[str, torch.device]) -> "ScoreAdaptation":
         self.device = device
         self.vf_estimator.to(device)
-        if self.prior is not None and hasattr(self.prior, "to"):
-            self.prior.to(device)  # type: ignore
+        if self.prior is not None:
+            self.prior = move_distribution_to_device(self.prior, device)
         return self
 
     def eval(self) -> "ScoreAdaptation":
@@ -699,8 +700,8 @@ class IIDScoreFunction(ABC):
         """
         self.device = device
         self.vector_field_estimator.to(device)
-        if self.prior:
-            self.prior.to(device)  # type: ignore
+        if self.prior is not None:
+            self.prior = move_distribution_to_device(self.prior, device)
 
     @abstractmethod
     def __call__(
