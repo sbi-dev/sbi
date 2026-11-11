@@ -1460,10 +1460,8 @@ class ContextSplineMap(nn.Module):
         # a scaling factor for initializations.
         self.hidden_features = hidden_features
 
-        # Use a non-linearity because otherwise, there will be a linear
-        # mapping from context features onto distribution parameters.
-
-        # Initialize with input layer.
+        # ReLUs between the layers make the map from context features to spline
+        # parameters nonlinear.
         layer_list = [nn.Linear(context_features, hidden_features), nn.ReLU()]
         # Add hidden layers, each with its own weights.
         for _ in range(hidden_layers):
