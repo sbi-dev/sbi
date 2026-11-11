@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### ⚠️ Breaking Changes
+
+* **Zuko flows get two hidden layers for an int `hidden_features`** ([#2115](https://github.com/sbi-dev/sbi/pull/2115)): sbi passed an int width to zuko as one hidden layer per transform, so at the defaults each transform's network had five hidden layers instead of two. An int now gives two hidden layers of that width, zuko's own default; a list still sets the hidden-layer widths directly. The default networks of the `zuko_*` density estimators, the zuko marginal flows and the VI flows are smaller as a result. sbi's own `maf` and `nsf` do not change.
+  * A state dict saved from such a zuko flow before this change does not load into a flow built after it. To rebuild the old network, pass `hidden_features=[w] * num_transforms`, for example `[50] * 5` at the defaults. Posteriors and inference objects saved with `save()` or pickled whole keep loading, because they store the network itself.
+
 ## v0.27.0
 
 ### ✨ Highlights
