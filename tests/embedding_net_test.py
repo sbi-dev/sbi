@@ -31,6 +31,7 @@ from sbi.neural_nets.embedding_nets import (
     TransformerEmbedding,
 )
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -94,6 +95,15 @@ def test_fc_embedding_output_takes_negative_values():
     embedding = FCEmbedding(input_dim=2, output_dim=20)
 
     assert (embedding(torch.randn(100, 2)) < 0).any()
+
+
+def test_mnle_combined_embedding_output_takes_negative_values():
+    """MNLE's default combined embedding must not end in a ReLU either."""
+    x = torch.cat([torch.rand(50, 1) + 0.1, torch.randint(0, 2, (50, 1))], dim=1)
+    embedding = build_mnle(x, torch.randn(50, 2)).continuous_net.embedding_net
+
+    # Its input is the discrete column of x and the two condition dims.
+    assert (embedding(torch.randn(100, 3)) < 0).any()
 
 
 @pytest.mark.parametrize("num_xo_batch", [1, 2])
