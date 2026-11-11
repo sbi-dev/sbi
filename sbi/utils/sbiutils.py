@@ -587,6 +587,51 @@ def handle_invalid_x(
     return is_valid_x, num_nans, num_infs
 
 
+def handle_invalid_inputs_for_simformer(
+    inputs: Tensor,
+    condition_masks: Optional[Tensor] = None,
+    exclude_invalid_x: bool = True,
+) -> Tuple[Tensor, Optional[Tensor], Tensor]:
+    """Prepare inputs with invalid (NaN or Inf) entries for a masked loss.
+
+    Invalid entries are set to zero and marked latent in the condition mask (a
+    variable with any invalid feature is latent), and the returned validity mask
+    excludes them from the loss, so that the network is never trained to reproduce
+    the placeholder values.
+
+    Note: If `exclude_invalid_x` is False, the tensors are returned as is and every
+    entry counts as valid.
+
+    Args:
+        inputs: Batch of inputs, `(B, T)` or `(B, T, F)`.
+        condition_masks: Optional condition masks, `(B, T)`.
+        exclude_invalid_x: Whether to exclude invalid entries.
+
+    Returns:
+        The cleaned inputs, the updated condition masks, and the boolean validity
+        mask of the shape of `inputs`.
+    """
+    if not exclude_invalid_x:
+        return inputs, condition_masks, torch.ones_like(inputs, dtype=torch.bool)
+
+    valid = torch.isfinite(inputs)
+    if bool(valid.all()):
+        return inputs, condition_masks, valid
+    if not bool(valid.any()):
+        raise ValueError(
+            "No valid data entries left after excluding NaNs and Infs. In case you "
+            "are encoding missing trials with NaNs consider setting "
+            "exclude_invalid_x=False and z_score_x=None to disable z-scoring."
+        )
+
+    # The value is irrelevant: these entries are latent and excluded from the loss.
+    inputs = torch.where(valid, inputs, torch.zeros_like(inputs))
+    if condition_masks is not None:
+        node_valid = valid if valid.shape == condition_masks.shape else valid.all(-1)
+        condition_masks = condition_masks.bool() & node_valid
+    return inputs, condition_masks, valid
+
+
 def npe_msg_on_invalid_x(
     num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
 ) -> None:
@@ -637,6 +682,25 @@ def nle_nre_apt_msg_on_invalid_x(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"{algorithm} does not allow invalid simulations. "
                 f"Replace the invalid values with an unreasonably low or high value."
+            )
+
+
+def simformer_msg_on_invalid_x(
+    num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
+) -> None:
+    if num_nans + num_infs > 0:
+        if exclude_invalid_x:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "Samples presenting invalid entries will be forced to be latent in "
+                "the condition mask."
+            )
+        else:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "Training will likely fail, we strongly recommend "
+                f"`exclude_invalid_x=True` for {algorithm}."
             )
 
 
@@ -798,6 +862,8 @@ def prior_support_is_bounded(prior: Any) -> Optional[bool]:
         False if the support is the real space, True otherwise, and None if the prior
         does not define a `support`.
     """
+    if prior is None:
+        return False
     try:
         support = prior.support
     except (NotImplementedError, AttributeError):
@@ -828,6 +894,9 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     Returns:
         Tensor of bools indicating whether each sample was within the support.
     """
+    if distribution is None:
+        return torch.ones(samples.shape[:-1], dtype=torch.bool, device=samples.device)
+
     # Try to check using the support property, use log prob method otherwise.
     # Before torch v1.7.0, `support.check()` returned bools for every element.
     # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,

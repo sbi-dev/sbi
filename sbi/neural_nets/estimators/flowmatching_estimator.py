@@ -2,14 +2,18 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
-from sbi.utils.vector_field_utils import VectorFieldNet
+from sbi.neural_nets.estimators.base import (
+    ConditionalVectorFieldEstimator,
+    MaskedConditionalVectorFieldEstimator,
+    entries_in_masked_loss,
+)
+from sbi.utils.vector_field_utils import MaskedVectorFieldNet, VectorFieldNet
 
 
 class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
@@ -521,6 +525,585 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         .. math::
             N(\theta_t; \mu_t(t), \sigma_t(t)^2) ,
             \mu_t(t) = (1 - t) \cdot \theta_0 + t \cdot \mu_{base}
+            \sigma_t(t) = t \cdot \sigma_{base}
+
+        Taking into account the noise scale :math:`\sigma_{min}`, the standard deviation
+        becomes:
+
+        .. math::
+            \sigma_t(t) = (t + \sigma_{min}) \cdot \sigma_{base}
+
+        Note that in the current implementation, the base distribution is Gaussian with
+        zero mean and unit variance.
+
+        Args:
+            times: SDE time variable in [0,1].
+
+        Returns:
+            Standard deviation at a given time.
+        """
+        std_t = times + self.noise_scale
+        for _ in range(len(self.input_shape)):
+            std_t = std_t.unsqueeze(-1)
+        return std_t
+
+
+class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
+    r"""
+    Rectified flow matching estimator class that estimates the conditional vector field,
+    :math:`v(\text{inputs}_t, t; x_o) = \mathbb{E}[\text{inputs}_1 - \text{inputs}_0 |
+        \text{inputs}_t, x_o = x_o]`
+
+    This estimator implements the flow matching approach where the vector field is
+    learned by matching the flow between the base and target distributions. The vector
+    field represents the instantaneous change in the distribution at time t.
+
+    References
+    ----------
+    .. [1] Liu, X., Gong, C., & Liu, Q. (2023).
+           "Flow Straight and Fast: Learning to Generate and Transfer Data with
+           Rectified Flow"
+           *International Conference on Learning Representations (ICLR)*
+           https://arxiv.org/abs/2209.03003
+
+    .. [2] Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nickel, M., & Le, M. (2023).
+           "Flow Matching for Generative Modeling"
+           *International Conference on Learning Representations (ICLR)*
+           https://arxiv.org/abs/2210.02747
+
+    .. [3] Singh, S., & Fischer, I. (2024).
+           "Stochastic Sampling from Deterministic Flow Models"
+           https://arxiv.org/abs/2410.02217
+    """
+
+    # Whether the score is defined for this estimator.
+    # Required for gradient-based methods.
+    SCORE_DEFINED: bool = True
+    # Whether the SDE functions - score, drift and diffusion -
+    # are defined for this estimator.
+    SDE_DEFINED: bool = True
+    # Whether the marginals are defined for this estimator.
+    # Required for iid methods.
+    MARGINALS_DEFINED: bool = True
+
+    def __init__(
+        self,
+        net: MaskedVectorFieldNet,
+        input_shape: torch.Size,
+        embedding_net: Optional[nn.Module] = None,
+        noise_scale: float = 1e-3,
+        mean_0: Union[float, Tensor] = 0.0,
+        std_0: Union[float, Tensor] = 1.0,
+        gaussian_baseline: bool = False,
+    ) -> None:
+        r"""Creates a masked vector field estimator for Flow Matching.
+
+        As in `FlowMatchingEstimator`, the network works with normalized inputs and
+        velocities, while `forward`, `ode_fn` and `score` act in the original space:
+        latent entries are z-scored with the time-dependent marginal statistics of
+        the probability path, observed (clean) entries with `mean_0` and `std_0`,
+        and the network output is mapped back with the velocity statistics.
+
+        Args:
+            net: Neural network that estimates the vector field.
+            input_shape: Shape of the input.
+            embedding_net: Embedding network for the condition.
+            noise_scale: Scale of the noise added to the vector field
+                (:math:`\sigma_{min}` in [2]_).
+            mean_0: Mean of the data (t=0), per entry or scalar.
+            std_0: Standard deviation of the data (t=0), per entry or scalar.
+            gaussian_baseline: If True, add the analytical velocity of a Gaussian
+                with mean `mean_0` and std `std_0`, so that the network only learns
+                the residual (see `FlowMatchingEstimator`).
+        """
+
+        super().__init__(
+            net=net,
+            input_shape=input_shape,
+            embedding_net=embedding_net,
+        )
+        self.noise_scale = noise_scale
+        self.gaussian_baseline = gaussian_baseline
+
+        mean_0 = torch.as_tensor(mean_0, dtype=torch.float32)
+        std_0 = torch.as_tensor(std_0, dtype=torch.float32)
+        self.register_buffer("mean_0", mean_0.expand(self.input_shape).clone())
+        self.register_buffer("std_0", std_0.expand(self.input_shape).clone())
+
+    def _broadcast_condition_mask(self, condition_mask: Tensor, num: int) -> Tensor:
+        """Return the condition mask as `(num, T)` or `(num, T, F)` booleans."""
+        condition_mask = condition_mask.bool()
+        if condition_mask.dim() == 1:
+            condition_mask = condition_mask.unsqueeze(0)
+        condition_mask = condition_mask.reshape(-1, self.input_shape[0])
+        if condition_mask.shape[0] != num:
+            condition_mask = condition_mask.repeat(num // condition_mask.shape[0], 1)
+        if len(self.input_shape) == 2:
+            condition_mask = condition_mask.unsqueeze(-1)
+        return condition_mask
+
+    def _time_dependent_stats(self, time: Tensor) -> tuple[Tensor, Tensor]:
+        """Marginal mean and std of the path `(1-t) x_0 + t x_1` with
+        `x_0 ~ N(mean_0, std_0^2)` and `x_1 ~ N(0, 1)`; time of shape `(N,)`."""
+        t = time.view(-1, *([1] * len(self.input_shape)))
+        mean_t = (1 - t) * self.mean_0
+        std_t = torch.sqrt(((1 - t) * self.std_0) ** 2 + t**2 + 1e-6)
+        return mean_t, std_t
+
+    def _velocity_stats(self) -> tuple[Tensor, Tensor]:
+        """Mean and std of the velocity target `x_1 - x_0`."""
+        return -self.mean_0, torch.sqrt(1 + self.std_0**2)
+
+    def _velocity_baseline(self, input: Tensor, time: Tensor) -> Tensor:
+        """Analytical velocity for Gaussian data, see `FlowMatchingEstimator`."""
+        t = time.view(-1, *([1] * len(self.input_shape)))
+        mean_t, std_t = self._time_dependent_stats(time)
+        factor = (t - (1 - t) * self.std_0**2) / std_t**2
+        return factor * (input - mean_t) - self.mean_0
+
+    def forward(
+        self,
+        input: Tensor,
+        time: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor],
+    ) -> Tensor:
+        """Forward pass of the FlowMatchingEstimator.
+
+        Args:
+            input: Inputs to evaluate the vector field on of shape
+                    `(sample_dim_input, batch_dim_input, *event_shape_input)`.
+            time: Time variable in [0,1] of shape
+                `(batch_dim_time, *event_shape_time)`.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
+
+        Returns:
+            The estimated vector field, in the original space.
+        """
+        # Continue with standard processing (broadcast shapes etc.)
+        batch_shape = input.shape[: -len(self.input_shape)]
+
+        input = torch.broadcast_to(input, batch_shape + self.input_shape)
+        time = torch.broadcast_to(time, batch_shape)
+
+        # NOTE: To simplify use of external networks, we will flatten the tensors
+        # batch_shape to a single batch dimension.
+        input = input.reshape(-1, *input.shape[len(batch_shape) :])
+        time = time.reshape(-1)
+
+        # Normalize: latent entries with the marginal statistics at time t, observed
+        # (clean) entries with the data statistics.
+        mean_t, std_t = self._time_dependent_stats(time)
+        is_observed = self._broadcast_condition_mask(condition_mask, input.shape[0])
+        input_norm = torch.where(
+            is_observed,
+            (input - self.mean_0) / self.std_0,
+            (input - mean_t) / std_t,
+        )
+
+        # The network predicts the normalized velocity (or residual).
+        v_out = self.net(input_norm, time, condition_mask, edge_mask)
+        v_mean, v_std = self._velocity_stats()
+        if self.gaussian_baseline:
+            v = self._velocity_baseline(input, time) + v_out * v_std
+        else:
+            v = v_out * v_std + v_mean
+        return v.reshape(*batch_shape + self.input_shape)
+
+    def loss(
+        self,
+        input: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor],
+        times: Optional[Tensor] = None,
+        rebalance_loss: bool = True,
+        loss_mask: Optional[Tensor] = None,
+        **kwargs,
+    ) -> Tensor:
+        r"""Return the loss for training the density estimator.
+
+        More precisely, we compute the conditional flow matching loss with naive optimal
+        trajectories as described in the original paper [1]_:
+
+        .. math::
+            \mathbb{E}_{\text{inputs}_0 \sim p_{data}, t \sim \text{Uniform}[0, 1]},
+            \text{inputs}_t = t \cdot \text{inputs}_1 + (1 - t) \cdot \text{inputs}_0,
+            \left[ \| v(\text{inputs}_t, t; x_o = x_o) - (\text{inputs}_1 -
+                \text{inputs}_0) \|^2 \right]
+
+        where :math:`v(\text{inputs}_t, t; x_o)` is the vector field
+            estimated by the neural
+        network (see Equation 1 in [1]_ with added conditioning on :math:`x_o`. The
+        notation is changed to match the standard SBI notation:
+            :math:`\text{inputs}_0 = x_0` and :math:`\text{inputs}_1 = x_1`).
+
+        The loss is computed as the mean squared error between the vector field:
+
+        .. math::
+            L(\text{inputs}_0, \text{inputs}_1, t, x_o) = \| v(\text{inputs}_t, t; x_o)
+                - (\text{inputs}_1 - \text{inputs}_0) \|^2
+
+            where
+
+            .. math::
+                \text{inputs}_1 \sim p_{base}
+                \text{inputs}_t = t \cdot \text{inputs}_1 + (1 - t) \cdot
+                    \text{inputs}_0
+
+            Additionally, the small noise :math:`\sigma_{min}` is added to the
+            vector field as per [2]_ to address numerical issues at small times.
+
+        Args:
+            input: Original data
+                Shape: [B, T, F]
+            times: SDE time variable in [t_min, t_max]. Uniformly sampled if None.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
+            rebalance_loss: If True, the loss for each batch item is divided by the
+                number of latent (unobserved) entries in that item (nodes times
+                features). This is useful when the number of latent variables varies
+                across the batch, as it prevents items with more latent variables
+                from dominating the loss.
+            loss_mask: Optional boolean mask of the shape of `input` (or
+                `(batch_size, num_variables)`); entries that are `False` (e.g.,
+                missing values) are excluded from the loss. If None, all latent
+                entries count.
+
+        Returns:
+            Loss value.
+        """
+
+        input_shape = input.shape
+        B = input_shape[0]  # Batch size
+        T = input_shape[1]  # Variables (nodes)
+
+        # randomly sample the time steps to compare the vector field at
+        # different time steps
+        if times is None:
+            times = torch.rand(B, device=input.device, dtype=input.dtype)
+
+        # Ensure compatible dimensions
+        times_ = times
+        while times_.dim() < input.dim():
+            times_ = times_.unsqueeze(-1)
+
+        # sample from probability path at time t
+        input_1 = torch.randn_like(input)
+        input_t = (1 - times_) * input + (times_ + self.noise_scale) * input_1
+
+        condition_mask = condition_mask.bool()
+        # Ensure condition_mask is broadcastable to input shape
+        # input: [B, T] or [B, T, F]
+        # condition_mask: [T] or [B, T]
+        # We want to broadcast condition_mask to [B, T] for masking
+
+        # Always ensure condition_mask is [B, T]
+        if condition_mask.dim() == 1:
+            # [T] -> [B, T]
+            condition_mask_broadcast = condition_mask.unsqueeze(0).expand(B, T)
+        elif condition_mask.dim() == 2:
+            # [B, T]
+            condition_mask_broadcast = condition_mask
+        else:
+            raise ValueError(
+                f"condition_mask has incorrect dimensions: {condition_mask.shape} "
+                f"condition_mask should have shape [T] or [B, T], where T is "
+                f"the number of nodes and B is the batch size."
+            )
+
+        # Now broadcast to input shape
+        if input.dim() == 2:
+            # [B, T]
+            pass
+        elif input.dim() == 3:
+            # [B, T, F]
+            condition_mask_broadcast = condition_mask_broadcast.unsqueeze(-1).expand_as(
+                input
+            )
+        else:
+            raise ValueError(
+                f"input has incorrect dimensions: {input.shape} "
+                f"input should have shape [B, T] or [B, T, F]"
+            )
+
+        # Shape of condition_mask is [B, T], I unsqueeze for broadcasting on F
+        input_t = torch.where(
+            # Where condition_mask is True, use input (observed)
+            condition_mask_broadcast,
+            input,
+            input_t,
+        )
+
+        # compute vector field at the sampled time steps
+        vector_field_target = input_1 - input
+
+        # Get the predicted vector field from the network
+        # Pass masks to the forward method
+        predicted_vector_field = self.forward(input_t, times, condition_mask, edge_mask)
+
+        # Mean squared error in normalized velocity space (as in
+        # `FlowMatchingEstimator`), so that all entries have comparable scale.
+        _, v_std = self._velocity_stats()
+        loss = ((predicted_vector_field - vector_field_target) / v_std) ** 2.0
+
+        # Loss is only computed for latent entries that are valid
+        in_loss = entries_in_masked_loss(condition_mask_broadcast, loss_mask)
+        loss = torch.where(in_loss, loss, torch.zeros_like(loss))
+
+        # Since sbi expects loss-per-batch, I sum on both T and F
+        if loss.dim() == 3:
+            loss = loss.sum(dim=(-2, -1), keepdim=True)  # [B, 1, 1]
+        elif loss.dim() == 2:
+            loss = loss.sum(dim=-1, keepdim=True)  # [B, 1]
+        else:
+            raise ValueError(f"Unexpected loss shape: {loss.shape}")
+
+        # Rebalance loss if desired (similar to MaskedConditionalScoreEstimator)
+        if rebalance_loss:
+            # Number of entries (nodes times features) in the loss, per batch item
+            num_elements = in_loss.flatten(1).sum(-1).clamp(min=1)
+            loss = loss / num_elements.view(-1, *([1] * (loss.dim() - 1)))
+
+        if loss.dim() == 3:
+            loss = loss.squeeze(dim=(-2, -1))
+        elif loss.dim() == 2:
+            loss = loss.squeeze(dim=-1)
+        else:
+            raise ValueError(f"Unexpected loss shape: {loss.shape}")
+
+        return loss
+
+    def ode_fn(
+        self,
+        input: Tensor,
+        times: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Tensor,
+    ) -> Tensor:
+        r"""
+        ODE flow function :math:`v(\text{inputs}_t, t, x_o)` of the vector field
+            estimator.
+
+        The target distribution can be sampled from by solving the following ODE:
+
+        .. math::
+            d\text{inputs}_t = v(\text{inputs}_t, t; x_o) dt
+
+        with initial :math:`\text{inputs}_1` sampled from the base distribution.
+        Here :math:`v(\text{inputs}_t, t; x_o)` is the vector field estimated by the
+        flow matching neural network (see Equation 1 in [1]_ with added
+        conditioning on :math:`x_o`).
+
+        Args:
+            input: :math:`\text{inputs}_t`.
+            times: Time :math:`t`.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
+
+        Returns:
+            Estimated vector field :math:`v(\text{inputs}_t, t; x_o)`.
+            The shape is the same as the input.
+        """
+        return self.forward(input, times, condition_mask, edge_mask)
+
+    def score(
+        self, input: Tensor, t: Tensor, condition_mask: Tensor, edge_mask: Tensor
+    ) -> Tensor:
+        r"""Score function of the vector field estimator.
+
+        The score function is calculated based on [3]_ (see Equation 13):
+
+        .. math::
+            \nabla_{\text{inputs}_t} \log p(\text{inputs}_t | x_o) =
+            (- (1 - t) v(\text{inputs}_t, t; x_o) - \text{inputs}_0 ) / t
+
+        Taking into account the noise scale :math:`\sigma_{min}`, the score function is
+        :math:`\nabla_{\text{inputs}_t} \log p(\text{inputs}_t | x_o) =
+            (- (1 - t) v(\text{inputs}_t, t; x_o) -
+                \text{inputs}_0 ) / (t + \sigma_{min})`.
+
+        Args:
+            input: variable whose distribution is estimated.
+            t: Time.
+            condition_mask: A boolean mask indicating the role of each variable.
+                Expected shape: `(batch_size, num_variables)`.
+
+                - `True` (or `1`): The variable at this position is observed and its
+                    features will be used for conditioning.
+                - `False` (or `0`): The variable at this position is latent and its
+                    features are subject to inference.
+            edge_mask: A boolean mask defining the adjacency matrix of the directed
+                acyclic graph (DAG) representing dependencies among variables.
+                Expected shape: `(batch_size, num_variables, num_variables)`.
+
+                - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
+                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                - `False` (or `0`): No edge exists between these variables.
+                - if None, it will be equivalent to a full attention (i.e., full ones)
+                    mask, we suggest you to use None instead of ones
+                    to save memory resources
+
+        Returns:
+            Score function of the vector field estimator.
+        """
+        v = self(input, t, condition_mask, edge_mask)
+        score = (-(1 - t) * v - input) / (t + self.noise_scale)
+        return score
+
+    def drift_fn(
+        self, input: Tensor, times: Tensor, effective_t_max: float = 0.99
+    ) -> Tensor:
+        r"""Drift function for the flow matching estimator.
+
+        The drift function is calculated based on [3]_ (see Equation 7):
+
+        .. math::
+            f(t) = - \text{inputs}_t / (1 - t)
+
+        The drift function :math:`f(t)` and diffusion function :math:`\g(t)`
+        enable SDE sampling:
+
+        .. math::
+            d\text{inputs}_t = [f(t) - g(t)^2 \nabla_{\text{inputs}_t}
+                \log p(\text{inputs}_t | x_o)]dt
+            + \g(t) dW_t
+
+        where :math:`dW_t` is the Wiener process.
+
+        Args:
+            input: Parameters :math:`\text{inputs}_t`.
+            times: SDE time variable in [0,1].
+            effective_t_max: Upper bound on time to avoid numerical issues at t=1.
+
+        Returns:
+            Drift function at a given time.
+        """
+        # analytical f(t) does not depend on noise_scale and is undefined at t = 1.
+        return -input / torch.maximum(
+            1 - times, torch.tensor(1 - effective_t_max).to(input)
+        )
+
+    def diffusion_fn(
+        self, input: Tensor, times: Tensor, effective_t_max: float = 0.99
+    ) -> Tensor:
+        r"""Diffusion function for the flow matching estimator.
+
+        The diffusion function is calculated based on [3]_ (see Equation 7):
+
+        .. math::
+            \g(t) = \sqrt{2t / (1 - t)}
+
+        Taking into account the noise scale :math:`\sigma_{min}`, the diffusion
+        function becomes:
+
+        .. math::
+            \g(t) = \sqrt{2(t + \sigma_{min}) / (1 - t)}
+
+
+        Args:
+            input: Parameters :math:`\text{inputs}_t`.
+            times: SDE time variable in [0,1].
+            effective_t_max: Upper bound on time to avoid numerical issues at t=1.
+                This effectively prevents an explosion of the SDE in the beginning.
+
+        Returns:
+            Diffusion function at a given time.
+        """
+        # analytical g(t) is undefined at t = 1.
+        return torch.sqrt(
+            2
+            * (times + self.noise_scale)
+            / torch.maximum(1 - times, torch.tensor(1 - effective_t_max).to(times))
+        )
+
+    def mean_t_fn(self, times: Tensor, effective_t_max: float = 0.99) -> Tensor:
+        r"""Linear coefficient of the perturbation kernel expectation
+        :math:`\mu_t(t) = E[\text{inputs}_t | \text{inputs}_0]` for the flow matching
+            estimator.
+
+        The perturbation kernel for rectified flows with Gaussian base distribution is:
+
+        .. math::
+            N(\text{inputs}_t; \mu_t(t), \sigma_t(t)^2) ,
+            \mu_t(t) = (1 - t) \cdot \text{inputs}_0 + t \cdot \mu_{base}
+            \sigma_t(t) = t \cdot \sigma_{base}
+
+        So far, the implementation of iid methods assumes that the mean_base
+        :math:`\mu_{base}` is 0. Therefore, the linear coefficient of the perturbation
+        kernel mean is simply :math:`1 - t`.
+
+        Args:
+            times: SDE time variable in [0,1].
+            effective_t_max: Upper bound on time to avoid numerical issues at t=1.
+
+        Returns:
+            Mean function at a given time.
+        """
+        times = torch.clamp(times, max=effective_t_max)
+        mean_t = 1 - times
+        for _ in range(len(self.input_shape)):
+            mean_t = mean_t.unsqueeze(-1)
+        return mean_t
+
+    def std_fn(self, times: Tensor) -> Tensor:
+        r"""Standard deviation of the perturbation kernel :math:`\sigma_t(t)`
+        for the flow matching estimator.
+
+        The perturbation kernel for rectified flows with Gaussian base distribution is:
+
+        .. math::
+            N(\text{inputs}_t; \mu_t(t), \sigma_t(t)^2) ,
+            \mu_t(t) = (1 - t) \cdot \text{inputs}_0 + t \cdot \mu_{base}
             \sigma_t(t) = t \cdot \sigma_{base}
 
         Taking into account the noise scale :math:`\sigma_{min}`, the standard deviation

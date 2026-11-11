@@ -715,6 +715,37 @@ def check_estimator_arg(
         )
 
 
+def _validate_tensor_properties_and_device(
+    tensor: Any,
+    name: str,
+    data_device: str,
+    training_device: str,
+    expected_dtype: Union[torch.dtype, Tuple[torch.dtype, ...]],
+) -> Tensor:
+    """Helper to validate a single tensor's type and dtype,
+    and move it to the data_device."""
+    assert isinstance(tensor, Tensor), f"{name} must be a `torch.Tensor`."
+
+    if isinstance(expected_dtype, tuple):
+        assert tensor.dtype in expected_dtype, (
+            f"Type of {name} must be one of {expected_dtype}, but got {tensor.dtype}."
+        )
+    else:
+        assert tensor.dtype == expected_dtype, (
+            f"Type of {name} must be {expected_dtype}, but got {tensor.dtype}."
+        )
+
+    if canonical_device(tensor.device) != canonical_device(data_device):
+        warnings.warn(
+            f"{name} has device '{tensor.device}'. "
+            f"Moving {name} to the data_device '{data_device}'. "
+            f"Training will proceed on device '{training_device}'.",
+            stacklevel=3,
+        )
+        tensor = tensor.to(data_device)
+    return tensor
+
+
 def validate_theta_and_x(
     theta: Any, x: Any, data_device: str = "cpu", training_device: str = "cpu"
 ) -> Tuple[Tensor, Tensor]:
@@ -740,38 +771,53 @@ def validate_theta_and_x(
         data_device: Device where data is stored.
         training_device: Training device for net.
     """
-    assert isinstance(theta, Tensor), "Parameters theta must be a `torch.Tensor`."
-    assert isinstance(x, Tensor), "Simulator output must be a `torch.Tensor`."
+    theta = _validate_tensor_properties_and_device(
+        theta, "theta", data_device, training_device, torch.float32
+    )
+    x = _validate_tensor_properties_and_device(
+        x, "x", data_device, training_device, torch.float32
+    )
 
     assert theta.shape[0] == x.shape[0], (
         f"Number of parameter sets (={theta.shape[0]}) must match the number of "
         f"simulation outputs (={x.shape[0]})"
     )
 
-    # I did not fuse these asserts with the `isinstance(x, Tensor)` asserts in order
-    # to give more explicit errors.
-    assert theta.dtype == float32, "Type of parameters must be float32."
-    assert x.dtype == float32, "Type of simulator outputs must be float32."
-
-    if canonical_device(x.device) != canonical_device(data_device):
-        warnings.warn(
-            f"Data x has device '{x.device}'. "
-            f"Moving x to the data_device '{data_device}'. "
-            f"Training will proceed on device '{training_device}'.",
-            stacklevel=2,
-        )
-        x = x.to(data_device)
-
-    if canonical_device(theta.device) != canonical_device(data_device):
-        warnings.warn(
-            f"Parameters theta has device '{theta.device}'. "
-            f"Moving theta to the data_device '{data_device}'. "
-            f"Training will proceed on device '{training_device}'.",
-            stacklevel=2,
-        )
-        theta = theta.to(data_device)
-
     return theta, x
+
+
+def validate_inputs(
+    inputs: Any,
+    data_device: str = "cpu",
+    training_device: str = "cpu",
+) -> Tensor:
+    r"""Check the inputs of a masked (Simformer-style) trainer and move them to
+    `data_device`.
+
+    Checks that `inputs` is a float32 tensor of shape `(batch_size, num_variables)`
+    or `(batch_size, num_variables, num_features)`.
+
+    Args:
+        inputs: Joint inputs of all variables (latent and observed).
+        data_device: Device where data is stored.
+        training_device: Training device for neural network computations.
+
+    Returns:
+        The validated inputs on `data_device`.
+
+    Raises:
+        ValueError: If `inputs` does not have 2 or 3 dimensions.
+    """
+    inputs = _validate_tensor_properties_and_device(
+        inputs, "inputs", data_device, training_device, torch.float32
+    )
+    if inputs.dim() not in (2, 3):
+        raise ValueError(
+            "inputs must have shape (batch_size, num_variables) or "
+            "(batch_size, num_variables, num_features), but got shape "
+            f"{tuple(inputs.shape)}."
+        )
+    return inputs
 
 
 def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:

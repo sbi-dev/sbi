@@ -11,6 +11,7 @@ from sbi.inference import FMPE, MNLE, NLE, NPE, NPE_PFN, NPSE, NRE
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
+from sbi.inference.trainers.vfpe.simformer import FlowMatchingSimformer, Simformer
 from sbi.neural_nets import DensityConfigBase, FlowMatchingConfig, MixedConfig
 from sbi.neural_nets.net_builders.estimator_configs import (
     _CLASSIFIER_CONFIGS,
@@ -49,6 +50,8 @@ METHOD_GROUPS = {
     "snpe": [NPE_C],  # NPE_B not implemented, NPE_A need Gaussian prior
     "snle": [NLE],
     "snre": [NRE_A, NRE_B, NRE_C, BNRE],
+    "simformer": [Simformer],
+    "flow-simformer": [FlowMatchingSimformer],
     "mnle": [MNLE],
 }
 METHOD_PARAMS = {
@@ -67,6 +70,8 @@ METHOD_PARAMS = {
     "snpe": [{}],
     "snle": [{}],
     "snre": [{}],
+    "simformer": [{"sde_type": sde} for sde in ["ve", "vp"]],
+    "flow-simformer": [{}],
     "mnle": [{}],
 }
 ESTIMATOR_ARGUMENTS = {
@@ -325,10 +330,21 @@ def train_and_eval_amortized_inference(
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
-    inference = inference_class(
-        prior, **_estimator_kwargs(inference_class, extra_kwargs)
-    )
-    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
+    kwargs = _estimator_kwargs(inference_class, extra_kwargs)
+    if inference_class in {Simformer, FlowMatchingSimformer}:
+        # The Simformer learns the joint of theta (first) and x.
+        num_theta, num_x = thetas.shape[1], xs.shape[1]
+        inference = inference_class(
+            posterior_latent_idx=list(range(num_theta)),
+            posterior_observed_idx=list(range(num_theta, num_theta + num_x)),
+            prior=prior,
+            **kwargs,
+        )
+        inference.append_simulations(torch.cat([thetas, xs], dim=1))
+    else:
+        inference = inference_class(prior, **kwargs)
+        inference.append_simulations(thetas, xs)
+    inference.train(**TRAIN_KWARGS)
 
     posterior = inference.build_posterior()
 

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from sbi.inference.abc import MCABC, SMCABC
 from sbi.inference.trainers.base import (
+    MaskedNeuralInference,  # noqa: F401
     NeuralInference,  # noqa: F401
     check_if_proposal_has_default_x,
     infer,
@@ -14,7 +15,7 @@ from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.inference.trainers.nle import MNLE, NLE_A
 from sbi.inference.trainers.npe import MNPE, NPE_A, NPE_B, NPE_C, NPE_PFN  # noqa: F401
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C  # noqa: F401
-from sbi.inference.trainers.vfpe import FMPE, NPSE
+from sbi.inference.trainers.vfpe import FMPE, NPSE, FlowMatchingSimformer, Simformer
 
 NLE = NLE_A
 _nle_family = ["NLE_A", "MNLE"]
@@ -98,9 +99,11 @@ __all__ = (
     + _nle_family
     + _abc_family
     + [
+        "FlowMatchingSimformer",
         "FMPE",
         "MarginalTrainer",
         "NPSE",
+        "Simformer",
         "DirectPosterior",
         "EnsemblePosterior",
         "ImportanceSamplingPosterior",
