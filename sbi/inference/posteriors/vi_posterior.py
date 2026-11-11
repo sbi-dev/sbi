@@ -36,7 +36,10 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unconditional_flow,
 )
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
-from sbi.samplers.vi.vi_quality_control import get_quality_metric
+from sbi.samplers.vi.vi_quality_control import (
+    QualityControlError,
+    get_quality_metric,
+)
 from sbi.samplers.vi.vi_utils import (
     AdaptedVariationalDistribution,
     LearnableGaussian,
@@ -993,27 +996,53 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = None
         self._mode = "single_x"
 
-        # Evaluate quality
+        # Evaluate quality; retrain once if q fails it and can be rebuilt.
         if quality_control:
-            try:
-                self.evaluate(quality_control_metric=quality_control_metric)
-            except Exception as e:
-                print(
-                    f"Quality control showed a low quality of the variational "
-                    f"posterior. We are automatically retraining the variational "
-                    f"posterior from scratch with a smaller learning rate. "
-                    f"Alternatively, if you want to skip quality control, please "
-                    f"retrain with `VIPosterior.train(..., quality_control=False)`. "
-                    f"\nThe error that occured is: {e}"
+            error = self._quality_control_error(quality_control_metric)
+            if error is not None and self._q_spec.kind != "instance":
+                warnings.warn(
+                    f"Quality control failed: {error} Retraining the variational "
+                    "posterior from scratch, once, with a 10 times smaller learning "
+                    "rate. To skip quality control, pass `quality_control=False`.",
+                    UserWarning,
+                    stacklevel=2,
                 )
                 self.train(
                     x=x,
+                    n_particles=n_particles,
                     learning_rate=learning_rate * 0.1,
+                    gamma=gamma,
+                    max_num_iters=max_num_iters,
+                    min_num_iters=min_num_iters,
+                    clip_value=clip_value,
+                    warm_up_rounds=warm_up_rounds,
                     retrain_from_scratch=True,
                     reset_optimizer=True,
+                    show_progress_bar=show_progress_bar,
+                    check_for_convergence=check_for_convergence,
+                    quality_control=False,
+                    **kwargs,
+                )
+                error = self._quality_control_error(quality_control_metric)
+            if error is not None:
+                warnings.warn(
+                    f"Quality control failed: {error} The variational posterior may "
+                    "be unreliable.",
+                    UserWarning,
+                    stacklevel=2,
                 )
 
         return self
+
+    def _quality_control_error(
+        self, quality_control_metric: str
+    ) -> Optional[QualityControlError]:
+        """Return the error of the quality control's basic checks, if any."""
+        try:
+            self.evaluate(quality_control_metric=quality_control_metric)
+        except QualityControlError as error:
+            return error
+        return None
 
     def train_amortized(
         self,
