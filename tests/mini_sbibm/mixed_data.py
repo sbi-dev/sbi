@@ -48,25 +48,19 @@ class MixedData(Task):
         """Return the single trial observation dimensionality."""
         return 2
 
-    def get_prior(self, device=None) -> Distribution:
+    def get_prior(self) -> Distribution:
         """Return the Gamma and Beta prior used by the MNLE tests."""
         return MultipleIndependent(
             [
-                Gamma(
-                    torch.tensor([1.0], device=device),
-                    torch.tensor([0.5], device=device),
-                ),
-                Beta(
-                    torch.tensor([2.0], device=device),
-                    torch.tensor([2.0], device=device),
-                ),
+                Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
+                Beta(torch.tensor([2.0]), torch.tensor([2.0])),
             ],
             validate_args=False,
         )
 
-    def get_simulator(self, device=None) -> Callable:
+    def get_simulator(self) -> Callable:
         """Return the mixed data simulator."""
-        return lambda theta: mixed_simulator(theta.to(device), self.stimulus_condition)
+        return mixed_simulator
 
     def get_true_parameters(self, idx: int) -> Tensor:
         """Generate reproducible true parameters for an observation."""

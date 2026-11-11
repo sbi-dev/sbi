@@ -294,7 +294,6 @@ def eval_observation(
     samples = posterior.sample((num_samples,), x=x_o)
     if isinstance(samples, tuple):
         samples = samples[0]
-    samples = samples.to("cpu")
     assert reference_samples.shape[0] >= num_samples, "Not enough reference samples"
 
     reference_std = reference_samples.std(0)
@@ -328,28 +327,23 @@ def train_and_eval_amortized_inference(
         The metrics, averaged over the evaluation observations.
     """
     torch.manual_seed(seed)
-    device = extra_kwargs.get("device", "cpu")
-    thetas, xs = task.get_data(benchmark_num_simulations, device=device)
-    prior = task.get_prior(device=device)
+    thetas, xs = task.get_data(benchmark_num_simulations)
+    prior = task.get_prior()
 
     kwargs = _estimator_kwargs(inference_class, extra_kwargs)
     if inference_class in {Simformer, FlowMatchingSimformer}:
-        # Get dimensions of thetas and xs, and set latent and observed idx
-        inference = inference_class(**kwargs)
-        num_theta = thetas.shape[1]
-        num_x = xs.shape[1]
-        inference.set_condition_indexes(
-            new_posterior_latent_idx=torch.arange(0, num_theta),
-            new_posterior_observed_idx=torch.arange(num_theta, num_theta + num_x),
+        # The Simformer learns the joint of theta (first) and x.
+        num_theta, num_x = thetas.shape[1], xs.shape[1]
+        inference = inference_class(
+            posterior_latent_idx=list(range(num_theta)),
+            posterior_observed_idx=list(range(num_theta, num_theta + num_x)),
+            prior=prior,
+            **kwargs,
         )
-        inputs = torch.cat([thetas, xs], dim=1)
-        inference.append_simulations(
-            inputs,
-            data_device=device,
-        )
+        inference.append_simulations(torch.cat([thetas, xs], dim=1))
     else:
         inference = inference_class(prior, **kwargs)
-        inference.append_simulations(thetas, xs, data_device=device)
+        inference.append_simulations(thetas, xs)
     inference.train(**TRAIN_KWARGS)
 
     posterior = inference.build_posterior()
@@ -382,18 +376,15 @@ def train_and_eval_sequential_inference(
     x_o = task.get_observation(idx_eval)
     torch.manual_seed(seed)
     num_simulations = benchmark_num_simulations // NUM_ROUNDS_SEQUENTIAL
-    device = extra_kwargs.get("device", "cpu")
-    thetas, xs = task.get_data(num_simulations, device=device)
-    prior = task.get_prior(device=device)
+    thetas, xs = task.get_data(num_simulations)
+    prior = task.get_prior()
     simulator = task.get_simulator()
 
     # Round 1
     inference = inference_class(
         prior, **_estimator_kwargs(inference_class, extra_kwargs)
     )
-    _ = inference.append_simulations(thetas, xs, data_device=device).train(
-        **TRAIN_KWARGS
-    )
+    _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
     for _ in range(NUM_ROUNDS_SEQUENTIAL - 1):
         proposal = inference.build_posterior().set_default_x(x_o)
@@ -419,7 +410,6 @@ def test_run_benchmark(
     results_bag: ResultsBag,
     extra_kwargs: dict,
     benchmark_num_simulations: int,
-    benchmark_device,
     benchmark_seed: int,
     request: pytest.FixtureRequest,
 ) -> None:
@@ -433,7 +423,6 @@ def test_run_benchmark(
             but allows item assignment with dot notation.
         extra_kwargs: Additional keyword arguments for the method.
         benchmark_num_simulations: The number of training simulations.
-        benchmark_device: The device to use for training (e.g. 'cpu', 'cuda').
         benchmark_seed: The training seed.
         request: The pytest request, to read the benchmark mode.
     """
@@ -445,11 +434,6 @@ def test_run_benchmark(
     results_bag.task_name = task.name
     results_bag.seed = benchmark_seed
     results_bag.num_simulations = benchmark_num_simulations
-
-    # Patch extra_kwargs to include the device, without changing the result label.
-    patched_kwargs = dict(extra_kwargs)
-    patched_kwargs["device"] = torch.device(benchmark_device or "cpu")
-
     if mode in SEQUENTIAL_MODES:
         train_and_eval = train_and_eval_sequential_inference
     else:
@@ -458,7 +442,7 @@ def test_run_benchmark(
         inference_class,
         task,
         benchmark_num_simulations,
-        patched_kwargs,
+        extra_kwargs,
         benchmark_seed,
     )
 

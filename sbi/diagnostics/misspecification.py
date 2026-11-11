@@ -8,7 +8,8 @@ import warnings
 from typing import Optional
 
 import torch
-from torch import Tensor, nn
+import torch.nn as nn
+from torch import Tensor
 
 from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
 from sbi.neural_nets.estimators import UnconditionalDensityEstimator
@@ -148,25 +149,20 @@ def calc_misspecification_mmd(
                 "No neural net found. The inference object must be trained before "
                 "computing the MMD in mode 'embedding'."
             )
-        if inference._neural_net is None:
-            raise ValueError(
-                "no neural net found,"
-                "neural_net should not be None when mode is 'embedding'"
-            )
-        embedding_net = inference._neural_net.embedding_net
-        if isinstance(embedding_net, nn.modules.linear.Identity):
+        if isinstance(inference._neural_net.embedding_net, nn.modules.linear.Identity):
             warnings.warn(
                 "The embedding net might be the identity function, "
                 "in that case the MMD is computed in the x-space.",
                 stacklevel=2,
             )
-        if embedding_net is None:
+        if inference._neural_net.embedding_net is None:
             raise AttributeError(
-                "embedding_net attribute is None but is required for misspecification "
-                "detection."
+                "embedding_net attribute is None but is required for misspecification"
+                " detection."
             )
-        z_obs = embedding_net(x_obs).detach()
-        z = embedding_net(x).detach()
+
+        z_obs = inference._neural_net.embedding_net(x_obs).detach()
+        z = inference._neural_net.embedding_net(x).detach()
     else:
         raise ValueError("mode should be either 'x_space' or 'embedding'")
 
