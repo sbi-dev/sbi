@@ -24,9 +24,9 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.neural_nets.net_builders.estimator_configs import (
     MARGINAL_MODELS,
-    _ESTIMATOR_CONFIG_BASES,
     MarginalConfigBase,
     MarginalNSFConfig,
+    _PerModelConfigBase,
     _marginal_config_from_model,
 )
 from sbi.sbi_types import Tracker
@@ -129,7 +129,7 @@ class MarginalTrainer:
             self._build_neural_net = MarginalNSFConfig().build
         elif isinstance(density_estimator, MarginalConfigBase):
             self._build_neural_net = density_estimator.build
-        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
+        elif isinstance(density_estimator, _PerModelConfigBase):
             # The conditional configs are not callable, so without this branch
             # they would fall through to the unhelpful ValueError below.
             raise TypeError(
@@ -138,7 +138,7 @@ class MarginalTrainer:
                 "e.g. MarginalNSFConfig()."
             )
         elif isinstance(density_estimator, type) and issubclass(
-            density_estimator, _ESTIMATOR_CONFIG_BASES
+            density_estimator, _PerModelConfigBase
         ):
             # A config class is callable, so a forgotten `()` would pass the
             # callable branch below and only fail once training starts.
@@ -270,13 +270,11 @@ class MarginalTrainer:
                 we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
-            show_train_summary: Whether to print the number of epochs and validation
-                loss after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
-            Density estimator that approximates the distribution $p(\theta|x)$.
+            Density estimator that approximates the distribution $p(x)$.
         """
 
         # fake round setting just for compatibility with NeuralInference

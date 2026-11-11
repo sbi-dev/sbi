@@ -22,7 +22,6 @@ from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
 from sbi.utils.torchutils import (
     ensure_theta_batched,
-    process_device,
     split_leading_dim,
 )
 from sbi.utils.user_input_checks import check_prior
@@ -98,46 +97,6 @@ class DirectPosterior(NeuralPosterior):
 
         self._purpose = """It samples the posterior network and rejects samples that
             lie outside of the prior bounds."""
-
-    def to(self, device: Union[str, torch.device]) -> None:
-        """Move posterior_estimator, prior and x_o to device.
-
-        Changes the device attribute, reinstanciates the
-        posterior, and resets the default x.
-
-        Args:
-            device: device where to move the posterior to.
-        """
-        device = process_device(device)
-        self.device = device
-        if hasattr(self.prior, "to"):
-            self.prior.to(device)  # type: ignore
-        else:
-            raise ValueError("""Prior has no attribute to(device).""")
-        if hasattr(self.posterior_estimator, "to"):
-            self.posterior_estimator.to(device)
-        else:
-            raise ValueError("""Posterior estimator has no attribute to(device).""")
-
-        potential_fn, theta_transform = posterior_estimator_based_potential(
-            self.posterior_estimator,
-            self.prior,
-            x_o=None,
-            enable_transform=self.enable_transform,
-        )
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-
-        super().__init__(
-            potential_fn=potential_fn,
-            theta_transform=theta_transform,
-            device=device,
-            x_shape=self.x_shape,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
 
     def sample(
         self,
@@ -492,7 +451,7 @@ class DirectPosterior(NeuralPosterior):
 
         The factor is estimated from the acceptance probability during rejection
         sampling from the posterior. It is saved for the last `x` and re-estimated
-        whenever `x` changes. It is 1 for unbounded priors.
+        whenever `x` or `num_rejection_samples` changes. It is 1 for unbounded priors.
 
         Arguments:
             x: Observation at which to estimate the factor.
@@ -504,6 +463,7 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
+        x = self._x_else_default_x(x)
 
         def acceptance() -> Tensor:
             return rejection.accept_reject_sample(
@@ -520,7 +480,9 @@ class DirectPosterior(NeuralPosterior):
                 },
             )[1]
 
-        return self._cached_leakage_factor(x, self.prior, acceptance, force_update)
+        return self._cached_leakage_factor(
+            x, num_rejection_samples, self.prior, acceptance, force_update
+        )
 
     def map(
         self,
@@ -555,9 +517,10 @@ class DirectPosterior(NeuralPosterior):
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it must be `posterior`, which samples the
+                posterior `num_init_samples` times. If it is a tensor, the tensor is
+                used as the initial locations, so prior-based initialization can be
+                done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the

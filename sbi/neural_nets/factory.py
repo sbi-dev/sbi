@@ -5,18 +5,17 @@ from dataclasses import replace
 from enum import Enum
 from typing import Any, Callable, Literal, Optional, Union
 
-from torch import Tensor, nn
+from torch import nn
 
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
     _CLASSIFIER_CONFIGS,
     _DENSITY_CONFIGS,
-    MarginalFlowConfig,
+    _MARGINAL_CONFIGS,
     _config_from_factory_kwargs,
     _factory_defaults,
     _mixed_config_from_factory_kwargs,
 )
-from sbi.neural_nets.net_builders.flow import build_zuko_unconditional_flow
 from sbi.neural_nets.net_builders.vector_field_nets import (
     FlowMatchingConfig,
     _score_config_from_sde_type,
@@ -80,6 +79,14 @@ _VF_FACTORY_FIELDS: dict = {
     "time_embedding_dim": "t_embedding_dim",
     "time_emb_type": "time_emb_type",
     "compose_standardization": "compose_standardization",
+}
+
+# The marginal configs carry Zuko's own parameter names, e.g. `bins`.
+_MARGINAL_FACTORY_FIELDS: dict = {
+    "z_score_input": "z_score_x",
+    "hidden_features": "hidden_features",
+    "num_transforms": "num_transforms",
+    "bins": "num_bins",
 }
 
 
@@ -594,7 +601,6 @@ def marginal_nn(
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
-    num_components: int = 10,
     **kwargs: Any,
 ) -> Callable:
     r"""
@@ -603,33 +609,32 @@ def marginal_nn(
     Args:
         model: The type of density estimator that will be created.
         z_score_x: Whether to z-score samples $x$ before passing them into
-            the network.
+            the network. NCSF models data on $[-\pi, \pi)$, which a z-score
+            would move, so for NCSF the default becomes `none`.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms when a flow is used.
-        num_bins: Number of bins used for the splines in `nsf`.
-        num_components: Number of mixture components for a mixture of Gaussians.
-        **kwargs: Additional estimator arguments.  Valid keys are defined by
-            ``MarginalFlowConfig``; unknown keys trigger a warning and are forwarded to
-            the builder.
+        num_bins: Number of bins used for the splines in `nsf` and `ncsf`.
+        **kwargs: Additional estimator arguments.  Valid keys are the fields of
+            the chosen model's marginal config (e.g. `randperm` for `maf`); a key
+            the model does not use raises, and an unknown key triggers a warning
+            and is forwarded to the builder.
     """
 
-    # Map user-facing parameter names to internal names (no renaming needed here).
-    mapped = dict(
-        z_score_x=z_score_x,
-        hidden_features=hidden_features,
-        num_transforms=num_transforms,
-        num_bins=num_bins,
-        num_components=num_components,
-    )
-
-    # Validate against known fields — warns on unknown kwargs (typos)
-    # while still forwarding them to the underlying builder.
-    config = MarginalFlowConfig.from_kwargs(**mapped, **kwargs)
-    builder_kwargs = config.to_dict()
-
-    def build_fn(batch_x: Tensor) -> Any:
-        return build_zuko_unconditional_flow(
-            which_nf=model.value.upper(), batch_x=batch_x, **builder_kwargs
+    # Map user-facing parameter names to the config's field names.
+    family_args = _normalize_z_scoring(
+        dict(
+            z_score_input=z_score_x,
+            hidden_features=hidden_features,
+            num_transforms=num_transforms,
+            bins=num_bins,
         )
-
-    return build_fn
+    )
+    config = _config_from_factory_kwargs(
+        model.value,
+        _MARGINAL_CONFIGS,
+        "marginal",
+        family_args=family_args,
+        factory_defaults=_factory_defaults(marginal_nn, _MARGINAL_FACTORY_FIELDS),
+        extra=kwargs,
+    )
+    return config.build

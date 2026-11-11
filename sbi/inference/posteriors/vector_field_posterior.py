@@ -30,7 +30,7 @@ from sbi.utils.sbiutils import (
     warn_if_outside_prior_support,
     within_support,
 )
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 class VectorFieldPosterior(NeuralPosterior):
@@ -108,43 +108,6 @@ class VectorFieldPosterior(NeuralPosterior):
 
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
-
-    def to(self, device: Union[str, torch.device]) -> None:
-        """Move posterior to device.
-
-        Args:
-            device: device where to move the posterior to.
-        """
-        device = process_device(device)
-        self.device = device
-        if hasattr(self.prior, "to"):
-            self.prior.to(device)  # type: ignore
-        else:
-            raise ValueError("""Prior has no attribute to(device).""")
-        if hasattr(self.vector_field_estimator, "to"):
-            self.vector_field_estimator.to(device)
-        else:
-            raise ValueError("""Posterior estimator has no attribute to(device).""")
-
-        potential_fn, theta_transform = vector_field_estimator_based_potential(
-            self.vector_field_estimator,
-            self.prior,
-            x_o=None,
-            enable_transform=self.enable_transform,
-        )
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-        super().__init__(
-            potential_fn=potential_fn,
-            theta_transform=theta_transform,
-            device=device,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
-
-        self.potential_fn: VectorFieldBasedPotential = potential_fn
 
     def sample(
         self,
@@ -557,7 +520,8 @@ class VectorFieldPosterior(NeuralPosterior):
 
         The mass is the fraction of probability flow ODE samples inside the prior
         support. It is 1 for unbounded priors. The factor is saved for the last `x`
-        and re-estimated whenever `x` changes, or for any call with `ode_kwargs`.
+        and re-estimated whenever `x` or `num_rejection_samples` changes, or for any
+        call with `ode_kwargs`.
 
         Args:
             x: A single observation.
@@ -569,6 +533,7 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
+        x = self._x_else_default_x(x)
 
         def acceptance() -> Tensor:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
@@ -593,7 +558,12 @@ class VectorFieldPosterior(NeuralPosterior):
             return mass
 
         return self._cached_leakage_factor(
-            x, self.prior, acceptance, force_update, use_cache=not ode_kwargs
+            x,
+            num_rejection_samples,
+            self.prior,
+            acceptance,
+            force_update,
+            use_cache=not ode_kwargs,
         )
 
     def sample_batched(
@@ -773,9 +743,10 @@ class VectorFieldPosterior(NeuralPosterior):
                 for the optimization.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it must be `posterior`, which samples the
+                posterior `num_init_samples` times. If it is a tensor, the tensor is
+                used as the initial locations, so prior-based initialization can be
+                done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             save_best_every: The best log-probability is computed, saved in the
@@ -817,18 +788,9 @@ class VectorFieldPosterior(NeuralPosterior):
             callable_potential_fn = CallableDifferentiablePotentialFunction(
                 self.potential_fn
             )
-            if init_method == "posterior":
-                inits = self.sample((num_init_samples,))
-            elif init_method == "proposal":
-                inits = self.proposal.sample((num_init_samples,))  # type: ignore
-            elif isinstance(init_method, Tensor):
-                inits = init_method
-            else:
-                raise ValueError
-
             self._map = gradient_ascent(
                 potential_fn=callable_potential_fn,
-                inits=inits,
+                inits=self._map_inits(init_method, num_init_samples),
                 theta_transform=self.theta_transform,
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,

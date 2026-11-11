@@ -17,19 +17,13 @@ therefore not a field on its config, and raises ``TypeError`` at construction
 rather than being ignored.  Fields carry real defaults, which makes the class
 the reference for the values a build actually uses.
 
-The legacy ``MarginalFlowConfig`` is the factory-side validator from before
-that change. It keeps a flat field set with ``None`` as the "unset" sentinel,
-and ``from_kwargs()`` warns on unknown names while still forwarding them.
-
 Vector-field estimator and network configs are defined in ``vector_field_nets``.
 """
 
 import inspect
 import warnings
 from dataclasses import MISSING, dataclass, field, fields
-from functools import lru_cache
 from typing import (
-    Any,
     Callable,
     ClassVar,
     Literal,
@@ -50,7 +44,6 @@ from torch.distributions import Distribution
 
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
-    ConditionalEstimator,
 )
 from sbi.neural_nets.estimators.mixed_density_estimator import MixedDensityEstimator
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
@@ -122,194 +115,6 @@ def _check_literal_values(config, allow_none: bool) -> None:
                 f"Must be one of {sorted(map(str, allowed))}"
                 f"{' or None' if allow_none else ''}."
             )
-
-
-@dataclass(frozen=True, eq=False, repr=False)
-class _EstimatorBuilderBase:
-    """Shared base providing ``from_kwargs()``, ``to_dict()``, and the abstract
-    ``build()`` contract for all estimator builders."""
-
-    # kw_only so this base field does not become the first positional
-    # parameter of every subclass (it would capture, e.g., a model name).
-    extra_kwargs: dict = field(default_factory=dict, kw_only=True)
-
-    def __post_init__(self):
-        _check_literal_values(self, allow_none=True)
-
-    _DISCRIMINATORS: ClassVar[frozenset] = frozenset({
-        "model",
-        "continuous_model",
-        "estimator_type",
-    })
-
-    def __repr__(self) -> str:
-        cls = type(self)
-        parts: list[str] = []
-        for f in fields(self):
-            val = getattr(self, f.name)
-            if f.name == "extra_kwargs":
-                if val:
-                    parts.append(f"extra_kwargs={val!r}")
-                continue
-            if f.name in self._DISCRIMINATORS:
-                parts.append(f"{f.name}={val!r}")
-            elif f.default is not MISSING and val is f.default:
-                continue
-            elif val is not None:
-                parts.append(f"{f.name}={val!r}")
-        return f"{cls.__name__}({', '.join(parts)})"
-
-    def _build_kwargs(self) -> dict:
-        """Non-None fields as builder kwargs, alias-translated, minus discriminators.
-
-        Field names are translated via ``_BUILD_KWARG_ALIASES`` so that
-        user-facing names (e.g. ``z_score_input``) map to the legacy
-        kwarg names (``z_score_x``) expected by ``build_*`` functions.
-        """
-        d = {
-            _BUILD_KWARG_ALIASES.get(f.name, f.name): getattr(self, f.name)
-            for f in fields(self)
-            if f.name not in self._DISCRIMINATORS
-            and f.name != "extra_kwargs"
-            and getattr(self, f.name) is not None
-        }
-        d.update(self.extra_kwargs)
-        return d
-
-    @staticmethod
-    @lru_cache(maxsize=None)
-    def _fn_param_names(build_fn) -> frozenset:
-        """Return the set of explicit parameter names for *build_fn*,
-        excluding ``batch_x``, ``batch_y`` and ``**kwargs``."""
-        return frozenset(
-            p.name
-            for p in inspect.signature(build_fn).parameters.values()
-            if p.kind is not inspect.Parameter.VAR_KEYWORD
-            and p.name not in ("batch_x", "batch_y")
-        )
-
-    def _reject_inapplicable_fields(
-        self,
-        build_fn,
-        *,
-        discriminator: str,
-        always_ok: frozenset = frozenset(),
-    ) -> None:
-        """Raise ``ValueError`` if any non-None field would be silently
-        ignored by *build_fn*.
-
-        Args:
-            build_fn: The downstream builder function whose signature
-                defines the set of accepted parameter names.
-            discriminator: Name of the field that selects which build
-                function is used (e.g. ``"model"``).
-            always_ok: Additional field names that are always
-                acceptable regardless of *build_fn*'s signature.
-        """
-        allowed = self._fn_param_names(build_fn) | always_ok
-        skip = self._DISCRIMINATORS | {"extra_kwargs"}
-        set_fields = {
-            f.name
-            for f in fields(self)
-            if f.name not in skip and getattr(self, f.name) is not None
-        }
-        bad = {
-            n
-            for n in set_fields
-            if n not in allowed and _BUILD_KWARG_ALIASES.get(n, n) not in allowed
-        }
-        if bad:
-            raise ValueError(
-                f"Field(s) {sorted(bad)} are not used by "
-                f"{discriminator}={getattr(self, discriminator)!r} and would "
-                "be silently ignored. To forward library-specific options, "
-                "use `extra_kwargs`."
-            )
-
-    @classmethod
-    def from_kwargs(cls, **kwargs) -> "_EstimatorBuilderBase":
-        """Create a config, forwarding unknown kwargs into ``extra_kwargs``.
-
-        Known fields are set directly on the dataclass; any remaining kwargs
-        are stored in ``extra_kwargs`` and merged back by ``to_dict()``.
-        A warning is emitted for each unknown kwarg so that typos are still
-        surfaced, while legitimate library-specific parameters (e.g. Zuko
-        flow kwargs) pass through.
-        """
-        known_fields = {f.name for f in fields(cls)} - {"extra_kwargs"}
-        known = {}
-        extra = {}
-        for k, v in kwargs.items():
-            if k in known_fields:
-                known[k] = v
-            else:
-                extra[k] = v
-
-        if extra:
-            warnings.warn(
-                f"Unknown kwargs passed to {cls.__name__}: {set(extra)}. "
-                f"These will be forwarded to the underlying builder. "
-                f"If this is unintentional, check for typos.",
-                stacklevel=3,
-            )
-
-        return cls(**known, extra_kwargs=extra)
-
-    def build(
-        self, batch_input: Tensor, batch_condition: Tensor
-    ) -> ConditionalEstimator:
-        """Build an estimator from training batches.
-
-        Subclasses must override this method to construct the appropriate
-        estimator.  Shape inference and z-scoring are derived from the
-        supplied batches by the downstream ``build_*`` functions.
-
-        Args:
-            batch_input: Batch of the modeled variable (input to the density estimator)
-            batch_condition: Batch of the conditioning variable
-
-        Returns:
-            A ``ConditionalEstimator`` subclass instance.
-        """
-        raise NotImplementedError(f"{type(self).__name__} does not implement build().")
-
-    def to_dict(self) -> dict:
-        """Return only explicitly-set (non-``None``) fields as a dict.
-
-        Uses shallow field access (not ``dataclasses.asdict``) to avoid
-        deep-copying ``nn.Module`` objects stored in fields like
-        ``embedding_net``.  Extra (unknown) kwargs are merged in.
-        """
-        d = {
-            f.name: getattr(self, f.name)
-            for f in fields(self)
-            if f.name != "extra_kwargs" and getattr(self, f.name) is not None
-        }
-        d.update(self.extra_kwargs)
-        return d
-
-
-@dataclass(frozen=True, eq=False, repr=False)
-class MarginalFlowConfig(_EstimatorBuilderBase):
-    """Configuration for marginal density estimator builders.
-
-    Used by ``marginal_nn``.  Covers parameters accepted by
-    ``build_zuko_unconditional_flow`` and the underlying Zuko constructors.
-    """
-
-    z_score_x: Optional[Any] = None
-    hidden_features: Optional[Any] = None
-    num_transforms: Optional[int] = None
-    num_bins: Optional[int] = None
-    num_components: Optional[int] = None
-
-    # --- Zuko per-model kwargs ---
-    randperm: Optional[bool] = None  # zuko_maf, zuko_naf, zuko_unaf
-    randmask: Optional[bool] = None  # zuko_nice
-    signal: Optional[int] = None  # zuko_naf, zuko_unaf
-    degree: Optional[int] = None  # zuko_sospf, zuko_bpf
-    polynomials: Optional[int] = None  # zuko_sospf
-    components: Optional[int] = None  # zuko_gf
 
 
 VF_MODELS = Literal["mlp", "ada_mlp", "transformer", "transformer_cross_attn"]
@@ -409,9 +214,6 @@ class _PerModelConfigBase:
             )
 
 
-_ESTIMATOR_CONFIG_BASES = (_EstimatorBuilderBase, _PerModelConfigBase)
-
-
 def _reject_filtered_extra_kwargs(config) -> None:
     """Raise for ``extra_kwargs`` names the Zuko build functions drop.
 
@@ -488,9 +290,11 @@ class MarginalBPFConfig(MarginalConfigBase):
 
     Args:
         degree: Degree of the Bernstein polynomial.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     degree: int = 16
+    randperm: bool = False
 
     _WHICH_NF: ClassVar[str] = "BPF"
 
@@ -559,13 +363,19 @@ class MarginalNAFConfig(MarginalConfigBase):
 
 @dataclass(frozen=True, eq=False, repr=False)
 class MarginalNCSFConfig(MarginalConfigBase):
-    """Marginal neural circular spline flow.
+    r"""Marginal neural circular spline flow.
+
+    NCSF models data on $[-\pi, \pi)$, which a z-score would move, so
+    `z_score_input` offers `none` only.
 
     Args:
         bins: Number of bins of the spline transforms.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
+    z_score_input: Literal["none"] = "none"
     bins: int = 10
+    randperm: bool = False
 
     _WHICH_NF: ClassVar[str] = "NCSF"
 
@@ -589,9 +399,11 @@ class MarginalNSFConfig(MarginalConfigBase):
 
     Args:
         bins: Number of bins of the spline transforms.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     bins: int = 10
+    randperm: bool = False
 
     _WHICH_NF: ClassVar[str] = "NSF"
 
@@ -603,10 +415,12 @@ class MarginalSOSPFConfig(MarginalConfigBase):
     Args:
         degree: Degree of the polynomials.
         polynomials: Number of polynomials.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     degree: int = 4
     polynomials: int = 3
+    randperm: bool = False
 
     _WHICH_NF: ClassVar[str] = "SOSPF"
 
@@ -787,9 +601,11 @@ class ZukoBPFConfig(_ZukoDensityConfigBase):
 
     Args:
         degree: Degree of the Bernstein polynomial.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     degree: int = 16
+    randperm: bool = False
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_bpf)
 
@@ -837,13 +653,19 @@ class ZukoNAFConfig(_ZukoDensityConfigBase):
 
 @dataclass(frozen=True, eq=False, repr=False)
 class ZukoNCSFConfig(_ZukoDensityConfigBase):
-    """Conditional neural circular spline flow.
+    r"""Conditional neural circular spline flow.
+
+    NCSF models data on $[-\pi, \pi)$, which a z-score would move, so
+    `z_score_input` offers `none` only.
 
     Args:
         num_bins: Number of bins of the spline transforms.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
+    z_score_input: Literal["none"] = "none"
     num_bins: int = 10
+    randperm: bool = False
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_ncsf)
     _SHADOWED_EXTRA_KWARGS: ClassVar[frozenset[str]] = frozenset({"bins"})
@@ -868,9 +690,11 @@ class ZukoNSFConfig(_ZukoDensityConfigBase):
 
     Args:
         num_bins: Number of bins of the spline transforms.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     num_bins: int = 10
+    randperm: bool = False
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_nsf)
     _SHADOWED_EXTRA_KWARGS: ClassVar[frozenset[str]] = frozenset({"bins"})
@@ -883,10 +707,12 @@ class ZukoSOSPFConfig(_ZukoDensityConfigBase):
     Args:
         degree: Degree of the polynomials.
         polynomials: Number of polynomials.
+        randperm: Whether features are randomly permuted between transforms.
     """
 
     degree: int = 4
     polynomials: int = 3
+    randperm: bool = False
 
     _BUILD_FN: ClassVar[Callable] = staticmethod(build_zuko_sospf)
 

@@ -573,6 +573,16 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
             if modeled_z == "transform_to_unconstrained" and implements_transform:
                 kwargs["x_dist"] = dist
 
+        # NCSF models data on [-pi, pi), so its config offers no z-score. An
+        # argument left at the factory default gives way to that.
+        if model == "zuko_ncsf" and modeled_z in (
+            "structured",
+            "transform_to_unconstrained",
+        ):
+            with pytest.raises(ValueError, match="z_score_input"):
+                build_fn(**kwargs)(theta, model_x)
+            continue
+
         unsupported = (
             modeled_z == "transform_to_unconstrained" and not implements_transform
         ) or condition_z == "transform_to_unconstrained"

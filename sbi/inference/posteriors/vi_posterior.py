@@ -1,10 +1,20 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import math
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, Literal, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    Iterable,
+    Literal,
+    Optional,
+    Self,
+    Union,
+)
 
 import numpy as np
 import torch
@@ -41,11 +51,11 @@ from sbi.sbi_types import (
     TorchTensor,
     TorchTransform,
 )
-from sbi.utils.sbiutils import mcmc_transform
+from sbi.utils.sbiutils import _apply_to_transform, mcmc_transform
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
-    process_device,
+    move_tensors,
 )
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
@@ -239,45 +249,34 @@ class VIPosterior(NeuralPosterior):
             "can evaluate the _normalized_ posterior density with .log_prob()."
         )
 
-    def to(self, device: Union[str, torch.device]) -> "VIPosterior":
-        """Move all components to the given device.
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the posterior and its variational distributions to `device` in place.
+
+        The optimizer is reset; `train()` builds a new one.
 
         Args:
             device: The device to move the posterior to.
 
         Returns:
-            self for method chaining.
+            The posterior itself.
         """
-        device = process_device(device)
-        self._device = device
+        super().to(device)
+        device = self._device
+        _apply_to_transform(self.link_transform, lambda t: t.to(device))
+        self._trained_on = move_tensors(self._trained_on, device)
 
-        # Move potential (which moves prior, x_o, and estimator).
-        self.potential_fn.to(device)  # type: ignore
-        self._prior = move_distribution_to_device(self._prior, device)
-
-        # Rebuild link_transform on new device (same logic as __init__).
-        if self.theta_transform is None:
-            self.link_transform = mcmc_transform(self._prior, device=device).inv
-        else:
-            self.link_transform = self.theta_transform.inv
-
-        # Move cached tensors.
-        if self._x is not None:
-            self._x = self._x.to(device)
-        if self._map is not None:
-            self._map = self._map.to(device)
-        if self._trained_on is not None:
-            self._trained_on = self._trained_on.to(device)
-
-        # Move variational distributions.
         if hasattr(self, "_q") and hasattr(self._q, "to"):
             self._q.to(device)  # type: ignore[union-attr]
-        # Update link_transform reference on q if it caches one.
         if hasattr(self, "_q") and hasattr(self._q, "_link_transform"):
             self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
-
+        q_spec = getattr(self, "_q_spec", None)
+        if q_spec is not None and q_spec.init_snapshot is not None:
+            q_spec.init_snapshot = move_distribution_to_device(
+                q_spec.init_snapshot, device
+            )
+        self._optimizer = None
         return self
 
     def _build_unconditional_flow(
@@ -553,10 +552,17 @@ class VIPosterior(NeuralPosterior):
                 q = self._build_q_from_spec()
             self._trained_on = None
         elif isinstance(q, VIPosterior):
-            # A copy, so that later `set_q` calls on one posterior stay local to it.
-            self._q_spec = replace(q._q_spec)
+            # A copy, so that later `set_q` or `to` calls on one posterior stay local
+            # to it.
+            snapshot = q._q_spec.init_snapshot
+            if snapshot is not None:
+                snapshot = detach_and_deepcopy(snapshot)
+            self._q_spec = replace(q._q_spec, init_snapshot=snapshot)
             self._trained_on = q._trained_on
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
+            self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
+            if self._amortized_q is not None:
+                self._amortized_q.to(self._device)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
@@ -1326,6 +1332,22 @@ class VIPosterior(NeuralPosterior):
         metric = round(float(quality_control_fn(self, N=N)), 3)
         print(f"Quality Score: {metric} " + quality_control_msg)
 
+    def _map_inits(
+        self,
+        init_method: Union[str, TorchTensor],
+        num_init_samples: int,
+        x: Optional[TorchTensor] = None,
+    ) -> Tensor:
+        # Amortized training leaves `q` untouched. Pool `num_init_samples` starts in
+        # total over the observations in `x`.
+        if self._mode == "amortized" and init_method in ("posterior", "proposal"):
+            num_obs = self._x_else_default_x(x).shape[0]
+            samples = self.sample((math.ceil(num_init_samples / num_obs),), x=x)
+            samples = samples.reshape(-1, samples.shape[-1])
+            keep = torch.randperm(samples.shape[0], device=samples.device)
+            return samples[keep[:num_init_samples]]
+        return super()._map_inits(init_method, num_init_samples, x)
+
     def map(
         self,
         x: Optional[TorchTensor] = None,
@@ -1359,9 +1381,12 @@ class VIPosterior(NeuralPosterior):
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be either `posterior` or `proposal`. For
+                `VIPosterior` both draw `num_init_samples` samples from the variational
+                distribution, not the prior (in amortized mode, from q(θ|x) for the
+                observations in the default `x`). If it is a tensor, the tensor is used
+                as the initial locations, so prior-based initialization can be done by
+                passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the
