@@ -22,6 +22,8 @@ from torch.distributions import (
     constraints,
 )
 
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
+
 
 class VectorFieldNet(nn.Module, ABC):
     """Abstract base class for vector field estimation networks.
@@ -97,14 +99,8 @@ def _fit_gmm_ratio_impl(
     """Fit a generalized GMM to the prior ratio q(theta) / p(theta)."""
     num_components = int(num_components)
     device = torch.device(device)
-    if hasattr(train_prior, "to"):
-        moved = train_prior.to(device)  # type: ignore
-        if moved is not None:
-            train_prior = moved
-    if hasattr(test_prior, "to"):
-        moved = test_prior.to(device)  # type: ignore
-        if moved is not None:
-            test_prior = moved
+    train_prior = move_distribution_to_device(train_prior, device)
+    test_prior = move_distribution_to_device(test_prior, device)
     with torch.no_grad():
         init_means = test_prior.sample((num_components,)).to(device)
         init_means = init_means.reshape(num_components, -1)
@@ -320,6 +316,11 @@ def denoise_independent(
     Returns:
         The posterior independent distribution.
     """
+    exact_types = (Independent, MixtureSameFamily, Normal, MultivariateNormal, Uniform)
+    if not isinstance(p.base_dist, exact_types):
+        # Fit the whole prior: wrapping a fitted base would fold the batch of x_t
+        # into the event.
+        return denoise_general(p, m, s, x_t)
     denoised_base_dist = denoise(p.base_dist, m, s, x_t)
     batch_shape = denoised_base_dist.batch_shape
     if len(batch_shape) < p.reinterpreted_batch_ndims:
@@ -462,7 +463,8 @@ def denoise_general(
     Returns:
         The posterior empirical distribution.
     """
-    gmm = fit_gmm(p)
+    # `fit_gmm` caches by prior; a prior moved in place keeps its key.
+    gmm = move_distribution_to_device(fit_gmm(p), x_t.device)
     return denoise_mixture(gmm, m, s, x_t)
 
 
@@ -623,7 +625,8 @@ def marginalize_empirical(
     Returns:
         The marginal empirical distribution.
     """
-    gmm_approx = fit_gmm(p)
+    # `fit_gmm` caches by prior; a prior moved in place keeps its key.
+    gmm_approx = move_distribution_to_device(fit_gmm(p), torch.as_tensor(m).device)
     return marginalize_mixture(gmm_approx, m, s)
 
 
