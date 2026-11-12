@@ -26,8 +26,10 @@ from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
     gradient_ascent,
     mcmc_transform,
+    standardizing_net,
     warn_if_invalid_for_zscoring,
     z_score_parser,
+    z_standardization,
 )
 
 
@@ -629,6 +631,19 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     # plt.plot(x_zstructured.T)
     # plt.title('z-scored: structured dims');
     # plt.show()
+
+
+@pytest.mark.parametrize("event_shape", [(1, 6, 6), (3, 6, 6), (2, 18)])
+def test_structured_z_scoring_uses_all_event_dims(event_shape):
+    """Structured std is the per-sample std over the whole event, whatever its shape."""
+    batch = torch.randn(50, *event_shape) * 3.0 + 1.0
+    expected_std = batch.flatten(start_dim=1).std(dim=1).mean()
+
+    _, t_std = z_standardization(batch, structured_dims=True)
+    z_net = standardizing_net(batch, structured_dims=True)
+
+    assert torch.allclose(t_std, expected_std)
+    assert torch.allclose(z_net._std, expected_std)
 
 
 @pytest.mark.parametrize(
