@@ -742,10 +742,16 @@ def test_iwelbo_optimizer_uses_importance_weighted_loss(
 @pytest.mark.parametrize("offset", [0.0, 1e5])
 def test_forward_kl_weights_finite_for_extreme_log_weights(monkeypatch, offset: float):
     """fKL weights stay self-normalized when exp of the log-weights would under- or
-    overflow, as for a target much narrower than q or a large potential offset."""
+    overflow, as for a target much narrower than q or a large potential offset, and
+    the loss stays finite with a particle outside the target's support."""
     prior = MultivariateNormal(zeros(1), eye(1))
     narrow = MultivariateNormal(3 * ones(1), 1e-4 * eye(1))
-    target = SimpleNamespace(log_prob=lambda theta: narrow.log_prob(theta) + offset)
+
+    def target_log_prob(theta):
+        outside = theta[..., 0] < -1.5
+        return torch.where(outside, -torch.inf, narrow.log_prob(theta) + offset)
+
+    target = SimpleNamespace(log_prob=target_log_prob)
     weight_sums = []
 
     def record_weight_sum(weights):
