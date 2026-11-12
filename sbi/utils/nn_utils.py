@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from itertools import chain
 from typing import Optional
 from warnings import warn
 
@@ -53,6 +54,9 @@ def check_net_device(
     """
     Check whether a net is on the desired device and move it there if not.
 
+    The first parameter or buffer gives the device of the net. A net without either,
+    e.g. `nn.Flatten()`, holds no tensors and is returned unchanged.
+
     Args:
         net: neural network.
         device: desired device.
@@ -61,9 +65,10 @@ def check_net_device(
         Neural network on the desired device.
     """
 
-    if isinstance(net, nn.Identity):
+    first_tensor = next(chain(net.parameters(), net.buffers()), None)
+    if first_tensor is None:
         return net
-    if canonical_device(next(net.parameters()).device) != canonical_device(device):
+    if canonical_device(first_tensor.device) != canonical_device(device):
         warn(
             message or f"Network is not on the correct device. Moving it to {device}.",
             stacklevel=2,

@@ -102,6 +102,12 @@ def pytest_addoption(parser):
         default=None,
         help="Comma-separated estimators for the selected mini-benchmark mode",
     )
+    parser.addoption(
+        "--bm-embedding",
+        action="store",
+        default=None,
+        help="Embedding net for x in the npe mini-benchmark: 'fc' adds an FCEmbedding",
+    )
 
     parser.addoption(
         "--bm-label",
