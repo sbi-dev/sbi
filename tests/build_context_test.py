@@ -17,6 +17,7 @@ from sbi.neural_nets.build_context import (
     compute_z_score_stats,
 )
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.utils.torchutils import process_device
 
 
 def test_zscore_config_defaults():
@@ -45,7 +46,7 @@ def test_zscore_config_invalid_value_raises(field):
         ZScoreConfig(**{field: "invalid"})
 
 
-@pytest.mark.parametrize("device", ["cpu", pytest.param("cuda", marks=pytest.mark.gpu)])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 @pytest.mark.parametrize(
     "theta_shape, x_shape",
     [
@@ -55,12 +56,13 @@ def test_zscore_config_invalid_value_raises(field):
 )
 def test_build_context_from_data(device, theta_shape, x_shape):
     """BuildContext.from_data infers shapes, device, and dtype correctly."""
+    device = torch.device(process_device(device))
     theta = torch.randn(*theta_shape, device=device)
     x = torch.randn(*x_shape, device=device)
     ctx = BuildContext.from_data(theta, x)
     assert ctx.theta_shape == torch.Size(theta_shape[1:])
     assert ctx.x_shape == torch.Size(x_shape[1:])
-    assert ctx.device.type == device
+    assert ctx.device == device
     assert ctx.dtype == torch.float32
 
 
@@ -74,17 +76,17 @@ def test_build_context_from_data_with_stats():
 
 @pytest.mark.gpu
 def test_build_context_device_mismatch_raises():
-    """Mismatched cpu/cuda devices raise ValueError."""
+    """Mismatched CPU and GPU devices raise ValueError."""
     theta_cpu = torch.randn(10, 3, device="cpu")
-    x_cuda = torch.randn(10, 3, device="cuda")
+    x_gpu = torch.randn(10, 3, device=process_device("gpu"))
     with pytest.raises(ValueError, match="same device"):
-        BuildContext.from_data(theta_cpu, x_cuda)
+        BuildContext.from_data(theta_cpu, x_gpu)
 
     with pytest.raises(ValueError, match="same device"):
-        BuildContext.from_data(x_cuda, theta_cpu)
+        BuildContext.from_data(x_gpu, theta_cpu)
 
 
-@pytest.mark.parametrize("device", ["cpu", pytest.param("cuda", marks=pytest.mark.gpu)])
+@pytest.mark.parametrize("device", ["cpu", pytest.param("gpu", marks=pytest.mark.gpu)])
 @pytest.mark.parametrize(
     "theta_mode, x_mode",
     [
@@ -96,6 +98,7 @@ def test_build_context_device_mismatch_raises():
 )
 def test_compute_z_score_stats(device, theta_mode, x_mode):
     """Z-score stats have correct shape, type, and device for all mode combos."""
+    device = torch.device(process_device(device))
     theta = torch.randn(200, 5, device=device)
     x = torch.randn(200, 3, device=device)
     stats = compute_z_score_stats(theta, x, ZScoreConfig(theta=theta_mode, x=x_mode))
@@ -104,19 +107,19 @@ def test_compute_z_score_stats(device, theta_mode, x_mode):
         assert stats.theta_mean is None
     elif theta_mode == "independent":
         assert stats.theta_mean.shape == (5,)
-        assert stats.theta_mean.device.type == device
+        assert stats.theta_mean.device == device
     else:
         assert stats.theta_mean.dim() == 0
-        assert stats.theta_mean.device.type == device
+        assert stats.theta_mean.device == device
 
     if x_mode == "none":
         assert stats.x_mean is None
     elif x_mode == "independent":
         assert stats.x_mean.shape == (3,)
-        assert stats.x_mean.device.type == device
+        assert stats.x_mean.device == device
     else:
         assert stats.x_mean.dim() == 0
-        assert stats.x_mean.device.type == device
+        assert stats.x_mean.device == device
 
 
 def test_compute_z_score_stats_matches_z_standardization():
