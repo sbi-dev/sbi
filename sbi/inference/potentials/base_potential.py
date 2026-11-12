@@ -54,8 +54,8 @@ class BasePotential(metaclass=ABCMeta):
 
     @property
     def x_is_iid(self) -> bool:
-        """If x has batch dimension greater than 1, whether to intepret the batch as iid
-        samples or batch of data points."""
+        """If x has batch dimension greater than 1, whether to interpret the batch as
+        iid samples or batch of data points."""
         if self._x_is_iid is not None:
             return self._x_is_iid
         else:

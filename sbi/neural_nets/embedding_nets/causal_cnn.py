@@ -57,7 +57,7 @@ def WaveNetSRLikeAggregator(
     stride_sizes: Union[int, List] = 1,
 ) -> nn.Module:
     """
-    Creates a non-causal 1D CNN aggregator based on the WaveNet speach recognition task
+    Creates a non-causal 1D CNN aggregator based on the WaveNet speech recognition task
 
     By default this function creates an aggregator with two CNN layers,
     after every convolution a maxpooling operation halves the number of timepoints.
@@ -100,7 +100,7 @@ def WaveNetSRLikeAggregator(
     intermediate_channel_sizes += [output_dim]
     if isinstance(stride_sizes, List):
         assert len(stride_sizes) == len(kernel_sizes), (
-            "Provided stride size list should be have the same size as"
+            "Provided stride size list should have the same size as"
             "the kernel size list."
         )
     else:
@@ -152,7 +152,7 @@ class CausalCNNEmbedding(nn.Module):
         aggregator: Optional[nn.Module] = None,
         output_dim: int = 20,
     ):
-        """Intitialize embedding network that uses 1D causal convolutions.
+        """Initialize embedding network that uses 1D causal convolutions.
 
         This is a simplified version of the architecture introduced for
         the speech recognition task in the WaveNet paper (van den Oord, et al. (2016))

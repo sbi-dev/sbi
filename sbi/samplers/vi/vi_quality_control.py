@@ -96,12 +96,12 @@ def psis_diagnostics(
     q: Distribution,
     N: int = int(5e4),
 ) -> float:
-    r"""This will evaluate the posteriors quality by investingating its importance
+    r"""This will evaluate the posteriors quality by investigating its importance
     weights. If q is a perfect posterior approximation then $q(\theta) \propto
     p(\theta, x_o)$ thus $\log w(\theta) = \log \frac{p(\theta, x_o)}{\log q(\theta)} =
     \log p(x_o)$ is constant. This function will fit a Generalized Paretto
     distribution to the tails of w. The shape parameter k serves as metric as detailed
-    in [1]. In short it is related to the variance of a importance sampling estimate,
+    in [1]. In short it is related to the variance of an importance sampling estimate,
     especially for k > 1 the variance will be infinite.
 
     NOTE: In our experience this metric does distinguish "very bad" from "ok", but
@@ -133,7 +133,7 @@ def proportional_to_joint_diagnostics(
     proposal: Optional[Distribution] = None,
     N: int = int(5e4),
 ) -> float:
-    r"""This will evaluate the posteriors quality by investingating its importance
+    r"""This will evaluate the posteriors quality by investigating its importance
     weights. If q is a perfect posterior approximation then $q(\theta) \propto
     p(\theta, x_o)$. Thus we should be able to fit a line to $(q(\theta),
     p(\theta, x_o))$, whereas the slope will be proportional to the normalizing

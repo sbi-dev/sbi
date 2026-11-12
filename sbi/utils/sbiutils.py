@@ -408,7 +408,7 @@ def biject_transform_zuko(
     transform: TorchTransform,
 ) -> zuko.flows.UnconditionalTransform:
     """
-    Wraps a pytorch transform in a Zuko unconditional transfrom on a bounded interval.
+    Wraps a pytorch transform in a Zuko unconditional transform on a bounded interval.
 
     Args:
         transform: a bijective transformation for Zuko, depending on the input
@@ -813,7 +813,7 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
 
     If first checks whether the `distribution` has a `support` attribute (as is the
     case for `torch.distribution`). If it does not, it evaluates the log-probabilty and
-    returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
+    returns whether it is finite or not (this handles e.g. `NeuralPosterior`). Only
     checking whether the log-probabilty is not `-inf` will not work because, as of
     torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
     sample is out of the support (see #451). In `process_prior()`, we set
@@ -1277,7 +1277,7 @@ def gradient_ascent(
     sorted_inits = inits[sort_indices]
     optimize_inits = sorted_inits[-num_to_optimize:]
 
-    # The `_overall` variables store data accross the iterations, whereas the
+    # The `_overall` variables store data across the iterations, whereas the
     # `_iter` variables contain data exclusively extracted from the current
     # iteration. Slicing keeps the batch dim, so `argmax` is `(1, D)` and `max`
     # is `(1,)` on every return path, as in the loop below.

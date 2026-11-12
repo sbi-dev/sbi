@@ -83,7 +83,7 @@ def c2st(
     Note: Both set of samples are normalized (z scored) using the mean and std
     of the samples in <X>. If <z_score> is set to False, no normalization is
     done. If features in <X> are close to constant with std close to zero, the
-    std is set to 1 to avoud division by zero.
+    std is set to 1 to avoid division by zero.
 
     If you need a more flexible interface which is able to take a sklearn
     compatible classifier and more, see the `c2st_` method in this module.

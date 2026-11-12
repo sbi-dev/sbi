@@ -73,7 +73,7 @@ class SliceSampler(MCMCSampler):
             x: Initial state.
             lp_f: Function that returns the log prob.
             max_width: maximum bracket width.
-            init_width: Inital width of brackets.
+            init_width: Initial width of brackets.
             thin: Amount of thinning; if None, no thinning.
             tuning: Number of tuning steps for brackets.
             verbose: Whether to show progress bars (False).
@@ -101,7 +101,7 @@ class SliceSampler(MCMCSampler):
             show_info: whether to plot info at the end of sampling
             rng: random number generator to use
         Returns:
-            sampels: numpy array of samples
+            samples: numpy array of samples
         """
 
         assert n_samples >= 0, "number of samples can't be negative"
@@ -240,7 +240,7 @@ class SliceSamplerSerial:
             thin: Thinning (subsampling) factor, default 1 (no thinning).
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
-            init_width: Inital width of brackets.
+            init_width: Initial width of brackets.
             max_width: Maximum width of brackets.
             num_workers: Number of parallel workers to use.
         """
@@ -376,7 +376,7 @@ class SliceSamplerVectorized:
             thin: Thinning (subsampling) factor, default 1 (no thinning).
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
-            init_width: Inital width of brackets.
+            init_width: Initial width of brackets.
             max_width: Maximum width of brackets.
             num_workers: Number of parallel workers to use (not implemented.)
         """

@@ -187,7 +187,7 @@ class EnsemblePosterior(NeuralPosterior):
             TypeError if weights are provided in an unsupported format.
 
         Args:
-            weights: Assignes weight to each posterior distribution.
+            weights: Assigns weight to each posterior distribution.
         """
         if weights is None:
             self._weights = torch.tensor([

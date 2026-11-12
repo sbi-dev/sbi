@@ -137,7 +137,7 @@ class GibbsCorrector(Corrector):
         """(Pseudo) Gibbs sampling corrector.
 
         Iteratively adds back noise according to the correct forward SDE, then removes
-        noise using the predictor. Hence, approximatly sampling form the joint
+        noise using the predictor. Hence, approximately sampling from the joint
         distribution using Gibbs sampling (if the two conditional distributions are
         compatible).
 

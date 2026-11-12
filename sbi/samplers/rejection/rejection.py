@@ -246,7 +246,7 @@ def accept_reject_sample(
     return_partial_on_timeout: bool = False,
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:
-    r"""Returns samples from a proposal according to a acception criterion.
+    r"""Returns samples from a proposal according to an acceptance criterion.
 
     This is relevant for snpe methods and flows for which the posterior tends to have
     mass outside the prior support.

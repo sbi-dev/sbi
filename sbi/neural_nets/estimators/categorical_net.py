@@ -42,7 +42,7 @@ class CategoricalMADE(MADE):
             num_categories: number of categories for each variable. len(categories)
                 defines the number of input units, i.e., dimensionality of the features.
                 max(categories) defines the number of output units, i.e., the largest
-                number of categories. Can handle mutliple variables with differing
+                number of categories. Can handle multiple variables with differing
                 numbers of choices.
             num_hidden_features: number of hidden units per layer.
             categorical_values: list of unique values for each variable.

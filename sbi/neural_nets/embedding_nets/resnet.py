@@ -203,7 +203,7 @@ class ResNetEmbedding2D(nn.Module):
         self.c_out = c_out
         self.activation = activation
 
-        # Intial transformation applied before the residual blocks
+        # Initial transformation applied before the residual blocks
         self.initial = nn.Sequential(
             nn.Conv2d(c_in, c_stages[0], kernel_size=7, stride=2, padding=3),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
@@ -270,7 +270,7 @@ class ResNetEmbedding2D(nn.Module):
         # Apply the residual blocks
         y = self.blocks(x)
 
-        # On first call intitalize the final transformation
+        # On first call initialize the final transformation
         if self.final is None:
             # Get the shape of the input to the final layer
             c_in_final = int(torch.tensor(y.shape[1:]).prod().item())

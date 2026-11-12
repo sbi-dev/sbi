@@ -260,8 +260,8 @@ class ConditionedPotential(BasePotential):
 
     @property
     def x_is_iid(self) -> bool:
-        """If x has batch dimension greater than 1, whether to intepret the batch as iid
-        samples or batch of data points."""
+        """If x has batch dimension greater than 1, whether to interpret the batch as
+        iid samples or batch of data points."""
         if hasattr(self, "_x_is_iid") and self._x_is_iid is not None:
             return self._x_is_iid
         elif hasattr(self, "potential_fn") and self.potential_fn is not None:
@@ -320,7 +320,7 @@ class RestrictedPriorForConditional:
 
     The resulting prior samples only from the free dimensions of the conditional.
 
-    This is needed for the the MCMC initialization functions when conditioning. For the
+    This is needed for the MCMC initialization functions when conditioning. For the
     prior init, we could post-hoc select the relevant dimensions. But for SIR, we want
     to evaluate the `potential_fn` of the conditional posterior, which takes only a
     subset of the full parameter vector theta (only the `dims_to_sample`). This subset
@@ -360,7 +360,7 @@ class RestrictedTransformForConditional(torch_tf.Transform):
     case `theta` is a batch of `theta` (e.g. multi-chain MCMC), we have to repeat
     `theta_condition`` to the match the batchsize.
 
-    This is needed for the the MCMC initialization functions when conditioning and when
+    This is needed for the MCMC initialization functions when conditioning and when
     transforming the samples back into the original theta space after sampling.
     """
 

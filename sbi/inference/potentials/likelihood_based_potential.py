@@ -289,7 +289,7 @@ def _log_likelihoods_over_trials(
     r"""Return log likelihoods summed over iid trials of `x`.
 
     Note: `x` can be a batch with batch size larger 1. Batches in `x` are assumed
-    to be iid trials, i.e., data generated based on the same paramters /
+    to be iid trials, i.e., data generated based on the same parameters /
     experimental conditions.
 
     Repeats `x` and $\theta$ to cover all their combinations of batch entries.
@@ -310,7 +310,7 @@ def _log_likelihoods_over_trials(
     )
 
     # Match the number of `x` to the number of conditions (`theta`). This is important
-    # if the potential is simulataneously evaluated at multiple `theta` (e.g.
+    # if the potential is simultaneously evaluated at multiple `theta` (e.g.
     # multi-chain MCMC).
     theta_batch_size = theta.shape[0]
     trailing_minus_ones = [-1 for _ in range(x.dim() - 2)]
@@ -477,7 +477,7 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
         )
         theta_batch_dim = theta.shape[0]
         # Match the number of `x` to the number of conditions (`theta`). This is
-        # importantif the potential is simulataneously evaluated at multiple `theta`
+        # important if the potential is simultaneously evaluated at multiple `theta`
         # (e.g. multi-chain MCMC).
         trailing_minus_ones = [-1 for _ in range(x.dim() - 2)]
         x = x.expand(-1, theta_batch_dim, *trailing_minus_ones)

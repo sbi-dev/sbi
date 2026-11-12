@@ -616,7 +616,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         ema_loss_decay = summarization_kwargs.get("ema_loss_decay")
         assert ema_loss_decay is not None and isinstance(ema_loss_decay, float)
 
-        # NOTE: Due to the inherently noisy nature we do instead log a exponential
+        # NOTE: Due to the inherently noisy nature we do instead log an exponential
         # moving average of the training loss.
         if len(self._summary["training_loss"]) == 0:
             train_loss_ema = train_loss
