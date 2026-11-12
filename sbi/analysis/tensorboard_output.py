@@ -183,7 +183,7 @@ def plot_summary(
     if len(scalars[tags[0]]["step"]) == tensorboard_scalar_limit:
         logger.warning(
             (
-                "Event data as large as the chosen limit for tensorboard scalars."
+                "Event data as large as the chosen limit for tensorboard scalars. "
                 "Tensorboard might be subsampling your data, as "
                 "https://stackoverflow.com/a/65564389/7770835 explains."
                 " Consider increasing tensorboard_scalar_limit to see all data.\n"

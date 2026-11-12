@@ -813,7 +813,7 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if self.default_x is None:
             raise ValueError(
-                "Default `x` has not been set."
+                "Default `x` has not been set. "
                 "To set the default, use the `.set_default_x()` method."
             )
 

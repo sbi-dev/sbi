@@ -311,7 +311,7 @@ class VectorFieldBasedPotential(BasePotential):
         """
         if not self.vector_field_estimator.SCORE_DEFINED:
             raise ValueError(
-                "Gradient is not available since the score"
+                "Gradient is not available since the score "
                 "is not defined for this vector field estimator."
             )
 
@@ -323,7 +323,7 @@ class VectorFieldBasedPotential(BasePotential):
 
         if self._x_o is None:
             raise ValueError(
-                "No observed data x_o is available. Please reinitialize"
+                "No observed data x_o is available. Please reinitialize "
                 "the potential or manually set self._x_o."
             )
 
@@ -368,7 +368,7 @@ class VectorFieldBasedPotential(BasePotential):
         """
         if self._x_o is None:
             raise ValueError(
-                "No observed data x_o is available. Please reinitialize"
+                "No observed data x_o is available. Please reinitialize "
                 "the potential or manually set self._x_o."
             )
         x_density_estimator = reshape_to_batch_event(

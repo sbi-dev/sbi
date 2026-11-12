@@ -226,7 +226,7 @@ class NeuralPosterior:
             return x.to(self._device)
         elif self.default_x is None:
             raise ValueError(
-                "Context `x` needed when a default has not been set."
+                "Context `x` needed when a default has not been set. "
                 "If you'd like to have a default, use the `.set_default_x()` method."
             )
         else:
@@ -395,7 +395,7 @@ class NeuralPosterior:
 
         if self.default_x is None:
             raise ValueError(
-                "Default `x` has not been set."
+                "Default `x` has not been set. "
                 "To set the default, use the `.set_default_x()` method."
             )
 
