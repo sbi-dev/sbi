@@ -756,7 +756,7 @@ def test_forward_kl_weights_finite_for_extreme_log_weights(monkeypatch, offset: 
 
     def record_weight_sum(weights):
         weight_sums.append(weights.sum())
-        return weights
+        return 2 * weights
 
     optimizer = ForwardKLOptimizer(
         potential_fn=make_tractable_potential(target, prior),
