@@ -583,7 +583,7 @@ class IWElboOptimizer(ElboOptimizer):
 
 @register_VI_method(name="fKL")
 class ForwardKLOptimizer(DivergenceOptimizer):
-    """This learns the variational posterior by minimizing the forward KL divergence
+    r"""This learns the variational posterior by minimizing the forward KL divergence
     i.e. $D_KL(p(\theta|x_o)|| q(\theta))$. The typically necessary samples from the
     posterior are not required by using importance sampling techniques.
 
