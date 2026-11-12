@@ -1888,7 +1888,7 @@ def _sbc_rank_plot(
                         )
                     # Name the rank sets in the first subplot.
                     if jj == 0 and num_ranks > 1:
-                        plt.legend(**legend_kwargs)
+                        _sbc_legend(**legend_kwargs)
                 else:
                     _plot_ranks_as_hist(
                         ranki[:, jj],  # type: ignore
@@ -1910,7 +1910,7 @@ def _sbc_rank_plot(
                     )
                     # show legend only in first subplot.
                     if jj == 0 and ranks_labels[ii] is not None:
-                        plt.legend(**legend_kwargs)
+                        _sbc_legend(**legend_kwargs)
         # Remove empty subplots.
         col_idx += 1
         while num_rows > 1 and col_idx < num_cols:
@@ -1950,7 +1950,7 @@ def _sbc_rank_plot(
                 diff=diff,
             )
         # show legend on the last subplot.
-        plt.legend(**legend_kwargs)
+        _sbc_legend(**legend_kwargs)
 
     return fig, ax  # pyright: ignore[reportReturnType]
 
@@ -2074,6 +2074,9 @@ def _plot_ranks_as_cdf(
     plt.xlabel("posterior rank" if xlabel is None else xlabel)
 
 
+_UNIFORM_REGION_LABEL = "expected under uniformity"
+
+
 def _ecdf(ranks: np.ndarray, num_bins: int, num_posterior_samples: int) -> np.ndarray:
     """Empirical CDF of the ranks at the right edge of each bin over [0, N]."""
     hist, _ = np.histogram(ranks, bins=num_bins, range=(0, num_posterior_samples))
@@ -2161,7 +2164,7 @@ def _plot_cdf_region_expected_under_uniformity(
         y2=np.repeat(upper - offset, num_repeats),
         color=color,
         alpha=alpha,
-        label="expected under uniformity",
+        label=_UNIFORM_REGION_LABEL,
     )
 
 
@@ -2186,8 +2189,20 @@ def _plot_hist_region_expected_under_uniformity(
         y2=np.repeat(upper, num_bins),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
-        label="expected under uniformity",
+        label=_UNIFORM_REGION_LABEL,
     )
+
+
+def _sbc_legend(**legend_kwargs) -> None:
+    """Add a legend with one entry per label and the uniformity band last."""
+    handles, labels = plt.gca().get_legend_handles_labels()
+    entries = {}
+    for handle, label in zip(handles, labels, strict=True):
+        entries.setdefault(label, handle)
+    band = entries.pop(_UNIFORM_REGION_LABEL, None)
+    if band is not None:
+        entries[_UNIFORM_REGION_LABEL] = band
+    plt.legend(list(entries.values()), list(entries), **legend_kwargs)
 
 
 # Diagnostics for hypothesis tests

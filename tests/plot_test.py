@@ -417,7 +417,7 @@ def test_sbc_rank_plot_legend_names_each_rank_set(plot_type):
     ranks = [rng.integers(0, 101, size=(100, 2)) for _ in range(2)]
     _, ax = sbc_rank_plot(ranks, 100, plot_type=plot_type, ranks_labels=["NPE", "NLE"])
     legend_texts = [text.get_text() for text in ax[0].get_legend().get_texts()]
-    assert {"NPE", "NLE"} <= set(legend_texts)
+    assert legend_texts == ["NPE", "NLE", "expected under uniformity"]
     assert ax[1].get_legend() is None
     close()
 
