@@ -28,6 +28,7 @@ from sbi.analysis.plotting_classes import (
     FigOptions,
     HistDiagOptions,
     HistOffDiagOptions,
+    PlotOffDiagOptions,
 )
 from sbi.inference import NLE, NPE, NRE
 from sbi.utils import BoxUniform
@@ -142,11 +143,56 @@ def test_pairplot_dep(
     samples, labels, legend, offdiag, samples_labels, points_labels, points
 ):
     # uses old style keywords, checks backward compatibility
-    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
+    with pytest.warns(FutureWarning, match="v0.29.0"):
+        fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
 
     assert isinstance(fig, Figure)
     assert isinstance(axs, np.ndarray)
     assert isinstance(axs[0, 0], Axes)
+    close()
+
+
+@pytest.mark.parametrize(
+    "plot_call, expected",
+    [
+        (lambda s: pairplot(s, legend=True), "['legend']"),
+        (lambda s: marginal_plot(s, legend=True), "['legend']"),
+        (
+            lambda s: pairplot(s, legend=True, upper_kwargs={}),
+            "ignores ['upper_kwargs']",
+        ),
+        (
+            lambda s: marginal_plot(s, legend=True, diag_kwargs={}),
+            "ignores ['diag_kwargs']",
+        ),
+        (
+            lambda s: pairplot(LabeledSamples(s, name="a"), legend=True),
+            "ignores ['LabeledSamples names']",
+        ),
+        (lambda s: plt.pairplot_dep(s), "`pairplot_dep`"),
+        (lambda s: plt.marginal_plot_dep(s), "`marginal_plot_dep`"),
+        (lambda s: PlotOffDiagOptions(), "`PlotOffDiagOptions`"),
+    ],
+    ids=[
+        "pairplot",
+        "marginal_plot",
+        "pairplot_ignored",
+        "marginal_plot_ignored",
+        "labeled_samples_ignored",
+        "pairplot_dep",
+        "marginal_plot_dep",
+        "PlotOffDiagOptions",
+    ],
+)
+def test_deprecated_plotting_warns_once_at_the_caller(plot_call, expected):
+    """Each deprecated entry point warns once, names v0.29.0 and points at the
+    caller, so that Python's default warning filters show it."""
+    with pytest.warns(FutureWarning) as record:
+        plot_call(torch.randn(50, 2))
+    ours = [w for w in record if "v0.29.0" in str(w.message)]
+    assert len(ours) == 1
+    assert ours[0].filename == __file__
+    assert expected in str(ours[0].message)
     close()
 
 
@@ -517,6 +563,19 @@ def test_pairplot_legend_labels_from_labeled_samples(samples_labels, expected):
         fig_kwargs=dict(legend=True, samples_labels=samples_labels),
     )
     assert [t.get_text() for t in axes[-1, 0].get_legend().get_texts()] == expected
+    close()
+
+
+@pytest.mark.parametrize(
+    "triangles, legend_cell",
+    ((dict(upper="hist"), (-1, 0)), (dict(upper=None, lower="hist"), (0, -1))),
+)
+def test_pairplot_legend_cell_has_no_axis_labels(triangles, legend_cell):
+    """The legend goes into an empty cell without that cell's axis labels."""
+    _, axes = pairplot(torch.randn(100, 3), fig_kwargs=dict(legend=True), **triangles)
+    legend_ax = axes[legend_cell]
+    assert legend_ax.get_legend() is not None
+    assert (legend_ax.get_xlabel(), legend_ax.get_ylabel()) == ("", "")
     close()
 
 

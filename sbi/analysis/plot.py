@@ -106,7 +106,8 @@ def marginal_plot(
             see the source code in `FigOptions`.
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
-        **kwargs: Additional arguments to adjust the plot (deprecated)
+        **kwargs: Deprecated, will be removed in v0.29.0. Pass `FigOptions` fields
+            in `fig_kwargs` and plot styles in `diag_kwargs` instead.
     Returns: figure and axis of posterior distribution plot
     """
 
@@ -116,8 +117,18 @@ def marginal_plot(
 
     # backwards compatibility
     if len(kwargs) > 0:
-        fig, axes = _use_deprecated_plot(
-            marginal_plot_dep,
+        _warn_deprecated_kwargs(
+            "marginal_plot",
+            kwargs,
+            ignored={
+                "diag_kwargs": diag_kwargs,
+                "fig_kwargs": fig_kwargs,
+                "LabeledSamples names": sample_names
+                if any(sample_names or [])
+                else None,
+            },
+        )
+        return _marginal_plot_dep(
             samples=sample_data,
             points=points,
             limits=limits,
@@ -130,7 +141,6 @@ def marginal_plot(
             axes=axes,
             **kwargs,
         )
-        return fig, axes
 
     sample_data, _, limits = prepare_for_plot(sample_data, limits)
 
@@ -222,10 +232,10 @@ def pairplot(
             `ScatterDiagOptions` or `BarDiagOptions`.
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
             see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
-            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+            `ScatterOffDiagOptions` or `ContourOffDiagOptions`.
         lower_kwargs: Additional arguments to adjust the lower diagonal plot,
             see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
-            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+            `ScatterOffDiagOptions` or `ContourOffDiagOptions`.
         fig_kwargs: Additional arguments to adjust the overall figure,
             see the source code in `FigOptions`
         fig: matplotlib figure to plot on.
@@ -235,7 +245,8 @@ def pairplot(
             diagonal (instead of kde/hist) and scatter with jitter on the
             off-diagonal (instead of kde/contour). This prevents crashes from
             KDE on integer-valued data.
-        **kwargs: Additional arguments to adjust the plot (deprecated).
+        **kwargs: Deprecated, will be removed in v0.29.0. Pass `FigOptions` fields
+            in `fig_kwargs` and plot styles in the `*_kwargs` arguments instead.
 
     Returns: figure and axis of posterior distribution plot
     """
@@ -257,8 +268,22 @@ def pairplot(
 
     # Backwards compatibility
     if len(kwargs) > 0:
-        fig, axes = _use_deprecated_plot(
-            pairplot_dep,
+        _warn_deprecated_kwargs(
+            "pairplot",
+            kwargs,
+            ignored={
+                "lower": lower,
+                "diag_kwargs": diag_kwargs,
+                "upper_kwargs": upper_kwargs,
+                "lower_kwargs": lower_kwargs,
+                "fig_kwargs": fig_kwargs,
+                "discrete_indices": discrete_indices,
+                "LabeledSamples names": sample_names
+                if any(sample_names or [])
+                else None,
+            },
+        )
+        return _pairplot_dep(
             samples=sample_data,
             points=points,
             limits=limits,
@@ -273,7 +298,6 @@ def pairplot(
             axes=axes,
             **kwargs,
         )
-        return fig, axes
 
     sample_data, dim, limits = prepare_for_plot(sample_data, limits, points)
 
@@ -717,10 +741,13 @@ def _format_subplot(
 
 
 def _place_legend_in_empty_cell(ax, handles, labels, legend_kw):
-    """Place a legend in an empty off-diagonal cell, hiding spines and ticks."""
+    """Place a legend in an empty off-diagonal cell, hiding spines, ticks and labels."""
     ax.axis("on")
     ax.set_xticks([])
     ax.set_yticks([])
+    # A bottom-row cell got its x-label before it was turned off.
+    ax.set_xlabel("")
+    ax.set_ylabel("")
     for spine in ax.spines.values():
         spine.set_visible(False)
     ax.legend(handles, labels, **legend_kw)
@@ -1097,26 +1124,28 @@ def _prepare_fig_kwargs(
     return replace(fig_kwargs, samples_labels=sample_labels)
 
 
-def _use_deprecated_plot(
-    deprecated_method: Callable, **kwargs
-) -> Tuple[FigureBase, Axes]:
-    """
-    Issues a deprecation warning and invokes the old-style plotting method.
+def _warn_deprecated_kwargs(
+    func_name: str, kwargs: Dict, ignored: Dict[str, Any]
+) -> None:
+    """Warn that `kwargs` make `func_name` use its old implementation.
 
     Args:
-        deprecated_method: The deprecated plotting function.
-        **kwargs: Arbitrary keyword arguments passed to the deprecated function.
-
-    Returns:
-        The figure and axes objects returned by the plotting function.
+        func_name: Public name of the plotting function.
+        kwargs: The deprecated keyword arguments that were passed.
+        ignored: Newer arguments that the old implementation does not use. Those
+            that are not None are named in the warning.
     """
-
-    warn(
-        "you passed deprecated arguments **kwargs, use fig_kwargs instead.",
-        DeprecationWarning,
-        stacklevel=2,
+    message = (
+        f"`{func_name}` got the deprecated keyword arguments {sorted(kwargs)}. "
+        "They are deprecated since sbi v0.23.0 and will be removed in v0.29.0. "
+        "Pass `FigOptions` fields in `fig_kwargs` and plot styles in the "
+        "`*_kwargs` arguments (see `sbi.analysis.plotting_classes`)."
     )
-    return deprecated_method(**kwargs)
+    dropped = [name for name, value in ignored.items() if value is not None]
+    if dropped:
+        message += f" This call uses the old implementation, which ignores {dropped}."
+    # stacklevel=3 points at the line that called `pairplot` or `marginal_plot`.
+    warn(message, FutureWarning, stacklevel=3)
 
 
 def _prepare_upper(
@@ -2534,7 +2563,21 @@ def plot_tarp(
 
 # TO BE DEPRECATED
 # ----------------
-def pairplot_dep(
+def pairplot_dep(*args, **kwargs) -> Tuple[FigureBase, Axes]:
+    """Deprecated, will be removed in sbi v0.29.0. Use `pairplot` instead.
+
+    Takes the arguments of `_pairplot_dep`.
+    """
+    warn(
+        "`pairplot_dep` is deprecated since sbi v0.28.0 and will be removed in "
+        "v0.29.0. Use `pairplot` with `fig_kwargs` and the `*_kwargs` arguments.",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return _pairplot_dep(*args, **kwargs)
+
+
+def _pairplot_dep(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
@@ -2715,7 +2758,21 @@ def pairplot_dep(
     )
 
 
-def marginal_plot_dep(
+def marginal_plot_dep(*args, **kwargs) -> Tuple[FigureBase, Axes]:
+    """Deprecated, will be removed in sbi v0.29.0. Use `marginal_plot` instead.
+
+    Takes the arguments of `_marginal_plot_dep`.
+    """
+    warn(
+        "`marginal_plot_dep` is deprecated since sbi v0.28.0 and will be removed "
+        "in v0.29.0. Use `marginal_plot` with `fig_kwargs` and `diag_kwargs`.",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return _marginal_plot_dep(*args, **kwargs)
+
+
+def _marginal_plot_dep(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
