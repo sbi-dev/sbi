@@ -411,14 +411,41 @@ def test_sbc_rank_plot_cdf_diff_axis_keeps_default_for_small_deviations():
     close()
 
 
+def test_sbc_rank_plot_cdf_diff_axis_ignores_hidden_band():
+    # With 5 runs the band reaches beyond 0.5; the curve deviates by 0.4.
+    _, ax = sbc_rank_plot(
+        np.full((5, 1), 50.0),
+        100,
+        num_bins=5,
+        plot_type="cdf-diff",
+        show_uniform_region=False,
+    )
+    assert ax.get_ylim() == (-0.5, 0.5)
+    close()
+
+
 @pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
-def test_sbc_rank_plot_legend_names_each_rank_set(plot_type):
+@pytest.mark.parametrize("ranks_labels", (["NPE", "NLE"], ["NPE", "NPE"]))
+def test_sbc_rank_plot_legend_names_each_rank_set(plot_type, ranks_labels):
     rng = np.random.default_rng(0)
     ranks = [rng.integers(0, 101, size=(100, 2)) for _ in range(2)]
-    _, ax = sbc_rank_plot(ranks, 100, plot_type=plot_type, ranks_labels=["NPE", "NLE"])
+    _, ax = sbc_rank_plot(ranks, 100, plot_type=plot_type, ranks_labels=ranks_labels)
     legend_texts = [text.get_text() for text in ax[0].get_legend().get_texts()]
-    assert legend_texts == ["NPE", "NLE", "expected under uniformity"]
+    assert legend_texts == [*ranks_labels, "expected under uniformity"]
     assert ax[1].get_legend() is None
+    close()
+
+
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+def test_sbc_rank_plot_legend_kwargs_override_labels(plot_type):
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 1)) for _ in range(2)]
+    custom = ["a", "b", "band"]
+    _, ax = sbc_rank_plot(
+        ranks, 100, plot_type=plot_type, legend_kwargs={"labels": custom}
+    )
+    legend_texts = [text.get_text() for text in ax[0].get_legend().get_texts()]
+    assert legend_texts == custom
     close()
 
 

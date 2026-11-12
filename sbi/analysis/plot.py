@@ -1835,7 +1835,9 @@ def _sbc_rank_plot(
     assert isinstance(num_bins, int)
     diff = plot_type == "cdf-diff"
     cdf_ylim = (
-        _cdf_diff_ylim(ranks_list, num_bins, num_posterior_samples) if diff else None
+        _cdf_diff_ylim(ranks_list, num_bins, num_posterior_samples, show_uniform_region)
+        if diff
+        else (0.0, 1.0)
     )
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
@@ -1888,7 +1890,7 @@ def _sbc_rank_plot(
                         )
                     # Name the rank sets in the first subplot.
                     if jj == 0 and num_ranks > 1:
-                        _sbc_legend(**legend_kwargs)
+                        _sbc_legend(legend_kwargs)
                 else:
                     _plot_ranks_as_hist(
                         ranki[:, jj],  # type: ignore
@@ -1910,7 +1912,7 @@ def _sbc_rank_plot(
                     )
                     # show legend only in first subplot.
                     if jj == 0 and ranks_labels[ii] is not None:
-                        _sbc_legend(**legend_kwargs)
+                        _sbc_legend(legend_kwargs)
         # Remove empty subplots.
         col_idx += 1
         while num_rows > 1 and col_idx < num_cols:
@@ -1950,7 +1952,7 @@ def _sbc_rank_plot(
                 diff=diff,
             )
         # show legend on the last subplot.
-        _sbc_legend(**legend_kwargs)
+        _sbc_legend(legend_kwargs)
 
     return fig, ax  # pyright: ignore[reportReturnType]
 
@@ -2015,7 +2017,7 @@ def _plot_ranks_as_cdf(
     show_ylabel: bool = True,
     num_ticks: int = 3,
     diff: bool = False,
-    ylim: Optional[Tuple[float, float]] = None,
+    ylim: Tuple[float, float] = (0.0, 1.0),
 ) -> None:
     """Plot ranks as empirical CDFs on the current axis.
 
@@ -2038,16 +2040,15 @@ def _plot_ranks_as_cdf(
         show_ylabel: whether to show the y-label.
         num_ticks: number of ticks on the x-axis.
         diff: whether to plot the difference to the uniform CDF.
-        ylim: y range, by default (0, 1), or (-0.5, 0.5) with `diff=True`.
+        ylim: y range.
 
     """
     if diff:
         offset = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
-        default_ylim, ylabel = (-0.5, 0.5), "empirical CDF - uniform CDF"
+        ylabel = "empirical CDF - uniform CDF"
     else:
         offset = 0.0
-        default_ylim, ylabel = (0, 1), "empirical CDF"
-    ylim = default_ylim if ylim is None else ylim
+        ylabel = "empirical CDF"
     yticks = np.linspace(*ylim, 3)
 
     # Plot cdf and repeat each stair step
@@ -2085,7 +2086,10 @@ def _ecdf(ranks: np.ndarray, num_bins: int, num_posterior_samples: int) -> np.nd
 
 
 def _cdf_diff_ylim(
-    ranks_list: List[np.ndarray], num_bins: int, num_posterior_samples: int
+    ranks_list: List[np.ndarray],
+    num_bins: int,
+    num_posterior_samples: int,
+    include_band: bool,
 ) -> Tuple[float, float]:
     """Symmetric y range for cdf-diff plots that fits every curve and the band.
 
@@ -2095,11 +2099,13 @@ def _cdf_diff_ylim(
     uniform_cdf, lower, upper = _uniform_cdf_band(
         num_sbc_runs, num_bins, num_posterior_samples
     )
-    deviations = [lower - uniform_cdf, upper - uniform_cdf] + [
+    deviations = [
         _ecdf(param_ranks, num_bins, num_posterior_samples) - uniform_cdf
         for ranks in ranks_list
         for param_ranks in ranks.T
     ]
+    if include_band:
+        deviations += [lower - uniform_cdf, upper - uniform_cdf]
     largest = max(np.abs(deviation).max() for deviation in deviations)
     # Round before ceil, so that 0.9 does not become 1.0 from float error.
     half_range = max(0.5, float(np.ceil(round(largest * 10, 6))) / 10)
@@ -2193,16 +2199,17 @@ def _plot_hist_region_expected_under_uniformity(
     )
 
 
-def _sbc_legend(**legend_kwargs) -> None:
-    """Add a legend with one entry per label and the uniformity band last."""
-    handles, labels = plt.gca().get_legend_handles_labels()
-    entries = {}
-    for handle, label in zip(handles, labels, strict=True):
-        entries.setdefault(label, handle)
-    band = entries.pop(_UNIFORM_REGION_LABEL, None)
-    if band is not None:
-        entries[_UNIFORM_REGION_LABEL] = band
-    plt.legend(list(entries.values()), list(entries), **legend_kwargs)
+def _sbc_legend(legend_kwargs: Dict) -> None:
+    """Add a legend that lists the uniformity band once, after the curves.
+
+    `handles` and `labels` in `legend_kwargs` take precedence.
+    """
+    entries = list(zip(*plt.gca().get_legend_handles_labels(), strict=True))
+    curves = [entry for entry in entries if entry[1] != _UNIFORM_REGION_LABEL]
+    band = [entry for entry in entries if entry[1] == _UNIFORM_REGION_LABEL][:1]
+    handles = [handle for handle, _ in curves + band]
+    labels = [label for _, label in curves + band]
+    plt.legend(**{"handles": handles, "labels": labels, **legend_kwargs})
 
 
 # Diagnostics for hypothesis tests
