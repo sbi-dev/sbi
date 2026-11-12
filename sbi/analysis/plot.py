@@ -1888,8 +1888,8 @@ def _sbc_rank_plot(
                             alpha=uniform_region_alpha,
                             diff=diff,
                         )
-                    # Name the rank sets in the first subplot.
-                    if jj == 0 and num_ranks > 1:
+                    # Name the rank sets in the first subplot, once all are drawn.
+                    if jj == 0 and ii == num_ranks - 1 > 0:
                         _sbc_legend(legend_kwargs)
                 else:
                     _plot_ranks_as_hist(
@@ -1910,8 +1910,8 @@ def _sbc_rank_plot(
                         num_posterior_samples,
                         alpha=uniform_region_alpha,
                     )
-                    # show legend only in first subplot.
-                    if jj == 0 and ranks_labels[ii] is not None:
+                    # Show legend in the first subplot, once all rank sets are drawn.
+                    if jj == 0 and ii == num_ranks - 1:
                         _sbc_legend(legend_kwargs)
         # Remove empty subplots.
         col_idx += 1
@@ -2095,16 +2095,17 @@ def _cdf_diff_ylim(
 
     The range is at least (-0.5, 0.5) and grows in steps of 0.1 up to (-1, 1).
     """
-    num_sbc_runs = ranks_list[0].shape[0]
-    uniform_cdf, lower, upper = _uniform_cdf_band(
-        num_sbc_runs, num_bins, num_posterior_samples
-    )
+    uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
     deviations = [
         _ecdf(param_ranks, num_bins, num_posterior_samples) - uniform_cdf
         for ranks in ranks_list
         for param_ranks in ranks.T
     ]
     if include_band:
+        num_sbc_runs = ranks_list[0].shape[0]
+        _, lower, upper = _uniform_cdf_band(
+            num_sbc_runs, num_bins, num_posterior_samples
+        )
         deviations += [lower - uniform_cdf, upper - uniform_cdf]
     largest = max(np.abs(deviation).max() for deviation in deviations)
     # Round before ceil, so that 0.9 does not become 1.0 from float error.
