@@ -385,6 +385,43 @@ def test_sbc_rank_plot_bands_for_uniform_integer_ranks(plot_type):
     close()
 
 
+@pytest.mark.parametrize("params_in_subplots", (True, False))
+def test_sbc_rank_plot_cdf_diff_axis_fits_large_deviations(params_in_subplots):
+    """The cdf-diff y-axis grows to show deviations beyond 0.5 instead of clipping."""
+    # All ranks 0: the empirical CDF is 1 from the first bin on, about 0.9 above
+    # the uniform CDF there.
+    _, ax = sbc_rank_plot(
+        np.zeros((200, 2)),
+        100,
+        num_bins=10,
+        plot_type="cdf-diff",
+        params_in_subplots=params_in_subplots,
+    )
+    for axis in np.atleast_1d(ax):
+        largest = max(np.abs(line.get_ydata()).max() for line in axis.lines)
+        assert largest == pytest.approx(1 - 10 / 101)
+        assert axis.get_ylim() == (-1.0, 1.0)
+    close()
+
+
+def test_sbc_rank_plot_cdf_diff_axis_keeps_default_for_small_deviations():
+    ranks = np.random.default_rng(0).integers(0, 101, size=(1000, 2))
+    _, ax = sbc_rank_plot(ranks, 100, plot_type="cdf-diff")
+    assert ax.get_ylim() == (-0.5, 0.5)
+    close()
+
+
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+def test_sbc_rank_plot_legend_names_each_rank_set(plot_type):
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 2)) for _ in range(2)]
+    _, ax = sbc_rank_plot(ranks, 100, plot_type=plot_type, ranks_labels=["NPE", "NLE"])
+    legend_texts = [text.get_text() for text in ax[0].get_legend().get_texts()]
+    assert {"NPE", "NLE"} <= set(legend_texts)
+    assert ax[1].get_legend() is None
+    close()
+
+
 @pytest.mark.parametrize("bad_rank", (-1.0, 11.0, np.nan))
 def test_sbc_rank_plot_rejects_ranks_outside_0_to_n(bad_rank):
     with pytest.raises(ValueError, match="num_posterior_samples"):
