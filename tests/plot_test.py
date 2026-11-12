@@ -459,6 +459,17 @@ def test_sbc_rank_plot_legend_kwargs_override_entries(
     close()
 
 
+def test_sbc_rank_plot_legend_keeps_entries_already_on_the_axes():
+    fig, ax = subplots(1, 1)
+    ax.bar([10], [0.5], label="reference")  # a container, not an artist
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 1)) for _ in range(2)]
+    sbc_rank_plot(ranks, 100, plot_type="cdf", fig=fig, ax=np.array([ax]))
+    legend_texts = [text.get_text() for text in ax.get_legend().get_texts()]
+    assert "reference" in legend_texts
+    close()
+
+
 @pytest.mark.parametrize("bad_rank", (-1.0, 11.0, np.nan))
 def test_sbc_rank_plot_rejects_ranks_outside_0_to_n(bad_rank):
     with pytest.raises(ValueError, match="num_posterior_samples"):

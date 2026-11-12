@@ -23,6 +23,7 @@ import numpy as np
 import torch
 from matplotlib import cm
 from matplotlib import pyplot as plt
+from matplotlib.artist import Artist
 from matplotlib.axes import Axes
 from matplotlib.colors import Normalize
 from matplotlib.figure import Figure, FigureBase
@@ -2213,7 +2214,10 @@ def _sbc_legend(legend_kwargs: Dict) -> None:
         plt.legend(**legend_kwargs)
         return
     entries = list(zip(*plt.gca().get_legend_handles_labels(), strict=True))
-    is_band = [handle.get_gid() == _UNIFORM_REGION_GID for handle, _ in entries]
+    is_band = [
+        isinstance(handle, Artist) and handle.get_gid() == _UNIFORM_REGION_GID
+        for handle, _ in entries
+    ]
     curves = [entry for entry, band in zip(entries, is_band, strict=True) if not band]
     bands = [entry for entry, band in zip(entries, is_band, strict=True) if band]
     handles = [handle for handle, _ in curves + bands[:1]]
