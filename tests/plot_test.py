@@ -9,6 +9,7 @@ import pytest
 import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from matplotlib.pyplot import close, subplots
 from scipy.stats import binom
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -425,7 +426,10 @@ def test_sbc_rank_plot_cdf_diff_axis_ignores_hidden_band():
 
 
 @pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
-@pytest.mark.parametrize("ranks_labels", (["NPE", "NLE"], ["NPE", "NPE"]))
+@pytest.mark.parametrize(
+    "ranks_labels",
+    (["NPE", "NLE"], ["NPE", "NPE"], ["expected under uniformity", "NLE"]),
+)
 def test_sbc_rank_plot_legend_names_each_rank_set(plot_type, ranks_labels):
     rng = np.random.default_rng(0)
     ranks = [rng.integers(0, 101, size=(100, 2)) for _ in range(2)]
@@ -437,15 +441,21 @@ def test_sbc_rank_plot_legend_names_each_rank_set(plot_type, ranks_labels):
 
 
 @pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
-def test_sbc_rank_plot_legend_kwargs_override_labels(plot_type):
+@pytest.mark.parametrize(
+    "legend_kwargs, expected",
+    (
+        ({"labels": ["a", "b", "band"]}, ["a", "b", "band"]),
+        ({"handles": [Line2D([], [], label="reference")]}, ["reference"]),
+    ),
+)
+def test_sbc_rank_plot_legend_kwargs_override_entries(
+    plot_type, legend_kwargs, expected
+):
     rng = np.random.default_rng(0)
     ranks = [rng.integers(0, 101, size=(100, 1)) for _ in range(2)]
-    custom = ["a", "b", "band"]
-    _, ax = sbc_rank_plot(
-        ranks, 100, plot_type=plot_type, legend_kwargs={"labels": custom}
-    )
+    _, ax = sbc_rank_plot(ranks, 100, plot_type=plot_type, legend_kwargs=legend_kwargs)
     legend_texts = [text.get_text() for text in ax[0].get_legend().get_texts()]
-    assert legend_texts == custom
+    assert legend_texts == expected
     close()
 
 

@@ -2076,6 +2076,7 @@ def _plot_ranks_as_cdf(
 
 
 _UNIFORM_REGION_LABEL = "expected under uniformity"
+_UNIFORM_REGION_GID = "sbc-uniform-region"
 
 
 def _ecdf(ranks: np.ndarray, num_bins: int, num_posterior_samples: int) -> np.ndarray:
@@ -2172,6 +2173,7 @@ def _plot_cdf_region_expected_under_uniformity(
         color=color,
         alpha=alpha,
         label=_UNIFORM_REGION_LABEL,
+        gid=_UNIFORM_REGION_GID,
     )
 
 
@@ -2197,19 +2199,25 @@ def _plot_hist_region_expected_under_uniformity(
         color=color,
         alpha=alpha,
         label=_UNIFORM_REGION_LABEL,
+        gid=_UNIFORM_REGION_GID,
     )
 
 
 def _sbc_legend(legend_kwargs: Dict) -> None:
     """Add a legend that lists the uniformity band once, after the curves.
 
-    `handles` and `labels` in `legend_kwargs` take precedence.
+    `handles` and `labels` in `legend_kwargs` take precedence; custom `handles`
+    keep their own labels.
     """
+    if "handles" in legend_kwargs:
+        plt.legend(**legend_kwargs)
+        return
     entries = list(zip(*plt.gca().get_legend_handles_labels(), strict=True))
-    curves = [entry for entry in entries if entry[1] != _UNIFORM_REGION_LABEL]
-    band = [entry for entry in entries if entry[1] == _UNIFORM_REGION_LABEL][:1]
-    handles = [handle for handle, _ in curves + band]
-    labels = [label for _, label in curves + band]
+    is_band = [handle.get_gid() == _UNIFORM_REGION_GID for handle, _ in entries]
+    curves = [entry for entry, band in zip(entries, is_band, strict=True) if not band]
+    bands = [entry for entry, band in zip(entries, is_band, strict=True) if band]
+    handles = [handle for handle, _ in curves + bands[:1]]
+    labels = [label for _, label in curves + bands[:1]]
     plt.legend(**{"handles": handles, "labels": labels, **legend_kwargs})
 
 
