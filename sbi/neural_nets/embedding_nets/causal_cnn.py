@@ -100,7 +100,7 @@ def WaveNetSRLikeAggregator(
     intermediate_channel_sizes += [output_dim]
     if isinstance(stride_sizes, List):
         assert len(stride_sizes) == len(kernel_sizes), (
-            "Provided stride size list should have the same size as"
+            "Provided stride size list should be have the same size as"
             "the kernel size list."
         )
     else:
