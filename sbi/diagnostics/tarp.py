@@ -49,6 +49,11 @@ def run_tarp(
         thetas: ground-truth parameters for tarp, simulated from the prior.
         xs: observed data for tarp, simulated from thetas.
         posterior: a posterior obtained from sbi.
+        references: reference points used for the coverage regions, with shape
+            ``thetas.shape``, or ``None``. Rows where ``xs`` is NaN or Inf are
+            dropped from ``references`` alongside ``thetas`` and ``xs``. If ``None``,
+            reference points are drawn uniformly from the parameter space spanned
+            by ``thetas``.
         num_posterior_samples: number of approximate posterior samples used for ranking.
         num_workers: number of CPU cores to use for running inference in parallel.
         show_progress_bar: whether to display a progress over sbc runs.
