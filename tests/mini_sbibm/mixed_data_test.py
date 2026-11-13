@@ -8,7 +8,7 @@ from torch.distributions import Bernoulli, Beta, Gamma
 
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 
-from .mixed_data import MixedData
+from .mixed_data import MixedData, mixed_simulator
 
 
 @pytest.mark.parametrize("num_trials", [1, 4, 10])
@@ -42,3 +42,17 @@ def test_reference_density_matches_simulator_likelihood(num_trials, custom_prior
         atol=1e-4,
         rtol=1e-5,
     )
+
+
+def test_simulator_uses_task_stimulus_condition():
+    """The training simulator and the reference share the stimulus condition."""
+    task = MixedData()
+    task.stimulus_condition = 3.0
+    theta = torch.tensor([[0.4, 0.2], [1.1, 0.5]]).repeat(50, 1)
+
+    torch.manual_seed(0)
+    simulated = task.get_simulator()(theta)
+    torch.manual_seed(0)
+    expected = mixed_simulator(theta, stimulus_condition=3.0)
+
+    torch.testing.assert_close(simulated, expected)
