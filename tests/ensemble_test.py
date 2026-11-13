@@ -190,7 +190,7 @@ def test_ensemble_map_uses_default_x():
         for _ in range(ensemble_size)
     ]
     ensemble = EnsemblePosterior(posteriors)
-    with pytest.raises(ValueError, match="Default `x` has not been set"):
+    with pytest.raises(ValueError, match="default has not been set"):
         ensemble.map()
     x_o = 2.0 * ones(1, num_dim)
     ensemble.set_default_x(x_o)

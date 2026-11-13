@@ -16,7 +16,6 @@ from torch import multiprocessing as mp
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 from sbi.samplers.mcmc import (
     IterateParameters,
     SliceSamplerSerial,
@@ -200,6 +199,8 @@ class MCMCPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
+            x: Observation. If not provided, uses the default `x`. Several
+                observations are combined as iid trials.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -215,7 +216,7 @@ class MCMCPosterior(NeuralPosterior):
         warn("The log-probability is unnormalized!", stacklevel=2)
 
         x = self._x_else_default_x(x)
-        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
+        self.potential_fn = self._bind_iid(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -244,7 +245,8 @@ class MCMCPosterior(NeuralPosterior):
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
-                set via `.set_default_x()`.
+                set via `.set_default_x()`. Several observations are combined as iid
+                trials.
             method: MCMC method to use. One of `slice_np`, `slice_np_vectorized`,
                 `hmc_pyro`, `nuts_pyro`, `slice_pymc`, `hmc_pymc`, `nuts_pymc`.
                 If not provided, uses the method specified at initialization.
@@ -274,7 +276,7 @@ class MCMCPosterior(NeuralPosterior):
         """
 
         x = self._x_else_default_x(x)
-        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
+        self.potential_fn = self._bind_iid(x)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -397,7 +399,7 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
-        self._assert_finite_x(x)
+        x = self._process_x(x)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -427,13 +429,7 @@ class MCMCPosterior(NeuralPosterior):
             )
             num_chains = torch.Size(sample_shape).numel()
 
-        # custom shape handling to make sure to match the batch size of x and theta
-        # without unnecessary combinations.
-        if len(x.shape) == 1:
-            x = x.unsqueeze(0)
         batch_size = x.shape[0]
-
-        x = reshape_to_batch_event(x, event_shape=x.shape[1:])
 
         # For batched sampling, we want `num_chains` for each observation in the batch.
         # Here we repeat the observations ABC -> AAABBBCCC, so that the chains are

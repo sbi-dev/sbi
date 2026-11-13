@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import math
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, replace
@@ -569,6 +568,7 @@ class VIPosterior(NeuralPosterior):
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
+            self._map = None
             q = detach_and_deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
             if hasattr(q, "to"):
@@ -622,9 +622,9 @@ class VIPosterior(NeuralPosterior):
         Args:
             sample_shape: Desired shape of samples that are drawn from the posterior.
             x: Conditioning observation. In single-x mode, must match trained x_o
-                (or be None to use default). In amortized mode, required and can be
-                any observation. For batched observations, shape should be
-                (batch_size, x_dim).
+                (or be None to use the default x, else the trained x_o). In amortized
+                mode, required and can be any observation. For batched observations,
+                shape should be (batch_size, x_dim).
             show_progress_bars: Unused for `VIPosterior` since sampling from the
                 variational distribution is fast. Included for API consistency.
 
@@ -655,7 +655,7 @@ class VIPosterior(NeuralPosterior):
         else:
             # Single-x mode: sample from unconditional flow q(θ)
             x = self._x_else_default_x(x)
-            if self._trained_on is None or (x != self._trained_on).any():
+            if not self._is_trained_on(x):
                 raise ValueError(
                     f"The variational posterior was not fit on the specified "
                     f"observation {x}. Please train using posterior.train()."
@@ -695,9 +695,9 @@ class VIPosterior(NeuralPosterior):
             return self.sample(sample_shape, x=x, show_progress_bars=show_progress_bars)
         else:
             raise NotImplementedError(
-                "Batched sampling is not implemented for single-x VI mode. "
-                "Use train_amortized() to train an amortized posterior, or "
-                "call sample() in a loop: [posterior.sample(shape, x_o) for x_o in x]."
+                "Batched sampling is not implemented for single-x VI mode, because q "
+                "is fit to one observed data set. Use train_amortized() to train an "
+                "amortized posterior, or train a posterior for each observation."
             )
 
     def log_prob(
@@ -771,12 +771,49 @@ class VIPosterior(NeuralPosterior):
             else:
                 # Single-x mode: evaluate log q(θ)
                 x = self._x_else_default_x(x)
-                if self._trained_on is None or (x != self._trained_on).any():
+                if not self._is_trained_on(x):
                     raise ValueError(
                         f"The variational posterior was not fit on the specified "
                         f"observation {x}. Please train using posterior.train()."
                     )
                 return self.q.log_prob(theta)
+
+    @property
+    def _takes_one_observation(self) -> bool:
+        """The amortized q(θ|x), like a direct posterior, takes one observation."""
+        return self._mode == "amortized"
+
+    @property
+    def _one_observation_hint(self) -> str:
+        return (
+            "For a separate posterior of each observation, pass one observation at "
+            "a time, or use `sample_batched()`. To combine them as iid trials, fit "
+            "q to all of them with `train(x=x)`."
+        )
+
+    @property
+    def _implicit_x(self) -> Optional[Tensor]:
+        """The default `x`, else the `x` the single-x q was fit to.
+
+        A single-x q answers for one observation only, so `sample()`, `log_prob()`,
+        `potential()` and `map()` fall back to it when no `x` is given.
+        """
+        if self.default_x is None and self._mode == "single_x":
+            return self._trained_on
+        return self.default_x
+
+    def _is_trained_on(self, x: Tensor) -> bool:
+        """Whether q was trained on `x`: the same shape and the same values.
+
+        Comparing values alone would broadcast, so that a q trained on one observation
+        would pass for several copies of it.
+        """
+        trained_on = self._trained_on
+        return (
+            trained_on is not None
+            and trained_on.shape == x.shape
+            and bool((x == trained_on).all())
+        )
 
     def train(
         self,
@@ -796,10 +833,11 @@ class VIPosterior(NeuralPosterior):
         quality_control_metric: str = "psis",
         **kwargs,
     ) -> "VIPosterior":
-        """This method trains the variational posterior for a single observation.
+        """This method trains the variational posterior for one observed data set.
 
         Args:
-            x: The observation, optional, defaults to self._x.
+            x: The observation, optional, defaults to self._x. Several observations
+                are combined as iid trials.
             n_particles: Number of samples to approximate expectations within the
                 variational bounds. The larger the more accurate are gradient
                 estimates, but the computational cost per iteration increases.
@@ -835,7 +873,8 @@ class VIPosterior(NeuralPosterior):
                 stick_the_landing: If one should use the STL estimator (only for rKL,
                     IW, alpha).
                 dreg: If one should use the DREG estimator (only for rKL, IW, alpha).
-                weight_transform: Callable applied to importance weights (only for fKL)
+                weight_transform: Callable applied to importance weights (only for
+                    fKL), scaled so that the largest weight is 1.
         Returns:
             VIPosterior: `VIPosterior` (can be used to chain calls).
 
@@ -893,14 +932,21 @@ class VIPosterior(NeuralPosterior):
                 **kwargs,
             )
 
-        # Check context
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(  # type: ignore
-            self._device
-        )
+        # Check context. Training does not fall back to the x of an earlier fit.
+        if x is not None:
+            x = self._process_x(x)
+        elif self.default_x is not None:
+            x = self.default_x
+        else:
+            raise ValueError(
+                "Pass `x` to `train()`, or set a default with `.set_default_x()`."
+            )
         if not torch.isfinite(x).all():
             raise ValueError("x contains NaN or Inf values.")
+        # The single-x q combines observations, also while an amortized q is in place.
+        bound_potential = self._bind_iid(x, check_num_observations=False)
 
-        already_trained = self._trained_on is not None and (x == self._trained_on).all()
+        already_trained = self._is_trained_on(x)
 
         # Optimize
         optimizer = self._optimizer
@@ -937,9 +983,8 @@ class VIPosterior(NeuralPosterior):
                 break
         # Training finished:
         self._trained_on = x
-
-        # Bind potential_fn to the trained x so it can be used for sampling/evaluation
-        self.potential_fn = self.potential_fn.bind(x)
+        self.potential_fn = bound_potential
+        self._map = None
 
         if self._mode == "amortized":
             warnings.warn(
@@ -1359,6 +1404,9 @@ class VIPosterior(NeuralPosterior):
         quality_control_fn, quality_control_msg = get_quality_metric(
             quality_control_metric
         )
+        if self._mode == "single_x" and self._trained_on is not None:
+            # Score q against the x it was fit to, not the x bound last.
+            self.potential_fn = self._bind_iid(self._trained_on)
         metric = round(float(quality_control_fn(self, N=N)), 3)
         print(f"Quality Score: {metric} " + quality_control_msg)
 
@@ -1368,14 +1416,9 @@ class VIPosterior(NeuralPosterior):
         num_init_samples: int,
         x: Optional[TorchTensor] = None,
     ) -> Tensor:
-        # Amortized training leaves `q` untouched. Pool `num_init_samples` starts in
-        # total over the observations in `x`.
+        # Amortized training leaves `q` untouched, so draw from q(θ|x).
         if self._mode == "amortized" and init_method in ("posterior", "proposal"):
-            num_obs = self._x_else_default_x(x).shape[0]
-            samples = self.sample((math.ceil(num_init_samples / num_obs),), x=x)
-            samples = samples.reshape(-1, samples.shape[-1])
-            keep = torch.randperm(samples.shape[0], device=samples.device)
-            return samples[keep[:num_init_samples]]
+            return self.sample((num_init_samples,), x=x)
         return super()._map_inits(init_method, num_init_samples, x)
 
     def map(
@@ -1414,7 +1457,7 @@ class VIPosterior(NeuralPosterior):
                 it is a string, it can be either `posterior` or `proposal`. For
                 `VIPosterior` both draw `num_init_samples` samples from the variational
                 distribution, not the prior (in amortized mode, from q(θ|x) for the
-                observations in the default `x`). If it is a tensor, the tensor is used
+                default `x`). If it is a tensor, the tensor is used
                 as the initial locations, so prior-based initialization can be done by
                 passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and

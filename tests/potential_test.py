@@ -23,9 +23,13 @@ from sbi.inference.potentials.base_potential import (
     BasePotential,
     CustomPotentialWrapper,
 )
-from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
+from sbi.inference.potentials.posterior_based_potential import (
+    PosteriorBasedPotential,
+    posterior_estimator_based_potential,
+)
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
 from sbi.neural_nets import posterior_nn, posterior_score_nn
+from sbi.neural_nets.embedding_nets import FCEmbedding, PermutationInvariantEmbedding
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
 from sbi.utils.user_input_checks import process_prior
@@ -299,3 +303,29 @@ def test_set_x_none_clears_observation():
     with pytest.warns(FutureWarning):
         bound.set_x(None)
     assert bound.return_x_o() is None
+
+
+def test_potential_counts_iid_trials_against_the_shape_of_one_observation():
+    """With a permutation-invariant embedding, one observation holds 5 trials. Without
+    batch dimension, it is one observation, not 5 iid trials."""
+    torch.manual_seed(0)
+    prior = BoxUniform(-3 * ones(2), 3 * ones(2))
+    theta = prior.sample((50,))
+    x = theta.unsqueeze(1) + torch.randn(50, 5, 2)
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(2, 8), trial_net_output_dim=8, output_dim=4
+    )
+    estimator = posterior_nn("mdn", embedding_net=embedding)(theta, x)
+    potential_fn, _ = posterior_estimator_based_potential(estimator, prior, None)
+
+    theta_o = torch.tensor([[0.5, -0.5], [1.0, 1.0]])
+    x_o = torch.stack([zeros(5, 2), ones(5, 2), -ones(5, 2)])
+
+    def iid_potential(x_o: Tensor) -> Tensor:
+        return potential_fn.bind(x_o, x_is_iid=True)(theta_o, track_gradients=False)
+
+    singles = torch.stack([iid_potential(x_i.unsqueeze(0)) for x_i in x_o])
+    assert torch.allclose(iid_potential(x_o[0]), singles[0])
+    # iid trials: the sum of single-trial potentials, with the prior counted once.
+    expected = singles.sum(0) - 2 * prior.log_prob(theta_o)
+    assert torch.allclose(iid_potential(x_o), expected, atol=1e-5)

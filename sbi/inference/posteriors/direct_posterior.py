@@ -98,6 +98,10 @@ class DirectPosterior(NeuralPosterior):
         self._purpose = """It samples the posterior network and rejects samples that
             lie outside of the prior bounds."""
 
+    @property
+    def _takes_one_observation(self) -> bool:
+        return True
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -134,17 +138,7 @@ class DirectPosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(
-            x, event_shape=self.posterior_estimator.condition_shape
-        )
-        if x.shape[0] > 1:
-            raise ValueError(
-                ".sample() supports only `batchsize == 1`. If you intend "
-                "to sample multiple observations, use `.sample_batched()`. "
-                "If you intend to sample i.i.d. observations, set up the "
-                "posterior density estimator with an appropriate permutation "
-                "invariant embedding net."
-            )
+        self._check_num_observations(x.shape[0])
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -223,10 +217,8 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
-        self._assert_finite_x(x)
+        x = self._process_x(x)
         num_samples = torch.Size(sample_shape).numel()
-        condition_shape = self.posterior_estimator.condition_shape
-        x = reshape_to_batch_event(x.to(self._device), event_shape=condition_shape)
         num_xos = x.shape[0]
 
         # throw warning if num_x * num_samples is too large
@@ -316,24 +308,14 @@ class DirectPosterior(NeuralPosterior):
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
-        x_density_estimator = reshape_to_batch_event(
-            x, event_shape=self.posterior_estimator.condition_shape
-        )
-        if x_density_estimator.shape[0] > 1:
-            raise ValueError(
-                ".log_prob() supports only `batchsize == 1`. If you intend "
-                "to evaluate given multiple observations, use `.log_prob_batched()`. "
-                "If you intend to evaluate given i.i.d. observations, set up the "
-                "posterior density estimator with an appropriate permutation "
-                "invariant embedding net."
-            )
+        self._check_num_observations(x.shape[0])
 
         self.posterior_estimator.eval()
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
             unnorm_log_prob = self.posterior_estimator.log_prob(
-                theta_density_estimator, condition=x_density_estimator
+                theta_density_estimator, condition=x
             )
             # `log_prob` supports only a single observation (i.e. `batchsize==1`).
             # We now remove this additional dimension.
@@ -397,9 +379,8 @@ class DirectPosterior(NeuralPosterior):
             in the support of the prior, -∞ (corresponding to 0 probability) outside.
         """
 
-        self._assert_finite_x(x)
+        x = self._process_x(x)
         theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
-        x = x.to(self._device)
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
         # overwise, the leading is sample.
@@ -461,7 +442,7 @@ class DirectPosterior(NeuralPosterior):
             rejection_sampling_batch_size: Batch size for rejection sampling.
 
         Returns:
-            Saved or newly-estimated correction factor (as a scalar `Tensor`).
+            Saved or newly-estimated correction factor, one per observation in `x`.
         """
         x = self._x_else_default_x(x)
 

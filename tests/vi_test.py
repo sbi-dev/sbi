@@ -22,14 +22,23 @@ import torch.distributions.transforms as torch_tf
 from torch import eye, ones, zeros
 from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
-from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
+from sbi.inference import (
+    NLE,
+    NRE,
+    EnsemblePosterior,
+    VectorFieldPosterior,
+    likelihood_estimator_based_potential,
+)
 from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
+from sbi.neural_nets import posterior_flow_nn
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.samplers.vi.vi_divergence_optimizers import (
+    ElboOptimizer,
+    ForwardKLOptimizer,
     IWElboOptimizer,
     RenyiDivergenceOptimizer,
 )
@@ -66,9 +75,6 @@ class FakePotential(BasePotential):
     def __call__(self, theta, **kwargs):
         return self.prior.log_prob(theta)
 
-    def allow_iid_x(self) -> bool:
-        return True
-
     def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
         """Create new potential with x bound, without mutable state."""
 
@@ -87,9 +93,6 @@ def make_tractable_potential(target_distribution, prior):
             return target_distribution.log_prob(
                 torch.as_tensor(theta, dtype=torch.float32)
             )
-
-        def allow_iid_x(self) -> bool:
-            return True
 
         def bind(
             self, x_o: torch.Tensor, x_is_iid: bool = True
@@ -737,6 +740,83 @@ def test_iwelbo_optimizer_uses_importance_weighted_loss(
     assert torch.allclose(loss, torch.tensor(-offset))
 
 
+class _OffsetPotential(BasePotential):
+    """The prior log probability plus a constant, an unnormalized potential."""
+
+    def __init__(self, prior, offset: float):
+        super().__init__(prior)
+        self.offset = offset
+
+    def __call__(self, theta, track_gradients: bool = True):
+        return self.prior.log_prob(theta) + self.offset
+
+
+class _ZeroPotential(BasePotential):
+    """A constant potential: the ELBO gradient is the one of the entropy alone."""
+
+    def __call__(self, theta, track_gradients: bool = True):
+        return torch.zeros(theta.shape[0])
+
+
+def test_elbo_differentiates_a_vector_field_potential():
+    """The ELBO gradient includes the potential, also for a vector field potential,
+    which does not track gradients by default."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    estimator = posterior_flow_nn(hidden_features=8, num_layers=1)(
+        theta, theta + 0.1 * torch.randn_like(theta)
+    )
+    potentials = {
+        "vector field": VectorFieldPosterior(estimator, prior).potential_fn,
+        "zero": _ZeroPotential(prior),
+    }
+
+    def location_gradient(potential_fn):
+        torch.manual_seed(0)
+        q = LearnableGaussian(dim=2, full_covariance=False)
+        optimizer = ElboOptimizer(
+            potential_fn=potential_fn,
+            q=q,
+            prior=prior,
+            n_particles=8,
+            lr=1e-3,
+            gamma=0.999,
+        )
+        surrogate, _ = optimizer.loss(zeros(1, 2))
+        return torch.autograd.grad(surrogate, next(q.parameters()))[0]
+
+    assert not torch.allclose(
+        location_gradient(potentials["vector field"]),
+        location_gradient(potentials["zero"]),
+    )
+
+
+def test_forward_kl_loss_ignores_a_constant_in_the_potential():
+    """Self-normalized fKL weights do not depend on a constant in the potential.
+
+    With an offset of -200, exp() of every log weight underflows in float32.
+    """
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def loss_with_offset(offset: float):
+        torch.manual_seed(0)
+        optimizer = ForwardKLOptimizer(
+            potential_fn=_OffsetPotential(prior, offset),
+            q=LearnableGaussian(dim=2, full_covariance=False),
+            prior=prior,
+            n_particles=64,
+            lr=1e-3,
+            gamma=0.999,
+        )
+        return optimizer.loss(zeros(2))
+
+    surrogate, loss = loss_with_offset(0.0)
+    surrogate_low, loss_low = loss_with_offset(-200.0)
+    assert torch.isfinite(surrogate_low)
+    assert torch.allclose(surrogate_low, surrogate)
+    assert torch.allclose(loss_low, loss - 200.0)
+
+
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
 @pytest.mark.parametrize("dreg_before, dreg_after", [(False, True), (True, False)])
 def test_dreg_changed_by_update_matches_new_optimizer(
@@ -1057,6 +1137,42 @@ def test_amortized_vi_requires_training(linear_gaussian_setup):
         posterior.sample((100,))
 
 
+def test_amortized_vi_takes_one_observation():
+    """Amortized q, like a direct posterior, takes one observation in `potential()`,
+    instead of combining several as iid trials."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(potential_fn=FakePotential(prior=prior), prior=prior)
+    posterior.train_amortized(
+        theta=theta,
+        x=theta + 0.1 * torch.randn_like(theta),
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        posterior.potential(zeros(4, 2), x=zeros(3, 2))
+
+
+def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
+    """Amortized q(theta|x) needs an x; it ignores the x of a stale single-x fit."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    with pytest.raises(ValueError, match="Context `x` needed"):
+        posterior.sample((5,))
+
+
 @pytest.mark.slow
 def test_amortized_vi_map(linear_gaussian_setup):
     """Test that MAP estimation returns high-density region."""
@@ -1181,3 +1297,99 @@ def test_learnable_gaussian_ignores_the_upper_triangle_of_scale_tril():
 
     scale_tril = q._base_dist().scale_tril
     assert torch.equal(scale_tril, scale_tril.tril())
+
+
+class _CenteredPotential(BasePotential):
+    """A potential with its mode at the bound observation."""
+
+    def __call__(self, theta, track_gradients: bool = True):
+        return -0.5 * ((theta - self.x_o) ** 2).sum(-1)
+
+
+@pytest.mark.parametrize("refit", ["train", "set_q"])
+def test_map_follows_a_refit_on_another_observation(refit):
+    """Without a default x, `map()` uses the x that q was last fit to, not a cached
+    MAP of an earlier fit."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def make_posterior():
+        return VIPosterior(
+            _CenteredPotential(prior),
+            prior,
+            q="gaussian",
+            theta_transform=torch_tf.identity_transform,
+        )
+
+    posterior = make_posterior()
+    map_kwargs = dict(init_method=zeros(1, 2), num_iter=300, learning_rate=0.1)
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior.map(**map_kwargs)
+    if refit == "train":
+        posterior.train(x=3 * ones(1, 2), **TRAIN_KWARGS)
+    else:
+        other = make_posterior()
+        other.train(x=3 * ones(1, 2), **TRAIN_KWARGS)
+        posterior.set_q(other)
+
+    assert torch.allclose(posterior.map(**map_kwargs), 3 * ones(1, 2), atol=0.3)
+
+
+def test_q_fit_on_one_observation_rejects_copies_of_it():
+    """A q fit on one observation is not the posterior of several iid copies."""
+    posterior = _make_posterior("gaussian")
+    posterior.train(**TRAIN_KWARGS)
+    copies = posterior.default_x.repeat(3, 1)
+
+    with pytest.raises(ValueError, match="not fit on the specified observation"):
+        posterior.sample((5,), x=copies)
+    with pytest.raises(ValueError, match="not fit on the specified observation"):
+        posterior.log_prob(zeros(1, 2), x=copies)
+
+
+def test_ensemble_of_vi_fits_to_different_x_raises():
+    """Without an x, an ensemble of q fit to different observations would mix their
+    posteriors. With one shared x, it uses that x."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    fits = []
+    for x_o in (2 * ones(1, 2), -2 * ones(1, 2)):
+        posterior = VIPosterior(_CenteredPotential(prior), prior, q="gaussian")
+        posterior.train(x=x_o, **TRAIN_KWARGS)
+        fits.append(posterior)
+
+    with pytest.raises(ValueError, match="use different observations"):
+        EnsemblePosterior(fits).sample((5,))
+    assert EnsemblePosterior([fits[0], fits[0]]).sample((5,)).shape == (5, 2)
+
+
+def test_ensemble_of_amortized_vi_takes_one_observation_in_log_prob():
+    """`log_prob()` of the ensemble raises like `sample()`, instead of pairing each
+    theta with one observation."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    ensemble = EnsemblePosterior([posterior, posterior])
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        ensemble.log_prob(zeros(3, 2), x=zeros(3, 2))
+
+
+def test_evaluate_scores_q_at_the_x_it_was_fit_to(capsys):
+    """A potential evaluated at another x does not change the quality score of q."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    posterior = VIPosterior(_CenteredPotential(prior), prior, q="gaussian")
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    torch.manual_seed(0)
+    posterior.evaluate(quality_control_metric="prop", N=1000)
+    expected = capsys.readouterr().out
+
+    posterior.potential(zeros(1, 2), x=3 * ones(1, 2))
+    torch.manual_seed(0)
+    posterior.evaluate(quality_control_metric="prop", N=1000)
+    assert capsys.readouterr().out == expected

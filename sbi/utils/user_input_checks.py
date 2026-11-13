@@ -619,40 +619,34 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
 def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
-    This means that `x` is returned with a `batch_dim`.
-
-    If `x_shape` is `None`, the shape is not checked.
+    This means that `x` is returned with a `batch_dim`. With `x_event_shape`, an `x`
+    of exactly that shape is one observation and gets a batch dimension of 1, and any
+    other shape than `(num_observations, *x_event_shape)` raises a ValueError. If
+    `x_event_shape` is `None`, the shape is not checked.
 
     Args:
         x: Observed data as provided by the user.
-        x_event_shape: Prescribed shape - either directly provided by the user at init
-            or inferred by sbi by running a simulation and checking the output. Does not
-            contain a batch dimension.
+        x_event_shape: Shape of one observation, without batch dimension.
 
     Returns:
-        x: Observed data with shape ready for usage in sbi.
+        x: Observed data of shape `(num_observations, *x_event_shape)`.
+
+    Raises:
+        ValueError: If `x` does not match `x_event_shape`.
     """
-
+    input_shape = tuple(torch.as_tensor(x).shape)
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
-    if x_event_shape is not None and len(x_event_shape) > len(x.shape):
-        raise ValueError(
-            f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
-            f"from simulations) is {x_event_shape}. We are raising this error because "
-            f"len(x_event_shape) > len(x.shape)"
-        )
+    if x_event_shape is None:
+        return x
 
-    # If x_shape is provided, we can fix a missing batch dim for >1D data.
-    if x_event_shape is not None and len(x_event_shape) == len(x.shape):
+    if len(x.shape) == len(x_event_shape):
         x = x.unsqueeze(0)
-
-    input_x_shape = x.shape
-
-    if x_event_shape is not None:
-        # Number of trials can change for every new x, but single trial x shape must
-        # match.
-        assert input_x_shape[1:] == x_event_shape, (
-            f"Observed data shape ({input_x_shape[1:]}) must match "
-            f"the shape of simulated data x ({x_event_shape})."
+    if x.shape[1:] != x_event_shape:
+        event = tuple(x_event_shape)
+        raise ValueError(
+            f"x has shape {input_shape}, but one observation has shape {event}. "
+            f"Pass one observation of shape {event}, or several of shape "
+            f"(num_observations, {', '.join(str(d) for d in event)})."
         )
     return x
 
