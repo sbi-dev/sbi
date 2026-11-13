@@ -30,6 +30,7 @@ from sbi.neural_nets.embedding_nets import (
     SpectralConvEmbedding,
     TransformerEmbedding,
 )
+from sbi.neural_nets.embedding_nets.causal_cnn import WaveNetSRLikeAggregator
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 from sbi.simulators.linear_gaussian import (
@@ -215,6 +216,64 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
 
     with pytest.raises(ValueError, match="Expected flat or channel-first input"):
         embedding_net(channel_last_input)
+
+
+@pytest.mark.parametrize(
+    ("input_shape", "kwargs", "match"),
+    [
+        ((32, 32, 3), {}, "in_channels"),
+        ((32,), {"num_conv_layers": 0}, "num_conv_layers must be at least 1"),
+        (
+            (32,),
+            {"num_conv_layers": 3, "out_channels_per_layer": [6, 12]},
+            "num_conv_layers is 3",
+        ),
+        # Kernel much larger than the padded input: both sizes are negative, and
+        # their product is positive.
+        ((4, 4), {"kernel_size": 9}, "smaller kernel_size"),
+        ((8,), {"pool_kernel_size": 4}, "num_conv_layers to at most 1"),
+    ],
+)
+def test_cnn_embedding_errors_name_arguments(input_shape, kwargs, match):
+    """CNNEmbedding errors name the constructor arguments that fix them."""
+    with pytest.raises(ValueError, match=match):
+        CNNEmbedding(input_shape, **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"num_conv_layers": 0}, "num_conv_layers must be at least 1"),
+        ({"out_channels_per_layer": [16, 16]}, "num_conv_layers is 5"),
+        ({"dilation": [1, 2]}, "dilation has 2 entries"),
+        ({"pool_kernel_size": 128}, r"pool_kernel_size \(128\) must not be larger"),
+        ({"pool_kernel_size": 64}, "the default aggregator needs at least 2"),
+    ],
+)
+def test_causal_cnn_embedding_errors_name_arguments(kwargs, match):
+    """CausalCNNEmbedding errors name the constructor arguments that fix them."""
+    with pytest.raises(ValueError, match=match):
+        CausalCNNEmbedding((64,), **{"pool_kernel_size": 2, **kwargs})
+
+
+def test_wavenet_aggregator_keeps_arguments_and_prints_nothing(capsys):
+    """Building the aggregator neither changes the caller's list nor prints."""
+    intermediate_channel_sizes = [8]
+    WaveNetSRLikeAggregator(
+        4, 32, output_dim=5, intermediate_channel_sizes=intermediate_channel_sizes
+    )
+
+    assert intermediate_channel_sizes == [8]
+    assert capsys.readouterr().out == ""
+
+
+def test_cnn_embedding_default_channels_follow_num_conv_layers():
+    """The default channels double per layer, starting at 6."""
+    embedding_net = CNNEmbedding((32,), num_conv_layers=3)
+    convs = [m for m in embedding_net.cnn_subnet if isinstance(m, nn.Conv1d)]
+
+    assert [conv.out_channels for conv in convs] == [6, 12, 24]
+    assert embedding_net(torch.randn(4, 32)).shape == (4, 20)
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
@@ -588,15 +647,18 @@ def test_permutation_invariant_embedding_ignores_padding_per_observation(
     assert torch.allclose(batched[1], embedding(x[1:])[0])
 
 
+@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
 @pytest.mark.parametrize(
     "pattern", ("padded_trial", "partially_nan_trial", "no_real_trial")
 )
-def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
+def test_permutation_invariant_embedding_warns_on_invalid_padding(
+    pattern, aggregation_fn
+):
     """NaN outside whole padded trials must not silently become data; warn once."""
     embedding = PermutationInvariantEmbedding(
         FCEmbedding(input_dim=2, output_dim=4),
         trial_net_output_dim=4,
-        aggregation_fn="sum",
+        aggregation_fn=aggregation_fn,
     )
     x = torch.randn(2, 3, 2)
     x[0, 1:] = float("nan")
@@ -607,11 +669,43 @@ def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        embedding(x)
+        output = embedding(x)
         embedding(x)
 
     issued = [w for w in caught if "should only mark padded trials" in str(w.message)]
     assert len(issued) == (0 if pattern == "padded_trial" else 1)
+    if pattern == "no_real_trial":
+        # Zero aggregate and zero trial count, for "mean" as for "sum".
+        assert torch.allclose(output[1], embedding.fc_subnet(torch.zeros(1, 5))[0])
+
+
+@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
+@pytest.mark.parametrize("with_padding", (False, True))
+@pytest.mark.parametrize("inf", (float("inf"), float("-inf")))
+def test_permutation_invariant_embedding_rejects_inf(inf, with_padding, aggregation_fn):
+    """Inf in a real trial raises instead of passing as a huge finite embedding."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4),
+        trial_net_output_dim=4,
+        aggregation_fn=aggregation_fn,
+    )
+    x = torch.randn(2, 3, 2)
+    x[0, 1, 0] = inf
+    if with_padding:
+        x[:, 2] = float("nan")
+
+    with pytest.raises(ValueError, match="Input contains inf"):
+        embedding(x)
+
+
+def test_permutation_invariant_embedding_rejects_non_finite_trial_net_output():
+    """A trial_net that returns inf for finite input raises."""
+    embedding = PermutationInvariantEmbedding(nn.Linear(2, 4), trial_net_output_dim=4)
+    with torch.no_grad():
+        embedding.trial_net.bias.fill_(float("inf"))
+
+    with pytest.raises(ValueError, match="trial_net returned NaN or inf"):
+        embedding(torch.randn(2, 3, 2))
 
 
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])

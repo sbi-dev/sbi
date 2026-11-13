@@ -337,10 +337,11 @@ class LRU(nn.Module):
             )
         else:
             state = state.to(device=input.device)
-            assert state.shape == expected_state_shape, (
-                f"Invalid state shape {state.shape}, "  # fmt: skip
-                f"expected {expected_state_shape}"  # fmt: skip
-            )
+            if state.shape != expected_state_shape:
+                raise ValueError(
+                    f"Invalid state shape {state.shape}, "
+                    f"expected {expected_state_shape}"
+                )
 
         # Detemine which mode to run the forward method with.
         mode = mode or self.mode
