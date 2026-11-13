@@ -9,9 +9,8 @@ import torch
 
 import sbi.inference
 from sbi import utils
-from sbi.inference import FMPE, NPE, VectorFieldPosterior, infer
+from sbi.inference import FMPE, NPE, infer
 from sbi.inference.trainers import nle, npe, nre
-from sbi.neural_nets import FlowMatchingConfig
 from sbi.utils.removed_names import REMOVED_MODULES, REMOVED_NAMES, RENAMED_METHODS
 
 
@@ -185,26 +184,6 @@ def test_canonical_shorthands_do_not_warn():
         assert sbi.inference.NLE is sbi.inference.NLE_A
         assert sbi.inference.NRE is sbi.inference.NRE_B
     assert {"NPE", "NLE", "NRE"} <= set(sbi.inference.__all__)
-
-
-def test_vector_field_posterior_sample_with_warns():
-    """Passing `sample_with` to `sample()` warns; setting it at construction is the
-    supported path and must stay silent."""
-    theta, x = torch.randn(20, 2), torch.randn(20, 2)
-    posterior = VectorFieldPosterior(
-        vector_field_estimator=FlowMatchingConfig().build(theta, x),
-        prior=utils.BoxUniform(-torch.ones(2), torch.ones(2)),
-        sample_with="ode",
-    )
-
-    with pytest.warns(FutureWarning, match="sample_with"):
-        posterior.sample(
-            (1,),
-            x=torch.zeros(1, 2),
-            sample_with="ode",
-            reject_outside_prior=False,
-            show_progress_bars=False,
-        )
 
 
 @pytest.mark.parametrize(
