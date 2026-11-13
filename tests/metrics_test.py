@@ -126,8 +126,23 @@ def test_c2st_passes_kwargs_and_seed(classifier_kwargs, random_state):
     c2st(x, y, classifier_kwargs=classifier_kwargs)
 
 
+def test_c2st_clones_classifier_instance():
+    x, y = torch.randn(100, 2), torch.randn(100, 2) + 1.0
+    clf = RandomForestClassifier(n_estimators=5)
+    score = c2st(x, y, classifier=clf, classifier_kwargs={"max_depth": 2})
+    expected = c2st(
+        x,
+        y,
+        classifier=RandomForestClassifier,
+        classifier_kwargs={"n_estimators": 5, "max_depth": 2},
+    )
+    assert score == expected
+    assert clf.get_params() == RandomForestClassifier(n_estimators=5).get_params()
+    assert not hasattr(clf, "estimators_")
+
+
 @pytest.mark.parametrize(
-    "classifier", ("svm", 123, LogisticRegression(), LinearRegression)
+    "classifier", ("svm", 123, LinearRegression, LinearRegression())
 )
 def test_c2st_invalid_classifier_raises(classifier):
     with pytest.raises(ValueError, match="classifier"):

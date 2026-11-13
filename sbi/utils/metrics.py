@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Union
 import numpy as np
 import torch
 import torch.nn as nn
-from sklearn.base import BaseEstimator, is_classifier
+from sklearn.base import BaseEstimator, clone, is_classifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neural_network import MLPClassifier
@@ -61,7 +61,7 @@ def c2st(
     seed: int = 1,
     n_folds: int = 5,
     metric: str = "accuracy",
-    classifier: Union[str, Callable] = "rf",
+    classifier: Union[str, BaseEstimator, Callable] = "rf",
     classifier_kwargs: Optional[Dict[str, Any]] = None,
     z_score: bool = True,
     noise_scale: Optional[float] = None,
@@ -93,12 +93,14 @@ def c2st(
         metric: sklearn compliant metric to use for the scoring parameter of
             cross_val_score.
         classifier: Classifier to use. "rf" (default) for a
-            RandomForestClassifier, "mlp" for an MLPClassifier, or a sklearn
-            classifier class or a function that returns a sklearn classifier. It is
-            called with `classifier_kwargs`. If the classifier has a `random_state`
-            parameter that is left at None, it is set to `seed`.
-        classifier_kwargs: Keyword arguments for the classifier. For "mlp", they
-            replace the default MLP settings instead of updating them.
+            RandomForestClassifier, "mlp" for an MLPClassifier, a sklearn
+            classifier instance, a sklearn classifier class, or a function that
+            returns a sklearn classifier. An instance is cloned, so it stays
+            unchanged. If the classifier has a `random_state` parameter that is
+            left at None, it is set to `seed`.
+        classifier_kwargs: Keyword arguments for the classifier class or function,
+            or parameters to set on the cloned instance. For "mlp", they replace the
+            default MLP settings instead of updating them.
         z_score: Z-scoring using X, i.e. mean and std deviation of X is
             used to normalize X and Y, i.e. Y=(Y - mean)/std
         noise_scale: If passed, will add Gaussian noise with standard deviation
@@ -137,13 +139,16 @@ def c2st(
             "early_stopping": True,
             "n_iter_no_change": 50,
         }
+    elif isinstance(classifier, BaseEstimator):
+        clf_class = clone(classifier).set_params  # returns the configured copy
+        clf_kwargs = classifier_kwargs or {}
     elif callable(classifier) and not isinstance(classifier, str):
         clf_class = classifier
         clf_kwargs = classifier_kwargs or {}
     else:
         raise ValueError(
-            f"Invalid classifier {classifier!r}. Expected 'rf', 'mlp', or a sklearn "
-            "classifier class or a function that returns a sklearn classifier."
+            f"Invalid classifier {classifier!r}. Expected 'rf', 'mlp', a sklearn "
+            "classifier or its class, or a function that returns a sklearn classifier."
         )
 
     clf = clf_class(**clf_kwargs)
