@@ -484,7 +484,7 @@ class SMCABC(ABCBASE):
                 x_candidates = x_candidates.squeeze(1)
 
             dists = self.distance(self.x_o, x_candidates)
-            is_accepted = dists <= epsilon
+            is_accepted = dists.to(torch.float64) <= epsilon
             num_accepted_batch = int(is_accepted.sum().item())
 
             if num_accepted_batch > 0:
@@ -566,8 +566,7 @@ class SMCABC(ABCBASE):
             quantile: Quantile in the distance distribution to determine new epsilon.
 
         Returns:
-            epsilon: Epsilon for the next population. It is one of the finite
-                distances, so the acceptance comparison is exact in their dtype.
+            epsilon: Epsilon for the next population, one of the finite distances.
 
         Raises:
             ValueError: If no distance in the previous population is finite.

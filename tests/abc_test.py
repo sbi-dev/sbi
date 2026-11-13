@@ -496,6 +496,37 @@ def test_smcabc_next_epsilon_raises_without_finite_distances():
         SMCABC._get_next_epsilon(torch.tensor([float("inf")] * 3), 0.5)
 
 
+def test_smcabc_accepts_only_distances_within_epsilon():
+    """Integer distances above 2**24 must not be rounded into the acceptance."""
+    torch.manual_seed(0)
+
+    def count_distance(x_o, x):
+        return 2**24 + (100 * (x - x_o).abs().sum(-1)).long()
+
+    smcabc = SMCABC(
+        lambda theta: theta,
+        BoxUniform(-ones(2), ones(2)),
+        distance=count_distance,
+        requires_iid_data=False,
+        show_progress_bars=False,
+    )
+    _, summary = smcabc(
+        zeros(1, 2),
+        num_particles=50,
+        num_initial_pop=100,
+        num_simulations=1000,
+        epsilon_decay=0.5,
+        distance_based_decay=True,
+        return_summary=True,
+    )
+
+    # The last population may be filled up from the one before it.
+    for distances, epsilon in zip(
+        summary["distances"][1:-1], summary["epsilons"][1:-1], strict=True
+    ):
+        assert (distances <= int(epsilon)).all()
+
+
 @pytest.mark.parametrize("epsilon_decay", [0.0, 1.5])
 def test_smcabc_rejects_invalid_quantile_with_distance_based_decay(epsilon_decay):
     """`epsilon_decay` is a quantile then, so values outside (0, 1] fail early."""
