@@ -450,8 +450,8 @@ def z_standardization(
         # equivalent to taking mean over per-sample mean, i.e.,
         # `torch.mean(torch.mean(.., dim=1))`.
         t_mean = torch.mean(batch_t[is_valid_t])
-        # Compute std per-sample first.
-        sample_std = torch.std(batch_t[is_valid_t], dim=1)
+        # Compute std per-sample first, over all of its dimensions.
+        sample_std = torch.std(batch_t[is_valid_t].flatten(start_dim=1), dim=1)
         sample_std[sample_std < min_std] = min_std
         # Average over all samples for batch std.
         t_std = torch.mean(sample_std)
@@ -524,8 +524,8 @@ def standardizing_net(
 
     if len(batch_t) > 1:
         if structured_dims:
-            # Compute std per-sample first.
-            sample_std = torch.std(batch_t[is_valid_t], dim=1)
+            # Compute std per-sample first, over all of its dimensions.
+            sample_std = torch.std(batch_t[is_valid_t].flatten(start_dim=1), dim=1)
             sample_std[sample_std < min_std] = min_std
             # Average over all samples for batch std.
             t_std = torch.mean(sample_std)
