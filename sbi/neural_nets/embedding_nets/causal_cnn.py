@@ -100,7 +100,7 @@ def WaveNetSRLikeAggregator(
     intermediate_channel_sizes += [output_dim]
     if isinstance(stride_sizes, List):
         assert len(stride_sizes) == len(kernel_sizes), (
-            "Provided stride size list should be have the same size as"
+            "Provided stride size list should have the same size as "
             "the kernel size list."
         )
     else:
@@ -216,8 +216,8 @@ class CausalCNNEmbedding(nn.Module):
                     dilation_per_layer = [1] * num_conv_layers
                 case _:
                     raise ValueError(
-                        f"{dilation} is not a valid option, please use \"none\","
-                        "\"exponential\",or \"exponential_cyclic\", or pass a list "
+                        f"{dilation} is not a valid option, please use \"none\", "
+                        "\"exponential\", or \"exponential_cyclic\", or pass a list "
                         "of dilation sizes."
                     )
         else:
@@ -256,7 +256,7 @@ class CausalCNNEmbedding(nn.Module):
                 int(total_timepoints / pool_kernel_size),
             )
             assert aggregator_out_shape[-1] > 1, (
-                "Your dimensionality is already small,"
+                "Your dimensionality is already small, "
                 "Please ensure a larger input size or use a custom aggregator."
             )
             aggregator = WaveNetSRLikeAggregator(

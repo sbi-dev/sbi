@@ -22,7 +22,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     `ImportanceSamplingPosterior` allows to estimate the posterior log-probability by
     estimating the normlalization constant with importance sampling. It also allows to
     perform importance sampling (with `.sample()`) and to draw approximate samples with
-    sampling-importance-resampling (SIR) (with `.sir_sample()`)
+    sampling-importance-resampling (SIR) (with `.sample(method="sir")`)
     """
 
     def __init__(

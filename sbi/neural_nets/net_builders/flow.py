@@ -1324,7 +1324,7 @@ def _prepare_x_transforms(
             )
         if not hasattr(x_dist, "support"):
             raise ValueError(
-                "`x_dist` requires a `.support` attribute for"
+                "`x_dist` requires a `.support` attribute for "
                 "an unconstrained transformation."
             )
         transform_to_unconstrained = biject_transform_zuko(

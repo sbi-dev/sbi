@@ -99,7 +99,7 @@ class MCMCPosterior(NeuralPosterior):
             init_strategy_parameters: Dictionary of keyword arguments passed to the
                 init strategy, e.g., for `init_strategy=sir` this could be
                 `num_candidate_samples`, i.e., the number of candidates to find init
-                locations (internal default is `1000`), or `device`.
+                locations (internal default is `10000`), or `device`.
             num_workers: number of cpu cores used to parallelize mcmc
             mp_context: Multiprocessing start method, either `"fork"` or `"spawn"`
                 (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
