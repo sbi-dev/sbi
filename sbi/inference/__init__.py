@@ -71,5 +71,5 @@ __all__ = (
     ]
 )
 
-if not TYPE_CHECKING:  # Hidden so that type checkers still flag unknown names.
+if not TYPE_CHECKING:
     __getattr__ = removed_names_getattr(__name__)

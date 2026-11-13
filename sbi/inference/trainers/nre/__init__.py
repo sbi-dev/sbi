@@ -11,5 +11,5 @@ from sbi.utils.removed_names import removed_names_getattr
 
 NRE = NRE_B
 
-if not TYPE_CHECKING:  # Hidden so that type checkers still flag unknown names.
+if not TYPE_CHECKING:
     __getattr__ = removed_names_getattr(__name__)

@@ -183,7 +183,7 @@ def test_canonical_shorthands_do_not_warn():
         assert sbi.inference.NPE is sbi.inference.NPE_C
         assert sbi.inference.NLE is sbi.inference.NLE_A
         assert sbi.inference.NRE is sbi.inference.NRE_B
-    assert {"NPE", "NLE", "NRE"} <= set(sbi.inference.__all__)
+    assert {"NPE", "NLE", "NRE", "infer"} <= set(sbi.inference.__all__)
 
 
 @pytest.mark.parametrize(
