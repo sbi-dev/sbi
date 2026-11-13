@@ -5,11 +5,10 @@ from typing import Callable
 
 import torch
 from torch import Tensor
-from tqdm.auto import tqdm
 
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.sbi_types import Proposal
-from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
+from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc, tqdm
 
 _MAX_CANDIDATES_WITHOUT_SAMPLE = 100_000
 

@@ -14,7 +14,7 @@ class FCEmbedding(nn.Module):
         num_layers: int = 2,
         num_hiddens: int = 50,
         enable_layer_norm: bool = False,
-        activation: nn.Module = nn.ReLU,
+        activation: type[nn.Module] = nn.ReLU,
     ):
         """Fully-connected multi-layer neural network to be used as embedding network.
 
@@ -24,7 +24,8 @@ class FCEmbedding(nn.Module):
             num_layers: Number of layers of the embedding network. (Minimum of 2).
             num_hiddens: Number of hidden units in each layer of the embedding network.
             enable_layer_norm: Enable layer normalization. Default is False.
-            activation: Activation function. Default is nn.ReLU.
+            activation: Activation function of the hidden layers. Default is nn.ReLU.
+                The output layer is linear.
         """
         super().__init__()
         layer_norm = nn.LayerNorm if enable_layer_norm else nn.Identity
@@ -40,7 +41,6 @@ class FCEmbedding(nn.Module):
             layers.append(layer_norm(num_hiddens))
             layers.append(activation())
         layers.append(nn.Linear(num_hiddens, output_dim))
-        layers.append(activation())
         self.net = nn.Sequential(*layers)
 
     def forward(self, x: Tensor) -> Tensor:
