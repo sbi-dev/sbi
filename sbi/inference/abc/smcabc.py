@@ -148,6 +148,8 @@ class SMCABC(ABCBASE):
             num_initial_pop: Number of simulations used for initial population.
             num_simulations: Total number of possible simulations.
             epsilon_decay: Factor with which the acceptance threshold $\epsilon$ decays.
+                With `distance_based_decay=True`, the quantile in (0, 1] of the previous
+                population's distances that becomes the next $\epsilon$.
             distance_based_decay: Whether the $\epsilon$ decay is constant over
                 populations or calculated from the previous population's distribution of
                 distances. If True, `epsilon_decay` is used as the quantile of the
@@ -212,14 +214,13 @@ class SMCABC(ABCBASE):
         self.num_simulations = num_simulations * num_iid_samples
         if kde_kwargs is None:
             kde_kwargs = {}
-        assert isinstance(epsilon_decay, float) and (
-            epsilon_decay > 0.0 or (distance_based_decay and epsilon_decay == 0.0)
-        )
-        if distance_based_decay:
-            assert 0.0 <= epsilon_decay <= 1.0, (
-                "`epsilon_decay` is used as a quantile when `distance_based_decay=True`"
-                f" and must be in [0, 1], got {epsilon_decay}."
+        if distance_based_decay and not 0.0 < epsilon_decay <= 1.0:
+            raise ValueError(
+                "With `distance_based_decay=True`, `epsilon_decay` is the quantile of "
+                "the previous population's distances and must be in (0, 1], got "
+                f"{epsilon_decay}."
             )
+        assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
         assert not (self.distance.requires_iid_data and lra), (
             "Currently there is no support to run inference "
         )
@@ -483,12 +484,7 @@ class SMCABC(ABCBASE):
                 x_candidates = x_candidates.squeeze(1)
 
             dists = self.distance(self.x_o, x_candidates)
-            if dists.device.type == "mps":
-                is_accepted = (dists.cpu().to(torch.float64) <= epsilon).to(
-                    dists.device
-                )
-            else:
-                is_accepted = dists.to(torch.float64) <= epsilon
+            is_accepted = dists <= epsilon
             num_accepted_batch = int(is_accepted.sum().item())
 
             if num_accepted_batch > 0:
@@ -561,7 +557,8 @@ class SMCABC(ABCBASE):
             new_x[sort_idx],
         )
 
-    def _get_next_epsilon(self, distances: Tensor, quantile: float) -> float:
+    @staticmethod
+    def _get_next_epsilon(distances: Tensor, quantile: float) -> float:
         """Return epsilon for next round based on quantile of this round's distances.
 
         Args:

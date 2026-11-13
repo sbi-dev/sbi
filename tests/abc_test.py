@@ -81,7 +81,8 @@ def test_smcabc_performance(prior_type: str, algorithm_variant: str, kernel: str
     num_dim = 2
     x_o = zeros((1, num_dim))
     num_samples = 1000
-    num_simulations = 5000  # Reduced for faster tests
+    # The budget leaves room for SMC populations after the initial one.
+    num_simulations = 15000
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
 
@@ -465,62 +466,49 @@ def test_smcabc_resampling_keeps_particles_paired_with_simulations():
         assert torch.allclose(distances, smcabc.distance(zeros(1, 2), xs))
 
 
-@pytest.mark.parametrize("quantile", [0.1, 0.5, 0.9])
-def test_smcabc_next_epsilon_is_distance_quantile(quantile):
-    """`distance_based_decay` must use the distance quantile, not a weighted index."""
-    distances = torch.tensor([0.0, 0.1, 0.2, 100.0])
-    epsilon = SMCABC._get_next_epsilon(None, distances, quantile)
+@pytest.mark.parametrize(
+    "distances, quantile, expected",
+    [
+        pytest.param([0.0, 0.1, 0.2, 100.0], 0.1, 0.03, id="heavy-tail-q0.1"),
+        pytest.param([0.0, 0.1, 0.2, 100.0], 0.5, 0.15, id="heavy-tail-q0.5"),
+        pytest.param([0.0, 0.1, 0.2, 100.0], 0.9, 70.06, id="heavy-tail-q0.9"),
+        pytest.param([0.0, 0.1, 0.2, 100.0], 1.0, 100.0, id="heavy-tail-q1"),
+        pytest.param(torch.tensor([0, 1, 2, 100]), 0.5, 1.5, id="integer"),
+        pytest.param(
+            torch.tensor([0.0, 1.0, 2.0], dtype=torch.float16), 0.5, 1.0, id="float16"
+        ),
+        pytest.param([0.0, 1.0, float("inf")], 0.5, 0.5, id="drops-inf"),
+    ],
+)
+def test_smcabc_next_epsilon_is_distance_quantile(distances, quantile, expected):
+    """`distance_based_decay` must use the empirical quantile of finite distances."""
+    epsilon = SMCABC._get_next_epsilon(torch.as_tensor(distances), quantile)
 
-    assert epsilon == pytest.approx(torch.quantile(distances, quantile).item())
+    assert epsilon == pytest.approx(expected)
 
 
-def test_smcabc_next_epsilon_handles_integer_and_non_finite_distances():
-    """Integer counts and infinite distances must not break the quantile."""
-    integer_distances = torch.tensor([0, 1, 2, 100])
-    assert SMCABC._get_next_epsilon(None, integer_distances, 0.5) == pytest.approx(1.5)
-
-    half_precision = torch.tensor([0.0, 1.0, 2.0], dtype=torch.float16)
-    assert SMCABC._get_next_epsilon(None, half_precision, 0.5) == pytest.approx(1.0)
-
-    with_inf = torch.tensor([0.0, 1.0, float("inf")])
-    assert SMCABC._get_next_epsilon(None, with_inf, 0.5) == pytest.approx(0.5)
-
+def test_smcabc_next_epsilon_raises_without_finite_distances():
+    """All-infinite distances must raise instead of returning NaN."""
     with pytest.raises(ValueError, match="non-finite"):
-        SMCABC._get_next_epsilon(None, torch.tensor([float("inf")] * 3), 0.5)
+        SMCABC._get_next_epsilon(torch.tensor([float("inf")] * 3), 0.5)
 
 
-def test_smcabc_rejects_invalid_quantile_with_distance_based_decay():
-    """`epsilon_decay` is a quantile then, so values above 1 fail before simulating."""
+@pytest.mark.parametrize("epsilon_decay", [0.0, 1.5])
+def test_smcabc_rejects_invalid_quantile_with_distance_based_decay(epsilon_decay):
+    """`epsilon_decay` is a quantile then, so values outside (0, 1] fail early."""
     prior = BoxUniform(-ones(2), ones(2))
     smcabc = SMCABC(lambda theta: theta, prior)
 
-    with pytest.raises(AssertionError, match="quantile"):
+    with pytest.raises(ValueError, match="quantile"):
         smcabc(
             zeros(1, 2),
             num_particles=10,
             num_initial_pop=20,
             num_simulations=100,
-            epsilon_decay=1.5,
+            epsilon_decay=epsilon_decay,
             distance_based_decay=True,
         )
-
-
-def test_smcabc_accepts_zero_quantile_with_distance_based_decay():
-    """A zero quantile selects the minimum distance and must be allowed."""
-    prior = BoxUniform(-ones(2), ones(2))
-    smcabc = SMCABC(lambda theta: theta, prior)
-
-    _, summary = smcabc(
-        zeros(1, 2),
-        num_particles=10,
-        num_initial_pop=20,
-        num_simulations=100,
-        epsilon_decay=0.0,
-        distance_based_decay=True,
-        return_summary=True,
-    )
-
-    assert summary["epsilons"][1] == pytest.approx(summary["distances"][0].min().item())
+    assert smcabc.simulation_counter == 0
 
 
 @pytest.mark.parametrize(
