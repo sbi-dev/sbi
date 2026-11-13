@@ -329,15 +329,17 @@ def test_tqdm_disable_turns_off_pyro_bars(monkeypatch):
     class Stop(Exception):
         pass
 
-    with patch("pyro.infer.mcmc.api.MCMC", side_effect=Stop) as mcmc:
-        with pytest.raises(Stop):
-            _gaussian_mcmc_posterior().sample(
-                (1,),
-                method="nuts_pyro",
-                num_chains=1,
-                warmup_steps=1,
-                show_progress_bars=True,
-            )
+    with (
+        patch("pyro.infer.mcmc.api.MCMC", side_effect=Stop) as mcmc,
+        pytest.raises(Stop),
+    ):
+        _gaussian_mcmc_posterior().sample(
+            (1,),
+            method="nuts_pyro",
+            num_chains=1,
+            warmup_steps=1,
+            show_progress_bars=True,
+        )
 
     assert mcmc.call_args.kwargs["disable_progbar"] is True
 
