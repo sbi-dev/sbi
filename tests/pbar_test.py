@@ -4,6 +4,7 @@
 import io
 import sys
 import threading
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -317,6 +318,27 @@ def test_tqdm_disable_turns_off_all_progress_output(monkeypatch, capsys, tqdm_di
     # The progress message, ended by a newline so that later output starts on its own.
     expected_out = "\r Training neural network. Epochs trained: 3\n"
     assert captured.out == (expected_out if shows_output else "")
+
+
+@pytest.mark.mcmc
+def test_tqdm_disable_turns_off_pyro_bars(monkeypatch):
+    """Pyro passes `disable=` to its own bars, so sbi must pass the variable on."""
+    monkeypatch.setenv("TQDM_DISABLE", "1")
+
+    class Stop(Exception):
+        pass
+
+    with patch("pyro.infer.mcmc.api.MCMC", side_effect=Stop) as mcmc:
+        with pytest.raises(Stop):
+            _gaussian_mcmc_posterior().sample(
+                (1,),
+                method="nuts_pyro",
+                num_chains=1,
+                warmup_steps=1,
+                show_progress_bars=True,
+            )
+
+    assert mcmc.call_args.kwargs["disable_progbar"] is True
 
 
 def test_print_progress_flushes_each_message(monkeypatch):

@@ -27,7 +27,7 @@ from sbi.samplers.mcmc import (
 )
 from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.pbar import sampling_desc, tqdm
+from sbi.utils.pbar import progress_disabled, sampling_desc, tqdm
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import (
     ensure_theta_batched,
@@ -862,7 +862,7 @@ class MCMCPosterior(NeuralPosterior):
             initial_params={self.param_name: initial_params},
             num_chains=num_chains,
             mp_context=mp_context,
-            disable_progbar=not show_progress_bars,
+            disable_progbar=not show_progress_bars or progress_disabled(),
             transforms={},
         )
         sampler.run()
@@ -934,7 +934,7 @@ class MCMCPosterior(NeuralPosterior):
             tune=warmup_steps,
             chains=num_chains,
             mp_ctx=mp_context,
-            progressbar=show_progress_bars,
+            progressbar=show_progress_bars and not progress_disabled(),
             param_name=self.param_name,
             device=self._device,
             target_accept=target_accept,
