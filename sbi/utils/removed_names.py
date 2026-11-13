@@ -42,6 +42,14 @@ REMOVED_NAMES = {
     "posterior_nn": "from sbi.neural_nets import posterior_nn",
     "likelihood_nn": "from sbi.neural_nets import likelihood_nn",
     "classifier_nn": "from sbi.neural_nets import classifier_nn",
+    **{
+        old: f"from sbi.neural_nets import {new}; {new}().build(theta, x)"
+        for old, new in (
+            ("build_flow_matching_estimator", "FlowMatchingConfig"),
+            ("build_score_matching_estimator", "VEScoreConfig"),
+            ("build_vector_field_estimator", "FlowMatchingConfig"),
+        )
+    },
 }
 
 REMOVED_MODULES = {

@@ -100,7 +100,8 @@ def test_renamed_method_set_is_complete():
 
 @pytest.mark.parametrize(("name", "replacement"), REMOVED_NAMES.items())
 def test_removed_names_name_their_replacement(name, replacement):
-    exec(replacement, {})  # The replacement must exist.
+    # The replacement must run as written.
+    exec(replacement, {"theta": torch.randn(10, 2), "x": torch.randn(10, 2)})
     with pytest.raises(ImportError, match=re.escape(replacement)):
         exec(f"from sbi.inference import {name}", {})
 
@@ -112,6 +113,7 @@ def test_removed_names_name_their_replacement(name, replacement):
         "sbi.inference.trainers.npe",
         "sbi.inference.trainers.nle",
         "sbi.inference.trainers.nre",
+        "sbi.neural_nets.net_builders",
     ),
 )
 def test_every_package_that_exported_removed_names_raises(package):
