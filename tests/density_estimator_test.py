@@ -38,7 +38,7 @@ from sbi.neural_nets.net_builders import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
-from sbi.neural_nets.net_builders.flow import build_zuko_flow
+from sbi.neural_nets.net_builders.flow import ContextSplineMap, build_zuko_flow
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.torchutils import BoxUniform
 
@@ -779,3 +779,17 @@ def test_tabpfn_flow_shapes(batch_dim, input_sample_dim):
 
     with pytest.raises(NotImplementedError):
         estimator.loss(inputs[0], condition=condition)
+
+
+def test_context_spline_map_hidden_layers_have_their_own_weights():
+    """Repeating one layer object would make all hidden layers share weights."""
+    net = ContextSplineMap(
+        in_features=1,
+        out_features=4,
+        hidden_features=8,
+        context_features=3,
+        hidden_layers=3,
+    )
+    linears = [m for m in net.spline_predictor if isinstance(m, torch.nn.Linear)]
+
+    assert len({id(m) for m in linears}) == len(linears) == 5

@@ -7,7 +7,6 @@ from typing import Callable, Dict, List, Tuple, Union
 import torch
 from scipy.stats import kstest, uniform
 from torch import Tensor
-from tqdm.auto import tqdm
 
 from sbi.inference import DirectPosterior, VectorFieldPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -17,6 +16,7 @@ from sbi.utils.diagnostics_utils import (
     remove_nans_and_infs_in_x,
 )
 from sbi.utils.metrics import c2st
+from sbi.utils.pbar import tqdm
 
 
 def run_sbc(
