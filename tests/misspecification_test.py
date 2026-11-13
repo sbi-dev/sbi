@@ -10,6 +10,7 @@ import torch.distributions as dist
 from sbi.diagnostics.misspecification import (
     calc_misspecification_logprob,
     calc_misspecification_mmd,
+    calculate_baseline_mmd,
 )
 from sbi.inference import NPE
 from sbi.inference.trainers.marginal import MarginalTrainer
@@ -234,3 +235,22 @@ def test_mmd_embedding_mode_requires_trained_inference():
 
     with pytest.raises(ValueError, match="No neural net found"):
         calc_misspecification_mmd(x_obs=x[:1], x=x, inference=NPE(), mode="embedding")
+
+
+@pytest.mark.parametrize("n_obs", (1000, 1500))
+def test_mmd_many_observations_gives_finite_baseline(n_obs: int):
+    """The MMD baseline must stay finite when ``n_obs >= max_samples``."""
+    x_obs = torch.randn(n_obs, 2) + 5.0
+    x = torch.randn(3000, 2)
+
+    p_val, (mmds_baseline, _) = calc_misspecification_mmd(
+        x_obs=x_obs, x=x, mode="x_space", n_shuffle=20, max_samples=1000
+    )
+
+    assert torch.isfinite(mmds_baseline).all()
+    assert p_val < 0.05, f"Expected a small p_val for misspecified data, got {p_val}"
+
+
+def test_baseline_mmd_needs_more_synthetic_than_observed_samples():
+    with pytest.raises(ValueError, match="should be less than"):
+        calculate_baseline_mmd(n_obs=10, y=torch.randn(10, 2), n_shuffle=2)
