@@ -203,6 +203,13 @@ def test_ensemble_map_uses_default_x():
     log_weights, maps = ensemble.map(individually=True, **map_kwargs)
     assert log_weights.shape == (ensemble_size, 1)
     assert_close(maps, x_o.expand(ensemble_size, -1, -1), atol=0.01, rtol=0)
+
+    # A stale cached MAP is returned unless `force_update` reaches the components.
+    stale = -ones(1, num_dim)
+    for component in posteriors:
+        component._map = stale
+    _, maps = ensemble.map(individually=True, **map_kwargs)
+    assert_close(maps, stale.expand(ensemble_size, -1, -1))
     _, maps = ensemble.map(individually=True, force_update=True, **map_kwargs)
     assert_close(maps, x_o.expand(ensemble_size, -1, -1), atol=0.01, rtol=0)
 
