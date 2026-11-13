@@ -16,9 +16,9 @@ from skorch import NeuralNetBinaryClassifier
 from skorch.callbacks import EarlyStopping
 from skorch.dataset import ValidSplit
 from torch import Tensor
-from tqdm import tqdm
 
 from sbi.utils.metrics import MLPClassifierModule
+from sbi.utils.pbar import tqdm
 from sbi.utils.sbiutils import handle_invalid_x
 
 # Default MLP classifier hyperparameters

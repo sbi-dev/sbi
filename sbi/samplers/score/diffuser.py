@@ -5,11 +5,10 @@ from typing import Optional, Union
 
 import torch
 from torch import Tensor
-from tqdm.auto import tqdm
 
 from sbi.samplers.score.correctors import Corrector, get_corrector
 from sbi.samplers.score.predictors import Predictor, get_predictor
-from sbi.utils.pbar import is_nested, sampling_desc
+from sbi.utils.pbar import is_nested, sampling_desc, tqdm
 
 
 class Diffuser:
