@@ -188,3 +188,46 @@ def test_ensemble_potential_follows_weight_change():
 
     expected = MixtureSameFamily(Categorical(tensor([1.0, 3.0])), components)
     assert_close(ensemble.potential(theta), expected.log_prob(theta))
+
+
+class _BatchedTractablePosterior(TractablePosterior):
+    def sample_batched(self, sample_shape, x, **kwargs):
+        return self.potential_fn.posterior.sample((*sample_shape, x.shape[0]))
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_samples_are_not_sorted_by_component(method: str):
+    """Every row of a multi-dimensional `sample_shape` must mix the components."""
+    prior = MultivariateNormal(zeros(1), 10 * eye(1))
+    posteriors = [
+        _BatchedTractablePosterior(
+            PosteriorPotential(MultivariateNormal(tensor([mean]), 0.01 * eye(1)), prior)
+        )
+        for mean in [-2.0, 2.0]
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+
+    samples = getattr(ensemble, method)((10, 100), x=zeros(1, 1))
+
+    assert ((samples < 0).any(dim=1) & (samples > 0).any(dim=1)).all()
+
+
+class _TimedOutTractablePosterior(TractablePosterior):
+    """Returns 3 samples, like a sampler that timed out with partial results."""
+
+    def sample(self, sample_shape, x=None, **kwargs):
+        return self.potential_fn.posterior.sample((3,))
+
+    def sample_batched(self, sample_shape, x, **kwargs):
+        return self.potential_fn.posterior.sample((3, x.shape[0]))
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_raises_for_partial_samples(method: str):
+    """Partial samples, e.g., after a timeout, would not follow the weights."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    potential = PosteriorPotential(MultivariateNormal(zeros(1), eye(1)), prior)
+    ensemble = EnsemblePosterior([_TimedOutTractablePosterior(potential)] * 2)
+
+    with pytest.raises(ValueError, match="of 100 samples"):
+        getattr(ensemble, method)((10, 10), x=zeros(1, 1))
