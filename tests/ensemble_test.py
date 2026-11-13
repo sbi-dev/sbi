@@ -223,18 +223,11 @@ class _TimedOutTractablePosterior(TractablePosterior):
 
 
 @pytest.mark.parametrize("method", ["sample", "sample_batched"])
-def test_ensemble_partial_samples_stay_flat(method: str):
-    """Like in `DirectPosterior`, a partial result on timeout is not reshaped."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    posteriors = [
-        _TimedOutTractablePosterior(
-            PosteriorPotential(MultivariateNormal(zeros(2), eye(2)), prior)
-        )
-        for _ in range(2)
-    ]
-    ensemble = EnsemblePosterior(posteriors)
+def test_ensemble_raises_for_partial_samples(method: str):
+    """Partial samples, e.g., after a timeout, would not follow the weights."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    potential = PosteriorPotential(MultivariateNormal(zeros(1), eye(1)), prior)
+    ensemble = EnsemblePosterior([_TimedOutTractablePosterior(potential)] * 2)
 
-    samples = getattr(ensemble, method)((10, 10), x=zeros(1, 2))
-
-    # Each of the two components returns 3 samples.
-    assert samples.shape[0] == 6 and samples.shape[-1] == 2
+    with pytest.raises(ValueError, match="of 100 samples"):
+        getattr(ensemble, method)((10, 10), x=zeros(1, 1))

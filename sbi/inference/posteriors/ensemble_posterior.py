@@ -207,9 +207,9 @@ class EnsemblePosterior(NeuralPosterior):
         r"""Return samples from posterior ensemble.
 
         The samples are drawn according to their assigned weight. The number of samples
-        for each distributino is drawn from a corresponding multinomial distribution.
+        for each distribution is drawn from a corresponding multinomial distribution.
         Then each component posterior is sampled individually and all samples are
-        aggregated afterwards.
+        aggregated and shuffled afterwards.
 
         All kwargs are passed directly through to `posterior.sample()`.
 
@@ -222,6 +222,10 @@ class EnsemblePosterior(NeuralPosterior):
 
         Returns:
             Samples drawn from the ensemble distribution.
+
+        Raises:
+            ValueError: If the components return fewer samples than requested, e.g.,
+                with `return_partial_on_timeout=True`.
         """
         # Components are drawn randomly; guard here so validation of `x` does
         # not depend on the draw.
@@ -239,12 +243,7 @@ class EnsemblePosterior(NeuralPosterior):
             samples.append(
                 self.posteriors[posterior_index].sample(sample_shape_c, x=x, **kwargs)
             )
-        # Shuffle, as the samples are sorted by component.
-        samples = torch.vstack(samples)
-        samples = samples[torch.randperm(samples.shape[0], device=samples.device)]
-        # Like in `DirectPosterior`, a partial result on timeout stays flat.
-        if samples.shape[0] != num_samples:
-            return samples
+        samples = self._stack_and_shuffle(samples, num_samples)
         return samples.reshape(*sample_shape, -1)
 
     def sample_batched(
@@ -269,13 +268,28 @@ class EnsemblePosterior(NeuralPosterior):
                     sample_shape_c, x=x, **kwargs
                 )
             )
-        # Shuffle, as the samples are sorted by component.
-        samples = torch.vstack(samples)
-        samples = samples[torch.randperm(samples.shape[0], device=samples.device)]
-        # Like in `DirectPosterior`, a partial result on timeout stays flat.
-        if samples.shape[0] != num_samples:
-            return samples
+        samples = self._stack_and_shuffle(samples, num_samples)
         return samples.reshape(sample_shape + samples.shape[1:])
+
+    @staticmethod
+    def _stack_and_shuffle(samples: List[Tensor], num_samples: int) -> Tensor:
+        """Return the component samples stacked and in random order.
+
+        Raises:
+            ValueError: If the components returned fewer samples than requested,
+                e.g., with `return_partial_on_timeout=True`. Such partial samples
+                would no longer follow the ensemble weights.
+        """
+        stacked = torch.vstack(samples)
+        if stacked.shape[0] != num_samples:
+            raise ValueError(
+                f"The ensemble components returned {stacked.shape[0]} of "
+                f"{num_samples} samples, e.g., after a sampling timeout. Partial "
+                "samples would not follow the ensemble weights, so ensembles do "
+                "not support them."
+            )
+        # The samples are sorted by component, so any slice would be biased.
+        return stacked[torch.randperm(num_samples, device=stacked.device)]
 
     def log_prob(
         self,
