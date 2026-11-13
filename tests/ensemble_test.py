@@ -17,6 +17,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
 from tests.test_utils import (
     PosteriorPotential,
@@ -168,6 +169,81 @@ def test_ensemble_posterior_weights(weights, expected_exception):
         posterior = EnsemblePosterior(posteriors, weights=weights)
         posterior.set_default_x(x_o)
         _ = posterior.sample((2,))
+
+
+class _GaussianShiftPotential(PosteriorPotential):
+    """Potential whose MAP is at the bound `x`."""
+
+    def __call__(self, theta, track_gradients=True):
+        return -((theta - self.x_o) ** 2).sum(dim=-1)
+
+
+def test_ensemble_map_uses_default_x():
+    """`map()` must use the default `x` for both the joint and the individual MAP."""
+    num_dim = 2
+    ensemble_size = 2
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    posterior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+
+    posteriors = [
+        TractablePosterior(_GaussianShiftPotential(posterior, prior))
+        for _ in range(ensemble_size)
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+    with pytest.raises(ValueError, match="Default `x` has not been set"):
+        ensemble.map()
+    x_o = 2.0 * ones(1, num_dim)
+    ensemble.set_default_x(x_o)
+
+    map_kwargs = {
+        "num_iter": 100,
+        "num_to_optimize": 2,
+        "learning_rate": 0.1,
+        "init_method": zeros(1, num_dim),
+        "show_progress_bars": False,
+    }
+
+    log_weights, maps = ensemble.map(individually=True, **map_kwargs)
+    assert log_weights.shape == (ensemble_size, 1)
+    assert_close(maps, x_o.expand(ensemble_size, -1, -1), atol=0.01, rtol=0)
+
+    # A stale cached MAP is returned unless `force_update` reaches the components.
+    stale = -ones(1, num_dim)
+    for component in posteriors:
+        component._map = stale
+    _, maps = ensemble.map(individually=True, **map_kwargs)
+    assert_close(maps, stale.expand(ensemble_size, -1, -1))
+    _, maps = ensemble.map(individually=True, force_update=True, **map_kwargs)
+    assert_close(maps, x_o.expand(ensemble_size, -1, -1), atol=0.01, rtol=0)
+
+    assert_close(ensemble.map(**map_kwargs), x_o, atol=0.01, rtol=0)
+    assert_close(ensemble.map(force_update=True, **map_kwargs), x_o, atol=0.01, rtol=0)
+
+    with pytest.raises(ValueError, match=r"deprecated\. Use `\.set_default_x\(\)`"):
+        ensemble.map(x=x_o, individually=True)
+
+    with pytest.raises(ValueError, match=r"deprecated\. Use `\.set_default_x\(\)`"):
+        ensemble.map(x=x_o)
+
+
+def test_ensemble_to_keeps_default_x():
+    """`to()` rebuilds the ensemble and must keep its default `x`."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * randn_like(theta)
+    posteriors = []
+    for _ in range(2):
+        trainer = NPE_C(prior, show_progress_bars=False)
+        trainer.append_simulations(theta, x).train(max_num_epochs=1)
+        posteriors.append(trainer.build_posterior())
+    ensemble = EnsemblePosterior(posteriors)
+    x_o = ones(1, 2)
+    ensemble.set_default_x(x_o)
+
+    ensemble.to("cpu")
+
+    assert_close(ensemble.default_x, x_o)
+    assert ensemble.sample((2,)).shape == (2, 2)
 
 
 def test_ensemble_potential_follows_weight_change():

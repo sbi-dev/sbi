@@ -148,9 +148,12 @@ class SMCABC(ABCBASE):
             num_initial_pop: Number of simulations used for initial population.
             num_simulations: Total number of possible simulations.
             epsilon_decay: Factor with which the acceptance threshold $\epsilon$ decays.
+                With `distance_based_decay=True`, the quantile in (0, 1] of the previous
+                population's distances that becomes the next $\epsilon$.
             distance_based_decay: Whether the $\epsilon$ decay is constant over
-                populations or calculated from the previous populations distribution of
-                distances.
+                populations or calculated from the previous population's distribution of
+                distances. If True, `epsilon_decay` is used as the quantile of the
+                previous population's distances that determines the next $\epsilon$.
             ess_min: Threshold of effective sampling size for resampling weights. Not
                 used when None (default).
             kernel_variance_scale: Factor for scaling the perturbation kernel variance.
@@ -211,6 +214,12 @@ class SMCABC(ABCBASE):
         self.num_simulations = num_simulations * num_iid_samples
         if kde_kwargs is None:
             kde_kwargs = {}
+        if distance_based_decay and not 0.0 < epsilon_decay <= 1.0:
+            raise ValueError(
+                "With `distance_based_decay=True`, `epsilon_decay` is the quantile of "
+                "the previous population's distances and must be in (0, 1], got "
+                f"{epsilon_decay}."
+            )
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
         assert not (self.distance.requires_iid_data and lra), (
             "Currently there is no support to run inference "
@@ -475,7 +484,7 @@ class SMCABC(ABCBASE):
                 x_candidates = x_candidates.squeeze(1)
 
             dists = self.distance(self.x_o, x_candidates)
-            is_accepted = dists <= epsilon
+            is_accepted = dists.to(torch.float64) <= epsilon
             num_accepted_batch = int(is_accepted.sum().item())
 
             if num_accepted_batch > 0:
@@ -548,37 +557,29 @@ class SMCABC(ABCBASE):
             new_x[sort_idx],
         )
 
-    def _get_next_epsilon(self, distances: Tensor, quantile: float) -> float:
+    @staticmethod
+    def _get_next_epsilon(distances: Tensor, quantile: float) -> float:
         """Return epsilon for next round based on quantile of this round's distances.
-
-        Note: distances are made unique to avoid repeated distances from simulations
-        that result in the same observation.
 
         Args:
             distances: The distances accepted in this round.
             quantile: Quantile in the distance distribution to determine new epsilon.
 
         Returns:
-            epsilon: Epsilon for the next population.
-        """
-        # Take unique distances to skip same distances simulations (return is sorted).
-        distances = torch.unique(distances)
-        # Cumsum as cdf proxy.
-        distances_cdf = torch.cumsum(distances, dim=0) / distances.sum()
-        # Take the q quantile of distances.
-        try:
-            qidx = torch.where(distances_cdf >= quantile)[0][0]
-        except IndexError:
-            self.logger.warning(
-                "Accepted unique distances=%s don't match quantile=%s. "
-                "Selecting last distance.",
-                distances,
-                quantile,
-            )
-            qidx = -1
+            epsilon: Epsilon for the next population, one of the finite distances.
 
-        # The new epsilon is given by that distance.
-        return distances[qidx].item()
+        Raises:
+            ValueError: If no distance in the previous population is finite.
+        """
+        finite_distances = distances[torch.isfinite(distances)]
+        if finite_distances.numel() == 0:
+            raise ValueError(
+                "Cannot compute the next epsilon: all distances in the previous "
+                "population are non-finite."
+            )
+        return torch.quantile(
+            finite_distances.cpu().to(torch.float64), quantile, interpolation="lower"
+        ).item()
 
     def _calculate_new_log_weights(
         self,
