@@ -359,3 +359,4 @@ def test_print_progress_flushes_each_message(monkeypatch):
     monkeypatch.setattr(sys, "stdout", stdout)
     print_progress("Training neural network. Epochs trained: 1")
     assert stdout.flushed.endswith("Epochs trained: 1")
+    end_progress_line()  # Else the open line leaks into later tests in this process.
