@@ -466,7 +466,8 @@ class LC2ST:
             Normalized theta if z_score is enabled, otherwise unchanged theta.
         """
         if self.z_score:
-            return (theta - self.theta_p_mean) / self.theta_p_std
+            device = theta.device
+            return (theta - self.theta_p_mean.to(device)) / self.theta_p_std.to(device)
         return theta
 
     def _normalize_x(self, x: Tensor) -> Tensor:
@@ -479,7 +480,7 @@ class LC2ST:
             Normalized x if z_score is enabled, otherwise unchanged x.
         """
         if self.z_score:
-            return (x - self.x_p_mean) / self.x_p_std
+            return (x - self.x_p_mean.to(x.device)) / self.x_p_std.to(x.device)
         return x
 
     @property

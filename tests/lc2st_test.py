@@ -624,7 +624,11 @@ def test_lc2st_runs_on_requested_device(cal_data, device):
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ACCELERATOR_DEVICES)
 def test_lc2st_cross_validation_with_accelerator_tensors(cal_data, device):
-    """`num_folds > 1` must split samples that live on an accelerator."""
+    """Folds and z-scoring must work with samples on an accelerator.
+
+    The evaluation inputs stay on the CPU to check that z-scoring accepts inputs
+    on another device than the calibration data.
+    """
     lc2st = LC2ST(
         cal_data.thetas.to(device),
         cal_data.xs.to(device),
@@ -632,6 +636,7 @@ def test_lc2st_cross_validation_with_accelerator_tensors(cal_data, device):
         classifier="mlp",
         num_folds=2,
         num_trials_null=2,
+        z_score=True,
         device=device,
     )
     lc2st.train_on_observed_data()
@@ -639,6 +644,7 @@ def test_lc2st_cross_validation_with_accelerator_tensors(cal_data, device):
     assert len(lc2st.trained_clfs) == 2
     assert lc2st.trained_clfs_null is not None
     assert all(len(clfs) == 2 for clfs in lc2st.trained_clfs_null.values())
+    assert lc2st.p_value(cal_data.posterior_samples[:100], cal_data.xs[:1]) is not None
 
 
 def test_lc2st_accepts_gpu_device_alias(cal_data):
