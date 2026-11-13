@@ -9,7 +9,10 @@ import torch.distributions.transforms as torch_tf
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    resolve_track_gradients,
+)
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
     ProposalCorrectedMDN,
@@ -226,7 +229,7 @@ class ConditionedPotential(BasePotential):
         self.dims_to_sample = dims_to_sample
         self.device = self.potential_fn.device
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: Optional[bool] = None) -> Tensor:
         r"""
         Returns the conditional potential $\log(p(\theta_i|\theta_j, x))$.
 
@@ -234,24 +237,27 @@ class ConditionedPotential(BasePotential):
             theta: Free parameters $\theta_i$, batch dimension 1.
             x_o: Unused keyword argument. Only present to match the signature of the
                 `Potential` class.
-            track_gradients: Whether to track gradients.
+            track_gradients: Whether to track gradients. `None` keeps the caller's
+                grad mode.
 
         Returns:
             Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
             masked outside of prior.
         """
-        theta_ = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32))
+        track_gradients = resolve_track_gradients(track_gradients)
+        with torch.set_grad_enabled(track_gradients):
+            theta_ = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32))
 
-        # `theta_condition`` will first have all entries of the `condition` and then
-        # override the entries that should be sampled with `theta` (see below).
-        theta_condition = deepcopy(self.condition)
+            # `theta_condition`` will first have all entries of the `condition` and then
+            # override the entries that should be sampled with `theta` (see below).
+            theta_condition = deepcopy(self.condition)
 
-        # In case `theta` is a batch of theta (e.g. multi-chain MCMC), we have to
-        # repeat `theta_condition`` to the same batchsize.
-        theta_condition = theta_condition.repeat(theta_.shape[0], 1)
-        theta_condition[:, self.dims_to_sample] = theta_
+            # In case `theta` is a batch of theta (e.g. multi-chain MCMC), we have to
+            # repeat `theta_condition`` to the same batchsize.
+            theta_condition = theta_condition.repeat(theta_.shape[0], 1)
+            theta_condition[:, self.dims_to_sample] = theta_
 
-        return self.potential_fn(theta_condition, track_gradients=track_gradients)
+            return self.potential_fn(theta_condition, track_gradients=track_gradients)
 
     @property
     def x_embedding_net(self) -> Optional[nn.Module]:
