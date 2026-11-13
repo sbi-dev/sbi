@@ -1763,10 +1763,8 @@ def _sbc_rank_plot(
         colors: list of colors for each parameter dimension, or each set of ranks.
         num_repeats: number of repeats for each empirical CDF step (resolution).
         line_alpha: alpha for cdf lines or histograms.
-        show_uniform_region: whether to plot the region showing the cdfs expected under
-            uniformity.
-        uniform_region_alpha: alpha for region showing the cdfs expected under
-            uniformity.
+        show_uniform_region: whether to plot the region expected under uniformity.
+        uniform_region_alpha: alpha for the region expected under uniformity.
         xlim_offset_factor: factor for empty space left and right of the histogram.
         num_cols: number of subplot columns, e.g., when plotting ranks of many
             parameters.
@@ -1889,9 +1887,6 @@ def _sbc_rank_plot(
                             alpha=uniform_region_alpha,
                             diff=diff,
                         )
-                    # Name the rank sets in the first subplot, once all are drawn.
-                    if jj == 0 and ii == num_ranks - 1 > 0:
-                        _sbc_legend(legend_kwargs)
                 else:
                     _plot_ranks_as_hist(
                         ranki[:, jj],  # type: ignore
@@ -1904,16 +1899,16 @@ def _sbc_rank_plot(
                         alpha=line_alpha,
                         xlim_offset_factor=xlim_offset_factor,
                     )
-                    # Plot expected uniform band.
-                    _plot_hist_region_expected_under_uniformity(
-                        num_sbc_runs,
-                        num_bins,
-                        num_posterior_samples,
-                        alpha=uniform_region_alpha,
-                    )
-                    # Show legend in the first subplot, once all rank sets are drawn.
-                    if jj == 0 and ii == num_ranks - 1:
-                        _sbc_legend(legend_kwargs)
+                    if ii == 0 and show_uniform_region:
+                        _plot_hist_region_expected_under_uniformity(
+                            num_sbc_runs,
+                            num_bins,
+                            num_posterior_samples,
+                            alpha=uniform_region_alpha,
+                        )
+        if plot_type == "hist" or num_ranks > 1:
+            plt.sca(ax.flat[0])
+            _sbc_legend(legend_kwargs)
         # Remove empty subplots.
         col_idx += 1
         while num_rows > 1 and col_idx < num_cols:

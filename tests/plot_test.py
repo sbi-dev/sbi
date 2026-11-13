@@ -459,6 +459,18 @@ def test_sbc_rank_plot_legend_kwargs_override_entries(
     close()
 
 
+@pytest.mark.parametrize("show_uniform_region", (True, False))
+def test_sbc_rank_plot_hist_draws_the_band_once(show_uniform_region):
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 2)) for _ in range(2)]
+    _, ax = sbc_rank_plot(
+        ranks, 100, plot_type="hist", show_uniform_region=show_uniform_region
+    )
+    for axis in ax:
+        assert len(axis.collections) == int(show_uniform_region)
+    close()
+
+
 def test_sbc_rank_plot_legend_keeps_entries_already_on_the_axes():
     fig, ax = subplots(1, 1)
     ax.bar([10], [0.5], label="reference")  # a container, not an artist
