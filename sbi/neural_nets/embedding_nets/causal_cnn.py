@@ -163,7 +163,7 @@ class CausalCNNEmbedding(nn.Module):
         If you do not provide an aggregator network yourself, a default aggregator
         is used. This default aggregator is based on the WaveNet paper's description
         of their Speech Recognition Task, and uses non-causal convolutions and pooling
-        layers, and global average poolingg to obtain a final low dimensional embedding.
+        layers, and global average pooling to obtain a final low dimensional embedding.
 
         Args:
             input_shape: Spatial input shape without batch or channel dimensions,

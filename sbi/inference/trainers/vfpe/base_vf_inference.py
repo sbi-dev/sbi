@@ -236,7 +236,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         matching methods (FMPE).
 
         The denoising score matching loss has a high
-        variance, which makes it more difficult to detect converegence. To reduce this
+        variance, which makes it more difficult to detect convergence. To reduce this
         variance, we evaluate the validation loss at a fixed set of times. We also use
         the exponential moving average of the training and validation losses, as opposed
         to the other `trainer` classes, which track the loss directly.

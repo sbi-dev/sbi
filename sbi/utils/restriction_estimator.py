@@ -817,7 +817,7 @@ class RestrictedPrior(Distribution):
                 density. The normalizing factor is calculated via rejection sampling,
                 so if you need speedier but unnormalized log probability estimates set
                 here `norm_restricted_prior=False`. The returned log probability is set
-                to -∞ outside of the restriceted prior support regardless of this
+                to -∞ outside of the restricted prior support regardless of this
                 setting.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory

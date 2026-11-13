@@ -209,7 +209,7 @@ class EnsemblePosterior(NeuralPosterior):
         r"""Return samples from posterior ensemble.
 
         The samples are drawn according to their assigned weight. The number of samples
-        for each distributino is drawn from a corresponding multinomial distribution.
+        for each distribution is drawn from a corresponding multinomial distribution.
         Then each component posterior is sampled individually and all samples are
         aggregated afterwards.
 
@@ -321,8 +321,8 @@ class EnsemblePosterior(NeuralPosterior):
         printing one exemplary component of the ensemble).
 
         NOTE: this method is chainable, i.e. will return the EnsemblePosterior
-        object so that calls like `posterior_enemble.set_default_x(my_x).sample(mytheta)
-        ` are possible.
+        object so that calls like
+        `posterior_ensemble.set_default_x(my_x).sample(mytheta)` are possible.
 
         Args:
             x: The default observation to set for every posterior $p_i(theta|x)$ in the

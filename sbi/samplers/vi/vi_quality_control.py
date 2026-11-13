@@ -99,7 +99,7 @@ def psis_diagnostics(
     r"""This will evaluate the posteriors quality by investigating its importance
     weights. If q is a perfect posterior approximation then $q(\theta) \propto
     p(\theta, x_o)$ thus $\log w(\theta) = \log \frac{p(\theta, x_o)}{\log q(\theta)} =
-    \log p(x_o)$ is constant. This function will fit a Generalized Paretto
+    \log p(x_o)$ is constant. This function will fit a Generalized Pareto
     distribution to the tails of w. The shape parameter k serves as metric as detailed
     in [1]. In short it is related to the variance of an importance sampling estimate,
     especially for k > 1 the variance will be infinite.

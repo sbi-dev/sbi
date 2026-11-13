@@ -332,7 +332,7 @@ def check_sample_shape_and_support(q: Distribution, prior: Distribution) -> None
         "The event shape of q must match that of the prior"
     )
     assert q.batch_shape == prior.batch_shape, (
-        "The batch sahpe of q must match that of the prior"
+        "The batch shape of q must match that of the prior"
     )
 
     sample_shape = torch.Size((1000,))

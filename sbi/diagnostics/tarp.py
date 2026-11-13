@@ -213,7 +213,7 @@ def check_tarp(
     ecp: Tensor,
     alpha: Tensor,
 ) -> Tuple[float, float]:
-    r"""check the obtained TARP credibitlity levels and
+    r"""check the obtained TARP credibility levels and
     expected coverage probabilities. This will help to uncover underdispersed,
     well covering or overdispersed posteriors.
 

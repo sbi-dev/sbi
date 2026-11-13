@@ -53,7 +53,7 @@ class CategoricalMADE(MADE):
             activation: activation function. default is ReLU.
             dropout_probability: dropout probability. default is 0.0.
             use_batch_norm: whether to use batch normalization.
-            embedding_net: emebedding net for input.
+            embedding_net: embedding net for input.
         """
         if use_residual_blocks and random_mask:
             raise ValueError("Residual blocks can't be used with random masks.")

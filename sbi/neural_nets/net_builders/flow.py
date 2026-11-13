@@ -1433,7 +1433,7 @@ class ContextSplineMap(nn.Module):
 
     We cannot use the resnet as conditioner to learn each dimension conditioned
     on the other dimensions (because there is only one). Instead, we learn the
-    spline parameters directly. In the case of conditinal density estimation,
+    spline parameters directly. In the case of conditional density estimation,
     we make the spline parameters conditional on the context. This is
     implemented in this class.
     """
