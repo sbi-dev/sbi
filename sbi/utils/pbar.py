@@ -111,12 +111,15 @@ def trange(*args, **kwargs) -> tqdm:
 def print_progress(message: str) -> None:
     """Overwrites the current line with `message`, unless `TQDM_DISABLE` is set."""
     if not progress_disabled():
-        # The leading `\r` returns to the line start also where `end="\r"` would not
-        # (#330); the next message then overwrites this one.
+        # The leading `\r` returns to the line start also where `end="\r"` would not;
+        # the next message then overwrites this one.
         print("\r", message, end="", flush=True)
+        _state.progress_line_open = True
 
 
 def end_progress_line() -> None:
-    """Ends the line of `print_progress()`, so that later output starts on its own."""
-    if not progress_disabled():
+    """Ends the line that `print_progress()` left open, if any, so that later output
+    starts on its own."""
+    if getattr(_state, "progress_line_open", False):
         print()
+        _state.progress_line_open = False

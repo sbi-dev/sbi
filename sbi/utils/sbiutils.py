@@ -1340,14 +1340,12 @@ def gradient_ascent(
             iter_ += 1
 
     except KeyboardInterrupt:
-        if show_progress_bars:
-            end_progress_line()
+        end_progress_line()
         interruption = f"Optimization was interrupted after {iter_} iterations. "
         print(interruption + interruption_note)
         return argmax_, max_val  # type: ignore
 
-    if show_progress_bars:
-        end_progress_line()
+    end_progress_line()
     with torch.no_grad():
         argmax_ = theta_transform.inv(best_theta_overall)
     return argmax_, max_val  # type: ignore

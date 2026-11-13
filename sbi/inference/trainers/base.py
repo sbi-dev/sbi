@@ -1320,11 +1320,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         # Not `_converged()`: it advances the counter it reads, so a second call can
         # flip its own verdict.
         converged = epoch <= max_num_epochs
+        end_progress_line()
         if converged:
-            print("\r", f"Neural network successfully converged after {epoch} epochs.")
+            print(f"Neural network successfully converged after {epoch} epochs.")
         else:
-            if self._show_progress_bars:
-                end_progress_line()
             warn(
                 f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached, "
                 "but network has not yet fully converged. Consider increasing it.",

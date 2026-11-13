@@ -351,8 +351,7 @@ class MarginalTrainer:
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        if self._show_progress_bars:
-            end_progress_line()
+        end_progress_line()
         if self.epoch > max_num_epochs:
             # The `and` above short-circuits on the last check, so `_converged` never
             # saw the final epoch. Score it here before choosing the weights to keep.

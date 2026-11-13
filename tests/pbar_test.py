@@ -311,6 +311,7 @@ def test_tqdm_disable_turns_off_all_progress_output(monkeypatch, capsys, tqdm_di
         pass
     print_progress("Training neural network. Epochs trained: 3")
     end_progress_line()
+    end_progress_line()  # No line is open, so this prints nothing.
 
     captured = capsys.readouterr()
     shows_output = tqdm_disable is None

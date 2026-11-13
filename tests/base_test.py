@@ -296,6 +296,17 @@ def test_training_output_ends_with_a_newline(monkeypatch, capsys, train_kwargs):
     assert out.endswith("\n")
 
 
+def test_converged_message_is_plain_when_captured(monkeypatch, capsys):
+    """Captured output must not start with the `\\r` that overwrites a progress line."""
+    monkeypatch.setenv("TQDM_DISABLE", "1")
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+
+    NPE(prior=prior)._report_convergence_at_end(epoch=3, max_num_epochs=10)
+
+    expected = "Neural network successfully converged after 3 epochs.\n"
+    assert capsys.readouterr().out == expected
+
+
 def test_vector_field_converged_resets_between_runs():
     """A stale best-val-loss from run one must not leak into run two.
 
