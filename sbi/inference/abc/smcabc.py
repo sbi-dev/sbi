@@ -566,7 +566,8 @@ class SMCABC(ABCBASE):
             quantile: Quantile in the distance distribution to determine new epsilon.
 
         Returns:
-            epsilon: Epsilon for the next population.
+            epsilon: Epsilon for the next population. It is one of the finite
+                distances, so the acceptance comparison is exact in their dtype.
 
         Raises:
             ValueError: If no distance in the previous population is finite.
@@ -577,7 +578,9 @@ class SMCABC(ABCBASE):
                 "Cannot compute the next epsilon: all distances in the previous "
                 "population are non-finite."
             )
-        return torch.quantile(finite_distances.cpu().to(torch.float64), quantile).item()
+        return torch.quantile(
+            finite_distances.cpu().to(torch.float64), quantile, interpolation="lower"
+        ).item()
 
     def _calculate_new_log_weights(
         self,

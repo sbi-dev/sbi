@@ -469,19 +469,22 @@ def test_smcabc_resampling_keeps_particles_paired_with_simulations():
 @pytest.mark.parametrize(
     "distances, quantile, expected",
     [
-        pytest.param([0.0, 0.1, 0.2, 100.0], 0.1, 0.03, id="heavy-tail-q0.1"),
-        pytest.param([0.0, 0.1, 0.2, 100.0], 0.5, 0.15, id="heavy-tail-q0.5"),
-        pytest.param([0.0, 0.1, 0.2, 100.0], 0.9, 70.06, id="heavy-tail-q0.9"),
+        pytest.param([0.0, 0.1, 0.2, 100.0], 0.1, 0.0, id="heavy-tail-q0.1"),
+        pytest.param([0.0, 0.1, 0.2, 100.0], 0.5, 0.1, id="heavy-tail-q0.5"),
+        pytest.param([0.0, 0.1, 0.2, 100.0], 0.9, 0.2, id="heavy-tail-q0.9"),
         pytest.param([0.0, 0.1, 0.2, 100.0], 1.0, 100.0, id="heavy-tail-q1"),
-        pytest.param(torch.tensor([0, 1, 2, 100]), 0.5, 1.5, id="integer"),
+        pytest.param(torch.tensor([0, 1, 2, 100]), 0.5, 1.0, id="integer"),
         pytest.param(
-            torch.tensor([0.0, 1.0, 2.0], dtype=torch.float16), 0.5, 1.0, id="float16"
+            torch.tensor([1.0, 1.0009765625], dtype=torch.float16),
+            0.75,
+            1.0,
+            id="float16-adjacent",
         ),
-        pytest.param([0.0, 1.0, float("inf")], 0.5, 0.5, id="drops-inf"),
+        pytest.param([0.0, 1.0, float("inf")], 1.0, 1.0, id="drops-inf"),
     ],
 )
 def test_smcabc_next_epsilon_is_distance_quantile(distances, quantile, expected):
-    """`distance_based_decay` must use the empirical quantile of finite distances."""
+    """`distance_based_decay` must use a quantile of the finite distances."""
     epsilon = SMCABC._get_next_epsilon(torch.as_tensor(distances), quantile)
 
     assert epsilon == pytest.approx(expected)
