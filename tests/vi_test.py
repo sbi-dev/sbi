@@ -451,6 +451,21 @@ def test_every_flow_family_pickles(q: str):
     assert torch.allclose(reloaded._q.sample((3,)), expected)
 
 
+@pytest.mark.parametrize("hidden_features, warns", [(50, False), (64, True)])
+def test_gf_warns_that_it_ignores_hidden_features(hidden_features: int, warns: bool):
+    prior = MultivariateNormal(zeros(2), eye(2))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        VIPosterior(
+            FakePotential(prior=prior),
+            prior,
+            q="gf",
+            hidden_features=hidden_features,
+        )
+
+    assert any("no effect" in str(w.message) for w in caught) == warns
+
+
 def test_deepcopy_of_trained_posterior_rewires_optimizer():
     """A copy's optimizer must step the copy's own `q`, not the original's."""
     posterior = _make_posterior("gaussian")

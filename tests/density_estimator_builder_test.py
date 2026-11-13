@@ -6,6 +6,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 import torch
+import zuko
 from torch import nn
 
 from sbi.neural_nets import likelihood_nn
@@ -13,12 +14,14 @@ from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.net_builders.estimator_configs import (
     _CLASSIFIER_CONFIGS,
     _DENSITY_CONFIGS,
+    _MARGINAL_CONFIGS,
     ClassifierConfigBase,
     DensityConfigBase,
     LinearClassifierConfig,
     MAFConfig,
     MDNConfig,
     MLPClassifierConfig,
+    MarginalGFConfig,
     MixedConfig,
     NSFConfig,
     PretrainedConfigBase,
@@ -29,7 +32,11 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     _UnconstrainedCapableConfigBase,
     _ZukoDensityConfigBase,
 )
-from sbi.neural_nets.net_builders.flow import build_zuko_flow, get_base_dist
+from sbi.neural_nets.net_builders.flow import (
+    _zuko_hidden_layers,
+    build_zuko_flow,
+    get_base_dist,
+)
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils import BoxUniform
 
@@ -38,6 +45,13 @@ DENSITY_MODELS = sorted(_DENSITY_CONFIGS)
 # in the introspection tests but not in the ones that build a network.
 BUILDABLE_DENSITY_MODELS = [m for m in DENSITY_MODELS if m != "tabpfn"]
 CLASSIFIER_MODELS = sorted(_CLASSIFIER_CONFIGS)
+ZUKO_DENSITY_MODELS = [
+    m for m in DENSITY_MODELS if issubclass(_DENSITY_CONFIGS[m], _ZukoDensityConfigBase)
+]
+# A marginal GF has no network to size: it rejects `hidden_features`.
+ZUKO_MARGINAL_MODELS = [
+    m for m in sorted(_MARGINAL_CONFIGS) if _MARGINAL_CONFIGS[m] is not MarginalGFConfig
+]
 
 
 @pytest.fixture
@@ -421,3 +435,75 @@ def test_nflows_dtype_reaches_the_base_distribution(batches):
     )
 
     assert estimator.net._distribution._log_z.dtype == torch.float64
+
+
+# An int is two hidden layers of that width, a list one layer per entry.
+ZUKO_WIDTH_CASES = [(24, [24, 24]), ([24, 32, 16], [24, 32, 16])]
+# Two values, because a depth computed from one `num_transforms` can match by chance.
+ZUKO_NUM_TRANSFORMS = [3, 5]
+
+
+def _zuko_hidden_layer_widths(estimator: nn.Module) -> list[list[int]]:
+    """Return the hidden-layer widths of each transform's network in a Zuko flow."""
+    nets = [
+        module
+        for name, module in estimator.named_modules()
+        if name.rsplit(".", 1)[-1] in ("hyper", "ode")
+    ]
+    return [
+        [
+            layer.out_features
+            for layer in net
+            if isinstance(layer, (nn.Linear, zuko.nn.Linear))
+        ][:-1]
+        for net in nets
+    ]
+
+
+@pytest.mark.parametrize("num_transforms", ZUKO_NUM_TRANSFORMS)
+@pytest.mark.parametrize("hidden_features, widths", ZUKO_WIDTH_CASES)
+@pytest.mark.parametrize("model", ZUKO_DENSITY_MODELS)
+def test_zuko_hidden_features_set_the_hidden_layers(
+    model, hidden_features, widths, num_transforms, batches
+):
+    """The depth must not follow `num_transforms`."""
+    theta, x = batches
+    estimator = _DENSITY_CONFIGS[model](
+        hidden_features=hidden_features, num_transforms=num_transforms
+    ).build(batch_input=theta, batch_condition=x)
+
+    assert _zuko_hidden_layer_widths(estimator) == [widths] * num_transforms
+
+
+@pytest.mark.parametrize("num_transforms", ZUKO_NUM_TRANSFORMS)
+@pytest.mark.parametrize("hidden_features, widths", ZUKO_WIDTH_CASES)
+def test_zuko_cnf_hidden_features_set_the_hidden_layers(
+    hidden_features, widths, num_transforms, batches
+):
+    theta, x = batches
+    estimator = build_zuko_flow(
+        "CNF", theta, x, hidden_features=hidden_features, num_transforms=num_transforms
+    )
+
+    assert _zuko_hidden_layer_widths(estimator) == [widths]
+
+
+@pytest.mark.parametrize("num_transforms", ZUKO_NUM_TRANSFORMS)
+@pytest.mark.parametrize("hidden_features, widths", ZUKO_WIDTH_CASES)
+@pytest.mark.parametrize("model", ZUKO_MARGINAL_MODELS)
+def test_zuko_marginal_hidden_features_set_the_hidden_layers(
+    model, hidden_features, widths, num_transforms, batches
+):
+    theta, _ = batches
+    estimator = _MARGINAL_CONFIGS[model](
+        hidden_features=hidden_features, num_transforms=num_transforms
+    ).build(theta)
+
+    assert _zuko_hidden_layer_widths(estimator) == [widths] * num_transforms
+
+
+def test_zuko_hidden_layers_copies_a_list():
+    widths = [24, 32]
+    _zuko_hidden_layers(widths).append(16)
+
+    assert widths == [24, 32]

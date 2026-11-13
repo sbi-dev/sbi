@@ -64,6 +64,7 @@ from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 # Supported Zuko flow types for VI (lowercase names)
 _ZUKO_FLOW_TYPES = {"maf", "nsf", "naf", "unaf", "nice", "sospf", "gf"}
+_DEFAULT_HIDDEN_FEATURES = 50
 
 # Type for supported variational family strings
 VariationalFamily = Literal[
@@ -129,7 +130,7 @@ class VIPosterior(NeuralPosterior):
         parameters: Optional[Iterable] = None,
         modules: Optional[Iterable] = None,
         num_transforms: int = 5,
-        hidden_features: int = 50,
+        hidden_features: int = _DEFAULT_HIDDEN_FEATURES,
         z_score_theta: Literal["none", "independent", "structured"] = "independent",
         z_score_x: Literal["none", "independent", "structured"] = "independent",
     ):
@@ -180,8 +181,9 @@ class VIPosterior(NeuralPosterior):
                 attribute.
             num_transforms: Number of transforms in the normalizing flow. Used for
                 both single-x VI (when q is a string flow type) and amortized VI.
-            hidden_features: Hidden layer size in flow networks. Used for both
-                single-x VI and amortized VI.
+            hidden_features: Width of the two hidden layers in each transform's
+                network. Used for both single-x VI and amortized VI. Single-x VI
+                with `q="gf"` builds no such network and ignores it.
             z_score_theta: Method for z-scoring θ (parameters). One of "none",
                 "independent", "structured". Used for both single-x VI and amortized
                 VI. Use "structured" for parameters with correlations.
@@ -300,8 +302,8 @@ class VIPosterior(NeuralPosterior):
             flow_type: Type of flow, one of ["maf", "nsf", "naf", "unaf", "nice",
                 "sospf", "gf"]. For "gaussian"/"gaussian_diag", use LearnableGaussian.
             num_transforms: Number of flow transforms. If None, uses instance default.
-            hidden_features: Number of hidden features per layer. If None, uses
-                instance default.
+            hidden_features: Width of the two hidden layers in each transform's
+                network, ignored by "gf". If None, uses instance default.
             z_score_theta: Method for z-scoring theta (parameters). One of
                 "independent", "structured", or "none". If None, uses instance default.
                 Use "structured" for parameters with correlations.
@@ -420,7 +422,8 @@ class VIPosterior(NeuralPosterior):
             x: Sample of x values for z-scoring (batch_size, x_dim).
             flow_type: Type of flow. Can be a ZukoFlowType enum or string.
             num_transforms: Number of flow transforms.
-            hidden_features: Number of hidden features per layer.
+            hidden_features: Width of the two hidden layers in each transform's
+                network.
             z_score_theta: Method for z-scoring θ (the parameters being modeled).
                 One of "none", "independent", "structured".
             z_score_x: Method for z-scoring x (the conditioning variable).
@@ -536,6 +539,15 @@ class VIPosterior(NeuralPosterior):
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
                 if q in _ZUKO_FLOW_TYPES:
+                    if q == "gf" and self._hidden_features != _DEFAULT_HIDDEN_FEATURES:
+                        warnings.warn(
+                            f"hidden_features={self._hidden_features} has no effect "
+                            "on q='gf' for a single observation: an unconditional "
+                            "Gaussianization flow has no network. It only sizes the "
+                            "flow of amortized VI. Use num_transforms instead.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
                     self._q_spec = _QSpec(kind="flow", flow_type=q)
                     q = self._build_unconditional_flow(q)
                 elif q in ("gaussian", "gaussian_diag"):
@@ -1051,8 +1063,8 @@ class VIPosterior(NeuralPosterior):
                 If None, uses value from params or instance default.
             num_transforms: Number of transforms in the flow. If None, uses value
                 from params or instance default.
-            hidden_features: Hidden layer size in the flow. If None, uses value
-                from params or instance default.
+            hidden_features: Width of the two hidden layers in each transform's
+                network. If None, uses value from params or instance default.
             z_score_theta: Method for z-scoring θ (the parameters being modeled).
                 One of "none", "independent", "structured". If None, uses value
                 from params or instance default.
