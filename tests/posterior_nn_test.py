@@ -926,7 +926,7 @@ def test_npe_ensemble_mixture_takes_one_observation(method, npe_for_iid_x):
     x_o = zeros(3, 2)
     calls = {
         "potential": lambda: posterior.potential(zeros(4, 2), x=x_o),
-        "map": lambda: posterior.map(x=x_o),
+        "map": lambda: posterior.set_default_x(x_o).map(),
         "log_prob": lambda: posterior.log_prob(zeros(4, 2), x=x_o),
     }
     with pytest.raises(ValueError, match=f"`{method}\\(\\)` of an ensemble"):

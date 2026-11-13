@@ -16,6 +16,7 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
 from sbi.sbi_types import Shape
+from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
     handle_invalid_x,
@@ -392,8 +393,9 @@ class RestrictionEstimator:
             self._val_log_prob = -val_loss / num_validation_examples
             self._validation_log_probs.append(self._val_log_prob)
 
-            print("Training neural network. Epochs trained: ", epoch, end="\r")
+            print_progress(f"Training neural network. Epochs trained: {epoch}")
 
+        end_progress_line()
         return deepcopy(self._classifier)
 
     def restrict_prior(

@@ -17,6 +17,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
 from tests.test_utils import (
     PosteriorPotential,
@@ -170,6 +171,81 @@ def test_ensemble_posterior_weights(weights, expected_exception):
         _ = posterior.sample((2,))
 
 
+class _GaussianShiftPotential(PosteriorPotential):
+    """Potential whose MAP is at the bound `x`."""
+
+    def __call__(self, theta, track_gradients=True):
+        return -((theta - self.x_o) ** 2).sum(dim=-1)
+
+
+def test_ensemble_map_uses_default_x():
+    """`map()` must use the default `x` for both the joint and the individual MAP."""
+    num_dim = 2
+    ensemble_size = 2
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    posterior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+
+    posteriors = [
+        TractablePosterior(_GaussianShiftPotential(posterior, prior))
+        for _ in range(ensemble_size)
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+    with pytest.raises(ValueError, match="default has not been set"):
+        ensemble.map()
+    x_o = 2.0 * ones(1, num_dim)
+    ensemble.set_default_x(x_o)
+
+    map_kwargs = {
+        "num_iter": 100,
+        "num_to_optimize": 2,
+        "learning_rate": 0.1,
+        "init_method": zeros(1, num_dim),
+        "show_progress_bars": False,
+    }
+
+    log_weights, maps = ensemble.map(individually=True, **map_kwargs)
+    assert log_weights.shape == (ensemble_size, 1)
+    assert_close(maps, x_o.expand(ensemble_size, -1, -1), atol=0.01, rtol=0)
+
+    # A stale cached MAP is returned unless `force_update` reaches the components.
+    stale = -ones(1, num_dim)
+    for component in posteriors:
+        component._map = stale
+    _, maps = ensemble.map(individually=True, **map_kwargs)
+    assert_close(maps, stale.expand(ensemble_size, -1, -1))
+    _, maps = ensemble.map(individually=True, force_update=True, **map_kwargs)
+    assert_close(maps, x_o.expand(ensemble_size, -1, -1), atol=0.01, rtol=0)
+
+    assert_close(ensemble.map(**map_kwargs), x_o, atol=0.01, rtol=0)
+    assert_close(ensemble.map(force_update=True, **map_kwargs), x_o, atol=0.01, rtol=0)
+
+    with pytest.raises(ValueError, match=r"deprecated\. Use `\.set_default_x\(\)`"):
+        ensemble.map(x=x_o, individually=True)
+
+    with pytest.raises(ValueError, match=r"deprecated\. Use `\.set_default_x\(\)`"):
+        ensemble.map(x=x_o)
+
+
+def test_ensemble_to_keeps_default_x():
+    """`to()` rebuilds the ensemble and must keep its default `x`."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * randn_like(theta)
+    posteriors = []
+    for _ in range(2):
+        trainer = NPE_C(prior, show_progress_bars=False)
+        trainer.append_simulations(theta, x).train(max_num_epochs=1)
+        posteriors.append(trainer.build_posterior())
+    ensemble = EnsemblePosterior(posteriors)
+    x_o = ones(1, 2)
+    ensemble.set_default_x(x_o)
+
+    ensemble.to("cpu")
+
+    assert_close(ensemble.default_x, x_o)
+    assert ensemble.sample((2,)).shape == (2, 2)
+
+
 def test_ensemble_potential_follows_weight_change():
     """`potential()` must use the weights set after construction."""
     prior = MultivariateNormal(zeros(1), 10 * eye(1))
@@ -188,3 +264,46 @@ def test_ensemble_potential_follows_weight_change():
 
     expected = MixtureSameFamily(Categorical(tensor([1.0, 3.0])), components)
     assert_close(ensemble.potential(theta), expected.log_prob(theta))
+
+
+class _BatchedTractablePosterior(TractablePosterior):
+    def sample_batched(self, sample_shape, x, **kwargs):
+        return self.potential_fn.posterior.sample((*sample_shape, x.shape[0]))
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_samples_are_not_sorted_by_component(method: str):
+    """Every row of a multi-dimensional `sample_shape` must mix the components."""
+    prior = MultivariateNormal(zeros(1), 10 * eye(1))
+    posteriors = [
+        _BatchedTractablePosterior(
+            PosteriorPotential(MultivariateNormal(tensor([mean]), 0.01 * eye(1)), prior)
+        )
+        for mean in [-2.0, 2.0]
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+
+    samples = getattr(ensemble, method)((10, 100), x=zeros(1, 1))
+
+    assert ((samples < 0).any(dim=1) & (samples > 0).any(dim=1)).all()
+
+
+class _TimedOutTractablePosterior(TractablePosterior):
+    """Returns 3 samples, like a sampler that timed out with partial results."""
+
+    def sample(self, sample_shape, x=None, **kwargs):
+        return self.potential_fn.posterior.sample((3,))
+
+    def sample_batched(self, sample_shape, x, **kwargs):
+        return self.potential_fn.posterior.sample((3, x.shape[0]))
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_raises_for_partial_samples(method: str):
+    """Partial samples, e.g., after a timeout, would not follow the weights."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    potential = PosteriorPotential(MultivariateNormal(zeros(1), eye(1)), prior)
+    ensemble = EnsemblePosterior([_TimedOutTractablePosterior(potential)] * 2)
+
+    with pytest.raises(ValueError, match="of 100 samples"):
+        getattr(ensemble, method)((10, 10), x=zeros(1, 1))

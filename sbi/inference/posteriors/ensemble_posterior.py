@@ -260,9 +260,9 @@ class EnsemblePosterior(NeuralPosterior):
         r"""Return samples from posterior ensemble.
 
         The samples are drawn according to their assigned weight. The number of samples
-        for each distributino is drawn from a corresponding multinomial distribution.
+        for each distribution is drawn from a corresponding multinomial distribution.
         Then each component posterior is sampled individually and all samples are
-        aggregated afterwards.
+        aggregated and shuffled afterwards.
 
         All kwargs are passed directly through to `posterior.sample()`.
 
@@ -275,6 +275,10 @@ class EnsemblePosterior(NeuralPosterior):
 
         Returns:
             Samples drawn from the ensemble distribution.
+
+        Raises:
+            ValueError: If the components return fewer samples than requested, e.g.,
+                with `return_partial_on_timeout=True`.
         """
         # Components are drawn randomly; validate `x` here so that errors do not
         # depend on the draw.
@@ -292,7 +296,8 @@ class EnsemblePosterior(NeuralPosterior):
             samples.append(
                 self.posteriors[posterior_index].sample(sample_shape_c, x=x, **kwargs)
             )
-        return torch.vstack(samples).reshape(*sample_shape, -1)
+        samples = self._stack_and_shuffle(samples, num_samples)
+        return samples.reshape(*sample_shape, -1)
 
     def sample_batched(
         self,
@@ -316,8 +321,28 @@ class EnsemblePosterior(NeuralPosterior):
                     sample_shape_c, x=x, **kwargs
                 )
             )
-        samples = torch.vstack(samples)
+        samples = self._stack_and_shuffle(samples, num_samples)
         return samples.reshape(sample_shape + samples.shape[1:])
+
+    @staticmethod
+    def _stack_and_shuffle(samples: List[Tensor], num_samples: int) -> Tensor:
+        """Return the component samples stacked and in random order.
+
+        Raises:
+            ValueError: If the components returned fewer samples than requested,
+                e.g., with `return_partial_on_timeout=True`. Such partial samples
+                would no longer follow the ensemble weights.
+        """
+        stacked = torch.vstack(samples)
+        if stacked.shape[0] != num_samples:
+            raise ValueError(
+                f"The ensemble components returned {stacked.shape[0]} of "
+                f"{num_samples} samples, e.g., after a sampling timeout. Partial "
+                "samples would not follow the ensemble weights, so ensembles do "
+                "not support them."
+            )
+        # The samples are sorted by component, so any slice would be biased.
+        return stacked[torch.randperm(num_samples, device=stacked.device)]
 
     def log_prob(
         self,
@@ -464,6 +489,7 @@ class EnsemblePosterior(NeuralPosterior):
         save_best_every: int = 10,
         show_progress_bars: bool = False,
         individually: bool = False,
+        force_update: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         r"""Returns the average maximum-a-posteriori estimate (MAP).
 
@@ -479,11 +505,11 @@ class EnsemblePosterior(NeuralPosterior):
         self.posteriors[idx].
 
         Args:
-            x: Observed data at which to evaluate the joint MAP. If None, the default
-                `x` of the ensemble, else the `x` that all its posteriors use. The
-                joint MAP of an ensemble with NPE posteriors takes one observation.
-                With `individually=True`, each posterior uses its default `x`, which
-                must be the same for all of them.
+            x: Deprecated, raises. The joint MAP uses the default `x` of the
+                ensemble, else the `x` that all its posteriors use. The joint MAP of
+                an ensemble with NPE posteriors takes one observation. With
+                `individually=True`, each posterior uses its default `x`, which must
+                be the same for all of them.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -506,18 +532,23 @@ class EnsemblePosterior(NeuralPosterior):
             show_progress_bars: Whether to show a progressbar during sampling from
                 the posterior.
             individually: If true, returns log weights and MAPs individually.
+            force_update: Whether to re-calculate the MAPs of the component
+                posteriors when `x` is unchanged and they have a cached value. It is
+                passed to each component when `individually=True`. The joint MAP is
+                computed on every call, so it has no effect otherwise.
 
         Returns:
             The ensemble MAP estimate or individual log_weigths and component MAP
             estimate if individually == True.
         """
 
+        if x is not None:
+            raise ValueError(
+                "Passing `x` directly to `.map()` has been deprecated. "
+                "Use `.set_default_x()` to set `x`, and then run `.map()`."
+            )
+
         if individually:
-            if x is not None:
-                raise ValueError(
-                    "`map(individually=True)` uses the default `x` of each posterior. "
-                    "Set it with `set_default_x()` of the ensemble."
-                )
             self._require_posteriors_use(self._x_else_default_x(None))
             maps = []
             log_weights = torch.log(self._weights).reshape(-1, 1)
@@ -532,13 +563,14 @@ class EnsemblePosterior(NeuralPosterior):
                         num_init_samples=num_init_samples,
                         save_best_every=save_best_every,
                         show_progress_bars=show_progress_bars,
+                        force_update=force_update,
                     )
                 )
             maps = torch.stack(maps)
             return log_weights, maps
 
         else:
-            x = self._bind_mixture(x, "map")
+            x = self._bind_mixture(None, "map")
             inits = self._map_inits(init_method, num_init_samples, x)
             # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(

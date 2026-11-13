@@ -16,9 +16,9 @@ from skorch import NeuralNetBinaryClassifier
 from skorch.callbacks import EarlyStopping
 from skorch.dataset import ValidSplit
 from torch import Tensor
-from tqdm import tqdm
 
 from sbi.utils.metrics import MLPClassifierModule
+from sbi.utils.pbar import tqdm
 from sbi.utils.sbiutils import handle_invalid_x
 
 # Default MLP classifier hyperparameters
@@ -466,7 +466,8 @@ class LC2ST:
             Normalized theta if z_score is enabled, otherwise unchanged theta.
         """
         if self.z_score:
-            return (theta - self.theta_p_mean) / self.theta_p_std
+            device = theta.device
+            return (theta - self.theta_p_mean.to(device)) / self.theta_p_std.to(device)
         return theta
 
     def _normalize_x(self, x: Tensor) -> Tensor:
@@ -479,7 +480,7 @@ class LC2ST:
             Normalized x if z_score is enabled, otherwise unchanged x.
         """
         if self.z_score:
-            return (x - self.x_p_mean) / self.x_p_std
+            return (x - self.x_p_mean.to(x.device)) / self.x_p_std.to(x.device)
         return x
 
     @property
@@ -523,7 +524,7 @@ class LC2ST:
         if self.num_folds > 1:
             trained_clfs = []
             kf = KFold(n_splits=self.num_folds, shuffle=True, random_state=self.seed)
-            cv_splits = kf.split(theta_p.numpy())
+            cv_splits = kf.split(theta_p.cpu().numpy())
             for train_idx, _ in tqdm(
                 cv_splits, desc="Cross-validation", disable=verbosity < 1
             ):

@@ -126,7 +126,6 @@ class VectorFieldPosterior(NeuralPosterior):
         guidance_method: Optional[str] = None,
         guidance_params: Optional[Dict] = None,
         max_sampling_batch_size: Optional[int] = None,
-        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -178,11 +177,6 @@ class VectorFieldPosterior(NeuralPosterior):
                 `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
             max_sampling_batch_size: Maximum batch size for sampling.
                 If not provided, uses the value specified at initialization.
-            sample_with: Deprecated, set it at construction instead; will be removed
-                in v0.28.0. Sampling method to use - 'ode' or 'sde'. Note that in
-                order to use the 'sde' sampling method, the vector field estimator
-                must support it and have the SCORE_DEFINED class attribute set to
-                True.
             show_progress_bars: Whether to show a progress bar during sampling.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
@@ -197,18 +191,6 @@ class VectorFieldPosterior(NeuralPosterior):
                 A warning will be issued. Only applies when `reject_outside_prior=True`
                 (default).
         """
-
-        if sample_with is None:
-            sample_with = self.sample_with
-        else:
-            warnings.warn(
-                "Passing `sample_with` to `VectorFieldPosterior.sample()` is "
-                "deprecated since sbi v0.27.0 and will be removed in v0.28.0. Set "
-                "it at construction, e.g. "
-                "`build_posterior(..., sample_with=...)`, instead.",
-                FutureWarning,
-                stacklevel=2,
-            )
 
         x = self._x_else_default_x(x)
         is_iid = x.shape[0] > 1
@@ -237,7 +219,7 @@ class VectorFieldPosterior(NeuralPosterior):
             else max_sampling_batch_size
         )
 
-        if sample_with == "ode":
+        if self.sample_with == "ode":
             if reject_outside_prior:
                 samples, _ = rejection.accept_reject_sample(
                     proposal=self.sample_via_ode,
@@ -251,7 +233,7 @@ class VectorFieldPosterior(NeuralPosterior):
             else:
                 # Bypass rejection sampling entirely.
                 samples = self.sample_via_ode(torch.Size([num_samples]))
-        elif sample_with == "sde":
+        elif self.sample_with == "sde":
             proposal_sampling_kwargs = {
                 "predictor": predictor,
                 "corrector": corrector,
@@ -281,7 +263,8 @@ class VectorFieldPosterior(NeuralPosterior):
                 )
         else:
             raise ValueError(
-                f"Expected sample_with to be 'ode' or 'sde', but got {sample_with}."
+                "Expected sample_with to be 'ode' or 'sde', but got "
+                f"{self.sample_with}."
             )
 
         if not reject_outside_prior:
@@ -327,8 +310,6 @@ class VectorFieldPosterior(NeuralPosterior):
                 uses the solve_schedule() specific to the estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
                 If not provided, uses the value specified at initialization.
-            sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
-                `.sample()`.
             show_progress_bars: Whether to show a progress bar during sampling.
             save_intermediate: Whether to save intermediate results of the diffusion
                 process. If True, the returned tensor has shape
@@ -778,7 +759,7 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if self.default_x is None:
             raise ValueError(
-                "Default `x` has not been set."
+                "Default `x` has not been set. "
                 "To set the default, use the `.set_default_x()` method."
             )
         _require_one_observation(

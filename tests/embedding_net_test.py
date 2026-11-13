@@ -31,6 +31,7 @@ from sbi.neural_nets.embedding_nets import (
     TransformerEmbedding,
 )
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
+from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -87,6 +88,22 @@ def test_embedding_net_api(
         method,
         posterior_parameters=posterior_parameters,
     )
+
+
+def test_fc_embedding_output_takes_negative_values():
+    """A final ReLU would make every output non-negative."""
+    embedding = FCEmbedding(input_dim=2, output_dim=20)
+
+    assert (embedding(torch.randn(100, 2)) < 0).any()
+
+
+def test_mnle_combined_embedding_output_takes_negative_values():
+    """MNLE's default combined embedding must not end in a ReLU either."""
+    x = torch.cat([torch.rand(50, 1) + 0.1, torch.randint(0, 2, (50, 1))], dim=1)
+    embedding = build_mnle(x, torch.randn(50, 2)).continuous_net.embedding_net
+
+    # Its input is the discrete column of x and the two condition dims.
+    assert (embedding(torch.randn(100, 3)) < 0).any()
 
 
 @pytest.mark.parametrize("num_xo_batch", [1, 2])
@@ -491,7 +508,7 @@ def test_npe_with_with_iid_embedding_varying_num_trials(trial_factor=50):
     num_thetas = 5000 + trial_factor * max_num_trials
 
     theta = prior.sample(sample_shape=torch.Size((num_thetas,)))
-    num_trials = torch.randint(1, max_num_trials, size=(num_thetas,))
+    num_trials = torch.randint(1, max_num_trials + 1, size=(num_thetas,))
 
     # simulate iid x, pad smaller number of trials with nans.
     x = ones(num_thetas, max_num_trials, 2) * float("nan")
@@ -569,8 +586,9 @@ def test_permutation_invariant_embedding_ignores_padding_per_observation(
 
     batched = embedding(x)
 
-    assert torch.allclose(batched[0], embedding(x[:1, :1])[0])
-    assert torch.allclose(batched[1], embedding(x[1:])[0])
+    # Batched and single-observation float32 sums differ by rounding (~1e-7).
+    assert torch.allclose(batched[0], embedding(x[:1, :1])[0], atol=1e-6)
+    assert torch.allclose(batched[1], embedding(x[1:])[0], atol=1e-6)
 
 
 @pytest.mark.parametrize(

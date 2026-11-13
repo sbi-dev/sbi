@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import logging
 import warnings
 from typing import Tuple
 
@@ -24,6 +25,7 @@ from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
+    clamp_and_warn,
     gradient_ascent,
     mcmc_transform,
     warn_if_invalid_for_zscoring,
@@ -919,3 +921,12 @@ def test_gradient_ascent_returns_map_in_prior_space(inits, atol):
     assert argmax.shape == (1, 2)
     assert max_val.shape == (1,)
     assert torch.allclose(argmax, optimum, atol=atol)
+
+
+def test_sbi_warnings_use_module_loggers(caplog):
+    """A root-logger call configures the root logger on first use, after which the
+    user's own `logging.basicConfig()` silently does nothing."""
+    with caplog.at_level(logging.WARNING):
+        clamp_and_warn("learning_rate", 5.0, 0.0, 1.0)
+
+    assert [record.name for record in caplog.records] == ["sbi.utils.sbiutils"]
