@@ -12,7 +12,6 @@ with code originally developed by Conor M. Durkan et al.
 Based on: C. M. Bishop, "Mixture Density Networks", NCRG Report (1994)
 """
 
-from itertools import chain
 from typing import Optional, Tuple
 
 import torch
@@ -412,16 +411,17 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
         # Validate that embedding_net output matches MDN input if embedding is provided
         if embedding_net is not None:
-            tensors = chain(
-                self._embedding_net.parameters(), self._embedding_net.buffers()
-            )
-            first = next((t for t in tensors if t.is_floating_point()), None)
+            tensors = [
+                *self._embedding_net.parameters(),
+                *self._embedding_net.buffers(),
+            ]
+            floating = next((t for t in tensors if t.is_floating_point()), None)
             with torch.no_grad():
                 test_input = torch.randn(
                     1,
                     *condition_shape,
-                    device=None if first is None else first.device,
-                    dtype=None if first is None else first.dtype,
+                    device=tensors[0].device if tensors else None,
+                    dtype=None if floating is None else floating.dtype,
                 )
                 test_output = self._embedding_net(test_input)
                 embedded_dim = test_output.shape[-1]

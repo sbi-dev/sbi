@@ -15,6 +15,7 @@ from sbi.neural_nets.estimators.mixture_density_estimator import (
     MultivariateGaussianMDN,
 )
 from sbi.neural_nets.estimators.mog import MoG
+from sbi.utils.torchutils import process_device
 
 # =============================================================================
 # Fixtures
@@ -442,12 +443,20 @@ class TestMixtureDensityEstimatorCreation:
     @pytest.mark.parametrize(
         "embedding_net",
         [
-            pytest.param(nn.Linear(10, 5).double(), id="float64"),
-            pytest.param(_SelectDims(torch.arange(5)), id="integer_buffer_only"),
+            pytest.param(lambda: nn.Linear(10, 5).double(), id="float64"),
+            pytest.param(
+                lambda: _SelectDims(torch.arange(5)), id="integer_buffer_only"
+            ),
+            pytest.param(
+                lambda: _SelectDims(torch.arange(5, device=process_device("gpu"))),
+                id="integer_buffer_only-gpu",
+                marks=pytest.mark.gpu,
+            ),
         ],
     )
     def test_estimator_creation_probes_embedding_net_in_its_dtype(self, embedding_net):
-        """The probe input matches the embedding net's floating-point dtype."""
+        """The probe input takes the embedding net's device and floating dtype."""
+        embedding_net = embedding_net()
         mdn_net = MultivariateGaussianMDN(
             features=3, context_features=5, hidden_features=20, num_components=4
         )
