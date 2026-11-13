@@ -1350,7 +1350,14 @@ def gradient_ascent(
 
 
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
-    """Sets all python, numpy and pytorch seeds."""
+    """Seeds the global random states of Python, numpy and PyTorch.
+
+    It also makes cuDNN use deterministic algorithms for the rest of the session,
+    which can slow down convolutions on a GPU.
+
+    Args:
+        seed: Seed for all random states. If None, it is drawn from PyTorch's.
+    """
 
     # Cast Tensor to int (required by math.random since Python 3.11)
     seed = int(torch.randint(1000000, size=(1,))) if seed is None else int(seed)

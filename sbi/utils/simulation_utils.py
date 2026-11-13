@@ -1,121 +1,772 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Callable, Optional, Tuple, Union
+import pickle
+import warnings
+from contextlib import suppress
+from dataclasses import dataclass
+from functools import partial, wraps
+from math import ceil
+from typing import (
+    Any,
+    Callable,
+    Generator,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+    overload,
+)
 
 import numpy as np
 import torch
-from joblib import Parallel, delayed
-from numpy import ndarray
+from joblib import Parallel, delayed, effective_n_jobs
+from joblib.parallel import get_active_backend
 from torch import Tensor, float32
 from tqdm.auto import tqdm
 
-from sbi.sbi_types import Proposal
+from sbi.sbi_types import (
+    Array,
+    OnError,
+    Proposal,
+    SimulationBatchSize,
+    SimulationOutput,
+)
 from sbi.utils.sbiutils import seed_all_backends
 
+# Several tasks per worker balance uneven run times; few tasks keep the cost of
+# sending the simulator to the workers low.
+_TASKS_PER_WORKER = 4
 
-# Refactoring following #1175. tl:dr: letting joblib iterate over numpy arrays
-# allows for a roughly 10x performance gain. The resulting casting necessity
-# (cfr. user_input_checks.wrap_as_joblib_efficient_simulator) introduces
-# considerable overhead. The simulating pipeline should, therefore, be further
-# restructured in the future (PR #1188).
+
 def simulate_for_sbi(
     simulator: Callable,
     proposal: Proposal,
     num_simulations: int,
     num_workers: int = 1,
-    simulation_batch_size: Union[int, None] = 1,
+    simulation_batch_size: SimulationBatchSize = "auto",
     seed: Optional[int] = None,
     show_progress_bar: bool = True,
+    simulator_is_batched: bool = True,
+    on_error: OnError = "raise",
 ) -> Tuple[Tensor, Tensor]:
     r"""Returns pairs :math:`(\theta, x)` by sampling proposal and running simulations.
 
     This function performs two steps:
 
     - Sample parameters $\theta$ from the `proposal`.
-    - Simulate these parameters to obtain $x$.
+    - Simulate these parameters to obtain $x$ with :func:`simulate_from_theta`.
 
     Args:
         simulator: A function that takes parameters $\theta$ and maps them to
             simulations, or observations, `x`, $\text{sim}(\theta)\to x$. Any
             regular Python callable (i.e. function or class with `__call__` method)
-            can be used. Note that the simulator should be able to handle numpy
-            arrays for efficient parallelization. You can use
-            `process_simulator` to ensure this.
+            can be used. It receives the sampled parameters as a tensor, on the
+            proposal's device with one worker and on the CPU with more, and must
+            return numbers: a tensor, a numpy array, or a list of numbers per
+            parameter set.
         proposal: Probability distribution that the parameters $\theta$ are sampled
             from.
         num_simulations: Number of simulations that are run.
-        num_workers: Number of parallel workers to use for simulations.
-        simulation_batch_size: Number of parameter sets of shape
-            (simulation_batch_size, parameter_dimension) that the simulator
-            receives per call. If None, we set
-            simulation_batch_size=num_simulations and simulate all parameter
-            sets with one call. Otherwise, we construct batches of parameter
-            sets and distribute them among num_workers.
-        seed: Seed for reproducibility.
+        num_workers: Number of parallel joblib workers; -1 uses all CPUs, -2 all
+            but one, and so on.
+        simulation_batch_size: Number of parameter sets per worker task, and per
+            call of a batched simulator. "auto" gives each call one parameter set
+            and, with more than one worker, groups the calls into four tasks per
+            worker. For all parameter sets in one call, pass their number; None
+            does the same but is deprecated.
+        seed: Seed for reproducibility. It seeds the global random state before
+            the parameters are sampled. A simulator that is not batched is also
+            reseeded before each simulation, see :func:`simulate_from_theta`. A
+            batched simulator continues the seeded random state on one worker; with
+            more workers, each task gets its own seed, so `x` differs between one
+            worker and more. Afterwards, the global random state is seeded with a
+            seed derived from `seed`, the same for any `num_workers`, so later
+            draws do not repeat those of this call.
         show_progress_bar: Whether to show a progress bar for simulating. This will not
             affect whether there will be a progressbar while drawing samples from the
             proposal.
+        simulator_is_batched: Whether the simulator takes a batch of parameter sets
+            per call. If False, it is called once per parameter set. Unlike in
+            :func:`simulate_from_theta`, the default is True.
+        on_error: What to do when the simulator raises an exception, "raise" or
+            "nan", see :func:`simulate_from_theta`.
 
-    Returns: Sampled parameters $\theta$ and simulation-outputs $x$.
+    Returns:
+        Sampled parameters $\theta$ and simulation outputs $x$, both float32
+        tensors on the device of $\theta$. One number per simulation gives $x$ of
+        shape (num_simulations, 1).
     """
-
+    settings = _Settings(
+        num_workers, simulation_batch_size, simulator_is_batched, on_error
+    )
     if num_simulations == 0:
-        theta = torch.tensor([], dtype=float32)
-        x = torch.tensor([], dtype=float32)
+        return torch.tensor([], dtype=float32), torch.tensor([], dtype=float32)
 
+    # Batched simulators get no seed below, so a thread backend is checked here.
+    _check_backend(seed, num_workers)
+    seed_all_backends(seed)
+    theta = proposal.sample((num_simulations,))
+    if theta.ndim < 2:
+        raise ValueError(
+            f"The proposal samples parameters of shape {tuple(theta.shape)}, but "
+            "`simulate_for_sbi` needs (num_simulations, *parameter_shape). A "
+            "proposal over one parameter needs the event shape (1,), e.g. "
+            "`BoxUniform(torch.zeros(1), torch.ones(1))`."
+        )
+    # Batched simulations continue the seeded random state.
+    x = _simulate(
+        simulator,
+        theta,
+        settings,
+        seed=None if simulator_is_batched else seed,
+        show_progress_bar=show_progress_bar,
+    )
+    if seed is not None:
+        _seed_after_call(seed)
+    real = (isinstance(x, Tensor) and not x.is_complex()) or (
+        isinstance(x, np.ndarray) and x.dtype.kind in "biuf"
+    )
+    if not real:
+        raise TypeError(
+            "`simulate_for_sbi` needs real numeric simulator outputs of one shape. "
+            "For other outputs, such as file paths, use `simulate_from_theta`."
+        )
+
+    x = torch.as_tensor(x, dtype=float32, device=theta.device).detach()
+    return torch.as_tensor(theta, dtype=float32), x[:, None] if x.ndim == 1 else x
+
+
+def simulate_from_theta(
+    simulator: Callable,
+    theta: Union[Array, Sequence[Any]],
+    *,
+    num_workers: int = 1,
+    simulation_batch_size: SimulationBatchSize = "auto",
+    simulator_is_batched: bool = False,
+    seed: Optional[int] = None,
+    on_error: OnError = "raise",
+    show_progress_bar: bool = True,
+) -> SimulationOutput:
+    r"""Returns simulator outputs for given parameters, optionally in parallel.
+
+    Args:
+        simulator: Function that maps parameters to simulation outputs. By default,
+            it takes one parameter set per call. If `simulator_is_batched`, it takes
+            a batch of parameter sets and returns outputs with the same leading
+            dimension, or a list of that length.
+        theta: Parameters of shape (num_simulations, \*parameter_shape), as a
+            tensor or numpy array. Other array-likes become numpy arrays.
+        num_workers: Number of parallel joblib workers; -1 uses all CPUs, -2 all
+            but one, and so on. The simulator receives parameters of the same type
+            as `theta` for any number of workers; with more than one worker, tensors
+            are on the CPU.
+        simulation_batch_size: Number of parameter sets per worker task, and per
+            call of a batched simulator. "auto" gives each call one parameter set
+            and, with more than one worker, groups the calls into four tasks per
+            worker. For all parameter sets in one call, pass their number; None
+            does the same but is deprecated.
+        simulator_is_batched: Whether the simulator takes a batch of parameter sets
+            per call. A batched simulator passed with False gets one parameter set
+            per call: indexing such as `theta[:, 0]` raises, and outputs sized by
+            `len(theta)` gain a dimension.
+        seed: Seed for reproducibility. The simulator is reseeded before each
+            call: before each simulation, or before each batch of a batched
+            simulator. So for noise drawn on the CPU, the outputs do not depend on
+            `num_workers`; for a simulator that is not batched, not on
+            `simulation_batch_size` either. Afterwards, the global random state is
+            seeded with a seed derived from `seed`, the same for any
+            `num_workers`. If None, the current random state is used; with more
+            than one worker, the workers are seeded from numpy's global random
+            state, so seed it before the call to reproduce the outputs, e.g. with
+            :func:`sbi.utils.seed_all_backends`. Seeding needs joblib's default
+            process workers: with a thread backend, a seed raises an error.
+        on_error: What to do when the simulator raises an exception. "raise" stops
+            all simulations and raises it. "nan" keeps going: a failed simulation
+            returns NaN in the shape of the first successful output, or None for
+            outputs that are not numeric (for a batched simulator, all parameter
+            sets of the call), with one warning at the end; integer outputs then
+            become float64 (float32 on MPS). If all simulations
+            fail, the first exception is raised. With more than one worker, an
+            exception that the workers cannot send back, e.g. one whose class is
+            defined in a script, arrives as a RuntimeError with its type and
+            message.
+        show_progress_bar: Whether to show a progress bar.
+
+    Returns:
+        Simulation outputs in the order of `theta`, one per parameter set. Numeric
+        outputs of one shape form one tensor or numpy array with a leading
+        dimension of num_simulations; other outputs, such as file paths, and outputs
+        of different shapes come back as a list. Tensor outputs are on the device
+        of `theta`; float64 becomes float32 on MPS, which has no float64.
+    """
+    settings = _Settings(
+        num_workers, simulation_batch_size, simulator_is_batched, on_error
+    )
+    x = _simulate(simulator, theta, settings, seed, show_progress_bar)
+    if seed is not None:
+        _seed_after_call(seed)
+    return x
+
+
+@overload
+def parallelize_simulator(
+    simulator: Callable,
+    /,
+    *,
+    num_workers: int = ...,
+    simulation_batch_size: SimulationBatchSize = ...,
+    simulator_is_batched: bool = ...,
+    on_error: OnError = ...,
+    show_progress_bar: bool = ...,
+) -> Callable[[Array], SimulationOutput]: ...
+
+
+@overload
+def parallelize_simulator(
+    simulator: None = None,
+    /,
+    *,
+    num_workers: int = ...,
+    simulation_batch_size: SimulationBatchSize = ...,
+    simulator_is_batched: bool = ...,
+    on_error: OnError = ...,
+    show_progress_bar: bool = ...,
+) -> Callable[[Callable], Callable[[Array], SimulationOutput]]: ...
+
+
+def parallelize_simulator(
+    simulator: Optional[Callable] = None,
+    /,
+    *,
+    num_workers: int = -1,
+    simulation_batch_size: SimulationBatchSize = "auto",
+    simulator_is_batched: bool = False,
+    on_error: OnError = "raise",
+    show_progress_bar: bool = False,
+) -> Union[
+    Callable[[Array], SimulationOutput],
+    Callable[[Callable], Callable[[Array], SimulationOutput]],
+]:
+    r"""Returns a batched simulator that runs :func:`simulate_from_theta` per call.
+
+    Use it as a function, `parallelize_simulator(simulator)`, or as a decorator,
+    `@parallelize_simulator` or `@parallelize_simulator(num_workers=4)`. By default,
+    the simulator takes one parameter set per call and runs on all CPUs.
+
+    Calls take no seed. To reproduce a call, seed beforehand with
+    :func:`sbi.utils.seed_all_backends`: with one worker, the simulator draws from
+    the global random states; with more, the workers are seeded from numpy's.
+    Consecutive calls still draw different noise. This needs joblib's default
+    process workers.
+
+    Each call sends the simulator to the workers; for slow calls, see the how-to
+    guide "How to run simulations in parallel".
+
+    Args:
+        simulator: Function that maps parameters to simulation outputs, see
+            :func:`simulate_from_theta`. If None, returns a decorator.
+        num_workers: Number of parallel joblib workers; -1 uses all CPUs, -2 all
+            but one, and so on.
+        simulation_batch_size: Number of parameter sets per worker task, and per
+            call of a batched simulator, see :func:`simulate_from_theta`.
+        simulator_is_batched: Whether the simulator takes a batch of parameter sets
+            per call.
+        on_error: What to do when the simulator raises an exception, "raise" or
+            "nan", see :func:`simulate_from_theta`.
+        show_progress_bar: Whether to show a progress bar on every call.
+
+    Returns:
+        Function that takes parameters of shape (num_simulations,
+        \*parameter_shape) and returns their simulation outputs, or a decorator
+        that creates it.
+    """
+    if simulator is not None and not callable(simulator):
+        raise TypeError(
+            "The simulator must be callable. Pass settings as keywords, e.g. "
+            "`@parallelize_simulator(num_workers=4)`."
+        )
+    settings = _Settings(
+        num_workers, simulation_batch_size, simulator_is_batched, on_error
+    )
+
+    def decorator(simulator: Callable) -> Callable[[Array], SimulationOutput]:
+        @wraps(simulator)
+        def parallel_simulator(theta: Array) -> SimulationOutput:
+            return _simulate(simulator, theta, settings, None, show_progress_bar)
+
+        return parallel_simulator
+
+    return decorator if simulator is None else decorator(simulator)
+
+
+@dataclass(frozen=True)
+class _Settings:
+    """How to run the simulations, checked once when created."""
+
+    num_workers: int
+    simulation_batch_size: SimulationBatchSize
+    simulator_is_batched: bool
+    on_error: OnError
+
+    def __post_init__(self) -> None:
+        if not _is_int(self.num_workers) or self.num_workers == 0:
+            raise ValueError(
+                "`num_workers` must be a nonzero integer, e.g. 4, or -1 for all "
+                f"CPUs; got {self.num_workers!r}."
+            )
+        if self.simulation_batch_size is None:
+            warnings.warn(
+                "`simulation_batch_size=None` is deprecated. For all parameter sets "
+                "in one call, pass their number.",
+                FutureWarning,
+                stacklevel=4,
+            )
+        elif self.simulation_batch_size != "auto" and (
+            not _is_int(self.simulation_batch_size) or self.simulation_batch_size < 1
+        ):
+            raise ValueError(
+                '`simulation_batch_size` must be "auto" or a positive integer, got '
+                f"{self.simulation_batch_size!r}."
+            )
+        if self.on_error not in ("raise", "nan"):
+            raise ValueError(
+                f'`on_error` must be "raise" or "nan", got {self.on_error!r}.'
+            )
+
+    def task_size(self, num_simulations: int) -> int:
+        """Returns the number of parameter sets that one process runs at a time."""
+        if self.simulation_batch_size is None:
+            return num_simulations
+        if self.simulation_batch_size != "auto":
+            return int(self.simulation_batch_size)
+        if self.num_workers == 1:
+            return 1
+        num_tasks = _TASKS_PER_WORKER * effective_n_jobs(self.num_workers)
+        return ceil(num_simulations / num_tasks)
+
+    def call_size(self, num_simulations: int) -> int:
+        """Returns the number of parameter sets per call of a batched simulator."""
+        if self.simulation_batch_size == "auto":
+            return 1
+        return self.task_size(num_simulations)
+
+
+class _Task(NamedTuple):
+    """Parameter sets `theta[start : start + len(theta)]`, run in one process."""
+
+    theta: Array
+    start: int
+    call_seeds: Optional[np.ndarray]  # One per simulator call.
+    worker_seed: Optional[int]  # Seeds the worker if the calls get no seeds.
+
+
+class _Failure(NamedTuple):
+    where: str
+    note: str
+    error: Exception
+
+
+class _TaskResult(NamedTuple):
+    output: Any
+    num_failed: int
+    first_failure: Optional[_Failure]
+
+
+def _simulate(
+    simulator: Callable,
+    theta: Array,
+    settings: _Settings,
+    seed: Optional[int],
+    show_progress_bar: bool,
+) -> SimulationOutput:
+    """Runs the simulations of :func:`simulate_from_theta`."""
+    if not isinstance(theta, (Tensor, np.ndarray)):
+        theta = np.asarray(theta)
+    if theta.ndim < 2:
+        raise ValueError(
+            "`theta` must have shape (num_simulations, *parameter_shape), got "
+            f"{tuple(theta.shape)}. For one parameter set, pass `theta[None]`; for "
+            "one parameter, `theta[:, None]`."
+        )
+    if len(theta) == 0:
+        if isinstance(theta, Tensor):
+            return torch.empty(0, dtype=float32, device=theta.device)
+        return np.empty(0)
+
+    device = theta.device if isinstance(theta, Tensor) else None
+    uses_threads = _check_backend(seed, settings.num_workers)
+    tasks = _plan_tasks(theta, settings, seed, uses_threads)
+    run = partial(_run_rows, simulator, on_error=settings.on_error)
+    if settings.simulator_is_batched:
+        call_size = settings.call_size(len(theta))
+        run = partial(_run_batched, simulator, call_size, on_error=settings.on_error)
+    results: Generator[_TaskResult, None, None]
+    if settings.num_workers == 1:
+        results = (run(task) for task in tasks)
     else:
-        # Cast theta to numpy for better joblib performance (seee #1175)
-        seed_all_backends(seed)
-        theta = proposal.sample((num_simulations,))
+        parallel = Parallel(n_jobs=settings.num_workers, return_as="generator")
+        results = cast(
+            Generator, parallel(delayed(_run_in_worker)(run, task) for task in tasks)
+        )
+    outputs, num_failed, first_failure = _collect(results, tasks, show_progress_bar)
 
-        # Parse the simulation_batch_size logic
-        if simulation_batch_size is None:
-            simulation_batch_size = num_simulations
+    if first_failure is not None:
+        _report_failures(first_failure, num_failed, len(theta))
+    x = _concatenate(outputs, fill_failed=num_failed > 0)
+    return x if device is None else _to_device(x, device)
+
+
+def _plan_tasks(
+    theta: Array, settings: _Settings, seed: Optional[int], uses_threads: bool
+) -> List[_Task]:
+    """Splits `theta` into tasks and seeds their calls, or else their workers."""
+    num_simulations = len(theta)
+    task_size = settings.task_size(num_simulations)
+    starts = range(0, num_simulations, task_size)
+    thetas = _split(theta, task_size)
+    if settings.num_workers != 1:
+        # Copies, as a pickled view of a tensor sends all of `theta`.
+        thetas = [
+            t.detach().to("cpu", copy=True) if isinstance(t, Tensor) else t
+            for t in thetas
+        ]
+
+    call_seeds = [None] * len(starts)
+    if seed is not None:
+        call_size = 1
+        if settings.simulator_is_batched:
+            call_size = settings.call_size(num_simulations)
+        num_calls = [ceil(len(t) / call_size) for t in thetas]
+        seeds = _distinct_seeds(sum(num_calls), seed)
+        call_seeds = np.split(seeds, np.cumsum(num_calls)[:-1])
+    worker_seeds = [None] * len(starts)
+    if seed is None and settings.num_workers != 1 and not uses_threads:
+        worker_seeds = _distinct_seeds(len(starts), None)
+    return list(map(_Task, thetas, starts, call_seeds, worker_seeds))
+
+
+def _collect(
+    results: Generator[_TaskResult, None, None],
+    tasks: List[_Task],
+    show_progress_bar: bool,
+) -> Tuple[List[Any], int, Optional[_Failure]]:
+    """Returns the task outputs in order, the number of failures and the first."""
+    outputs = []
+    num_failed, first_failure = 0, None
+    num_simulations = sum(len(task.theta) for task in tasks)
+    try:
+        with tqdm(total=num_simulations, disable=not show_progress_bar) as pbar:
+            for task, result in zip(tasks, results, strict=True):
+                outputs.append(result.output)
+                num_failed += result.num_failed
+                first_failure = first_failure or result.first_failure
+                pbar.update(len(task.theta))
+    except pickle.PicklingError as error:
+        error.add_note(
+            "Workers need the simulator and its inputs pickled. See the FAQ on "
+            "pickling errors, or pass `num_workers=1`."
+        )
+        raise
+    finally:
+        with warnings.catch_warnings():
+            # Closing joblib's generator cancels the simulations not yet run.
+            warnings.filterwarnings("ignore", ".*tasks", module="joblib")
+            results.close()
+    return outputs, num_failed, first_failure
+
+
+def _to_device(value: Any, device: torch.device) -> Any:
+    if type(value) in (list, tuple):
+        return type(value)(_to_device(item, device) for item in value)
+    if not isinstance(value, Tensor):
+        return value
+    if device.type == "mps" and value.dtype == torch.float64:
+        value = value.float()  # MPS has no float64.
+    return value.to(device)
+
+
+def _run_batched(
+    simulator: Callable, call_size: int, task: _Task, on_error: OnError
+) -> _TaskResult:
+    """Runs a batched simulator on the calls of a task; a failure fails its call."""
+    outputs = []
+    num_failed, first_failure = 0, None
+    for i, theta in enumerate(_split(task.theta, call_size)):
+        if task.call_seeds is not None:
+            seed_all_backends(task.call_seeds[i])
+        try:
+            output = _call(simulator, theta)
+        except Exception as error:
+            start = task.start + i * call_size
+            where = f"theta[{start}:{start + len(theta)}]"
+            hint = (
+                "It was called with a batch of parameter sets; if it takes one per "
+                "call, pass `simulator_is_batched=False`."
+            )
+            failure = _Failure(where, _failure_note(where, error, hint), error)
+            if on_error == "raise":
+                error.add_note(failure.note)
+                raise
+            output = [None] * len(theta)
+            num_failed += len(theta)
+            first_failure = first_failure or failure
         else:
-            simulation_batch_size = min(simulation_batch_size, num_simulations)
+            _check_num_outputs(output, len(theta))
+        outputs.append(output)
 
-        if num_workers != 1:
-            # For multiprocessing, we want to switch to numpy arrays.
-            # The batch size will be an approximation, since np.array_split does
-            # not take as argument the size of the batch but their total.
-            num_batches = num_simulations // simulation_batch_size
-            batches = np.array_split(theta.cpu().numpy(), num_batches, axis=0)
-            batch_seeds = np.random.randint(low=0, high=1_000_000, size=(len(batches),))
+    # Rows as one call per task would give them, so that tasks join alike.
+    output = outputs[0] if len(outputs) == 1 else _join(outputs)
+    return _TaskResult(output, num_failed, first_failure)
 
-            # define seeded simulator.
-            def simulator_seeded(theta: ndarray, seed: int) -> Tensor:
-                seed_all_backends(seed)
-                return simulator(theta)
 
-            try:  # catch TypeError to give more informative error message
-                simulation_outputs: list[Tensor] = [  # pyright: ignore
-                    xx
-                    for xx in tqdm(
-                        Parallel(return_as="generator", n_jobs=num_workers)(
-                            delayed(simulator_seeded)(batch, seed)
-                            for batch, seed in zip(batches, batch_seeds, strict=False)
-                        ),
-                        total=num_simulations,
-                        disable=not show_progress_bar,
-                    )
-                ]
-            except TypeError as err:
-                raise TypeError(
-                    "There is a TypeError error in your simulator function. Note: For"
-                    " multiprocessing, we switch to numpy arrays. Besides confirming"
-                    " your simulator works correctly, make sure to preprocess your"
-                    " simulator with `process_simulator` to handle numpy arrays."
-                ) from err
+def _run_rows(simulator: Callable, task: _Task, on_error: OnError) -> _TaskResult:
+    """Runs a simulator that is not batched on each parameter set of a task."""
+    outputs = []
+    num_failed, first_failure = 0, None
+    for i, theta in enumerate(task.theta):
+        if task.call_seeds is not None:
+            seed_all_backends(task.call_seeds[i])
+        try:
+            outputs.append(_call(simulator, theta))
+        except Exception as error:
+            where = f"theta[{task.start + i}] = {theta.tolist()}"
+            failure = _Failure(where, _failure_note(where, error), error)
+            if on_error == "raise":
+                error.add_note(failure.note)
+                raise
+            outputs.append(None)
+            num_failed += 1
+            first_failure = first_failure or failure
 
-        else:
-            simulation_outputs: list[Tensor] = []
-            batches = torch.split(theta, simulation_batch_size)
-            for batch in tqdm(batches, disable=not show_progress_bar):
-                simulation_outputs.append(simulator(batch))
+    return _TaskResult(outputs, num_failed, first_failure)
 
-        # Correctly format the output
-        x = torch.cat(simulation_outputs, dim=0)
-        theta = torch.as_tensor(theta, dtype=float32)
 
-    return theta, x
+def _call(simulator: Callable, theta: Array) -> Any:
+    output = simulator(theta)
+    if output is None:
+        raise ValueError("The simulator returned None. Does it miss a `return`?")
+    return _snapshot(output)
+
+
+def _snapshot(output: Any) -> Any:
+    """Copies tensors, arrays and plain lists or tuples that a simulator may reuse."""
+    if isinstance(output, Tensor):
+        return output.clone()
+    if isinstance(output, np.ndarray):
+        return output.copy()
+    if type(output) in (list, tuple):
+        return type(output)(_snapshot(item) for item in output)
+    return output
+
+
+def _run_in_worker(run: Callable, task: _Task) -> _TaskResult:
+    # Without this, worker results would not follow the caller's random state.
+    if task.worker_seed is not None:
+        seed_all_backends(task.worker_seed)
+    try:
+        result = run(task)
+    except Exception as error:
+        sendable = _sendable(error)
+        if sendable is error:
+            raise
+        raise sendable from None
+    if result.first_failure is not None:
+        failure = result.first_failure
+        result = result._replace(
+            first_failure=failure._replace(error=_sendable(failure.error))
+        )
+    return result
+
+
+def _check_backend(seed: Optional[int], num_workers: int) -> bool:
+    """Returns whether joblib runs tasks in several threads of this process at once.
+
+    Raises if joblib's backend cannot stream results, or if threads would share one
+    random state for a seeded run.
+    """
+    if num_workers == 1:
+        return False
+    backend, _ = get_active_backend()
+    parallel = backend.effective_n_jobs(num_workers) > 1
+    if parallel and not getattr(backend, "supports_return_generator", True):
+        raise ValueError(
+            f"joblib's {type(backend).__name__} cannot return results as they "
+            "finish. Use joblib's default backend."
+        )
+    runs_threads = parallel and getattr(backend, "uses_threads", False)
+    if seed is not None and runs_threads:
+        raise ValueError(
+            "`seed` needs process workers, but joblib is set to use threads, which "
+            "share one random state. Use joblib's default backend, or pass no seed."
+        )
+    return runs_threads
+
+
+def _sendable(error: Exception) -> Exception:
+    """Returns `error`, or a RuntimeError with its message if it cannot be unpickled.
+
+    An exception that fails to unpickle in the main process breaks joblib's pool,
+    which loses the results of all simulations.
+    """
+    try:
+        pickle.loads(pickle.dumps(error))
+        return error
+    except Exception:
+        sendable = RuntimeError(f"{type(error).__name__}: {error}")
+        for note in getattr(error, "__notes__", []):
+            sendable.add_note(note)
+        return sendable
+
+
+def _report_failures(
+    first_failure: _Failure, num_failed: int, num_simulations: int
+) -> None:
+    error = first_failure.error
+    if num_failed == num_simulations:
+        error.add_note(
+            f"{first_failure.note} All {num_simulations} simulations failed."
+        )
+        raise error
+    warnings.warn(
+        f"{num_failed} of {num_simulations} simulations failed; their outputs are "
+        "NaN, or None for outputs that are not numeric. First failure at "
+        f"{first_failure.where}: {type(error).__name__}: {error}",
+        UserWarning,
+        stacklevel=4,
+    )
+
+
+def _failure_note(where: str, error: Exception, hint: str = "") -> str:
+    note = f"The simulator failed for {where}."
+    if isinstance(error, AttributeError) and "'Tensor' object" in str(error):
+        note += " It receives tensors; convert them with `np.asarray(theta.cpu())`."
+    return f"{note} {hint}".rstrip()
+
+
+def _is_int(value: Any) -> bool:
+    return isinstance(value, (int, np.integer)) and not isinstance(value, bool)
+
+
+def _check_num_outputs(output: Any, num_parameter_sets: int) -> None:
+    num_outputs = None  # One output without a batch dimension.
+    if isinstance(output, (Tensor, np.ndarray)) and output.ndim > 0:
+        num_outputs = output.shape[0]
+    elif isinstance(output, (list, tuple)):
+        num_outputs = len(output)
+    if num_outputs != num_parameter_sets:
+        got = (
+            "a single output without a batch dimension"
+            if num_outputs is None
+            else f"{num_outputs} output{'' if num_outputs == 1 else 's'}"
+        )
+        plural = "" if num_parameter_sets == 1 else "s"
+        sets = f"a batch of {num_parameter_sets} parameter set{plural}"
+        raise ValueError(
+            f"The simulator returned {got} for {sets}. If it takes one parameter "
+            "set per call, pass `simulator_is_batched=False`."
+        )
+
+
+def _split(theta: Array, batch_size: int) -> List[Array]:
+    if isinstance(theta, Tensor):
+        return list(theta.split(batch_size))
+    return [theta[i : i + batch_size] for i in range(0, len(theta), batch_size)]
+
+
+def _seed_after_call(seed: int) -> None:
+    """Seeds the global random state with a seed derived from `seed`.
+
+    A child sequence of `seed` keeps later draws from repeating the parameters or
+    the noise of the seeded call.
+    """
+    child = np.random.SeedSequence(seed).spawn(1)[0]
+    seed_all_backends(int(child.generate_state(1)[0]))
+
+
+def _distinct_seeds(num_seeds: int, seed: Optional[int]) -> np.ndarray:
+    """Returns distinct seeds derived from `seed`.
+
+    Distinct seeds keep batches or simulations from repeating each other's noise.
+    With `seed=None`, the seeds follow the global numpy random state.
+    """
+    if seed is None:
+        seed = np.random.randint(2**31)
+    # `np.random.seed` accepts seeds below 2**32.
+    return np.random.default_rng(seed).choice(2**32, size=num_seeds, replace=False)
+
+
+def _is_numeric(output: Any) -> bool:
+    if isinstance(output, Tensor):
+        return True
+    try:
+        return np.asarray(output).dtype.kind in "biufc"
+    except (TypeError, ValueError):  # Ragged lists, or tensors without a numpy dtype.
+        return False
+
+
+def _join(outputs: List[Any]) -> Any:
+    """Concatenates outputs along the first dimension, or else lists their rows."""
+    try:
+        if all(isinstance(output, Tensor) for output in outputs):
+            return torch.cat(outputs)
+        if all(isinstance(output, np.ndarray) for output in outputs):
+            return np.concatenate(outputs)
+    except (RuntimeError, ValueError):  # Outputs of different shapes.
+        pass
+    return [row for output in outputs for row in output]
+
+
+def _concatenate(outputs: List[Any], fill_failed: bool) -> SimulationOutput:
+    """Concatenates per-task outputs along the first dimension.
+
+    With `fill_failed`, failed outputs (None) become NaN if the others are numeric.
+    Other outputs, e.g. paths, are returned as a list.
+    """
+    rows = _join(outputs)
+    if not isinstance(rows, list):
+        return rows
+    if all(row is None or _is_tensor_list(row) for row in rows):
+        with suppress(RuntimeError):  # Items of different shapes stay lists.
+            rows = [None if row is None else torch.stack(list(row)) for row in rows]
+    if fill_failed:
+        rows = _fill_failed(rows)
+    if isinstance(rows[0], Tensor):
+        try:
+            return torch.stack(rows)
+        except (RuntimeError, TypeError):  # Different shapes, or not all tensors.
+            return rows
+    if all(_is_numeric(row) for row in rows):
+        try:
+            return np.asarray(rows)
+        except (TypeError, ValueError):  # Different shapes, or no numpy dtype.
+            return rows
+    return rows
+
+
+def _is_tensor_list(row: Any) -> bool:
+    return (
+        type(row) in (list, tuple)
+        and len(row) > 0
+        and all(isinstance(item, Tensor) for item in row)
+    )
+
+
+def _fill_failed(rows: List[Any]) -> List[Any]:
+    """Replaces failed outputs (None) with NaN if the other outputs are numeric."""
+    template = next((row for row in rows if row is not None), None)
+    if isinstance(template, Tensor):
+        floating = template.is_floating_point() or template.is_complex()
+        mps = template.device.type == "mps"  # MPS has no float64.
+        dtype = template.dtype if floating else (float32 if mps else torch.float64)
+        nan = torch.full_like(template, float("nan"), dtype=dtype)
+        return [nan if row is None else row.to(dtype) for row in rows]
+    if template is None or not _is_numeric(template):
+        return rows
+    dtype = np.asarray(template).dtype
+    nan_dtype = dtype if dtype.kind in "fc" else np.float64  # Integers stay exact.
+    nan = np.full(np.shape(template), np.nan, dtype=nan_dtype)
+    return [nan if row is None else row for row in rows]
