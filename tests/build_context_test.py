@@ -10,7 +10,7 @@ Covers ``ZScoreConfig``, ``ZScoreStats``, ``BuildContext``,
 import pytest
 import torch
 
-from sbi.neural_nets.build_context import (
+from sbi.neural_nets._build_context import (
     BuildContext,
     ZScoreConfig,
     ZScoreStats,

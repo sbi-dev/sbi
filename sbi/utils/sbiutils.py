@@ -550,6 +550,36 @@ def standardizing_net(
     return Standardize(t_mean, t_std)
 
 
+def build_z_scored_embedding_net(
+    batch: Tensor,
+    z_score: Optional[str] = "independent",
+    embedding_net: nn.Module = nn.Identity(),
+) -> nn.Module:
+    """Prepends a z-scoring layer to an embedding net if z-scoring is requested.
+
+    Args:
+        batch: Batch of inputs to the embedding net, used to compute the z-score
+            statistics.
+        z_score: Whether to z-score the inputs, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        embedding_net: Embedding net that receives the (z-scored) inputs.
+
+    Returns:
+        `nn.Sequential(standardizing_net, embedding_net)` if z-scoring is requested,
+        otherwise `embedding_net` itself.
+    """
+    z_score_bool, structured = z_score_parser(z_score)
+    if z_score_bool:
+        embedding_net = nn.Sequential(
+            standardizing_net(batch, structured), embedding_net
+        )
+    return embedding_net
+
+
 def handle_invalid_x(
     x: Tensor, exclude_invalid_x: bool = True
 ) -> Tuple[Tensor, int, int]:

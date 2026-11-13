@@ -17,10 +17,9 @@ from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import (
+    build_z_scored_embedding_net,
     get_simulations_since_round,
     handle_invalid_x,
-    standardizing_net,
-    z_score_parser,
 )
 from sbi.utils.torchutils import (
     ensure_theta_batched,
@@ -57,15 +56,7 @@ def build_input_layer(
     Returns:
         Input layer with optional embedding net and z-scoring.
     """
-    z_score_theta_bool, structured_theta = z_score_parser(z_score_theta)
-    if z_score_theta_bool:
-        input_layer = nn.Sequential(
-            standardizing_net(batch_theta, structured_theta), embedding_net_theta
-        )
-    else:
-        input_layer = embedding_net_theta
-
-    return input_layer
+    return build_z_scored_embedding_net(batch_theta, z_score_theta, embedding_net_theta)
 
 
 class RestrictionEstimator:

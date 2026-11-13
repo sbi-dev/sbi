@@ -439,6 +439,43 @@ def test_kde_cv_bandwidth_falls_back_for_concentrated_weights():
     assert kde.kde.bandwidth == get_kde(samples, "cv").kde.bandwidth
 
 
+@pytest.mark.parametrize("z_score", (None, "none", "independent", "structured"))
+def test_build_z_scored_embedding_net(z_score):
+    """Prepends a z-scoring layer only when asked, and never copies the net."""
+    from sbi.utils.sbiutils import build_z_scored_embedding_net, standardizing_net
+
+    batch = 3.0 + 2.0 * torch.randn(50, 4)
+    embedding_net = torch.nn.Linear(4, 2)
+
+    net = build_z_scored_embedding_net(batch, z_score, embedding_net)
+
+    if z_score in (None, "none"):
+        assert net is embedding_net
+    else:
+        assert isinstance(net, torch.nn.Sequential)
+        assert net[1] is embedding_net
+        expected = standardizing_net(batch, structured_dims=z_score == "structured")
+        torch.testing.assert_close(net[0](batch), expected(batch))
+
+
+def test_z_scored_embedding_net_old_import_paths():
+    """The classifier and restriction-estimator names keep working."""
+    from sbi.neural_nets.net_builders.classifier import (
+        build_z_scored_embedding_net as classifier_helper,
+    )
+    from sbi.utils.restriction_estimator import build_input_layer
+    from sbi.utils.sbiutils import build_z_scored_embedding_net
+
+    assert classifier_helper is build_z_scored_embedding_net
+    embedding_net = torch.nn.Identity()
+    net = build_input_layer(
+        batch_theta=torch.randn(20, 3),
+        z_score_theta="none",
+        embedding_net_theta=embedding_net,
+    )
+    assert net is embedding_net
+
+
 @pytest.mark.parametrize(
     "z_x",
     [
