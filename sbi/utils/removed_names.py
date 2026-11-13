@@ -60,6 +60,34 @@ REMOVED_MODULES = {
     "sbi.utils.posterior_ensemble": "from sbi.inference import EnsemblePosterior",
 }
 
+# Removed names and modules of the sequential methods. Only the name is gone: the
+# trainer they map to runs the same multi-round inference.
+SEQUENTIAL = {
+    **{
+        old: RENAMED_METHODS[old]
+        for old in (
+            *("SNL", "SNLE", "SNLE_A", "SNPE", "SNPE_A", "SNPE_B", "SNPE_C", "APT"),
+            *("SRE", "SNRE", "SNRE_A", "SNRE_B", "SNRE_C"),
+        )
+    },
+    "sbi.inference.snpe": "NPE",
+    "sbi.inference.snle": "NLE",
+    "sbi.inference.snre": "NRE",
+}
+
+MULTIROUND_GUIDE = (
+    "https://sbi.readthedocs.io/en/latest/how_to_guide/02_multiround_inference.html"
+)
+
+
+def _sequential_note(removed: str) -> str:
+    if removed not in SEQUENTIAL:
+        return ""
+    return (
+        f" Sequential (multi-round) inference still works: run `{SEQUENTIAL[removed]}` "
+        f"over several rounds, see {MULTIROUND_GUIDE}"
+    )
+
 
 def removed_names_getattr(module_name: str) -> Callable[[str], NoReturn]:
     """Returns a module `__getattr__` that names the replacement of a removed name.
@@ -75,7 +103,8 @@ def removed_names_getattr(module_name: str) -> Callable[[str], NoReturn]:
     def __getattr__(name: str) -> NoReturn:
         if name in REMOVED_NAMES:
             raise ImportError(
-                f"`{name}` was removed from sbi. Use `{REMOVED_NAMES[name]}` instead."
+                f"The name `{name}` was removed from sbi. "
+                f"Use `{REMOVED_NAMES[name]}` instead.{_sequential_note(name)}"
             )
         raise AttributeError(f"module {module_name!r} has no attribute {name!r}")
 
@@ -89,6 +118,7 @@ def raise_removed_module(module_name: str) -> NoReturn:
     that error with a bare "cannot import name".
     """
     raise ImportError(
-        f"`{module_name}` was removed from sbi. "
+        f"The module `{module_name}` was removed from sbi. "
         f"Use `{REMOVED_MODULES[module_name]}` instead."
+        f"{_sequential_note(module_name)}"
     )

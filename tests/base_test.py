@@ -139,6 +139,26 @@ def test_removed_modules_name_their_replacement(module, replacement):
             exec(statement, {})
 
 
+@pytest.mark.parametrize(
+    ("statement", "note"),
+    (
+        ("from sbi.inference import SNPE", "run `NPE` over several rounds"),
+        ("from sbi.inference import SNRE_A", "run `NRE_A` over several rounds"),
+        ("import sbi.inference.snle", "run `NLE` over several rounds"),
+        ("from sbi.inference import ABC", None),
+    ),
+)
+def test_sequential_names_point_to_multiround_inference(statement, note):
+    """Only the old name is gone: the error must not read as if the method were."""
+    with pytest.raises(ImportError) as error:
+        exec(statement, {})
+    if note is None:
+        assert "several rounds" not in str(error.value)
+    else:
+        assert note in str(error.value)
+        assert "02_multiround_inference.html" in str(error.value)
+
+
 def test_unknown_names_still_raise_attribute_error():
     """Only removed names raise `ImportError`, so `hasattr()` keeps working."""
     assert not hasattr(sbi.inference, "not_an_sbi_name")
