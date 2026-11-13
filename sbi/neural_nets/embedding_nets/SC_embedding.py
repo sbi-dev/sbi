@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-# This code is based on on the following three papers:
+# This code is based on the following three papers:
 
 # Lingsch et al. (2024) FUSE: Fast Unified Simulation and Estimation for PDEs
 # (https://proceedings.neurips.cc/paper_files/paper/2024/file/266c0f191b04cbbbe529016d0edc847e-Paper-Conference.pdf)
@@ -192,7 +192,7 @@ class SpectralConv1d_SMM(nn.Module):
             Transformed output tensor of shape (batch, 2*modes, out_channels).
         """
 
-        # Compute Fourier coeffcients
+        # Compute Fourier coefficients
         x_ft = transform.forward(x.to(torch.complex64), norm='forward')
         x_ft = x_ft.permute(0, 2, 1)
         x_ft = self.compl_mul1d(x_ft, self.weights1)  # (batch, conv_channels, modes)
@@ -242,7 +242,7 @@ class SpectralConvEmbedding(nn.Module):
         # input channels to number of convolutional channels
         self.fc0 = nn.Linear(self.in_channels, self.conv_channels)
 
-        # Inititalize layers performing convolution in Fourier space
+        # Initialize layers performing convolution in Fourier space
         self.conv_layers = nn.ModuleList([
             SpectralConv1d_SMM(self.conv_channels, self.conv_channels, self.modes)
             for _ in range(self.num_layers)

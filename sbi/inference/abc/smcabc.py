@@ -194,7 +194,7 @@ class SMCABC(ABCBASE):
             kde (if kde True): KDE object fitted on accepted parameters, from which one
                 can .sample() and .log_prob().
             summary (if return_summary True): dictionary containing the accepted
-                paramters (if kde True), distances and simulated data x of all
+                parameters (if kde True), distances and simulated data x of all
                 populations, and under `final_particles` and `final_weights` the
                 returned parameters (after LRA, if used) and their log weights.
 
@@ -244,7 +244,7 @@ class SMCABC(ABCBASE):
                 lra,
                 sass_expansion_degree,
             )
-            # Udpate simulator and xo
+            # Update simulator and xo
             x_o = sass_transform(self.x_o)
 
             def sass_simulator(theta):
@@ -587,12 +587,12 @@ class SMCABC(ABCBASE):
         old_particles: Tensor,
         old_log_weights: Tensor,
     ) -> Tensor:
-        """Return new log weights following formulas in publications A,B anc C."""
+        """Return new log weights following formulas in publications A,B and C."""
 
         # Prior can be batched across new particles.
         prior_log_probs = self.prior.log_prob(new_particles)
 
-        # Contstruct function to get kernel log prob for given old particle.
+        # Construct function to get kernel log prob for given old particle.
         # The kernel is centered on each old particle as in all three variants (A,B,C).
         def kernel_log_prob(new_particle):
             return self._get_new_kernel(old_particles).log_prob(new_particle)
@@ -691,7 +691,7 @@ class SMCABC(ABCBASE):
             raise ValueError(f"Kernel, '{self.kernel}' not supported.")
 
     def _get_new_kernel(self, thetas: Tensor) -> Distribution:
-        """Return new kernel distribution for a given set of paramters."""
+        """Return new kernel distribution for a given set of parameters."""
 
         if self.kernel == "gaussian":
             assert self.kernel_variance is not None, "get kernel variance first."
@@ -752,7 +752,7 @@ class SMCABC(ABCBASE):
     ) -> Callable:
         """Return transform for semi-automatic summary statistics.
 
-        Runs an single round of rejection abc with fixed budget and accepts
+        Runs a single round of rejection abc with fixed budget and accepts
         num_particles simulations to run the regression for sass.
 
         Sets self.x_o once the x_shape can be derived from simulations.

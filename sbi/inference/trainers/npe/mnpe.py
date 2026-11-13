@@ -54,7 +54,7 @@ class MNPE(NPE_C):
         discrete_theta = torch.randint(low=0, high=2, size=(100, dim_theta_discrete))
         continuous_theta = torch.randn((num_sims, dim_theta_discrete))
 
-        # Important: the theta must have all continuous paramters first, and
+        # Important: the theta must have all continuous parameters first, and
         # discrete parameters after this.
         theta = torch.cat([continuous_theta, discrete_theta], dim=1)
         x = torch.randn((num_sims, dim_x))

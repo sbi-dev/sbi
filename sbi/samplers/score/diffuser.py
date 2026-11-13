@@ -130,7 +130,7 @@ class Diffuser:
         Args:
             num_samples: Number of samples to draw.
             ts: Time grid to propagate samples forward, or "solve" the SDE.
-            show_progress_bars: Whehter to show progressbar. Defaults to True.
+            show_progress_bars: Whether to show progressbar. Defaults to True.
             save_intermediate: Whether to return samples at all time point, instead of
                 only returning samples at the end. Defaults to False.
 

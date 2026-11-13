@@ -32,7 +32,7 @@ class ZukoFlow(ConditionalDensityEstimator):
 
         Args:
             flow: Flow object.
-            input_shape: Event shape of the input at which the coniditional
+            input_shape: Event shape of the input at which the conditional
                 density is being evaluated (and which is also the event_shape
                 of samples).
             condition_shape: Event shape of the condition.

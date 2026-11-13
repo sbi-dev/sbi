@@ -35,7 +35,7 @@ class FCEmbedding(nn.Module):
             activation(),
         ]
         # first and last layer is defined by the input and output dimension.
-        # therefor the "number of hidden layeres" is num_layers-2
+        # therefore the "number of hidden layers" is num_layers-2
         for _ in range(num_layers - 2):
             layers.append(nn.Linear(num_hiddens, num_hiddens))
             layers.append(layer_norm(num_hiddens))

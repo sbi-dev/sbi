@@ -92,9 +92,9 @@ class ABCBASE:
         expansion_degree: int = 1,
         sample_weight: Optional[Tensor] = None,
     ) -> Callable[[Tensor], Tensor]:
-        """Return semi-automatic summary statitics function.
+        """Return semi-automatic summary statistics function.
 
-        Running weighted linear regressin as in
+        Running weighted linear regression as in
         Fearnhead & Prandle 2012: https://arxiv.org/abs/1004.1112
 
         Following implementation in

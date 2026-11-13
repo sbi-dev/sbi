@@ -129,7 +129,7 @@ class MCABC(ABCBASE):
             theta (if kde False): accepted parameters
             kde (if kde True): KDE object based on accepted parameters from which one
                 can .sample() and .log_prob().
-            summary (if summary True): dictionary containing the accepted paramters (if
+            summary (if summary True): dictionary containing the accepted parameters (if
                 kde True), distances and simulated data x.
 
         Examples:

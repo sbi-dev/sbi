@@ -212,7 +212,7 @@ def calc_misspecification_logprob(
 
     Args:
         x_val: array-like, known samples to compute baseline logprobs
-        x_o: array-like, the test sample or the obervation
+        x_o: array-like, the test sample or the observation
         estimator: marginal distribution estimator
         alpha: significance level (default 0.05)
 

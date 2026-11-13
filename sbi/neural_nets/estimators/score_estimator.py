@@ -193,7 +193,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         mean = self.approx_marginal_mean(time)
         std = self.approx_marginal_std(time)
 
-        # As input to the neural net we want to have something that changes proportianl
+        # As input to the neural net we want to have something that changes proportional
         # to how the scores change
         time_enc = self.std_fn(time)
 
@@ -215,7 +215,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_pred = score_pred.reshape(*batch_shape, *score_pred.shape[1:])
 
         # Output pre-conditioned score
-        # The learnable part will be largly scaled at the beginning of the diffusion
+        # The learnable part will be largely scaled at the beginning of the diffusion
         # and the gaussian part (where it should end up) will dominate at the end of
         # the diffusion.
         scale = self.mean_t_fn(time) / self.std_fn(time)

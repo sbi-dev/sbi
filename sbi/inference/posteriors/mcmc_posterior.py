@@ -522,7 +522,7 @@ class MCMCPosterior(NeuralPosterior):
                 [`proposal`|`sir`|`resample`|`latest_sample`].
             kwargs: Passed on to init function. This way, init specific keywords can
                 be set through `mcmc_parameters`. Unused arguments will be absorbed by
-                the intitialization method.
+                the initialization method.
 
         Returns: Initialization function.
         """
@@ -593,7 +593,7 @@ class MCMCPosterior(NeuralPosterior):
             init_strategy: Specifies the initialization method. Either of
                 [`proposal`|`sir`|`resample`|`latest_sample`].
             num_chains: number of MCMC chains, generates initial params for each
-            num_workers: number of CPU cores for parallization
+            num_workers: number of CPU cores for parallelization
             show_progress_bars: whether to show progress bars for SIR init
             kwargs: Passed on to `_build_mcmc_init_fn`.
 
@@ -668,7 +668,7 @@ class MCMCPosterior(NeuralPosterior):
                 [`proposal`|`sir`|`resample`|`latest_sample`].
             num_chains_per_x: number of MCMC chains for each x, generates initial params
                 for each x
-            num_workers: number of CPU cores for parallization
+            num_workers: number of CPU cores for parallelization
             show_progress_bars: whether to show progress bars for SIR init
             kwargs: Passed on to `_build_mcmc_init_fn`.
 
@@ -751,7 +751,7 @@ class MCMCPosterior(NeuralPosterior):
             interchangeable_chains: Whether chains are interchangeable, i.e., whether
                 we can mix samples between chains.
             num_workers: Number of CPU cores to use.
-            init_width: Inital width of brackets.
+            init_width: Initial width of brackets.
             show_progress_bars: Whether to show a progressbar during sampling;
                 can only be turned off for vectorized sampler.
             num_xos: Number of observations. Chains and samples are split evenly

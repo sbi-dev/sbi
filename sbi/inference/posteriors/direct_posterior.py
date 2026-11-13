@@ -402,7 +402,7 @@ class DirectPosterior(NeuralPosterior):
         x = x.to(self._device)
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
-        # overwise, the leading is sample.
+        # otherwise, the leading is sample.
         num_leading = len(theta.shape) - len(event_shape)
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, event_shape, leading_is_sample=(num_leading > 1)

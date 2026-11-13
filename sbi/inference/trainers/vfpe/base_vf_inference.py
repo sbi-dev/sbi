@@ -236,7 +236,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         matching methods (FMPE).
 
         The denoising score matching loss has a high
-        variance, which makes it more difficult to detect converegence. To reduce this
+        variance, which makes it more difficult to detect convergence. To reduce this
         variance, we evaluate the validation loss at a fixed set of times. We also use
         the exponential moving average of the training and validation losses, as opposed
         to the other `trainer` classes, which track the loss directly.
@@ -616,7 +616,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         ema_loss_decay = summarization_kwargs.get("ema_loss_decay")
         assert ema_loss_decay is not None and isinstance(ema_loss_decay, float)
 
-        # NOTE: Due to the inherently noisy nature we do instead log a exponential
+        # NOTE: Due to the inherently noisy nature we do instead log an exponential
         # moving average of the training loss.
         if len(self._summary["training_loss"]) == 0:
             train_loss_ema = train_loss

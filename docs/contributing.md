@@ -177,7 +177,7 @@ git merge upstream/main
 All our docstrings and comments are written following the [Google
 Style](http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
 
-For code linting and formating, we use [`ruff`](https://docs.astral.sh/ruff/),
+For code linting and formatting, we use [`ruff`](https://docs.astral.sh/ruff/),
 which is installed alongside `sbi`.
 
 You can exclude slow tests and those which require a GPU with

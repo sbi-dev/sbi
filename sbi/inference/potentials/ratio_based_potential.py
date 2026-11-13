@@ -147,7 +147,7 @@ def _log_ratios_over_trials(
     r"""Return log ratios summed over iid trials of `x`.
 
     Note: `x` can be a batch with batch size larger 1. Batches in x are assumed to
-    be iid trials, i.e., data generated based on the same paramters / experimental
+    be iid trials, i.e., data generated based on the same parameters / experimental
     conditions.
 
     Repeats `x` and $\theta$ to cover all their combinations of batch entries.
