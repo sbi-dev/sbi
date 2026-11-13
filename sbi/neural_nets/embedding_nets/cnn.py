@@ -118,12 +118,12 @@ class CNNEmbedding(nn.Module):
             in_channels: Number of image channels, default 1.
             out_channels_per_layer: Number of out convolutional out_channels for each
                 layer. Must match the number of layers passed below.
-            num_cnn_layers: Number of convolutional layers.
+            num_conv_layers: Number of convolutional layers.
             num_linear_layers: Number fully connected layer.
             num_linear_units: Number of hidden units in fully-connected layers.
             output_dim: Number of output units of the final layer.
             kernel_size: Kernel size for both convolutional layers.
-            pool_size: pool size for MaxPool1d operation after the convolutional
+            pool_kernel_size: pool size for MaxPool1d operation after the convolutional
                 layers.
         """
         super(CNNEmbedding, self).__init__()

@@ -107,9 +107,8 @@ def psis_diagnostics(
     NOTE: In our experience this metric does distinguish "very bad" from "ok", but
     becomes less sensitive to distinguish "ok" from "good".
     Args:
-        potential_function: Potential function of target.
-        q: Variational distribution, should be proportional to the potential_function
-        proposal: Proposal for samples. Typically this is q.
+        potential_fn: Potential function of target.
+        q: Variational distribution, should be proportional to the potential_fn
         N: Number of samples involved in the test.
     Returns:
         float: Quality metric

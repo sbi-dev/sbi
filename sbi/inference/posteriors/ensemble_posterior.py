@@ -519,7 +519,7 @@ class EnsemblePotential(BasePotential):
         Args:
             potential_fns: List of the potential_fns from each posterior component.
             weights: Weights of each posterior distribution.
-            priors: List of prior distributions.
+            prior: Prior distribution.
             x_o: Used as conditioning context for `potential_fn`.
             device: Device which the component distributions sit on.
         """

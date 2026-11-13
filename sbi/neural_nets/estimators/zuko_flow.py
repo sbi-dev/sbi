@@ -31,7 +31,7 @@ class ZukoFlow(ConditionalDensityEstimator):
         r"""Initialize the conditional density estimator.
 
         Args:
-            flow: Flow object.
+            net: Flow object.
             input_shape: Event shape of the input at which the coniditional
                 density is being evaluated (and which is also the event_shape
                 of samples).
@@ -190,7 +190,7 @@ class ZukoUnconditionalFlow(UnconditionalDensityEstimator):
         r"""Initialize the density estimator.
 
         Args:
-            flow: Flow object.
+            net: Flow object.
             input_shape: Event shape of the input at which the density is being
                 evaluated (and which is also the event_shape of samples).
         """

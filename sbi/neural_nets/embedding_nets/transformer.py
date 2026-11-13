@@ -719,7 +719,7 @@ class TransformerEmbedding(nn.Module):
         import torch
 
         x = torch.randn(16, 100)       # (batch, seq_len)
-        emb = TransformerEmbedding(feature_space_dim=64)
+        emb = TransformerEmbedding(feature_space_dim=48)
         z = emb(x)
 
     **Image input (ViT-style)**::
@@ -733,7 +733,7 @@ class TransformerEmbedding(nn.Module):
             image_size=64,
             patch_size=8,
             num_channels=3,
-            feature_space_dim=128,
+            feature_space_dim=96,
         )
         z = emb(x)
     """
@@ -931,8 +931,6 @@ class TransformerEmbedding(nn.Module):
                 or `(batch, num_channels, height, width)` if using ViT
             attention_mask:
                 attention mask of size `(batch_size, sequence_length)`
-            output_attentions:
-                Whether or not to return the attention tensors
             cache_attention_mask:
                 Whether or not to cache the expanded attention mask, useful if using
                 multiple batched with identical input shapes

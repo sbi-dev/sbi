@@ -2315,7 +2315,7 @@ def marginal_plot_with_probs_intensity(
         n_bins: number of bins for the histogram, defaults to 20.
         vmin: minimum value for the color intensity, defaults to 0.
         vmax: maximum value for the color intensity, defaults to 1.
-        cmap: colormap for the color intensity, defaults to "Spectral_r".
+        cmap_name: colormap for the color intensity, defaults to "Spectral_r".
         show_colorbar: whether to show the colorbar, defaults to True.
         label: label for the colorbar, defaults to None.
         ax (matplotlib.axes.Axes): axes to plot on, defaults to None.
