@@ -1152,8 +1152,9 @@ def train_lc2st(
     data = np.concatenate((joint_p, joint_q))
 
     # labels - use float32 for skorch NeuralNetBinaryClassifier (BCEWithLogitsLoss),
-    # int64 for sklearn classifiers
-    is_skorch = isinstance(clf, NeuralNetBinaryClassifier)
+    # int64 for sklearn classifiers. An ensemble keeps its base classifier in `clf`.
+    base_clf = clf.clf if isinstance(clf, EnsembleClassifier) else clf
+    is_skorch = isinstance(base_clf, NeuralNetBinaryClassifier)
     label_dtype = np.float32 if is_skorch else np.int64
     target = np.concatenate((
         np.zeros((joint_p.shape[0],), dtype=label_dtype),
