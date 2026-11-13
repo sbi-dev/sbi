@@ -1351,8 +1351,17 @@ def gradient_ascent(
     return argmax_, max_val  # type: ignore
 
 
-def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
-    """Sets all python, numpy and pytorch seeds."""
+def seed_random_states(seed: Optional[Union[int, Tensor]] = None) -> None:
+    """Sets all python, numpy and pytorch seeds.
+
+    The cuDNN flags are left untouched, see `seed_all_backends` for the variant that
+    also requests deterministic algorithms.
+
+    Args:
+        seed: Seed for the random states. If None, a seed is drawn from PyTorch's
+            random state, so an upstream `torch.manual_seed` keeps the call
+            reproducible.
+    """
 
     # Cast Tensor to int (required by math.random since Python 3.11)
     seed = int(torch.randint(1000000, size=(1,))) if seed is None else int(seed)
@@ -1361,5 +1370,20 @@ def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
+
+
+def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
+    """Sets all python, numpy and pytorch seeds, and turns on deterministic cuDNN.
+
+    The two cuDNN flags are process global and can slow down later training of
+    convolutional networks. Simulation helpers therefore call `seed_random_states`.
+    Use this function when bit-reproducible convolutions matter more than that.
+
+    Args:
+        seed: Seed for the random states. If None, a seed is drawn from PyTorch's
+            random state.
+    """
+    seed_random_states(seed)
+
     torch.backends.cudnn.deterministic = True  # type: ignore
     torch.backends.cudnn.benchmark = False  # type: ignore
