@@ -22,6 +22,7 @@ from sbi.utils.diagnostics_utils import (
     remove_nans_and_infs_in_x,
 )
 from sbi.utils.metrics import l2
+from sbi.utils.sbiutils import handle_invalid_x
 
 
 def run_tarp(
@@ -48,6 +49,11 @@ def run_tarp(
         thetas: ground-truth parameters for tarp, simulated from the prior.
         xs: observed data for tarp, simulated from thetas.
         posterior: a posterior obtained from sbi.
+        references: reference points used for the coverage regions, with shape
+            ``thetas.shape``, or ``None``. Rows where ``xs`` is NaN or Inf are
+            dropped from ``references`` alongside ``thetas`` and ``xs``. If ``None``,
+            reference points are drawn uniformly from the parameter space spanned
+            by ``thetas``.
         num_posterior_samples: number of approximate posterior samples used for ranking.
         num_workers: number of CPU cores to use for running inference in parallel.
         show_progress_bar: whether to display a progress over sbc runs.
@@ -69,6 +75,15 @@ def run_tarp(
         alpha: credibility values, ``num_bins + 1`` points evenly spaced over
             ``[0, 1]``, see equation 2 of the paper
     """
+
+    if references is not None:
+        assert references.shape == thetas.shape, (
+            "references must have the same shape as thetas"
+        )
+        # Drop the same rows that are dropped from thetas and xs below, so that
+        # each reference stays paired with its theta.
+        is_valid_x, _, _ = handle_invalid_x(xs, exclude_invalid_x=True)
+        references = references[is_valid_x]
 
     thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
 
