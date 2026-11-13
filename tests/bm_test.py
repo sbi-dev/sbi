@@ -12,6 +12,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.trainers.npe import NPE_C
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C
 from sbi.neural_nets import DensityConfigBase, FlowMatchingConfig, MixedConfig
+from sbi.neural_nets.embedding_nets import FCEmbedding
 from sbi.neural_nets.net_builders.estimator_configs import (
     _CLASSIFIER_CONFIGS,
     _DENSITY_CONFIGS,
@@ -94,6 +95,22 @@ ESTIMATOR_CONFIGS = {
 }
 
 
+# Embedding nets for x, by their `--bm-embedding` name.
+EMBEDDING_NETS = {"fc": lambda task: FCEmbedding(input_dim=task.x_dim())}
+
+
+def _benchmark_embedding(config, mode: str) -> str | None:
+    """Return and validate the embedding net name, or None without one."""
+    name = config.getoption("--bm-embedding")
+    if name is not None and mode != "npe":
+        raise pytest.UsageError("--bm-embedding requires --bm-mode npe.")
+    if name is not None and name not in EMBEDDING_NETS:
+        raise pytest.UsageError(
+            f"Unknown embedding '{name}'. Supported: {', '.join(EMBEDDING_NETS)}."
+        )
+    return name
+
+
 def _benchmark_mode(config) -> str:
     """Return and validate the selected benchmark mode."""
     mode = config.getoption("--bm-mode")
@@ -154,7 +171,9 @@ def _kwargs_id(parameters: dict) -> str:
     return "-".join(str(value) for value in parameters.values()) or "default"
 
 
-def _estimator_kwargs(inference_class, parameters: dict) -> dict:
+def _estimator_kwargs(
+    inference_class, parameters: dict, embedding_fields: dict | None = None
+) -> dict:
     """Replace estimator names with sbi's per-model configs.
 
     The method settings keep plain names, which give the test ids and the rows of
@@ -170,7 +189,9 @@ def _estimator_kwargs(inference_class, parameters: dict) -> dict:
                 else MixedConfig(continuous=_DENSITY_CONFIGS[name]())
             )
         else:
-            kwargs["density_estimator"] = _DENSITY_CONFIGS[name]()
+            kwargs["density_estimator"] = _DENSITY_CONFIGS[name](
+                **(embedding_fields or {})
+            )
     if "classifier" in kwargs:
         kwargs["classifier"] = _CLASSIFIER_CONFIGS[kwargs["classifier"]]()
     if "vf_estimator" in kwargs:
@@ -204,6 +225,7 @@ def pytest_generate_tests(metafunc):
         return
 
     mode = _benchmark_mode(metafunc.config)
+    _benchmark_embedding(metafunc.config, mode)
     if "inference_class" in metafunc.fixturenames:
         classes = METHOD_GROUPS[mode]
         metafunc.parametrize(
@@ -307,6 +329,7 @@ def train_and_eval_amortized_inference(
     benchmark_num_simulations: int,
     extra_kwargs: dict,
     seed: int,
+    embedding_name: str | None = None,
 ) -> dict[str, float]:
     """
     Performs amortized inference evaluation.
@@ -317,6 +340,7 @@ def train_and_eval_amortized_inference(
         benchmark_num_simulations: The number of training simulations.
         extra_kwargs: Additional keyword arguments for the method.
         seed: The training seed.
+        embedding_name: Name of the embedding net for x, see `--bm-embedding`.
 
     Returns:
         The metrics, averaged over the evaluation observations.
@@ -325,8 +349,13 @@ def train_and_eval_amortized_inference(
     thetas, xs = task.get_data(benchmark_num_simulations)
     prior = task.get_prior()
 
+    embedding_fields = (
+        {"embedding_net": EMBEDDING_NETS[embedding_name](task)}
+        if embedding_name
+        else None
+    )
     inference = inference_class(
-        prior, **_estimator_kwargs(inference_class, extra_kwargs)
+        prior, **_estimator_kwargs(inference_class, extra_kwargs, embedding_fields)
     )
     _ = inference.append_simulations(thetas, xs).train(**TRAIN_KWARGS)
 
@@ -411,9 +440,11 @@ def test_run_benchmark(
         request: The pytest request, to read the benchmark mode.
     """
     mode = _benchmark_mode(request.config)
+    embedding_name = _benchmark_embedding(request.config, mode)
     # Set before training, so a crashed case replaces the stored result of its label.
     results_bag.method = (
         f"{_class_id(inference_class, mode)}-{_kwargs_id(extra_kwargs)}"
+        + (f"-{embedding_name}" if embedding_name else "")
     )
     results_bag.task_name = task.name
     results_bag.seed = benchmark_seed
@@ -421,7 +452,9 @@ def test_run_benchmark(
     if mode in SEQUENTIAL_MODES:
         train_and_eval = train_and_eval_sequential_inference
     else:
-        train_and_eval = train_and_eval_amortized_inference
+        train_and_eval = partial(
+            train_and_eval_amortized_inference, embedding_name=embedding_name
+        )
     metrics = train_and_eval(
         inference_class,
         task,

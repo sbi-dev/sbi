@@ -24,6 +24,7 @@ from torch.nn import Module
 
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
+from sbi.utils.sbiutils import _apply_to_transform
 from sbi.utils.torchutils import _base_recursor
 
 _CopyableT = TypeVar("_CopyableT")
@@ -482,6 +483,10 @@ class AdaptedVariationalDistribution(Distribution):
             parameter.data = parameter.data.to(device)
             if parameter.grad is not None:
                 parameter.grad.data = parameter.grad.data.to(device)
+        # A copy of `q`, as the initialization snapshot holds, has its own copy of
+        # the link transform.
+        for transform in getattr(self._q, "transforms", []):
+            _apply_to_transform(transform, lambda t: t.to(device))
 
     @property
     def support(self):  # type: ignore[override]

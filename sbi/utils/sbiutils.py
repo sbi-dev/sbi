@@ -37,9 +37,11 @@ from torch.optim.adam import Adam
 
 from sbi import __version__
 from sbi.sbi_types import TorchTransform
+from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.torchutils import unwrap_mixture_support
 
 _T = TypeVar("_T")
+logger = logging.getLogger(__name__)
 
 
 def save_with_version(obj: Any, filename: Union[str, Path]) -> None:
@@ -194,7 +196,7 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     """Return clamped value, logging an informative warning if different from value."""
     clamped_val = max(min_val, min(value, max_val))
     if clamped_val != value:
-        logging.warning(
+        logger.warning(
             f"{name}={value} was clamped to {clamped_val}; "
             f"must be in [{min_val},{max_val}] range"
         )
@@ -283,7 +285,7 @@ def standardizing_transform(
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
-        structured_dim: Whether data dimensions are structured (e.g., time-series,
+        structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which requires computing mean and std per sample first before
             aggregating over samples for a single standardization mean and std for the
             batch, or independent (default), which z-scores dimensions independently.
@@ -308,7 +310,7 @@ def standardizing_transform_zuko(
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
-        structured_dim: Whether data dimensions are structured (e.g., time-series,
+        structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which requires computing mean and std per sample first before
             aggregating over samples for a single standardization mean and std for the
             batch, or independent (default), which z-scores dimensions independently.
@@ -433,13 +435,12 @@ def z_standardization(
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
-        structured_dim: Whether data dimensions are structured (e.g., time-series,
+        structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which requires computing mean and std per sample first before
             aggregating over samples for a single standardization mean and std for the
             batch, or independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
-        backend: Whether to use nflows or zuko backend
 
     Returns:
         Mean and standard deviation for z-scoring
@@ -501,7 +502,7 @@ def standardizing_net(
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
-        structured_dim: Whether data dimensions are structured (e.g., time-series,
+        structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which requires computing mean and std per sample first before
             aggregating over samples for a single standardization mean and std for the
             batch, or independent (default), which z-scores dimensions independently.
@@ -535,7 +536,7 @@ def standardizing_net(
             t_std[t_std < min_std] = min_std
     else:
         t_std = torch.ones(1)
-        logging.warning(
+        logger.warning(
             """Using a one-dimensional batch will instantiate a Standardize transform
             with (mean, std) parameters which are not representative of the data. We
             allow this behavior because you might be loading a pre-trained net.
@@ -600,12 +601,12 @@ def npe_msg_on_invalid_x(
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
-            logging.warning(
+            logger.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 "They will be excluded from training."
             )
         else:
-            logging.warning(
+            logger.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 "They are not excluded from training due to `exclude_invalid_x=False`. "
                 "Training will likely fail, we strongly recommend "
@@ -626,7 +627,7 @@ def nle_nre_apt_msg_on_invalid_x(
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
-            logging.warning(
+            logger.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"These will be discarded from training due to "
                 f"`exclude_invalid_x=True`. Please be aware that this gives "
@@ -921,7 +922,9 @@ def _apply_to_transform(
     """Apply fn to all tensors in a transform tree.
 
     Walks ComposeTransform.parts, IndependentTransform.base_transform,
-    etc., so .to() calls propagate into the transform.
+    etc., so .to() calls propagate into the transform. A transform that is also
+    an `nn.Module` (e.g. a Pyro `TransformModule`) gets `fn` applied to its
+    parameters and buffers as well.
 
     Args:
         transform: Root of the transform tree.
@@ -929,13 +932,24 @@ def _apply_to_transform(
     """
     seen = set()
 
+    def _apply_to_tensor(val: Tensor) -> Tensor:
+        moved = fn(val)
+        if not (val.is_leaf and val.requires_grad) or moved.is_leaf:
+            return moved
+        # A moved parameter stays a leaf; a non-leaf breaks `copy.deepcopy`.
+        if isinstance(val, nn.Parameter):
+            return nn.Parameter(moved.detach())
+        return moved.detach().requires_grad_(True)
+
     def _walk(t):
         if id(t) in seen:
             return
         seen.add(id(t))
+        if isinstance(t, nn.Module):
+            t._apply(fn)
         for key, val in list(t.__dict__.items()):
             if isinstance(val, Tensor):
-                object.__setattr__(t, key, fn(val))
+                object.__setattr__(t, key, _apply_to_tensor(val))
             elif isinstance(val, (list, tuple)):
                 for item in val:
                     if isinstance(item, TorchTransform):
@@ -1271,13 +1285,16 @@ def gradient_ascent(
     # is `(1,)` on every return path, as in the loop below.
     best_log_prob_iter = init_probs[sort_indices[-1:]]
     best_theta_iter = sorted_inits[-1:]
-    best_theta_overall = theta_transform(best_theta_iter.detach().clone())
+    # Without gradients: a transform with parameters would attach its graph to the
+    # returned MAP, which the posterior caches.
+    with torch.no_grad():
+        best_theta_overall = theta_transform(best_theta_iter.detach().clone())
+        argmax_ = theta_transform.inv(best_theta_overall)
     best_log_prob_overall = best_log_prob_iter.detach().clone()
-
-    argmax_ = theta_transform.inv(best_theta_overall)
     max_val = best_log_prob_overall
 
-    optimize_inits = theta_transform(optimize_inits)
+    # Detached: a transform with parameters would make the inits non-leaf tensors.
+    optimize_inits = theta_transform(optimize_inits).detach()  # type: ignore
     optimize_inits.requires_grad_(True)  # type: ignore
     optimizer = Adam([optimize_inits], lr=learning_rate)  # type: ignore
 
@@ -1310,14 +1327,12 @@ def gradient_ascent(
                         best_log_prob_overall = best_log_prob_iter.detach().clone()
 
                 if show_progress_bars:
-                    print(
-                        "\r",
+                    print_progress(
                         f"Optimizing MAP estimate. Iterations: {iter_ + 1} / "
                         f"{num_iter}. Performance in iteration "
                         f"{divmod(iter_ + 1, save_best_every)[0] * save_best_every}: "
                         f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob). "
                         "Press Ctrl-C to interrupt.",
-                        end="",
                     )
                 argmax_ = theta_transform.inv(best_theta_overall)
                 max_val = best_log_prob_overall
@@ -1325,11 +1340,15 @@ def gradient_ascent(
             iter_ += 1
 
     except KeyboardInterrupt:
+        end_progress_line()
         interruption = f"Optimization was interrupted after {iter_} iterations. "
         print(interruption + interruption_note)
         return argmax_, max_val  # type: ignore
 
-    return theta_transform.inv(best_theta_overall), max_val  # type: ignore
+    end_progress_line()
+    with torch.no_grad():
+        argmax_ = theta_transform.inv(best_theta_overall)
+    return argmax_, max_val  # type: ignore
 
 
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
