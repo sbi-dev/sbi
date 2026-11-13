@@ -124,22 +124,25 @@ class CategoricalMADE(MADE):
 
     def _map_values_to_indices(self, input: Tensor) -> Tensor:
         """Map user categorical values to 0-based indices."""
-        # Cast once to the lookup dtype to avoid per-iteration conversions
-        input_for_search = input.to(self.values_lookup.dtype)
-        mapped = input_for_search.clone()
+        lookup_dtype = self.values_lookup.dtype
+        mapped = input.to(lookup_dtype).clone()
         for i in range(self.num_variables):
             c = int(self.num_categories_per_var[i])
             unique_vals = self.values_lookup[i, :c]
-            input_values = input_for_search[..., i].contiguous()
+            observed_values = input[..., i].contiguous()
+            input_values = observed_values.to(lookup_dtype)
+            cast_is_lossless = input_values.to(observed_values.dtype) == observed_values
             indices = torch.searchsorted(unique_vals, input_values)
 
-            # Check if clamping would change indices (indicating invalid values)
-            indices_clamped = indices.clamp(0, c - 1)
-            if not (indices == indices_clamped).all():
-                invalid_mask = indices != indices_clamped
+            matched = (
+                cast_is_lossless
+                & (indices < c)
+                & (unique_vals[indices.clamp(max=c - 1)] == input_values)
+            )
+            if not matched.all():
                 raise ValueError(
                     f"Variable {i} contains values not seen during training: "
-                    f"{input_values[invalid_mask].unique().tolist()}. "
+                    f"{observed_values[~matched].unique().tolist()}. "
                     f"Valid values are: {unique_vals.tolist()}"
                 )
 
