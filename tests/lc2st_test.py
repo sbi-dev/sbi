@@ -585,31 +585,28 @@ def test_lc2st_both_thetas_and_prior_samples_error(cal_data):
 
 
 # =============================================================================
-# Statistical Tests (Slow)
+# Device Tests
 # =============================================================================
+
+ACCELERATOR_DEVICES = [
+    pytest.param(
+        "cuda",
+        marks=pytest.mark.skipif(
+            not torch.cuda.is_available(), reason="cuda is not available"
+        ),
+    ),
+    pytest.param(
+        "mps",
+        marks=pytest.mark.skipif(
+            not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()),
+            reason="mps is not available",
+        ),
+    ),
+]
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize(
-    "device",
-    [
-        pytest.param(
-            "cuda",
-            marks=pytest.mark.skipif(
-                not torch.cuda.is_available(), reason="cuda is not available"
-            ),
-        ),
-        pytest.param(
-            "mps",
-            marks=pytest.mark.skipif(
-                not (
-                    hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-                ),
-                reason="mps is not available",
-            ),
-        ),
-    ],
-)
+@pytest.mark.parametrize("device", ACCELERATOR_DEVICES)
 def test_lc2st_runs_on_requested_device(cal_data, device):
     """Test that LC2ST runs on cuda/mps (if available)."""
     lc2st = LC2ST(
@@ -625,26 +622,7 @@ def test_lc2st_runs_on_requested_device(cal_data, device):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize(
-    "device",
-    [
-        pytest.param(
-            "cuda",
-            marks=pytest.mark.skipif(
-                not torch.cuda.is_available(), reason="cuda is not available"
-            ),
-        ),
-        pytest.param(
-            "mps",
-            marks=pytest.mark.skipif(
-                not (
-                    hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
-                ),
-                reason="mps is not available",
-            ),
-        ),
-    ],
-)
+@pytest.mark.parametrize("device", ACCELERATOR_DEVICES)
 def test_lc2st_cross_validation_with_accelerator_tensors(cal_data, device):
     """`num_folds > 1` must split samples that live on an accelerator."""
     lc2st = LC2ST(
@@ -653,10 +631,35 @@ def test_lc2st_cross_validation_with_accelerator_tensors(cal_data, device):
         cal_data.posterior_samples.to(device),
         classifier="mlp",
         num_folds=2,
+        num_trials_null=2,
         device=device,
     )
     lc2st.train_on_observed_data()
+    lc2st.train_under_null_hypothesis()
     assert len(lc2st.trained_clfs) == 2
+    assert lc2st.trained_clfs_null is not None
+    assert all(len(clfs) == 2 for clfs in lc2st.trained_clfs_null.values())
+
+
+def test_lc2st_accepts_gpu_device_alias(cal_data):
+    """Test that sbi's "gpu" alias does not crash LC2ST.
+
+    LC2ST falls back to CPU classifiers for devices it does not recognize
+    instead of raising.
+    """
+    lc2st = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.posterior_samples,
+        classifier="mlp",
+        device="gpu",
+    )
+    assert lc2st.clf_class is MLPClassifier
+
+
+# =============================================================================
+# Statistical Tests (Slow)
+# =============================================================================
 
 
 @pytest.mark.slow
@@ -796,19 +799,3 @@ def test_lc2st_classifier_kwargs_override(cal_data):
         device="cpu",
     )
     assert lc2st_clean.clf_kwargs["max_iter"] == 1000
-
-
-def test_lc2st_accepts_gpu_device_alias(cal_data):
-    """Test that sbi's "gpu" alias does not crash LC2ST.
-
-    LC2ST falls back to CPU classifiers for devices it does not recognize
-    instead of raising.
-    """
-    lc2st = LC2ST(
-        cal_data.thetas,
-        cal_data.xs,
-        cal_data.posterior_samples,
-        classifier="mlp",
-        device="gpu",
-    )
-    assert lc2st.clf_class is MLPClassifier
