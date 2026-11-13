@@ -118,8 +118,10 @@ def print_progress(message: str) -> None:
 
 
 def end_progress_line() -> None:
-    """Ends the line that `print_progress()` left open, if any, so that later output
-    starts on its own."""
+    """Ends the line that `print_progress()` left open, if any.
+
+    Later output then starts on a line of its own.
+    """
     if getattr(_state, "progress_line_open", False):
         print()
         _state.progress_line_open = False
