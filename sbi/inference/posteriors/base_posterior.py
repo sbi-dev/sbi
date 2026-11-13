@@ -168,6 +168,17 @@ class NeuralPosterior:
         self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
+
+        prior = self.potential_fn.prior
+        if prior is not None and len(prior.event_shape) > 0:
+            event_shape = prior.event_shape
+            actual_shape = theta.shape[-len(event_shape):]
+
+            if actual_shape != event_shape:
+                raise ValueError(
+                    f"Expected theta to have event shape {tuple(event_shape)}, "
+                    f"but got shape {tuple(actual_shape)}."
+                )
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients
         )

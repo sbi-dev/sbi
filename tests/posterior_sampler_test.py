@@ -87,3 +87,29 @@ def test_api_posterior_sampler_set(
         assert type(posterior.posterior_sampler) is SliceSamplerSerial
     else:  # sampling_method == "slice_np_vectorized"
         assert type(posterior.posterior_sampler) is SliceSamplerVectorized
+
+
+
+def test_direct_posterior_shape_validation():
+    """Test that passing a malformed theta shape raises a clean ValueError (issue #2136)."""
+    import torch
+    from sbi.inference import NPE
+    from sbi.utils import BoxUniform
+
+    prior = BoxUniform(low=torch.tensor([-2.0]), high=torch.tensor([2.0]))
+
+    def simulator(theta):
+        return theta + 0.1 * torch.randn_like(theta)
+
+    theta = prior.sample((20,))
+    x = simulator(theta)
+
+    inferer = NPE(prior=prior)
+    inferer.append_simulations(theta, x)
+    density_estimator = inferer.train(max_num_epochs=1, show_train_summary=False)
+    posterior = inferer.build_posterior(density_estimator)
+
+    # Passing a 1D tensor with mismatched feature dimension (2 elements instead of 1)
+    bad_theta = torch.tensor([1.0, 2.0])
+    with pytest.raises(ValueError, match="Expected theta to have feature dimension"):
+        posterior.log_prob(bad_theta, x=x[0])
