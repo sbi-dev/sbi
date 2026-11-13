@@ -583,7 +583,7 @@ class IWElboOptimizer(ElboOptimizer):
 
 @register_VI_method(name="fKL")
 class ForwardKLOptimizer(DivergenceOptimizer):
-    """This learns the variational posterior by minimizing the forward KL divergence
+    r"""This learns the variational posterior by minimizing the forward KL divergence
     i.e. $D_KL(p(\theta|x_o)|| q(\theta))$. The typically necessary samples from the
     posterior are not required by using importance sampling techniques.
 
@@ -604,15 +604,14 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         weight_transform: Callable = lambda x: x,
         **kwargs,
     ):
-        """See `DivergenceOptimizer` for base arguments.
+        r"""See `DivergenceOptimizer` for base arguments.
 
         Args:
             proposal: The proposal used we currently support only [`q`]
-            weight_transform: This is a transformation that is applied to the importance
-                weight $w(\theta) = p(\theta, x_o)/q(\theta)$. For example it may be
-                usefull to clamp the weights by a certain rule to reduce variance.
-
-
+            weight_transform: A transformation applied to the self-normalized
+                importance weights $w(\theta) \propto p(\theta, x_o)/q(\theta)$, which
+                sum to one over the particles. The transformed weights are normalized
+                again. For example, clamping them can reduce variance.
         """
         super().__init__(*args, **kwargs)
 
@@ -643,12 +642,13 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         self.potential_fn = self.potential_fn.bind(x_o)
         logp = self.potential_fn(samples)
         with torch.no_grad():
-            logweights = logp - logq
-            weights = self.weight_transform(logweights.exp())
-            weights /= weights.sum()
+            # Normalized in log space: exp of raw log-weights under- or overflows.
+            weights = self.weight_transform(torch.softmax(logp - logq, dim=0))
+            weights = weights / weights.sum()
 
         surrogate = -torch.sum(weights * logq)
-        loss = torch.sum(weights * (logp - logq))
+        # Zero-weight particles (log p = -inf) would give 0 * -inf = nan.
+        loss = torch.sum(weights * torch.where(weights > 0, logp - logq, 0.0))
         return surrogate, loss.detach()
 
 

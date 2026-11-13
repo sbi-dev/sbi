@@ -14,6 +14,7 @@ from __future__ import annotations
 import pickle
 import warnings
 from copy import deepcopy
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -30,6 +31,7 @@ from sbi.inference.potentials.ratio_based_potential import (
 )
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.samplers.vi.vi_divergence_optimizers import (
+    ForwardKLOptimizer,
     IWElboOptimizer,
     RenyiDivergenceOptimizer,
 )
@@ -735,6 +737,45 @@ def test_iwelbo_optimizer_uses_importance_weighted_loss(
     )
     _, loss = optimizer.loss(zeros(1))
     assert torch.allclose(loss, torch.tensor(-offset))
+
+
+@pytest.mark.parametrize("offset", [0.0, 1e5])
+def test_forward_kl_weights_finite_for_extreme_log_weights(monkeypatch, offset: float):
+    """fKL weights stay self-normalized when exp of the log-weights would under- or
+    overflow, as for a target much narrower than q or a large potential offset, and
+    the loss stays finite with a particle outside the target's support."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    narrow = MultivariateNormal(3 * ones(1), 1e-4 * eye(1))
+
+    def target_log_prob(theta):
+        outside = theta[..., 0] < -1.5
+        return torch.where(outside, -torch.inf, narrow.log_prob(theta) + offset)
+
+    target = SimpleNamespace(log_prob=target_log_prob)
+    weight_sums = []
+
+    def record_weight_sum(weights):
+        weight_sums.append(weights.sum())
+        return 2 * weights
+
+    optimizer = ForwardKLOptimizer(
+        potential_fn=make_tractable_potential(target, prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=6,
+        weight_transform=record_weight_sum,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    particles = torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]).unsqueeze(-1)
+    monkeypatch.setattr(optimizer.q, "sample", lambda sample_shape: particles)
+    surrogate_loss, loss = optimizer.loss(zeros(1))
+
+    logq = optimizer.q.log_prob(particles)
+    weights = torch.softmax(target.log_prob(particles) - logq.detach(), dim=0)
+    assert torch.isfinite(loss)
+    assert torch.allclose(surrogate_loss, -(weights * logq).sum())
+    assert torch.allclose(torch.stack(weight_sums), torch.ones(1))
 
 
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
