@@ -1,12 +1,14 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import io
+import sys
 import threading
+from unittest.mock import patch
 
 import pytest
 import torch
 from torch.distributions import MultivariateNormal
-from tqdm.auto import tqdm
 
 from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.posteriors.mcmc_posterior import build_from_potential
@@ -17,7 +19,15 @@ from sbi.samplers.mcmc import slice_numpy
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score import diffuser
 from sbi.utils import BoxUniform
-from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
+from sbi.utils.pbar import (
+    end_progress_line,
+    is_nested,
+    nested_pbar_context,
+    print_progress,
+    sampling_desc,
+    tqdm,
+    trange,
+)
 
 
 class TestNestedPbarContext:
@@ -285,3 +295,68 @@ def test_batched_mcmc_bar_counts_per_observation(recorded_bars):
     assert shown(recorded_bars) == [
         "Drawing 3 samples for each of 2 observations [slice_np_vectorized, 2 chains]"
     ]
+
+
+@pytest.mark.parametrize("tqdm_disable", (None, "1"))
+def test_tqdm_disable_turns_off_all_progress_output(monkeypatch, capsys, tqdm_disable):
+    """sbi passes `disable=` to every bar, which plain tqdm prefers to the variable."""
+    if tqdm_disable is None:
+        monkeypatch.delenv("TQDM_DISABLE", raising=False)
+    else:
+        monkeypatch.setenv("TQDM_DISABLE", tqdm_disable)
+
+    for _ in tqdm(range(3), disable=False):
+        pass
+    for _ in trange(3, disable=False):
+        pass
+    print_progress("Training neural network. Epochs trained: 3")
+    end_progress_line()
+    end_progress_line()  # No line is open, so this prints nothing.
+
+    captured = capsys.readouterr()
+    shows_output = tqdm_disable is None
+    assert bool(captured.err) is shows_output  # The bars.
+    # The progress message, ended by a newline so that later output starts on its own.
+    expected_out = "\r Training neural network. Epochs trained: 3\n"
+    assert captured.out == (expected_out if shows_output else "")
+
+
+@pytest.mark.mcmc
+def test_tqdm_disable_turns_off_pyro_bars(monkeypatch):
+    """Pyro passes `disable=` to its own bars, so sbi must pass the variable on."""
+    monkeypatch.setenv("TQDM_DISABLE", "1")
+
+    class Stop(Exception):
+        pass
+
+    with (
+        patch("pyro.infer.mcmc.api.MCMC", side_effect=Stop) as mcmc,
+        pytest.raises(Stop),
+    ):
+        _gaussian_mcmc_posterior().sample(
+            (1,),
+            method="nuts_pyro",
+            num_chains=1,
+            warmup_steps=1,
+            show_progress_bars=True,
+        )
+
+    assert mcmc.call_args.kwargs["disable_progbar"] is True
+
+
+def test_print_progress_flushes_each_message(monkeypatch):
+    """A terminal flushes at the leading `\\r`, before the message, so without a flush
+    each message showed up only with the next one."""
+    monkeypatch.delenv("TQDM_DISABLE", raising=False)
+
+    class RecordingStdout(io.StringIO):
+        flushed = ""
+
+        def flush(self):
+            self.flushed = self.getvalue()
+
+    stdout = RecordingStdout()
+    monkeypatch.setattr(sys, "stdout", stdout)
+    print_progress("Training neural network. Epochs trained: 1")
+    assert stdout.flushed.endswith("Epochs trained: 1")
+    end_progress_line()  # Else the open line leaks into later tests in this process.

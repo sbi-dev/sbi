@@ -105,8 +105,8 @@ extend-include = ["*.ipynb"]
 line-length = 88
 
 [tool.ruff.lint]
-# pycodestyle, Pyflakes, pyupgrade, flake8-bugbear, flake8-simplify, isort
-select = ["E", "F", "W", "B", "SIM", "I"]
+# pycodestyle, Pyflakes, pyupgrade, flake8-bugbear, flake8-simplify, isort, banned imports
+select = ["E", "F", "W", "B", "SIM", "I", "TID251"]
 ignore = [
     "E731",  # allow naming lambda functions.
     "B008",  # allow function calls in default args.
@@ -124,6 +124,9 @@ case-sensitive = true
 lines-between-types = 0  # like isort default.
 relative-imports-order = "furthest-to-closest"  # like isort default.
 known-first-party = ["sbi", "tests", "docs/tutorials", "docs/advanced_tutorials", "docs/how_to_guide"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"tqdm".msg = "Import `tqdm` and `trange` from `sbi.utils.pbar`, which honour `TQDM_DISABLE`."
 
 [tool.ruff.format]
 exclude = ["*.ipynb"]

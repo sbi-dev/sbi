@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import re
 import warnings
 
 import pytest
@@ -8,9 +9,9 @@ import torch
 
 import sbi.inference
 from sbi import utils
-from sbi.inference import FMPE, NPE, VectorFieldPosterior, infer
+from sbi.inference import FMPE, NPE, infer
 from sbi.inference.trainers import nle, npe, nre
-from sbi.neural_nets import FlowMatchingConfig
+from sbi.utils.removed_names import REMOVED_MODULES, REMOVED_NAMES, RENAMED_METHODS
 
 
 def test_infer():
@@ -51,80 +52,31 @@ def test_get_dataloaders(training_batch_size):
     assert len(val_loader) * val_loader.batch_size == int(validation_fraction * N)
 
 
-# The aliases warn by design; this test is about cross-path agreement, which
-# `test_deprecated_aliases_warn` does not cover.
-@pytest.mark.filterwarnings("ignore::FutureWarning")
-@pytest.mark.parametrize(
-    "legacy_name",
-    (
-        "SNPE_A",
-        "SNPE_B",
-        "SNPE_C",
-        "SNPE",
-        "NPE",
-        "SNLE_A",
-        "SNLE",
-        "NLE",
-        "SNRE_A",
-        "SNRE_B",
-        "SNRE_C",
-        "SRE",
-        "AALR",
-        "CNRE",
-        "NRE",
-    ),
-)
-def test_legacy_aliases_agree_across_import_paths(legacy_name):
-    """Deprecated aliases must resolve to the same class from either import path.
-
-    Only aliases that a trainer sub-package also defines are parametrized here.
-    `ABC`, `APT`, `SMC`, `SNL` and `SNRE` exist on `sbi.inference` alone, so there is
-    nothing to cross-check for them.
-    """
-    expected = getattr(sbi.inference, legacy_name)
-    defining_modules = [m for m in (npe, nle, nre) if hasattr(m, legacy_name)]
+@pytest.mark.parametrize("name", ("NPE", "NLE", "NRE"))
+def test_shorthands_agree_across_import_paths(name):
+    """`sbi.inference` and the trainer sub-package must resolve to the same class."""
+    expected = getattr(sbi.inference, name)
+    defining_modules = [m for m in (npe, nle, nre) if hasattr(m, name)]
 
     assert defining_modules, (
-        f"No trainer sub-package defines {legacy_name}. Either the alias moved or it "
+        f"No trainer sub-package defines {name}. Either the name moved or it "
         f"should not be parametrized here, which would make this test vacuous."
     )
 
     for module in defining_modules:
-        assert getattr(module, legacy_name) is expected, (
-            f"{module.__name__}.{legacy_name} disagrees with "
-            f"sbi.inference.{legacy_name}"
+        assert getattr(module, name) is expected, (
+            f"{module.__name__}.{name} disagrees with sbi.inference.{name}"
         )
 
 
-def test_infer_warns_on_legacy_method_string():
-    """The legacy method strings warn once, attributed to the caller."""
-    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+def test_renamed_method_set_is_complete():
+    """Pin the renamed names literally.
 
-    def simulator(theta):
-        return theta + 0.1 * torch.randn_like(theta)
-
-    with pytest.warns(FutureWarning, match="npe_c") as record:
-        infer(
-            simulator,
-            prior,
-            method="snpe",
-            num_simulations=10,
-            train_kwargs={"max_num_epochs": 1},
-        )
-
-    future_warnings = [w for w in record if w.category is FutureWarning]
-    assert len(future_warnings) == 1
-    assert __file__ == future_warnings[0].filename
-
-
-def test_deprecated_alias_set_is_complete():
-    """Pin the alias set literally.
-
-    The tests below parametrize over `_DEPRECATED_ALIASES`, so dropping an entry
-    would shrink their collection rather than fail them, and the alias would stop
-    resolving for users with a green suite. This is the only test that would notice.
+    The tests below parametrize over the tables, so dropping an entry would shrink
+    their collection rather than fail them, and the name would fall back to a bare
+    "cannot import name" for users with a green suite.
     """
-    assert set(sbi.inference._DEPRECATED_ALIASES) == {
+    assert set(RENAMED_METHODS) == {
         "SNL",
         "SNLE",
         "SNLE_A",
@@ -145,36 +97,78 @@ def test_deprecated_alias_set_is_complete():
     }
 
 
+@pytest.mark.parametrize(("name", "replacement"), REMOVED_NAMES.items())
+def test_removed_names_name_their_replacement(name, replacement):
+    # The replacement must run as written.
+    exec(replacement, {"theta": torch.randn(10, 2), "x": torch.randn(10, 2)})
+    with pytest.raises(ImportError, match=re.escape(replacement)):
+        exec(f"from sbi.inference import {name}", {})
+
+
 @pytest.mark.parametrize(
-    ("alias", "canonical"), sbi.inference._DEPRECATED_ALIASES.items()
+    "package",
+    (
+        "sbi.utils",
+        "sbi.inference.trainers.npe",
+        "sbi.inference.trainers.nle",
+        "sbi.inference.trainers.nre",
+        "sbi.neural_nets.net_builders",
+    ),
 )
-def test_deprecated_aliases_warn(alias, canonical):
-    """Every legacy alias must emit a FutureWarning that names its replacement.
+def test_every_package_that_exported_removed_names_raises(package):
+    """Each package that exported a removed name needs its own `__getattr__`."""
+    with pytest.raises(ImportError, match=r"from sbi\.inference import NPE`"):
+        exec(f"from {package} import SNPE", {})
 
-    Matches the replacement clause, not the bare name: many aliases contain their
-    canonical name as a substring (`"NPE_A"` in `"SNPE_A"`).
+
+@pytest.mark.parametrize(("module", "replacement"), REMOVED_MODULES.items())
+def test_removed_modules_name_their_replacement(module, replacement):
+    """Every import form keeps the message.
+
+    `from package import module` would drop it if the placeholder raised a
+    `ModuleNotFoundError`.
     """
-    with pytest.warns(
-        FutureWarning, match=rf"Use `sbi\.inference\.{canonical}` instead"
+    exec(replacement, {})  # The replacement must exist.
+    package, name = module.rsplit(".", 1)
+    for statement in (
+        f"import {module}",
+        f"from {module} import anything",
+        f"from {package} import {name}",
     ):
-        resolved = getattr(sbi.inference, alias)
-
-    assert resolved is getattr(sbi.inference, canonical), (
-        f"sbi.inference.{alias} does not resolve to {canonical}"
-    )
+        with pytest.raises(ImportError, match=re.escape(replacement)):
+            exec(statement, {})
 
 
-@pytest.mark.parametrize("module", (npe, nle, nre))
-def test_submodule_aliases_warn_and_agree(module):
-    """The trainer sub-packages warn too, and resolve to the same classes."""
-    for alias, canonical in module._DEPRECATED_ALIASES.items():
-        expected = sbi.inference._DEPRECATED_ALIASES[alias]
-        assert expected == canonical, (
-            f"{module.__name__}.{alias} maps to {canonical}, expected {expected}"
-        )
-        with pytest.warns(FutureWarning, match=rf"\.{canonical}` instead"):
-            resolved = getattr(module, alias)
-        assert resolved is getattr(module, canonical)
+@pytest.mark.parametrize(
+    ("statement", "note"),
+    (
+        ("from sbi.inference import SNPE", "run `NPE` over several rounds"),
+        ("from sbi.inference import SNRE_A", "run `NRE_A` over several rounds"),
+        ("import sbi.inference.snle", "run `NLE` over several rounds"),
+        ("from sbi.inference import ABC", None),
+    ),
+)
+def test_sequential_names_point_to_multiround_inference(statement, note):
+    """Only the old name is gone: the error must not read as if the method were."""
+    with pytest.raises(ImportError) as error:
+        exec(statement, {})
+    if note is None:
+        assert "several rounds" not in str(error.value)
+    else:
+        assert note in str(error.value)
+        assert "02_multiround_inference.html" in str(error.value)
+
+
+def test_unknown_names_still_raise_attribute_error():
+    """Only removed names raise `ImportError`, so `hasattr()` keeps working."""
+    assert not hasattr(sbi.inference, "not_an_sbi_name")
+    assert not hasattr(utils, "not_an_sbi_name")
+
+
+def test_infer_rejects_removed_method_names():
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+    with pytest.raises(ValueError, match=r"Use method='npe' instead"):
+        infer(lambda theta: theta, prior, method="snpe", num_simulations=10)
 
 
 @pytest.mark.parametrize("method", ("abc", "smcabc"))
@@ -203,32 +197,13 @@ def test_infer_rejects_abc_methods(method):
 
 
 def test_canonical_shorthands_do_not_warn():
-    """`NPE`, `NLE` and `NRE` stay silent: their fate is a separate naming decision."""
+    """`NPE`, `NLE` and `NRE` are the recommended names: exported and silent."""
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
         assert sbi.inference.NPE is sbi.inference.NPE_C
         assert sbi.inference.NLE is sbi.inference.NLE_A
         assert sbi.inference.NRE is sbi.inference.NRE_B
-
-
-def test_vector_field_posterior_sample_with_warns():
-    """Passing `sample_with` to `sample()` warns; setting it at construction is the
-    supported path and must stay silent."""
-    theta, x = torch.randn(20, 2), torch.randn(20, 2)
-    posterior = VectorFieldPosterior(
-        vector_field_estimator=FlowMatchingConfig().build(theta, x),
-        prior=utils.BoxUniform(-torch.ones(2), torch.ones(2)),
-        sample_with="ode",
-    )
-
-    with pytest.warns(FutureWarning, match="sample_with"):
-        posterior.sample(
-            (1,),
-            x=torch.zeros(1, 2),
-            sample_with="ode",
-            reject_outside_prior=False,
-            show_progress_bars=False,
-        )
+    assert {"NPE", "NLE", "NRE", "infer"} <= set(sbi.inference.__all__)
 
 
 @pytest.mark.parametrize(
@@ -298,6 +273,39 @@ def test_summary_records_why_training_stopped(losses, max_num_epochs, converged)
     assert inference.summary["converged"] == [converged]
     budget_warned = any("max_num_epochs" in str(w.message) for w in caught)
     assert budget_warned is not converged
+
+
+@pytest.mark.parametrize(
+    "train_kwargs",
+    (
+        {"max_num_epochs": 2},  # Stops at the budget.
+        {"stop_after_epochs": 1},  # Converges.
+    ),
+)
+def test_training_output_ends_with_a_newline(monkeypatch, capsys, train_kwargs):
+    """Output after `train()` must not continue the epoch counter's line."""
+    monkeypatch.delenv("TQDM_DISABLE", raising=False)
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+    theta = prior.sample((100,))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)  # The epoch budget warning.
+        NPE(prior=prior).append_simulations(theta, theta).train(**train_kwargs)
+
+    out = capsys.readouterr().out
+    assert "Epochs trained" in out
+    assert out.endswith("\n")
+
+
+def test_converged_message_is_plain_when_captured(monkeypatch, capsys):
+    """Captured output must not start with the `\\r` that overwrites a progress line."""
+    monkeypatch.setenv("TQDM_DISABLE", "1")
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+
+    NPE(prior=prior)._report_convergence_at_end(epoch=3, max_num_epochs=10)
+
+    expected = "Neural network successfully converged after 3 epochs.\n"
+    assert capsys.readouterr().out == expected
 
 
 def test_vector_field_converged_resets_between_runs():
