@@ -17,6 +17,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils import BoxUniform
 from sbi.utils.metrics import check_c2st
 from tests.test_utils import (
     PosteriorPotential,
@@ -221,6 +222,26 @@ def test_ensemble_map_uses_default_x():
 
     with pytest.raises(ValueError, match=r"deprecated\. Use `\.set_default_x\(\)`"):
         ensemble.map(x=x_o)
+
+
+def test_ensemble_to_keeps_default_x():
+    """`to()` rebuilds the ensemble and must keep its default `x`."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * randn_like(theta)
+    posteriors = []
+    for _ in range(2):
+        trainer = NPE_C(prior, show_progress_bars=False)
+        trainer.append_simulations(theta, x).train(max_num_epochs=1)
+        posteriors.append(trainer.build_posterior())
+    ensemble = EnsemblePosterior(posteriors)
+    x_o = ones(1, 2)
+    ensemble.set_default_x(x_o)
+
+    ensemble.to("cpu")
+
+    assert_close(ensemble.default_x, x_o)
+    assert ensemble.sample((2,)).shape == (2, 2)
 
 
 def test_ensemble_potential_follows_weight_change():

@@ -117,6 +117,8 @@ class EnsemblePosterior(NeuralPosterior):
             device: The device to move the ensemble posterior to.
         """
         device = process_device(device)
+        # The rebuild below resets the default `x`.
+        default_x = self.default_x
         self.device = device
         self._device = device
         for i in range(len(self.posteriors)):
@@ -125,6 +127,8 @@ class EnsemblePosterior(NeuralPosterior):
         self.theta_transform = mcmc_transform(self.prior, device=device)
         self._weights = self._weights.to(device)
         self._build_potential_fns()
+        if default_x is not None:
+            self._x = default_x.to(device)
 
     def _build_potential_fns(self):
         potential_fns = []
