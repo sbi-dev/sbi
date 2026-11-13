@@ -9,6 +9,7 @@ import torch
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
+from sbi.analysis.sensitivity_analysis import Destandardize, destandardizing_net
 from sbi.inference import FMPE, NLE, NPE, NPSE, NRE
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
@@ -21,7 +22,14 @@ from sbi.inference.posteriors.posterior_parameters import (
     VectorFieldPosteriorParameters,
 )
 from sbi.inference.posteriors.vi_posterior import VIPosterior
-from sbi.utils.sbiutils import load_with_version
+from sbi.neural_nets import (
+    classifier_nn,
+    likelihood_nn,
+    posterior_flow_nn,
+    posterior_nn,
+)
+from sbi.utils.sbiutils import Standardize, load_with_version
+from sbi.utils.torchutils import process_device
 
 
 def _assert_survives_pickling(posterior, num_dim: int) -> None:
@@ -236,6 +244,65 @@ def test_torch_load_map_location_same_device_is_passthrough():
     assert loaded._device == "cpu"
     assert loaded.device == "cpu"
     assert loaded.sample((10,)).shape == (10, 2)
+
+
+def _saved_locations(net) -> set:
+    """Devices of the tensors in the file that `torch.save(net)` writes."""
+    buffer, locations = io.BytesIO(), set()
+    torch.save(net, buffer)
+    buffer.seek(0)
+
+    def record(storage, location):
+        locations.add(location)
+        return storage
+
+    torch.load(buffer, weights_only=False, map_location=record)
+    return locations
+
+
+_STANDARDIZED_NET_BUILDERS = [
+    pytest.param(posterior_nn("maf"), id="maf"),
+    pytest.param(posterior_nn("mdn"), id="mdn"),
+    pytest.param(posterior_nn("zuko_nsf"), id="zuko_nsf"),
+    pytest.param(likelihood_nn("maf"), id="likelihood_maf"),
+    pytest.param(classifier_nn("resnet"), id="classifier"),
+    pytest.param(posterior_flow_nn("mlp"), id="flow_matching"),
+    pytest.param(lambda t, x: destandardizing_net(x), id="destandardizing_net"),
+]
+
+
+@pytest.mark.parametrize("build", _STANDARDIZED_NET_BUILDERS)
+def test_net_holds_mean_and_std_only_as_buffers(build):
+    """Plain tensor attributes on the z-scoring layers would be missed by `.to()`.
+
+    Checked on the two z-scoring classes only: `nflows` keeps integer `degrees` as
+    plain attributes, which never come from the data.
+    """
+    theta = torch.randn(100, 2)
+    net = build(theta, theta + 0.1 * torch.randn_like(theta))
+
+    plain_tensors = [
+        f"{name}.{attr}"
+        for name, module in net.named_modules()
+        if isinstance(module, (Standardize, Destandardize))
+        for attr, value in vars(module).items()
+        if isinstance(value, torch.Tensor)
+    ]
+    assert plain_tensors == []
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("build", _STANDARDIZED_NET_BUILDERS)
+def test_net_built_on_gpu_saves_no_gpu_tensor_after_cpu(build):
+    """A net built from GPU data and moved with `.cpu()` must load on a CPU machine.
+
+    Plain tensor attributes are not moved by `.cpu()`; a GPU tensor left in the file
+    makes `torch.load` fail without `map_location` where no GPU is available.
+    """
+    theta = torch.randn(100, 2, device=process_device("gpu"))
+    net = build(theta, theta + 0.1 * torch.randn_like(theta))
+
+    assert _saved_locations(net.cpu()) == {"cpu"}
 
 
 @pytest.mark.parametrize("kind", ["direct", "vector_field"])
