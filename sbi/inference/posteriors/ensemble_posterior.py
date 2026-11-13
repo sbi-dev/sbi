@@ -395,8 +395,8 @@ class EnsemblePosterior(NeuralPosterior):
         num_init_samples: int = 1_000,
         save_best_every: int = 10,
         show_progress_bars: bool = False,
-        force_update: bool = False,
         individually: bool = False,
+        force_update: bool = False,
     ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         r"""Returns the average maximum-a-posteriori estimate (MAP).
 
@@ -434,11 +434,11 @@ class EnsemblePosterior(NeuralPosterior):
                 (thus, the default is `10`.)
             show_progress_bars: Whether to show a progressbar during sampling from
                 the posterior.
+            individually: If true, returns log weights and MAPs individually.
             force_update: Whether to re-calculate the MAPs of the component
                 posteriors when `x` is unchanged and they have a cached value. It is
                 passed to each component when `individually=True`. The joint MAP is
                 computed on every call, so it has no effect otherwise.
-            individually: If true, returns log weights and MAPs individually.
 
         Returns:
             The ensemble MAP estimate or individual log_weigths and component MAP
