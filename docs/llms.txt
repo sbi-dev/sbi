@@ -12,6 +12,10 @@ workflow is: define a prior and simulator, generate simulations, train a neural
 density estimator, build a posterior, and validate with diagnostics (SBC,
 expected coverage, TARP, L-C2ST).
 
+When output is captured, e.g. by a coding agent, set the environment variable
+`TQDM_DISABLE=1`. It turns off sbi's progress bars and progress messages, which
+otherwise make up most of the output.
+
 ## Tutorials
 
 - [Getting Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html): Minimal NPE example from prior to posterior
