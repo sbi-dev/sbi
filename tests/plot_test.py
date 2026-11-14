@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import subprocess
+import sys
 import warnings
 from typing import get_args
 
@@ -857,3 +859,9 @@ def test_plots_accept_device_and_grad_tensors(device):
     )
     conditional_pairplot(cpu_density, condition, [[-3.0, 3.0]], resolution=10)
     close("all")
+
+
+def test_analysis_import_does_not_need_six():
+    """Importing the plotting API must not require `six` (not an sbi dependency)."""
+    code = "import sys; sys.modules['six'] = None; from sbi.analysis import pairplot"
+    subprocess.run([sys.executable, "-c", code], check=True)
