@@ -20,6 +20,10 @@ _QUALITY_METRIC = {}
 _METRIC_MESSAGE = {}
 
 
+class QualityControlError(Exception):
+    """The variational posterior failed a basic check of the quality control."""
+
+
 def register_quality_metric(
     cls: Optional[Callable] = None,
     name: Optional[str] = None,
@@ -64,25 +68,27 @@ def basic_checks(posterior, N: int = int(5e4)):
         N: Number of samples that are checked.
     """
     prior = posterior._prior
-    assert prior is not None, "Posterior has no `._prior` attribute."
+    # Check at the observation `q` was trained on, which can differ from the default.
+    x = posterior._trained_on
     prior_samples = prior.sample(Size((N,)))
-    samples = posterior.sample(Size((N,)))
-    assert (torch.isfinite(samples)).all(), "Some of the samples are not finite"
+    samples = posterior.sample(Size((N,)), x=x)
+    if not torch.isfinite(samples).all():
+        raise QualityControlError("Some of the samples are not finite.")
     try:
         _ = prior.support
         has_support = True
     except (NotImplementedError, AttributeError):
         has_support = False
-    if has_support:
-        assert (
-            prior.support.check(samples)  # type: ignore
-        ).all(), "Some of the samples are not within the prior support."
-    assert (torch.isfinite(posterior.log_prob(samples))).all(), (
-        "The log probability is not finite for some samples"
-    )
-    assert (torch.isfinite(posterior.log_prob(prior_samples))).all(), (
-        "The log probability is not finite for some samples"
-    )
+    if has_support and not prior.support.check(samples).all():  # type: ignore
+        raise QualityControlError(
+            "Some of the samples are not within the prior support."
+        )
+    if not torch.isfinite(posterior.log_prob(samples, x=x)).all():
+        raise QualityControlError("The log probability is not finite for some samples.")
+    if not torch.isfinite(posterior.log_prob(prior_samples, x=x)).all():
+        raise QualityControlError(
+            "The log probability is not finite for some prior samples."
+        )
 
 
 def psis_diagnostics(

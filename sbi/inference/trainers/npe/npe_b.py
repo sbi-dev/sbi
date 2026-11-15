@@ -38,7 +38,7 @@ class NPE_B(PosteriorEstimatorTrainer):
         dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017.
         https://arxiv.org/abs/1711.01861
 
-    Example:
+    Example
     --------
 
     ::
