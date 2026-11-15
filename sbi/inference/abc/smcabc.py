@@ -110,13 +110,12 @@ class SMCABC(ABCBASE):
         self.simulation_counter = 0
         self.num_simulations = 0
         self.kernel_variance = None
+        self._simulate_with_budget = self._count_and_simulate
 
-        # Define simulator that keeps track of budget.
-        def simulate_with_budget(theta):
-            self.simulation_counter += theta.shape[0]
-            return self._batched_simulator(theta)
-
-        self._simulate_with_budget = simulate_with_budget
+    def _count_and_simulate(self, theta: Tensor) -> Tensor:
+        """Simulate `theta` and add the number of simulations to the budget."""
+        self.simulation_counter += theta.shape[0]
+        return self._batched_simulator(theta)
 
     def __call__(
         self,
@@ -210,6 +209,11 @@ class SMCABC(ABCBASE):
             ... )
         """
 
+        # Each call has its own budget, kernel and simulator.
+        self.simulation_counter = 0
+        self.kernel_variance = None
+        self._simulate_with_budget = self._count_and_simulate
+
         pop_idx = 0
         self.num_simulations = num_simulations * num_iid_samples
         if kde_kwargs is None:
@@ -248,8 +252,7 @@ class SMCABC(ABCBASE):
             x_o = sass_transform(self.x_o)
 
             def sass_simulator(theta):
-                self.simulation_counter += theta.shape[0]
-                return sass_transform(self._batched_simulator(theta))
+                return sass_transform(self._count_and_simulate(theta))
 
             self._simulate_with_budget = sass_simulator
 
