@@ -47,10 +47,8 @@ def _constructor_matches_arg_constraints(dist: Distribution) -> bool:
     except (TypeError, ValueError, NotImplementedError):
         return False
 
-    parameters = signature.parameters.values()
-    if any(p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD) for p in parameters):
-        return False
-    constructor_names = {p.name for p in parameters} - {"self", "validate_args"}
+    # `*args` and `**kwargs` count by their names, so they never match.
+    constructor_names = set(signature.parameters) - {"self", "validate_args"}
     return bool(arg_constraint_names) and constructor_names == arg_constraint_names
 
 
