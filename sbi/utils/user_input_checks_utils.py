@@ -137,8 +137,8 @@ def convert_distribution_to_float32(dist: Distribution) -> Distribution:
 
     Rebuilds the distribution from its parameters cast to float32, so that its
     support, mean and variance are float32 as well. A distribution that cannot be
-    rebuilt this way is wrapped in a `PytorchReturnTypeWrapper`, which casts only its
-    samples and log probs.
+    rebuilt this way is wrapped in a `PytorchReturnTypeWrapper`, which casts its
+    samples, log probs, mean and variance, but not its support.
 
     Args:
         dist: The distribution to convert.

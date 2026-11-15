@@ -251,7 +251,6 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
         )
         prior = convert_distribution_to_float32(prior)
 
-    # This will fail for float64 priors.
     check_prior_return_type(prior)
 
     # Potentially required wrapper if the prior returns an additional sample dimension
