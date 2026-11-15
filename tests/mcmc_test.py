@@ -261,6 +261,33 @@ def test_latest_sample_raises_when_more_chains_than_stored():
 
 
 @pytest.mark.mcmc
+@pytest.mark.parametrize("init_strategy", ("resample", "sir"))
+def test_init_strategy_evaluates_potential_without_gradients(init_strategy: str):
+    """Weighting the init candidates builds no autograd graph."""
+    prior = BoxUniform(low=-2 * ones(2), high=2 * ones(2))
+    init_calls_grad_enabled = []
+
+    def potential_fn(theta):
+        # The chains evaluate 2 parameters at a time, the init candidates 10,000.
+        if theta.shape[0] > 2:
+            init_calls_grad_enabled.append(torch.is_grad_enabled())
+        return -0.5 * (theta**2).sum(axis=-1)
+
+    with pytest.warns(UserWarning, match="unconditional potential"):
+        posterior = build_from_potential(potential_fn, prior)
+    posterior.sample(
+        (2,),
+        num_chains=2,
+        warmup_steps=1,
+        init_strategy=init_strategy,
+        show_progress_bars=False,
+    )
+
+    assert init_calls_grad_enabled
+    assert not any(init_calls_grad_enabled)
+
+
+@pytest.mark.mcmc
 def test_direct_mcmc_unconditional():
     "Test MCMCPosterior from user defined potential (unconditional)"
     num_samples = 100

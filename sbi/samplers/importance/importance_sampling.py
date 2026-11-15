@@ -12,6 +12,7 @@ from sbi.sbi_types import Proposal
 from sbi.utils.pbar import nested_pbar_context
 
 
+@torch.no_grad()
 def importance_sample(
     potential_fn,
     proposal: Proposal,
@@ -28,7 +29,7 @@ def importance_sample(
             has one.
 
     Returns:
-        Samples and logarithm of importance weights.
+        Samples and logarithm of importance weights, computed without gradients.
     """
     # The proposal's own progress bar, if it has one, is the only bar here. It is
     # suppressed like a nested bar unless progress bars are requested.
