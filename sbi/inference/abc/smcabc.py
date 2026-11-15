@@ -209,8 +209,7 @@ class SMCABC(ABCBASE):
             ... )
         """
 
-        # Reset the state of earlier calls: each call has its own budget, kernel and
-        # simulator, which SASS below may replace for this call.
+        # Each call has its own budget, kernel and simulator.
         self.simulation_counter = 0
         self.kernel_variance = None
         self._simulate_with_budget = self._count_and_simulate
@@ -253,8 +252,7 @@ class SMCABC(ABCBASE):
             x_o = sass_transform(self.x_o)
 
             def sass_simulator(theta):
-                self.simulation_counter += theta.shape[0]
-                return sass_transform(self._batched_simulator(theta))
+                return sass_transform(self._count_and_simulate(theta))
 
             self._simulate_with_budget = sass_simulator
 
