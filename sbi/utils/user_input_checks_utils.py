@@ -13,7 +13,6 @@ from torch.distributions import (
     Categorical,
     Distribution,
     Independent,
-    Multinomial,
     MultivariateNormal,
     constraints,
 )
@@ -35,10 +34,10 @@ def _remove_non_constructor_arguments(params: dict, dist: Distribution) -> dict:
     if isinstance(dist, MultivariateNormal):
         params["precision_matrix"] = None
         params["scale_tril"] = None
-    # Binomial, Bernoulli, Categorical and Multinomial calculate logits from
+    # Binomial, Bernoulli and Categorical calculate logits from
     # probabilities, and store them in the arg_constraints. When reinstantiating, we
     # must provide only one of them.
-    elif isinstance(dist, (Binomial, Bernoulli, Categorical, Multinomial)):
+    elif isinstance(dist, (Binomial, Bernoulli, Categorical)):
         params["logits"] = None
     return params
 
@@ -84,9 +83,6 @@ def get_distribution_parameters(
     """
     params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
     params = _remove_non_constructor_arguments(params, dist)
-    # Unlike Binomial, Multinomial keeps `total_count` outside `arg_constraints`.
-    if isinstance(dist, Multinomial):
-        params["total_count"] = dist.total_count
     return params
 
 
