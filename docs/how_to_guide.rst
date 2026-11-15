@@ -34,6 +34,7 @@ Neural nets
 -----------
 
 - :doc:`how_to_guide/03_choose_neural_net`
+- :doc:`how_to_guide/27_estimator_configs`
 - :doc:`how_to_guide/04_embedding_networks`
 - :doc:`how_to_guide/20_time_series_embedding`
 - :doc:`how_to_guide/08_permutation_invariant_embeddings`

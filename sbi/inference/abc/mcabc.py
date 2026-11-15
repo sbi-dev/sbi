@@ -101,7 +101,9 @@ class MCABC(ABCBASE):
             quantile: Upper quantile of smallest distances for which the corresponding
                 parameters are returned, e.g, q=0.01 will return the top 1%. Exactly
                 one of quantile or `eps` have to be passed.
-            lra: Whether to run linear regression adjustment as in Beaumont et al. 2002
+            lra: Whether to run linear regression adjustment as in Beaumont et al. 2002.
+                Adjusted parameters outside the prior support are removed, so fewer
+                samples than accepted can be returned.
             sass: Whether to determine semi-automatic summary statistics as in
                 Fearnhead & Prangle 2012.
             sass_fraction: Fraction of simulation budget used for the initial sass run.
@@ -211,9 +213,14 @@ class MCABC(ABCBASE):
         # Maybe adjust theta with LRA.
         if lra:
             self.logger.info("Running Linear regression adjustment.")
-            final_theta = super()._run_lra(
+            adjusted_theta = super()._run_lra(
                 theta_accepted, x_accepted, observation=self.x_o
             )
+            is_within = self._is_within_prior_after_lra(adjusted_theta)
+            final_theta = adjusted_theta[is_within]
+            distances_accepted = distances_accepted[is_within]
+            x_accepted = x_accepted[is_within]
+            kde_kwargs = self._mask_kde_sample_weights(kde_kwargs, is_within)
         else:
             final_theta = theta_accepted
 

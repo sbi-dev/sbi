@@ -9,11 +9,12 @@ from typing import Callable, Dict, Optional, Tuple
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, as_tensor
-from tqdm.auto import tqdm
 
 from sbi.sbi_types import AcceptRejectFn, Proposal, SampleProposal
-from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc
+from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc, tqdm
 from sbi.utils.sbiutils import gradient_ascent
+
+logger = logging.getLogger(__name__)
 
 
 def rejection_sample(
@@ -204,8 +205,9 @@ def rejection_sample(
                 num_sampled_total > 1000
                 and acceptance_rate < warn_acceptance
                 and not leakage_warning_raised
+                and num_remaining > 0
             ):
-                logging.warning(
+                logger.warning(
                     f"""Only {acceptance_rate:.3%} proposal samples were accepted. It
                         may take a long time to collect the remaining {num_remaining}
                         samples. You can prevent long runtimes by
@@ -299,7 +301,7 @@ def accept_reject_sample(
         acceptance rates for each observation.
     """
     if kwargs:
-        logging.warning(
+        logger.warning(
             f"You passed arguments to `rejection_sampling_parameters` that "
             f"are unused when you do not specify a `proposal` in the same "
             f"dictionary. The unused arguments are: {kwargs}"
@@ -332,6 +334,9 @@ def accept_reject_sample(
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
     num_sampled_total = torch.zeros(num_xos)
     num_samples_possible = 0
+    # Shape of one draw without the sample dim: `(*event_shape)` for flat proposals,
+    # `(num_xos, *event_shape)` for batched ones. Set at each draw.
+    draw_shape = torch.Size()
 
     start_time = time.time()
     while num_remaining > 0:
@@ -356,6 +361,7 @@ def accept_reject_sample(
                     for i in range(num_xos)
                 ]
                 samples = torch.stack(samples, dim=1)
+                samples = samples.reshape(num_collected, *draw_shape)
                 return samples, as_tensor(acceptance_rate, device=samples.device)
             raise RuntimeError(
                 "Sampling aborted early because rejection sampling exceeded "
@@ -372,6 +378,7 @@ def accept_reject_sample(
                 torch.Size((sampling_batch_size,)),
                 **proposal_sampling_kwargs,
             )
+        draw_shape = candidates.shape[1:]
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
 
@@ -413,10 +420,11 @@ def accept_reject_sample(
             num_samples_possible > (sampling_batch_size - 1)
             and min_acceptance_rate < warn_acceptance
             and not leakage_warning_raised
+            and num_remaining > 0
         ):
             if sample_for_correction_factor:
                 idx_min = acceptance_rate.argmin().item()
-                logging.warning(
+                logger.warning(
                     f"""Drawing samples from posterior to estimate the normalizing
                         constant for `log_prob()`. However, only
                         {min_acceptance_rate:.3%} posterior samples are within the
@@ -424,8 +432,8 @@ def accept_reject_sample(
                         to collect the remaining {num_remaining} samples.
                         Consider interrupting (Ctrl-C) and either basing the
                         estimate of the normalizing constant on fewer samples (by
-                        calling `posterior.leakage_correction(x_o,
-                        num_rejection_samples=N)`, where `N` is the number of
+                        passing `leakage_correction_params={{"num_rejection_samples":
+                        N}}` to `log_prob()`, where `N` is the number of
                         samples you want to base the
                         estimate on (default N=10000), or not estimating the
                         normalizing constant at all
@@ -442,7 +450,7 @@ def accept_reject_sample(
                 if alternative_method is not None:
                     warn_msg += f"""Alternatively, consider interrupting (Ctrl-C)
                     and switching to `{alternative_method}`."""
-                logging.warning(warn_msg)
+                logger.warning(warn_msg)
 
             leakage_warning_raised = True  # Ensure warning is raised just once.
 
@@ -451,7 +459,7 @@ def accept_reject_sample(
     # When in case of leakage a batch size was used there could be too many samples.
     samples = [torch.cat(accepted[i], dim=0)[:num_samples] for i in range(num_xos)]
     samples = torch.stack(samples, dim=1)
-    samples = samples.reshape(num_samples, *candidates.shape[1:])
+    samples = samples.reshape(num_samples, *draw_shape)
     assert samples.shape[0] == num_samples, (
         "Number of accepted samples must match required samples."
     )

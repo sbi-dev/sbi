@@ -17,7 +17,7 @@ from typing import (
 import torch
 from numpy import ndarray
 from torch import Tensor, float32, nn
-from torch.distributions import Distribution, Uniform
+from torch.distributions import Distribution, Independent, Uniform
 
 from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
@@ -36,7 +36,6 @@ from sbi.utils.user_input_checks_utils import (
 
 if TYPE_CHECKING:
     from sbi.neural_nets.net_builders.estimator_configs import (
-        _EstimatorBuilderBase,
         _PerModelConfigBase,
     )
 
@@ -258,9 +257,13 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     check_prior_return_type(prior)
 
     # Potentially required wrapper if the prior returns an additional sample dimension
-    # for `.log_prob()`.
+    # for `.log_prob()`. Prefer `Independent`: the vector field methods recognise it
+    # and use exact formulas for it.
     if prior.log_prob(prior.sample(torch.Size((10,)))).shape == torch.Size([10, 1]):
-        prior = OneDimPriorWrapper(prior, validate_args=False)
+        if prior.batch_shape == torch.Size([1]):
+            prior = Independent(prior, 1, validate_args=False)
+        else:
+            prior = OneDimPriorWrapper(prior, validate_args=False)
 
     theta_numel = prior.sample().numel()
 
@@ -683,7 +686,7 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
 
 
 def check_estimator_arg(
-    estimator: Union[str, Callable, "_PerModelConfigBase", "_EstimatorBuilderBase"],
+    estimator: Union[str, Callable, "_PerModelConfigBase"],
 ) -> None:
     """Check (density or ratio) estimator argument passed by the user.
 
@@ -693,16 +696,16 @@ def check_estimator_arg(
     Args:
         estimator: The estimator argument to check.
     """
-    from sbi.neural_nets.net_builders.estimator_configs import _ESTIMATOR_CONFIG_BASES
+    from sbi.neural_nets.net_builders.estimator_configs import _PerModelConfigBase
 
-    if isinstance(estimator, type) and issubclass(estimator, _ESTIMATOR_CONFIG_BASES):
+    if isinstance(estimator, type) and issubclass(estimator, _PerModelConfigBase):
         raise TypeError(
             f"Got the config class {estimator.__name__}, not an instance. "
             f"Use {estimator.__name__}()."
         )
 
     if not (
-        isinstance(estimator, (str, *_ESTIMATOR_CONFIG_BASES))
+        isinstance(estimator, (str, _PerModelConfigBase))
         or (isinstance(estimator, Callable) and not isinstance(estimator, nn.Module))
     ):
         raise TypeError(

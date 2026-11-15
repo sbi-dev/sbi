@@ -12,8 +12,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Proposal, Shape, TorchTransform
-from sbi.utils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -71,34 +70,6 @@ class RejectionPosterior(NeuralPosterior):
             "It provides rejection sampling to .sample() from the posterior and "
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
-
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move potential fucntion, proposal and x_o to the device.
-
-        This method reinstantiates the posterior and resets the default x_o
-
-        Args:
-            device: The device to move the posterior to.
-        """
-        device = process_device(device)
-        self.device = device
-        self.potential_fn.to(device)  # type: ignore
-        self.proposal.to(device)
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-
-        self.theta_transform = mcmc_transform(self.proposal, device=device)
-        super().__init__(
-            self.potential_fn,
-            theta_transform=self.theta_transform,
-            device=device,
-            x_shape=self.x_shape,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
 
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
@@ -271,9 +242,11 @@ class RejectionPosterior(NeuralPosterior):
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be either `posterior` or `proposal`, which
+                samples the respective distribution `num_init_samples` times (the
+                proposal is the prior for posteriors from `build_posterior()`). If it
+                is a tensor, the tensor is used as the initial locations, so
+                prior-based initialization can be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the

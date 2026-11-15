@@ -132,7 +132,7 @@ class FilteredDirectPosterior(DirectPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
-        max_sampling_batch_size: int = 10_000,
+        max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -143,7 +143,8 @@ class FilteredDirectPosterior(DirectPosterior):
         Args:
             sample_shape: Shape of the returned sample batch.
             x: Observation to condition on. Uses the default observation if `None`.
-            max_sampling_batch_size: Maximum internal sampling batch size.
+            max_sampling_batch_size: Maximum internal sampling batch size. Uses the
+                value given to the constructor if `None`.
             show_progress_bars: Whether to display progress bars.
             reject_outside_prior: Whether to reject samples outside prior support.
             max_sampling_time: Optional timeout in seconds.

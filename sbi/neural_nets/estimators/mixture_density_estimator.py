@@ -12,16 +12,17 @@ with code originally developed by Conor M. Durkan et al.
 Based on: C. M. Bishop, "Mixture Density Networks", NCRG Report (1994)
 """
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
 from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
-from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.mog import MoG, correct_for_proposal
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import CallableTransform
+from sbi.utils.torchutils import infer_module_device
 
 
 class MultivariateGaussianMDN(nn.Module):
@@ -257,6 +258,41 @@ class MultivariateGaussianMDN(nn.Module):
         mog = self.get_mixture_components(context)
         return mog.sample(sample_shape)
 
+    def expand_components(self, num_components: int, perturbation: float) -> None:
+        """Replace the single component by `num_components` noisy copies of it.
+
+        Equal logits keep the density of the single component, and the noise lets
+        training move the copies apart (Papamakarios & Murray 2016, Algorithm 2).
+
+        Args:
+            num_components: Number of components after the expansion.
+            perturbation: Standard deviation of the noise on the copied weights.
+        """
+        assert self._num_components == 1
+        for name in (
+            "_logits_layer",
+            "_means_layer",
+            "_unconstrained_diagonal_layer",
+            "_upper_layer",
+        ):
+            layer = getattr(self, name)
+            if layer is None:
+                continue
+            expanded = nn.Linear(
+                layer.in_features,
+                layer.out_features * num_components,
+                device=layer.weight.device,
+                dtype=layer.weight.dtype,
+            )
+            # Outputs are ordered by component, so repeated rows copy components.
+            with torch.no_grad():
+                expanded.weight.copy_(layer.weight.repeat(num_components, 1))
+                expanded.bias.copy_(layer.bias.repeat(num_components))
+                expanded.weight.add_(torch.randn_like(expanded.weight) * perturbation)
+                expanded.bias.add_(torch.randn_like(expanded.bias) * perturbation)
+            setattr(self, name, expanded)
+        self._num_components = num_components
+
     def _initialize(self) -> None:
         """Initialize MDN for approximately uniform mixture and identity covariance.
 
@@ -350,10 +386,12 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             embedding_net: Optional network to embed the condition before passing
                 to the MDN. If provided, condition is first transformed by this
                 network. The output dimension must match net.context_features.
-            transform_input: Optional tensor of shape (2, input_dim) containing
-                [shift, scale] for z-score transformation of inputs. If provided,
-                inputs are transformed as: z = (x - shift) / scale before density
-                evaluation, and samples are inverse transformed as:
+            transform_input: Optional tensor of shape (2, *input_shape) containing
+                [shift, scale] for z-score transformation of inputs. Each row must
+                broadcast to input_shape, e.g. shape (2,) for one shift and scale
+                shared by all dimensions. If provided, inputs are transformed as:
+                z = (x - shift) / scale before density evaluation, and samples are
+                inverse transformed as:
                 x = z * scale + shift.
                 This is used for z-scoring inputs to improve numerical stability.
             prior_transform: Optional Transform mapping constrained -> unconstrained
@@ -391,17 +429,25 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         if transform_input is not None:
             if transform_input.shape[0] != 2:
                 raise ValueError(
-                    f"transform_input must have shape (2, input_dim), "
+                    f"transform_input must have shape (2, *input_shape), "
                     f"got {transform_input.shape}"
                 )
-            scale = transform_input[1]
+            try:
+                shift, scale = [
+                    row.expand(self.input_shape).contiguous() for row in transform_input
+                ]
+            except RuntimeError as err:
+                raise ValueError(
+                    f"transform_input rows must broadcast to input_shape "
+                    f"{tuple(self.input_shape)}, got {tuple(transform_input.shape)}"
+                ) from err
             if not torch.all(scale > 0):
                 raise ValueError(
                     "transform_input scale (second row) must be strictly positive, "
                     f"got values in range [{scale.min().item():.6f}, "
                     f"{scale.max().item():.6f}]"
                 )
-            self.register_buffer("_transform_shift", transform_input[0])
+            self.register_buffer("_transform_shift", shift)
             self.register_buffer("_transform_scale", scale)
         else:
             self.register_buffer("_transform_shift", None)
@@ -475,7 +521,91 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             return self._prior_transform.log_abs_det_jacobian(input, transformed_input)
         if self._transform_shift is None:
             return torch.zeros(1, device=input.device, dtype=input.dtype).squeeze()
-        return -torch.log(self._transform_scale).sum()
+        # The scale is 0-dim in estimators pickled with sbi <= 0.27.
+        return -torch.log(self._transform_scale).expand(self.input_shape).sum()
+
+    def _affine_transform(self) -> Optional[Tuple[Tensor, Tensor]]:
+        """Return (shift, scale) of the z-score z = (x - shift) / scale, or None.
+
+        Raises:
+            NotImplementedError: If the input transform is not affine.
+        """
+        if self._prior_transform is not None:
+            raise NotImplementedError(
+                "This needs an affine z-score of the inputs, so "
+                "z_score_theta='transform_to_unconstrained' is not supported. Use "
+                "'independent' or 'structured', or a different method."
+            )
+        if self._transform_shift is None:
+            return None
+        # The scale is 0-dim in estimators pickled with sbi <= 0.27.
+        return self._transform_shift, self._transform_scale.expand(self.input_shape)
+
+    def transform_mog(self, mog: MoG) -> MoG:
+        """Map a MoG over inputs into the transformed space of the estimator's MoGs.
+
+        The MoG is cast to the estimator's device and dtype first, so a float64
+        prior matches a float32 estimator.
+
+        Args:
+            mog: MoG over inputs, e.g. a Gaussian prior or proposal.
+
+        Returns:
+            MoG in transformed space.
+
+        Raises:
+            NotImplementedError: If the input transform is not affine.
+        """
+        param = next(self.parameters())
+        mog = mog.to(param.device, param.dtype)
+        affine = self._affine_transform()
+        if affine is None:
+            return mog
+        shift, scale = affine
+        return mog.standardize(shift, scale)
+
+    def inverse_transform_mog(self, mog: MoG) -> MoG:
+        """Map a MoG in transformed space, e.g. from `get_uncorrected_mog()`, to inputs.
+
+        Args:
+            mog: MoG in transformed space.
+
+        Returns:
+            MoG over inputs.
+
+        Raises:
+            NotImplementedError: If the input transform is not affine.
+        """
+        affine = self._affine_transform()
+        if affine is None:
+            return mog
+        shift, scale = affine
+        return mog.unstandardize(shift, scale)
+
+    def transform_mog_from(self, source: "MixtureDensityEstimator", mog: MoG) -> MoG:
+        """Map a MoG from the transformed space of `source` into this estimator's.
+
+        Args:
+            source: The estimator whose transformed space `mog` is in.
+            mog: MoG in the transformed space of `source`.
+
+        Returns:
+            MoG in this estimator's transformed space, on its device and dtype.
+
+        Raises:
+            NotImplementedError: If either input transform is not affine.
+        """
+        param = next(self.parameters())
+        mog = mog.to(param.device, param.dtype)
+        zeros = torch.zeros(self.input_shape, device=param.device, dtype=param.dtype)
+        ones = torch.ones_like(zeros)
+        source_shift, source_scale = source._affine_transform() or (zeros, ones)
+        shift, scale = self._affine_transform() or (zeros, ones)
+        # Map with the relative shift and scale: a way through inputs would lose
+        # small offsets at a large shift and overflow at a large scale in float32.
+        return mog.unstandardize(
+            (source_shift.to(param) - shift) / scale, source_scale.to(param) / scale
+        )
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         """Compute log probability of inputs given conditions.
@@ -492,7 +622,23 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
             Log probabilities. Shape (sample_dim, batch_dim) if input has sample_dim,
             otherwise (batch_dim,).
         """
-        self._check_condition_shape(condition)
+        return self.log_prob_from_mog(input, self.get_uncorrected_mog(condition))
+
+    def log_prob_from_mog(self, input: Tensor, mog: MoG) -> Tensor:
+        """Compute log probability of inputs under a given MoG.
+
+        The MoG lives in transformed space. As in `log_prob()`, inputs are transformed
+        before evaluation and the log-det-jacobian is added.
+
+        Args:
+            input: Inputs to evaluate, shape (sample_dim, batch_dim, *input_shape)
+                or (batch_dim, *input_shape).
+            mog: MoG in transformed space, with batch size batch_dim or 1.
+
+        Returns:
+            Log probabilities. Shape (sample_dim, batch_dim) if input has sample_dim,
+            otherwise (batch_dim,).
+        """
         self._check_input_shape(input)
 
         # Handle input with or without sample dimension
@@ -502,9 +648,6 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
         # Apply z-score transform to input if enabled
         transformed_input = self._transform_input(input)
-
-        # Get MoG from network
-        mog = self.get_uncorrected_mog(condition)
 
         # MoG.log_prob handles (sample_dim, batch_dim, dim) input
         # Change of variables: log p(x) = log p(z) + log|det(dz/dx)|
@@ -543,18 +686,23 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         Returns:
             Samples, shape (*sample_shape, batch_dim, *input_shape).
         """
-        self._check_condition_shape(condition)
+        return self.sample_from_mog(sample_shape, self.get_uncorrected_mog(condition))
 
-        # Get MoG from network
-        mog = self.get_uncorrected_mog(condition)
+    def sample_from_mog(self, sample_shape: torch.Size, mog: MoG) -> Tensor:
+        """Sample from a given MoG and map the samples back to input space.
 
+        Args:
+            sample_shape: Shape prefix for samples.
+            mog: MoG in transformed space, with batch size batch_dim.
+
+        Returns:
+            Samples, shape (*sample_shape, batch_dim, *input_shape).
+        """
         # MoG.sample returns (*sample_shape, batch_dim, dim) - matches sbi convention
         samples = mog.sample(sample_shape)
 
         # Apply inverse transform to get samples in original space
-        samples = self._inverse_transform_input(samples)
-
-        return samples
+        return self._inverse_transform_input(samples)
 
     def get_uncorrected_mog(self, condition: Tensor) -> MoG:
         """Extract MoG parameters for a given condition.
@@ -568,3 +716,84 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
         self._check_condition_shape(condition)
         embedded_condition = self._embedding_net(condition)
         return self.net.get_mixture_components(embedded_condition)
+
+
+class ProposalCorrectedMDN(ConditionalDensityEstimator):
+    """Mixture density estimator with the SNPE-A proposal correction.
+
+    Wraps a MixtureDensityEstimator trained on samples from a proposal. `sample()` and
+    `log_prob()` use the analytically corrected MoG
+        p(θ|x) ∝ q(θ|x) × prior(θ) / proposal(θ),
+    so every method of a posterior built on this estimator is corrected.
+    """
+
+    net: MixtureDensityEstimator
+
+    def __init__(
+        self,
+        estimator: MixtureDensityEstimator,
+        proposal_mog: MoG,
+        prior_mog: Optional[MoG] = None,
+    ) -> None:
+        """Initialize the corrected estimator.
+
+        Args:
+            estimator: The trained MixtureDensityEstimator.
+            proposal_mog: MoG of the proposal in the estimator's transformed space.
+            prior_mog: MoG of the prior in the estimator's transformed space. None for
+                uniform priors (which have zero precision).
+
+        Raises:
+            NotImplementedError: If the estimator's input transform is not affine.
+        """
+        estimator._affine_transform()  # Raises for a non-affine z-score.
+        super().__init__(estimator, estimator.input_shape, estimator.condition_shape)
+        device = infer_module_device(estimator, fallback="cpu")
+        self._proposal_mog = proposal_mog.to(device).detach()
+        self._prior_mog = (
+            prior_mog.to(device).detach() if prior_mog is not None else None
+        )
+
+    def _apply(self, fn, *args, **kwargs):
+        """Also apply `fn` to the proposal and prior MoGs, which are not buffers."""
+        super()._apply(fn, *args, **kwargs)
+        self._proposal_mog = self._proposal_mog.apply(fn)
+        if self._prior_mog is not None:
+            self._prior_mog = self._prior_mog.apply(fn)
+        return self
+
+    @property
+    def embedding_net(self) -> nn.Module:
+        """Return the embedding network of the wrapped estimator."""
+        return self.net.embedding_net
+
+    def get_corrected_mog(self, condition: Tensor) -> MoG:
+        """Return the proposal-corrected MoG for the given conditions.
+
+        Args:
+            condition: Conditions, shape (batch_dim, *condition_shape).
+
+        Returns:
+            Corrected MoG in the estimator's transformed space.
+        """
+        density_mog = self.net.get_uncorrected_mog(condition)
+        return correct_for_proposal(density_mog, self._proposal_mog, self._prior_mog)
+
+    def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        """Log probability under the corrected MoG; shapes as in the wrapped MDN."""
+        return self.net.log_prob_from_mog(input, self.get_corrected_mog(condition))
+
+    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
+        """Sample from the corrected MoG; shapes as in the wrapped MDN."""
+        return self.net.sample_from_mog(sample_shape, self.get_corrected_mog(condition))
+
+    def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        """Not supported: train the wrapped estimator, the correction is post hoc.
+
+        Raises:
+            NotImplementedError: Always.
+        """
+        raise NotImplementedError(
+            "ProposalCorrectedMDN cannot be trained. Train the wrapped "
+            "MixtureDensityEstimator; the correction is applied after training."
+        )

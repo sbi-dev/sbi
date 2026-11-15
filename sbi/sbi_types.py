@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-from typing import Any, Optional, Protocol, Sequence, Tuple, TypeVar, Union
+from typing import Any, Optional, Protocol, Sequence, Tuple, TypeAlias, TypeVar, Union
 
 import numpy as np
 import torch
@@ -9,7 +9,6 @@ from torch import Tensor
 from torch.distributions import Distribution
 from torch.distributions.transforms import Transform
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import TypeAlias
 
 Array = Union[np.ndarray, torch.Tensor]
 Shape = Union[torch.Size, Tuple[int, ...]]

@@ -4,7 +4,7 @@
 import pytest
 import torch
 from torch import Tensor, eye, norm, ones, zeros
-from torch.distributions import MultivariateNormal, biject_to
+from torch.distributions import Independent, MultivariateNormal, Uniform, biject_to
 
 from sbi.inference import MCABC, SMCABC
 from sbi.inference.abc.abc_base import ABCBASE
@@ -15,6 +15,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils.kde import KDEWrapper
 from sbi.utils.metrics import check_c2st
+from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import BoxUniform
 
 
@@ -80,7 +81,8 @@ def test_smcabc_performance(prior_type: str, algorithm_variant: str, kernel: str
     num_dim = 2
     x_o = zeros((1, num_dim))
     num_samples = 1000
-    num_simulations = 5000  # Reduced for faster tests
+    # The budget leaves room for SMC populations after the initial one.
+    num_simulations = 15000
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
 
@@ -348,7 +350,7 @@ def test_mcabc_coverage(test_params):
             {
                 "distance": "wasserstein",
                 "num_iid_samples": 2,
-                "distance_kwargs": {"epsilon": 1.0, "tol": 1e-6, "max_iter": 100},
+                "distance_kwargs": {"relative_epsilon": 0.1, "max_iter": 100},
             },
             id="smcabc-iid-wasserstein",
         ),
@@ -440,3 +442,100 @@ def test_sass_correctness():
     # Should be deterministic
     x_transformed_2 = sass_transform(x_test)
     assert torch.allclose(x_transformed, x_transformed_2)
+
+
+def test_smcabc_resampling_keeps_particles_paired_with_simulations():
+    """Resampling at low ESS must reorder distances and simulations with particles."""
+    prior = BoxUniform(-ones(2), ones(2))
+    smcabc = SMCABC(lambda theta: theta + 0.01 * torch.randn_like(theta), prior)
+    _, summary = smcabc(
+        zeros(1, 2),
+        num_particles=200,
+        num_initial_pop=500,
+        num_simulations=3000,
+        epsilon_decay=0.5,
+        distance_based_decay=True,
+        ess_min=0.99,
+        return_summary=True,
+    )
+
+    for particles, distances, xs in zip(
+        summary["particles"], summary["distances"], summary["xs"], strict=True
+    ):
+        assert (particles - xs).abs().max() < 0.1
+        assert torch.allclose(distances, smcabc.distance(zeros(1, 2), xs))
+
+
+@pytest.mark.parametrize(
+    "distances, quantile, expected",
+    [
+        pytest.param([0.0, 0.1, 0.2, 100.0], 0.5, 0.1, id="heavy-tail"),
+        pytest.param([0.0, 0.1, 0.2, 100.0], 1.0, 100.0, id="upper-bound"),
+        pytest.param(torch.tensor([0, 1, 2, 100]), 0.5, 1.0, id="integer"),
+        pytest.param([0.0, 1.0, float("inf")], 1.0, 1.0, id="drops-inf"),
+    ],
+)
+def test_smcabc_next_epsilon_is_distance_quantile(distances, quantile, expected):
+    """`distance_based_decay` must use a quantile of the finite distances."""
+    epsilon = SMCABC._get_next_epsilon(torch.as_tensor(distances), quantile)
+
+    assert epsilon == pytest.approx(expected)
+
+
+def test_smcabc_next_epsilon_raises_without_finite_distances():
+    """All-infinite distances must raise instead of returning NaN."""
+    with pytest.raises(ValueError, match="non-finite"):
+        SMCABC._get_next_epsilon(torch.tensor([float("inf")] * 3), 0.5)
+
+
+@pytest.mark.parametrize("epsilon_decay", [0.0, 1.5])
+def test_smcabc_rejects_invalid_quantile_with_distance_based_decay(epsilon_decay):
+    """`epsilon_decay` is a quantile then, so values outside (0, 1] fail early."""
+    prior = BoxUniform(-ones(2), ones(2))
+    smcabc = SMCABC(lambda theta: theta, prior)
+
+    with pytest.raises(ValueError, match="quantile"):
+        smcabc(
+            zeros(1, 2),
+            num_particles=10,
+            num_initial_pop=20,
+            num_simulations=100,
+            epsilon_decay=epsilon_decay,
+            distance_based_decay=True,
+        )
+    assert smcabc.simulation_counter == 0
+
+
+@pytest.mark.parametrize(
+    "method, call_kwargs, per_sample_key",
+    [
+        (MCABC, dict(num_simulations=2000, quantile=0.1), "distances"),
+        (
+            SMCABC,
+            dict(
+                num_particles=200,
+                num_initial_pop=500,
+                num_simulations=2000,
+                epsilon_decay=0.5,
+            ),
+            "final_weights",
+        ),
+    ],
+)
+def test_lra_removes_parameters_outside_bounded_prior(
+    method, call_kwargs, per_sample_key
+):
+    """LRA near the prior bound must neither return parameters outside nor raise."""
+    # Validation is set per instance: zuko and pyro flip torch's global default.
+    prior = Independent(Uniform(-ones(2), ones(2), validate_args=True), 1)
+    inferer = method(lambda theta: theta + 0.1 * torch.randn_like(theta), prior)
+
+    with pytest.warns(UserWarning, match="outside the prior support"):
+        samples, summary = inferer(
+            0.95 * ones(1, 2), lra=True, return_summary=True, **call_kwargs
+        )
+
+    assert within_support(prior, samples).all()
+    assert len(summary[per_sample_key]) == len(samples)
+    if method is SMCABC:
+        assert torch.isclose(summary["final_weights"].exp().sum(), torch.tensor(1.0))

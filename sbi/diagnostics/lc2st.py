@@ -16,9 +16,9 @@ from skorch import NeuralNetBinaryClassifier
 from skorch.callbacks import EarlyStopping
 from skorch.dataset import ValidSplit
 from torch import Tensor
-from tqdm import tqdm
 
 from sbi.utils.metrics import MLPClassifierModule
+from sbi.utils.pbar import tqdm
 from sbi.utils.sbiutils import handle_invalid_x
 
 # Default MLP classifier hyperparameters
@@ -87,10 +87,10 @@ class LC2ST:
 
     To evaluate the test, steps 1 and 2 are performed over multiple trials under the
     null hypothesis (H0). If the null distribution is not known, it is estimated
-    using the permutation method, i.e. by training the classifier on the permuted
-    data. The statistics obtained under (H0) is then compared to the one obtained
-    on observed data to compute the p-value, used to decide whether to reject (H0)
-    or not.
+    using the permutation method, i.e. by training the classifier on data whose P
+    and Q labels are randomly swapped within each pair sharing an observation. The
+    statistics obtained under (H0) is then compared to the one obtained on observed
+    data to compute the p-value, used to decide whether to reject (H0) or not.
 
     Example:
         >>> lc2st = LC2ST(prior_samples, xs, posterior_samples, num_folds=5)
@@ -466,7 +466,8 @@ class LC2ST:
             Normalized theta if z_score is enabled, otherwise unchanged theta.
         """
         if self.z_score:
-            return (theta - self.theta_p_mean) / self.theta_p_std
+            device = theta.device
+            return (theta - self.theta_p_mean.to(device)) / self.theta_p_std.to(device)
         return theta
 
     def _normalize_x(self, x: Tensor) -> Tensor:
@@ -479,7 +480,7 @@ class LC2ST:
             Normalized x if z_score is enabled, otherwise unchanged x.
         """
         if self.z_score:
-            return (x - self.x_p_mean) / self.x_p_std
+            return (x - self.x_p_mean.to(x.device)) / self.x_p_std.to(x.device)
         return x
 
     @property
@@ -523,7 +524,7 @@ class LC2ST:
         if self.num_folds > 1:
             trained_clfs = []
             kf = KFold(n_splits=self.num_folds, shuffle=True, random_state=self.seed)
-            cv_splits = kf.split(theta_p.numpy())
+            cv_splits = kf.split(theta_p.cpu().numpy())
             for train_idx, _ in tqdm(
                 cv_splits, desc="Cross-validation", disable=verbosity < 1
             ):
@@ -684,10 +685,10 @@ class LC2ST:
     ) -> float:
         r"""Computes the p-value for L-C2ST.
 
-        The p-value is the proportion of times the L-C2ST statistic under the null
-        hypothesis is greater than the L-C2ST statistic at the observation `x_o`.
-        It is computed by taking the empirical mean over statistics computed on
-        several trials under the null hypothesis: $1/H \sum_{h=1}^{H} I(T_h < T_o)$.
+        The p-value is the proportion of the L-C2ST statistics under the null
+        hypothesis that are at least as large as the L-C2ST statistic at the
+        observation `x_o`, counting the observed statistic as one of them:
+        $(1 + \sum_{h=1}^{H} I(T_h \geq T_o)) / (H + 1)$.
 
         Args:
             theta_o: Samples from the posterior conditioned on the observation `x_o`,
@@ -717,7 +718,8 @@ class LC2ST:
             theta_o=theta_o, x_o=x_o, verbosity=0
         )
         assert isinstance(stats_null, LC2STScores)
-        return float((stat_data < stats_null.scores).mean())
+        num_extreme = (stat_data <= stats_null.scores).sum()
+        return float((1 + num_extreme) / (1 + len(stats_null.scores)))
 
     def reject_test(
         self,
@@ -771,19 +773,12 @@ class LC2ST:
         ):
             # Prepare data
             if self.permutation:
-                joint_p = torch.cat([self.theta_p, self.x_p], dim=1)
-                joint_q = torch.cat([self.theta_q, self.x_q], dim=1)
-                # Permute data (same as permuting the labels)
-                joint_p_perm, joint_q_perm = permute_data(joint_p, joint_q, seed=t)
-                # Extract the permuted P and Q and x
-                theta_p_t, x_p_t = (
-                    joint_p_perm[:, : self.theta_p.shape[-1]],
-                    joint_p_perm[:, self.theta_p.shape[1] :],
+                theta_p_t, theta_q_t = permute_data(
+                    self.theta_p,
+                    self.theta_q,
+                    seed=self.seed * self.num_trials_null + t,
                 )
-                theta_q_t, x_q_t = (
-                    joint_q_perm[:, : self.theta_q.shape[-1]],
-                    joint_q_perm[:, self.theta_q.shape[1] :],
-                )
+                x_p_t, x_q_t = self.x_p, self.x_q
             else:
                 if self.null_distribution is None:
                     raise ValueError(
@@ -1054,10 +1049,10 @@ class LC2ST_NF(LC2ST):
     ) -> float:
         r"""Computes the p-value for L-C2ST.
 
-        The p-value is the proportion of times the L-C2ST statistic under the null
-        hypothesis is greater than the L-C2ST statistic at the observation `x_o`.
-        It is computed by taking the empirical mean over statistics computed on
-        several trials under the null hypothesis: $1/H \sum_{h=1}^{H} I(T_h < T_o)$.
+        The p-value is the proportion of the L-C2ST statistics under the null
+        hypothesis that are at least as large as the L-C2ST statistic at the
+        observation `x_o`, counting the observed statistic as one of them:
+        $(1 + \sum_{h=1}^{H} I(T_h \geq T_o)) / (H + 1)$.
 
         Args:
             x_o: The observation, of shape (, dim_x).
@@ -1210,25 +1205,30 @@ def eval_lc2st(
 def permute_data(
     theta_p: Tensor, theta_q: Tensor, seed: int = 1
 ) -> Tuple[Tensor, Tensor]:
-    """Permutes the concatenated data [P,Q] to create null samples.
+    """Swaps the P and Q labels within each pair to create null samples.
+
+    Row `i` of P and row `i` of Q must share the observation `x_i`. Each pair is
+    swapped with probability 1/2.
+
+    The swaps depend only on `seed`; the global torch RNG is left untouched.
 
     Args:
         theta_p: samples from P, of shape (sample_size, dim).
-        theta_q: samples from Q, of shape (sample_size, dim).
+        theta_q: samples from Q, of shape (sample_size, dim), row-aligned with
+            `theta_p`.
         seed: random seed, defaults to 1.
 
     Returns:
         Tuple of (theta_p_permuted, theta_q_permuted), each of shape (sample_size, dim).
     """
-    # set seed
-    torch.manual_seed(seed)
     # check inputs
-    assert theta_p.shape[0] == theta_q.shape[0]
+    assert theta_p.shape == theta_q.shape
 
-    sample_size = theta_p.shape[0]
-    X = torch.cat([theta_p, theta_q], dim=0)
-    x_perm = X[torch.randperm(sample_size * 2)]
-    return x_perm[:sample_size], x_perm[sample_size:]
+    generator = torch.Generator().manual_seed(seed)
+    # The generator lives on the CPU, whatever the default device is.
+    swap = torch.rand(theta_p.shape[0], generator=generator, device="cpu") < 0.5
+    swap = swap.to(theta_p.device).unsqueeze(-1)
+    return torch.where(swap, theta_q, theta_p), torch.where(swap, theta_p, theta_q)
 
 
 class EnsembleClassifier(BaseEstimator):

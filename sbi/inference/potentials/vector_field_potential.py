@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor, nn
@@ -91,17 +91,43 @@ class VectorFieldBasedPotential(BasePotential):
         """Return the net embedding `x`: the estimator's condition is `x`."""
         return self.vector_field_estimator.embedding_net
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Moves the vector field estimator, prior and x_o to the given device.
+    @property
+    def num_iid_observations(self) -> int:
+        """Number of iid observations combined: batch size of `x_o` if iid, else 1."""
+        if self._x_o is None or not self.x_is_iid:
+            return 1
+        return self._x_o.shape[0]
 
-        It also sets the device attribute to the given device.
+    @property
+    def init_std_scale(self) -> float:
+        """Initial noise scale: 1/sqrt(N) for fnpe with N iid observations, else 1.
+
+        Assumes the default fnpe prior weight, which is zero at `t_max`.
+        """
+        if self.iid_method == "fnpe":
+            return self.num_iid_observations**-0.5
+        return 1.0
+
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the vector field estimator, its ODE, the prior and x_o to `device`.
 
         Args:
-            device: Device to move the vector field estimator, prior and x_o to.
+            device: Device to move the potential to.
+
+        Returns:
+            Self for method chaining.
         """
         super().to(device)
         self.vector_field_estimator.to(self.device)
+        self.neural_ode.to(self.device)
+        # Cached flows hold x_o and the ODE's base distribution of the old device.
+        flow_kwargs = getattr(self, "_flow_kwargs", {})
+        if self._x_o is not None:
+            if getattr(self, "flow", None) is not None:
+                self.flow = self.rebuild_flow(**flow_kwargs)
+            if getattr(self, "flows", None) is not None:
+                self.flows = self.rebuild_flows_for_batch(**flow_kwargs)
+        return self
 
     def set_x(
         self,
@@ -151,6 +177,7 @@ class VectorFieldBasedPotential(BasePotential):
         self.iid_params = bound.iid_params
         self.guidance_method = bound.guidance_method
         self.guidance_params = bound.guidance_params
+        self._flow_kwargs = bound._flow_kwargs
         if not x_is_iid and (bound._x_o is not None):
             self.flow = bound.flow
         elif bound._x_o is not None:
@@ -196,6 +223,8 @@ class VectorFieldBasedPotential(BasePotential):
         bound._x_is_iid = x_is_iid
         bound.guidance_method = guidance_method
         bound.guidance_params = guidance_params
+        # Kept so that `to()` rebuilds the flows with the same ODE options.
+        bound._flow_kwargs = ode_kwargs
         if not x_is_iid and (bound._x_o is not None):
             bound.flow = bound.rebuild_flow(**ode_kwargs)
         elif bound._x_o is not None:
@@ -325,7 +354,7 @@ class VectorFieldBasedPotential(BasePotential):
             vf_estimator = self.vector_field_estimator
 
         with torch.set_grad_enabled(track_gradients):
-            if not self.x_is_iid or self._x_o.shape[0] == 1:
+            if self.num_iid_observations == 1:
                 score = vf_estimator.score(
                     input=theta, condition=self.x_o, t=time.to(device)
                 )

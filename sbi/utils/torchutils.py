@@ -5,11 +5,13 @@
 
 import os
 import warnings
+from itertools import chain
 from typing import (
     Any,
     Callable,
     Dict,
     Generator,
+    Iterator,
     List,
     Optional,
     OrderedDict,
@@ -20,7 +22,7 @@ from typing import (
 import numpy as np
 import torch
 from torch import Tensor, float32
-from torch.distributions import Independent, Uniform
+from torch.distributions import Independent, Uniform, biject_to, constraints
 from torch.nn import Module
 
 from sbi.sbi_types import Array, OneOrMore, Shape
@@ -238,6 +240,38 @@ def infer_module_device(module: torch.nn.Module, fallback: str) -> str:
             return fallback
 
 
+def _iter_tensors(obj: Any) -> Iterator[Tensor]:
+    """Yield every tensor reachable from `obj` via attributes, dicts and sequences.
+
+    Depth first, in attribute order; a module yields its parameters and buffers
+    before its other attributes.
+    """
+    seen: set = set()
+
+    def _walk(current: Any) -> Iterator[Tensor]:
+        if id(current) in seen:
+            return
+        seen.add(id(current))
+        if isinstance(current, Module):
+            for tensor in chain(current.parameters(), current.buffers()):
+                if id(tensor) not in seen:
+                    seen.add(id(tensor))
+                    yield tensor
+        if isinstance(current, Tensor):
+            yield current
+        elif isinstance(current, dict):
+            for value in current.values():
+                yield from _walk(value)
+        elif isinstance(current, (list, tuple)):
+            for value in current:
+                yield from _walk(value)
+        elif hasattr(current, "__dict__"):
+            for value in vars(current).values():
+                yield from _walk(value)
+
+    yield from _walk(obj)
+
+
 def infer_tensor_device(obj: Any) -> Optional[str]:
     """Return the device of the first tensor or module parameter reachable from `obj`.
 
@@ -248,43 +282,39 @@ def infer_tensor_device(obj: Any) -> Optional[str]:
         Device string, e.g. `"cpu"`, `"cuda:0"` or `"mps:0"`, or `None` if the graph
         contains no tensor or module with parameters or buffers.
     """
+    return next((str(tensor.device) for tensor in _iter_tensors(obj)), None)
 
-    def _infer(current: Any, seen: set) -> Optional[str]:
-        if id(current) in seen:
-            return None
-        seen.add(id(current))
 
-        if isinstance(current, Module):
-            try:
-                return str(next(current.parameters()).device)
-            except StopIteration:
-                try:
-                    return str(next(current.buffers()).device)
-                except StopIteration:
-                    pass
+def all_tensors_on_device(obj: Any, device: Union[str, torch.device]) -> bool:
+    """Return whether every tensor reachable from `obj` lives on `device`.
 
-        if isinstance(current, Tensor):
-            return str(current.device)
+    Args:
+        obj: Root object of the graph to inspect.
+        device: Device to compare with.
 
-        if isinstance(current, dict):
-            for value in current.values():
-                device = _infer(value, seen)
-                if device is not None:
-                    return device
-        elif isinstance(current, (list, tuple)):
-            for value in current:
-                device = _infer(value, seen)
-                if device is not None:
-                    return device
-        elif hasattr(current, "__dict__"):
-            for value in vars(current).values():
-                device = _infer(value, seen)
-                if device is not None:
-                    return device
+    Returns:
+        False if a reachable tensor lives elsewhere, True otherwise, also if `obj`
+        reaches no tensor.
+    """
+    target = canonical_device(device)
+    return all(canonical_device(t.device) == target for t in _iter_tensors(obj))
 
-        return None
 
-    return _infer(obj, set())
+def move_tensors(value: Any, device: Union[str, torch.device]) -> Any:
+    """Move every tensor in `value`, also inside nested tuples and lists.
+
+    Args:
+        value: A tensor, a tuple or list that may hold tensors, or any other value.
+        device: Device to move the tensors to.
+
+    Returns:
+        `value` with its tensors on `device`; other values are returned unchanged.
+    """
+    if isinstance(value, Tensor):
+        return value.to(device)
+    if isinstance(value, (tuple, list)):
+        return type(value)(move_tensors(v, device) for v in value)
+    return value
 
 
 def tile(x: Tensor, n: int) -> Tensor:
@@ -924,3 +954,56 @@ def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> 
 
     with torch.no_grad():
         _base_recursor(obj, check=check, action=action)
+
+
+# Torch >= 2.8 wraps the support of a mixture; older versions return the support of
+# the components.
+_MixtureSupport = getattr(constraints, "MixtureSameFamilyConstraint", None)
+
+
+def unwrap_mixture_support(
+    support: constraints.Constraint,
+    event_shape: torch.Size,
+    device: Union[str, torch.device],
+) -> constraints.Constraint:
+    """Return the support with each mixture support replaced by the component one.
+
+    Torch defines the support of a mixture as the intersection of the component
+    supports. This is only correct when the support does not depend on the component
+    parameters. Supports without a bijection, e.g. discrete ones, stay unchanged.
+
+    Args:
+        support: The prior support, e.g. of a mixture or an `Independent` mixture.
+        event_shape: The event shape of the prior.
+        device: The device of the prior.
+
+    Raises:
+        ValueError: If the support of a mixture depends on the component parameters.
+    """
+    if isinstance(support, constraints.independent):
+        return constraints.independent(
+            unwrap_mixture_support(support.base_constraint, event_shape, device),
+            support.reinterpreted_batch_ndims,
+        )
+    if _MixtureSupport is None or not isinstance(support, _MixtureSupport):
+        return support
+    component_support = support.base_constraint
+    # Bounds set per component broadcast the size-1 component axis; a fixed support
+    # keeps it.
+    component_event_shape = event_shape[
+        len(event_shape) - component_support.event_dim :
+    ]
+    probe = torch.zeros(1, 1, *component_event_shape, device=device)
+    try:
+        probe_shape = biject_to(component_support).inv(probe).shape
+    except NotImplementedError:
+        return support
+    if probe_shape != probe.shape:
+        raise ValueError(
+            "The support of this mixture prior depends on the parameters of its "
+            "components, e.g. the bounds of uniform components or the scale of "
+            "Pareto components. sbi supports mixture priors only when the support "
+            "of the components is fixed, e.g. Gaussian, LogNormal or Gamma "
+            "components."
+        )
+    return component_support

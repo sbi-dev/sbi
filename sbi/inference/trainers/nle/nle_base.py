@@ -9,6 +9,7 @@ from typing import (
     Dict,
     Literal,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Union,
@@ -17,7 +18,6 @@ from typing import (
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import Self
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -38,10 +38,10 @@ from sbi.neural_nets.estimators.shape_handling import (
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
     _DENSITY_CONFIGS,
-    _ESTIMATOR_CONFIG_BASES,
     DensityConfigBase,
     MAFConfig,
     PretrainedConfigBase,
+    _PerModelConfigBase,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
@@ -120,7 +120,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
                 stacklevel=3,
             )
             self._build_neural_net = likelihood_nn(model=density_estimator)
-        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
+        elif isinstance(density_estimator, _PerModelConfigBase):
             if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
                 allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
                 hint = self._BUILDER_TYPE_HINT or getattr(

@@ -60,7 +60,7 @@ posterior = inference.build_posterior()
 
 ### Installation
 
-`sbi` requires Python 3.10 or higher. While a GPU isn't necessary, it can
+`sbi` requires Python 3.11 or higher. While a GPU isn't necessary, it can
 improve performance in some cases. We recommend using
 [`uv`](https://docs.astral.sh/uv/) for package management:
 
@@ -93,6 +93,10 @@ print(posterior)
 
 If you're new to `sbi`, we recommend starting with our [Getting
 Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html) tutorial.
+
+If you use a coding agent, point it to
+[`llms.txt`](https://sbi.readthedocs.io/en/stable/llms.txt), an index of the
+documentation of the current release.
 
 The tutorials are Jupyter notebooks in
 [`docs/tutorials/`](https://github.com/sbi-dev/sbi/tree/main/docs/tutorials). To run

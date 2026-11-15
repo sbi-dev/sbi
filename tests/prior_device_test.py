@@ -3,13 +3,21 @@
 
 import pytest
 import torch
-from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal, Normal
+from torch.distributions import (
+    Beta,
+    Binomial,
+    Gamma,
+    Multinomial,
+    MultivariateNormal,
+    Normal,
+)
 
 from sbi.utils import RestrictedPrior
 from sbi.utils.torchutils import BoxUniform, process_device
 from sbi.utils.user_input_checks_utils import (
     MultipleIndependent,
     PytorchReturnTypeWrapper,
+    get_distribution_parameters,
 )
 from tests.test_utils import skip_if_mps_op_unsupported
 
@@ -137,3 +145,13 @@ def test_restricted_prior_stores_resolved_device():
 
     restricted = RestrictedPrior(prior, accept_all, device="cpu:0")
     assert restricted._device == "cpu"
+
+
+def test_rebuilt_multinomial_keeps_total_count():
+    """A `Multinomial` rebuilt for a move keeps its `total_count`."""
+    dist = Multinomial(total_count=10, probs=torch.tensor([0.2, 0.3, 0.5]))
+
+    rebuilt = Multinomial(**get_distribution_parameters(dist, "cpu"))
+
+    assert rebuilt.total_count == 10
+    assert rebuilt.sample().sum() == 10

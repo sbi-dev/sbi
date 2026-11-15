@@ -3,12 +3,11 @@
 
 from copy import deepcopy
 from dataclasses import asdict
-from typing import Any, Dict, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Self, Sequence, Tuple, Union
 
 from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
-from typing_extensions import Self
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -30,8 +29,8 @@ from sbi.neural_nets.estimators.base import (
 )
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.neural_nets.net_builders.estimator_configs import (
-    _ESTIMATOR_CONFIG_BASES,
     TabPFNConfig,
+    _PerModelConfigBase,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -100,7 +99,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             density_estimator = TabPFNConfig()
         if isinstance(density_estimator, TabPFNConfig):
             self._build_neural_net = self._wrap_builder(density_estimator)
-        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
+        elif isinstance(density_estimator, _PerModelConfigBase):
             raise TypeError(
                 "NPE_PFN requires a TabPFNConfig; got "
                 f"{type(density_estimator).__name__}."

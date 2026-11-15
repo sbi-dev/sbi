@@ -8,6 +8,7 @@ Neural nets
    :maxdepth: 1
 
    03_choose_neural_net.ipynb
+   27_estimator_configs.ipynb
    04_embedding_networks.ipynb
    20_time_series_embedding.ipynb
    08_permutation_invariant_embeddings.ipynb

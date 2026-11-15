@@ -6,7 +6,7 @@ and z-score computation.
 
 ``ZScoreConfig`` captures the user's preprocessing choice (per-axis z-score mode).
 ``ZScoreStats`` holds the computed statistics. ``BuildContext`` bundles all
-data-derived state needed by ``_EstimatorBuilderBase.build()``.
+data-derived state needed to build an estimator.
 
 ``compute_z_score_stats`` is a pure helper that bridges config + data → stats.
 """

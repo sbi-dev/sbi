@@ -4,10 +4,15 @@
 from __future__ import annotations
 
 import math
+import warnings
 
 import numpy as np
 import pytest
 import torch
+from scipy.optimize import linear_sum_assignment
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
 from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import (
@@ -20,10 +25,12 @@ from sbi.utils.metrics import (
     mse_distance,
     posterior_shrinkage,
     posterior_zscore,
+    regularized_ot_dual,
     unbiased_mmd_squared_hypothesis_test,
     wasserstein_2_squared,
     wasserstein_distance,
 )
+from sbi.utils.torchutils import process_device
 
 ## c2st related:
 ## for a study about c2st see https://github.com/psteinb/c2st/
@@ -87,6 +94,78 @@ def test_c2st_with_constant_features(dims_constant: int):
     c2st(x, y)
 
 
+@pytest.mark.parametrize(
+    "classifier",
+    (
+        LogisticRegression,
+        KNeighborsClassifier,
+        lambda **kwargs: KNeighborsClassifier(**kwargs),
+    ),
+)
+def test_c2st_custom_classifier(classifier):
+    x = torch.randn(200, 2)
+    y = torch.randn(200, 2) + 3.0
+    assert c2st(x, y, classifier=classifier) > 0.9
+
+
+@pytest.mark.parametrize(
+    "classifier_kwargs, random_state",
+    (({"n_estimators": 5}, 3), ({"n_estimators": 5, "random_state": 7}, 7)),
+)
+def test_c2st_passes_kwargs_and_seed(classifier_kwargs, random_state):
+    built = []
+
+    def factory(**kwargs):
+        built.append(RandomForestClassifier(**kwargs))
+        return built[-1]
+
+    x, y = torch.randn(50, 2), torch.randn(50, 2)
+    c2st(x, y, seed=3, classifier=factory, classifier_kwargs=classifier_kwargs)
+    assert built[0].n_estimators == 5
+    assert built[0].random_state == random_state
+    c2st(x, y, classifier_kwargs=classifier_kwargs)
+
+
+def test_c2st_clones_classifier_instance():
+    x, y = torch.randn(100, 2), torch.randn(100, 2) + 1.0
+    clf = RandomForestClassifier(n_estimators=5)
+    score = c2st(x, y, classifier=clf, classifier_kwargs={"max_depth": 2})
+    expected = c2st(
+        x,
+        y,
+        classifier=RandomForestClassifier,
+        classifier_kwargs={"n_estimators": 5, "max_depth": 2},
+    )
+    assert score == expected
+    assert clf.get_params() == RandomForestClassifier(n_estimators=5).get_params()
+    assert not hasattr(clf, "estimators_")
+
+
+@pytest.mark.parametrize(
+    "classifier", ("svm", 123, LinearRegression, LinearRegression())
+)
+def test_c2st_invalid_classifier_raises(classifier):
+    with pytest.raises(ValueError, match="classifier"):
+        c2st(torch.randn(50, 2), torch.randn(50, 2), classifier=classifier)
+
+
+def test_c2st_keeps_inputs_unchanged():
+    x = torch.randn(100, 2, requires_grad=True)
+    y = torch.randn(100, 2)
+    x_orig, y_orig = x.detach().clone(), y.clone()
+    c2st(x, y, z_score=False, noise_scale=1.0)
+    assert torch.equal(x, x_orig)
+    assert torch.equal(y, y_orig)
+
+
+@pytest.mark.gpu
+def test_c2st_with_noise_on_gpu():
+    device = process_device("gpu")
+    x = torch.randn(100, 2, device=device)
+    y = torch.randn(100, 2, device=device) + 3.0
+    assert c2st(x, y, noise_scale=0.1) > 0.9
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "sigma",
@@ -106,7 +185,7 @@ def test_wasserstein_2_distance(sigma):
 
     otherdist = tmvn(loc=sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
     Y = otherdist.sample((nsamples - 1,))
-    estimate = wasserstein_2_squared(X, Y, epsilon=5e-4).item()
+    estimate = wasserstein_2_squared(X, Y).item()
 
     # Check if the wasserstein estimate is of the same order
     # as the analytically derived squared Wasserstein-2 distance
@@ -117,6 +196,58 @@ def test_wasserstein_2_distance(sigma):
     )
     exponent2 = 0 if estimate == 0 else int(math.floor(math.log10(abs(estimate))))
     assert exponent1 == exponent2
+
+
+def _ot_inputs(dtype, batch=False):
+    torch.manual_seed(0)
+    x, y = torch.randn(100, 2), torch.randn(100, 2) + 1.0
+    a = torch.ones(100, dtype=dtype) / 100
+    cost = torch.cdist(x, y).to(dtype) ** 2
+    if batch:
+        return a.repeat(2, 1), a.repeat(2, 1), torch.stack([cost, 4 * cost])
+    return a, a, cost
+
+
+@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
+@pytest.mark.parametrize("batch", (False, True))
+def test_regularized_ot_dual_converged_does_not_warn(dtype, batch):
+    a, b, cost = _ot_inputs(dtype, batch)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        coupling = regularized_ot_dual(a, b, cost)
+    assert (coupling.sum(-1) - a).abs().sum(-1).max() < 2e-3
+    assert (coupling.sum(-2) - b).abs().sum(-1).max() < 2e-3
+
+
+@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
+def test_regularized_ot_dual_warns_when_not_converged(dtype):
+    a, b, cost = _ot_inputs(dtype)
+    with pytest.warns(UserWarning, match="did not converge"):
+        regularized_ot_dual(a, b, cost, relative_epsilon=1e-3, max_iter=10)
+
+
+def test_wasserstein_distance_regularizes_each_pair_separately():
+    torch.manual_seed(0)
+    x_o = torch.randn(10, 2)
+    x = torch.randn(3, 10, 2) * torch.tensor([0.1, 1.0, 10.0]).view(3, 1, 1)
+    separately = torch.stack([wasserstein_2_squared(x_o, x_i) for x_i in x])
+    assert torch.allclose(wasserstein_distance(x_o, x), separately)
+
+
+@pytest.mark.parametrize("scale", (1e-2, 1e2))
+def test_wasserstein_2_squared_defaults_match_exact_ot(scale):
+    torch.manual_seed(0)
+    x, y = scale * torch.randn(100, 2), scale * (torch.randn(100, 2) + 1.0)
+    cost = (torch.cdist(x, y) ** 2).double().numpy()
+    exact = cost[linear_sum_assignment(cost)].mean()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        estimate = wasserstein_2_squared(x, y).item()
+    assert estimate == pytest.approx(exact, rel=0.02)
+
+
+def test_wasserstein_2_squared_of_identical_points_is_zero():
+    assert wasserstein_2_squared(torch.ones(5, 2), torch.ones(5, 2)) == 0
 
 
 @pytest.mark.slow

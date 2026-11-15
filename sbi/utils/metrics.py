@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import inspect
 import warnings
 from functools import partial
 from typing import Any, Callable, Dict, Optional, Sequence, Union
@@ -8,6 +9,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Union
 import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.base import BaseEstimator, clone, is_classifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neural_network import MLPClassifier
@@ -59,14 +61,13 @@ def c2st(
     seed: int = 1,
     n_folds: int = 5,
     metric: str = "accuracy",
-    classifier: Union[str, Callable] = "rf",
+    classifier: Union[str, BaseEstimator, Callable] = "rf",
     classifier_kwargs: Optional[Dict[str, Any]] = None,
     z_score: bool = True,
     noise_scale: Optional[float] = None,
     verbosity: int = 0,
 ) -> Tensor:
-    """
-    Return classifier based two-sample test accuracy between X and Y.
+    """Return classifier based two-sample test accuracy between X and Y.
 
     For details on the method, see [1,2]. If the returned accuracy is 0.5, <X>
     and <Y> are considered to be from the same generating PDF, i.e. they can not
@@ -84,18 +85,22 @@ def c2st(
     done. If features in <X> are close to constant with std close to zero, the
     std is set to 1 to avoud division by zero.
 
-    If you need a more flexible interface which is able to take a sklearn
-    compatible classifier and more, see the `c2st_` method in this module.
-
     Args:
-        X: Samples from one distribution. Y: Samples from another distribution.
-        seed: Seed for the sklearn classifier and the KFold cross-validation
-        n_folds: Number of folds to use metric: sklearn compliant metric to use
-        for the scoring parameter of
-            cross_val_score
-        classifier: classification architecture to use. Defaults to "rf" for a
-            RandomForestClassifier. Should be a sklearn classifier, or a
-            Callable that behaves like one.
+        X: Samples from one distribution.
+        Y: Samples from another distribution.
+        seed: Seed for the sklearn classifier and the KFold cross-validation.
+        n_folds: Number of folds to use.
+        metric: sklearn compliant metric to use for the scoring parameter of
+            cross_val_score.
+        classifier: Classifier to use. "rf" (default) for a
+            RandomForestClassifier, "mlp" for an MLPClassifier, a sklearn
+            classifier instance, a sklearn classifier class, or a function that
+            returns a sklearn classifier. An instance is cloned, so it stays
+            unchanged. If the classifier has a `random_state` parameter that is
+            left at None, it is set to `seed`.
+        classifier_kwargs: Keyword arguments for the classifier class or function,
+            or parameters to set on the cloned instance. For "mlp", they replace the
+            default MLP settings instead of updating them.
         z_score: Z-scoring using X, i.e. mean and std deviation of X is
             used to normalize X and Y, i.e. Y=(Y - mean)/std
         noise_scale: If passed, will add Gaussian noise with standard deviation
@@ -134,6 +139,23 @@ def c2st(
             "early_stopping": True,
             "n_iter_no_change": 50,
         }
+    elif isinstance(classifier, BaseEstimator):
+        clf_class = clone(classifier).set_params  # returns the configured copy
+        clf_kwargs = classifier_kwargs or {}
+    elif callable(classifier) and not isinstance(classifier, str):
+        clf_class = classifier
+        clf_kwargs = classifier_kwargs or {}
+    else:
+        raise ValueError(
+            f"Invalid classifier {classifier!r}. Expected 'rf', 'mlp', a sklearn "
+            "classifier or its class, or a function that returns a sklearn classifier."
+        )
+
+    clf = clf_class(**clf_kwargs)
+    if not (isinstance(clf, BaseEstimator) and is_classifier(clf)):
+        raise ValueError(f"classifier must build a sklearn classifier, got {clf!r}.")
+    if clf.get_params().get("random_state", 0) is None:
+        clf.set_params(random_state=seed)
 
     if z_score:
         X_mean = torch.mean(X, dim=0)
@@ -146,13 +168,11 @@ def c2st(
         Y = (Y - X_mean) / X_std
 
     if noise_scale is not None:
-        X += noise_scale * torch.randn(X.shape)
-        Y += noise_scale * torch.randn(Y.shape)
-
-    clf = clf_class(random_state=seed, **clf_kwargs)
+        X = X + noise_scale * torch.randn_like(X)
+        Y = Y + noise_scale * torch.randn_like(Y)
 
     # prepare data, convert to numpy
-    data = np.concatenate((X.cpu().numpy(), Y.cpu().numpy()))
+    data = np.concatenate((X.detach().cpu().numpy(), Y.detach().cpu().numpy()))
     # labels
     target = np.concatenate((np.zeros((X.shape[0],)), np.ones((Y.shape[0],))))
 
@@ -291,18 +311,24 @@ def unbiased_mmd_squared_hypothesis_test(x: Tensor, y: Tensor, alpha=0.05):
 
 
 def wasserstein_2_squared(
-    x: Tensor, y: Tensor, epsilon: float = 1e-3, max_iter: int = 1000, tol: float = 1e-9
+    x: Tensor,
+    y: Tensor,
+    *,
+    relative_epsilon: float = 1e-2,
+    max_iter: int = 5000,
+    tol: float = 1e-3,
 ):
     """Approximate the squared 2-Wasserstein distance
-    using entropic regularized optimal transport [1]. In the limit,
-    'epsilon' to 0, we recover the squared Wasserstein-2 distance is recovered.
+    using entropic regularized optimal transport [1]. In the limit
+    'relative_epsilon' to 0, the squared Wasserstein-2 distance is recovered.
 
     Args:
         x: Data of shape (B, m, d) or (m, d)
         y: Data of shape (B, n, d) or (n, d)
-        epsilon: Entropic regularization term
-        max_iter: Maximum number of iteration for which the Sinkhorn iterations run
-        tol: Tolerance required for Sinkhorn to converge
+        relative_epsilon: Entropic regularization, relative to the mean squared
+            distance between the points of x and y. See `regularized_ot_dual`.
+        max_iter: Maximum number of Sinkhorn iterations. See `regularized_ot_dual`.
+        tol: Tolerance on the coupling's marginals. See `regularized_ot_dual`.
 
     Return:
         The squared 2-Wasserstein distance of shape (B, ) or ()
@@ -316,13 +342,13 @@ def wasserstein_2_squared(
     )
     if x.ndim == 2:
         nx, ny = x.shape[0], y.shape[0]
-        a = torch.ones(nx) / nx
-        b = torch.ones(ny) / ny
+        a = torch.ones(nx, dtype=x.dtype, device=x.device) / nx
+        b = torch.ones(ny, dtype=x.dtype, device=x.device) / ny
     elif x.ndim == 3:
         batch_size = x.shape[0]
         nx, ny = x.shape[1], y.shape[1]
-        a = torch.ones((batch_size, nx)) / nx
-        b = torch.ones((batch_size, ny)) / ny
+        a = torch.ones((batch_size, nx), dtype=x.dtype, device=x.device) / nx
+        b = torch.ones((batch_size, ny), dtype=x.dtype, device=x.device) / ny
     else:
         raise ValueError(
             "This implementation of Wasserstein is only implemented, "
@@ -333,7 +359,12 @@ def wasserstein_2_squared(
     cost_matrix = torch.cdist(x, y, 2) ** 2
 
     coupling = regularized_ot_dual(
-        a, b, cost_matrix, epsilon, max_iter=max_iter, tol=tol
+        a,
+        b,
+        cost_matrix,
+        relative_epsilon=relative_epsilon,
+        max_iter=max_iter,
+        tol=tol,
     )
     if a.ndim == 1:
         return torch.sum(coupling * cost_matrix)
@@ -345,77 +376,87 @@ def regularized_ot_dual(
     a: Tensor,
     b: Tensor,
     cost: Tensor,
-    epsilon: float = 1e-3,
-    max_iter: int = 1000,
-    tol=1e-9,
+    *,
+    relative_epsilon: float = 1e-2,
+    max_iter: int = 5000,
+    tol: float = 1e-3,
 ):
     """Implementation of regularized optimal transport based on
     the dual formulation of the regularized optimal transport problem.
 
     Args:
         a: Probability vector of the empirical distribution x,
-        either in batched form (B, m) or as a single vector (m,).
+            either in batched form (B, m) or as a single vector (m,).
         b: Probability vector of the empirical distribution y,
-        either in batched form (B, n) or as a single vector (n,).
+            either in batched form (B, n) or as a single vector (n,).
         cost: Cost-matrix between the empirical samples of x and y.
-        Either in batched form (B, m, n) or as a matrix (m, n).
-        epsilon: The entropic regularization term
-        max_iter: Maximum number of iterations
-        tol: Tolerance required for Sinkhorn to converge
+            Either in batched form (B, m, n) or as a matrix (m, n).
+        relative_epsilon: Entropic regularization, relative to the mean of each
+            cost matrix, so the result does not depend on the scale of the cost.
+            The cost has to be nonnegative. Smaller values bias the result less
+            but need more iterations.
+        max_iter: Maximum number of iterations. A warning is raised if Sinkhorn
+            has not converged by then.
+        tol: Tolerance on the L1 error of the coupling's row marginals; the column
+            marginals are exact after each update.
 
     Return:
         Optimal transport coupling of shape (B, m, n) or (m, n)
     """
 
     assert a.ndim == b.ndim, (
-        "Please make sure that 'a' and 'b' are both either batched or not."
+        "Please make sure that 'a' and 'b' are both either batched or not, "
+        f"currently a.ndim={a.ndim} and b.ndim={b.ndim}"
     )
-    f"currently a.ndim={a.ndim} and b.ndim={b.ndim}"
 
     batched = True
     if a.ndim == 1 and b.ndim == 1:
         batched = False
-        na, nb = a.shape[0], b.shape[0]
         a = torch.atleast_2d(a)
         b = torch.atleast_2d(b)
         cost = cost.unsqueeze(0)
-    na, nb = a.shape[1], b.shape[1]
+
+    dtype = torch.promote_types(torch.promote_types(cost.dtype, a.dtype), b.dtype)
+    if not dtype.is_floating_point:
+        dtype = torch.get_default_dtype()
+    a, b, cost = a.to(dtype), b.to(dtype), cost.to(dtype)
+    finfo = torch.finfo(dtype)
+
+    epsilon = relative_epsilon * cost.mean(dim=(1, 2), keepdim=True)
+    epsilon = epsilon.clamp(min=finfo.tiny)
 
     # Define potentials
     f, g = torch.zeros_like(a), torch.zeros_like(b)
 
     def s(f, g):
-        return cost - f.unsqueeze(2) - g.unsqueeze(1)
+        return (cost - f.unsqueeze(2) - g.unsqueeze(1)) / epsilon
 
-    err = torch.inf
-    iters = torch.zeros(a.shape[0])
-    terminated = torch.zeros(a.shape[0], dtype=torch.bool)
-    for _ in range(max_iter):
-        f_prev, g_prev = f, g
-        f_tmp = f + epsilon * (
-            torch.log(a) - torch.logsumexp(-s(f, g) / epsilon, dim=2)
-        )
-        g_tmp = g + epsilon * (
-            torch.log(b) - torch.logsumexp(-s(f_tmp, g) / epsilon, dim=1)
-        )
-        f = torch.where(terminated.unsqueeze(-1).repeat((1, na)), f, f_tmp)
-        g = torch.where(terminated.unsqueeze(-1).repeat((1, nb)), g, g_tmp)
-
-        err = torch.max((f_prev - f).abs().sum(dim=1), (g_prev - g).abs().sum(dim=1))
-        terminated = torch.logical_or(terminated, err < tol)
+    terminated = torch.zeros(a.shape[0], dtype=torch.bool, device=a.device)
+    for i in range(max_iter + 1):
+        # The column marginals are exact after a g-update, so only the row
+        # marginals are checked, from the first update on.
+        log_row_marginal = torch.logsumexp(-s(f, g), dim=2)
+        err = (log_row_marginal.exp() - a).abs().sum(dim=1)
+        if i > 0:
+            terminated = torch.logical_or(terminated, err < tol)
         if torch.all(terminated):
             break
-        if iters.max() == max_iter:
+        if i == max_iter:
             warnings.warn(
                 f"Sinkhorn iterations did not converge within {max_iter} iterations. "
-                f"Consider a bigger regularization parameter 'epsilon' "
-                "or increasing 'max_iter'.",
+                "Consider a bigger 'relative_epsilon', increasing 'max_iter', "
+                "or float64.",
                 stacklevel=2,
             )
             break
-        iters = torch.where(terminated, iters, iters + 1)
+        f_tmp = f + epsilon[..., 0] * (torch.log(a) - log_row_marginal)
+        g_tmp = g + epsilon[..., 0] * (
+            torch.log(b) - torch.logsumexp(-s(f_tmp, g), dim=1)
+        )
+        f = torch.where(terminated.unsqueeze(-1), f, f_tmp)
+        g = torch.where(terminated.unsqueeze(-1), g, g_tmp)
 
-    coupling = torch.exp(-s(f, g) / epsilon)
+    coupling = torch.exp(-s(f, g))
 
     if not batched:
         coupling = coupling.squeeze(0)
@@ -558,7 +599,8 @@ class Distance:
                 Typically, this information is inferred by the choice of the distance,
                 but in case a custom distance is used, this information is pivotal.
             distance_kwargs: Configurations parameters for the distances. In particular
-                useful for the MMD and Wasserstein distance.
+                useful for the MMD and Wasserstein distance. Unknown keys raise a
+                TypeError when the distance is created.
             batch_size: Number of simulations that the distance function
                 evaluates against the reference observations at once. If -1, we evaluate
                 all simulations at the same time.
@@ -593,13 +635,13 @@ class Distance:
                 "mse": mse_distance,
                 "l2": l2,
                 "l1": l1,
-                "mmd": partial(mmd_distance, **self.distance_kwargs),
-                "wasserstein": partial(wasserstein_distance, **self.distance_kwargs),
+                "mmd": mmd_distance,
+                "wasserstein": wasserstein_distance,
             }
-            try:
-                self.distance_fn = distance_functions[distance]
-            except KeyError as exc:
-                raise KeyError(f"Distance {distance} not supported.") from exc
+            distance_fn = distance_functions[distance]
+            # partial only checks the keyword arguments when it is called.
+            inspect.signature(distance_fn).bind(None, None, **self.distance_kwargs)
+            self.distance_fn = partial(distance_fn, **self.distance_kwargs)
 
     def __call__(self, x_o: Tensor, x: Tensor) -> Tensor:
         """Distance evaluation between the reference data and the simulated data.
@@ -670,23 +712,26 @@ def mmd_distance(x_o: Tensor, x: Tensor, scale: Optional[float] = None) -> Tenso
 def wasserstein_distance(
     x_o: Tensor,
     x: Tensor,
-    epsilon: float = 1e-3,
-    max_iter: int = 1000,
-    tol: float = 1e-9,
+    *,
+    relative_epsilon: float = 1e-2,
+    max_iter: int = 5000,
+    tol: float = 1e-3,
 ) -> Tensor:
-    """Calculates the Wasserstein-2 distance between two tensors.
+    """Calculates the squared Wasserstein-2 distance between two tensors.
 
     Args:
         x_o: The observed data tensor.
         x: The simulated data tensor.
-        epsilon: Regularization parameter for the Sinkhorn algorithm.
-        max_iter: Maximum number of iterations for the Sinkhorn algorithm.
-        tol: Tolerance for the Sinkhorn algorithm.
+        relative_epsilon: Entropic regularization, relative to the mean squared
+            distance between the points of x_o and each simulated dataset. See
+            `regularized_ot_dual`.
+        max_iter: Maximum number of Sinkhorn iterations. See `regularized_ot_dual`.
+        tol: Tolerance on the coupling's marginals. See `regularized_ot_dual`.
 
     Returns:
-        The Wasserstein-2 distance.
+        The squared Wasserstein-2 distance.
     """
     batched_x_o = x_o.repeat((x.shape[0], *[1] * len(x_o.shape)))
     return wasserstein_2_squared(
-        batched_x_o, x, epsilon=epsilon, max_iter=max_iter, tol=tol
+        batched_x_o, x, relative_epsilon=relative_epsilon, max_iter=max_iter, tol=tol
     )

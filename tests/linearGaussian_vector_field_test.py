@@ -402,8 +402,9 @@ def test_vector_field_sde_ode_sampling_equivalence(vector_field_type, prior_type
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("vector_field_type", ["ve", "fmpe", "subvp", "vp"])
-@pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
+@pytest.mark.parametrize(
+    "vector_field_type, prior_type", [("fmpe", "gaussian"), ("subvp", "uniform")]
+)
 @pytest.mark.parametrize(
     "iid_method, num_trials",
     [

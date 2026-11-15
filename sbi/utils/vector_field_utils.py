@@ -22,6 +22,8 @@ from torch.distributions import (
     constraints,
 )
 
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
+
 
 class VectorFieldNet(nn.Module, ABC):
     """Abstract base class for vector field estimation networks.
@@ -97,14 +99,8 @@ def _fit_gmm_ratio_impl(
     """Fit a generalized GMM to the prior ratio q(theta) / p(theta)."""
     num_components = int(num_components)
     device = torch.device(device)
-    if hasattr(train_prior, "to"):
-        moved = train_prior.to(device)  # type: ignore
-        if moved is not None:
-            train_prior = moved
-    if hasattr(test_prior, "to"):
-        moved = test_prior.to(device)  # type: ignore
-        if moved is not None:
-            test_prior = moved
+    train_prior = move_distribution_to_device(train_prior, device)
+    test_prior = move_distribution_to_device(test_prior, device)
     with torch.no_grad():
         init_means = test_prior.sample((num_components,)).to(device)
         init_means = init_means.reshape(num_components, -1)
@@ -320,6 +316,11 @@ def denoise_independent(
     Returns:
         The posterior independent distribution.
     """
+    exact_types = (Independent, MixtureSameFamily, Normal, MultivariateNormal, Uniform)
+    if not isinstance(p.base_dist, exact_types):
+        # Fit the whole prior: wrapping a fitted base would fold the batch of x_t
+        # into the event.
+        return denoise_general(p, m, s, x_t)
     denoised_base_dist = denoise(p.base_dist, m, s, x_t)
     batch_shape = denoised_base_dist.batch_shape
     if len(batch_shape) < p.reinterpreted_batch_ndims:
@@ -462,7 +463,8 @@ def denoise_general(
     Returns:
         The posterior empirical distribution.
     """
-    gmm = fit_gmm(p)
+    # `fit_gmm` caches by prior; a prior moved in place keeps its key.
+    gmm = move_distribution_to_device(fit_gmm(p), x_t.device)
     return denoise_mixture(gmm, m, s, x_t)
 
 
@@ -623,7 +625,8 @@ def marginalize_empirical(
     Returns:
         The marginal empirical distribution.
     """
-    gmm_approx = fit_gmm(p)
+    # `fit_gmm` caches by prior; a prior moved in place keeps its key.
+    gmm_approx = move_distribution_to_device(fit_gmm(p), torch.as_tensor(m).device)
     return marginalize_mixture(gmm_approx, m, s)
 
 
@@ -773,16 +776,36 @@ class UniformNormalConvolution(Distribution):
         return self.scale * x + noise_sample
 
     def log_prob(self, value: Tensor) -> Tensor:
-        # Compute p(value) using the convolution formula:
-        # p(value) = 1/(b-a) * [Phi((value - scale*a)/noise)
-        # - Phi((value - scale*b)/noise)]
-        dist0 = Normal(torch.tensor(0.0, device=value.device), 1.0, validate_args=False)
-        numerator = dist0.cdf((value - self.scale * self.low) / self.noise) - dist0.cdf(
-            (value - self.scale * self.high) / self.noise
-        )
-        denom = (self.high - self.low).clamp_min(1e-30)
-        pdf = numerator / denom
-        return torch.log(pdf.clamp_min(1e-30))
+        """Log density of the scaled box convolved with the Gaussian noise.
+
+        With [u_lo, u_hi] the box [low, high] times scale, the density is
+        p(value) = [Phi((value - u_lo)/noise) - Phi((value - u_hi)/noise)]
+        / (u_hi - u_lo).
+
+        Args:
+            value: Points at which to evaluate the density.
+
+        Returns:
+            Log density at each point of `value`.
+        """
+        u_lo = torch.minimum(self.scale * self.low, self.scale * self.high)
+        u_hi = torch.maximum(self.scale * self.low, self.scale * self.high)
+        z_lo = (value - u_lo) / self.noise
+        z_hi = (value - u_hi) / self.noise
+        # Take the CDF difference from the small tail probabilities on value's side
+        # of the box, so it does not round to zero (and lose its gradient) there.
+        right = z_lo + z_hi > 0
+        near = torch.where(right, z_hi, -z_lo)
+        far = torch.where(right, z_lo, -z_hi)
+        mass = 0.5 * (torch.erfc(near / math.sqrt(2)) - torch.erfc(far / math.sqrt(2)))
+        tiny = torch.finfo(mass.dtype).tiny
+        # A box much narrower than the noise is a Gaussian up to O(width^2 / noise^2),
+        # where the CDF difference above would cancel.
+        narrow = u_hi - u_lo < 1e-3 * self.noise
+        width = torch.where(narrow, 1.0, u_hi - u_lo)
+        box = torch.log(mass.clamp_min(tiny)) - torch.log(width)
+        point = Normal((u_lo + u_hi) / 2, self.noise, validate_args=False)
+        return torch.where(narrow, point.log_prob(value), box)
 
 
 # Utility functions --------------------------------------------------------
