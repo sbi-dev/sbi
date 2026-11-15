@@ -18,7 +18,6 @@ from torch.distributions import (
     Gamma,
     Independent,
     MixtureSameFamily,
-    Multinomial,
     MultivariateNormal,
     Normal,
     Pareto,
@@ -319,44 +318,31 @@ def _support_lower_bound(prior):
         ),
     ),
 )
-def test_process_prior_casts_support_dtype(prior):
-    """Test that the output prior's samples and support have the same dtype.
-
-    This is a regression test for a previous issue where sample and support dtypes
-    could mismatch in the output prior in the specific case of a distribution with a
-    tensor support that is not already a float32 tensor.
-    """
-    prior, _, _ = process_prior(prior)  # output prior
-    assert prior.sample().dtype == _support_lower_bound(prior).dtype
+def test_process_prior_float64_prior_has_float32_support(prior):
+    """A float64 prior comes out with float32 samples and support."""
+    prior, _, _ = process_prior(prior)
+    assert prior.sample().dtype == torch.float32
+    assert _support_lower_bound(prior).dtype == torch.float32
 
 
-@pytest.mark.parametrize("dtype", (torch.float32, torch.float64))
-def test_prior_rebuild_does_not_reset_parameters_to_default(dtype: torch.dtype):
-    """Regression test where prior rebuilds reset parameters to their default value.
+def test_rebuild_keeps_constructor_arguments_outside_arg_constraints(monkeypatch):
+    """Float32 conversion and device moves keep `coords`, which has a default."""
+    pyro_distributions = pytest.importorskip("pyro.distributions")
 
-    This could previously happen when processing a prior that was float64 or when
-    moving a prior to a different device. Specifically, it happened in the case
-    of priors who had parameters not in `arg_constraints` such as
-    `Multinomial.total_count` that had default values. These parameters were not
-    passed on rebuilding so they got reset to their default value. Such
-    distributions are no longer rebuilt so this should no longer happen.
-    """
-    prior = Multinomial(10, probs=torch.tensor([0.3, 0.7], dtype=dtype))
+    def stable(dtype):
+        stability = torch.tensor([1.5], dtype=dtype)
+        skew = torch.tensor([0.9], dtype=dtype)
+        return pyro_distributions.StableWithLogProb(stability, skew, coords="S")
+
+    prior = stable(torch.float64)
     processed, _, _ = process_prior(prior)
+    theta = torch.tensor([[0.0], [2.0]])
+    expected = prior.log_prob(theta.double()).squeeze(-1).float()
+    assert_close(processed.log_prob(theta), expected)
 
-    if dtype == torch.float32:
-        assert processed.total_count == prior.total_count
-    else:
-        # Wrapped in PytorchReturnTypeWrapper, so we need to access the prior.
-        assert processed.prior.total_count == prior.total_count
-
-    moved = move_distribution_to_device(processed, "cpu")
-
-    if dtype == torch.float32:
-        assert moved.total_count == prior.total_count
-    else:
-        # Wrapped in PytorchReturnTypeWrapper, so we need to access the prior.
-        assert moved.prior.total_count == prior.total_count
+    # A move to "meta" rebuilds on any machine; argument validation fails there.
+    monkeypatch.setattr(Distribution, "_validate_args", False)
+    assert move_distribution_to_device(stable(torch.float32), "meta").coords == "S"
 
 
 def test_process_prior_float64_prior_keeps_logits():
