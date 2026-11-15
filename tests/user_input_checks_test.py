@@ -345,10 +345,28 @@ def test_rebuild_keeps_constructor_arguments_outside_arg_constraints(monkeypatch
     assert move_distribution_to_device(stable(torch.float32), "meta").coords == "S"
 
 
-def test_process_prior_float64_prior_keeps_logits():
-    """A prior built from logits is rebuilt from logits, which are not clamped."""
-    logits = torch.tensor([-100.0, 0.0], dtype=torch.float64)
-    prior = Independent(Bernoulli(logits=logits), 1)
+@pytest.mark.parametrize(
+    "prior",
+    (
+        pytest.param(
+            Independent(
+                Bernoulli(logits=torch.tensor([-100.0, 0.0], dtype=torch.float64)), 1
+            ),
+            id="bernoulli-logits",
+        ),
+        pytest.param(
+            MultivariateNormal(
+                zeros(2, dtype=torch.float64),
+                scale_tril=torch.tensor(
+                    [[1.0, 0.0], [1.0, 2.5e-4]], dtype=torch.float64
+                ),
+            ),
+            id="mvn-scale-tril",
+        ),
+    ),
+)
+def test_process_prior_float64_prior_keeps_parametrization(prior):
+    """The float32 rebuild keeps the precision of the prior's parameters."""
     processed, _, _ = process_prior(prior)
     theta = torch.tensor([[1.0, 1.0]])
     assert_close(processed.log_prob(theta), prior.log_prob(theta.double()).float())

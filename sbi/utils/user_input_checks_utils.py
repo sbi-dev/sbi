@@ -77,10 +77,11 @@ def get_distribution_parameters(
             device=device, dtype=dtype if value.is_floating_point() else None
         )
     # MultivariateNormal stores all parametrizations of the covariance in
-    # `arg_constraints`, but its constructor accepts only one of them.
+    # `arg_constraints`, but its constructor accepts only one of them. Pass the
+    # Cholesky factor it computes with: a rebuild from the covariance loses precision.
     if isinstance(dist, MultivariateNormal):
+        params["covariance_matrix"] = None
         params["precision_matrix"] = None
-        params["scale_tril"] = None
     # Same for probs and logits. Keep the one the distribution was built with:
     # converting probs to logits clamps them.
     elif isinstance(dist, (Binomial, Bernoulli, Categorical)):
