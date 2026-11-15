@@ -46,7 +46,7 @@ class FMPE(VectorFieldTrainer):
     [1] Flow Matching for Generative Modeling, Lipman et al., ICLR 2023,
         https://arxiv.org/abs/2210.02747
 
-    Example:
+    Example
     --------
 
     ::

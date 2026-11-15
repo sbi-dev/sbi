@@ -80,6 +80,8 @@ from sbi.utils import (
     validate_theta_and_x,
     warn_if_invalid_for_zscoring,
 )
+from sbi.utils.pbar import end_progress_line, print_progress
+from sbi.utils.removed_names import RENAMED_METHODS
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
     get_simulations_since_round,
@@ -161,10 +163,9 @@ def infer(
         method: What inference method to use, case-insensitively: any neural
             trainer `sbi.inference` exports, for example 'npe', 'nle', 'nre',
             'npe_a', 'fmpe', 'npse' or 'simformer'. For the Simformer, `theta`
-            and `x` are concatenated into one joint input (theta first). The
-            legacy names 'snpe', 'snle' and 'snre' still work but emit a
-            `FutureWarning`. The ABC methods are not supported, because they take
-            the simulator at construction; call `MCABC`/`SMCABC` directly.
+            and `x` are concatenated into one joint input (theta first). The ABC
+            methods are not supported, because they take the simulator at
+            construction; call `MCABC`/`SMCABC` directly.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
@@ -179,14 +180,12 @@ def infer(
     # Moved here to avoid circular imports at initialization.
     import sbi.inference  # noqa: R0401
 
-    # Resolve legacy method strings here: going through the module `__getattr__`
-    # would attribute the warning to this file instead of the caller.
     name = method.upper()
-    canonical = sbi.inference._DEPRECATED_ALIASES.get(name)
-    resolved = canonical if canonical is not None else name
+    renamed = RENAMED_METHODS.get(name)
+    resolved = renamed if renamed is not None else name
 
-    # Before the deprecation warning: advising a spelling `infer` cannot run either
-    # would only send the user around the loop again.
+    # Before the removal error: advising a spelling `infer` cannot run either would
+    # only send the user around the loop again.
     if resolved in sbi.inference._abc_family:
         raise ValueError(
             f"`infer` does not support '{method}'. It trains a neural network on "
@@ -195,12 +194,10 @@ def infer(
             f"Its `__call__` docstring shows an example."
         )
 
-    if canonical is not None:
-        warn(
-            f"method='{method}' is deprecated since sbi v0.27.0 and will be "
-            f"removed in v0.28.0. Use method='{canonical.lower()}' instead.",
-            FutureWarning,
-            stacklevel=2,
+    if renamed is not None:
+        raise ValueError(
+            f"method='{method}' was removed from sbi. "
+            f"Use method='{renamed.lower()}' instead."
         )
 
     # Exported names are mixed case (e.g. `Simformer`), so match case-insensitively.
@@ -222,8 +219,8 @@ def infer(
         or train_kwargs is not None
     ):
         warn(
-            "We discourage the use the simple interface in more complicated settings. "
-            "Have a look into the flexible interface, e.g. in our tutorial "
+            "We discourage the use of the simple interface in more complicated "
+            "settings. Have a look into the flexible interface, e.g. in our tutorial "
             "(https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html).",
             stacklevel=2,
         )
@@ -1176,12 +1173,9 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         # Not `_converged()`: it advances the counter it reads, so a second call can
         # flip its own verdict.
         converged = epoch <= max_num_epochs
+        end_progress_line()
         if converged:
-            print(
-                "\r",
-                f"Neural network successfully converged after {epoch} epochs.",
-                end="",
-            )
+            print(f"Neural network successfully converged after {epoch} epochs.")
         else:
             warn(
                 f"Maximum number of epochs `max_num_epochs={max_num_epochs}` reached, "
@@ -1298,10 +1292,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
     @staticmethod
     def _maybe_show_progress(show: bool, epoch: int) -> None:
         if show:
-            # end="\r" deletes the print statement when a new one appears.
-            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
-            # to #330.
-            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
+            print_progress(f"Training neural network. Epochs trained: {epoch}")
 
     def save(self, filename: Union[str, Path]) -> None:
         """Save the inference object to a file. Load it with `load()`.

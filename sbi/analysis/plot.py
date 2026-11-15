@@ -23,6 +23,7 @@ import numpy as np
 import torch
 from matplotlib import cm
 from matplotlib import pyplot as plt
+from matplotlib.artist import Artist
 from matplotlib.axes import Axes
 from matplotlib.colors import Normalize
 from matplotlib.figure import Figure, FigureBase
@@ -1762,10 +1763,8 @@ def _sbc_rank_plot(
         colors: list of colors for each parameter dimension, or each set of ranks.
         num_repeats: number of repeats for each empirical CDF step (resolution).
         line_alpha: alpha for cdf lines or histograms.
-        show_uniform_region: whether to plot the region showing the cdfs expected under
-            uniformity.
-        uniform_region_alpha: alpha for region showing the cdfs expected under
-            uniformity.
+        show_uniform_region: whether to plot the region expected under uniformity.
+        uniform_region_alpha: alpha for the region expected under uniformity.
         xlim_offset_factor: factor for empty space left and right of the histogram.
         num_cols: number of subplot columns, e.g., when plotting ranks of many
             parameters.
@@ -1833,6 +1832,12 @@ def _sbc_rank_plot(
         )
     num_bins = max(num_bins, 1)
     assert isinstance(num_bins, int)
+    diff = plot_type == "cdf-diff"
+    cdf_ylim = (
+        _cdf_diff_ylim(ranks_list, num_bins, num_posterior_samples, show_uniform_region)
+        if diff
+        else (0.0, 1.0)
+    )
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
     if params_in_subplots:
@@ -1858,7 +1863,7 @@ def _sbc_rank_plot(
                 row_idx = jj // num_cols
                 plt.sca(ax[col_idx] if num_rows == 1 else ax[row_idx, col_idx])
 
-                if plot_type == "cdf":
+                if plot_type in ("cdf", "cdf-diff"):
                     _plot_ranks_as_cdf(
                         ranki[:, jj],  # type: ignore
                         num_bins,
@@ -1867,9 +1872,11 @@ def _sbc_rank_plot(
                         ranks_label=ranks_labels[ii],
                         color=f"C{ii}" if colors is None else colors[ii],
                         xlabel=f"posterior ranks {parameter_labels[jj]}",
-                        # Show legend and ylabel only in first subplot.
+                        # Show ylabel only in first subplot.
                         show_ylabel=jj == 0,
                         alpha=line_alpha,
+                        diff=diff,
+                        ylim=cdf_ylim,
                     )
                     if ii == 0 and show_uniform_region:
                         _plot_cdf_region_expected_under_uniformity(
@@ -1878,8 +1885,9 @@ def _sbc_rank_plot(
                             num_posterior_samples,
                             num_repeats,
                             alpha=uniform_region_alpha,
+                            diff=diff,
                         )
-                elif plot_type == "hist":
+                else:
                     _plot_ranks_as_hist(
                         ranki[:, jj],  # type: ignore
                         num_bins,
@@ -1887,54 +1895,28 @@ def _sbc_rank_plot(
                         ranks_label=ranks_labels[ii],
                         color="firebrick" if colors is None else colors[ii],
                         xlabel=f"posterior rank {parameter_labels[jj]}",
-                        # Show legend and ylabel only in first subplot.
                         show_ylabel=show_ylabel,
                         alpha=line_alpha,
                         xlim_offset_factor=xlim_offset_factor,
                     )
-                    # Plot expected uniform band.
-                    _plot_hist_region_expected_under_uniformity(
-                        num_sbc_runs,
-                        num_bins,
-                        num_posterior_samples,
-                        alpha=uniform_region_alpha,
-                    )
-                    # show legend only in first subplot.
-                    if jj == 0 and ranks_labels[ii] is not None:
-                        plt.legend(**legend_kwargs)
-
-                elif plot_type == "cdf-diff":
-                    _plot_ranks_as_cdf_diff(
-                        ranki[:, jj],  # type: ignore
-                        num_bins,
-                        num_posterior_samples,
-                        num_repeats,
-                        ranks_label=ranks_labels[ii],
-                        color=f"C{ii}" if colors is None else colors[ii],
-                        xlabel=f"posterior ranks {parameter_labels[jj]}",
-                        show_ylabel=jj == 0,
-                        alpha=line_alpha,
-                    )
                     if ii == 0 and show_uniform_region:
-                        _plot_cdf_diff_region_expected_under_uniformity(
+                        _plot_hist_region_expected_under_uniformity(
                             num_sbc_runs,
                             num_bins,
                             num_posterior_samples,
-                            num_repeats,
                             alpha=uniform_region_alpha,
                         )
-
-                else:
-                    raise ValueError(
-                        f"plot_type {plot_type} not defined, use one in {plot_types}"
-                    )
-                # Remove empty subplots.
+        if plot_type == "hist" or num_ranks > 1:
+            plt.sca(ax.flat[0])
+            _sbc_legend(legend_kwargs)
+        # Remove empty subplots.
         col_idx += 1
         while num_rows > 1 and col_idx < num_cols:
             ax[row_idx, col_idx].axis("off")
             col_idx += 1
 
     # When there is only one set of ranks show all params in a single subplot.
+    # Only "cdf" and "cdf-diff" get here: "hist" always uses subplots.
     else:
         if fig is None or ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -1942,55 +1924,31 @@ def _sbc_rank_plot(
         plt.sca(ax)
         ranki = ranks_list[0]
         for jj in range(num_parameters):
-            if plot_type == "cdf":
-                _plot_ranks_as_cdf(
-                    ranki[:, jj],  # type: ignore
-                    num_bins,
-                    num_posterior_samples,
-                    num_repeats,
-                    ranks_label=parameter_labels[jj],
-                    color=f"C{jj}" if colors is None else colors[jj],
-                    xlabel="posterior rank",
-                    # Plot ylabel and legend at last.
-                    show_ylabel=jj == (num_parameters - 1),
-                    alpha=line_alpha,
-                )
-            elif plot_type == "cdf-diff":
-                _plot_ranks_as_cdf_diff(
-                    ranki[:, jj],  # type: ignore
-                    num_bins,
-                    num_posterior_samples,
-                    num_repeats,
-                    ranks_label=parameter_labels[jj],
-                    color=f"C{jj}" if colors is None else colors[jj],
-                    xlabel="posterior rank",
-                    # Plot ylabel and legend at last.
-                    show_ylabel=jj == (num_parameters - 1),
-                    alpha=line_alpha,
-                )
-            else:
-                raise ValueError(
-                    f"plot_type {plot_type} not defined, use one in {plot_types}"
-                )
+            _plot_ranks_as_cdf(
+                ranki[:, jj],  # type: ignore
+                num_bins,
+                num_posterior_samples,
+                num_repeats,
+                ranks_label=parameter_labels[jj],
+                color=f"C{jj}" if colors is None else colors[jj],
+                xlabel="posterior rank",
+                # Plot ylabel and legend at last.
+                show_ylabel=jj == (num_parameters - 1),
+                alpha=line_alpha,
+                diff=diff,
+                ylim=cdf_ylim,
+            )
         if show_uniform_region:
-            if plot_type == "cdf":
-                _plot_cdf_region_expected_under_uniformity(
-                    num_sbc_runs,
-                    num_bins,
-                    num_posterior_samples,
-                    num_repeats,
-                    alpha=uniform_region_alpha,
-                )
-            else:
-                _plot_cdf_diff_region_expected_under_uniformity(
-                    num_sbc_runs,
-                    num_bins,
-                    num_posterior_samples,
-                    num_repeats,
-                    alpha=uniform_region_alpha,
-                )
+            _plot_cdf_region_expected_under_uniformity(
+                num_sbc_runs,
+                num_bins,
+                num_posterior_samples,
+                num_repeats,
+                alpha=uniform_region_alpha,
+                diff=diff,
+            )
         # show legend on the last subplot.
-        plt.legend(**legend_kwargs)
+        _sbc_legend(legend_kwargs)
 
     return fig, ax  # pyright: ignore[reportReturnType]
 
@@ -2054,8 +2012,14 @@ def _plot_ranks_as_cdf(
     alpha: float = 0.8,
     show_ylabel: bool = True,
     num_ticks: int = 3,
+    diff: bool = False,
+    ylim: Tuple[float, float] = (0.0, 1.0),
 ) -> None:
     """Plot ranks as empirical CDFs on the current axis.
+
+    With `diff=True`, plot the difference between the empirical CDF and the
+    uniform CDF instead. Positive values mean more ranks accumulated than
+    expected, negative fewer.
 
     Args:
         ranks: SBC ranks in shape (num_sbc_runs, ).
@@ -2069,91 +2033,81 @@ def _plot_ranks_as_cdf(
         xlabel: label for the current parameter.
         color: line color for the cdf.
         alpha: line transparency.
-        show_ylabel: whether to show y-label "empirical CDF".
+        show_ylabel: whether to show the y-label.
         num_ticks: number of ticks on the x-axis.
+        diff: whether to plot the difference to the uniform CDF.
+        ylim: y range.
 
     """
-    # Generate histogram of ranks.
-    hist, *_ = np.histogram(ranks, bins=num_bins, range=(0, num_posterior_samples))
-    # Construct empirical CDF.
-    histcs = hist.cumsum()
+    if diff:
+        offset = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
+        ylabel = "empirical CDF - uniform CDF"
+    else:
+        offset = 0.0
+        ylabel = "empirical CDF"
+    yticks = np.linspace(*ylim, 3)
+
     # Plot cdf and repeat each stair step
     plt.plot(
         _cdf_x(num_bins, num_posterior_samples, num_repeats),
-        np.repeat(histcs / histcs.max(), num_repeats),
+        np.repeat(_ecdf(ranks, num_bins, num_posterior_samples) - offset, num_repeats),
         label=ranks_label,
         color=color,
         alpha=alpha,
     )
 
     if show_ylabel:
-        plt.yticks(np.linspace(0, 1, 3))
-        plt.ylabel("empirical CDF")
+        plt.yticks(yticks)
+        plt.ylabel(ylabel)
     else:
         # Plot ticks only
-        plt.yticks(np.linspace(0, 1, 3), [])
+        plt.yticks(yticks, [])
 
-    plt.ylim(0, 1)
+    if diff:
+        plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
+    plt.ylim(*ylim)
     plt.xlim(0, num_posterior_samples)
     plt.xticks(np.linspace(0, num_posterior_samples, num_ticks))
     plt.xlabel("posterior rank" if xlabel is None else xlabel)
 
 
-def _plot_ranks_as_cdf_diff(
-    ranks: np.ndarray,
+_UNIFORM_REGION_LABEL = "expected under uniformity"
+_UNIFORM_REGION_GID = "sbc-uniform-region"
+
+
+def _ecdf(ranks: np.ndarray, num_bins: int, num_posterior_samples: int) -> np.ndarray:
+    """Empirical CDF of the ranks at the right edge of each bin over [0, N]."""
+    hist, _ = np.histogram(ranks, bins=num_bins, range=(0, num_posterior_samples))
+    histcs = hist.cumsum()
+    return histcs / histcs.max()
+
+
+def _cdf_diff_ylim(
+    ranks_list: List[np.ndarray],
     num_bins: int,
     num_posterior_samples: int,
-    num_repeats: int,
-    ranks_label: Optional[str] = None,
-    xlabel: Optional[str] = None,
-    color: Optional[str] = None,
-    alpha: float = 0.8,
-    show_ylabel: bool = True,
-    num_ticks: int = 3,
-) -> None:
-    """Plot the difference between the empirical CDF and the uniform CDF.
+    include_band: bool,
+) -> Tuple[float, float]:
+    """Symmetric y range for cdf-diff plots that fits every curve and the band.
 
-    Positive values mean more ranks accumulated than expected, negative fewer.
-
-    Args:
-        ranks: SBC ranks in shape (num_sbc_runs, )
-        num_bins: number of bins for the histogram.
-        num_posterior_samples: number of posterior samples used for ranking.
-        num_repeats: number of repeats of each CDF step, i.e., resolution of the
-            empirical CDF.
-        ranks_label: label for the ranks, e.g., when comparing ranks of different
-            methods.
-        xlabel: label for the current parameter.
-        color: line color for the cdf.
-        alpha: line transparency.
-        show_ylabel: whether to show y-label.
-        num_ticks: number of ticks on the x-axis.
+    The range is at least (-0.5, 0.5) and grows in steps of 0.1 up to (-1, 1).
     """
-    hist, *_ = np.histogram(ranks, bins=num_bins, range=(0, num_posterior_samples))
-    histcs = hist.cumsum()
-    ecdf = histcs / histcs.max()
     uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
-    diff = ecdf - uniform_cdf
-
-    plt.plot(
-        _cdf_x(num_bins, num_posterior_samples, num_repeats),
-        np.repeat(diff, num_repeats),
-        label=ranks_label,
-        color=color,
-        alpha=alpha,
-    )
-
-    if show_ylabel:
-        plt.yticks(np.linspace(-0.5, 0.5, 3))
-        plt.ylabel("empirical CDF - uniform CDF")
-    else:
-        plt.yticks(np.linspace(-0.5, 0.5, 3), [])
-
-    plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
-    plt.ylim(-0.5, 0.5)
-    plt.xlim(0, num_posterior_samples)
-    plt.xticks(np.linspace(0, num_posterior_samples, num_ticks))
-    plt.xlabel("posterior rank" if xlabel is None else xlabel)
+    deviations = [
+        _ecdf(param_ranks, num_bins, num_posterior_samples) - uniform_cdf
+        for ranks in ranks_list
+        for param_ranks in ranks.T
+    ]
+    if include_band:
+        num_sbc_runs = ranks_list[0].shape[0]
+        _, lower, upper = _uniform_cdf_band(
+            num_sbc_runs, num_bins, num_posterior_samples
+        )
+        deviations += [lower - uniform_cdf, upper - uniform_cdf]
+    largest = max(np.abs(deviation).max() for deviation in deviations)
+    # Round before ceil, so that 0.9 does not become 1.0 from float error.
+    half_range = max(0.5, float(np.ceil(round(largest * 10, 6))) / 10)
+    return -half_range, half_range
 
 
 def _uniform_rank_bin_probs(num_bins: int, num_posterior_samples: int) -> np.ndarray:
@@ -2195,43 +2149,27 @@ def _plot_cdf_region_expected_under_uniformity(
     num_repeats: int,
     alpha: float = 0.2,
     color: str = "gray",
+    diff: bool = False,
 ) -> None:
-    """Plot region of empirical cdfs expected under uniformity on the current axis."""
+    """Plot region of empirical cdfs expected under uniformity on the current axis.
 
-    _, lower, upper = _uniform_cdf_band(num_sbc_runs, num_bins, num_posterior_samples)
-
-    # Plot grey area with expected ECDF.
-    plt.fill_between(
-        x=_cdf_x(num_bins, num_posterior_samples, num_repeats),
-        y1=np.repeat(lower, num_repeats),
-        y2=np.repeat(upper, num_repeats),
-        color=color,
-        alpha=alpha,
-        label="expected under uniformity",
-    )
-
-
-def _plot_cdf_diff_region_expected_under_uniformity(
-    num_sbc_runs: int,
-    num_bins: int,
-    num_posterior_samples: int,
-    num_repeats: int,
-    alpha: float = 0.2,
-    color: str = "gray",
-) -> None:
-    """Plot region of empirical CDF differences expected under uniformity."""
+    With `diff=True`, plot the region of their differences to the uniform CDF.
+    """
 
     uniform_cdf, lower, upper = _uniform_cdf_band(
         num_sbc_runs, num_bins, num_posterior_samples
     )
+    offset = uniform_cdf if diff else 0.0
 
+    # Plot grey area with expected ECDF.
     plt.fill_between(
         x=_cdf_x(num_bins, num_posterior_samples, num_repeats),
-        y1=np.repeat(lower - uniform_cdf, num_repeats),
-        y2=np.repeat(upper - uniform_cdf, num_repeats),
+        y1=np.repeat(lower - offset, num_repeats),
+        y2=np.repeat(upper - offset, num_repeats),
         color=color,
         alpha=alpha,
-        label="expected under uniformity",
+        label=_UNIFORM_REGION_LABEL,
+        gid=_UNIFORM_REGION_GID,
     )
 
 
@@ -2256,8 +2194,30 @@ def _plot_hist_region_expected_under_uniformity(
         y2=np.repeat(upper, num_bins),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
-        label="expected under uniformity",
+        label=_UNIFORM_REGION_LABEL,
+        gid=_UNIFORM_REGION_GID,
     )
+
+
+def _sbc_legend(legend_kwargs: Dict) -> None:
+    """Add a legend that lists the uniformity band once, after the curves.
+
+    `handles` and `labels` in `legend_kwargs` take precedence; custom `handles`
+    keep their own labels.
+    """
+    if "handles" in legend_kwargs:
+        plt.legend(**legend_kwargs)
+        return
+    entries = list(zip(*plt.gca().get_legend_handles_labels(), strict=True))
+    is_band = [
+        isinstance(handle, Artist) and handle.get_gid() == _UNIFORM_REGION_GID
+        for handle, _ in entries
+    ]
+    curves = [entry for entry, band in zip(entries, is_band, strict=True) if not band]
+    bands = [entry for entry, band in zip(entries, is_band, strict=True) if band]
+    handles = [handle for handle, _ in curves + bands[:1]]
+    labels = [label for _, label in curves + bands[:1]]
+    plt.legend(**{"handles": handles, "labels": labels, **legend_kwargs})
 
 
 # Diagnostics for hypothesis tests

@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import inspect
 import warnings
 from typing import Dict, Optional, Self, Sequence, Union
 
@@ -12,7 +13,6 @@ from torch.distributions import (
     Categorical,
     Distribution,
     Independent,
-    Multinomial,
     MultivariateNormal,
     constraints,
 )
@@ -27,26 +27,63 @@ from sbi.utils.torchutils import (
 )
 
 
-def get_distribution_parameters(
-    dist: Distribution, device: Union[str, torch.device]
-) -> Dict:
-    """Used to get the tensors of the parameters in torch distributions.
+def _constructor_matches_arg_constraints(dist: Distribution) -> bool:
+    """Return whether `dist` can be rebuilt from its `arg_constraints` parameters.
 
-    Returns the tensors relocated to device.
+    A rebuild passes only these parameters, so any other constructor argument would
+    silently fall back to its default.
+
+    Args:
+        dist: The distribution to check.
+
+    Returns:
+        True if the constructor takes exactly the `arg_constraints` parameters, apart
+        from `validate_args`. False if there are none, if the constructor takes
+        `*args` or `**kwargs`, or if either cannot be inspected.
     """
-    params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
-    # MultivariateNormal calculates precision matrix from covariance, and stores it in
-    # the arg_constraints. When reinstantiating, we must provide only one of them.
+    try:
+        signature = inspect.signature(type(dist).__init__)
+        arg_constraint_names = set(dist.arg_constraints)
+    except (TypeError, ValueError, NotImplementedError):
+        return False
+
+    # `*args` and `**kwargs` count by their names, so they never match.
+    constructor_names = set(signature.parameters) - {"self", "validate_args"}
+    return bool(arg_constraint_names) and constructor_names == arg_constraint_names
+
+
+def get_distribution_parameters(
+    dist: Distribution,
+    device: Optional[Union[str, torch.device]] = None,
+    dtype: Optional[torch.dtype] = None,
+) -> Dict[str, Optional[Tensor]]:
+    """Return the parameters that rebuild a torch distribution.
+
+    Args:
+        dist: The distribution.
+        device: Device to move the parameters to. None keeps their device.
+        dtype: Dtype to cast floating point parameters to. None keeps their dtype.
+
+    Returns:
+        The `arg_constraints` parameters, to pass to the distribution's constructor.
+        Alternative parametrizations of the same quantity are None.
+    """
+    params = {}
+    for name in dist.arg_constraints:
+        value = getattr(dist, name)
+        params[name] = value.to(
+            device=device, dtype=dtype if value.is_floating_point() else None
+        )
+    # MultivariateNormal stores all parametrizations of the covariance in
+    # `arg_constraints`, but its constructor accepts only one of them. Pass the
+    # Cholesky factor it computes with: a rebuild from the covariance loses precision.
     if isinstance(dist, MultivariateNormal):
+        params["covariance_matrix"] = None
         params["precision_matrix"] = None
-        params["scale_tril"] = None
-    # MultivariateNormal calculates logits from probabilities, and stores it in the
-    # arg_constraints. When reinstantiating, we must provide only one of them.
-    elif isinstance(dist, (Binomial, Bernoulli, Categorical, Multinomial)):
-        params["logits"] = None
-    # Unlike Binomial, Multinomial keeps `total_count` outside `arg_constraints`.
-    if isinstance(dist, Multinomial):
-        params["total_count"] = dist.total_count
+    # Same for probs and logits. Keep the one the distribution was built with:
+    # converting probs to logits clamps them.
+    elif isinstance(dist, (Binomial, Bernoulli, Categorical)):
+        params["probs" if dist._param is dist.logits else "logits"] = None
     return params
 
 
@@ -57,8 +94,9 @@ def move_distribution_to_device(
 
     If the distribution has a `.to()` method (e.g. sbi prior wrappers like
     ``PytorchReturnTypeWrapper`` or ``BoxUniform``), it is called directly.
-    Otherwise, the distribution is reconstructed on the target device by
-    extracting its parameters via ``get_distribution_parameters()``.
+    Otherwise, if its constructor takes only its ``arg_constraints`` parameters, the
+    distribution is rebuilt on the target device. Else its tensors are moved in place,
+    so that its other constructor arguments are kept.
 
     Args:
         dist: The distribution to move.
@@ -80,8 +118,7 @@ def move_distribution_to_device(
         return dist
     if all_tensors_on_device(dist, device):
         return dist
-    if not dist.arg_constraints:
-        # Without declared parameters, a rebuild would use the constructor defaults.
+    if not _constructor_matches_arg_constraints(dist):
         move_all_tensor_to_device(dist, device)
         return dist
     try:
@@ -93,6 +130,39 @@ def move_distribution_to_device(
     # Not a constructor argument: a user subclass need not accept `validate_args`.
     set_validate_args(rebuilt, dist._validate_args)
     return rebuilt
+
+
+def convert_distribution_to_float32(dist: Distribution) -> Distribution:
+    """Return the distribution with float32 samples.
+
+    Rebuilds the distribution from its parameters cast to float32, so that its
+    support, mean and variance are float32 as well. A distribution that cannot be
+    rebuilt this way is wrapped in a `PytorchReturnTypeWrapper`, which casts its
+    samples, log probs, mean and variance, but not its support.
+
+    Args:
+        dist: The distribution to convert.
+
+    Returns:
+        The rebuilt distribution, or the distribution in a `PytorchReturnTypeWrapper`.
+    """
+    # Exact type: a subclass might take other constructor arguments.
+    if type(dist) is Independent:
+        return Independent(
+            convert_distribution_to_float32(dist.base_dist),
+            dist.reinterpreted_batch_ndims,
+            validate_args=dist._validate_args,
+        )
+    if _constructor_matches_arg_constraints(dist):
+        try:
+            rebuilt = type(dist)(**get_distribution_parameters(dist, dtype=float32))
+            # Not a constructor argument: a user subclass need not accept it.
+            set_validate_args(rebuilt, dist._validate_args)
+            if rebuilt.sample().dtype == float32:
+                return rebuilt
+        except Exception:
+            pass
+    return PytorchReturnTypeWrapper(dist, return_type=float32, validate_args=False)
 
 
 class CustomPriorWrapper(Distribution):
@@ -313,7 +383,7 @@ class MultipleIndependent(Distribution):
             device (Optional): Device to move the distribution to. If None, \
                 the distribution is moved to the CPU.
 
-        Example:
+        Example
         --------
 
         ::
