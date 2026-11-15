@@ -24,6 +24,7 @@ from torch.distributions import (
     Pareto,
     Uniform,
 )
+from torch.testing import assert_close
 
 from sbi.analysis import conditional_potential
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
@@ -356,6 +357,15 @@ def test_prior_rebuild_does_not_reset_parameters_to_default(dtype: torch.dtype):
     else:
         # Wrapped in PytorchReturnTypeWrapper, so we need to access the prior.
         assert moved.prior.total_count == prior.total_count
+
+
+def test_process_prior_float64_prior_keeps_logits():
+    """A prior built from logits is rebuilt from logits, which are not clamped."""
+    logits = torch.tensor([-100.0, 0.0], dtype=torch.float64)
+    prior = Independent(Bernoulli(logits=logits), 1)
+    processed, _, _ = process_prior(prior)
+    theta = torch.tensor([[1.0, 1.0]])
+    assert_close(processed.log_prob(theta), prior.log_prob(theta.double()).float())
 
 
 def test_process_prior_warns_and_keeps_shapes_for_float64_prior():

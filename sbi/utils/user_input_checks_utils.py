@@ -34,11 +34,10 @@ def _remove_non_constructor_arguments(params: dict, dist: Distribution) -> dict:
     if isinstance(dist, MultivariateNormal):
         params["precision_matrix"] = None
         params["scale_tril"] = None
-    # Binomial, Bernoulli and Categorical calculate logits from
-    # probabilities, and store them in the arg_constraints. When reinstantiating, we
-    # must provide only one of them.
+    # Same for probs and logits. Keep the one the distribution was built with:
+    # converting probs to logits clamps them.
     elif isinstance(dist, (Binomial, Bernoulli, Categorical)):
-        params["logits"] = None
+        params["probs" if dist._param is dist.logits else "logits"] = None
     return params
 
 
