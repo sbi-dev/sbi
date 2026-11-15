@@ -32,7 +32,7 @@ class EnsemblePosterior(NeuralPosterior):
 
     So far, ``log_prob()``, ``sample()`` and ``map()`` functionality are supported.
 
-    Example:
+    Example
     --------
 
     ::

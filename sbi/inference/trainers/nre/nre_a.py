@@ -35,7 +35,7 @@ class NRE_A(RatioEstimatorTrainer):
     [1] *Likelihood-free MCMC with Amortized Approximate Likelihood Ratios*, Hermans
         et al., ICML 2020, https://arxiv.org/abs/1903.04057
 
-    Example:
+    Example
     --------
 
     ::

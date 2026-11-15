@@ -313,7 +313,7 @@ class MultipleIndependent(Distribution):
             device (Optional): Device to move the distribution to. If None, \
                 the distribution is moved to the CPU.
 
-        Example:
+        Example
         --------
 
         ::
