@@ -49,14 +49,17 @@ def _constructor_matches_arg_constraints(dist: Distribution) -> bool:
 
     Returns:
         True if the constructor's parameters match the `arg_constraints` keys. False if
-        they differ, if the constructor takes `*args` or `**kwargs`, or if either
-        cannot be inspected.
+        they differ, if there are none, if the constructor takes `*args` or
+        `**kwargs`, or if either cannot be inspected.
     """
     try:
         signature = inspect.signature(type(dist).__init__)
         arg_constraint_names = set(dist.arg_constraints)
     except Exception:
         # Cannot inspect the constructor
+        return False
+    if not arg_constraint_names:
+        # A rebuild would use the constructor defaults.
         return False
 
     # Extract the constructor arguments
@@ -144,7 +147,7 @@ def move_distribution_to_device(
         return dist
     if all_tensors_on_device(dist, device):
         return dist
-    if not dist.arg_constraints or not _constructor_matches_arg_constraints(dist):
+    if not _constructor_matches_arg_constraints(dist):
         # A rebuild would reset constructor arguments to their defaults.
         move_all_tensor_to_device(dist, device)
         return dist
