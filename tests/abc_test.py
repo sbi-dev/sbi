@@ -81,7 +81,8 @@ def test_smcabc_performance(prior_type: str, algorithm_variant: str, kernel: str
     num_dim = 2
     x_o = zeros((1, num_dim))
     num_samples = 1000
-    num_simulations = 5000  # Reduced for faster tests
+    # The budget leaves room for SMC populations after the initial one.
+    num_simulations = 15000
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
 
@@ -463,6 +464,46 @@ def test_smcabc_resampling_keeps_particles_paired_with_simulations():
     ):
         assert (particles - xs).abs().max() < 0.1
         assert torch.allclose(distances, smcabc.distance(zeros(1, 2), xs))
+
+
+@pytest.mark.parametrize(
+    "distances, quantile, expected",
+    [
+        pytest.param([0.0, 0.1, 0.2, 100.0], 0.5, 0.1, id="heavy-tail"),
+        pytest.param([0.0, 0.1, 0.2, 100.0], 1.0, 100.0, id="upper-bound"),
+        pytest.param(torch.tensor([0, 1, 2, 100]), 0.5, 1.0, id="integer"),
+        pytest.param([0.0, 1.0, float("inf")], 1.0, 1.0, id="drops-inf"),
+    ],
+)
+def test_smcabc_next_epsilon_is_distance_quantile(distances, quantile, expected):
+    """`distance_based_decay` must use a quantile of the finite distances."""
+    epsilon = SMCABC._get_next_epsilon(torch.as_tensor(distances), quantile)
+
+    assert epsilon == pytest.approx(expected)
+
+
+def test_smcabc_next_epsilon_raises_without_finite_distances():
+    """All-infinite distances must raise instead of returning NaN."""
+    with pytest.raises(ValueError, match="non-finite"):
+        SMCABC._get_next_epsilon(torch.tensor([float("inf")] * 3), 0.5)
+
+
+@pytest.mark.parametrize("epsilon_decay", [0.0, 1.5])
+def test_smcabc_rejects_invalid_quantile_with_distance_based_decay(epsilon_decay):
+    """`epsilon_decay` is a quantile then, so values outside (0, 1] fail early."""
+    prior = BoxUniform(-ones(2), ones(2))
+    smcabc = SMCABC(lambda theta: theta, prior)
+
+    with pytest.raises(ValueError, match="quantile"):
+        smcabc(
+            zeros(1, 2),
+            num_particles=10,
+            num_initial_pop=20,
+            num_simulations=100,
+            epsilon_decay=epsilon_decay,
+            distance_based_decay=True,
+        )
+    assert smcabc.simulation_counter == 0
 
 
 @pytest.mark.parametrize(

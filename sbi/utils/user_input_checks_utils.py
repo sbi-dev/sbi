@@ -3,7 +3,7 @@
 
 import inspect
 import warnings
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Optional, Self, Sequence, Union
 
 import torch
 from torch import Tensor, float32
@@ -19,6 +19,8 @@ from torch.distributions import (
 )
 
 from sbi.utils.torchutils import (
+    all_tensors_on_device,
+    canonical_device,
     move_all_tensor_to_device,
     process_device,
     set_validate_args,
@@ -82,6 +84,9 @@ def get_distribution_parameters(
     """
     params = {param: getattr(dist, param).to(device) for param in dist.arg_constraints}
     params = _remove_non_constructor_arguments(params, dist)
+    # Unlike Binomial, Multinomial keeps `total_count` outside `arg_constraints`.
+    if isinstance(dist, Multinomial):
+        params["total_count"] = dist.total_count
     return params
 
 
@@ -129,30 +134,34 @@ def move_distribution_to_device(
         device: The target device.
 
     Returns:
-        The distribution on the target device. If `.to()` was used or the tensors were
-        moved in place, this is the same object; otherwise it is a newly constructed
-        instance.
+        The distribution on the target device. If it moved in place or is already on
+        `device`, this is the same object; otherwise it is a new instance.
     """
-    # Try direct move
     if hasattr(dist, "to"):
-        dist.to(device)  # type: ignore
+        # sbi priors move in place; a user prior may return a moved copy instead.
+        moved = dist.to(device)  # type: ignore
+        if moved is None or moved is dist:
+            return dist
+        set_validate_args(moved, dist._validate_args)
+        return moved
+    if isinstance(dist, Independent):
+        dist.base_dist = move_distribution_to_device(dist.base_dist, device)
         return dist
-
-    # Try rebuilding the distribution
-    if _constructor_matches_arg_constraints(dist):
-        try:
-            rebuilt = type(dist)(**get_distribution_parameters(dist, device))
-        except Exception:
-            rebuilt = None
-
-        if rebuilt is not None:
-            # Not a constructor argument: a user subclass need not accept it.
-            set_validate_args(rebuilt, dist._validate_args)
-            return rebuilt
-
-    # Fall back to moving all tensors to the device
-    move_all_tensor_to_device(dist, device)
-    return dist
+    if all_tensors_on_device(dist, device):
+        return dist
+    if not dist.arg_constraints or not _constructor_matches_arg_constraints(dist):
+        # A rebuild would reset constructor arguments to their defaults.
+        move_all_tensor_to_device(dist, device)
+        return dist
+    try:
+        params = get_distribution_parameters(dist, device)
+        rebuilt = type(dist)(**params)
+    except Exception:
+        move_all_tensor_to_device(dist, device)
+        return dist
+    # Not a constructor argument: a user subclass need not accept `validate_args`.
+    set_validate_args(rebuilt, dist._validate_args)
+    return rebuilt
 
 
 def convert_distribution_to_float32(
@@ -274,13 +283,20 @@ class CustomPriorWrapper(Distribution):
                 stacklevel=2,
             )
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move the distribution to the specified device. Not implemented for this class.
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Keep the distribution on the CPU, the only device it supports.
+
+        Args:
+            device: Target device.
+
+        Returns:
+            The distribution itself, for the CPU.
 
         Raises:
-            NotImplementedError.
+            NotImplementedError: For any other device.
         """
+        if canonical_device(device) == "cpu":
+            return self
         raise NotImplementedError(
             "This class is not supported on the GPU. Use on cpu or use "
             "any of `PytorchReturnTypeWrapper`, `BoxUniform`, or `MultipleIndependent`."
@@ -411,7 +427,7 @@ class MultipleIndependent(Distribution):
             device (Optional): Device to move the distribution to. If None, \
                 the distribution is moved to the CPU.
 
-        Example:
+        Example
         --------
 
         ::
@@ -564,7 +580,7 @@ class MultipleIndependent(Distribution):
             reinterpreted_batch_ndims=1,
         )
 
-    def to(self, device: Union[str, torch.device]) -> None:
+    def to(self, device: Union[str, torch.device]) -> Self:
         """Move the distribution to the specified device.
 
         If the distribution has the `to` method, it is used. Otherwise, the
@@ -572,11 +588,23 @@ class MultipleIndependent(Distribution):
 
         Args:
             device: device to move the distribution to.
+
+        Returns:
+            The distribution itself.
         """
         device = process_device(device)
-        for i in range(len(self.dists)):
-            self.dists[i] = move_distribution_to_device(self.dists[i], device)
+        originals = list(self.dists)
+        try:
+            for i in range(len(self.dists)):
+                self.dists[i] = move_distribution_to_device(self.dists[i], device)
+        except Exception:
+            # A component that cannot move (e.g. a custom prior) must not leave the
+            # others on `device`: move them back, so that the prior stays usable.
+            for i, dist in enumerate(originals):
+                self.dists[i] = move_distribution_to_device(dist, self.device)
+            raise
         self.device = device
+        return self
 
 
 def build_support(
@@ -662,8 +690,10 @@ class OneDimPriorWrapper(Distribution):
     dist.log_prob(samples).shape  # (10, 1)
     ```
 
-    This will lead to unexpected errors in `sbi`. The point of this class is to wrap
-    those batched 1D distributions to get rid of their batch dimension in `.log_prob()`.
+    This will lead to unexpected errors in `sbi`. `process_prior` folds such a batch
+    dimension with torch's `Independent`, which the vector field methods recognise. It
+    uses this wrapper only for priors without that batch dimension whose `.log_prob()`
+    still returns shape `(N, 1)`, e.g. custom priors.
     """
 
     def __init__(self, prior: Distribution, validate_args=None) -> None:

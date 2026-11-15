@@ -119,6 +119,25 @@ def copy_data_folder(app, exception):
                 )
 
 
+def version_llms_txt(app, exception):
+    """Point the links in the built `llms.txt` to the docs version being built.
+
+    The source links to `latest`. On Read the Docs, `READTHEDOCS_CANONICAL_URL` is the
+    URL of the version being built, e.g. `https://sbi.readthedocs.io/en/stable/`.
+    """
+    canonical_url = os.environ.get("READTHEDOCS_CANONICAL_URL")
+    path = os.path.join(app.outdir, "llms.txt")
+    if exception is None and canonical_url and os.path.exists(path):
+        with open(path) as f:
+            text = f.read()
+        text = text.replace(
+            "https://sbi.readthedocs.io/en/latest/", canonical_url.rstrip("/") + "/"
+        )
+        with open(path, "w") as f:
+            f.write(text)
+
+
 def setup(app):
-    """Action to copy all images in `how_to_guide/data` to the `_build_` folder."""
+    """Run the post-build steps above."""
     app.connect('build-finished', copy_data_folder)
+    app.connect('build-finished', version_llms_txt)
