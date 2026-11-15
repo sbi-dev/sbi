@@ -327,7 +327,8 @@ def test_process_prior_float64_prior_has_float32_support(prior):
 
 def test_rebuild_keeps_constructor_arguments_outside_arg_constraints(monkeypatch):
     """Float32 conversion and device moves keep `coords`, which has a default."""
-    pyro_distributions = pytest.importorskip("pyro.distributions")
+    pytest.importorskip("pyro", minversion="1.9.1")  # adds `StableWithLogProb`
+    import pyro.distributions as pyro_distributions
 
     def stable(dtype):
         stability = torch.tensor([1.5], dtype=dtype)
