@@ -91,7 +91,7 @@ def process_prior(
             - `theta_numel`: Dimensionality of a single sample from the prior.
             - `prior_returns_numpy`: Whether the prior originally returned NumPy arrays.
 
-    Example:
+    Example
     --------
 
     ::
@@ -508,7 +508,7 @@ def process_simulator(
             simulator: processed simulator that returns :class:`torch.Tensor` \
                 and can handle batches of parameters.
 
-    Example:
+    Example
     --------
 
     ::

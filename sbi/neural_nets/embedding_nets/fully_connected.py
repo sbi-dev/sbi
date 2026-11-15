@@ -5,7 +5,27 @@ from torch import Tensor, nn
 
 
 class FCEmbedding(nn.Module):
-    """Fully-connected multi-layer neural network to be used as embedding network."""
+    """Fully-connected multi-layer neural network to be used as embedding network.
+
+    Examples
+    --------
+
+    ::
+
+        import torch
+        from sbi.neural_nets.embedding_nets import FCEmbedding
+
+        embedding_net = FCEmbedding(
+            input_dim=8,
+            output_dim=20,
+        )
+
+        x = torch.randn(32, 8)
+        embeddings = embedding_net(x)
+
+        print(embeddings.shape)
+        # torch.Size([32, 20])
+    """
 
     def __init__(
         self,
