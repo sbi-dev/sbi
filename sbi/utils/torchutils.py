@@ -633,7 +633,7 @@ class BoxUniform(Independent):
             device (Optional): device of the prior, inferred from low arg, \
             defaults to "cpu", should match the training device when used in SBI.
 
-        Example:
+        Example
         --------
 
         ::
@@ -663,7 +663,7 @@ class BoxUniform(Independent):
         )
         if not low.device == high.device:
             raise RuntimeError(
-                "Expected all tensors to be on the same device, but found at least"
+                "Expected all tensors to be on the same device, but found at least "
                 f"two devices, {low.device} and {high.device}."
             )
 
@@ -697,7 +697,7 @@ class BoxUniform(Independent):
         Args:
             device: Target device (e.g., "cpu", "cuda", "mps").
 
-        Example:
+        Example
         --------
 
         ::

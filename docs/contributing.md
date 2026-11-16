@@ -176,6 +176,18 @@ git merge upstream/main
 
 All our docstrings and comments are written following the [Google
 Style](http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
+Put code examples under an `Examples` heading with a dashed underline and no colon,
+followed by a `::` block. With a colon, the API reference turns the heading into a page
+section that also takes in the method documentation below it.
+
+```
+Examples
+--------
+
+::
+
+    embedding_net = FCEmbedding(input_dim=8, output_dim=20)
+```
 
 For code linting and formatting, we use [`ruff`](https://docs.astral.sh/ruff/),
 which is installed alongside `sbi`.

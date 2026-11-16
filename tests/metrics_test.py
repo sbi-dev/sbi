@@ -10,6 +10,9 @@ import numpy as np
 import pytest
 import torch
 from scipy.optimize import linear_sum_assignment
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
 from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import (
@@ -27,6 +30,7 @@ from sbi.utils.metrics import (
     wasserstein_2_squared,
     wasserstein_distance,
 )
+from sbi.utils.torchutils import process_device
 
 ## c2st related:
 ## for a study about c2st see https://github.com/psteinb/c2st/
@@ -88,6 +92,78 @@ def test_c2st_with_constant_features(dims_constant: int):
     y[:, :dims_constant] = 1.0
 
     c2st(x, y)
+
+
+@pytest.mark.parametrize(
+    "classifier",
+    (
+        LogisticRegression,
+        KNeighborsClassifier,
+        lambda **kwargs: KNeighborsClassifier(**kwargs),
+    ),
+)
+def test_c2st_custom_classifier(classifier):
+    x = torch.randn(200, 2)
+    y = torch.randn(200, 2) + 3.0
+    assert c2st(x, y, classifier=classifier) > 0.9
+
+
+@pytest.mark.parametrize(
+    "classifier_kwargs, random_state",
+    (({"n_estimators": 5}, 3), ({"n_estimators": 5, "random_state": 7}, 7)),
+)
+def test_c2st_passes_kwargs_and_seed(classifier_kwargs, random_state):
+    built = []
+
+    def factory(**kwargs):
+        built.append(RandomForestClassifier(**kwargs))
+        return built[-1]
+
+    x, y = torch.randn(50, 2), torch.randn(50, 2)
+    c2st(x, y, seed=3, classifier=factory, classifier_kwargs=classifier_kwargs)
+    assert built[0].n_estimators == 5
+    assert built[0].random_state == random_state
+    c2st(x, y, classifier_kwargs=classifier_kwargs)
+
+
+def test_c2st_clones_classifier_instance():
+    x, y = torch.randn(100, 2), torch.randn(100, 2) + 1.0
+    clf = RandomForestClassifier(n_estimators=5)
+    score = c2st(x, y, classifier=clf, classifier_kwargs={"max_depth": 2})
+    expected = c2st(
+        x,
+        y,
+        classifier=RandomForestClassifier,
+        classifier_kwargs={"n_estimators": 5, "max_depth": 2},
+    )
+    assert score == expected
+    assert clf.get_params() == RandomForestClassifier(n_estimators=5).get_params()
+    assert not hasattr(clf, "estimators_")
+
+
+@pytest.mark.parametrize(
+    "classifier", ("svm", 123, LinearRegression, LinearRegression())
+)
+def test_c2st_invalid_classifier_raises(classifier):
+    with pytest.raises(ValueError, match="classifier"):
+        c2st(torch.randn(50, 2), torch.randn(50, 2), classifier=classifier)
+
+
+def test_c2st_keeps_inputs_unchanged():
+    x = torch.randn(100, 2, requires_grad=True)
+    y = torch.randn(100, 2)
+    x_orig, y_orig = x.detach().clone(), y.clone()
+    c2st(x, y, z_score=False, noise_scale=1.0)
+    assert torch.equal(x, x_orig)
+    assert torch.equal(y, y_orig)
+
+
+@pytest.mark.gpu
+def test_c2st_with_noise_on_gpu():
+    device = process_device("gpu")
+    x = torch.randn(100, 2, device=device)
+    y = torch.randn(100, 2, device=device) + 3.0
+    assert c2st(x, y, noise_scale=0.1) > 0.9
 
 
 @pytest.mark.slow

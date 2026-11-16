@@ -584,8 +584,9 @@ def test_permutation_invariant_embedding_ignores_padding_per_observation(
 
     batched = embedding(x)
 
-    assert torch.allclose(batched[0], embedding(x[:1, :1])[0])
-    assert torch.allclose(batched[1], embedding(x[1:])[0])
+    # Batched and single-observation float32 sums differ by rounding (~1e-7).
+    assert torch.allclose(batched[0], embedding(x[:1, :1])[0], atol=1e-6)
+    assert torch.allclose(batched[1], embedding(x[1:])[0], atol=1e-6)
 
 
 @pytest.mark.parametrize(
