@@ -530,6 +530,18 @@ def test_copied_posterior_keeps_trained_link(mode):
     )
 
 
+def test_copied_posterior_is_independent_of_its_source_device():
+    """Moving the source of a `q=` copy leaves the copy's prior on its own device."""
+    prior = BoxUniform(zeros(2), ones(2))
+    posterior = _make_posterior("gaussian", 2, prior=prior)
+    posterior.train(**TRAIN_KWARGS)
+    clone = VIPosterior(posterior.potential_fn, prior, q=posterior)
+
+    posterior.to("meta")
+
+    assert torch.isfinite(clone.log_prob(torch.tensor([[0.5, 0.5]]))).all()
+
+
 def test_link_transform_moves_with_its_distribution():
     """A CDF link moves the tensors of the distribution it holds."""
     normal = Normal(zeros(2), ones(2))

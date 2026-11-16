@@ -574,7 +574,10 @@ class VIPosterior(NeuralPosterior):
             if self._amortized_q is not None:
                 self._amortized_q.to(self._device)
             self.vi_method = q.vi_method  # type: ignore
-            self._prior = q._prior
+            # Moving the source moves its prior in place, so the copy needs its own.
+            self._prior = move_distribution_to_device(
+                detach_and_deepcopy(q._prior), self._device
+            )
             self._x = q._x
             q = detach_and_deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
