@@ -355,8 +355,8 @@ class _Settings:
         return ceil(num_simulations / num_tasks)
 
     def call_size(self, num_simulations: int) -> int:
-        """Returns the number of parameter sets per call of a batched simulator."""
-        if self.simulation_batch_size == "auto":
+        """Returns the number of parameter sets per simulator call."""
+        if not self.simulator_is_batched or self.simulation_batch_size == "auto":
             return 1
         return self.task_size(num_simulations)
 
@@ -405,10 +405,7 @@ def _simulate(
     device = theta.device if isinstance(theta, Tensor) else None
     uses_threads = _check_backend(seed, settings.num_workers)
     tasks = _plan_tasks(theta, settings, seed, uses_threads)
-    run = partial(_run_rows, simulator, on_error=settings.on_error)
-    if settings.simulator_is_batched:
-        call_size = settings.call_size(len(theta))
-        run = partial(_run_batched, simulator, call_size, on_error=settings.on_error)
+    run = partial(_run_task, simulator, settings, settings.call_size(len(theta)))
     results: Generator[_TaskResult, None, None]
     if settings.num_workers == 1:
         results = (run(task) for task in tasks)
@@ -443,9 +440,7 @@ def _plan_tasks(
     call_seeds = [None] * len(starts)
     # Without a seed, worker processes would not follow the caller's random state.
     if seed is not None or (settings.num_workers != 1 and not uses_threads):
-        call_size = 1
-        if settings.simulator_is_batched:
-            call_size = settings.call_size(num_simulations)
+        call_size = settings.call_size(num_simulations)
         num_calls = [ceil(len(t) / call_size) for t in thetas]
         seeds = _distinct_seeds(sum(num_calls), seed)
         call_seeds = np.split(seeds, np.cumsum(num_calls)[:-1])
@@ -492,60 +487,45 @@ def _to_device(value: Any, device: torch.device) -> Any:
     return value.to(device)
 
 
-def _run_batched(
-    simulator: Callable, call_size: int, task: _Task, on_error: OnError
+def _run_task(
+    simulator: Callable, settings: _Settings, call_size: int, task: _Task
 ) -> _TaskResult:
-    """Runs a batched simulator on the calls of a task; a failure fails its call."""
+    """Runs the simulator calls of a task; a failure fails its call."""
+    batched = settings.simulator_is_batched
     outputs = []
     num_failed, first_failure = 0, None
     for i, theta in enumerate(_split(task.theta, call_size)):
         if task.call_seeds is not None:
             seed_all_backends(task.call_seeds[i])
         try:
-            output = _call(simulator, theta)
+            output = _call(simulator, theta if batched else theta[0])
         except Exception as error:
             start = task.start + i * call_size
-            where = f"theta[{start}:{start + len(theta)}]"
-            hint = (
-                "It was called with a batch of parameter sets; if it takes one per "
-                "call, pass `simulator_is_batched=False`."
-            )
+            if batched:
+                where = f"theta[{start}:{start + len(theta)}]"
+                hint = (
+                    "It was called with a batch of parameter sets; if it takes one "
+                    "per call, pass `simulator_is_batched=False`."
+                )
+            else:
+                where, hint = f"theta[{start}] = {theta[0].tolist()}", ""
             failure = _Failure(where, _failure_note(where, error, hint), error)
-            if on_error == "raise":
+            if settings.on_error == "raise":
                 error.add_note(failure.note)
                 raise
             output = [None] * len(theta)
             num_failed += len(theta)
             first_failure = first_failure or failure
         else:
-            _check_num_outputs(output, len(theta))
+            if batched:
+                _check_num_outputs(output, len(theta))
+            else:
+                output = [output]
         outputs.append(output)
 
     # Rows as one call per task would give them, so that tasks join alike.
     output = outputs[0] if len(outputs) == 1 else _join(outputs)
     return _TaskResult(output, num_failed, first_failure)
-
-
-def _run_rows(simulator: Callable, task: _Task, on_error: OnError) -> _TaskResult:
-    """Runs a simulator that is not batched on each parameter set of a task."""
-    outputs = []
-    num_failed, first_failure = 0, None
-    for i, theta in enumerate(task.theta):
-        if task.call_seeds is not None:
-            seed_all_backends(task.call_seeds[i])
-        try:
-            outputs.append(_call(simulator, theta))
-        except Exception as error:
-            where = f"theta[{task.start + i}] = {theta.tolist()}"
-            failure = _Failure(where, _failure_note(where, error), error)
-            if on_error == "raise":
-                error.add_note(failure.note)
-                raise
-            outputs.append(None)
-            num_failed += 1
-            first_failure = first_failure or failure
-
-    return _TaskResult(outputs, num_failed, first_failure)
 
 
 def _call(simulator: Callable, theta: Array) -> Any:
