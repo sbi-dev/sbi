@@ -4,9 +4,12 @@ When working with **multi-round** NPE (i.e., SNPE), you might have experienced t
 following warning:
 
 ```python
-Only x% posterior samples are within the prior support. It may take a long time to
-collect the remaining 10000 samples. Consider interrupting (Ctrl-C) and switching to
-'sample_with_mcmc=True'.
+Only x% proposal samples are accepted. It may take a long time to collect the
+remaining 10000 samples. You can prevent very long runtimes by setting
+`max_sampling_time` to limit runtime, or disabling rejection sampling (e.g. via
+`reject_outside_prior=False` in `posterior.sample()` when available). Alternatively,
+consider interrupting (Ctrl-C) and switching to
+`build_posterior(..., sample_with='mcmc')`.
 ```
 
 The reason for this issue is described in more detail
@@ -32,7 +35,8 @@ for _ in range(num_rounds):
     proposal = RestrictedPrior(prior, accept_reject_fn, sample_with="rejection")
 ```
 
-- sample with MCMC: `samples = posterior((num_samples,), x=x_o, sample_with_mcmc=True)`.
+- sample with MCMC: `posterior = inference.build_posterior(sample_with="mcmc")`, then
+`samples = posterior.sample((num_samples,), x=x_o)`.
 This approach will make sampling slower, but samples will not "leak".
 
 - resort to single-round NPE and (if necessary) increase your simulation budget.
