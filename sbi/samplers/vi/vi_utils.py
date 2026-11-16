@@ -69,10 +69,10 @@ class _LinkedFamily(nn.Module):
     """Variational family that maps a density on unconstrained space to the prior's
     support through `_link_transform`."""
 
-    def _apply(self, fn: Callable[[Tensor], Tensor], recurse: bool = True):
+    def _apply(self, fn: Callable[[Tensor], Tensor], *args, **kwargs):
         # `nn.Module.to()` moves parameters and buffers only. The link holds plain
         # tensors (e.g. the prior's bounds), and a copied family holds its own link.
-        super()._apply(fn, recurse)
+        super()._apply(fn, *args, **kwargs)
         link_transform = getattr(self, "_link_transform", None)
         if link_transform is not None:
             _apply_to_transform(link_transform, fn)
