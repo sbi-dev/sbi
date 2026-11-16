@@ -1,12 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import logging
 import warnings
 from unittest.mock import patch
 
 import pytest
 import torch
-from torch.distributions import Uniform
+from torch.distributions import Independent, Normal, Uniform
 
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.samplers.rejection import accept_reject_sample, rejection_sample
@@ -148,6 +149,49 @@ def test_accept_reject_sample_partial_return():
         # Should have issued a warning
         assert len(w) == 1
         assert "partial results" in str(w[0].message).lower()
+
+
+def _accept_reject(num_samples):
+    proposal = Uniform(-torch.ones(1), torch.ones(1))
+    samples, _ = accept_reject_sample(
+        proposal=proposal.sample,
+        accept_reject_fn=lambda theta: theta[:, 0] > 0.99,  # About 0.5 %.
+        num_samples=num_samples,
+    )
+    return samples
+
+
+def _rejection(num_samples):
+    proposal = Independent(Normal(torch.zeros(1), torch.ones(1)), 1)
+    # The target is the proposal, so `m` alone sets the acceptance: 1/200 = 0.5 %.
+    samples, _ = rejection_sample(
+        proposal.log_prob, proposal, num_samples=num_samples, m=200.0
+    )
+    return samples
+
+
+@pytest.mark.parametrize(
+    "sample", (_accept_reject, _rejection), ids=("accept_reject", "rejection")
+)
+@pytest.mark.parametrize(
+    ("num_samples", "expect_warning"),
+    (
+        # The second batch finishes sampling with samples to spare, so none remain
+        # to warn about.
+        (10, False),
+        (1000, True),
+    ),
+)
+def test_low_acceptance_warning_only_while_samples_remain(
+    caplog, sample, num_samples, expect_warning
+):
+    torch.manual_seed(0)
+
+    with caplog.at_level(logging.WARNING):
+        samples = sample(num_samples)
+
+    assert samples.shape == (num_samples, 1)
+    assert ("may take a long time" in caplog.text) is expect_warning
 
 
 def test_warn_if_outside_prior_support():

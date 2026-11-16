@@ -1324,7 +1324,7 @@ def _prepare_x_transforms(
             )
         if not hasattr(x_dist, "support"):
             raise ValueError(
-                "`x_dist` requires a `.support` attribute for"
+                "`x_dist` requires a `.support` attribute for "
                 "an unconstrained transformation."
             )
         transform_to_unconstrained = biject_transform_zuko(
@@ -1460,16 +1460,12 @@ class ContextSplineMap(nn.Module):
         # a scaling factor for initializations.
         self.hidden_features = hidden_features
 
-        # Use a non-linearity because otherwise, there will be a linear
-        # mapping from context features onto distribution parameters.
-
-        # Initialize with input layer.
+        # ReLUs between the layers make the map from context features to spline
+        # parameters nonlinear.
         layer_list = [nn.Linear(context_features, hidden_features), nn.ReLU()]
-        # Add hidden layers.
-        layer_list += [
-            nn.Linear(hidden_features, hidden_features),
-            nn.ReLU(),
-        ] * hidden_layers
+        # Add hidden layers, each with its own weights.
+        for _ in range(hidden_layers):
+            layer_list += [nn.Linear(hidden_features, hidden_features), nn.ReLU()]
         # Add output layer.
         layer_list += [nn.Linear(hidden_features, out_features)]
         self.spline_predictor = nn.Sequential(*layer_list)

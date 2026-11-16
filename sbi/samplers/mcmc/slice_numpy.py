@@ -12,9 +12,9 @@ from joblib import Parallel, delayed
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import FigureBase
-from tqdm.auto import tqdm, trange
 
 from sbi.simulators.simutils import tqdm_joblib
+from sbi.utils.pbar import tqdm, trange
 
 
 class MCMCSampler:

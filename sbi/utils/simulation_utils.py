@@ -26,7 +26,6 @@ import torch
 from joblib import Parallel, delayed, effective_n_jobs
 from joblib.parallel import get_active_backend
 from torch import Tensor, float32
-from tqdm.auto import tqdm
 
 from sbi.sbi_types import (
     Array,
@@ -35,6 +34,7 @@ from sbi.sbi_types import (
     SimulationBatchSize,
     SimulationOutput,
 )
+from sbi.utils.pbar import tqdm
 from sbi.utils.sbiutils import seed_all_backends
 
 # Several tasks per worker balance uneven run times; few tasks keep the cost of
