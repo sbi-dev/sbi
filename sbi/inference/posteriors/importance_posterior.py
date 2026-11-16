@@ -22,7 +22,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     `ImportanceSamplingPosterior` estimates the posterior log-probability by
     estimating the normalization constant with importance sampling. `.sample()` draws
     approximate samples with sampling-importance-resampling (SIR) by default, or returns
-    samples and importance weights with `method="importance"`.
+    samples and their log importance weights with `method="importance"`.
     """
 
     def __init__(
@@ -47,7 +47,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 `.sample()` method. With `sir`, approximate posterior samples are
                 generated with sampling importance resampling (SIR). With
                 `importance`, the `.sample()` method returns a tuple of samples and
-                corresponding importance weights.
+                corresponding log importance weights.
             oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight.
             max_sampling_batch_size: The batch size of samples being drawn from the
@@ -207,7 +207,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 `.sample()` method. With `sir`, approximate posterior samples are
                 generated with sampling importance resampling (SIR). With
                 `importance`, the `.sample()` method returns a tuple of samples and
-                corresponding importance weights.
+                corresponding log importance weights.
             oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight. If not provided, uses the
                 value specified at initialization.
