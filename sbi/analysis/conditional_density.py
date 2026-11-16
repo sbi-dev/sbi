@@ -160,9 +160,8 @@ def conditional_corrcoeff(
                     ),
                     limits[[dim1, dim2]].to(device),
                 )
-                for dim1 in subset_
-                for dim2 in subset_
-                if dim1 < dim2
+                for i, dim1 in enumerate(subset_)
+                for dim2 in subset_[i + 1 :]
             ])
         )
 

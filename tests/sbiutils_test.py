@@ -195,6 +195,22 @@ def test_conditional_corrcoeff(corr):
     assert torch.abs(corr - estimated_corr) < 1e-3
 
 
+def test_conditional_corrcoeff_unsorted_subset():
+    """An unsorted subset gives the full matrix re-indexed by the subset."""
+    d = MultivariateNormal(
+        torch.zeros(3),
+        torch.tensor([[1.0, 0.8, 0.0], [0.8, 1.0, -0.5], [0.0, -0.5, 1.0]]),
+    )
+    condition = torch.zeros(1, 3)
+    limits = torch.tensor([[-4.0, 4.0]] * 3)
+    subset = [2, 0, 1]
+
+    full = conditional_corrcoeff(d, limits, condition, resolution=50)
+    sub = conditional_corrcoeff(d, limits, condition, subset=subset, resolution=50)
+
+    assert torch.allclose(sub, full[subset][:, subset])
+
+
 def test_average_cond_coeff_matrix():
     d = MultivariateNormal(
         torch.tensor([10.0, 5, 1]),
