@@ -54,7 +54,11 @@ from sbi.sbi_types import (
     TorchTensor,
     TorchTransform,
 )
-from sbi.utils.sbiutils import _apply_to_transform, mcmc_transform
+from sbi.utils.sbiutils import (
+    _apply_to_transform,
+    mcmc_transform,
+    within_support,
+)
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
@@ -278,7 +282,7 @@ class VIPosterior(NeuralPosterior):
             # Keep the trained link: rebuilding it can re-estimate prior moments.
             link_transform = self._amortized_q._link_transform
             move_all_tensor_to_device(link_transform, device)
-            self._rebind_amortized_q(self._prior, link_transform)
+            self._rebind_amortized_q(link_transform)
         q_spec = getattr(self, "_q_spec", None)
         if q_spec is not None and q_spec.init_snapshot is not None:
             q_spec.init_snapshot = move_distribution_to_device(
@@ -287,21 +291,10 @@ class VIPosterior(NeuralPosterior):
         self._optimizer = None
         return self
 
-    @staticmethod
-    def _prior_support(prior: Distribution):
-        """Support of the prior, or None if it does not define one."""
-        try:
-            return prior.support
-        except (AttributeError, NotImplementedError):
-            return None
-
-    def _rebind_amortized_q(
-        self, prior: Distribution, link_transform: TorchTransform
-    ) -> None:
-        """Point the amortized flow's link and support at tensors on this device."""
+    def _rebind_amortized_q(self, link_transform: TorchTransform) -> None:
+        """Point the amortized flow's link at tensors on this device."""
         assert self._amortized_q is not None
         self._amortized_q._link_transform = link_transform
-        self._amortized_q._support = self._prior_support(prior)
 
     def _build_unconditional_flow(
         self,
@@ -475,9 +468,9 @@ class VIPosterior(NeuralPosterior):
             num_transforms=num_transforms,
             hidden_features=hidden_features,
         )
-        return TransformedConditionalZukoFlow(
-            flow, self.link_transform, self._prior_support(self._prior)
-        ).to(self._device)
+        return TransformedConditionalZukoFlow(flow, self.link_transform).to(
+            self._device
+        )
 
     @property
     def q(
@@ -592,8 +585,8 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
             if self._amortized_q is not None:
                 self._amortized_q.to(self._device)
-                # Link and support come from the source posterior's prior (not this
-                # one's), copied so that the source stays on its own device.
+                # The link comes from the source posterior's prior (not this one's),
+                # copied so that the source stays on its own device.
                 prior = move_distribution_to_device(
                     detach_and_deepcopy(q._prior), self._device
                 )
@@ -602,7 +595,7 @@ class VIPosterior(NeuralPosterior):
                 else:
                     theta_transform = detach_and_deepcopy(q.theta_transform)
                     move_all_tensor_to_device(theta_transform, self._device)
-                self._rebind_amortized_q(prior, theta_transform.inv)
+                self._rebind_amortized_q(theta_transform.inv)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
@@ -759,7 +752,8 @@ class VIPosterior(NeuralPosterior):
                 consumption.
 
         Returns:
-            Log-probability of shape (batch,) where batch is:
+            Log-probability of shape (batch,), `-inf` for θ outside the prior
+            support, where batch is:
             - batch_theta if x has batch size 1 (broadcast x)
             - batch_x if theta has batch size 1 (broadcast theta)
             - batch_theta if batch_theta == batch_x (paired evaluation)
@@ -803,8 +797,7 @@ class VIPosterior(NeuralPosterior):
                 theta_with_sample_dim = theta.unsqueeze(0)
                 log_probs = self._amortized_q.log_prob(
                     theta_with_sample_dim, condition=x
-                )
-                return log_probs.squeeze(0)
+                ).squeeze(0)
             else:
                 # Single-x mode: evaluate log q(θ)
                 x = self._x_else_default_x(x)
@@ -813,7 +806,15 @@ class VIPosterior(NeuralPosterior):
                         f"The variational posterior was not fit on the specified "
                         f"observation {x}. Please train using posterior.train()."
                     )
-                return self.q.log_prob(theta)
+                log_probs = self.q.log_prob(theta)
+
+            # The inverse link clamps θ outside the support onto its boundary, which
+            # would give such θ a finite density.
+            return torch.where(
+                within_support(self._prior, theta),
+                log_probs,
+                torch.tensor(float("-inf"), device=log_probs.device),
+            )
 
     def train(
         self,

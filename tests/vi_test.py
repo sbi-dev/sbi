@@ -990,8 +990,9 @@ def test_amortized_vi_batched_sampling(linear_gaussian_setup):
     assert samples.shape == (num_samples, num_obs, setup["num_dim"])
 
 
-def test_amortized_vi_with_bounded_prior():
-    """Amortized VI trains and samples inside the support of a `BoxUniform` prior."""
+@pytest.mark.parametrize("mode", ["single_x", "amortized"])
+def test_vi_with_bounded_prior(mode):
+    """VI trains, samples and evaluates inside the support of a `BoxUniform` prior."""
     prior = BoxUniform(-3 * ones(2), 3 * ones(2))
     theta = prior.sample((300,))
     x = theta + 0.3 * torch.randn_like(theta)
@@ -999,7 +1000,11 @@ def test_amortized_vi_with_bounded_prior():
     nle.append_simulations(theta, x).train(max_num_epochs=3)
     posterior = nle.build_posterior(sample_with="vi")
 
-    posterior.train_amortized(theta, x, max_num_iters=5, show_progress_bar=False)
+    if mode == "amortized":
+        posterior.train_amortized(theta, x, max_num_iters=5, show_progress_bar=False)
+    else:
+        posterior.set_default_x(x[:1])
+        posterior.train(max_num_iters=5, quality_control=False, show_progress_bar=False)
 
     samples = posterior.sample((50,), x=x[:1], show_progress_bars=False)
     assert torch.isfinite(samples).all()
