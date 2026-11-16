@@ -232,8 +232,6 @@ class ConditionedPotential(BasePotential):
 
         Args:
             theta: Free parameters $\theta_i$, batch dimension 1.
-            x_o: Unused keyword argument. Only present to match the signature of the
-                `Potential` class.
             track_gradients: Whether to track gradients.
 
         Returns:

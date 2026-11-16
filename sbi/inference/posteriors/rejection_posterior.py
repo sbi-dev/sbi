@@ -240,7 +240,7 @@ class RejectionPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.

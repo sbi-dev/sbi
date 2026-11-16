@@ -33,7 +33,7 @@ class EnsemblePosterior(NeuralPosterior):
 
     So far, ``log_prob()``, ``sample()`` and ``map()`` functionality are supported.
 
-    Example:
+    Example
     --------
 
     ::
@@ -505,11 +505,11 @@ class EnsemblePosterior(NeuralPosterior):
         self.posteriors[idx].
 
         Args:
-            x: Deprecated, raises. The joint MAP uses the default `x` of the
-                ensemble, else the `x` that all its posteriors use. The joint MAP of
-                an ensemble with NPE posteriors takes one observation. With
-                `individually=True`, each posterior uses its default `x`, which must
-                be the same for all of them.
+            x: No longer supported; use `.set_default_x()` before `.map()`. The
+                joint MAP uses the default `x` of the ensemble, else the `x` that all
+                its posteriors use. The joint MAP of an ensemble with NPE posteriors
+                takes one observation. With `individually=True`, each posterior uses
+                its default `x`, which must be the same for all of them.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -544,7 +544,7 @@ class EnsemblePosterior(NeuralPosterior):
 
         if x is not None:
             raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated. "
+                "Passing `x` to `.map()` is no longer supported. "
                 "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 
@@ -611,7 +611,7 @@ class EnsemblePotential(BasePotential):
         Args:
             potential_fns: List of the potential_fns from each posterior component.
             weights: Weights of each posterior distribution.
-            priors: List of prior distributions.
+            prior: Prior distribution.
             x_o: Used as conditioning context for `potential_fn`.
             device: Device which the component distributions sit on.
         """
