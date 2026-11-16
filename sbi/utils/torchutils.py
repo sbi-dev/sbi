@@ -633,7 +633,7 @@ class BoxUniform(Independent):
             device (Optional): device of the prior, inferred from low arg, \
             defaults to "cpu", should match the training device when used in SBI.
 
-        Example:
+        Example
         --------
 
         ::
@@ -697,7 +697,7 @@ class BoxUniform(Independent):
         Args:
             device: Target device (e.g., "cpu", "cuda", "mps").
 
-        Example:
+        Example
         --------
 
         ::

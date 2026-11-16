@@ -89,7 +89,28 @@ def get_new_cnn_output_size(
 
 
 class CNNEmbedding(nn.Module):
-    """Convolutional embedding network with channel-first 1D or 2D inputs."""
+    """Convolutional embedding network with channel-first 1D or 2D inputs.
+
+    Examples
+    --------
+
+    ::
+
+        import torch
+        from sbi.neural_nets.embedding_nets import CNNEmbedding
+
+        embedding_net = CNNEmbedding(
+            input_shape=(28, 28),
+            in_channels=1,
+            output_dim=20,
+        )
+
+        x = torch.randn(32, 1, 28, 28)
+        embeddings = embedding_net(x)
+
+        print(embeddings.shape)
+        # torch.Size([32, 20])
+    """
 
     def __init__(
         self,
