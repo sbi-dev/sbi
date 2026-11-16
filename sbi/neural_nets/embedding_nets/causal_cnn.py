@@ -256,7 +256,7 @@ class CausalCNNEmbedding(nn.Module):
                 int(total_timepoints / pool_kernel_size),
             )
             assert aggregator_out_shape[-1] > 1, (
-                "Your dimensionality is already small, "
+                "Your dimensionality is already small. "
                 "Please ensure a larger input size or use a custom aggregator."
             )
             aggregator = WaveNetSRLikeAggregator(

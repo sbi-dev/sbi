@@ -42,7 +42,7 @@ def sir_init(
     num_candidate_samples: int = 10_000,
     **kwargs: Any,
 ) -> Tensor:
-    r"""Return a sample obtained by sequential importance reweighting.
+    r"""Return a sample obtained by sampling-importance-resampling (SIR).
 
     See Rubin 1988, "Using the sir algorithm to simulate posterior distributions."
 
@@ -78,7 +78,7 @@ def resample_given_potential_fn(
     The difference to actually performing SIR is that the weights are given only
     by the `potential_fn`, whereas SIR corrects for the `proposal.log_prob()`.
 
-    This method (`resample`) is the default.
+    `MCMCPosterior` uses this strategy by default (`init_strategy="resample"`).
 
     Args:
         proposal: Proposal distribution, candidate samples are drawn from it.
