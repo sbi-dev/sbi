@@ -417,20 +417,38 @@ def test_worker_tasks_carry_only_their_own_parameter_sets():
     assert torch.all(x == 1.0)
 
 
-@pytest.mark.parametrize("num_workers, call_size", [(1, 40.0), (2, 1.0)])
-def test_simulate_for_sbi_gives_a_parallel_simulator_all_parameter_sets_on_one_worker(
-    prior, num_workers, call_size
+def test_simulate_for_sbi_runs_a_parallel_simulator_with_its_settings(prior):
+    def run(simulator, **kwargs):
+        return simulate_for_sbi(
+            simulator, prior, 40, seed=0, show_progress_bar=False, **kwargs
+        )[1]
+
+    parallel = parallelize_simulator(numpy_noise, num_workers=2)
+    expected = run(numpy_noise, num_workers=2, simulator_is_batched=False)
+
+    assert torch.equal(run(parallel), expected)
+    # Copies the marker; runs as a batched simulator.
+    run(torch.no_grad()(parallel))
+
+
+@pytest.mark.parametrize(
+    "on_error, parallel_on_error", [("nan", "raise"), ("raise", "nan")]
+)
+def test_simulate_for_sbi_fails_single_simulations_of_a_parallel_simulator(
+    prior, on_error, parallel_on_error
 ):
-    # With batches of up to 100, `batch_sizes` shows how many the wrapper got.
     simulator = parallelize_simulator(
-        batch_sizes, num_workers=2, simulation_batch_size=100, simulator_is_batched=True
+        fails_for_negative, num_workers=2, on_error=parallel_on_error
     )
 
-    _, x = simulate_for_sbi(
-        simulator, prior, 40, num_workers=num_workers, show_progress_bar=False
-    )
+    with pytest.warns(UserWarning, match="simulations failed"):
+        theta, x = simulate_for_sbi(
+            simulator, prior, 40, seed=0, on_error=on_error, show_progress_bar=False
+        )
 
-    assert torch.all(x == call_size)
+    failed = (theta < 0).any(-1)
+    assert torch.isnan(x[failed]).all()
+    assert torch.equal(x[~failed], theta[~failed] * 2.0)
 
 
 def test_unknown_on_error_raises():

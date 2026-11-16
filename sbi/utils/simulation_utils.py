@@ -4,7 +4,7 @@
 import pickle
 import warnings
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial, wraps
 from math import ceil
 from typing import (
@@ -76,11 +76,11 @@ def simulate_for_sbi(
         simulation_batch_size: Number of parameter sets per worker task, and per
             call of a batched simulator. "auto" gives each call one parameter set
             and, with more than one worker, groups the calls into four tasks per
-            worker; on one worker, a simulator from :func:`parallelize_simulator`
-            gets all parameter sets in one call and spreads them over its own
-            workers. For
-            all parameter sets in one call, pass their number; None does the same
-            but is deprecated.
+            worker. On one worker, "auto" runs a simulator from
+            :func:`parallelize_simulator` with its settings: its workers, batch
+            size and `simulator_is_batched`, and "nan" if either `on_error` says
+            so. For all parameter sets in one call, pass their number; None does
+            the same but is deprecated.
         seed: Seed for reproducibility. It seeds the global random state before
             the parameters are sampled. The simulator is also reseeded before each
             call, see :func:`simulate_from_theta`, except a batched simulator on one
@@ -103,14 +103,20 @@ def simulate_for_sbi(
         tensors on the device of $\theta$. One number per simulation gives $x$ of
         shape (num_simulations, 1).
     """
-    parallel = getattr(simulator, "_sbi_parallel", None)
-    # In a worker, joblib would run the parallel simulator on threads.
-    if simulation_batch_size == "auto" and parallel is not None and num_workers == 1:
-        _check_backend(seed, parallel.num_workers)
-        simulation_batch_size = max(num_simulations, 1)
     settings = _Settings(
         num_workers, simulation_batch_size, simulator_is_batched, on_error
     )
+    parallel = getattr(simulator, "_sbi_parallel", None)
+    # A decorator on a parallel simulator, e.g. `torch.no_grad()`, copies the marker.
+    if (
+        simulation_batch_size == "auto"
+        and num_workers == 1
+        and parallel is not None
+        and getattr(simulator, "__wrapped__", None) is parallel.simulator
+    ):
+        simulator = parallel.simulator
+        nan = "nan" in (on_error, parallel.settings.on_error)
+        settings = replace(parallel.settings, on_error="nan" if nan else "raise")
     if num_simulations == 0:
         return torch.tensor([], dtype=float32), torch.tensor([], dtype=float32)
 
@@ -124,12 +130,9 @@ def simulate_for_sbi(
             "`BoxUniform(torch.zeros(1), torch.ones(1))`."
         )
     # Batched simulations on one worker continue the seeded random state.
+    continues = settings.simulator_is_batched and settings.num_workers == 1
     x = _simulate(
-        simulator,
-        theta,
-        settings,
-        seed=None if simulator_is_batched and num_workers == 1 else seed,
-        show_progress_bar=show_progress_bar,
+        simulator, theta, settings, None if continues else seed, show_progress_bar
     )
     if seed is not None:
         _seed_after_call(seed)
@@ -262,8 +265,9 @@ def parallelize_simulator(
     Use it as a function, `parallelize_simulator(simulator)`, or as a decorator,
     `@parallelize_simulator` or `@parallelize_simulator(num_workers=4)`. By default,
     the simulator takes one parameter set per call and runs on all CPUs.
-    On one worker, :func:`simulate_for_sbi` passes the parallel simulator all
-    parameter sets in one call, unless `simulation_batch_size` says otherwise.
+    On its defaults of one worker and "auto", :func:`simulate_for_sbi` runs
+    `simulator` with these settings, but with its own seed and progress bar;
+    `on_error` is "nan" if either says so.
 
     Calls take no seed. To reproduce a call, seed beforehand with
     :func:`sbi.utils.seed_all_backends`: with one worker, the simulator draws from
@@ -307,7 +311,7 @@ def parallelize_simulator(
         def parallel_simulator(theta: Array) -> SimulationOutput:
             return _simulate(simulator, theta, settings, None, show_progress_bar)
 
-        parallel_simulator._sbi_parallel = settings
+        parallel_simulator._sbi_parallel = _Parallel(simulator, settings)
         return parallel_simulator
 
     return decorator if simulator is None else decorator(simulator)
@@ -363,6 +367,13 @@ class _Settings:
         if not self.simulator_is_batched or self.simulation_batch_size == "auto":
             return 1
         return self.task_size(num_simulations)
+
+
+class _Parallel(NamedTuple):
+    """Marks a simulator from :func:`parallelize_simulator`."""
+
+    simulator: Callable
+    settings: _Settings
 
 
 class _Task(NamedTuple):
