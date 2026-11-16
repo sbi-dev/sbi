@@ -499,6 +499,36 @@ def test_amortized_posterior_survives_roundtrip():
     assert clone._amortized_q is not posterior._amortized_q
 
 
+@pytest.mark.parametrize("mode", ["single_x", "amortized"])
+def test_copied_posterior_keeps_trained_link(mode):
+    """A `q=` copy moved with `.to()` keeps the link its `q` was trained with.
+
+    The prior has no analytic moments, so a rebuilt link would re-estimate them from
+    fresh prior samples and shift the density.
+    """
+    num_dim = 2
+    prior = torch.distributions.TransformedDistribution(
+        MultivariateNormal(zeros(num_dim), eye(num_dim)),
+        [torch_tf.AffineTransform(ones(num_dim), 2 * ones(num_dim))],
+    )
+    posterior = _make_posterior("flow", num_dim, prior=prior)
+    x_o = zeros(1, num_dim)
+    if mode == "amortized":
+        posterior.train_amortized(
+            prior.sample((128,)), torch.randn(128, num_dim), max_num_iters=3
+        )
+    else:
+        posterior.set_default_x(x_o)
+        posterior.train(**TRAIN_KWARGS)
+
+    clone = VIPosterior(posterior.potential_fn, prior, q=posterior).to("cpu")
+
+    theta = prior.sample((10,))
+    assert torch.allclose(
+        clone.log_prob(theta, x=x_o), posterior.log_prob(theta, x=x_o)
+    )
+
+
 def test_retrain_from_scratch_with_bounded_prior():
     """Retraining an already-wrapped `q` must not apply the link transform twice.
 

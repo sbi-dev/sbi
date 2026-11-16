@@ -30,7 +30,21 @@ from sbi.utils.torchutils import _base_recursor
 _CopyableT = TypeVar("_CopyableT")
 
 
-class TransformedZukoFlow(nn.Module):
+class _LinkedFamily(nn.Module):
+    """Variational family that maps a density on unconstrained space to the prior's
+    support through `_link_transform`."""
+
+    def _apply(self, fn: Callable[[Tensor], Tensor], recurse: bool = True):
+        # `nn.Module.to()` moves parameters and buffers only. The link holds plain
+        # tensors (e.g. the prior's bounds), and a copied family holds its own link.
+        super()._apply(fn, recurse)
+        link_transform = getattr(self, "_link_transform", None)
+        if link_transform is not None:
+            _apply_to_transform(link_transform, fn)
+        return self
+
+
+class TransformedZukoFlow(_LinkedFamily):
     """Wrapper for Zuko flows that applies a link transform to samples.
 
     This wrapper ensures that:
@@ -137,7 +151,7 @@ class TransformedZukoFlow(nn.Module):
         return theta, log_prob_theta
 
 
-class TransformedConditionalZukoFlow(nn.Module):
+class TransformedConditionalZukoFlow(_LinkedFamily):
     """Conditional counterpart of `TransformedZukoFlow` for amortized VI.
 
     The wrapped flow q(z|x) lives in unconstrained space. Samples and log-probs of
@@ -188,7 +202,7 @@ class TransformedConditionalZukoFlow(nn.Module):
         return theta, log_prob_z - self._sum_log_det(log_det, log_prob_z)
 
 
-class LearnableGaussian(nn.Module):
+class LearnableGaussian(_LinkedFamily):
     """Learnable Gaussian distribution for variational inference.
 
     A simple parametric variational family with learnable mean and covariance.

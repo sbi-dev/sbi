@@ -62,7 +62,6 @@ from sbi.utils.sbiutils import (
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
-    move_all_tensor_to_device,
     move_tensors,
 )
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
@@ -275,14 +274,8 @@ class VIPosterior(NeuralPosterior):
 
         if hasattr(self, "_q") and hasattr(self._q, "to"):
             self._q.to(device)  # type: ignore[union-attr]
-        if hasattr(self, "_q") and hasattr(self._q, "_link_transform"):
-            self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
-            # Keep the trained link: rebuilding it can re-estimate prior moments.
-            link_transform = self._amortized_q._link_transform
-            move_all_tensor_to_device(link_transform, device)
-            self._rebind_amortized_q(link_transform)
         q_spec = getattr(self, "_q_spec", None)
         if q_spec is not None and q_spec.init_snapshot is not None:
             q_spec.init_snapshot = move_distribution_to_device(
@@ -290,11 +283,6 @@ class VIPosterior(NeuralPosterior):
             )
         self._optimizer = None
         return self
-
-    def _rebind_amortized_q(self, link_transform: TorchTransform) -> None:
-        """Point the amortized flow's link at tensors on this device."""
-        assert self._amortized_q is not None
-        self._amortized_q._link_transform = link_transform
 
     def _build_unconditional_flow(
         self,
@@ -461,7 +449,7 @@ class VIPosterior(NeuralPosterior):
         # support so that bounded priors are not evaluated outside their support.
         flow = build_zuko_flow(
             flow_type.value.upper(),
-            batch_x=self.link_transform.inv(theta),  # θ is what we model
+            batch_x=self.link_transform.inv(theta),  # unconstrained θ is modelled
             batch_y=x,  # x is the condition
             z_score_x=z_score_theta,  # z-score for θ (naming mismatch)
             z_score_y=z_score_x,  # z-score for x condition
@@ -585,17 +573,6 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
             if self._amortized_q is not None:
                 self._amortized_q.to(self._device)
-                # The link comes from the source posterior's prior (not this one's),
-                # copied so that the source stays on its own device.
-                prior = move_distribution_to_device(
-                    detach_and_deepcopy(q._prior), self._device
-                )
-                if q.theta_transform is None:
-                    theta_transform = mcmc_transform(prior, device=self._device)
-                else:
-                    theta_transform = detach_and_deepcopy(q.theta_transform)
-                    move_all_tensor_to_device(theta_transform, self._device)
-                self._rebind_amortized_q(theta_transform.inv)
             self.vi_method = q.vi_method  # type: ignore
             self._prior = q._prior
             self._x = q._x
