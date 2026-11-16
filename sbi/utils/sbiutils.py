@@ -348,31 +348,6 @@ def _patch_inverse_transform_pickling() -> None:
 _patch_inverse_transform_pickling()
 
 
-def _contains_inverse_transform(transform: TorchTransform) -> bool:
-    """Return whether a transform tree contains an inverse wrapper."""
-    seen = set()
-
-    def contains_inverse(current: TorchTransform) -> bool:
-        if id(current) in seen:
-            return False
-        seen.add(id(current))
-        if isinstance(current, torch_tf._InverseTransform):
-            return True
-        for key, value in current.__dict__.items():
-            if key == "_inv":
-                continue
-            if isinstance(value, TorchTransform) and contains_inverse(value):
-                return True
-            if isinstance(value, (list, tuple)) and any(
-                isinstance(item, TorchTransform) and contains_inverse(item)
-                for item in value
-            ):
-                return True
-        return False
-
-    return contains_inverse(transform)
-
-
 class CallableTransform(nn.Module):
     """Own a PyTorch transform as a movable, picklable module.
 
@@ -382,26 +357,28 @@ class CallableTransform(nn.Module):
 
     def __init__(self, transform: TorchTransform):
         super().__init__()
-        self._is_inverse = _contains_inverse_transform(transform)
-        self._transform = transform.inv if self._is_inverse else transform
-        if not isinstance(
-            self._transform, TorchTransform
-        ) or _contains_inverse_transform(self._transform):
+        if not isinstance(transform, TorchTransform):
             raise ValueError(
-                "CallableTransform requires one transform orientation without "
-                "nested inverse wrappers."
+                f"CallableTransform requires a torch Transform, got {type(transform)}."
             )
+        self._transform = transform
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+        # sbi 0.27 stored an inverse transform as its forward plus this flag.
+        if self.__dict__.pop("_is_inverse", False):
+            self._transform = self._transform.inv
 
     @property
     def transform(self) -> TorchTransform:
-        """Return the transform in the orientation supplied at construction."""
-        return self._transform.inv if self._is_inverse else self._transform
+        """Return the transform supplied at construction."""
+        return self._transform
 
     def forward(self) -> TorchTransform:
         return self.transform
 
-    def _apply(self, fn):
-        super()._apply(fn)
+    def _apply(self, fn, *args, **kwargs):
+        super()._apply(fn, *args, **kwargs)
         _apply_to_transform(self._transform, fn)
         return self
 
