@@ -20,7 +20,7 @@ import pytest
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import eye, ones, zeros
-from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
+from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal, Normal
 
 from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
 from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
@@ -45,6 +45,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import BoxUniform, MultipleIndependent
 from sbi.utils.metrics import c2st, check_c2st
+from sbi.utils.sbiutils import _apply_to_transform
 from sbi.utils.user_input_checks import process_x
 
 # Supported variational families for VI
@@ -527,6 +528,17 @@ def test_copied_posterior_keeps_trained_link(mode):
     assert torch.allclose(
         clone.log_prob(theta, x=x_o), posterior.log_prob(theta, x=x_o)
     )
+
+
+def test_link_transform_moves_with_its_distribution():
+    """A CDF link moves the tensors of the distribution it holds."""
+    normal = Normal(zeros(2), ones(2))
+    link = torch_tf.CumulativeDistributionTransform(normal)
+
+    _apply_to_transform(link, lambda t: t.to("meta"))
+
+    assert normal.loc.device.type == "meta"
+    assert normal.scale.device.type == "meta"
 
 
 def test_log_prob_on_edge_of_half_open_support():
