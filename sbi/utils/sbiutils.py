@@ -1354,8 +1354,8 @@ def gradient_ascent(
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     """Seeds the global random states of Python, numpy and PyTorch.
 
-    It also makes cuDNN use deterministic algorithms for the rest of the session,
-    which can slow down convolutions on a GPU.
+    It also makes cuDNN use deterministic convolution algorithms for the rest of the
+    session, which can slow down convolutions on a GPU.
 
     Args:
         seed: Seed for all random states. If None, it is drawn from PyTorch's.
