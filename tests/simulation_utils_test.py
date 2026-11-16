@@ -209,18 +209,20 @@ def test_tensors_in_list_outputs_stay_on_theta_device(num_workers):
 
 
 def test_simulate_for_sbi_reproducible_with_seed(prior):
-    def run(seed):
+    def run(seed, num_workers=2):
         return simulate_for_sbi(
             numpy_noise,
             prior,
             50,
-            num_workers=2,
+            num_workers=num_workers,
             seed=seed,
             show_progress_bar=False,
         )[1]
 
     assert torch.equal(run(seed=0), run(seed=0))
     assert not torch.equal(run(seed=0), run(seed=1))
+    # "auto" makes tasks of 7 and of 5 parameter sets.
+    assert torch.equal(run(seed=0), run(seed=0, num_workers=3))
 
 
 @pytest.mark.parametrize("simulator_is_batched", [False, True])

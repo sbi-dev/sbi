@@ -79,13 +79,13 @@ def simulate_for_sbi(
             worker. For all parameter sets in one call, pass their number; None
             does the same but is deprecated.
         seed: Seed for reproducibility. It seeds the global random state before
-            the parameters are sampled. A simulator that is not batched is also
-            reseeded before each simulation, see :func:`simulate_from_theta`. A
-            batched simulator continues the seeded random state on one worker; with
-            more workers, each task gets its own seed, so `x` differs between one
-            worker and more. Afterwards, the global random state is seeded with a
-            seed derived from `seed`, the same for any `num_workers`, so later
-            draws do not repeat those of this call.
+            the parameters are sampled. The simulator is also reseeded before each
+            call, see :func:`simulate_from_theta`, except a batched simulator on one
+            worker, which continues the seeded random state. So for a batched
+            simulator, `x` differs between one worker and more, but not between
+            other numbers of workers. Afterwards, the global random state is seeded
+            with a seed derived from `seed`, the same for any `num_workers`, so
+            later draws do not repeat those of this call.
         show_progress_bar: Whether to show a progress bar for simulating. This will not
             affect whether there will be a progressbar while drawing samples from the
             proposal.
@@ -106,8 +106,6 @@ def simulate_for_sbi(
     if num_simulations == 0:
         return torch.tensor([], dtype=float32), torch.tensor([], dtype=float32)
 
-    # Batched simulators get no seed below, so a thread backend is checked here.
-    _check_backend(seed, num_workers)
     seed_all_backends(seed)
     theta = proposal.sample((num_simulations,))
     if theta.ndim < 2:
@@ -117,12 +115,12 @@ def simulate_for_sbi(
             "proposal over one parameter needs the event shape (1,), e.g. "
             "`BoxUniform(torch.zeros(1), torch.ones(1))`."
         )
-    # Batched simulations continue the seeded random state.
+    # Batched simulations on one worker continue the seeded random state.
     x = _simulate(
         simulator,
         theta,
         settings,
-        seed=None if simulator_is_batched else seed,
+        seed=None if simulator_is_batched and num_workers == 1 else seed,
         show_progress_bar=show_progress_bar,
     )
     if seed is not None:
