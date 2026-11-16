@@ -412,7 +412,7 @@ class EnsemblePosterior(NeuralPosterior):
         self.posteriors[idx].
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -447,7 +447,7 @@ class EnsemblePosterior(NeuralPosterior):
 
         if x is not None:
             raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated. "
+                "Passing `x` to `.map()` is no longer supported. "
                 "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 
