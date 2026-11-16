@@ -32,7 +32,7 @@ class NRE_C(RatioEstimatorTrainer):
     [1] *Contrastive Neural Ratio Estimation*, Benjamin Kurt Miller, et al.,
         NeurIPS 2022, https://arxiv.org/abs/2210.06170
 
-    Example:
+    Example
     --------
 
     ::

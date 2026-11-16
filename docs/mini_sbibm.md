@@ -124,6 +124,7 @@ e.g. `--bm-label before` and `--bm-label after`.
 | `--bm` | off | Run the mini-sbibm tests (and only those). |
 | `--bm-mode` | default run | Method group to run, see the list above. |
 | `--bm-estimators` | mode default | Comma-separated estimators for the selected mode. |
+| `--bm-embedding` | none | Embedding net for x in the `npe` mode: `fc` adds an `FCEmbedding` on every task. |
 | `--bm-num-simulations` | 2000 | Training simulations per case. Sequential methods split them over two rounds. |
 | `--bm-seeds` | 1 | Training seeds per case. |
 | `--bm-num-iid-trials` | 10 | Trials per observation in the `mnle` mode. |

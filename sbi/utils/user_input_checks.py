@@ -17,7 +17,7 @@ from typing import (
 import torch
 from numpy import ndarray
 from torch import Tensor, float32, nn
-from torch.distributions import Distribution, Uniform
+from torch.distributions import Distribution, Independent, Uniform
 
 from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
@@ -31,7 +31,7 @@ from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     OneDimPriorWrapper,
-    PytorchReturnTypeWrapper,
+    convert_distribution_to_float32,
 )
 
 if TYPE_CHECKING:
@@ -91,7 +91,7 @@ def process_prior(
             - `theta_numel`: Dimensionality of a single sample from the prior.
             - `prior_returns_numpy`: Whether the prior originally returned NumPy arrays.
 
-    Example:
+    Example
     --------
 
     ::
@@ -245,21 +245,22 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     prior_dtype = prior.sample().dtype
     if prior_dtype != float32:
         warnings.warn(
-            f"Prior has dtype {prior_dtype}. sbi casts the samples and log probs of "
-            "the prior to float32.",
+            f"Prior has dtype {prior_dtype}. sbi rebuilds the prior in float32 or, "
+            "if that fails, casts its samples and log probs to float32.",
             stacklevel=2,
         )
-        prior = PytorchReturnTypeWrapper(
-            prior, return_type=float32, validate_args=False
-        )
+        prior = convert_distribution_to_float32(prior)
 
-    # This will fail for float64 priors.
     check_prior_return_type(prior)
 
     # Potentially required wrapper if the prior returns an additional sample dimension
-    # for `.log_prob()`.
+    # for `.log_prob()`. Prefer `Independent`: the vector field methods recognise it
+    # and use exact formulas for it.
     if prior.log_prob(prior.sample(torch.Size((10,)))).shape == torch.Size([10, 1]):
-        prior = OneDimPriorWrapper(prior, validate_args=False)
+        if prior.batch_shape == torch.Size([1]):
+            prior = Independent(prior, 1, validate_args=False)
+        else:
+            prior = OneDimPriorWrapper(prior, validate_args=False)
 
     theta_numel = prior.sample().numel()
 
@@ -504,7 +505,7 @@ def process_simulator(
             simulator: processed simulator that returns :class:`torch.Tensor` \
                 and can handle batches of parameters.
 
-    Example:
+    Example
     --------
 
     ::

@@ -34,7 +34,7 @@ class BNRE(NRE_A):
         Estimation, Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G.,
         NeurIPS 2022. https://arxiv.org/abs/2208.13624
 
-    Example:
+    Example
     --------
 
     ::

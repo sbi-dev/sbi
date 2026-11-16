@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Callable, Optional, TypeVar, Union
+from dataclasses import dataclass, field, fields
+from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 from torch import Tensor
 from torch.distributions import Distribution
@@ -215,6 +215,22 @@ LossArgs = Union[LossArgsNRE, LossArgsNPE, LossArgsVF]
 LossArgsT = TypeVar("LossArgsT", LossArgsNRE, LossArgsNPE, LossArgsVF)
 
 
+def loss_args_to_kwargs(loss_args: LossArgs) -> Dict[str, Any]:
+    """Return the fields of `loss_args` as keyword arguments for a loss.
+
+    Unlike `dataclasses.asdict`, the values are not copied, so a proposal posterior
+    is not deep-copied in every training batch. Unlike `vars`, fields declared with
+    `init=False` are included.
+
+    Args:
+        loss_args: Loss arguments of a trainer.
+
+    Returns:
+        A dict from field name to the field's value.
+    """
+    return {f.name: getattr(loss_args, f.name) for f in fields(loss_args)}
+
+
 __all__ = [
     "StartIndexContext",
     "TrainConfig",
@@ -223,4 +239,5 @@ __all__ = [
     "LossArgsVF",
     "LossArgs",
     "LossArgsT",
+    "loss_args_to_kwargs",
 ]
