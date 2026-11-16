@@ -448,7 +448,7 @@ def accept_reject_sample(
                     rejection sampling (e.g. via `reject_outside_prior=False` in
                     `posterior.sample()` when available)."""
                 if alternative_method is not None:
-                    warn_msg += f"""Alternatively, consider interrupting (Ctrl-C)
+                    warn_msg += f""" Alternatively, consider interrupting (Ctrl-C)
                     and switching to `{alternative_method}`."""
                 logger.warning(warn_msg)
 
