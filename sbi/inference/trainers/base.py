@@ -485,8 +485,6 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     ) -> Tuple[Tensor, Tensor, Tensor]:
         r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
 
-        If requested, do not return invalid data.
-
         Args:
             starting_round: The earliest round to return samples from (we start counting
                 from zero).

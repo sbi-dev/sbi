@@ -654,7 +654,7 @@ def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
 
 
 def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
-    """Assert requirements for simulator, prior and observation for usage in sbi.
+    """Assert requirements for simulator and prior for usage in sbi.
 
     Args:
         simulator: simulator function

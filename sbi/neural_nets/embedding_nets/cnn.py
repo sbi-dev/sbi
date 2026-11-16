@@ -105,7 +105,8 @@ class CNNEmbedding(nn.Module):
     ):
         """Convolutional embedding network.
 
-        First two layers are convolutional, followed by fully connected layers.
+        Convolutional layers (each followed by ReLU and max pooling), then fully
+        connected layers.
 
         Automatically infers whether to apply 1D or 2D convolution depending on
         input_shape.
@@ -116,15 +117,16 @@ class CNNEmbedding(nn.Module):
                 (28,) for 1D or (28, 28) for 2D. Inputs may be flat or use
                 channel-first layout.
             in_channels: Number of image channels, default 1.
-            out_channels_per_layer: Number of out convolutional out_channels for each
-                layer. Must match the number of layers passed below.
+            out_channels_per_layer: Number of output channels of each convolutional
+                layer, one entry per layer (`num_conv_layers` entries). Defaults to
+                `[6, 12]`.
             num_conv_layers: Number of convolutional layers.
             num_linear_layers: Number fully connected layer.
             num_linear_units: Number of hidden units in fully-connected layers.
             output_dim: Number of output units of the final layer.
-            kernel_size: Kernel size for both convolutional layers.
-            pool_kernel_size: pool size for MaxPool1d operation after the convolutional
-                layers.
+            kernel_size: Kernel size of every convolutional layer.
+            pool_kernel_size: Kernel size of the MaxPool1d (1D input) or MaxPool2d
+                (2D input) layer after each convolutional layer.
         """
         super(CNNEmbedding, self).__init__()
 
@@ -143,7 +145,7 @@ class CNNEmbedding(nn.Module):
         if out_channels_per_layer is None:
             out_channels_per_layer = [6, 12]
         assert len(out_channels_per_layer) == num_conv_layers, (
-            "out_channels needs as many entries as num_cnn_layers."
+            "out_channels_per_layer needs as many entries as num_conv_layers."
         )
 
         # define input shape with channel
@@ -172,7 +174,7 @@ class CNNEmbedding(nn.Module):
             assert all(
                 cnn_output_size
             ), f"""CNN output size is zero at layer {ii + 1}. Either reduce
-                 num_cnn_layers to {ii} or adjust the kernel_size
+                 num_conv_layers to {ii} or adjust the kernel_size
                  and pool_kernel_size accordingly."""
 
         self.cnn_subnet = nn.Sequential(*cnn_layers)

@@ -90,23 +90,28 @@ def psis_diagnostics(
     q: Distribution,
     N: int = int(5e4),
 ) -> float:
-    r"""This will evaluate the posteriors quality by investingating its importance
+    r"""This will evaluate the posteriors quality by investigating its importance
     weights. If q is a perfect posterior approximation then $q(\theta) \propto
-    p(\theta, x_o)$ thus $\log w(\theta) = \log \frac{p(\theta, x_o)}{\log q(\theta)} =
-    \log p(x_o)$ is constant. This function will fit a Generalized Paretto
+    p(\theta, x_o)$ thus $\log w(\theta) = \log \frac{p(\theta, x_o)}{q(\theta)} =
+    \log p(x_o)$ is constant. This function will fit a Generalized Pareto
     distribution to the tails of w. The shape parameter k serves as metric as detailed
     in [1]. In short it is related to the variance of a importance sampling estimate,
     especially for k > 1 the variance will be infinite.
 
     NOTE: In our experience this metric does distinguish "very bad" from "ok", but
     becomes less sensitive to distinguish "ok" from "good".
+
     Args:
-        potential_fn: Potential function of target.
-        q: Variational distribution, should be proportional to the potential_fn
+        potential_fn: Log-potential function of the target (unnormalized log
+            posterior).
+        q: Variational distribution, should be proportional to
+            `exp(potential_fn(theta))`.
         N: Number of samples involved in the test.
+
     Returns:
         float: Quality metric
-    Reference:
+
+    References:
         [1] _Yes, but Did It Work?: Evaluating Variational Inference_, Yuling Yao, Aki
         Vehtari, Daniel Simpson, Andrew Gelman, 2018, https://arxiv.org/abs/1802.02538
     """
@@ -126,7 +131,7 @@ def proportional_to_joint_diagnostics(
     proposal: Optional[Distribution] = None,
     N: int = int(5e4),
 ) -> float:
-    r"""This will evaluate the posteriors quality by investingating its importance
+    r"""This will evaluate the posteriors quality by investigating its importance
     weights. If q is a perfect posterior approximation then $q(\theta) \propto
     p(\theta, x_o)$. Thus we should be able to fit a line to $(q(\theta),
     p(\theta, x_o))$, whereas the slope will be proportional to the normalizing
@@ -137,8 +142,10 @@ def proportional_to_joint_diagnostics(
     becomes less sensitive to distinguish "very bad" from "ok".
 
     Args:
-        potential_function: Potential function of target.
-        q: Variational distribution, should be proportional to the potential_function
+        potential_function: Log-potential function of the target (unnormalized log
+            posterior).
+        q: Variational distribution, should be proportional to
+            `exp(potential_function(theta))`.
         proposal: Proposal for samples. Typically this is q.
         N: Number of samples involved in the test.
 

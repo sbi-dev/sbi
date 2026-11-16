@@ -32,7 +32,9 @@ class ZukoFlow(ConditionalDensityEstimator):
 
         Args:
             net: Flow object.
-            input_shape: Event shape of the input at which the coniditional
+            embedding_net: Network that embeds the condition before it is passed
+                to the flow.
+            input_shape: Event shape of the input at which the conditional
                 density is being evaluated (and which is also the event_shape
                 of samples).
             condition_shape: Event shape of the condition.
