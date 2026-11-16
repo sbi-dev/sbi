@@ -335,6 +335,14 @@ def test_posterior_zscore(true_theta, post_samples, expected_zscore, raises_exce
         )
 
 
+def test_posterior_zscore_requires_grad():
+    true_theta = torch.tensor([2.0, 3.0], requires_grad=True)
+    post_samples = torch.tensor([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0]])
+    z = posterior_zscore(true_theta, post_samples)
+    assert z.shape == (2,)
+    assert torch.allclose(z, torch.tensor([0.0, 0.0]))
+
+
 @pytest.mark.parametrize(
     "distance_func, identical_inputs",
     [

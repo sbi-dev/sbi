@@ -536,7 +536,7 @@ def posterior_zscore(
     if not isinstance(post_samples, torch.Tensor):
         post_samples = torch.tensor(post_samples, dtype=torch.float32)
 
-    true_theta = np.atleast_1d(true_theta)
+    true_theta = torch.atleast_1d(true_theta)
     if post_samples.ndim == 1:
         post_samples = post_samples[:, None]
 
