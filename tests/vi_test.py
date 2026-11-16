@@ -452,6 +452,52 @@ def test_every_flow_family_pickles(q: str):
     assert torch.allclose(reloaded._q.sample((3,)), expected)
 
 
+@pytest.mark.parametrize("family", ["flow", "conditional_flow", "gaussian"])
+@pytest.mark.parametrize("module_link", [False, True])
+def test_family_pickled_by_sbi_0_27_loads(family: str, module_link: bool):
+    """sbi 0.26 and 0.27 set the link as `_link_transform`: a plain attribute, or a
+    submodule when the link is an `nn.Module`. Such pickles keep their log_prob."""
+    from pyro.distributions.transforms import Spline
+
+    from sbi.neural_nets.net_builders.flow import (
+        build_zuko_flow,
+        build_zuko_unconditional_flow,
+    )
+    from sbi.samplers.vi.vi_utils import (
+        TransformedConditionalZukoFlow,
+        TransformedZukoFlow,
+    )
+    from sbi.utils import mcmc_transform
+
+    prior_link = mcmc_transform(BoxUniform(zeros(2), ones(2))).inv
+    link = Spline(2) if module_link else prior_link
+    theta, x = torch.tensor([[0.3, 0.2], [0.7, 0.9]]), torch.randn(2, 3)
+    if family == "flow":
+        flow = build_zuko_unconditional_flow(
+            "MAF", batch_x=torch.randn(10, 2), z_score_x="independent"
+        )
+        q = TransformedZukoFlow(flow, link)
+    elif family == "conditional_flow":
+        flow = build_zuko_flow(
+            "MAF", batch_x=torch.randn(10, 2), batch_y=torch.randn(10, 3)
+        )
+        q = TransformedConditionalZukoFlow(flow, link)
+    else:
+        q = LearnableGaussian(2, link_transform=link)
+
+    def log_prob(q):
+        return (
+            q.log_prob(theta, x) if family == "conditional_flow" else q.log_prob(theta)
+        )
+
+    old = deepcopy(q)
+    old_link = old._link.transform
+    del old._link
+    old._link_transform = old_link
+
+    assert torch.equal(log_prob(pickle.loads(pickle.dumps(old))), log_prob(q))
+
+
 def test_deepcopy_of_trained_posterior_rewires_optimizer():
     """A copy's optimizer must step the copy's own `q`, not the original's."""
     posterior = _make_posterior("gaussian")

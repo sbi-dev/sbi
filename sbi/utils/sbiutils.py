@@ -367,7 +367,9 @@ class CallableTransform(nn.Module):
         super().__setstate__(state)
         # sbi 0.27 stored an inverse transform as its forward plus this flag.
         if self.__dict__.pop("_is_inverse", False):
-            self._transform = self._transform.inv
+            forward = self._transform
+            del self._transform  # A registered submodule if `forward` is a module.
+            self._transform = forward.inv
 
     @property
     def transform(self) -> TorchTransform:

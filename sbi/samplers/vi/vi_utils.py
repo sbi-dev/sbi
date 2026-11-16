@@ -67,10 +67,14 @@ def _linked_sample_and_log_prob(
 
 
 def _restore_plain_link(family: nn.Module) -> None:
-    """Move a link pickled as a plain `_link_transform` attribute (sbi 0.26 and 0.27)
-    into the family's `_link` submodule."""
-    if "_link_transform" in family.__dict__:
-        link_transform = family.__dict__.pop("_link_transform")
+    """Move a link pickled as `_link_transform` (sbi 0.26 and 0.27) into the
+    family's `_link` submodule.
+
+    That attribute is plain, or a registered submodule if the link is a module.
+    """
+    if hasattr(family, "_link_transform"):
+        link_transform = family._link_transform
+        del family._link_transform
         family._link = (
             None if link_transform is None else CallableTransform(link_transform)
         )

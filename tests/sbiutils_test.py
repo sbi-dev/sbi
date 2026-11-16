@@ -902,6 +902,26 @@ def test_callable_transform_preserves_orientation_and_dtype(orientation):
     assert wrapped.transform(x.double()).dtype == torch.float64
 
 
+@pytest.mark.parametrize("module", [False, True])
+def test_callable_transform_loads_sbi_0_27_layout(module: bool):
+    """sbi 0.27 stored an inverse transform as its forward plus `_is_inverse`."""
+    import pickle
+
+    from pyro.distributions.transforms import Spline
+    from torch.distributions.transforms import AffineTransform
+
+    from sbi.utils.sbiutils import CallableTransform
+
+    forward = Spline(2) if module else AffineTransform(zeros(2), 2 * ones(2))
+    legacy = CallableTransform(forward)
+    legacy._is_inverse = True
+
+    loaded = pickle.loads(pickle.dumps(legacy))
+
+    y = torch.ones(1, 2)
+    assert torch.allclose(loaded.transform(y), forward.inv(y))
+
+
 @pytest.mark.parametrize(
     "inits, atol",
     [
