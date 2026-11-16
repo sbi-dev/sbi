@@ -903,8 +903,9 @@ def test_callable_transform_preserves_orientation_and_dtype(orientation):
 
 
 @pytest.mark.parametrize("module", [False, True])
-def test_callable_transform_loads_sbi_0_27_layout(module: bool):
-    """sbi 0.27 stored an inverse transform as its forward plus `_is_inverse`."""
+def test_callable_transform_stores_an_inverse_as_its_forward(module: bool):
+    """An inverse is stored as its forward plus `_is_inverse`, so a module forward
+    stays registered, and pickles of sbi 0.27, which use this layout, still load."""
     import pickle
 
     from pyro.distributions.transforms import Spline
@@ -920,6 +921,9 @@ def test_callable_transform_loads_sbi_0_27_layout(module: bool):
 
     y = torch.ones(1, 2)
     assert torch.allclose(loaded.transform(y), forward.inv(y))
+    if module:
+        wrapped = CallableTransform(forward.inv)
+        assert set(map(id, wrapped.parameters())) == set(map(id, forward.parameters()))
 
 
 @pytest.mark.parametrize(

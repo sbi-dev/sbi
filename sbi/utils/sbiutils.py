@@ -361,20 +361,15 @@ class CallableTransform(nn.Module):
             raise ValueError(
                 f"CallableTransform requires a torch Transform, got {type(transform)}."
             )
-        self._transform = transform
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        super().__setstate__(state)
-        # sbi 0.27 stored an inverse transform as its forward plus this flag.
-        if self.__dict__.pop("_is_inverse", False):
-            forward = self._transform
-            del self._transform  # A registered submodule if `forward` is a module.
-            self._transform = forward.inv
+        # Store an inverse as its forward, so a forward that is an `nn.Module` stays
+        # a registered submodule.
+        self._is_inverse = isinstance(transform, torch_tf._InverseTransform)
+        self._transform = transform.inv if self._is_inverse else transform
 
     @property
     def transform(self) -> TorchTransform:
-        """Return the transform supplied at construction."""
-        return self._transform
+        """Return the transform in the orientation supplied at construction."""
+        return self._transform.inv if self._is_inverse else self._transform
 
     def forward(self) -> TorchTransform:
         return self.transform
