@@ -12,6 +12,7 @@ This module tests both:
 from __future__ import annotations
 
 import pickle
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -31,6 +32,11 @@ from sbi.neural_nets.factory import ZukoFlowType
 from sbi.samplers.vi.vi_divergence_optimizers import (
     IWElboOptimizer,
     RenyiDivergenceOptimizer,
+)
+from sbi.samplers.vi.vi_quality_control import (
+    _METRIC_MESSAGE,
+    _QUALITY_METRIC,
+    QualityControlError,
 )
 from sbi.samplers.vi.vi_utils import AdaptedVariationalDistribution, LearnableGaussian
 from sbi.simulators.linear_gaussian import (
@@ -579,6 +585,112 @@ def test_retrain_fails_after_setting_an_already_built_q():
     assert posterior.q is replacement
     with pytest.raises(ValueError, match="Cannot rebuild"):
         posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
+
+
+def _count_train_calls(monkeypatch) -> list:
+    """Register the metrics `"always_fails"` and `"fails_once"` and record `train`
+    calls."""
+
+    def always_fails(posterior, N):
+        raise QualityControlError("Broken on purpose.")
+
+    checks = []
+
+    def fails_once(posterior, N):
+        checks.append(None)
+        if len(checks) == 1:
+            raise QualityControlError("Broken on purpose.")
+        return 0.0
+
+    for name, metric in [("always_fails", always_fails), ("fails_once", fails_once)]:
+        monkeypatch.setitem(_QUALITY_METRIC, name, metric)
+        monkeypatch.setitem(_METRIC_MESSAGE, name, "")
+    calls = []
+    train = VIPosterior.train
+
+    def counting_train(self, *args, **kwargs):
+        calls.append(kwargs)
+        return train(self, *args, **kwargs)
+
+    monkeypatch.setattr(VIPosterior, "train", counting_train)
+    return calls
+
+
+def test_quality_control_checks_the_trained_observation():
+    """The checks sampled at the default x, which differs from an `x` passed to
+    `train`, and the failure retrained `q` on the default x instead."""
+    posterior = _make_posterior("flow")
+    x = 3 * ones(1, 2)
+
+    posterior.train(x=x, max_num_iters=10, show_progress_bar=False)
+
+    assert torch.equal(posterior._trained_on, x)
+
+
+def test_failed_quality_control_retrains_once_with_the_callers_settings(monkeypatch):
+    """A check that kept failing retrained until the recursion limit, and each retry
+    dropped the caller's `x` and training settings."""
+    calls = _count_train_calls(monkeypatch)
+    posterior = _make_posterior("flow")
+    x = 3 * ones(1, 2)
+
+    with pytest.warns(UserWarning, match="may be unreliable"):
+        posterior.train(
+            x=x,
+            max_num_iters=10,
+            check_for_convergence=False,
+            show_progress_bar=False,
+            quality_control_metric="always_fails",
+        )
+
+    assert len(calls) == 2
+    assert calls[1]["max_num_iters"] == 10
+    assert calls[1]["learning_rate"] == pytest.approx(1e-4)
+    assert torch.equal(posterior._trained_on, x)
+
+
+def test_failed_quality_control_accepts_a_retrained_q_that_passes(monkeypatch):
+    """A check that fails once retrains once and then accepts the retrained `q`."""
+    calls = _count_train_calls(monkeypatch)
+    posterior = _make_posterior("flow")
+    x = 3 * ones(1, 2)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        posterior.train(
+            x=x,
+            max_num_iters=10,
+            check_for_convergence=False,
+            show_progress_bar=False,
+            quality_control_metric="fails_once",
+        )
+
+    messages = [str(w.message) for w in caught]
+    assert any("Retraining the variational posterior" in m for m in messages)
+    assert not any("may be unreliable" in m for m in messages)
+    assert len(calls) == 2
+    assert torch.equal(posterior._trained_on, x)
+
+
+def test_failed_quality_control_does_not_retrain_an_already_built_q(monkeypatch):
+    """An already-built `q` cannot be rebuilt, so a failed check only warns."""
+    posterior = _make_posterior("flow")
+    posterior.set_q(
+        LearnableGaussian(
+            dim=2, full_covariance=False, link_transform=posterior.link_transform
+        )
+    )
+    calls = _count_train_calls(monkeypatch)
+
+    with pytest.warns(UserWarning, match="may be unreliable"):
+        posterior.train(
+            max_num_iters=10,
+            check_for_convergence=False,
+            show_progress_bar=False,
+            quality_control_metric="always_fails",
+        )
+
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize("dreg", [False, True])

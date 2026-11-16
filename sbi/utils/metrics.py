@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Union
 import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.base import BaseEstimator, clone, is_classifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neural_network import MLPClassifier
@@ -60,14 +61,13 @@ def c2st(
     seed: int = 1,
     n_folds: int = 5,
     metric: str = "accuracy",
-    classifier: Union[str, Callable] = "rf",
+    classifier: Union[str, BaseEstimator, Callable] = "rf",
     classifier_kwargs: Optional[Dict[str, Any]] = None,
     z_score: bool = True,
     noise_scale: Optional[float] = None,
     verbosity: int = 0,
 ) -> Tensor:
-    """
-    Return classifier based two-sample test accuracy between X and Y.
+    """Return classifier based two-sample test accuracy between X and Y.
 
     For details on the method, see [1,2]. If the returned accuracy is 0.5, <X>
     and <Y> are considered to be from the same generating PDF, i.e. they can not
@@ -85,18 +85,22 @@ def c2st(
     done. If features in <X> are close to constant with std close to zero, the
     std is set to 1 to avoud division by zero.
 
-    If you need a more flexible interface which is able to take a sklearn
-    compatible classifier and more, see the `c2st_` method in this module.
-
     Args:
-        X: Samples from one distribution. Y: Samples from another distribution.
-        seed: Seed for the sklearn classifier and the KFold cross-validation
-        n_folds: Number of folds to use metric: sklearn compliant metric to use
-        for the scoring parameter of
-            cross_val_score
-        classifier: classification architecture to use. Defaults to "rf" for a
-            RandomForestClassifier. Should be a sklearn classifier, or a
-            Callable that behaves like one.
+        X: Samples from one distribution.
+        Y: Samples from another distribution.
+        seed: Seed for the sklearn classifier and the KFold cross-validation.
+        n_folds: Number of folds to use.
+        metric: sklearn compliant metric to use for the scoring parameter of
+            cross_val_score.
+        classifier: Classifier to use. "rf" (default) for a
+            RandomForestClassifier, "mlp" for an MLPClassifier, a sklearn
+            classifier instance, a sklearn classifier class, or a function that
+            returns a sklearn classifier. An instance is cloned, so it stays
+            unchanged. If the classifier has a `random_state` parameter that is
+            left at None, it is set to `seed`.
+        classifier_kwargs: Keyword arguments for the classifier class or function,
+            or parameters to set on the cloned instance. For "mlp", they replace the
+            default MLP settings instead of updating them.
         z_score: Z-scoring using X, i.e. mean and std deviation of X is
             used to normalize X and Y, i.e. Y=(Y - mean)/std
         noise_scale: If passed, will add Gaussian noise with standard deviation
@@ -135,6 +139,23 @@ def c2st(
             "early_stopping": True,
             "n_iter_no_change": 50,
         }
+    elif isinstance(classifier, BaseEstimator):
+        clf_class = clone(classifier).set_params  # returns the configured copy
+        clf_kwargs = classifier_kwargs or {}
+    elif callable(classifier) and not isinstance(classifier, str):
+        clf_class = classifier
+        clf_kwargs = classifier_kwargs or {}
+    else:
+        raise ValueError(
+            f"Invalid classifier {classifier!r}. Expected 'rf', 'mlp', a sklearn "
+            "classifier or its class, or a function that returns a sklearn classifier."
+        )
+
+    clf = clf_class(**clf_kwargs)
+    if not (isinstance(clf, BaseEstimator) and is_classifier(clf)):
+        raise ValueError(f"classifier must build a sklearn classifier, got {clf!r}.")
+    if clf.get_params().get("random_state", 0) is None:
+        clf.set_params(random_state=seed)
 
     if z_score:
         X_mean = torch.mean(X, dim=0)
@@ -147,13 +168,11 @@ def c2st(
         Y = (Y - X_mean) / X_std
 
     if noise_scale is not None:
-        X += noise_scale * torch.randn(X.shape)
-        Y += noise_scale * torch.randn(Y.shape)
-
-    clf = clf_class(random_state=seed, **clf_kwargs)
+        X = X + noise_scale * torch.randn_like(X)
+        Y = Y + noise_scale * torch.randn_like(Y)
 
     # prepare data, convert to numpy
-    data = np.concatenate((X.cpu().numpy(), Y.cpu().numpy()))
+    data = np.concatenate((X.detach().cpu().numpy(), Y.detach().cpu().numpy()))
     # labels
     target = np.concatenate((np.zeros((X.shape[0],)), np.ones((Y.shape[0],))))
 

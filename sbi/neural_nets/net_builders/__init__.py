@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from typing import TYPE_CHECKING
+
 from sbi.neural_nets.net_builders.categorial import build_categoricalmassestimator
 from sbi.neural_nets.net_builders.classifier import (
     build_linear_classifier,
@@ -70,3 +72,7 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     VectorFieldConfigBase,
     VectorFieldNetConfigBase,
 )
+from sbi.utils.removed_names import removed_names_getattr
+
+if not TYPE_CHECKING:
+    __getattr__ = removed_names_getattr(__name__)

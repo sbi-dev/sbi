@@ -57,7 +57,7 @@ class NPE_C(PosteriorEstimatorTrainer):
     [1] *Automatic Posterior Transformation for Likelihood-free Inference*,
         Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
-    Example:
+    Example
     --------
 
     ::

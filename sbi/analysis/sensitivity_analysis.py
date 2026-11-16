@@ -15,7 +15,10 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 
+from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.sbiutils import handle_invalid_x, standardizing_net
+
+logger = logging.getLogger(__name__)
 
 
 class Destandardize(nn.Module):
@@ -54,7 +57,7 @@ def destandardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
         t_std[t_std < min_std] = min_std
     else:
         t_std = 1
-        logging.warning(
+        logger.warning(
             """Using a one-dimensional batch will instantiate a Standardize transform
             with (mean, std) parameters which are not representative of the data. We
             allow this behavior because you might be loading a pre-trained. If this is
@@ -112,7 +115,7 @@ class ActiveSubspace:
             Deistler et al. 2021, in preparation.
 
         Args:
-            posterior: Posterior distribution obtained with `SNPE`, `SNLE`, or `SNRE`.
+            posterior: Posterior distribution obtained with NPE, NLE or NRE.
                 Needs to have a `.sample()` method. If we want to analyse the
                 sensitivity of the posterior probability, it also must have a
                 `.potential()` method.
@@ -329,8 +332,9 @@ class ActiveSubspace:
             self._val_log_prob = -val_loss / num_validation_examples
             self._validation_log_probs.append(self._val_log_prob)
 
-            print("\r", "Training neural network. Epochs trained: ", epoch, end="")
+            print_progress(f"Training neural network. Epochs trained: {epoch}")
 
+        end_progress_line()
         return deepcopy(self._regression_net)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
