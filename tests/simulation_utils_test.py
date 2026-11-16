@@ -417,15 +417,20 @@ def test_worker_tasks_carry_only_their_own_parameter_sets():
     assert torch.all(x == 1.0)
 
 
-def test_simulate_for_sbi_gives_a_parallel_simulator_all_parameter_sets(prior):
+@pytest.mark.parametrize("num_workers, call_size", [(1, 40.0), (2, 1.0)])
+def test_simulate_for_sbi_gives_a_parallel_simulator_all_parameter_sets_on_one_worker(
+    prior, num_workers, call_size
+):
     # With batches of up to 100, `batch_sizes` shows how many the wrapper got.
     simulator = parallelize_simulator(
         batch_sizes, num_workers=2, simulation_batch_size=100, simulator_is_batched=True
     )
 
-    _, x = simulate_for_sbi(simulator, prior, 40, show_progress_bar=False)
+    _, x = simulate_for_sbi(
+        simulator, prior, 40, num_workers=num_workers, show_progress_bar=False
+    )
 
-    assert torch.all(x == 40.0)
+    assert torch.all(x == call_size)
 
 
 def test_unknown_on_error_raises():
@@ -554,6 +559,13 @@ def test_thread_workers_run_without_seed_and_reject_one():
                 BoxUniform(-torch.ones(2), torch.ones(2)),
                 8,
                 num_workers=2,
+                seed=0,
+            )
+        with pytest.raises(ValueError, match="process workers"):
+            simulate_for_sbi(
+                parallelize_simulator(double, num_workers=2),
+                BoxUniform(-torch.ones(2), torch.ones(2)),
+                8,
                 seed=0,
             )
 
