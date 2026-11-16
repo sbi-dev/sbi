@@ -76,8 +76,10 @@ def simulate_for_sbi(
         simulation_batch_size: Number of parameter sets per worker task, and per
             call of a batched simulator. "auto" gives each call one parameter set
             and, with more than one worker, groups the calls into four tasks per
-            worker. For all parameter sets in one call, pass their number; None
-            does the same but is deprecated.
+            worker; a simulator from :func:`parallelize_simulator` gets all
+            parameter sets in one call and spreads them over its own workers. For
+            all parameter sets in one call, pass their number; None does the same
+            but is deprecated.
         seed: Seed for reproducibility. It seeds the global random state before
             the parameters are sampled. The simulator is also reseeded before each
             call, see :func:`simulate_from_theta`, except a batched simulator on one
@@ -100,6 +102,8 @@ def simulate_for_sbi(
         tensors on the device of $\theta$. One number per simulation gives $x$ of
         shape (num_simulations, 1).
     """
+    if simulation_batch_size == "auto" and getattr(simulator, "_sbi_parallel", False):
+        simulation_batch_size = max(num_simulations, 1)
     settings = _Settings(
         num_workers, simulation_batch_size, simulator_is_batched, on_error
     )
@@ -254,6 +258,8 @@ def parallelize_simulator(
     Use it as a function, `parallelize_simulator(simulator)`, or as a decorator,
     `@parallelize_simulator` or `@parallelize_simulator(num_workers=4)`. By default,
     the simulator takes one parameter set per call and runs on all CPUs.
+    :func:`simulate_for_sbi` passes the parallel simulator all parameter sets in one
+    call, unless `simulation_batch_size` says otherwise.
 
     Calls take no seed. To reproduce a call, seed beforehand with
     :func:`sbi.utils.seed_all_backends`: with one worker, the simulator draws from
@@ -297,6 +303,7 @@ def parallelize_simulator(
         def parallel_simulator(theta: Array) -> SimulationOutput:
             return _simulate(simulator, theta, settings, None, show_progress_bar)
 
+        parallel_simulator._sbi_parallel = True
         return parallel_simulator
 
     return decorator if simulator is None else decorator(simulator)

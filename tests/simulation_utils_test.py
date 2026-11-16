@@ -390,6 +390,17 @@ def test_auto_gives_a_batched_simulator_one_parameter_set_per_call(prior, num_wo
     assert torch.all(x == 1.0)
 
 
+def test_simulate_for_sbi_gives_a_parallel_simulator_all_parameter_sets(prior):
+    # With batches of up to 100, `batch_sizes` shows how many the wrapper got.
+    simulator = parallelize_simulator(
+        batch_sizes, num_workers=2, simulation_batch_size=100, simulator_is_batched=True
+    )
+
+    _, x = simulate_for_sbi(simulator, prior, 40, show_progress_bar=False)
+
+    assert torch.all(x == 40.0)
+
+
 def test_unknown_on_error_raises():
     with pytest.raises(ValueError, match="on_error"):
         simulate_from_theta(double, torch.ones(4, 2), on_error="ignore")
