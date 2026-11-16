@@ -61,6 +61,11 @@ def batch_sizes(theta):
     return torch.full((len(theta), 1), float(len(theta)))
 
 
+def storage_ratio(theta):
+    """Returns the storage size of `theta` relative to its own size."""
+    return torch.full((len(theta), 1), theta.untyped_storage().nbytes() / theta.nbytes)
+
+
 @pytest.fixture
 def prior():
     return BoxUniform(-torch.ones(3), torch.ones(3))
@@ -385,6 +390,28 @@ def test_simulator_error_keeps_type_and_names_parameter_set(on_error, num_worker
 def test_auto_gives_a_batched_simulator_one_parameter_set_per_call(prior, num_workers):
     _, x = simulate_for_sbi(
         batch_sizes, prior, 40, num_workers=num_workers, show_progress_bar=False
+    )
+
+    assert torch.all(x == 1.0)
+
+
+def test_batch_size_none_gives_all_parameter_sets_in_one_call(prior):
+    with pytest.warns(FutureWarning, match="simulation_batch_size=None"):
+        _, x = simulate_for_sbi(
+            batch_sizes, prior, 40, simulation_batch_size=None, show_progress_bar=False
+        )
+
+    assert torch.all(x == 40.0)
+
+
+def test_worker_tasks_carry_only_their_own_parameter_sets():
+    x = simulate_from_theta(
+        storage_ratio,
+        torch.rand(40, 2),
+        num_workers=2,
+        simulation_batch_size=10,
+        simulator_is_batched=True,
+        show_progress_bar=False,
     )
 
     assert torch.all(x == 1.0)
