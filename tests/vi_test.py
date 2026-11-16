@@ -529,6 +529,15 @@ def test_copied_posterior_keeps_trained_link(mode):
     )
 
 
+def test_log_prob_on_edge_of_half_open_support():
+    """θ = 0 under a Gamma prior has density zero, so log_prob is -inf, not NaN."""
+    prior = torch.distributions.Independent(Gamma(2 * ones(2), ones(2)), 1)
+    posterior = _make_posterior("flow", 2, prior=prior)
+    posterior.train(**TRAIN_KWARGS)
+
+    assert posterior.log_prob(torch.tensor([[0.0, 1.0]])).item() == -torch.inf
+
+
 def test_retrain_from_scratch_with_bounded_prior():
     """Retraining an already-wrapped `q` must not apply the link transform twice.
 
