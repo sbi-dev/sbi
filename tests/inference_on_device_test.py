@@ -407,7 +407,7 @@ def test_vi_on_gpu(num_dim: int, q: str, vi_method: str):
     if device == "mps:0" and num_dim > 1 and q == "nsf":
         return
 
-    # Good run where everythink is one the correct device.
+    # Good run where everything is on the correct device.
     class FakePotential(BasePotential):
         def __call__(self, theta, **kwargs):
             return torch.ones(len(theta), dtype=torch.float32, device=device)
@@ -632,7 +632,7 @@ def test_conditioned_posterior_on_gpu(
     for conditional posteriors.
 
     Args:
-        training_device: device for trainig
+        training_device: device for training
         inference_device: device for inference
         mcmc_params_fast: MCMCPosteriorParameters dataclass for mcmc posterior
     """
@@ -779,7 +779,7 @@ def test_to_method_on_potentials(device: str, potential: Union[ABC, BasePotentia
     )
     if hasattr("potential", "prior"):
         assert str(potential_fn).split(":")[0].prior == device.split(":")[0], (
-            "Device attribute of potential_fn.prior is not vcorrect"
+            "Device attribute of potential_fn.prior is not correct"
         )
 
 

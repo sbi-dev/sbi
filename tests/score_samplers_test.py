@@ -66,10 +66,10 @@ def build_random_priors(num_dim: int):
 )
 @pytest.mark.parametrize("num_dim", [1, 2, 3])
 def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
-    """Test the the iid methods work with the most common priors that are used in
+    """Test the iid methods work with the most common priors that are used in
     practice (or are implemented in this library).
 
-    This is mostly becuase "gauss" based methods do need to perform analytical
+    This is mostly because "gauss" based methods do need to perform analytical
     integration over the prior (which is automatically done in this library). It ensures
     that it doesn't lead to any errors, but does not test the correctness of the
     integration!
@@ -480,7 +480,7 @@ def _build_gaussian_score_estimator(
 ):
     """Helper function for all tests that deal with shapes of density estimators."""
 
-    # Use discrete thetas such that categorical density esitmators can also use them.
+    # Use discrete thetas such that categorical density estimators can also use them.
     building_thetas = (
         torch.randn((1000, *input_event_shape), dtype=torch.float32) * std0 + mean0
     )

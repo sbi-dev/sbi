@@ -554,7 +554,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
             integrated over [0, T], the marginal distribution at time T should
             approximate N(0, I).
 
-    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+    NOTE: Together with t_min and t_max they ultimately define the loss function.
         Changing these might also require changing t_min and t_max to find a good
         tradeoff between bias and variance.
     """
@@ -671,7 +671,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             integrated over [0, T], the marginal distribution at time T should
             approximate N(0, I).
 
-    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+    NOTE: Together with t_min and t_max they ultimately define the loss function.
         Changing these might also require changing t_min and t_max to find a good
         tradeoff between bias and variance.
     """

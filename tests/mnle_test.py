@@ -258,7 +258,7 @@ def test_mnle_with_experimental_conditions(
     """Test MNLE c2st accuracy when conditioned on a subset of the parameters, e.g.,
     experimental conditions.
 
-    MNLE is trained a on simulator with 3D parameter space. After training, the
+    MNLE is trained on a simulator with 3D parameter space. After training, the
     categorical parameter is set to a fixed value (conditioned posterior), and the
     accuracy of the conditioned posterior is tested against the true posterior.
     """
