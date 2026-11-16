@@ -269,7 +269,7 @@ class NeuralPosterior:
             return x.to(self._device)
         elif self.default_x is None:
             raise ValueError(
-                "Context `x` needed when a default has not been set."
+                "Context `x` needed when a default has not been set. "
                 "If you'd like to have a default, use the `.set_default_x()` method."
             )
         else:
@@ -404,7 +404,7 @@ class NeuralPosterior:
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -432,7 +432,7 @@ class NeuralPosterior:
         """
         if x is not None:
             raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated. "
+                "Passing `x` to `.map()` is no longer supported. "
                 "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 

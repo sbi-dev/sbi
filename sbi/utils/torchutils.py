@@ -663,7 +663,7 @@ class BoxUniform(Independent):
         )
         if not low.device == high.device:
             raise RuntimeError(
-                "Expected all tensors to be on the same device, but found at least"
+                "Expected all tensors to be on the same device, but found at least "
                 f"two devices, {low.device} and {high.device}."
             )
 
