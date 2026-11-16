@@ -178,8 +178,8 @@ def simulate_from_theta(
             `simulation_batch_size` either. Afterwards, the global random state is
             seeded with a seed derived from `seed`, the same for any
             `num_workers`. If None, the current random state is used; with more
-            than one worker, the workers are seeded from numpy's global random
-            state, so seed it before the call to reproduce the outputs, e.g. with
+            than one worker, each call is seeded from numpy's global random state,
+            so seed it before the call to reproduce the outputs, e.g. with
             :func:`sbi.utils.seed_all_backends`. Seeding needs joblib's default
             process workers: with a thread backend, a seed raises an error.
         on_error: What to do when the simulator raises an exception. "raise" stops
@@ -257,7 +257,8 @@ def parallelize_simulator(
 
     Calls take no seed. To reproduce a call, seed beforehand with
     :func:`sbi.utils.seed_all_backends`: with one worker, the simulator draws from
-    the global random states; with more, the workers are seeded from numpy's.
+    the global random states; with more, it is reseeded from numpy's before each
+    call.
     Consecutive calls still draw different noise. This needs joblib's default
     process workers.
 
@@ -359,7 +360,6 @@ class _Task(NamedTuple):
     theta: Array
     start: int
     call_seeds: Optional[np.ndarray]  # One per simulator call.
-    worker_seed: Optional[int]  # Seeds the worker if the calls get no seeds.
 
 
 class _Failure(NamedTuple):
@@ -421,7 +421,7 @@ def _simulate(
 def _plan_tasks(
     theta: Array, settings: _Settings, seed: Optional[int], uses_threads: bool
 ) -> List[_Task]:
-    """Splits `theta` into tasks and seeds their calls, or else their workers."""
+    """Splits `theta` into tasks and seeds their calls."""
     num_simulations = len(theta)
     task_size = settings.task_size(num_simulations)
     starts = range(0, num_simulations, task_size)
@@ -434,17 +434,15 @@ def _plan_tasks(
         ]
 
     call_seeds = [None] * len(starts)
-    if seed is not None:
+    # Without a seed, worker processes would not follow the caller's random state.
+    if seed is not None or (settings.num_workers != 1 and not uses_threads):
         call_size = 1
         if settings.simulator_is_batched:
             call_size = settings.call_size(num_simulations)
         num_calls = [ceil(len(t) / call_size) for t in thetas]
         seeds = _distinct_seeds(sum(num_calls), seed)
         call_seeds = np.split(seeds, np.cumsum(num_calls)[:-1])
-    worker_seeds = [None] * len(starts)
-    if seed is None and settings.num_workers != 1 and not uses_threads:
-        worker_seeds = _distinct_seeds(len(starts), None)
-    return list(map(_Task, thetas, starts, call_seeds, worker_seeds))
+    return list(map(_Task, thetas, starts, call_seeds))
 
 
 def _collect(
@@ -562,9 +560,6 @@ def _snapshot(output: Any) -> Any:
 
 
 def _run_in_worker(run: Callable, task: _Task) -> _TaskResult:
-    # Without this, worker results would not follow the caller's random state.
-    if task.worker_seed is not None:
-        seed_all_backends(task.worker_seed)
     try:
         result = run(task)
     except Exception as error:

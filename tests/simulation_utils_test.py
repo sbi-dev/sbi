@@ -261,6 +261,20 @@ def test_seed_leaves_the_same_random_state_for_any_num_workers():
     assert draw_after_seeded_call(1) == draw_after_seeded_call(2)
 
 
+def test_unseeded_workers_follow_numpy_state_for_any_num_workers():
+    def run(num_workers):
+        np.random.seed(0)
+        return simulate_from_theta(
+            numpy_noise,
+            np.zeros((30, 2)),
+            num_workers=num_workers,
+            show_progress_bar=False,
+        )
+
+    # "auto" makes tasks of 4 and of 3 parameter sets.
+    assert np.array_equal(run(2), run(3))
+
+
 @pytest.mark.parametrize(
     "simulator_is_batched, runs",
     [
