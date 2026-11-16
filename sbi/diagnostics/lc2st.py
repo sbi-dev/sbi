@@ -524,7 +524,7 @@ class LC2ST:
         if self.num_folds > 1:
             trained_clfs = []
             kf = KFold(n_splits=self.num_folds, shuffle=True, random_state=self.seed)
-            cv_splits = kf.split(theta_p.cpu().numpy())
+            cv_splits = kf.split(theta_p.detach().cpu().numpy())
             for train_idx, _ in tqdm(
                 cv_splits, desc="Cross-validation", disable=verbosity < 1
             ):
@@ -1146,8 +1146,12 @@ def train_lc2st(
         Trained classifier.
     """
     # concatenate to get joint data
-    joint_p = np.concatenate([theta_p.cpu().numpy(), x_p.cpu().numpy()], axis=1)
-    joint_q = np.concatenate([theta_q.cpu().numpy(), x_q.cpu().numpy()], axis=1)
+    joint_p = np.concatenate(
+        [theta_p.detach().cpu().numpy(), x_p.detach().cpu().numpy()], axis=1
+    )
+    joint_q = np.concatenate(
+        [theta_q.detach().cpu().numpy(), x_q.detach().cpu().numpy()], axis=1
+    )
 
     # prepare data
     data = np.concatenate((joint_p, joint_q))
@@ -1187,7 +1191,11 @@ def eval_lc2st(
     """
     # concatenate to get joint data
     joint_p = np.concatenate(
-        [theta_p.cpu().numpy(), x_o.repeat(len(theta_p), 1).cpu().numpy()], axis=1
+        [
+            theta_p.detach().cpu().numpy(),
+            x_o.repeat(len(theta_p), 1).detach().cpu().numpy(),
+        ],
+        axis=1,
     )
 
     # evaluate classifier
