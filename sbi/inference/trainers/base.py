@@ -482,13 +482,9 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
     ) -> Tuple[Tensor, Tensor, Tensor]:
         r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
 
-        If requested, do not return invalid data.
-
         Args:
             starting_round: The earliest round to return samples from (we start counting
                 from zero).
-            warn_on_invalid: Whether to give out a warning if invalid simulations were
-                found.
 
         Returns: Parameters, simulation outputs, prior masks.
         """
@@ -516,8 +512,10 @@ class NeuralInference(ABC, Generic[ConditionalEstimatorType]):
         """Return dataloaders for training and validation.
 
         Args:
-            dataset: holding all theta and x, optionally masks.
+            starting_round: The earliest round to return samples from (we start counting
+                from zero).
             training_batch_size: training arg of inference methods.
+            validation_fraction: The fraction of data to use for validation.
             resume_training: Whether the current call is resuming training so that no
                 new training and validation indices into the dataset have to be created.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training

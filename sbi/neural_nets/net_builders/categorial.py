@@ -37,7 +37,7 @@ def build_categoricalmassestimator(
         num_hidden: Number of hidden units per layer.
         num_layers: Number of hidden layers.
         embedding_net: Embedding net for y.
-        num_categories: number of categories for each variable.
+        num_categories_per_variable: number of categories for each variable.
         dropout_probability: dropout probability for regularization. default is 0.0.
     """
 
