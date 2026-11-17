@@ -9,7 +9,7 @@ from dataclasses import asdict
 import pytest
 import torch
 from torch import Tensor, eye, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import MultivariateNormal, Normal
 
 from sbi.inference import (
     NLE_A,
@@ -161,6 +161,56 @@ def test_nle_non_iid_multiple_x_multiple_theta():
 
     assert log_prob.shape == (4,)
     assert torch.isfinite(log_prob).all()
+
+
+def test_nle_non_iid_normal_prior_shape():
+    prior = Normal(torch.zeros(1), torch.ones(1))
+    theta = prior.sample((100,))
+    x = theta + torch.randn_like(theta)
+
+    inference = NLE_A(prior=prior)
+    inference.append_simulations(theta, x).train(max_num_epochs=5)
+
+    posterior = inference.build_posterior()
+
+    potential_fn = posterior.potential_fn.bind(
+        x_o=x[:1],
+        x_is_iid=False,
+    )
+
+    theta_batch = prior.sample((4,))
+
+    potential_values = potential_fn(
+        theta_batch,
+        track_gradients=False,
+    )
+
+    assert potential_values.shape == (4,)
+
+
+def test_nre_non_iid_normal_prior_shape():
+    prior = Normal(torch.zeros(1), torch.ones(1))
+    theta = prior.sample((100,))
+    x = theta + torch.randn_like(theta)
+
+    inference = NRE(prior=prior)
+    inference.append_simulations(theta, x).train(max_num_epochs=5)
+
+    posterior = inference.build_posterior()
+
+    potential_fn = posterior.potential_fn.bind(
+        x_o=x[:1],
+        x_is_iid=False,
+    )
+
+    theta_batch = prior.sample((4,))
+
+    potential_values = potential_fn(
+        theta_batch,
+        track_gradients=False,
+    )
+
+    assert potential_values.shape == (4,)
 
 
 def test_nre_non_iid_single_x_multiple_theta():

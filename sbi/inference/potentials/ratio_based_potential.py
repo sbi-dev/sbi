@@ -142,7 +142,10 @@ class RatioBasedPotential(BasePotential):
                 log_ratio_batches = self.ratio_estimator(theta, x)
                 log_ratio_batches = log_ratio_batches.reshape(-1)
 
-            return log_ratio_batches + self.prior.log_prob(theta)  # type: ignore
+            log_prior = self.prior.log_prob(theta)  # type: ignore
+            log_prior = log_prior.reshape(theta_batch_size, -1).sum(dim=-1)
+
+            return log_ratio_batches + log_prior
 
 
 def _log_ratios_over_trials(

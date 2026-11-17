@@ -129,15 +129,15 @@ class LikelihoodBasedPotential(BasePotential):
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
-            track_gradients: Whether to track the gradients.
+            track_gradients: Whether to track gradients.
 
         Returns:
             The potential $\log(p(x_o|\theta)p(\theta))$.
         """
         with torch.set_grad_enabled(track_gradients):
             log_prior = self.prior.log_prob(theta)  # type: ignore
+
         if self.x_is_iid:
-            # For each theta, calculate the likelihood sum over all x in batch.
             log_likelihood_trial_sum = _log_likelihoods_over_trials(
                 x=self.x_o,
                 theta=theta.to(self.device),
@@ -145,26 +145,29 @@ class LikelihoodBasedPotential(BasePotential):
                 track_gradients=track_gradients,
             )
             return log_likelihood_trial_sum + log_prior
+
+        theta_batch_size = theta.shape[0]
+        x_batch_size = self.x_o.shape[0]
+
+        if x_batch_size == 1:
+            x = self.x_o.unsqueeze(0).expand(1, theta_batch_size, *self.x_o.shape[1:])
         else:
-            # Calculate likelihood for each (theta, x) pair separately.
-            theta_batch_size = theta.shape[0]
-            x_batch_size = self.x_o.shape[0]
+            assert theta_batch_size == x_batch_size, (
+                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}."
+            )
+            x = self.x_o.unsqueeze(0)
 
-            if x_batch_size == 1:
-                x = self.x_o.unsqueeze(0).expand(
-                    1, theta_batch_size, *self.x_o.shape[1:]
-                )
-            else:
-                assert theta_batch_size == x_batch_size, (
-                    f"Batch size mismatch: {theta_batch_size} and {x_batch_size}."
-                )
-                x = self.x_o.unsqueeze(0)
+        with torch.set_grad_enabled(track_gradients):
+            log_likelihood_batches = self.likelihood_estimator.log_prob(
+                x, condition=theta
+            )
 
-            with torch.set_grad_enabled(track_gradients):
-                log_likelihood_batches = self.likelihood_estimator.log_prob(
-                    x, condition=theta
-                )
-            return (log_likelihood_batches + log_prior).squeeze(0)
+        log_likelihood_batches = log_likelihood_batches.squeeze(0)
+        log_prior = log_prior.reshape(theta_batch_size, -1).sum(dim=-1)
+
+        return (
+            log_likelihood_batches.reshape(theta_batch_size, -1).sum(dim=-1) + log_prior
+        )
 
     def condition_on_theta(
         self,
