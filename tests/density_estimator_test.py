@@ -549,6 +549,40 @@ def test_mixed_density_estimator(
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
 
 
+@pytest.mark.parametrize(
+    "value, dtype",
+    [
+        (-1.0, torch.float32),
+        (1.0, torch.float32),
+        (3.0, torch.float32),
+        (6.0, torch.float32),
+        (2.00000001, torch.float64),  # rounds to 2.0 in float32
+    ],
+)
+def test_categorical_mass_estimator_rejects_unseen_values(value, dtype):
+    estimator = build_categoricalmassestimator(
+        batch_x=torch.tensor([[0.0], [2.0], [5.0]]),
+        batch_y=torch.randn(3, 1),
+        num_categories_per_variable=torch.tensor([3]),
+    )
+    with pytest.raises(ValueError, match="values not seen during training"):
+        estimator.log_prob(
+            torch.tensor([[value]], dtype=dtype), condition=torch.zeros(1, 1)
+        )
+
+
+def test_categorical_mass_estimator_log_prob_of_own_samples():
+    # Integer categories above 2**24 are not exact in float32.
+    estimator = build_categoricalmassestimator(
+        batch_x=torch.tensor([[2**24 + 1], [2**24 + 5]]),
+        batch_y=torch.randn(2, 1),
+        num_categories_per_variable=torch.tensor([2]),
+    )
+    condition = torch.zeros(1, 1)
+    samples = estimator.sample((10,), condition=condition)
+    assert torch.isfinite(estimator.log_prob(samples, condition=condition)).all()
+
+
 @pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
 @pytest.mark.parametrize(
     "x_dist",
