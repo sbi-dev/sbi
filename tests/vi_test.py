@@ -20,7 +20,7 @@ import pytest
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import eye, ones, zeros
-from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
+from torch.distributions import Beta, Binomial, Gamma, Independent, MultivariateNormal
 
 from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
 from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
@@ -43,8 +43,9 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import MultipleIndependent
+from sbi.utils import BoxUniform, MultipleIndependent
 from sbi.utils.metrics import c2st, check_c2st
+from sbi.utils.sbiutils import _apply_to_transform, within_support
 from sbi.utils.user_input_checks import process_x
 
 # Supported variational families for VI
@@ -497,6 +498,44 @@ def test_amortized_posterior_survives_roundtrip():
         assert candidate._mode == "amortized"
         assert candidate.sample((5,), x=x_o).shape == (5, num_dim)
     assert clone._amortized_q is not posterior._amortized_q
+
+
+@pytest.mark.parametrize("mode", ["single_x", "amortized"])
+def test_copied_posterior_keeps_trained_link(mode):
+    """A `q=` copy keeps its trained link: a rebuilt one would re-estimate the
+    moments of this prior from samples and shift the density."""
+    num_dim = 2
+    prior = torch.distributions.TransformedDistribution(
+        MultivariateNormal(zeros(num_dim), eye(num_dim)),
+        [torch_tf.AffineTransform(ones(num_dim), 2 * ones(num_dim))],
+    )
+    posterior = _make_posterior("flow", num_dim, prior=prior)
+    x_o = zeros(1, num_dim)
+    if mode == "amortized":
+        posterior.train_amortized(
+            prior.sample((128,)), torch.randn(128, num_dim), max_num_iters=3
+        )
+    else:
+        posterior.set_default_x(x_o)
+        posterior.train(**TRAIN_KWARGS)
+
+    clone = VIPosterior(posterior.potential_fn, prior, q=posterior).to("cpu")
+
+    theta = prior.sample((10,))
+    assert torch.allclose(
+        clone.log_prob(theta, x=x_o), posterior.log_prob(theta, x=x_o)
+    )
+
+
+def test_link_transform_moves_with_its_distribution():
+    """A CDF link moves the tensors of the distribution it holds."""
+    normal = torch.distributions.Normal(zeros(2), ones(2))
+    link = torch_tf.CumulativeDistributionTransform(normal)
+
+    _apply_to_transform(link, lambda t: t.to("meta"))
+
+    assert normal.loc.device.type == "meta"
+    assert normal.scale.device.type == "meta"
 
 
 def test_retrain_from_scratch_with_bounded_prior():
@@ -988,6 +1027,42 @@ def test_amortized_vi_batched_sampling(linear_gaussian_setup):
     samples = posterior.sample_batched((num_samples,), x=x_batch)
 
     assert samples.shape == (num_samples, num_obs, setup["num_dim"])
+
+
+@pytest.mark.parametrize("mode", ["single_x", "amortized"])
+@pytest.mark.parametrize(
+    "make_prior, impossible",
+    [
+        (lambda: BoxUniform(-3 * ones(2), 3 * ones(2)), [4.0, 0.0]),  # outside
+        (lambda: Independent(Gamma(2 * ones(2), ones(2)), 1), [0.0, 1.0]),  # edge
+    ],
+    ids=["box_outside", "gamma_edge"],
+)
+def test_vi_with_bounded_prior(mode, make_prior, impossible):
+    """Samples stay in the support, and θ of density zero gets `-inf`, not a value or
+    NaN, also on a `q=` copy whose source moved to another device."""
+    prior = make_prior()  # one per case: moving the posterior moves it in place
+    theta = prior.sample((300,))
+    x = theta + 0.3 * torch.randn_like(theta)
+    nle = NLE(prior, show_progress_bars=False)
+    nle.append_simulations(theta, x).train(max_num_epochs=3)
+    posterior = nle.build_posterior(sample_with="vi")
+    x_o = x[:1]
+    if mode == "amortized":
+        posterior.train_amortized(theta, x, max_num_iters=5, show_progress_bar=False)
+    else:
+        posterior.set_default_x(x_o)
+        posterior.train(max_num_iters=5, quality_control=False, show_progress_bar=False)
+    clone = VIPosterior(posterior.potential_fn, prior, q=posterior)
+
+    samples = posterior.sample((50,), x=x_o, show_progress_bars=False)
+    assert within_support(prior, samples).all()
+    assert torch.isfinite(posterior.log_prob(samples, x=x_o)).all()
+    impossible = torch.tensor([impossible])
+    assert posterior.log_prob(impossible, x=x_o).item() == -torch.inf
+
+    posterior.to("meta")
+    assert clone.log_prob(impossible, x=x_o).item() == -torch.inf
 
 
 @pytest.mark.slow
