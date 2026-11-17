@@ -273,6 +273,22 @@ def test_mmd_squared_distance(test, sigma):
         assert estimate > threshold, "Accepting 0-hypothesis even though q!=p."
 
 
+def test_biased_mmd_with_repeated_values():
+    """Most pairwise distances are zero for discrete data, so the median bandwidth is
+    zero. The test must still return a finite MMD below the threshold for two samples
+    from the same distribution, and above it for different distributions."""
+    torch.manual_seed(0)
+    x = torch.poisson(torch.full((200, 1), 0.3))
+    y = torch.poisson(torch.full((200, 1), 0.3))
+    estimate, threshold = biased_mmd_hypothesis_test(x, y)
+    assert np.isfinite(estimate)
+    assert estimate < threshold
+
+    y = torch.poisson(torch.full((200, 1), 3.0))
+    estimate, threshold = biased_mmd_hypothesis_test(x, y)
+    assert estimate > threshold
+
+
 @pytest.mark.parametrize(
     "prior_samples, post_samples, expected_shrinkage, raises_exception",
     [
