@@ -124,26 +124,26 @@ class CategoricalMADE(MADE):
 
     def _map_values_to_indices(self, input: Tensor) -> Tensor:
         """Map user categorical values to 0-based indices."""
-        lookup_dtype = self.values_lookup.dtype
-        mapped = input.to(lookup_dtype).clone()
+        lookup_values = input.to(self.values_lookup.dtype)
+        mapped = lookup_values.clone()
         for i in range(self.num_variables):
             c = int(self.num_categories_per_var[i])
             unique_vals = self.values_lookup[i, :c]
-            observed_values = input[..., i].contiguous()
-            input_values = observed_values.to(lookup_dtype)
-            cast_is_lossless = input_values.to(observed_values.dtype) == observed_values
-            indices = torch.searchsorted(unique_vals, input_values)
+            values = lookup_values[..., i].contiguous()
+            indices = torch.searchsorted(unique_vals, values)
 
             matched = (
-                cast_is_lossless
+                (values.to(input.dtype) == input[..., i])
                 & (indices < c)
-                & (unique_vals[indices.clamp(max=c - 1)] == input_values)
+                & (unique_vals[indices.clamp(max=c - 1)] == values)
             )
             if not matched.all():
                 raise ValueError(
                     f"Variable {i} contains values not seen during training: "
-                    f"{observed_values[~matched].unique().tolist()}. "
-                    f"Valid values are: {unique_vals.tolist()}"
+                    f"{input[..., i][~matched].unique().tolist()}. "
+                    f"Valid values are: {unique_vals.tolist()}. Each value has to "
+                    "occur in the training data; run more simulations if a valid "
+                    "value is missing."
                 )
 
             mapped[..., i] = indices
@@ -286,6 +286,10 @@ class CategoricalMassEstimator(ConditionalDensityEstimator):
 
         Returns:
             Log-probabilities of shape `(sample_dim, batch_dim)`.
+
+        Raises:
+            ValueError: If `input` contains a value that did not occur in the
+                training data.
         """
         input, condition, batch_dim = self._broadcast_and_align(input, condition)
         sample_dim = input.shape[0]
