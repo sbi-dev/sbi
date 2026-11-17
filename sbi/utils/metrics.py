@@ -295,7 +295,9 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     mmd_square = kxx - 2 * kxy + kyy
     del kxx, kxy, kyy
 
-    return torch.sqrt(mmd_square)
+    # The estimate is non-negative, but rounding can make it slightly negative when the
+    # samples are (almost) the same, which would give a NaN from the square root.
+    return torch.sqrt(torch.clamp(mmd_square, min=0.0))
 
 
 def biased_mmd_hypothesis_test(x: Tensor, y: Tensor, alpha=0.05):
