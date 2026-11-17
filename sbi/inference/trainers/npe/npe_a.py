@@ -57,7 +57,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         `final_round=(r == num_rounds - 1)` to `train()`. For most multi-round
         problems, NPE_C is the better choice.
 
-    Example:
+    Example
     --------
 
     ::

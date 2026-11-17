@@ -94,6 +94,10 @@ print(posterior)
 If you're new to `sbi`, we recommend starting with our [Getting
 Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html) tutorial.
 
+If you use a coding agent, point it to
+[`llms.txt`](https://sbi.readthedocs.io/en/stable/llms.txt), an index of the
+documentation of the current release.
+
 The tutorials are Jupyter notebooks in
 [`docs/tutorials/`](https://github.com/sbi-dev/sbi/tree/main/docs/tutorials). To run
 them on your own machine, first follow the [installation instructions](#installation)

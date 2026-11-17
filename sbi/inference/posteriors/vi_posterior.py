@@ -5,7 +5,16 @@ import math
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, Literal, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    Iterable,
+    Literal,
+    Optional,
+    Self,
+    Union,
+)
 
 import numpy as np
 import torch
@@ -13,14 +22,13 @@ from torch import Tensor, nn
 from torch.distributions import Distribution
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
-from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.utils.pbar import tqdm
 
 if TYPE_CHECKING:
     from sbi.inference.posteriors.posterior_parameters import VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.neural_nets.net_builders.flow import (
@@ -28,10 +36,14 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unconditional_flow,
 )
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
-from sbi.samplers.vi.vi_quality_control import get_quality_metric
+from sbi.samplers.vi.vi_quality_control import (
+    QualityControlError,
+    get_quality_metric,
+)
 from sbi.samplers.vi.vi_utils import (
     AdaptedVariationalDistribution,
     LearnableGaussian,
+    TransformedConditionalZukoFlow,
     TransformedZukoFlow,
     check_variational_distribution,
     detach_and_deepcopy,
@@ -42,11 +54,15 @@ from sbi.sbi_types import (
     TorchTensor,
     TorchTransform,
 )
-from sbi.utils.sbiutils import mcmc_transform
+from sbi.utils.sbiutils import (
+    _apply_to_transform,
+    mcmc_transform,
+    within_support,
+)
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
-    process_device,
+    move_tensors,
 )
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
@@ -208,7 +224,7 @@ class VIPosterior(NeuralPosterior):
         self._mode: Optional[Literal["single_x", "amortized"]] = None
 
         # Amortized mode: conditional flow q(θ|x)
-        self._amortized_q: Optional[ConditionalDensityEstimator] = None
+        self._amortized_q: Optional[TransformedConditionalZukoFlow] = None
 
         self._num_transforms: int = num_transforms
         self._hidden_features: int = hidden_features
@@ -240,45 +256,32 @@ class VIPosterior(NeuralPosterior):
             "can evaluate the _normalized_ posterior density with .log_prob()."
         )
 
-    def to(self, device: Union[str, torch.device]) -> "VIPosterior":
-        """Move all components to the given device.
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the posterior and its variational distributions to `device` in place.
+
+        The optimizer is reset; `train()` builds a new one.
 
         Args:
             device: The device to move the posterior to.
 
         Returns:
-            self for method chaining.
+            The posterior itself.
         """
-        device = process_device(device)
-        self._device = device
+        super().to(device)
+        device = self._device
+        _apply_to_transform(self.link_transform, lambda t: t.to(device))
+        self._trained_on = move_tensors(self._trained_on, device)
 
-        # Move potential (which moves prior, x_o, and estimator).
-        self.potential_fn.to(device)  # type: ignore
-        self._prior = move_distribution_to_device(self._prior, device)
-
-        # Rebuild link_transform on new device (same logic as __init__).
-        if self.theta_transform is None:
-            self.link_transform = mcmc_transform(self._prior, device=device).inv
-        else:
-            self.link_transform = self.theta_transform.inv
-
-        # Move cached tensors.
-        if self._x is not None:
-            self._x = self._x.to(device)
-        if self._map is not None:
-            self._map = self._map.to(device)
-        if self._trained_on is not None:
-            self._trained_on = self._trained_on.to(device)
-
-        # Move variational distributions.
         if hasattr(self, "_q") and hasattr(self._q, "to"):
             self._q.to(device)  # type: ignore[union-attr]
-        # Update link_transform reference on q if it caches one.
-        if hasattr(self, "_q") and hasattr(self._q, "_link_transform"):
-            self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
-
+        q_spec = getattr(self, "_q_spec", None)
+        if q_spec is not None and q_spec.init_snapshot is not None:
+            q_spec.init_snapshot = move_distribution_to_device(
+                q_spec.init_snapshot, device
+            )
+        self._optimizer = None
         return self
 
     def _build_unconditional_flow(
@@ -411,7 +414,7 @@ class VIPosterior(NeuralPosterior):
         hidden_features: int = 32,
         z_score_theta: Literal["none", "independent", "structured"] = "independent",
         z_score_x: Literal["none", "independent", "structured"] = "independent",
-    ) -> ConditionalDensityEstimator:
+    ) -> TransformedConditionalZukoFlow:
         """Build a conditional Zuko flow for amortized variational inference.
 
         Args:
@@ -427,7 +430,7 @@ class VIPosterior(NeuralPosterior):
                 structured data like images.
 
         Returns:
-            ConditionalDensityEstimator: The constructed conditional flow q(θ|x).
+            TransformedConditionalZukoFlow: The conditional flow q(θ|x) in prior space.
 
         Raises:
             ValueError: If flow_type is not supported.
@@ -442,15 +445,20 @@ class VIPosterior(NeuralPosterior):
                     f"Supported types: {[t.name for t in ZukoFlowType]}."
                 ) from e
 
-        return build_zuko_flow(
+        # The flow models θ in unconstrained space; the wrapper maps it to the prior
+        # support so that bounded priors are not evaluated outside their support.
+        flow = build_zuko_flow(
             flow_type.value.upper(),
-            batch_x=theta,  # θ is what we model
+            batch_x=self.link_transform.inv(theta),  # unconstrained θ is modelled
             batch_y=x,  # x is the condition
             z_score_x=z_score_theta,  # z-score for θ (naming mismatch)
             z_score_y=z_score_x,  # z-score for x condition
             num_transforms=num_transforms,
             hidden_features=hidden_features,
-        ).to(self._device)
+        )
+        return TransformedConditionalZukoFlow(flow, self.link_transform).to(
+            self._device
+        )
 
     @property
     def q(
@@ -554,15 +562,22 @@ class VIPosterior(NeuralPosterior):
                 q = self._build_q_from_spec()
             self._trained_on = None
         elif isinstance(q, VIPosterior):
-            # A copy, so that later `set_q` calls on one posterior stay local to it.
-            self._q_spec = replace(q._q_spec)
+            # A copy, so that later `set_q` or `to` calls on one posterior stay local
+            # to it.
+            snapshot = q._q_spec.init_snapshot
+            if snapshot is not None:
+                snapshot = detach_and_deepcopy(snapshot)
+            self._q_spec = replace(q._q_spec, init_snapshot=snapshot)
             self._trained_on = q._trained_on
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
             if self._amortized_q is not None:
                 self._amortized_q.to(self._device)
             self.vi_method = q.vi_method  # type: ignore
-            self._prior = q._prior
+            # Moving the source moves its prior in place, so the copy needs its own.
+            self._prior = move_distribution_to_device(
+                detach_and_deepcopy(q._prior), self._device
+            )
             self._x = q._x
             q = detach_and_deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
@@ -717,7 +732,8 @@ class VIPosterior(NeuralPosterior):
                 consumption.
 
         Returns:
-            Log-probability of shape (batch,) where batch is:
+            Log-probability of shape (batch,), `-inf` for θ outside the prior
+            support, where batch is:
             - batch_theta if x has batch size 1 (broadcast x)
             - batch_x if theta has batch size 1 (broadcast theta)
             - batch_theta if batch_theta == batch_x (paired evaluation)
@@ -761,8 +777,7 @@ class VIPosterior(NeuralPosterior):
                 theta_with_sample_dim = theta.unsqueeze(0)
                 log_probs = self._amortized_q.log_prob(
                     theta_with_sample_dim, condition=x
-                )
-                return log_probs.squeeze(0)
+                ).squeeze(0)
             else:
                 # Single-x mode: evaluate log q(θ)
                 x = self._x_else_default_x(x)
@@ -771,7 +786,15 @@ class VIPosterior(NeuralPosterior):
                         f"The variational posterior was not fit on the specified "
                         f"observation {x}. Please train using posterior.train()."
                     )
-                return self.q.log_prob(theta)
+                log_probs = self.q.log_prob(theta)
+
+            # The inverse link clamps θ outside the support onto its boundary, which
+            # would give such θ a finite density.
+            return torch.where(
+                within_support(self._prior, theta),
+                log_probs,
+                torch.tensor(float("-inf"), device=log_probs.device),
+            )
 
     def train(
         self,
@@ -946,26 +969,53 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = None
         self._mode = "single_x"
 
-        # Evaluate quality
+        # Evaluate quality; retrain once if q fails it and can be rebuilt.
         if quality_control:
-            try:
-                self.evaluate(quality_control_metric=quality_control_metric)
-            except Exception as e:
-                print(
-                    f"Quality control showed a low quality of the variational "
-                    f"posterior. We are automatically retraining the variational "
-                    f"posterior from scratch with a smaller learning rate. "
-                    f"Alternatively, if you want to skip quality control, please "
-                    f"retrain with `VIPosterior.train(..., quality_control=False)`. "
-                    f"\nThe error that occured is: {e}"
+            error = self._quality_control_error(quality_control_metric)
+            if error is not None and self._q_spec.kind != "instance":
+                warnings.warn(
+                    f"Quality control failed: {error} Retraining the variational "
+                    "posterior from scratch, once, with a 10 times smaller learning "
+                    "rate. To skip quality control, pass `quality_control=False`.",
+                    UserWarning,
+                    stacklevel=2,
                 )
                 self.train(
+                    x=x,
+                    n_particles=n_particles,
                     learning_rate=learning_rate * 0.1,
+                    gamma=gamma,
+                    max_num_iters=max_num_iters,
+                    min_num_iters=min_num_iters,
+                    clip_value=clip_value,
+                    warm_up_rounds=warm_up_rounds,
                     retrain_from_scratch=True,
                     reset_optimizer=True,
+                    show_progress_bar=show_progress_bar,
+                    check_for_convergence=check_for_convergence,
+                    quality_control=False,
+                    **kwargs,
+                )
+                error = self._quality_control_error(quality_control_metric)
+            if error is not None:
+                warnings.warn(
+                    f"Quality control failed: {error} The variational posterior may "
+                    "be unreliable.",
+                    UserWarning,
+                    stacklevel=2,
                 )
 
         return self
+
+    def _quality_control_error(
+        self, quality_control_metric: str
+    ) -> Optional[QualityControlError]:
+        """Return the error of the quality control's basic checks, if any."""
+        try:
+            self.evaluate(quality_control_metric=quality_control_metric)
+        except QualityControlError as error:
+            return error
+        return None
 
     def train_amortized(
         self,
@@ -1374,7 +1424,7 @@ class VIPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.

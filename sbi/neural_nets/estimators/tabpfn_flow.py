@@ -3,6 +3,7 @@
 
 import logging
 import warnings
+from itertools import chain
 from pathlib import Path
 from typing import Mapping, Optional, Tuple, Union
 
@@ -147,11 +148,17 @@ class TabPFNFlow(ConditionalDensityEstimator):
 
         return self._context_input, self._context_condition
 
+    def _embedding_device(self) -> torch.device:
+        """Device of the embedding net, or of the estimator for a net without state."""
+        net = self._embedding_net
+        tensor = next(chain(net.parameters(), net.buffers()), self._device_anchor)
+        return tensor.device
+
     def _embed_condition(self, condition: Tensor) -> Tensor:
         """Validate, embed, flatten, and move conditions to CPU."""
         self._check_condition_shape(condition)
         with torch.no_grad():
-            embedded = self._embedding_net(condition)
+            embedded = self._embedding_net(condition.to(self._embedding_device()))
         return embedded.reshape(embedded.shape[0], -1).cpu()
 
     def embed(self, condition: Tensor) -> Tensor:

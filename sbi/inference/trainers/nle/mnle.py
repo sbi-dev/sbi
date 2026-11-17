@@ -37,7 +37,7 @@ class MNLE(LikelihoodEstimatorTrainer):
         decision-making, Boelts et al., eLife 2022,
         https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
 
-    Example:
+    Example
     --------
 
     ::
