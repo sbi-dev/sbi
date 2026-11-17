@@ -151,7 +151,7 @@ class CategoricalMADE(MADE):
 
     def _map_indices_to_values(self, indices: Tensor) -> Tensor:
         """Map 0-based indices back to original categorical values."""
-        mapped = indices.clone()
+        mapped = indices.to(self.values_lookup.dtype, copy=True)
         for i in range(self.num_variables):
             c = int(self.num_categories_per_var[i])
             lookup = self.values_lookup[i, :c]

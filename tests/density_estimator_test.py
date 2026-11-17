@@ -571,6 +571,18 @@ def test_categorical_mass_estimator_rejects_unseen_values(value, dtype):
         )
 
 
+def test_categorical_mass_estimator_log_prob_of_own_samples():
+    # Integer categories above 2**24 are not exact in float32.
+    estimator = build_categoricalmassestimator(
+        batch_x=torch.tensor([[2**24 + 1], [2**24 + 5]]),
+        batch_y=torch.randn(2, 1),
+        num_categories_per_variable=torch.tensor([2]),
+    )
+    condition = torch.zeros(1, 1)
+    samples = estimator.sample((10,), condition=condition)
+    assert torch.isfinite(estimator.log_prob(samples, condition=condition)).all()
+
+
 @pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
 @pytest.mark.parametrize(
     "x_dist",
