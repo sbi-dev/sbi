@@ -169,10 +169,10 @@ class NeuralPosterior:
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
-        prior = self.potential_fn.prior
+        prior = getattr(self.potential_fn, "prior", None)
         if prior is not None and len(prior.event_shape) > 0:
             event_shape = prior.event_shape
-            actual_shape = theta.shape[-len(event_shape):]
+            actual_shape = theta.shape[-len(event_shape) :]
 
             if actual_shape != event_shape:
                 raise ValueError(

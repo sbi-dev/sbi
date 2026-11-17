@@ -1,20 +1,24 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+
 from __future__ import annotations
 
 from dataclasses import asdict
 
 import pytest
+import torch
 from torch import Tensor, eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import (
     NLE_A,
+    NRE,
     MCMCPosterior,
     likelihood_estimator_based_potential,
 )
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
+from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
 from sbi.samplers.mcmc import SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
@@ -89,10 +93,10 @@ def test_api_posterior_sampler_set(
         assert type(posterior.posterior_sampler) is SliceSamplerVectorized
 
 
-
 def test_direct_posterior_shape_validation():
-    """Test that passing a malformed theta shape raises a clean ValueError (issue #2136)."""
+    """Test malformed theta shapes raise a clean ValueError (issue #2136)."""
     import torch
+
     from sbi.inference import NPE
     from sbi.utils import BoxUniform
 
@@ -109,7 +113,91 @@ def test_direct_posterior_shape_validation():
     density_estimator = inferer.train(max_num_epochs=1, show_train_summary=False)
     posterior = inferer.build_posterior(density_estimator)
 
-    # Passing a 1D tensor with mismatched feature dimension (2 elements instead of 1)
+    # Passing a 1D tensor with 2 elements instead of the expected 1.
     bad_theta = torch.tensor([1.0, 2.0])
-    with pytest.raises(ValueError, match="Expected theta to have feature dimension"):
+
+    with pytest.raises(ValueError, match="Expected theta to have event shape"):
         posterior.log_prob(bad_theta, x=x[0])
+
+    with pytest.raises(ValueError, match="Expected theta to have event shape"):
+        posterior.potential(bad_theta, x=x[0])
+
+
+def test_nle_non_iid_single_x_multiple_theta():
+    """Test NLE supports one x with multiple theta when x_is_iid=False."""
+    prior = MultivariateNormal(loc=zeros(2), covariance_matrix=eye(2))
+
+    theta = prior.sample((20,))
+    x = diagonal_linear_gaussian(theta)
+
+    inference = NLE_A(prior, show_progress_bars=False)
+    estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
+
+    potential_fn, _ = likelihood_estimator_based_potential(estimator, prior, x[:1])
+    potential_fn = potential_fn.bind(x[:1], x_is_iid=False)
+
+    theta_batch = prior.sample((4,))
+    log_prob = potential_fn(theta_batch)
+
+    assert log_prob.shape == (4,)
+    assert torch.isfinite(log_prob).all()
+
+
+def test_nle_non_iid_multiple_x_multiple_theta():
+    """Test NLE supports matching batches of x and theta when x_is_iid=False."""
+    prior = MultivariateNormal(loc=zeros(2), covariance_matrix=eye(2))
+
+    theta = prior.sample((20,))
+    x = diagonal_linear_gaussian(theta)
+
+    inference = NLE_A(prior, show_progress_bars=False)
+    estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
+
+    potential_fn, _ = likelihood_estimator_based_potential(estimator, prior, x[:4])
+    potential_fn = potential_fn.bind(x[:4], x_is_iid=False)
+
+    theta_batch = prior.sample((4,))
+    log_prob = potential_fn(theta_batch)
+
+    assert log_prob.shape == (4,)
+    assert torch.isfinite(log_prob).all()
+
+
+def test_nre_non_iid_single_x_multiple_theta():
+    """Test NRE supports one x with multiple theta when x_is_iid=False."""
+    prior = MultivariateNormal(loc=zeros(2), covariance_matrix=eye(2))
+
+    theta = prior.sample((20,))
+    x = diagonal_linear_gaussian(theta)
+
+    inference = NRE(prior=prior, show_progress_bars=False)
+    estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
+
+    potential_fn = RatioBasedPotential(estimator, prior, x[:1])
+    potential_fn = potential_fn.bind(x[:1], x_is_iid=False)
+
+    theta_batch = prior.sample((4,))
+    log_prob = potential_fn(theta_batch)
+
+    assert log_prob.shape == (4,)
+    assert torch.isfinite(log_prob).all()
+
+
+def test_nre_non_iid_multiple_x_multiple_theta():
+    """Test NRE supports matching batches of x and theta when x_is_iid=False."""
+    prior = MultivariateNormal(loc=zeros(2), covariance_matrix=eye(2))
+
+    theta = prior.sample((20,))
+    x = diagonal_linear_gaussian(theta)
+
+    inference = NRE(prior=prior, show_progress_bars=False)
+    estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
+
+    potential_fn = RatioBasedPotential(estimator, prior, x[:4])
+    potential_fn = potential_fn.bind(x[:4], x_is_iid=False)
+
+    theta_batch = prior.sample((4,))
+    log_prob = potential_fn(theta_batch)
+
+    assert log_prob.shape == (4,)
+    assert torch.isfinite(log_prob).all()

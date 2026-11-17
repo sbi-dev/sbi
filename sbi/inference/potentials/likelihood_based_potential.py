@@ -146,20 +146,25 @@ class LikelihoodBasedPotential(BasePotential):
             )
             return log_likelihood_trial_sum + log_prior
         else:
-            # Calculate likelihood for each (theta,x) pair separately
+            # Calculate likelihood for each (theta, x) pair separately.
             theta_batch_size = theta.shape[0]
             x_batch_size = self.x_o.shape[0]
-            assert theta_batch_size == x_batch_size, (
-                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
-                When performing batched sampling for multiple `x`, the batch size of\
-                `theta` must match the batch size of `x`."
-            )
-            x = self.x_o.unsqueeze(0)
+
+            if x_batch_size == 1:
+                x = self.x_o.unsqueeze(0).expand(
+                    1, theta_batch_size, *self.x_o.shape[1:]
+                )
+            else:
+                assert theta_batch_size == x_batch_size, (
+                    f"Batch size mismatch: {theta_batch_size} and {x_batch_size}."
+                )
+                x = self.x_o.unsqueeze(0)
+
             with torch.set_grad_enabled(track_gradients):
                 log_likelihood_batches = self.likelihood_estimator.log_prob(
                     x, condition=theta
                 )
-            return log_likelihood_batches + log_prior
+            return (log_likelihood_batches + log_prior).squeeze(0)
 
     def condition_on_theta(
         self,
