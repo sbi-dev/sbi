@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import os
 import shutil
 from pathlib import Path
 
@@ -147,11 +148,12 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
+    # Parallel workers would otherwise each start one thread per core in torch, BLAS
+    # and OpenMP. Workers inherit this variable; the libraries read it when they load.
+    if config.getoption("dist", "no") != "no":
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
     if not config.getoption("--bm"):
         return
-    # Parallel benchmark workers would otherwise each start one torch thread per core.
-    if hasattr(config, "workerinput"):
-        torch.set_num_threads(1)
     # Resolve the label at the start, so switching branches during a run does not
     # change where its results go.
     config.stash[BENCHMARK_LABEL] = benchmark_label(config.getoption("--bm-label"))
