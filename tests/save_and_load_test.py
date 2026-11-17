@@ -27,6 +27,11 @@ from sbi.neural_nets import (
     likelihood_nn,
     posterior_flow_nn,
     posterior_nn,
+    posterior_score_nn,
+)
+from sbi.neural_nets.estimators import (
+    ConditionalDensityEstimator,
+    ConditionalVectorFieldEstimator,
 )
 from sbi.utils.sbiutils import Standardize, load_with_version
 from sbi.utils.torchutils import process_device
@@ -303,6 +308,57 @@ def test_net_built_on_gpu_saves_no_gpu_tensor_after_cpu(build):
     net = build(theta, theta + 0.1 * torch.randn_like(theta))
 
     assert _saved_locations(net.cpu()) == {"cpu"}
+
+
+_REBUILT_NET_BUILDERS = [
+    *(pytest.param(posterior_nn(m), id=m) for m in ("maf", "nsf", "mdn", "zuko_maf")),
+    pytest.param(posterior_nn("zuko_nsf"), id="zuko_nsf"),
+    pytest.param(posterior_nn("maf", z_score_x="structured"), id="maf_structured_x"),
+    pytest.param(
+        posterior_nn(
+            "zuko_nsf",
+            z_score_theta="transform_to_unconstrained",
+            x_dist=utils.BoxUniform(-20 * torch.ones(2), 20 * torch.ones(2)),
+        ),
+        id="zuko_nsf_unconstrained",
+    ),
+    pytest.param(likelihood_nn("maf"), id="likelihood_maf"),
+    pytest.param(likelihood_nn("mdn"), id="likelihood_mdn"),
+    pytest.param(posterior_flow_nn("mlp"), id="flow_matching"),
+    pytest.param(posterior_score_nn("mlp"), id="score"),
+    pytest.param(classifier_nn("mlp"), id="classifier_mlp"),
+    pytest.param(classifier_nn("resnet"), id="classifier_resnet"),
+]
+
+
+def _evaluate(net, theta, x):
+    if isinstance(net, ConditionalDensityEstimator):
+        if net.input_shape == x.shape[1:]:  # A likelihood estimator.
+            theta, x = x, theta
+        return net.log_prob(theta.unsqueeze(0), x)
+    if isinstance(net, ConditionalVectorFieldEstimator):
+        return net(theta, x, torch.full((len(theta),), 0.5))
+    return net(theta, x)
+
+
+@pytest.mark.parametrize("build", _REBUILT_NET_BUILDERS)
+def test_net_rebuilt_from_one_row_loads_trained_weights(build):
+    """Saving only the weights works when the state dict holds every data statistic.
+
+    The net is rebuilt from one row with the same builder, as the save-and-load guide
+    shows, and must then match the original net exactly.
+    """
+    theta = 3 * torch.randn(100, 2) + 1
+    x = 5 * torch.randn(100, 3) - 2
+    trained = build(theta, x)
+    with pytest.warns(UserWarning, match="single row"):
+        rebuilt = build(theta[:1], x[:1])
+
+    rebuilt.load_state_dict(trained.state_dict())
+
+    with torch.no_grad():
+        expected = _evaluate(trained, theta[:5], x[:5])
+        assert torch.allclose(_evaluate(rebuilt, theta[:5], x[:5]), expected)
 
 
 @pytest.mark.parametrize("kind", ["direct", "vector_field"])

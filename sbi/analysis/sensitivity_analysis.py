@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import logging
 from copy import deepcopy
 from typing import Any, Callable, Optional, Tuple, Union
 from warnings import warn
@@ -18,11 +17,9 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.sbiutils import (
     _MeanStdBuffers,
-    handle_invalid_x,
     standardizing_net,
+    z_standardization,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class Destandardize(_MeanStdBuffers):
@@ -45,23 +42,7 @@ def destandardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
         Neural network module for z-scoring
     """
 
-    is_valid_t, *_ = handle_invalid_x(batch_t, True)
-
-    t_mean = torch.mean(batch_t[is_valid_t], dim=0)
-
-    # Use batch size to decide whether a reliable std can be computed.
-    if len(batch_t) > 1:
-        t_std = torch.std(batch_t[is_valid_t], dim=0)
-        t_std[t_std < min_std] = min_std
-    else:
-        t_std = torch.ones_like(t_mean)
-        logger.warning(
-            """Using a one-dimensional batch will instantiate a Standardize transform
-            with (mean, std) parameters which are not representative of the data. We
-            allow this behavior because you might be loading a pre-trained. If this is
-            not the case, please be sure to use a larger batch."""
-        )
-
+    t_mean, t_std = z_standardization(batch_t, min_std=min_std)
     return Destandardize(t_mean, t_std)
 
 
