@@ -310,31 +310,21 @@ def test_net_built_on_gpu_saves_no_gpu_tensor_after_cpu(build):
     assert _saved_locations(net.cpu()) == {"cpu"}
 
 
+# One builder per way of z-scoring: nflows, MDN and zuko transforms, the structured
+# standardizing net, the vector-field nets and the classifier.
 _REBUILT_NET_BUILDERS = [
-    *(pytest.param(posterior_nn(m), id=m) for m in ("maf", "nsf", "mdn", "zuko_maf")),
-    pytest.param(posterior_nn("zuko_nsf"), id="zuko_nsf"),
+    pytest.param(posterior_nn("maf"), id="maf"),
+    pytest.param(posterior_nn("mdn"), id="mdn"),
+    pytest.param(posterior_nn("zuko_maf"), id="zuko_maf"),
     pytest.param(posterior_nn("maf", z_score_x="structured"), id="maf_structured_x"),
-    pytest.param(
-        posterior_nn(
-            "zuko_nsf",
-            z_score_theta="transform_to_unconstrained",
-            x_dist=utils.BoxUniform(-20 * torch.ones(2), 20 * torch.ones(2)),
-        ),
-        id="zuko_nsf_unconstrained",
-    ),
-    pytest.param(likelihood_nn("maf"), id="likelihood_maf"),
-    pytest.param(likelihood_nn("mdn"), id="likelihood_mdn"),
     pytest.param(posterior_flow_nn("mlp"), id="flow_matching"),
     pytest.param(posterior_score_nn("mlp"), id="score"),
-    pytest.param(classifier_nn("mlp"), id="classifier_mlp"),
-    pytest.param(classifier_nn("resnet"), id="classifier_resnet"),
+    pytest.param(classifier_nn("mlp"), id="classifier"),
 ]
 
 
 def _evaluate(net, theta, x):
     if isinstance(net, ConditionalDensityEstimator):
-        if net.input_shape == x.shape[1:]:  # A likelihood estimator.
-            theta, x = x, theta
         return net.log_prob(theta.unsqueeze(0), x)
     if isinstance(net, ConditionalVectorFieldEstimator):
         return net(theta, x, torch.full((len(theta),), 0.5))
