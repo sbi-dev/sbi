@@ -456,11 +456,11 @@ def z_standardization(
 
     if len(valid_t) == 1:
         warnings.warn(
-            "z-scoring from a single row: the mean is that row and the std is one, "
-            "which does not represent your data. This is only useful to rebuild a "
-            "net and then load trained weights with `load_state_dict()`. To train, "
-            "pass more than one row. To save and load a whole trainer or posterior, "
-            "use their `save()` and `load()` methods.",
+            "z-scoring from a single valid row: the mean is that row and the std is "
+            "one, which does not represent your data. This is only useful to rebuild "
+            "a net and then load trained weights with `load_state_dict()`. To train, "
+            "pass more than one valid row. To save and load a whole trainer or "
+            "posterior, use their `save()` and `load()` methods.",
             UserWarning,
             stacklevel=2,
         )

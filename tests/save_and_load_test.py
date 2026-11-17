@@ -351,7 +351,7 @@ def test_net_rebuilt_from_one_row_loads_trained_weights(build):
     theta = 3 * torch.randn(100, 2) + 1
     x = 5 * torch.randn(100, 3) - 2
     trained = build(theta, x)
-    with pytest.warns(UserWarning, match="single row"):
+    with pytest.warns(UserWarning, match="single valid row"):
         rebuilt = build(theta[:1], x[:1])
 
     rebuilt.load_state_dict(trained.state_dict())
