@@ -899,6 +899,26 @@ def test_forward_kl_weights_and_loss_stay_finite(monkeypatch, offset: float):
     assert torch.allclose(torch.stack(weight_maxima), torch.ones(1))
 
 
+def test_non_finite_first_loss_is_left_out_of_loss_stats():
+    """A non-finite first loss, as from a batch entirely outside the support, would
+    otherwise turn the running statistics NaN for the rest of training."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = ForwardKLOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=4,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    optimizer.update_loss_stats(torch.tensor(float("nan")))
+    for loss in torch.linspace(2.0, 1.0, 60):
+        optimizer.update_loss_stats(loss)
+
+    assert optimizer.num_step == 60
+    assert torch.isfinite(optimizer.moving_slope[: optimizer.num_step]).all()
+
+
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
 @pytest.mark.parametrize("dreg_before, dreg_after", [(False, True), (True, False)])
 def test_dreg_changed_by_update_matches_new_optimizer(

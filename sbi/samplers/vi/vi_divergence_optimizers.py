@@ -312,6 +312,9 @@ class DivergenceOptimizer(ABC):
             self.moving_slope = torch.hstack([self.moving_slope, torch.zeros(2000)])
 
         if self.num_step == 0:
+            if not torch.isfinite(loss):
+                # Later steps average over this one, so wait for a finite loss.
+                return
             self.losses[self.num_step] = loss
             self.moving_average[self.num_step] = loss
         elif not torch.isfinite(loss):
