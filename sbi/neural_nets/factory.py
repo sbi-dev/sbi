@@ -18,10 +18,11 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.neural_nets.net_builders.vector_field_nets import (
     FlowMatchingConfig,
+    SimformerFlowMatchingConfig,
     _score_config_from_sde_type,
+    _simformer_config_from_kwargs,
+    _simformer_score_config_cls,
     _vf_config_from_factory_kwargs,
-    build_masked_flow_matching_estimator,
-    build_masked_score_matching_estimator,
 )
 from sbi.utils.nn_utils import check_net_device
 from sbi.utils.vector_field_utils import VectorFieldNet
@@ -676,7 +677,9 @@ def simformer_score_nn(
             of `build_simformer_network`. Unknown arguments raise an error.
     Returns:
         Callable: A function that takes batch inputs and returns a masked score
-        matching estimator.
+        matching estimator. It is the `build` method of the equivalent
+        `SimformerVEScoreConfig` (or the config of the chosen SDE); passing that
+        config to `Simformer` directly is preferred.
     """
     builder_kwargs = _simformer_builder_kwargs(
         model,
@@ -693,15 +696,12 @@ def simformer_score_nn(
         kwargs,
     )
 
-    def build_fn(batch_inputs):
-        return build_masked_score_matching_estimator(
-            batch_x=batch_inputs,
-            batch_y=batch_inputs,  # Unused, only for compatibility
-            sde_type=sde_type,
-            **builder_kwargs,
-        )
-
-    return build_fn
+    net = builder_kwargs.pop("net")
+    z_score = builder_kwargs.pop("z_score_x")
+    config = _simformer_config_from_kwargs(
+        _simformer_score_config_cls(sde_type), net, z_score, builder_kwargs
+    )
+    return config.build
 
 
 def simformer_flow_nn(
@@ -747,7 +747,9 @@ def simformer_flow_nn(
             raise an error.
     Returns:
         Callable: A function that takes batch inputs and returns a masked flow
-        matching estimator.
+        matching estimator. It is the `build` method of the equivalent
+        `SimformerFlowMatchingConfig`; passing that config to
+        `FlowMatchingSimformer` directly is preferred.
     """
     builder_kwargs = _simformer_builder_kwargs(
         model,
@@ -764,14 +766,13 @@ def simformer_flow_nn(
         kwargs,
     )
 
-    def build_fn(batch_inputs):
-        return build_masked_flow_matching_estimator(
-            batch_x=batch_inputs,
-            batch_y=batch_inputs,  # Unused, only for compatibility
-            **builder_kwargs,
-        )
-
-    return build_fn
+    net = builder_kwargs.pop("net")
+    z_score = builder_kwargs.pop("z_score_x")
+    builder_kwargs.pop("sde_type", None)  # Flow matching has no SDE.
+    config = _simformer_config_from_kwargs(
+        SimformerFlowMatchingConfig, net, z_score, builder_kwargs
+    )
+    return config.build
 
 
 def marginal_nn(

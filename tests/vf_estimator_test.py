@@ -10,6 +10,9 @@ import torch
 
 from sbi.neural_nets import (
     FlowMatchingConfig,
+    SimformerFlowMatchingConfig,
+    SimformerNetConfig,
+    SimformerVEScoreConfig,
     SubVPScoreConfig,
     VEScoreConfig,
     VPScoreConfig,
@@ -806,8 +809,9 @@ def test_simformer_iid_sampling_runs(iid_method, num_features):
     inference = Simformer(
         posterior_latent_idx=list(range(num_theta)),
         posterior_observed_idx=list(range(num_theta, num_theta + num_x)),
-        hidden_features=16,
-        num_layers=1,
+        vf_estimator=SimformerVEScoreConfig(
+            net=SimformerNetConfig(hidden_features=16, num_layers=1)
+        ),
         show_progress_bars=False,
     )
     inference.append_simulations(torch.cat([theta, x], dim=1))
@@ -927,8 +931,9 @@ def test_flow_simformer_z_scoring_samples_in_original_space():
     inference = FlowMatchingSimformer(
         posterior_latent_idx=[0, 1],
         posterior_observed_idx=[2, 3],
-        hidden_features=32,
-        num_layers=2,
+        vf_estimator=SimformerFlowMatchingConfig(
+            net=SimformerNetConfig(hidden_features=32, num_layers=2)
+        ),
         show_progress_bars=False,
     )
     inference.append_simulations(torch.cat([theta, x], dim=1))

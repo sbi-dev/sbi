@@ -121,6 +121,26 @@ network architecture.
    sbi.neural_nets.TransformerConfig
 
 
+Simformer estimator configs
+---------------------------
+
+For ``Simformer`` and ``FlowMatchingSimformer``, passed as ``vf_estimator``. The
+estimator config selects flow matching or the SDE of the score estimator; its
+``net`` config sets up the Simformer transformer.
+
+.. autosummary::
+   :toctree: _autosummary
+   :nosignatures:
+
+   sbi.neural_nets.SimformerConfigBase
+   sbi.neural_nets.SimformerFlowMatchingConfig
+   sbi.neural_nets.SimformerScoreConfigBase
+   sbi.neural_nets.SimformerVEScoreConfig
+   sbi.neural_nets.SimformerVPScoreConfig
+   sbi.neural_nets.SimformerSubVPScoreConfig
+   sbi.neural_nets.SimformerNetConfig
+
+
 Factory functions
 -----------------
 

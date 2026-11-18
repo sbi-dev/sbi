@@ -245,6 +245,14 @@ def infer(
     )
     if isinstance(method_fun, type) and issubclass(method_fun, MaskedNeuralInference):
         # Masked trainers learn the joint of all variables: theta first, then x.
+        if theta.dim() != 2 or x.dim() != 2:
+            raise ValueError(
+                f"`infer` with method='{method}' needs one-dimensional parameters "
+                f"and simulator outputs, but got theta of shape "
+                f"{tuple(theta.shape[1:])} and x of shape {tuple(x.shape[1:])} per "
+                f"simulation. Flatten them, or use {method_fun.__name__} directly "
+                "with joint inputs of shape (batch, num_variables, num_features)."
+            )
         num_theta, num_x = theta.shape[1], x.shape[1]
         init_kwargs = {
             "posterior_latent_idx": list(range(num_theta)),
@@ -1194,15 +1202,6 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         """
         return self._summary
 
-    def _default_summary_writer(self) -> SummaryWriter:
-        """Return summary writer logging to method- and simulator-specific directory."""
-
-        method = self.__class__.__name__
-        logdir = Path(
-            get_log_root(), method, datetime.now().isoformat().replace(":", "_")
-        )
-        return SummaryWriter(logdir)
-
     def _summarize(
         self,
         round_: int,
@@ -1583,6 +1582,9 @@ class MaskedNeuralInference(
 
     _neural_net: Optional[MaskedConditionalEstimatorType]
 
+    _DEFAULT_SAMPLE_WITH: ClassVar[Literal["ode", "sde"]] = "sde"
+    """Sampler used when `sample_with` is not given, overridden by subclasses."""
+
     def __init__(
         self,
         posterior_latent_idx: Optional[list | Tensor] = None,
@@ -1633,7 +1635,11 @@ class MaskedNeuralInference(
         self._condition_mask_generator = self._default_condition_masks_generator
         self._edge_mask_generator = self._default_edge_masks_generator
 
-        # Initialize default posterior idxs
+        # Initialize default posterior idxs, validated early when both are given.
+        if posterior_latent_idx is not None and posterior_observed_idx is not None:
+            self.generate_condition_mask_from_idx(
+                posterior_latent_idx, posterior_observed_idx
+            )
         self.posterior_latent_idx = (
             torch.as_tensor(posterior_latent_idx, dtype=torch.long)
             if posterior_latent_idx is not None
@@ -1798,6 +1804,10 @@ class MaskedNeuralInference(
         """Set the latent and observed condition indexes for posterior inference
         if not passed at init time, or if an update is desired."""
 
+        # Validate early (disjoint, complete, ascending, no duplicates).
+        self.generate_condition_mask_from_idx(
+            new_posterior_latent_idx, new_posterior_observed_idx
+        )
         self.posterior_latent_idx = torch.as_tensor(
             new_posterior_latent_idx, dtype=torch.long
         )
@@ -1809,11 +1819,10 @@ class MaskedNeuralInference(
         if self.posterior_latent_idx is None or self.posterior_observed_idx is None:
             raise ValueError(
                 "You did not pass latent and observed variable indexes. "
-                "sbi cannot generate a posterior or likelihood without any knowledge"
-                "of which variables are latent or observed "
-                "If you already instanciated a Masked Vector Filed Inference "
-                "and would like to update the current conditon indexes, "
-                "you can use the setter function `set_condtion_indexes()`"
+                "sbi cannot build a posterior or likelihood without knowing "
+                "which variables are latent and which are observed. Pass "
+                "`posterior_latent_idx` and `posterior_observed_idx` at "
+                "initialization, or set them with `set_condition_indexes()`."
             )
         return self.generate_condition_mask_from_idx(
             self.posterior_latent_idx, self.posterior_observed_idx
@@ -1830,6 +1839,21 @@ class MaskedNeuralInference(
         # Index checks run on the CPU, whatever the device of the passed indices.
         latent_idx = torch.as_tensor(latent_idx, dtype=torch.long).cpu()
         observed_idx = torch.as_tensor(observed_idx, dtype=torch.long).cpu()
+
+        # The condition mask keeps no order: latent and observed variables are
+        # always laid out in ascending node order (also the order of `x_o` and of
+        # the samples), so other orders and duplicates would be silently ignored.
+        for name, idx in (("latent_idx", latent_idx), ("observed_idx", observed_idx)):
+            if idx.dim() != 1:
+                raise ValueError(f"{name} must be one-dimensional, got {idx=}.")
+            if torch.unique(idx).numel() != idx.numel():
+                raise ValueError(f"{name} contains duplicate indices: {idx=}.")
+            if idx.numel() > 1 and not bool((idx[1:] > idx[:-1]).all()):
+                raise ValueError(
+                    f"{name} must be in ascending order, got {idx=}. Samples and "
+                    "observations follow the node order of the inputs, so pass "
+                    f"{name}={sorted(idx.tolist())} and order `x_o` accordingly."
+                )
 
         # Check for overlap
         if torch.any(torch.isin(latent_idx, observed_idx)):
@@ -1858,9 +1882,9 @@ class MaskedNeuralInference(
         self,
         condition_mask: Union[Tensor, list],
         edge_mask: Optional[Tensor] = None,
-        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
+        vector_field_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: Literal['ode', 'sde'] = 'sde',
+        sample_with: Optional[Literal['ode', 'sde']] = None,
         conditional_parameters: Optional[PosteriorParameters] = None,
         **kwargs,
     ) -> NeuralPosterior:
@@ -1887,20 +1911,22 @@ class MaskedNeuralInference(
                 means that `i` depends on `j`). If `None`, the edge mask generator
                 used in training is evaluated at `condition_mask` (full attention
                 by default).
-            mvf_estimator: The estimator that the conditional is based on. If `None`,
-                the trained network is used.
+            vector_field_estimator: The estimator that the conditional is based on.
+                If `None`, the trained network is used.
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
                 distribution, see FAQ for details on how to use custom distributions.
-            sample_with: The inference method to use. Must be one of:
-                - "sde"
-                - "ode"
+            sample_with: The inference method to use, "sde" or "ode". Defaults to
+                "sde" for the score-based Simformer and to "ode" for the
+                flow-matching Simformer, as for NPSE and FMPE.
             **kwargs: Additional method-specific parameters.
 
         Returns:
             NeuralPosterior object.
         """
 
+        if sample_with is None:
+            sample_with = self._DEFAULT_SAMPLE_WITH
         condition_mask = torch.as_tensor(condition_mask, dtype=torch.bool)
         if edge_mask is None:
             edge_mask = self._edge_mask_for_conditional(condition_mask)
@@ -1912,7 +1938,7 @@ class MaskedNeuralInference(
         # not a default here (see `build_posterior`).
         check_prior(prior)
         vf_estimator, device = self._resolve_estimator(
-            mvf_estimator,
+            vector_field_estimator,
             condition_mask,
             edge_mask,
         )

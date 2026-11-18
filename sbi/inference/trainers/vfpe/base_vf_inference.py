@@ -52,7 +52,10 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
     _PerModelConfigBase,
 )
-from sbi.neural_nets.net_builders.vector_field_nets import VectorFieldConfigBase
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    SimformerConfigBase,
+    VectorFieldConfigBase,
+)
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
     check_estimator_arg,
@@ -777,12 +780,15 @@ class MaskedVectorFieldTrainer(
     _VectorFieldTrainingMixin,
     MaskedNeuralInference[MaskedConditionalVectorFieldEstimator],
 ):
+    _ALLOWED_CONFIG_TYPE: ClassVar[type[SimformerConfigBase]] = SimformerConfigBase
+    """Config family this trainer accepts, narrowed by each subclass."""
+
     def __init__(
         self,
-        mvf_estimator_builder: Union[
-            Literal["simformer"],
+        vf_estimator: Union[
+            SimformerConfigBase,
             MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator],
-        ] = "simformer",
+        ],
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
         prior: Optional[Distribution] = None,
@@ -791,20 +797,18 @@ class MaskedVectorFieldTrainer(
         summary_writer: Optional[SummaryWriter] = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
-        **kwargs,
     ):
-        """Base class for masked vector field inference methods. It is
+        r"""Base class for masked vector field inference methods. It is
         used for (Score) Simformer and Flow Matching Simformer.
 
         NOTE: Masked Vector field inference does not support multi-round inference
         with flexible proposals yet.
 
         Args:
-            mvf_estimator_builder: Neural network architecture for the
-                masked vector field estimator. Can be a string (e.g. 'simformer')
-                or a callable that implements the `MaskedConditionalEstimatorBuilder`
-                protocol with `__call__` that receives `inputs`
-                and returns a `MaskedConditionalVectorFieldEstimator`.
+            vf_estimator: The masked vector field estimator: a Simformer config
+                (e.g. `SimformerVEScoreConfig()`), or a function that receives the
+                training `inputs` and returns a
+                `MaskedConditionalVectorFieldEstimator`.
             posterior_latent_idx: Indices of the variables that are latent in the
                 posterior, i.e., those that correspond to $\theta$.
             posterior_observed_idx: Indices of the variables that are observed in the
@@ -815,12 +819,11 @@ class MaskedVectorFieldTrainer(
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
-            summary_writer: Tensorboard summary writer.
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
-            kwargs: Additional keyword arguments passed to the default builder if
-                `mvf_estimator_builder` is a string.
         """
 
         super().__init__(
@@ -834,28 +837,29 @@ class MaskedVectorFieldTrainer(
             show_progress_bars=show_progress_bars,
         )
 
-        # As detailed in the docstring, `vector_field_estimator` is either a string or
-        # a callable. The function creating the neural network is attached to
-        # `_build_neural_net`. It will be called in the first round and receive
-        # thetas and xs as inputs, so that they can be used for shape inference and
-        # potentially for z-scoring.
-        check_estimator_arg(mvf_estimator_builder)
-        if isinstance(mvf_estimator_builder, str):
-            self._build_neural_net = self._build_default_nn_fn(
-                vector_field_estimator_builder=mvf_estimator_builder,
-                **kwargs,
+        # The function building the network is attached to `_build_neural_net`. It
+        # is called in the first round with the training inputs, which it uses for
+        # shape inference and z-scoring.
+        if isinstance(vf_estimator, str):
+            raise TypeError(
+                f"{type(self).__name__} does not take a string for `vf_estimator`. "
+                f"Pass a {self._ALLOWED_CONFIG_TYPE.__name__}, e.g. "
+                "`SimformerVEScoreConfig()` for `Simformer` or "
+                "`SimformerFlowMatchingConfig()` for `FlowMatchingSimformer`."
             )
+        check_estimator_arg(vf_estimator)
+        if isinstance(vf_estimator, _PerModelConfigBase):
+            if not isinstance(vf_estimator, self._ALLOWED_CONFIG_TYPE):
+                raise TypeError(
+                    f"{type(self).__name__} requires a "
+                    f"{self._ALLOWED_CONFIG_TYPE.__name__}; got "
+                    f"{type(vf_estimator).__name__}."
+                )
+            self._build_neural_net = vf_estimator.build
         else:
-            self._build_neural_net = mvf_estimator_builder
+            self._build_neural_net = vf_estimator
 
         self._proposal_roundwise = []
-
-    @abstractmethod
-    def _build_default_nn_fn(
-        self,
-        **kwargs,
-    ) -> MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator]:
-        pass
 
     def append_simulations(
         self,
@@ -1089,10 +1093,10 @@ class MaskedVectorFieldTrainer(
 
     def build_posterior(
         self,
-        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
+        vector_field_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         edge_mask: Optional[Tensor] = None,
         prior: Optional[Distribution] = None,
-        sample_with: Literal['ode', 'sde'] = "sde",
+        sample_with: Optional[Literal['ode', 'sde']] = None,
         posterior_parameters: Optional[VectorFieldPosteriorParameters] = None,
     ) -> NeuralPosterior:
         r"""Build posterior from the masked vector field estimator given
@@ -1109,20 +1113,17 @@ class MaskedVectorFieldTrainer(
                 - `False` (or `0`): No edge exists between these variables.
                 - if `None`, the edge mask generator used in training is evaluated at
                   the condition mask; by default this is full attention.
-            mvf_estimator: Neural network architecture for the masked
-                vector field estimator. Can be a callable that implements
-                the `MaskedConditionalEstimatorBuilder` protocol.
-                If a callable, `__call__` must accept `inputs`, and return
-                a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
-                underlying trained neural net.
+            vector_field_estimator: The trained masked vector field estimator to
+                use. If `None`, the network trained last is used.
             prior: Distribution over the latent variables. It is used to reject
                 samples outside its support and by the iid sampling methods; the
                 learned conditional does not depend on it. Defaults to the prior
                 passed at initialization.
-            sample_with: Method to use for sampling from the posterior. Can be one of
-                'sde' (default) or 'ode'. The 'sde' method uses the score to
-                do a Langevin diffusion step, while the 'ode' method solves a
-                probabilistic ODE with a numerical ODE solver.
+            sample_with: Method to use for sampling, 'sde' or 'ode'. The 'sde'
+                method integrates the reverse-time SDE, while the 'ode' method
+                solves the probability flow ODE with a numerical ODE solver.
+                Defaults to 'sde' for `Simformer` and to 'ode' for
+                `FlowMatchingSimformer`, as for NPSE and FMPE.
             posterior_parameters: Additional parameters passed to
                 `VectorFieldPosterior`.
         Returns:
@@ -1135,7 +1136,7 @@ class MaskedVectorFieldTrainer(
         return self.build_conditional(
             condition_mask=condition_mask,
             edge_mask=edge_mask,
-            mvf_estimator=mvf_estimator,
+            vector_field_estimator=vector_field_estimator,
             prior=self._prior if prior is None else prior,
             sample_with=sample_with,
             conditional_parameters=posterior_parameters,
@@ -1143,10 +1144,10 @@ class MaskedVectorFieldTrainer(
 
     def build_likelihood(
         self,
-        mvf_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
+        vector_field_estimator: Optional[MaskedConditionalVectorFieldEstimator] = None,
         edge_mask: Optional[Tensor] = None,
         prior: Optional[Distribution] = None,
-        sample_with: Literal['ode', 'sde'] = "sde",
+        sample_with: Optional[Literal['ode', 'sde']] = None,
         likelihood_parameters: Optional[VectorFieldPosteriorParameters] = None,
     ) -> NeuralPosterior:
         r"""Build likelihood from the masked vector field estimator given
@@ -1168,20 +1169,17 @@ class MaskedVectorFieldTrainer(
                 - if `None`, the edge mask generator used in training is evaluated at
                   the condition mask; by default this is full attention.
 
-            mvf_estimator: Neural network architecture for the masked
-                vector field estimator. Can be a callable that implements
-                the `MaskedConditionalEstimatorBuilder` protocol.
-                If a callable, `__call__` must accept `inputs`, and return
-                a `MaskedConditionalVectorFieldEstimator`. If `None` uses the
-                underlying trained neural net.
+            vector_field_estimator: The trained masked vector field estimator to
+                use. If `None`, the network trained last is used.
             prior: Distribution over the latent variables of the likelihood, i.e.,
                 over $x$. It is used to reject samples outside its support and by the
                 iid sampling methods; the learned conditional does not depend on it.
                 The prior passed at initialization is over $\theta$ and is not used.
-            sample_with: Method to use for sampling from the posterior. Can be one of
-                'sde' (default) or 'ode'. The 'sde' method uses the score to
-                do a Langevin diffusion step, while the 'ode' method solves a
-                probabilistic ODE with a numerical ODE solver.
+            sample_with: Method to use for sampling, 'sde' or 'ode'. The 'sde'
+                method integrates the reverse-time SDE, while the 'ode' method
+                solves the probability flow ODE with a numerical ODE solver.
+                Defaults to 'sde' for `Simformer` and to 'ode' for
+                `FlowMatchingSimformer`, as for NPSE and FMPE.
             likelihood_parameters: Additional parameters passed to
                 `VectorFieldPosterior`.
         Returns:
@@ -1194,7 +1192,7 @@ class MaskedVectorFieldTrainer(
         return self.build_conditional(
             condition_mask=condition_mask,
             edge_mask=edge_mask,
-            mvf_estimator=mvf_estimator,
+            vector_field_estimator=vector_field_estimator,
             prior=prior,
             sample_with=sample_with,
             conditional_parameters=likelihood_parameters,
@@ -1220,16 +1218,6 @@ class MaskedVectorFieldTrainer(
             "therefore do not require a potential function for "
             "gradient-based MCMC methods like HMC yet. Please avoid this."
         )
-
-    def _loss_proposal_conditional(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: Optional[Any],
-    ) -> Tensor:
-        cls_name = self.__class__.__name__
-        raise NotImplementedError(f"Multi-round {cls_name} is not yet implemented.")
 
     def _loss(
         self,

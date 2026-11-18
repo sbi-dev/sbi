@@ -1,8 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
-from typing import Literal, Optional, Union
+from typing import ClassVar, Literal, Optional, Union
 
 from torch import Tensor
 from torch.distributions import Distribution
@@ -13,7 +12,12 @@ from sbi.neural_nets.estimators.base import (
     MaskedConditionalEstimatorBuilder,
     MaskedConditionalVectorFieldEstimator,
 )
-from sbi.neural_nets.factory import simformer_flow_nn, simformer_score_nn
+from sbi.neural_nets.net_builders.vector_field_nets import (
+    SimformerConfigBase,
+    SimformerFlowMatchingConfig,
+    SimformerScoreConfigBase,
+    _simformer_score_config_cls,
+)
 from sbi.sbi_types import Tracker
 
 
@@ -44,6 +48,10 @@ class Simformer(MaskedVectorFieldTrainer):
       ``edge_mask[i, j] = True``. Self-edges are always added. If ``None``, full
       attention is used; prefer ``None`` over an all-ones tensor to save memory.
 
+    The estimator is configured with a score config, e.g.
+    ``Simformer(vf_estimator=SimformerVPScoreConfig(net=SimformerNetConfig(
+    num_layers=6)))``.
+
     NOTE:
         This is the score-based implementation of the Simformer; sbi also provides a
         flow-matching variant as ``FlowMatchingSimformer``.
@@ -56,53 +64,65 @@ class Simformer(MaskedVectorFieldTrainer):
           https://arxiv.org/abs/2404.09636
     """
 
+    _ALLOWED_CONFIG_TYPE: ClassVar[type[SimformerConfigBase]] = SimformerScoreConfigBase
+
     def __init__(
         self,
-        mvf_estimator: Union[
-            Literal["simformer"],
-            MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator],
-        ] = "simformer",
-        sde_type: Literal["vp", "ve", "subvp"] = "ve",
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
         prior: Optional[Distribution] = None,
+        vf_estimator: Union[
+            SimformerScoreConfigBase,
+            MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator],
+            None,
+        ] = None,
+        sde_type: Optional[Literal["vp", "ve", "subvp"]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
-        **kwargs,
     ):
         r"""Initialize Simformer.
 
         Args:
-            mvf_estimator: Neural network architecture for the masked
-                vector field estimator. Can be a string (e.g., `'simformer'`)
-                or a callable that implements the `MaskedConditionalEstimatorBuilder`
-                protocol. If a callable, `__call__` must accept `inputs`, and return
-                a `MaskedConditionalVectorFieldEstimator`.
-            sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
             posterior_latent_idx: List or Tensor of indices identifying which
                 variables are latent (to be inferred), i.e., those that correspond
-                to $\theta$ in a posterior.
+                to $\theta$ in a posterior. Must be in ascending order.
             posterior_observed_idx: List or Tensor of indices identifying which
                 variables are observed (to be conditioned on) in a posterior,
-                i.e., those that correspond to $x$.
+                i.e., those that correspond to $x$. Must be in ascending order.
             prior: Optional distribution over the posterior latent variables. It is
                 the default prior of `build_posterior` (rejection of samples outside
                 its support, iid sampling). Training does not use it.
+            vf_estimator: The masked score estimator. If ``None`` (default), uses
+                the score config of `sde_type` with default settings
+                (`SimformerVEScoreConfig`). A score config such as
+                `SimformerVPScoreConfig(...)` configures the estimator and its
+                network. Alternatively, a function that receives the training
+                inputs and returns a `MaskedConditionalVectorFieldEstimator`.
+            sde_type: Type of SDE of the default config, one of 've' (default),
+                'vp' or 'subvp'. Must not be given with `vf_estimator`, which
+                already selects the SDE.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
-            summary_writer: Tensorboard summary writer.
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
-            kwargs: Additional keyword arguments passed to the default builder if
-                `mvf_estimator` is a string.
         """
+        if vf_estimator is None:
+            vf_estimator = _simformer_score_config_cls(sde_type or "ve")()
+        elif sde_type is not None:
+            raise ValueError(
+                f"Conflicting `sde_type`: trainer received {sde_type!r}, but "
+                "`vf_estimator` already selects the SDE. Choose the config of the "
+                "SDE instead, e.g. `SimformerVPScoreConfig()`."
+            )
         super().__init__(
-            mvf_estimator_builder=mvf_estimator,
+            vf_estimator=vf_estimator,
             posterior_latent_idx=posterior_latent_idx,
             posterior_observed_idx=posterior_observed_idx,
             prior=prior,
@@ -111,15 +131,7 @@ class Simformer(MaskedVectorFieldTrainer):
             summary_writer=summary_writer,
             tracker=tracker,
             show_progress_bars=show_progress_bars,
-            sde_type=sde_type,
-            **kwargs,
         )
-
-    def _build_default_nn_fn(
-        self, **kwargs
-    ) -> MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator]:
-        net_type = kwargs.pop("vector_field_estimator_builder", "simformer")
-        return simformer_score_nn(model=net_type, **kwargs)
 
 
 class FlowMatchingSimformer(MaskedVectorFieldTrainer):
@@ -140,58 +152,57 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
           https://arxiv.org/abs/2404.09636
     """
 
+    _ALLOWED_CONFIG_TYPE: ClassVar[type[SimformerConfigBase]] = (
+        SimformerFlowMatchingConfig
+    )
+    _DEFAULT_SAMPLE_WITH: ClassVar[Literal["ode", "sde"]] = "ode"
+
     def __init__(
         self,
-        mvf_estimator: Union[
-            Literal["simformer"],
-            MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator],
-        ] = "simformer",
         posterior_latent_idx: Optional[list | Tensor] = None,
         posterior_observed_idx: Optional[list | Tensor] = None,
         prior: Optional[Distribution] = None,
+        vf_estimator: Union[
+            SimformerFlowMatchingConfig,
+            MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator],
+            None,
+        ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
-        **kwargs,
     ):
         r"""Initialize Flow Matching Simformer.
 
         Args:
-            mvf_estimator: Neural network architecture for the masked
-                vector field estimator. Can be a string (e.g., `'simformer'`)
-                or a callable that implements the `MaskedConditionalEstimatorBuilder`
-                protocol. If a callable, `__call__` must accept `inputs`, and return
-                a `MaskedConditionalVectorFieldEstimator`.
             posterior_latent_idx: List or Tensor of indices identifying which
                 variables are latent (to be inferred), i.e., those that correspond
-                to $\theta$ in a posterior.
+                to $\theta$ in a posterior. Must be in ascending order.
             posterior_observed_idx: List or Tensor of indices identifying which
                 variables are observed (to be conditioned on) in a posterior,
-                i.e., those that correspond to $x$.
+                i.e., those that correspond to $x$. Must be in ascending order.
             prior: Optional distribution over the posterior latent variables. It is
                 the default prior of `build_posterior` (rejection of samples outside
                 its support, iid sampling). Training does not use it.
+            vf_estimator: The masked flow-matching estimator. If ``None``
+                (default), uses `SimformerFlowMatchingConfig()`. A config
+                configures the estimator and its network. Alternatively, a function
+                that receives the training inputs and returns a
+                `MaskedConditionalVectorFieldEstimator`.
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
-            summary_writer: Tensorboard summary writer.
+            summary_writer: Deprecated alias for the TensorBoard summary writer.
+                Use ``tracker`` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
-            kwargs: Additional keyword arguments passed to the default builder if
-                `mvf_estimator` is a string. Flow matching does not use an SDE, so
-                `sde_type` is not supported; if passed, it is ignored with a warning.
         """
-        if "sde_type" in kwargs:
-            warnings.warn(
-                "`sde_type` is not used by FlowMatchingSimformer and is ignored.",
-                stacklevel=2,
-            )
-            kwargs.pop("sde_type")
         super().__init__(
-            mvf_estimator_builder=mvf_estimator,
+            vf_estimator=(
+                SimformerFlowMatchingConfig() if vf_estimator is None else vf_estimator
+            ),
             posterior_latent_idx=posterior_latent_idx,
             posterior_observed_idx=posterior_observed_idx,
             prior=prior,
@@ -200,11 +211,4 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             summary_writer=summary_writer,
             tracker=tracker,
             show_progress_bars=show_progress_bars,
-            **kwargs,
         )
-
-    def _build_default_nn_fn(
-        self, **kwargs
-    ) -> MaskedConditionalEstimatorBuilder[MaskedConditionalVectorFieldEstimator]:
-        model = kwargs.pop("vector_field_estimator_builder", "simformer")
-        return simformer_flow_nn(model=model, **kwargs)

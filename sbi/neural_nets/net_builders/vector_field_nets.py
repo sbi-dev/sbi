@@ -11,7 +11,10 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
+from sbi.neural_nets.estimators.base import (
+    ConditionalVectorFieldEstimator,
+    MaskedConditionalVectorFieldEstimator,
+)
 from sbi.neural_nets.estimators.flowmatching_estimator import (
     FlowMatchingEstimator,
     MaskedFlowMatchingEstimator,
@@ -1057,19 +1060,19 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         self.conditioning_parameter = nn.Parameter(torch.randn(1, 1, dim_cond) * 0.5)
 
         # Time embedding
-        if isinstance(time_emb_type, str):
-            if time_emb_type == "sinusoidal":
-                self.time_embedding = SinusoidalTimeEmbedding(
-                    embed_dim=time_embedding_dim, max_freq=sinusoidal_max_freq
-                )
-            elif time_emb_type == "random_fourier":
-                self.time_embedding = RandomFourierTimeEmbedding(
-                    embed_dim=time_embedding_dim, scale=fourier_scale
-                )
-            else:
-                raise ValueError(
-                    f"Unknown time_emb_type: {time_emb_type}"
-                )  # assume already a module
+        if time_emb_type == "sinusoidal":
+            self.time_embedding = SinusoidalTimeEmbedding(
+                embed_dim=time_embedding_dim, max_freq=sinusoidal_max_freq
+            )
+        elif time_emb_type == "random_fourier":
+            self.time_embedding = RandomFourierTimeEmbedding(
+                embed_dim=time_embedding_dim, scale=fourier_scale
+            )
+        else:
+            raise ValueError(
+                f"Unknown time_emb_type: {time_emb_type!r}. Must be 'sinusoidal' or "
+                "'random_fourier'."
+            )
 
         # Project input tokens to hidden dim
         self.in_proj = nn.Linear(dim_val + dim_id + dim_cond, hidden_features)
@@ -1498,12 +1501,6 @@ def build_simformer_network(
     return vectorfield_net
 
 
-_MASKED_SCORE_ESTIMATORS = {
-    "ve": MaskedVEScoreEstimator,
-    "vp": MaskedVPScoreEstimator,
-    "subvp": MaskedSubVPScoreEstimator,
-}
-
 # Arguments of the masked estimators that the builder sets itself.
 _MASKED_BUILDER_MANAGED_ARGS = frozenset({
     "self",
@@ -1555,72 +1552,59 @@ def _finite_z_score_stats(
     return mean, std
 
 
-def _build_masked_vector_field_estimator(
-    batch_x: Tensor,
-    batch_y: Tensor,
-    estimator_type: Literal["masked-flow", "masked-score"],
-    z_score_x: Optional[str] = None,
-    sde_type: str = "ve",
-    net: Union[Literal["simformer"], MaskedVectorFieldNet] = "simformer",
-    **kwargs,
-) -> Union[MaskedFlowMatchingEstimator, MaskedConditionalScoreEstimator]:
-    """Builds a masked vector field estimator (flow or score matching) for the
-    Simformer.
+def _simformer_config_from_kwargs(
+    config_cls: type["SimformerConfigBase"],
+    net: Union[Literal["simformer"], nn.Module],
+    z_score_x: Optional[str],
+    kwargs: dict,
+) -> "SimformerConfigBase":
+    """Assemble a Simformer config from flat keyword arguments.
 
-    Keyword arguments are routed by name: arguments of the estimator class (e.g.,
-    `sigma_min`, `sigma_max`, `beta_min`, `t_min`, `weight_fn` for score matching,
-    `noise_scale` for flow matching) go to the estimator, arguments of
-    `build_simformer_network` go to the network. Any other argument raises an error
-    instead of being silently ignored.
+    Keyword arguments are routed by name: fields of `SimformerNetConfig` go to the
+    network config, fields of `config_cls` and other arguments of its estimator
+    class (e.g. `t_min`, `weight_fn`, `noise_scale`) go to the estimator config. Any
+    other argument raises an error instead of being silently ignored.
 
     Args:
-        batch_x: Batch of inputs, used to infer dimensionality and z-scoring
-            statistics.
-        batch_y: Unused, kept for compatibility.
-        estimator_type: Either "masked-flow" or "masked-score".
-        z_score_x: Whether to z-score the inputs: "independent" (per entry),
-            "structured" (one statistic for all entries), or None. Statistics use
-            the finite values only. The standardization is internal to the
-            estimator (as for NPSE and FMPE); inputs and outputs stay in the
-            original space.
-        sde_type: SDE type for the score estimator, one of "vp", "subvp", or "ve".
+        config_cls: The Simformer estimator config to build.
         net: "simformer" or a custom network following the MaskedVectorFieldNet
             protocol.
-        **kwargs: Arguments of the estimator class or of `build_simformer_network`.
+        z_score_x: Whether to z-score the inputs: "independent", "structured",
+            "none" or None.
+        kwargs: Arguments of the network or of the estimator.
 
     Returns:
-        A masked vector field estimator.
+        The assembled estimator config.
     """
-    if estimator_type == "masked-flow":
-        estimator_cls = MaskedFlowMatchingEstimator
-    elif sde_type in _MASKED_SCORE_ESTIMATORS:
-        estimator_cls = _MASKED_SCORE_ESTIMATORS[sde_type]
-    else:
-        raise ValueError(
-            f"Unknown SDE type: {sde_type}. Must be one of "
-            f"{sorted(_MASKED_SCORE_ESTIMATORS)}."
-        )
-
+    network_fields = {f.name for f in fields(SimformerNetConfig)} - {"extra_kwargs"}
+    config_fields = {
+        f.name for f in fields(config_cls)
+    } - SimformerConfigBase._SHARED_FIELDS
     estimator_args = (
-        set(inspect.signature(estimator_cls.__init__).parameters)
+        set(inspect.signature(config_cls._ESTIMATOR_CLS.__init__).parameters)
         - _MASKED_BUILDER_MANAGED_ARGS
     )
-    network_args = set(inspect.signature(build_simformer_network).parameters) - {
-        "batch_x",
-        "batch_y",
+    network_kwargs = {k: v for k, v in kwargs.items() if k in network_fields}
+    config_kwargs = {k: v for k, v in kwargs.items() if k in config_fields}
+    extra_kwargs = {
+        k: v
+        for k, v in kwargs.items()
+        if k in estimator_args and k not in config_fields
     }
-    estimator_kwargs = {k: v for k, v in kwargs.items() if k in estimator_args}
-    network_kwargs = {k: v for k, v in kwargs.items() if k not in estimator_args}
-
-    unknown = set(network_kwargs) - network_args
+    unknown = set(kwargs) - set(network_kwargs) - set(config_kwargs) - set(extra_kwargs)
     if unknown:
         raise ValueError(
-            f"Unknown argument(s) {sorted(unknown)} for {estimator_cls.__name__} "
-            f"with the Simformer network. Estimator arguments: "
-            f"{sorted(estimator_args)}; network arguments: {sorted(network_args)}."
+            f"Unknown argument(s) {sorted(unknown)} for {config_cls.__name__}. "
+            f"Estimator arguments: {sorted(estimator_args)}; network arguments: "
+            f"{sorted(network_fields)}."
         )
-    if net == "simformer":
-        vectorfield_net = build_simformer_network(batch_x, batch_y, **network_kwargs)
+
+    if isinstance(net, str):
+        if net != "simformer":
+            raise ValueError(f"Unknown architecture: {net}")
+        net_config: Union[SimformerNetConfig, nn.Module] = SimformerNetConfig(
+            **network_kwargs
+        )
     elif isinstance(net, nn.Module):
         if network_kwargs:
             raise ValueError(
@@ -1628,47 +1612,84 @@ def _build_masked_vector_field_estimator(
                 "network and would be ignored for a custom network. Configure the "
                 "network before passing it."
             )
-        vectorfield_net = net
+        net_config = net
     else:
         raise ValueError(f"Unknown architecture: {net}")
 
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    input_shape = batch_x[0].shape
-    mean_0, std_0 = (
-        _finite_z_score_stats(batch_x, structured_x) if z_score_x_bool else (0, 1)
-    )
-    return estimator_cls(
-        net=vectorfield_net,  # type: ignore
-        input_shape=input_shape,
-        mean_0=mean_0,
-        std_0=std_0,
-        **estimator_kwargs,
+    return config_cls(
+        net=net_config,
+        z_score_input=z_score_x if z_score_x is not None else "none",  # type: ignore
+        **config_kwargs,
+        extra_kwargs=extra_kwargs,
     )
 
 
-def build_masked_flow_matching_estimator(*args, **kwargs):
+def build_masked_flow_matching_estimator(
+    batch_x: Tensor,
+    batch_y: Optional[Tensor] = None,
+    z_score_x: Optional[str] = "independent",
+    net: Union[Literal["simformer"], nn.Module] = "simformer",
+    **kwargs,
+) -> MaskedFlowMatchingEstimator:
     """Builds a masked flow matching estimator for the Simformer.
 
-    Inputs are z-scored per entry by default (`z_score_x="independent"`), as for
-    FMPE.
+    A functional shortcut for `SimformerFlowMatchingConfig(...).build(batch_x)`.
+
+    Args:
+        batch_x: Batch of inputs, used to infer dimensionality and z-scoring
+            statistics.
+        batch_y: Unused, kept for compatibility.
+        z_score_x: Whether to z-score the inputs: "independent" (default, as for
+            FMPE), "structured" or None. Statistics use the finite values only.
+        net: "simformer" or a custom network following the MaskedVectorFieldNet
+            protocol.
+        **kwargs: Arguments of the estimator (e.g. `noise_scale`,
+            `gaussian_baseline`) or of the Simformer network.
+
+    Returns:
+        A masked flow matching estimator.
     """
-    kwargs.pop("sde_type", None)  # The Simformer flow factory passes "flow".
-    kwargs.setdefault("z_score_x", "independent")
-    return _build_masked_vector_field_estimator(
-        *args, estimator_type="masked-flow", **kwargs
+    del batch_y
+    kwargs.pop("sde_type", None)  # Flow matching has no SDE.
+    config = _simformer_config_from_kwargs(
+        SimformerFlowMatchingConfig, net, z_score_x, kwargs
     )
+    return config.build(batch_x)  # type: ignore[return-value]
 
 
-def build_masked_score_matching_estimator(*args, **kwargs):
+def build_masked_score_matching_estimator(
+    batch_x: Tensor,
+    batch_y: Optional[Tensor] = None,
+    sde_type: str = "ve",
+    z_score_x: Optional[str] = "independent",
+    net: Union[Literal["simformer"], nn.Module] = "simformer",
+    **kwargs,
+) -> MaskedConditionalScoreEstimator:
     """Builds a masked score matching estimator for the Simformer.
 
-    Inputs are z-scored per entry by default (`z_score_x="independent"`), as for
-    NPSE.
+    A functional shortcut for `SimformerVEScoreConfig(...).build(batch_x)` (or the
+    config of the chosen SDE).
+
+    Args:
+        batch_x: Batch of inputs, used to infer dimensionality and z-scoring
+            statistics.
+        batch_y: Unused, kept for compatibility.
+        sde_type: SDE type, one of "ve", "vp" or "subvp".
+        z_score_x: Whether to z-score the inputs: "independent" (default, as for
+            NPSE), "structured" or None. Statistics use the finite values only.
+        net: "simformer" or a custom network following the MaskedVectorFieldNet
+            protocol.
+        **kwargs: Arguments of the estimator (e.g. `sigma_min`, `sigma_max`,
+            `beta_min`, `t_min`, `weight_fn`) or of the Simformer network.
+
+    Returns:
+        A masked score matching estimator.
     """
-    kwargs.setdefault("z_score_x", "independent")
-    return _build_masked_vector_field_estimator(
-        *args, estimator_type="masked-score", **kwargs
+    del batch_y
+    config = _simformer_config_from_kwargs(
+        _simformer_score_config_cls(sde_type), net, z_score_x, kwargs
     )
+    return config.build(batch_x)  # type: ignore[return-value]
 
 
 @dataclass(frozen=True, eq=False, repr=False)
@@ -2027,6 +2048,257 @@ _SDE_CONFIGS: dict[str, type[ScoreConfigBase]] = {
     "vp": VPScoreConfig,
     "subvp": SubVPScoreConfig,
 }
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class SimformerNetConfig(_PerModelConfigBase):
+    """Transformer network of the Simformer (`VectorFieldSimformer`).
+
+    Every variable is one token; attention between tokens follows the edge mask.
+
+    Args:
+        hidden_features: Width of the transformer (dimension of each token).
+        num_layers: Number of transformer blocks.
+        num_heads: Number of attention heads per block.
+        mlp_ratio: Ratio of the hidden dimension in each block's MLP.
+        time_embedding_dim: Number of dimensions of the time embedding.
+        dim_val: Dimension of the value embedding of each token.
+        dim_id: Dimension of the identity embedding of each token.
+        dim_cond: Dimension of the embedding of the condition state of each token.
+        ada_time: Whether to condition the blocks on time with adaptive layer
+            normalization instead of adding the time embedding.
+        activation: Activation function.
+        time_emb_type: Type of time embedding.
+        sinusoidal_max_freq: Maximum frequency of the sinusoidal embedding.
+        fourier_scale: Scale of the random Fourier embedding.
+        extra_kwargs: Additional keyword arguments forwarded to
+            `build_simformer_network`.
+    """
+
+    hidden_features: int = 100
+    num_layers: int = 4
+    num_heads: int = 4
+    mlp_ratio: int = 2
+    time_embedding_dim: int = 32
+    dim_val: int = 64
+    dim_id: int = 32
+    dim_cond: int = 16
+    ada_time: bool = False
+    activation: type[nn.Module] = nn.GELU
+    time_emb_type: Literal["sinusoidal", "random_fourier"] = "random_fourier"
+    sinusoidal_max_freq: float = 1000.0
+    fourier_scale: float = 30.0
+
+    def __post_init__(self):
+        if not isinstance(self.hidden_features, int) or isinstance(
+            self.hidden_features, bool
+        ):
+            raise TypeError("`hidden_features` must be an int.")
+        super().__post_init__()
+
+    def build(self, batch_inputs: Tensor) -> VectorFieldSimformer:
+        """Build the network.
+
+        Args:
+            batch_inputs: Batch of the joint inputs, `(batch, num_variables)` or
+                `(batch, num_variables, num_features)`, used for shape inference.
+
+        Returns:
+            A `VectorFieldSimformer`.
+        """
+        self._warn_unknown_extra_kwargs(build_simformer_network)
+        return build_simformer_network(
+            batch_x=batch_inputs, batch_y=batch_inputs, **self._build_kwargs()
+        )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class SimformerConfigBase(_PerModelConfigBase):
+    """Base configuration of the Simformer estimators (`Simformer`,
+    `FlowMatchingSimformer`).
+
+    The estimator and the network it wraps are configured separately: the
+    subclass selects the estimator, and ``net`` the network. Unlike FMPE and NPSE,
+    there is no condition and no embedding net: every variable is a token of the
+    transformer.
+
+    Args:
+        net: Network config, or a custom network following the
+            `MaskedVectorFieldNet` protocol.
+        z_score_input: Whether to z-score the inputs, one of `none`, `independent`
+            or `structured`. Statistics use the finite values only. The
+            standardization is internal to the estimator; inputs and outputs stay
+            in the original space.
+        extra_kwargs: Additional keyword arguments forwarded to the estimator
+            constructor, for settings that have no field of their own (e.g.
+            `t_min`, `t_max`, `weight_fn` for score matching, `noise_scale` for
+            flow matching). Network settings belong in ``net``.
+    """
+
+    net: Union[SimformerNetConfig, nn.Module] = field(
+        default_factory=SimformerNetConfig
+    )
+    z_score_input: Literal["none", "independent", "structured"] = "independent"
+
+    _ESTIMATOR_CLS: ClassVar[type[MaskedConditionalVectorFieldEstimator]]
+    """Estimator class this config builds, set by each subclass."""
+
+    _SHARED_FIELDS: ClassVar[frozenset] = frozenset({
+        "net",
+        "z_score_input",
+        "extra_kwargs",
+    })
+
+    _SHADOWED_EXTRA_KWARGS: ClassVar[frozenset[str]] = frozenset({
+        "input_shape",
+        "embedding_net",
+        "mean_0",
+        "std_0",
+        "z_score_x",
+    })
+
+    def __post_init__(self):
+        self._reject_if_abstract(SimformerConfigBase, "SimformerVEScoreConfig()")
+        if not isinstance(self.net, (SimformerNetConfig, nn.Module)):
+            raise TypeError(
+                "`net` must be a SimformerNetConfig or a network following the "
+                "MaskedVectorFieldNet protocol."
+            )
+        super().__post_init__()
+
+    def _build_kwargs(self) -> dict:
+        """The estimator-specific fields, with ``extra_kwargs`` merged in."""
+        d = {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in self._SHARED_FIELDS
+        }
+        d.update(self.extra_kwargs)
+        return d
+
+    def build(self, batch_inputs: Tensor) -> MaskedConditionalVectorFieldEstimator:
+        """Build the masked vector-field estimator.
+
+        Args:
+            batch_inputs: Batch of the joint inputs, `(batch, num_variables)` or
+                `(batch, num_variables, num_features)`, used for shape inference
+                and z-scoring.
+
+        Returns:
+            A `MaskedConditionalVectorFieldEstimator`.
+        """
+        if isinstance(self.net, SimformerNetConfig):
+            vectorfield_net = self.net.build(batch_inputs)
+        else:
+            vectorfield_net = self.net
+
+        z_score_bool, structured = z_score_parser(self.z_score_input)
+        mean_0, std_0 = (
+            _finite_z_score_stats(batch_inputs, structured)
+            if z_score_bool
+            else (0.0, 1.0)
+        )
+        self._warn_unknown_extra_kwargs(self._ESTIMATOR_CLS.__init__)
+        return self._ESTIMATOR_CLS(
+            net=vectorfield_net,  # type: ignore[arg-type]
+            input_shape=batch_inputs[0].shape,
+            mean_0=mean_0,
+            std_0=std_0,
+            **self._build_kwargs(),
+        )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class SimformerFlowMatchingConfig(SimformerConfigBase):
+    """Flow-matching Simformer estimator, used by ``FlowMatchingSimformer``.
+
+    Args:
+        gaussian_baseline: Whether to use the analytical Gaussian baseline
+            velocity, so that the network only learns the residual.
+    """
+
+    gaussian_baseline: bool = False
+
+    _ESTIMATOR_CLS: ClassVar[type[MaskedConditionalVectorFieldEstimator]] = (
+        MaskedFlowMatchingEstimator
+    )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class SimformerScoreConfigBase(SimformerConfigBase):
+    """Base configuration of the score-based Simformer estimators, used by
+    ``Simformer``. Subclasses select the SDE.
+    """
+
+    def __post_init__(self):
+        self._reject_if_abstract(SimformerScoreConfigBase, "SimformerVEScoreConfig()")
+        super().__post_init__()
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class SimformerVEScoreConfig(SimformerScoreConfigBase):
+    """Variance-exploding score-based Simformer estimator.
+
+    Args:
+        sigma_min: Lowest noise level.
+        sigma_max: Highest noise level.
+    """
+
+    sigma_min: float = 1e-4
+    sigma_max: float = 10.0
+
+    _ESTIMATOR_CLS: ClassVar[type[MaskedConditionalVectorFieldEstimator]] = (
+        MaskedVEScoreEstimator
+    )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class _SimformerBetaScoreConfigBase(SimformerScoreConfigBase):
+    """Shared noise schedule of the variance-preserving Simformer estimators.
+
+    Args:
+        beta_min: Lowest value of the noise schedule.
+        beta_max: Highest value of the noise schedule.
+    """
+
+    beta_min: float = 0.01
+    beta_max: float = 10.0
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class SimformerVPScoreConfig(_SimformerBetaScoreConfigBase):
+    """Variance-preserving score-based Simformer estimator."""
+
+    _ESTIMATOR_CLS: ClassVar[type[MaskedConditionalVectorFieldEstimator]] = (
+        MaskedVPScoreEstimator
+    )
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class SimformerSubVPScoreConfig(_SimformerBetaScoreConfigBase):
+    """Sub-variance-preserving score-based Simformer estimator."""
+
+    _ESTIMATOR_CLS: ClassVar[type[MaskedConditionalVectorFieldEstimator]] = (
+        MaskedSubVPScoreEstimator
+    )
+
+
+_SIMFORMER_SDE_CONFIGS: dict[str, type[SimformerScoreConfigBase]] = {
+    "ve": SimformerVEScoreConfig,
+    "vp": SimformerVPScoreConfig,
+    "subvp": SimformerSubVPScoreConfig,
+}
+
+
+def _simformer_score_config_cls(sde_type: str) -> type[SimformerScoreConfigBase]:
+    """Return the score-based Simformer config class of an SDE given its name."""
+    try:
+        return _SIMFORMER_SDE_CONFIGS[sde_type]
+    except KeyError:
+        raise ValueError(
+            f"Unknown SDE type: {sde_type}. Must be one of "
+            f"{sorted(_SIMFORMER_SDE_CONFIGS)}."
+        ) from None
 
 
 def _vf_net_config_from_model(model: str) -> VectorFieldNetConfigBase:

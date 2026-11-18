@@ -5,6 +5,7 @@
 conditionals, pickling and invalid entries."""
 
 import pickle
+from dataclasses import replace
 
 import pytest
 import torch
@@ -12,9 +13,20 @@ from torch.distributions import MultivariateNormal
 
 from sbi.inference import FlowMatchingSimformer, Simformer
 from sbi.inference.trainers.base import infer
+from sbi.neural_nets import (
+    FlowMatchingConfig,
+    SimformerFlowMatchingConfig,
+    SimformerNetConfig,
+    SimformerVEScoreConfig,
+    SimformerVPScoreConfig,
+)
 from sbi.neural_nets.estimators.base import (
     MaskedConditionalVectorFieldEstimatorWrapper,
 )
+from sbi.neural_nets.estimators.flowmatching_estimator import (
+    MaskedFlowMatchingEstimator,
+)
+from sbi.neural_nets.estimators.score_estimator import MaskedVPScoreEstimator
 from sbi.neural_nets.factory import simformer_flow_nn, simformer_score_nn
 from sbi.utils import BoxUniform
 from sbi.utils.sbiutils import handle_invalid_inputs_for_simformer
@@ -231,3 +243,105 @@ def test_loss_ignores_entries_outside_the_loss_mask(method):
         loss_mask=torch.zeros_like(inputs, dtype=torch.bool),
     )
     assert torch.all(loss == 0)
+
+
+@pytest.mark.parametrize(
+    "trainer, config, estimator_cls",
+    [
+        (Simformer, SimformerVPScoreConfig(beta_max=5.0), MaskedVPScoreEstimator),
+        (
+            FlowMatchingSimformer,
+            SimformerFlowMatchingConfig(extra_kwargs={"noise_scale": 1e-2}),
+            MaskedFlowMatchingEstimator,
+        ),
+    ],
+)
+def test_simformer_trainers_build_from_configs(trainer, config, estimator_cls):
+    """A config passed as `vf_estimator` sets up the estimator and its network."""
+    config = replace(config, net=SimformerNetConfig(hidden_features=16, num_layers=1))
+    inference = trainer(vf_estimator=config, show_progress_bars=False)
+    estimator = inference.append_simulations(torch.randn(100, 3)).train(
+        max_num_epochs=1
+    )
+    assert isinstance(estimator, estimator_cls)
+    assert len(estimator.net.blocks) == 1
+    if isinstance(estimator, MaskedVPScoreEstimator):
+        assert estimator.beta_max == pytest.approx(5.0)
+    else:
+        assert estimator.noise_scale == pytest.approx(1e-2)
+
+
+def test_simformer_trainers_reject_wrong_configs():
+    """Configs of other trainers, strings and an `sde_type` that conflicts with the
+    config fail at construction, not during training."""
+    with pytest.raises(TypeError, match="SimformerScoreConfigBase"):
+        Simformer(vf_estimator=FlowMatchingConfig())
+    with pytest.raises(TypeError, match="SimformerScoreConfigBase"):
+        Simformer(vf_estimator=SimformerFlowMatchingConfig())
+    with pytest.raises(TypeError, match="SimformerFlowMatchingConfig"):
+        FlowMatchingSimformer(vf_estimator=SimformerVEScoreConfig())
+    with pytest.raises(TypeError, match="string"):
+        Simformer(vf_estimator="simformer")  # type: ignore
+    with pytest.raises(ValueError, match="Conflicting `sde_type`"):
+        Simformer(vf_estimator=SimformerVEScoreConfig(), sde_type="vp")
+    with pytest.raises(ValueError, match="Unknown SDE type"):
+        Simformer(sde_type="wrong")  # type: ignore
+
+
+def test_simformer_default_config_follows_sde_type():
+    estimator = (
+        Simformer(sde_type="subvp", show_progress_bars=False)
+        .append_simulations(torch.randn(100, 3))
+        .train(max_num_epochs=1)
+    )
+    assert type(estimator).__name__ == "MaskedSubVPScoreEstimator"
+
+
+@pytest.mark.parametrize(
+    "latent_idx, observed_idx, match",
+    [
+        ([1, 0], [2, 3], "ascending"),
+        ([0, 1], [3, 2], "ascending"),
+        ([0, 0, 1], [2], "duplicate"),
+        ([0, 1], [1, 2], "disjoint"),
+        ([0, 1], [3], "complete range"),
+    ],
+)
+def test_posterior_indices_are_validated(latent_idx, observed_idx, match):
+    """The condition mask keeps no order, so unordered or duplicate indices would
+    silently map `x_o` and the samples to other variables."""
+    with pytest.raises(ValueError, match=match):
+        Simformer(posterior_latent_idx=latent_idx, posterior_observed_idx=observed_idx)
+    inference = Simformer()
+    with pytest.raises(ValueError, match=match):
+        inference.set_condition_indexes(latent_idx, observed_idx)
+
+
+def test_missing_posterior_indices_point_to_the_setter():
+    inference = Simformer(show_progress_bars=False)
+    inference.append_simulations(torch.randn(50, 3)).train(max_num_epochs=1)
+    with pytest.raises(ValueError, match=r"set_condition_indexes\(\)"):
+        inference.build_posterior()
+
+
+def test_default_sampler_matches_npse_and_fmpe():
+    inputs = torch.randn(100, 2)
+    for trainer, expected in ((Simformer, "sde"), (FlowMatchingSimformer, "ode")):
+        inference = trainer(
+            posterior_latent_idx=[0],
+            posterior_observed_idx=[1],
+            show_progress_bars=False,
+        )
+        inference.append_simulations(inputs).train(max_num_epochs=1)
+        assert inference.build_posterior().sample_with == expected
+        assert inference.build_likelihood().sample_with == expected
+
+
+def test_infer_rejects_multidimensional_data_for_the_simformer():
+    prior = BoxUniform(-torch.ones(2), torch.ones(2))
+
+    def simulator(theta):
+        return theta.unsqueeze(1).repeat(1, 3, 1)  # x of shape (3, 2)
+
+    with pytest.raises(ValueError, match="Flatten them"):
+        infer(simulator, prior, method="simformer", num_simulations=20)
