@@ -14,6 +14,7 @@ from sbi.inference.posteriors.base_posterior import (
     NeuralPosterior,
     _require_one_observation,
 )
+from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
@@ -197,8 +198,8 @@ class EnsemblePosterior(NeuralPosterior):
         use, else None.
 
         Raises:
-            ValueError: If the posteriors use different observations, since their
-                mixture would mix posteriors of different observations.
+            ValueError: If the posteriors do not all use the same observation,
+                since their mixture would mix posteriors of different observations.
         """
         if self.default_x is not None:
             return self.default_x
@@ -219,8 +220,8 @@ class EnsemblePosterior(NeuralPosterior):
                 or not torch.allclose(implicit_x, x, rtol=0, atol=0, equal_nan=True)
             ):
                 raise ValueError(
-                    "The posteriors of the ensemble use different observations "
-                    "(their default x, or for VI the x q was fit to). Pass `x`, or set "
+                    "The posteriors of the ensemble do not all use the same "
+                    "observation (their default x, or for VI the x q was fit to). Set "
                     "one observation for all of them with `set_default_x()` of the "
                     "ensemble."
                 )
@@ -437,17 +438,29 @@ class EnsemblePosterior(NeuralPosterior):
                 isinstance(posterior, type(self.posteriors[0]))
                 for posterior in self.posteriors
             )
-            alternatives = (
-                "`sample()`, `log_prob(individually=True)`"
-                if same_type
-                else "`sample()`"
+            # Vector field posteriors sample several observations only with the SDE
+            # sampler, and their `map()` takes one observation.
+            vector_field = any(
+                isinstance(posterior, VectorFieldPosterior)
+                for posterior in self.posteriors
             )
+            alternatives = [
+                "`sample()` (with `sample_with='sde'` for vector field posteriors)"
+                if vector_field
+                else "`sample()`"
+            ]
+            if same_type:
+                alternatives.append("`log_prob(individually=True)`")
+            if not vector_field:
+                alternatives.append(
+                    "`map(individually=True)` after `set_default_x()` with the "
+                    "observations"
+                )
             _require_one_observation(
                 num_observations,
                 f"`{method}()` of an ensemble with NPE or vector field posteriors",
                 "The normalizing constants of the components would skew the ensemble "
-                f"weights (issue #2135). Use {alternatives}, or set the observations "
-                "with `set_default_x()` and call `map(individually=True)`.",
+                f"weights (issue #2135). Use {' or '.join(alternatives)}.",
             )
 
     def _bind_mixture(self, x: Optional[Tensor], method: str) -> Tensor:

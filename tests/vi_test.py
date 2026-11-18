@@ -1374,7 +1374,7 @@ def test_ensemble_of_vi_fits_to_different_x_raises():
         posterior.train(x=x_o, **TRAIN_KWARGS)
         fits.append(posterior)
 
-    with pytest.raises(ValueError, match="use different observations"):
+    with pytest.raises(ValueError, match="do not all use the same observation"):
         EnsemblePosterior(fits).sample((5,))
     assert EnsemblePosterior([fits[0], fits[0]]).sample((5,)).shape == (5, 2)
 
