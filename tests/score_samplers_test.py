@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+import pickle
 from typing import Tuple
 
 import pytest
@@ -15,6 +16,7 @@ from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_adaptor import (
     AffineClassifierFreeGuidance,
     AffineClassifierFreeGuidanceConfig,
+    AutoGaussCorrectedScoreFn,
     FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
     IntervalGuidance,
@@ -321,6 +323,30 @@ def test_interval_guidance_on_gpu_matches_cpu():
     scores = guidance(inputs.to(device), x_o.to(device), time.to(device))
 
     torch.testing.assert_close(scores.cpu(), expected, rtol=1e-4, atol=1e-5)
+
+
+def test_auto_gauss_estimates_the_precision_once_with_guidance():
+    """With guidance, auto_gauss reuses its precision estimate at every step, and the
+    posterior still pickles."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    estimator = _build_estimator("vp", torch.randn(100, 2), torch.randn(100, 2))
+    posterior = VectorFieldPosterior(estimator, prior, sample_with="sde")
+    cache = AutoGaussCorrectedScoreFn.estimate_posterior_precision
+    misses = cache.cache_info().misses
+
+    posterior.sample(
+        (10,),
+        x=torch.zeros(3, 2),
+        iid_method="auto_gauss",
+        iid_params={"precision_est_budget": 100, "precision_initial_sampler_steps": 5},
+        guidance_method="interval",
+        guidance_params={"lower_bound": 0.0, "upper_bound": None},
+        steps=4,
+        show_progress_bars=False,
+    )
+
+    assert cache.cache_info().misses == misses + 1
+    pickle.dumps(posterior)
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve"])
