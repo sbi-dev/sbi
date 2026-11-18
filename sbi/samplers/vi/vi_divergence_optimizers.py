@@ -303,6 +303,7 @@ class DivergenceOptimizer(ABC):
         self.moving_std = torch.ones(2000)
         self.moving_slope = torch.ones(2000)
         self.num_step = 0
+        self._num_updates = 0
 
     def update_loss_stats(self, loss: Tensor, window: int = 20) -> None:
         """Updates current loss statistics of the optimizer
