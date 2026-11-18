@@ -192,25 +192,26 @@ class EnsemblePosterior(NeuralPosterior):
             f"from posteriors with {_IID_SAMPLERS}."
         )
 
-    @property
-    def _implicit_x(self) -> Optional[Tensor]:
-        """The default `x` of the ensemble, else the `x` all its posteriors use.
+    def _resolve_x(self) -> Optional[Tensor]:
+        """Return the default `x` of the ensemble, else the `x` all its posteriors
+        use, else None.
 
-        Raises if the posteriors use different observations, since their mixture
-        would mix posteriors of different observations.
+        Raises:
+            ValueError: If the posteriors use different observations, since their
+                mixture would mix posteriors of different observations.
         """
         if self.default_x is not None:
             return self.default_x
-        component_xs = [posterior._implicit_x for posterior in self.posteriors]
+        component_xs = [posterior._resolve_x() for posterior in self.posteriors]
         if all(x is None for x in component_xs):
             return None
-        self._require_posteriors_use(component_xs[0])
+        self._check_posteriors_share_x(component_xs[0])
         return component_xs[0]
 
-    def _require_posteriors_use(self, x: Tensor) -> None:
+    def _check_posteriors_share_x(self, x: Tensor) -> None:
         """Raise unless every posterior of the ensemble uses `x` when it gets none."""
         for posterior in self.posteriors:
-            implicit_x = posterior._implicit_x
+            implicit_x = posterior._resolve_x()
             # NaN entries pad sets of trials for permutation-invariant embeddings.
             if (
                 implicit_x is None
@@ -553,7 +554,7 @@ class EnsemblePosterior(NeuralPosterior):
             )
 
         if individually:
-            self._require_posteriors_use(self._x_else_default_x(None))
+            self._check_posteriors_share_x(self._x_else_default_x(None))
             maps = []
             log_weights = torch.log(self._weights).reshape(-1, 1)
 

@@ -323,9 +323,8 @@ class NeuralPosterior:
             )
         return bound
 
-    @property
-    def _implicit_x(self) -> Optional[Tensor]:
-        """The `x` that methods use when they get none: the default `x`."""
+    def _resolve_x(self) -> Optional[Tensor]:
+        """Return the `x` that methods use when they get none: the default `x`."""
         return self.default_x
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
@@ -333,7 +332,7 @@ class NeuralPosterior:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
             return self._process_x(x)
-        implicit_x = self._implicit_x
+        implicit_x = self._resolve_x()
         if implicit_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set. "

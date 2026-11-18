@@ -788,9 +788,8 @@ class VIPosterior(NeuralPosterior):
             "trials, fit q to all of them with `train(x=x)`."
         )
 
-    @property
-    def _implicit_x(self) -> Optional[Tensor]:
-        """The default `x`, else the `x` the single-x q was fit to.
+    def _resolve_x(self) -> Optional[Tensor]:
+        """Return the default `x`, else the `x` the single-x q was fit to.
 
         A single-x q answers for one observation only, so `sample()`, `log_prob()`,
         `potential()` and `map()` fall back to it when no `x` is given.
