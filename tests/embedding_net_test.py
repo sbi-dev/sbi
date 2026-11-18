@@ -648,6 +648,24 @@ def test_permutation_invariant_embedding_ignores_padding_per_observation(
     assert torch.allclose(batched[1], embedding(x[1:])[0], atol=1e-6)
 
 
+def test_permutation_invariant_embedding_appends_log_trial_count():
+    """The fc_subnet gets log(1 + N) of the real trials, not N of order 100."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4), trial_net_output_dim=4
+    )
+    fc_inputs = []
+    embedding.fc_subnet.register_forward_hook(
+        lambda _module, inputs, _output: fc_inputs.append(inputs[0])
+    )
+    x = torch.randn(2, 100, 2)
+    x[1, 10:] = float("nan")
+
+    embedding(x)
+
+    expected = torch.log1p(torch.tensor([100.0, 10.0]))
+    assert torch.allclose(fc_inputs[0][:, -1], expected)
+
+
 @pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
 @pytest.mark.parametrize(
     "pattern", ("padded_trial", "partially_nan_trial", "no_real_trial")

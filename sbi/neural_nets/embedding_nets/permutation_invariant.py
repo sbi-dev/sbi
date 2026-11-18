@@ -45,8 +45,9 @@ class PermutationInvariantEmbedding(nn.Module):
         It then aggregates the trial embeddings across the aggregation dimension to
         construct a permutation invariant embedding across iid trials.
         The resulting embedding is processed further using an additional fully
-        connected net. The input to the final embedding net is the trial_net output
-        plus the number of trials N: (batch, trial_net_output_dim + 1)
+        connected net. The input to the final embedding net is the aggregated
+        trial_net output plus log(1 + N), with N the number of real trials:
+        (batch, trial_net_output_dim + 1).
 
         If the data x has varying number of trials per batch element, missing trials
         should be encoded as NaNs. In the forward pass, the NaNs are masked.
@@ -165,5 +166,6 @@ class PermutationInvariantEmbedding(nn.Module):
                 "returned NaN or inf."
             )
 
-        # add number of trials as additional input
-        return self.fc_subnet(torch.cat([combined_embedding, trial_counts], dim=1))
+        # The raw count would be of order 100 next to inputs of order 1.
+        log_trial_counts = torch.log1p(trial_counts.to(combined_embedding.dtype))
+        return self.fc_subnet(torch.cat([combined_embedding, log_trial_counts], dim=1))

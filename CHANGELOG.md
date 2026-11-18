@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### ⚠️ Breaking Changes
+
+* **`PermutationInvariantEmbedding` passes log(1 + N) instead of the trial count N** ([#2113](https://github.com/sbi-dev/sbi/pull/2113)): the embedding appended the raw number of real trials N to the aggregated trial embedding before its fully connected net. With 100 trials, that input was about 100 next to inputs of order 1, which scales badly when the number of trials varies. It now appends log(1 + N), which is 0 for an observation without real trials.
+  * A network trained before this change gives different outputs after it, also when it was saved with `save()` or pickled whole, because the forward pass changed. Retrain it.
+
 ## v0.27.0
 
 ### ✨ Highlights
