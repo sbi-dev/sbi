@@ -77,6 +77,8 @@ def calculate_baseline_mmd(
     mmds = torch.zeros(n_shuffle)
     if max_samples < 1:
         raise ValueError(f"max_samples must be at least 1, got {max_samples}.")
+    if n_shuffle < 1:
+        raise ValueError(f"n_shuffle must be at least 1, got {n_shuffle}.")
     if n_obs >= y.shape[0]:
         raise ValueError(
             "n of observed samples should be less than n of synthetic samples"
@@ -119,7 +121,7 @@ def calculate_p_misspecification(
             "The MMD is not finite, so the misspecification test has no valid "
             "p-value. This happens when the median distance between samples is zero "
             "(for example, when most samples are identical, as in sparse discrete "
-            "data), or with mmd_mode='unbiased' and a single observation."
+            "data), or with mmd_mode='unbiased' and a single sample in either set."
         )
     # The observed MMD counts as one draw under H_0, so the p-value is never 0.
     p_val = (1 + (mmds_baseline >= mmd).sum().item()) / (1 + n_shuffle)
