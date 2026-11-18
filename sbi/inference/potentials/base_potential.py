@@ -60,6 +60,17 @@ class BasePotential(metaclass=ABCMeta):
         return False
 
     @property
+    def iid_breaks_normalization(self) -> bool:
+        """Whether the potential is normalized for one observation, but not for
+        several observations bound as iid trials.
+
+        A weighted mixture of such potentials would count each component's
+        normalizing constant as part of its weight. Likelihood and ratio potentials
+        are unnormalized for any number of observations and return False.
+        """
+        return False
+
+    @property
     def x_event_shape(self) -> Optional[torch.Size]:
         """Shape of one observation `x`, without batch dimension.
 

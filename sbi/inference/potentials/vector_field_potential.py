@@ -91,6 +91,12 @@ class VectorFieldBasedPotential(BasePotential):
         return self.vector_field_estimator.embedding_net
 
     @property
+    def iid_breaks_normalization(self) -> bool:
+        """The density combined from the iid scores of several observations is
+        unnormalized."""
+        return True
+
+    @property
     def x_event_shape(self) -> torch.Size:
         """Shape of one observation: the condition shape of the estimator."""
         return self.vector_field_estimator.condition_shape

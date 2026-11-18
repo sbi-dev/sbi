@@ -102,6 +102,11 @@ class PosteriorBasedPotential(BasePotential):
         return True
 
     @property
+    def iid_breaks_normalization(self) -> bool:
+        """The product of NPE posteriors for several observations is unnormalized."""
+        return True
+
+    @property
     def x_event_shape(self) -> torch.Size:
         """Shape of one observation: the condition shape of the estimator."""
         return self.posterior_estimator.condition_shape

@@ -881,6 +881,16 @@ def npe_for_iid_x():
     return prior, trainer
 
 
+@pytest.fixture(scope="module")
+def fmpe_for_iid_x(npe_for_iid_x):
+    """FMPE, trained for one epoch on the simulations of `npe_for_iid_x`."""
+    prior, npe = npe_for_iid_x
+    theta, x, _ = npe.get_simulations()
+    trainer = FMPE(prior=prior, show_progress_bars=False)
+    trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    return prior, trainer
+
+
 @pytest.mark.parametrize(
     "ensemble, method",
     [
@@ -917,11 +927,16 @@ def test_direct_posterior_takes_one_observation(ensemble, method, npe_for_iid_x)
 
 
 @pytest.mark.parametrize("method", ["potential", "map", "log_prob"])
-def test_npe_ensemble_mixture_takes_one_observation(method, npe_for_iid_x):
-    """For several observations, the normalizing constants of the NPE components
-    would skew the weights of the mixture."""
-    _, trainer = npe_for_iid_x
-    component = trainer.build_posterior(sample_with="rejection")
+@pytest.mark.parametrize("estimator", ["npe", "fmpe"])
+def test_ensemble_mixture_takes_one_observation(method, estimator, request):
+    """For several observations, the normalizing constants of the NPE and vector
+    field components would skew the weights of the mixture."""
+    _, trainer = request.getfixturevalue(f"{estimator}_for_iid_x")
+    component = (
+        trainer.build_posterior(sample_with="rejection")
+        if estimator == "npe"
+        else trainer.build_posterior()
+    )
     posterior = EnsemblePosterior([component, component])
     x_o = zeros(3, 2)
     calls = {

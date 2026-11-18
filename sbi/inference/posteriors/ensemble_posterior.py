@@ -361,7 +361,8 @@ class EnsemblePosterior(NeuralPosterior):
             theta: Parameters $\theta$.
             x: Conditioning context. If None, the default `x` of the ensemble, else
                 the `x` that all its posteriors use. The mixture of an ensemble with
-                NPE posteriors takes one observation, unless `individually=True`.
+                NPE or vector field posteriors takes one observation, unless
+                `individually=True`.
             individually: If true, returns log weights and log_probs individually.
 
         Raises:
@@ -419,14 +420,15 @@ class EnsemblePosterior(NeuralPosterior):
         return self
 
     def _check_mixture_observations(self, num_observations: int, method: str) -> None:
-        """Raise if a weighted mixture of NPE components gets several observations.
+        """Raise if a weighted mixture of NPE or vector field components gets several
+        observations.
 
-        For several observations, each NPE component's iid potential has its own
-        normalizing constant, which the mixture would count as part of its weight.
-        Components that take one observation are left to their own check.
+        For several observations, the iid potential of each such component has its
+        own normalizing constant, which the mixture would count as part of its
+        weight. Components that take one observation are left to their own check.
         """
         if any(
-            posterior.potential_fn.warns_on_implicit_iid
+            posterior.potential_fn.iid_breaks_normalization
             and not posterior._takes_one_observation
             for posterior in self.posteriors
         ):
@@ -441,7 +443,7 @@ class EnsemblePosterior(NeuralPosterior):
             )
             _require_one_observation(
                 num_observations,
-                f"`{method}()` of an ensemble with NPE posteriors",
+                f"`{method}()` of an ensemble with NPE or vector field posteriors",
                 "The normalizing constants of the components would skew the ensemble "
                 f"weights (issue #2135). Use {alternatives}, or set the observations "
                 "with `set_default_x()` and call `map(individually=True)`.",
@@ -465,7 +467,8 @@ class EnsemblePosterior(NeuralPosterior):
             theta: Parameters $\theta$, each evaluated given all of `x`.
             x: Observation. If None, the default `x` of the ensemble, else the `x`
                 that all its posteriors use. Several observations are combined as
-                iid trials; an ensemble with NPE posteriors raises.
+                iid trials; an ensemble with NPE or vector field posteriors
+                raises.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -507,9 +510,10 @@ class EnsemblePosterior(NeuralPosterior):
         Args:
             x: No longer supported; use `.set_default_x()` before `.map()`. The
                 joint MAP uses the default `x` of the ensemble, else the `x` that all
-                its posteriors use. The joint MAP of an ensemble with NPE posteriors
-                takes one observation. With `individually=True`, each posterior uses
-                its default `x`, which must be the same for all of them.
+                its posteriors use. The joint MAP of an ensemble with NPE or vector
+                field posteriors takes one observation. With `individually=True`,
+                each posterior uses its default `x`, which must be the same for all
+                of them.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -645,6 +649,11 @@ class EnsemblePotential(BasePotential):
     def warns_on_implicit_iid(self) -> bool:
         """Whether any component warns on iid observations."""
         return any(p.warns_on_implicit_iid for p in self.potential_fns)
+
+    @property
+    def iid_breaks_normalization(self) -> bool:
+        """Whether any component is normalized for one observation only."""
+        return any(p.iid_breaks_normalization for p in self.potential_fns)
 
     def set_x(self, x_o: Optional[Tensor]):
         """Check the shape of the observed data and, if valid, set it.
