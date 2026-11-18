@@ -139,6 +139,10 @@ def calc_misspecification_mmd(
 ):
     """Misspecification test based on MMD in data- or embedding space.
 
+    The MMDs under H_0 are computed between synthetic samples only, so the p-value
+    is approximate. It is close to exact when ``x`` holds at least about 100
+    samples and clearly more samples than ``x_obs``.
+
     Args:
         x_obs: observed data
         x: synthetic data
