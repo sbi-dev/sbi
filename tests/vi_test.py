@@ -1174,6 +1174,24 @@ def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
         posterior.sample((5,))
 
 
+def test_single_x_fit_after_an_amortized_fit_takes_several_observations():
+    """While an amortized q is in place, the posterior takes one observation, but
+    `train(x)` fits a single-x q to all observations in x."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    posterior.train(x=zeros(3, 2), **TRAIN_KWARGS)
+    assert posterior.sample((5,)).shape == (5, 2)
+
+
 @pytest.mark.slow
 def test_amortized_vi_map(linear_gaussian_setup):
     """Test that MAP estimation returns high-density region."""

@@ -46,12 +46,17 @@ def test_log_prob_is_normalized_inside_bounded_prior(estimator_type):
 
 
 @pytest.mark.parametrize("estimator_type", ["flow", "score"])
-def test_vector_field_leakage_correction_takes_one_observation(estimator_type):
-    """Several observations raise instead of adding up their masses above one."""
+def test_vector_field_leakage_correction_and_map_take_one_observation(
+    estimator_type,
+):
+    """Several observations raise: the leakage factor would add up their masses above
+    one, and `map()` binds its ODE flow to one observation."""
     prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
     posterior = _posterior(estimator_type, prior)
     with pytest.raises(ValueError, match="takes one observation"):
         posterior.leakage_correction(x=torch.zeros(3, 2), num_rejection_samples=10)
+    with pytest.raises(ValueError, match="`map\\(\\)` of a vector field posterior"):
+        posterior.set_default_x(torch.zeros(3, 2)).map(num_iter=1)
 
 
 @pytest.mark.parametrize("estimator_type", ["direct", "npe_a", "flow"])

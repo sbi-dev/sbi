@@ -16,6 +16,8 @@ from sbi.inference import (
     MCMCPosterior,
     RejectionPosterior,
     VIPosterior,
+    likelihood_estimator_based_potential,
+    ratio_estimator_based_potential,
 )
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePotential
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
@@ -28,7 +30,12 @@ from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
-from sbi.neural_nets import posterior_nn, posterior_score_nn
+from sbi.neural_nets import (
+    classifier_nn,
+    likelihood_nn,
+    posterior_nn,
+    posterior_score_nn,
+)
 from sbi.neural_nets.embedding_nets import FCEmbedding, PermutationInvariantEmbedding
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
@@ -329,3 +336,24 @@ def test_potential_counts_iid_trials_against_the_shape_of_one_observation():
     # iid trials: the sum of single-trial potentials, with the prior counted once.
     expected = singles.sum(0) - 2 * prior.log_prob(theta_o)
     assert torch.allclose(iid_potential(x_o), expected, atol=1e-5)
+
+
+@pytest.mark.parametrize("estimator", ("posterior", "likelihood", "ratio"))
+def test_potential_rejects_x_of_another_shape(estimator: str):
+    """Each estimator's potential knows the shape of one observation, so an `x` of
+    another shape raises instead of being reshaped or broadcast."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    if estimator == "posterior":
+        net = posterior_nn("mdn")(theta, x)
+        potential_fn, _ = posterior_estimator_based_potential(net, prior, None)
+    elif estimator == "likelihood":
+        net = likelihood_nn("mdn")(theta, x)
+        potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+    else:
+        net = classifier_nn("mlp")(theta, x)
+        potential_fn, _ = ratio_estimator_based_potential(net, prior, None)
+
+    assert potential_fn.bind(zeros(3)).x_o.shape == (1, 3)
+    with pytest.raises(ValueError, match=r"x has shape \(2, 4\), but one observation"):
+        potential_fn.bind(zeros(2, 4))
