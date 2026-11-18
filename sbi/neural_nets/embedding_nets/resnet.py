@@ -139,9 +139,11 @@ class ResNetEmbedding2D(nn.Module):
         in each of the residual blocks. At the end of the network, a fully
         connected network is applied to map the flattened output of the last
         stage to the fixed sized output vector. Its first layer infers its input
-        size from the first input or from a loaded state dict. Until then,
-        counting the parameters raises, and so does an optimizer that sets up
-        per-parameter state at construction, such as Adagrad.
+        size from the first input or from a loaded state dict. Pass one input
+        through the network before you count its parameters, call
+        `requires_grad_()`, build an optimizer that sets up per-parameter state at
+        construction (such as Adagrad), or save a state dict to load with
+        `torch.load(weights_only=True)`.
 
         References:
 
