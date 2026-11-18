@@ -103,13 +103,15 @@ def calculate_baseline_mmd(
     if n_shuffle < 1:
         raise ValueError(f"n_shuffle must be at least 1, got {n_shuffle}.")
     n_synthetic = _num_synthetic_samples(n_obs, y.shape[0], max_samples)
-    mmds = torch.zeros(n_shuffle, device=y.device, dtype=y.dtype)
-    for i in range(n_shuffle):
+    mmds = []
+    for _ in range(n_shuffle):
         idx = torch.randperm(y.shape[0], device=y.device)
-        mmds[i] = compute_rbf_mmd_median_heuristic(
-            y[idx[:n_obs]], y[idx[n_obs : n_obs + n_synthetic]], mode=mode
+        mmds.append(
+            compute_rbf_mmd_median_heuristic(
+                y[idx[:n_obs]], y[idx[n_obs : n_obs + n_synthetic]], mode=mode
+            )
         )
-    return mmds
+    return torch.stack(mmds)
 
 
 def calculate_p_misspecification(
@@ -129,9 +131,10 @@ def calculate_p_misspecification(
             data
         mode: mode of MMD calculation ("biased" or "unbiased")
     """
-    if x_obs.ndim != 2 or x.ndim != 2:
+    if x_obs.ndim != 2 or x.ndim != 2 or x_obs.shape[1] != x.shape[1]:
         raise ValueError(
-            "x_obs and x must have shape (num_samples, num_features), got "
+            "x_obs and x must have shapes (num_samples, num_features) with the same "
+            "num_features, got "
             f"{tuple(x_obs.shape)} and {tuple(x.shape)}."
         )
     if not (torch.isfinite(x_obs).all() and torch.isfinite(x).all()):
@@ -218,7 +221,7 @@ def calc_misspecification_mmd(
         validate_nan_input = getattr(nan_net, "validate_nan_input", None)
         for data, name in ((x_obs, "x_obs"), (x, "x")):
             assert_all_finite(data, name, allow_nan=nan_net is not None)
-            if validate_nan_input is not None and torch.isnan(data).any():
+            if validate_nan_input is not None:
                 validate_nan_input(data)
         z_obs = inference._neural_net.embedding_net(x_obs).detach()
         z = inference._neural_net.embedding_net(x).detach()
