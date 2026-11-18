@@ -138,6 +138,11 @@ def test_nle_non_iid_single_x_multiple_theta():
 
     theta_batch = prior.sample((4,))
     log_prob = potential_fn(theta_batch)
+    individual_log_probs = torch.cat([
+        potential_fn(theta_i.unsqueeze(0)) for theta_i in theta_batch
+    ])
+
+    torch.testing.assert_close(log_prob, individual_log_probs)
 
     assert log_prob.shape == (4,)
     assert torch.isfinite(log_prob).all()
@@ -161,6 +166,16 @@ def test_nle_non_iid_multiple_x_multiple_theta():
 
     assert log_prob.shape == (4,)
     assert torch.isfinite(log_prob).all()
+
+    individual_log_probs = torch.cat([
+        potential_fn.bind(
+            x_o=x[i : i + 1],
+            x_is_iid=False,
+        )(theta_batch[i : i + 1])
+        for i in range(4)
+    ])
+
+    torch.testing.assert_close(log_prob, individual_log_probs)
 
 
 def test_nle_non_iid_normal_prior_shape():
@@ -232,6 +247,12 @@ def test_nre_non_iid_single_x_multiple_theta():
     assert log_prob.shape == (4,)
     assert torch.isfinite(log_prob).all()
 
+    individual_log_probs = torch.cat([
+        potential_fn(theta_i.unsqueeze(0)) for theta_i in theta_batch
+    ])
+
+    torch.testing.assert_close(log_prob, individual_log_probs)
+
 
 def test_nre_non_iid_multiple_x_multiple_theta():
     """Test NRE supports matching batches of x and theta when x_is_iid=False."""
@@ -251,3 +272,13 @@ def test_nre_non_iid_multiple_x_multiple_theta():
 
     assert log_prob.shape == (4,)
     assert torch.isfinite(log_prob).all()
+
+    individual_log_probs = torch.cat([
+        potential_fn.bind(
+            x_o=x[i : i + 1],
+            x_is_iid=False,
+        )(theta_batch[i : i + 1])
+        for i in range(4)
+    ])
+
+    torch.testing.assert_close(log_prob, individual_log_probs)
