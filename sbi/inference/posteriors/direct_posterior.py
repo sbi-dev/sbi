@@ -8,7 +8,11 @@ import torch
 from torch import Tensor, log
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import (
+    _IID_SAMPLERS,
+    _ONE_AT_A_TIME,
+    NeuralPosterior,
+)
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
@@ -99,8 +103,14 @@ class DirectPosterior(NeuralPosterior):
             lie outside of the prior bounds."""
 
     @property
-    def _takes_one_observation(self) -> bool:
-        return True
+    def _one_observation_hint(self) -> str:
+        return (
+            f"{_ONE_AT_A_TIME}, or use `sample_batched()` and `log_prob_batched()`. "
+            "To combine them as iid trials, use a posterior built with "
+            f"{_IID_SAMPLERS}. For a direct posterior of several trials, train with "
+            "a permutation-invariant embedding net on sets of trials, and pass each "
+            "set as one observation."
+        )
 
     def sample(
         self,

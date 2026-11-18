@@ -9,6 +9,8 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import (
+    _IID_SAMPLERS,
+    _ONE_AT_A_TIME,
     NeuralPosterior,
     _require_one_observation,
 )
@@ -175,21 +177,19 @@ class EnsemblePosterior(NeuralPosterior):
         return devices[0]
 
     @property
-    def _takes_one_observation(self) -> bool:
-        """Whether any posterior of the ensemble takes exactly one observation."""
-        return any(posterior._takes_one_observation for posterior in self.posteriors)
-
-    @property
-    def _one_observation_hint(self) -> str:
+    def _one_observation_hint(self) -> Optional[str]:
+        """The ensemble takes one observation if any of its posteriors does."""
         names = sorted({
-            type(p).__name__ for p in self.posteriors if p._takes_one_observation
+            type(p).__name__
+            for p in self.posteriors
+            if p._one_observation_hint is not None
         })
+        if not names:
+            return None
         return (
             f"Its posteriors of type {' and '.join(names)} take one observation. "
-            "For a separate posterior of each observation, pass one observation at "
-            "a time. To combine them as iid trials, build the ensemble from "
-            "posteriors with `sample_with='mcmc'`, `'importance'`, `'rejection'` or "
-            "`'vi'` (trained with `train()`)."
+            f"{_ONE_AT_A_TIME}. To combine them as iid trials, build the ensemble "
+            f"from posteriors with {_IID_SAMPLERS}."
         )
 
     @property
@@ -429,7 +429,7 @@ class EnsemblePosterior(NeuralPosterior):
         """
         if any(
             posterior.potential_fn.iid_breaks_normalization
-            and not posterior._takes_one_observation
+            and posterior._one_observation_hint is None
             for posterior in self.posteriors
         ):
             same_type = all(

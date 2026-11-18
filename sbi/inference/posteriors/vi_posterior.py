@@ -22,7 +22,7 @@ from torch.distributions import Distribution
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import _ONE_AT_A_TIME, NeuralPosterior
 from sbi.utils.pbar import tqdm
 
 if TYPE_CHECKING:
@@ -779,16 +779,13 @@ class VIPosterior(NeuralPosterior):
                 return self.q.log_prob(theta)
 
     @property
-    def _takes_one_observation(self) -> bool:
+    def _one_observation_hint(self) -> Optional[str]:
         """The amortized q(θ|x), like a direct posterior, takes one observation."""
-        return self._mode == "amortized"
-
-    @property
-    def _one_observation_hint(self) -> str:
+        if self._mode != "amortized":
+            return None
         return (
-            "For a separate posterior of each observation, pass one observation at "
-            "a time, or use `sample_batched()`. To combine them as iid trials, fit "
-            "q to all of them with `train(x=x)`."
+            f"{_ONE_AT_A_TIME}, or use `sample_batched()`. To combine them as iid "
+            "trials, fit q to all of them with `train(x=x)`."
         )
 
     @property

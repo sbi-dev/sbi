@@ -277,33 +277,20 @@ class NeuralPosterior:
         return x.to(self._device)
 
     @property
-    def _takes_one_observation(self) -> bool:
-        """Whether this posterior takes exactly one observation `x`.
+    def _one_observation_hint(self) -> Optional[str]:
+        """What to do instead, if this posterior takes exactly one observation `x`.
 
-        A posterior that evaluates its estimator directly cannot combine several
-        observations as iid trials.
+        `None` (default) means the posterior combines several observations as iid
+        trials. A posterior that evaluates its estimator directly cannot, and
+        returns the alternatives for the error message.
         """
-        return False
-
-    @property
-    def _one_observation_hint(self) -> str:
-        """What to do instead when this posterior takes one observation."""
-        return (
-            "For a separate posterior of each observation, pass one observation "
-            "at a time, or use `sample_batched()` and `log_prob_batched()` where "
-            "available. To combine them as iid trials, use a posterior built with "
-            "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'` "
-            "(trained with `train()`). For a direct posterior of several trials, "
-            "train with a permutation-invariant embedding net on sets of trials, "
-            "and pass each set as one observation."
-        )
+        return None
 
     def _check_num_observations(self, num_observations: int) -> None:
         """Raise if this posterior takes one observation and gets several."""
-        if self._takes_one_observation:
-            _require_one_observation(
-                num_observations, type(self).__name__, self._one_observation_hint
-            )
+        hint = self._one_observation_hint
+        if hint is not None:
+            _require_one_observation(num_observations, type(self).__name__, hint)
 
     def _bind_iid(
         self, x: Tensor, check_num_observations: bool = True
@@ -599,6 +586,16 @@ class NeuralPosterior:
         ):
             return
         self.to(actual_device)
+
+
+# Advice shared by the errors of posteriors that take one observation.
+_ONE_AT_A_TIME = (
+    "For a separate posterior of each observation, pass one observation at a time"
+)
+_IID_SAMPLERS = (
+    "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'` (trained with "
+    "`train()`)"
+)
 
 
 def _require_one_observation(num_observations: int, subject: str, hint: str) -> None:
