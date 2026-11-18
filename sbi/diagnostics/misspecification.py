@@ -221,7 +221,7 @@ def calc_misspecification_mmd(
         validate_nan_input = getattr(nan_net, "validate_nan_input", None)
         for data, name in ((x_obs, "x_obs"), (x, "x")):
             assert_all_finite(data, name, allow_nan=nan_net is not None)
-            if validate_nan_input is not None:
+            if validate_nan_input is not None and torch.isnan(data).any():
                 validate_nan_input(data)
         z_obs = inference._neural_net.embedding_net(x_obs).detach()
         z = inference._neural_net.embedding_net(x).detach()
