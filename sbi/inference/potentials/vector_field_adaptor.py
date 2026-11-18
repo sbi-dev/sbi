@@ -375,8 +375,8 @@ class IntervalGuidanceConfig:
             less than its upper bound.
         mask: Optional boolean mask selecting constrained dimensions.
         scale_factor: Soft-constraint strength. The log-sigmoid walls have slope
-            `scale_factor / std(t)^2`, inversely proportional to the noise variance
-            of the diffused parameters, as in [1] of :class:`IntervalGuidance`.
+            `scale_factor * m(t) / std(t)^2`, so that they push the denoised
+            parameters by the same amount at every time.
     """
 
     lower_bound: Optional[Union[float, Tensor]]
@@ -387,11 +387,30 @@ class IntervalGuidanceConfig:
     def __post_init__(self) -> None:
         if self.lower_bound is None and self.upper_bound is None:
             raise ValueError("At least one of lower_bound or upper_bound is required.")
+        # Compare on the CPU, which holds every dtype, without converting the dtype.
+        lower, upper = (
+            b.cpu() if isinstance(b, Tensor) else b
+            for b in (self.lower_bound, self.upper_bound)
+        )
+        for name, bound, no_wall in (
+            ("lower", lower, -math.inf),
+            ("upper", upper, math.inf),
+        ):
+            if bound is None:
+                continue
+            if isinstance(bound, Tensor):
+                bad = bound.isnan().any() or (bound.isinf() & (bound != no_wall)).any()
+            else:
+                bad = math.isnan(bound) or (math.isinf(bound) and bound != no_wall)
+            if bad:
+                raise ValueError(
+                    f"{name}_bound must not be NaN or {-no_wall}: {no_wall} means no "
+                    "bound."
+                )
         if (
-            self.lower_bound is not None
-            and self.upper_bound is not None
-            # Compare before any conversion, so that float bounds keep their precision.
-            and not torch.as_tensor(self.lower_bound < self.upper_bound).all()
+            lower is not None
+            and upper is not None
+            and not torch.as_tensor(lower < upper).all()
         ):
             raise ValueError(
                 f"lower_bound ({self.lower_bound}) must be less than "
@@ -444,23 +463,20 @@ class IntervalGuidance(UniversalGuidance):
         def interval_fn(
             input: Tensor, condition: Tensor, m: Tensor, std: Tensor
         ) -> Tensor:
-            del condition, m
+            del condition
 
-            def like_input(value: Union[float, Tensor]) -> Tensor:
-                return torch.as_tensor(value, dtype=input.dtype, device=input.device)
+            scale = config.scale_factor * m / (std**2 + 1e-6)
 
-            scale = config.scale_factor / (std**2 + 1e-6)
-            upper_bound = (
-                F.logsigmoid(-scale * (input - like_input(config.upper_bound)))
-                if config.upper_bound is not None
-                else torch.zeros_like(input)
-            )
-            lower_bound = (
-                F.logsigmoid(scale * (input - like_input(config.lower_bound)))
-                if config.lower_bound is not None
-                else torch.zeros_like(input)
-            )
-            out = upper_bound + lower_bound
+            def wall(bound: Optional[Union[float, Tensor]], sign: float) -> Tensor:
+                if bound is None:
+                    return torch.zeros_like(input)
+                bound = torch.as_tensor(bound, dtype=input.dtype, device=input.device)
+                # An infinite bound is no wall, also when `scale` is zero.
+                finite = torch.isfinite(bound)
+                distance = input - torch.where(finite, bound, 0.0)
+                return torch.where(finite, F.logsigmoid(sign * scale * distance), 0.0)
+
+            out = wall(config.lower_bound, 1.0) + wall(config.upper_bound, -1.0)
             if config.mask is not None:
                 mask = config.mask.to(out.device)
                 out = torch.where(mask, out, torch.zeros_like(out))

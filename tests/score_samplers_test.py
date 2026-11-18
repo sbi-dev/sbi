@@ -241,15 +241,13 @@ def test_interval_guidance_samples_the_truncated_posterior(estimator_type):
 
     half_normal_mean = posterior_sd * math.sqrt(2 / math.pi)
     half_normal_sd = posterior_sd * math.sqrt(1 - 2 / math.pi)
-    # Guidance denoises with Tweedie's formula, an approximation: measured bias up to
-    # 0.14 sd and sd ratio up to 1.11.
-    assert abs(samples.mean() - half_normal_mean) < 0.2 * posterior_sd
-    assert abs(samples.std() / half_normal_sd - 1) < 0.15
+    # Measured over seeds: bias up to 0.04 sd, sd ratio from 0.97 to 1.04.
+    assert abs(samples.mean() - half_normal_mean) < 0.06 * posterior_sd
+    assert abs(samples.std() / half_normal_sd - 1) < 0.08
 
 
 def test_interval_guidance_takes_one_bound_per_dimension():
-    """Tensor bounds hold one bound per dimension. An infinite bound guides like a
-    masked-out dimension, and each lower bound must be below its upper bound."""
+    """Tensor bounds hold one bound per dimension; an infinite bound is no bound."""
     prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
     theta = prior.sample((100,))
     estimator = posterior_score_nn(sde_type="vp")(theta, theta)
@@ -267,13 +265,26 @@ def test_interval_guidance_takes_one_bound_per_dimension():
         masked = guided_score(
             lower_bound=-0.2, upper_bound=0.3, mask=torch.tensor([True, False])
         )
+        zero_strength = guided_score(
+            lower_bound=torch.tensor([-inf, -inf]),
+            upper_bound=torch.tensor([0.3, inf]),
+            scale_factor=0.0,
+        )
         unguided = estimator.score(inputs, x_o, time)
     assert not torch.allclose(per_dimension[..., 0], unguided[..., 0])
     torch.testing.assert_close(per_dimension, masked)
+    torch.testing.assert_close(zero_strength, unguided)
     with pytest.raises(ValueError, match="must be less than"):
         IntervalGuidanceConfig(
             lower_bound=torch.tensor([0.0, 2.0]), upper_bound=torch.tensor([1.0, 1.0])
         )
+    for invalid in ({"lower_bound": float("nan")}, {"upper_bound": -inf}):
+        with pytest.raises(ValueError, match="means no bound"):
+            IntervalGuidanceConfig(**{
+                "lower_bound": None,
+                "upper_bound": None,
+                **invalid,
+            })
 
 
 def test_interval_guidance_takes_any_batch_size_after_the_first_call():
@@ -294,13 +305,13 @@ def test_interval_guidance_takes_any_batch_size_after_the_first_call():
 
 @pytest.mark.gpu
 def test_interval_guidance_on_gpu_matches_cpu():
-    """Bounds and a mask given on the CPU guide inputs on the GPU."""
+    """Bounds and a mask on any device guide inputs on the CPU and the GPU."""
     device = process_device("gpu")
     theta = torch.randn(100, 2)
     estimator = posterior_score_nn(sde_type="vp")(theta, theta)
     config = IntervalGuidanceConfig(
-        lower_bound=torch.tensor([-0.2, -1.0]),
-        upper_bound=torch.tensor([0.3, 1.0]),
+        lower_bound=torch.tensor([-0.2, -1.0], device=device),
+        upper_bound=torch.tensor([0.3, 1.0], dtype=torch.float64),
         mask=torch.tensor([True, False]),
     )
     inputs, x_o, time = torch.randn(5, 1, 2), torch.zeros(1, 2), torch.tensor([0.5])
