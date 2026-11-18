@@ -157,6 +157,10 @@ def pytest_xdist_setupnodes(config, specs):
 
 
 def pytest_configure(config):
+    # pytest-harvest asks xdist for the `dist` option even when xdist is disabled
+    # (`-p no:xdist`), and xdist only defines it when it is loaded.
+    if not config.pluginmanager.hasplugin("xdist"):
+        config.option.dist = "no"
     if not config.getoption("--bm"):
         return
     # Resolve the label at the start, so switching branches during a run does not
