@@ -796,6 +796,21 @@ def test_2d_resnet_embedding_head_exists_before_first_call():
     assert build().double()(x.double()).dtype == torch.float64
 
 
+def test_2d_resnet_embedding_zero_padding_keeps_dtype():
+    """Channels added by zero padding take the dtype of the input."""
+    embedding_net = ResNetEmbedding2D(
+        c_in=1,
+        c_out=3,
+        c_hidden_fc=8,
+        n_stages=2,
+        blocks_per_stage=[1, 1],
+        c_stages=[4, 8],
+        change_c_mode="zeros",
+    ).half()
+
+    assert embedding_net(torch.randn(2, 1, 8, 8).half()).dtype == torch.float16
+
+
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
 @pytest.mark.parametrize("n_blocks", (1, 20))
 @pytest.mark.parametrize("c_internal", (2, 20))

@@ -30,7 +30,7 @@ def zero_pad(x: Tensor, c_out: int) -> Tensor:
         raise ValueError("c_out must be larger than c_in to apply zero padding.")
 
     c_in = x.shape[1]
-    a = torch.zeros(x.shape[0], c_out - c_in, x.shape[2], x.shape[3], device=x.device)
+    a = x.new_zeros(x.shape[0], c_out - c_in, x.shape[2], x.shape[3])
 
     x_aug = torch.cat([x, a], dim=1)
 
