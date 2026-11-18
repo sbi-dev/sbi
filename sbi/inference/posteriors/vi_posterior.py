@@ -802,13 +802,14 @@ class VIPosterior(NeuralPosterior):
         """Whether q was trained on `x`: the same shape and the same values.
 
         Comparing values alone would broadcast, so that a q trained on one observation
-        would pass for several copies of it.
+        would pass for several copies of it. NaN entries pad sets of trials for
+        permutation-invariant embeddings, so matching NaNs count as equal.
         """
         trained_on = self._trained_on
         return (
             trained_on is not None
             and trained_on.shape == x.shape
-            and bool((x == trained_on).all())
+            and torch.allclose(x, trained_on, rtol=0, atol=0, equal_nan=True)
         )
 
     def train(
@@ -937,8 +938,6 @@ class VIPosterior(NeuralPosterior):
             raise ValueError(
                 "Pass `x` to `train()`, or set a default with `.set_default_x()`."
             )
-        if not torch.isfinite(x).all():
-            raise ValueError("x contains NaN or Inf values.")
         # The single-x q combines observations, also while an amortized q is in place.
         bound_potential = self._bind_iid(x, check_num_observations=False)
 

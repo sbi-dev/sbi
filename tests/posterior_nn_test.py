@@ -36,7 +36,11 @@ from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
 from sbi.neural_nets import posterior_flow_nn, posterior_nn
-from sbi.neural_nets.embedding_nets import CNNEmbedding
+from sbi.neural_nets.embedding_nets import (
+    CNNEmbedding,
+    FCEmbedding,
+    PermutationInvariantEmbedding,
+)
 from sbi.neural_nets.estimators.mog import MoG
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
@@ -1028,3 +1032,33 @@ def test_npe_posteriors_sample_and_map_with_iid_x(
     theta_map = posterior.map(num_iter=10, num_init_samples=20, num_to_optimize=2)
     assert samples.shape == (10, 2)
     assert theta_map.shape == (1, 2)
+
+
+def test_nan_padded_set_of_trials_is_one_observation_for_vi_and_ensembles():
+    """With a permutation-invariant embedding, NaN entries pad a set of trials.
+    VI trains and samples on such a set, and an ensemble whose posteriors share it
+    uses it as their common observation."""
+    torch.manual_seed(0)
+    prior = BoxUniform(-2 * ones(2), 2 * ones(2))
+    theta = prior.sample((200,))
+    x = theta[:, None, :] + 0.3 * torch.randn(200, 5, 2)
+    x[:100, 3:] = float("nan")
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4), trial_net_output_dim=4
+    )
+    trainer = NPE_C(
+        prior, density_estimator=posterior_nn("mdn", embedding_net=embedding)
+    )
+    trainer.append_simulations(theta, x, exclude_invalid_x=False).train(
+        max_num_epochs=1
+    )
+    x_o = x[0]
+
+    vi = trainer.build_posterior(sample_with="vi")
+    vi.train(x=x_o, max_num_iters=2, quality_control=False, show_progress_bar=False)
+    assert vi.sample((3,), x=x_o).shape == (3, 2)
+
+    ensemble = EnsemblePosterior([
+        trainer.build_posterior().set_default_x(x_o) for _ in range(2)
+    ])
+    assert ensemble.sample((3,), show_progress_bars=False).shape == (3, 2)
