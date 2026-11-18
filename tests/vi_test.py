@@ -933,6 +933,19 @@ def test_non_finite_losses_are_left_out_of_loss_stats():
     )
 
 
+def test_rolled_back_step_does_not_end_training(monkeypatch):
+    """A non-finite gradient loss rolls q back and warms it up towards the prior, so
+    training must not stop on that step."""
+    optimizer = _optimizer_after_losses([2.0] * 60)
+    assert optimizer.converged()
+
+    param = next(optimizer.q.parameters())
+    nan_surrogate = lambda x_o: (param.sum() * float("nan"), torch.tensor(2.0))
+    monkeypatch.setattr(optimizer, "loss", nan_surrogate)
+    optimizer.step(zeros(1))
+    assert not optimizer.converged()
+
+
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
 @pytest.mark.parametrize("dreg_before, dreg_after", [(False, True), (True, False)])
 def test_dreg_changed_by_update_matches_new_optimizer(
