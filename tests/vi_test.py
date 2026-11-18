@@ -24,6 +24,7 @@ from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
 from sbi.inference import (
     NLE,
+    NPE,
     NRE,
     EnsemblePosterior,
     VectorFieldPosterior,
@@ -1332,6 +1333,23 @@ def test_map_follows_a_refit_on_another_observation(refit):
         posterior.set_q(other)
 
     assert torch.allclose(posterior.map(**map_kwargs), 3 * ones(1, 2), atol=0.3)
+
+
+@pytest.mark.parametrize("vi_method", ["rKL", "IW", "fKL", "alpha"])
+def test_npe_vi_posterior_fits_several_observations(vi_method):
+    """Each VI method binds several observations as iid trials of the NPE potential,
+    instead of pairing them with its particles."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((200,))
+    trainer = NPE(prior, show_progress_bars=False)
+    trainer.append_simulations(theta, theta + 0.3 * torch.randn_like(theta))
+    trainer.train(max_num_epochs=1)
+    posterior = trainer.build_posterior(sample_with="vi", vi_method=vi_method)
+
+    with pytest.warns(UserWarning, match="combined as iid trials"):
+        posterior.train(x=zeros(3, 2), **TRAIN_KWARGS)
+
+    assert posterior.sample((5,)).shape == (5, 2)
 
 
 def test_q_fit_on_one_observation_rejects_copies_of_it():
