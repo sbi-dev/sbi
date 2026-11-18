@@ -112,16 +112,18 @@ def calculate_p_misspecification(
     mmds_baseline = calculate_baseline_mmd(
         x_obs.shape[0], x, n_shuffle=n_shuffle, max_samples=max_samples, mode=mode
     )
-    # Use as many synthetic samples as the baseline does, so that the observed MMD
-    # and the MMDs under H_0 are computed from sets of the same sizes.
+    # Draw the synthetic samples like the baseline does: as many, and at random, so
+    # that the order of the rows in x does not matter.
     n_synthetic = min(max_samples, x.shape[0] - x_obs.shape[0])
-    mmd = compute_rbf_mmd_median_heuristic(x_obs, x[:n_synthetic], mode=mode)
+    idx = torch.randperm(x.shape[0])[:n_synthetic]
+    mmd = compute_rbf_mmd_median_heuristic(x_obs, x[idx], mode=mode)
     if not (torch.isfinite(mmds_baseline).all() and torch.isfinite(mmd)):
         raise ValueError(
             "The MMD is not finite, so the misspecification test has no valid "
             "p-value. This happens when the median distance between samples is zero "
             "(for example, when most samples are identical, as in sparse discrete "
-            "data), or with mmd_mode='unbiased' and a single sample in either set."
+            "data), when x_obs or x contain NaN or inf values, or with "
+            "mmd_mode='unbiased' and a single sample in either set."
         )
     # The observed MMD counts as one draw under H_0, so the p-value is never 0.
     p_val = (1 + (mmds_baseline >= mmd).sum().item()) / (1 + n_shuffle)

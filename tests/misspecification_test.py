@@ -252,6 +252,18 @@ def test_mmd_many_observations_gives_finite_baseline():
     assert p_val == pytest.approx(1 / 21)
 
 
+def test_mmd_does_not_depend_on_the_order_of_x():
+    """Sorted synthetic samples must not make a correct model look misspecified."""
+    x = torch.sort(torch.randn(2000, 1), dim=0).values
+    x_obs = torch.randn(50, 1)
+
+    p_val, _ = calc_misspecification_mmd(
+        x_obs=x_obs, x=x, n_shuffle=20, max_samples=200
+    )
+
+    assert p_val > 0.05, f"Expected a large p_val for well-specified data, got {p_val}"
+
+
 def test_mmd_raises_for_non_finite_baseline_mmd():
     """Many identical samples give a zero bandwidth and NaN baseline MMDs."""
     x = torch.poisson(torch.full((1000, 1), 0.1))
@@ -262,11 +274,11 @@ def test_mmd_raises_for_non_finite_baseline_mmd():
 
 
 def test_mmd_raises_for_non_finite_observed_mmd():
-    """An observation equal to its only synthetic sample gives a NaN observed MMD."""
-    x = torch.randn(100, 2)
+    """A NaN observation gives a NaN observed MMD next to a finite baseline."""
+    x_obs = torch.full((1, 2), float("nan"))
 
     with pytest.raises(ValueError, match="MMD is not finite"):
-        calc_misspecification_mmd(x_obs=x[:1], x=x, n_shuffle=20, max_samples=1)
+        calc_misspecification_mmd(x_obs=x_obs, x=torch.randn(100, 2), n_shuffle=20)
 
 
 @pytest.mark.parametrize("arg", ("max_samples", "n_shuffle"))
