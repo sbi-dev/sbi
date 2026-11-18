@@ -1296,8 +1296,14 @@ class MaskedVectorFieldTrainer(
 
         edge_masks_batch = self._edge_mask_generator(condition_masks_batch)
         if edge_masks_batch is not None:
+            # A single `(T, T)` edge mask is kept as is rather than expanded per
+            # sample: the network applies it to the whole batch without having to
+            # check (on the host, i.e. with a device sync) that all masks agree.
             edge_masks_batch = _batch_mask(
-                edge_masks_batch, (batch_size, num_nodes, num_nodes), "edge mask"
+                edge_masks_batch,
+                (batch_size, num_nodes, num_nodes),
+                "edge mask",
+                keep_shared=True,
             ).to(self._device)
 
         validation_times = loss_args.times
@@ -1305,12 +1311,14 @@ class MaskedVectorFieldTrainer(
             # For validation loss, we evaluate at a fixed set of times to reduce
             # the variance in the validation loss, for improved convergence
             # checks. We evaluate the entire validation batch at all times, so
-            # we repeat the batches here to match.
+            # we repeat the batches here to match. A shared `(T, T)` edge mask
+            # applies to every sample and needs no repeating.
+            shared_edge_mask = edge_masks_batch is None or edge_masks_batch.dim() == 2
             repeated, validation_times_rep = self._repeat_for_validation_times(
                 (
                     inputs_batch,
                     condition_masks_batch,
-                    edge_masks_batch,
+                    None if shared_edge_mask else edge_masks_batch,
                     prior_masks_batch,
                     valid_batch,
                 ),
@@ -1319,10 +1327,12 @@ class MaskedVectorFieldTrainer(
             (
                 inputs_batch,
                 condition_masks_batch,
-                edge_masks_batch,
+                repeated_edge_masks,
                 prior_masks_batch,
                 valid_batch,
             ) = repeated
+            if not shared_edge_mask:
+                edge_masks_batch = repeated_edge_masks
             loss_args = replace(loss_args, times=validation_times_rep)
 
         losses = self._loss(
@@ -1388,7 +1398,10 @@ class MaskedVectorFieldTrainer(
 
 
 def _batch_mask(
-    mask: Optional[Tensor], batch_shape: Tuple[int, ...], name: str
+    mask: Optional[Tensor],
+    batch_shape: Tuple[int, ...],
+    name: str,
+    keep_shared: bool = False,
 ) -> Tensor:
     """Expand a mask from a mask generator to a batch and check its shape.
 
@@ -1397,9 +1410,12 @@ def _batch_mask(
             `batch_shape[1:]` that is used for the whole batch.
         batch_shape: Expected shape `(batch_size, *mask_shape)`.
         name: Name of the mask, used in error messages.
+        keep_shared: Whether to return a single mask of shape `batch_shape[1:]`
+            unchanged instead of expanding it to `batch_shape`.
 
     Returns:
-        Boolean mask of shape `batch_shape`.
+        Boolean mask of shape `batch_shape`, or of shape `batch_shape[1:]` if
+        `keep_shared` is set and a single mask was given.
     """
     if mask is None:
         raise ValueError(
@@ -1407,6 +1423,8 @@ def _batch_mask(
         )
     mask = torch.as_tensor(mask).bool()
     if tuple(mask.shape) == tuple(batch_shape[1:]):
+        if keep_shared:
+            return mask
         mask = mask.expand(*batch_shape)
     if tuple(mask.shape) != tuple(batch_shape):
         raise ValueError(

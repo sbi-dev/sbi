@@ -113,6 +113,61 @@ def test_unbatched_generator_masks_train_and_validate():
     assert len(validation_losses) > 0 and torch.isfinite(validation_losses).all()
 
 
+def _record_edge_mask_shapes(inference) -> list:
+    """Train briefly and record the edge mask shapes the network receives."""
+    shapes = []
+    original_train_epoch = inference._train_epoch
+
+    def hook(module, args):
+        edge_mask = args[3] if len(args) > 3 else None
+        shapes.append(None if edge_mask is None else tuple(edge_mask.shape))
+
+    def train_epoch(*args, **kwargs):
+        if not getattr(inference._neural_net.net, "_shape_hook", None):
+            inference._neural_net.net._shape_hook = (
+                inference._neural_net.net.register_forward_pre_hook(hook)
+            )
+        return original_train_epoch(*args, **kwargs)
+
+    inference._train_epoch = train_epoch
+    inference.train(max_num_epochs=2, validation_fraction=0.2)
+    return shapes
+
+
+@pytest.mark.parametrize("method", [Simformer, FlowMatchingSimformer])
+def test_shared_edge_mask_is_not_expanded_per_sample(method):
+    """A single `(T, T)` edge mask reaches the network unexpanded in training and
+    validation, so the network needs no host-synchronizing check of the batch."""
+    inference = method(posterior_latent_idx=[0], posterior_observed_idx=[1, 2])
+    inference.set_edge_masks_generator(CHAIN_DAG)
+    inference.append_simulations(torch.randn(100, NUM_NODES))
+    shapes = _record_edge_mask_shapes(inference)
+    assert shapes and set(shapes) == {(NUM_NODES, NUM_NODES)}
+
+
+def test_per_sample_edge_masks_reach_the_network_batched():
+    def per_sample(condition_mask):
+        return CHAIN_DAG.expand(condition_mask.shape[0], NUM_NODES, NUM_NODES)
+
+    inference = Simformer(posterior_latent_idx=[0], posterior_observed_idx=[1, 2])
+    inference.set_edge_masks_generator(per_sample)
+    inference.append_simulations(torch.randn(100, NUM_NODES))
+    shapes = _record_edge_mask_shapes(inference)
+    assert shapes and all(len(shape) == 3 for shape in shapes)
+
+
+def test_shared_and_batched_edge_masks_give_the_same_output():
+    net = _trained(num_epochs=1)._neural_net.net
+    inputs = torch.randn(4, NUM_NODES, 1)
+    times = torch.rand(4)
+    condition_mask = torch.tensor([False, True, True]).expand(4, NUM_NODES)
+    batched = CHAIN_DAG.expand(4, NUM_NODES, NUM_NODES)
+    torch.testing.assert_close(
+        net(inputs, times, condition_mask, CHAIN_DAG),
+        net(inputs, times, condition_mask, batched),
+    )
+
+
 def test_generator_masks_of_wrong_shape_raise():
     inference = Simformer(posterior_latent_idx=[0], posterior_observed_idx=[1, 2])
     inference.set_edge_masks_generator(lambda condition_mask: torch.ones(2, 2))

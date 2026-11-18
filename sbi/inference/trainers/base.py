@@ -2076,7 +2076,10 @@ def check_if_proposal_has_default_x(
 
 
 class FixedMaskGenerator:
-    """Mask generator that returns one fixed mask for every element of a batch.
+    """Mask generator that returns one fixed mask shared by the whole batch.
+
+    The mask is returned unbatched: the trainer expands condition masks to the
+    batch, and keeps a shared edge mask as one mask that attention broadcasts.
 
     Defined at module level so that trainers using it can be pickled.
     """
@@ -2085,8 +2088,7 @@ class FixedMaskGenerator:
         self.mask = torch.as_tensor(mask, dtype=torch.bool)
 
     def __call__(self, inputs: Tensor) -> Tensor:
-        mask = self.mask.to(inputs.device)
-        return mask.expand(inputs.shape[0], *mask.shape)
+        return self.mask.to(inputs.device)
 
 
 class UniformMaskGenerator:

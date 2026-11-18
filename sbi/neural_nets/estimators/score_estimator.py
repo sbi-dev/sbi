@@ -873,13 +873,9 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
 
         if edge_mask is not None:
             edge_mask = edge_mask.bool()
-            if edge_mask.dim() == 2:
-                # Shape is [T, T], expand to batch dimension
-                edge_mask = edge_mask.unsqueeze(0).expand(B, T, T)
-            elif edge_mask.dim() == 3:
-                # Already correct shape [B, T, T]
-                pass
-            else:
+            # A [T, T] mask is shared by the whole batch and passed on as is; the
+            # network broadcasts it. A [B, T, T] mask holds one mask per sample.
+            if edge_mask.dim() not in (2, 3):
                 raise ValueError(
                     f"edge_mask has incorrect dimensions: {edge_mask.shape}"
                     f"edge_mask should have shape [T, T] or [B, T, T], where T is "
@@ -891,7 +887,7 @@ class MaskedConditionalScoreEstimator(MaskedConditionalVectorFieldEstimator):
             input_noised,  # [B, T, F]
             times,  # [B,]
             condition_mask,  # [B, T]
-            edge_mask,  # [B, T, T]
+            edge_mask,  # [T, T] or [B, T, T]
         )  # [B, T, F]
 
         # Compute MSE loss over the latent entries that are valid

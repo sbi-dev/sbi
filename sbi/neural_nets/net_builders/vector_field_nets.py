@@ -1193,14 +1193,14 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
         #   it to the blocks.
         # - Self-edges are always added: a node with no allowed key would get a fully
         #   masked attention row, which yields NaN.
-        # - A `(T, T)` mask (or a batch of identical masks) is passed as one `(T, T)`
-        #   mask, which attention broadcasts over batch and heads; a batch of
-        #   different masks is expanded to all heads once, not in every block.
+        # - A `(T, T)` mask is passed on as is, and attention broadcasts it over
+        #   batch and heads; a `(B, T, T)` batch of masks is expanded to all heads
+        #   once, not in every block. A batch is not checked for identical masks:
+        #   that check would need a host-device sync on every forward pass, so a
+        #   mask shared by the batch should be passed as one `(T, T)` mask.
         attn_mask = None
         if edge_mask is not None:
             edge_mask = edge_mask.bool()
-            if edge_mask.dim() == 3 and bool((edge_mask == edge_mask[:1]).all()):
-                edge_mask = edge_mask[0]
             self_edges = torch.eye(T, dtype=torch.bool, device=device)
             attn_mask = ~(edge_mask | self_edges)
             if attn_mask.dim() == 3:
