@@ -60,7 +60,15 @@ def to_list_kwargs(x: "KwargsType", len: int) -> List[Optional[Dict]]:
 
 
 def update(d: Dict, u: Optional[Dict]) -> Dict:
-    """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
+    """Recursively merge user options into a dictionary of defaults, in place.
+
+    Args:
+        d: Default options; nested mappings are merged key by key.
+        u: User options that override `d`. `None` leaves `d` unchanged.
+
+    Returns:
+        The updated dictionary `d`.
+    """
     if u is not None:
         for k, v in u.items():
             dv = d.get(k, {})
