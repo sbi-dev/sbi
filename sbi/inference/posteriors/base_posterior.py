@@ -251,9 +251,7 @@ class NeuralPosterior:
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
         Several observations, of shape `(num_observations, *x_event_shape)`, are iid
-        trials. Posteriors that sample with a potential combine them; methods that
-        take one observation raise and name the alternatives. The how-to guide on iid
-        observations lists which posterior does what.
+        trials (see the how-to guide on iid observations).
 
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
@@ -593,7 +591,6 @@ class NeuralPosterior:
         self.to(actual_device)
 
 
-# Advice shared by the errors of posteriors that take one observation.
 _ONE_AT_A_TIME = (
     "For a separate posterior of each observation, pass one observation at a time"
 )
@@ -605,9 +602,6 @@ _IID_SAMPLERS = (
 
 def _require_one_observation(num_observations: int, subject: str, hint: str) -> None:
     """Raise a ValueError if `subject`, which takes one observation, gets several.
-
-    Every posterior method that takes one observation raises through this function,
-    so that all of them give the same message.
 
     Args:
         num_observations: Number of observations in `x`.
