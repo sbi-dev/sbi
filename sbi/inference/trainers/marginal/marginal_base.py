@@ -51,7 +51,7 @@ class MarginalTrainer:
     misspecification diagnostics by comparing the estimated marginal $p(x)$ to the
     observed data distribution.
 
-    Example:
+    Example
     --------
 
     ::
