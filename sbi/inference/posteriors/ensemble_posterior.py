@@ -14,7 +14,6 @@ from sbi.inference.posteriors.base_posterior import (
     NeuralPosterior,
     _require_one_observation,
 )
-from sbi.inference.posteriors.vector_field_posterior import VectorFieldPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
@@ -434,33 +433,12 @@ class EnsemblePosterior(NeuralPosterior):
             and posterior._one_observation_hint is None
             for posterior in self.posteriors
         ):
-            same_type = all(
-                isinstance(posterior, type(self.posteriors[0]))
-                for posterior in self.posteriors
-            )
-            # Vector field posteriors sample several observations only with the SDE
-            # sampler, and their `map()` takes one observation.
-            vector_field = any(
-                isinstance(posterior, VectorFieldPosterior)
-                for posterior in self.posteriors
-            )
-            alternatives = [
-                "`sample()` (with `sample_with='sde'` for vector field posteriors)"
-                if vector_field
-                else "`sample()`"
-            ]
-            if same_type:
-                alternatives.append("`log_prob(individually=True)`")
-            if not vector_field:
-                alternatives.append(
-                    "`map(individually=True)` after `set_default_x()` with the "
-                    "observations"
-                )
             _require_one_observation(
                 num_observations,
                 f"`{method}()` of an ensemble with NPE or vector field posteriors",
                 "The normalizing constants of the components would skew the ensemble "
-                f"weights (issue #2135). Use {' or '.join(alternatives)}.",
+                "weights (issue #2135). Use `sample()`, or `individually=True` where "
+                "available (see the how-to guide on iid sampling).",
             )
 
     def _bind_mixture(self, x: Optional[Tensor], method: str) -> Tensor:

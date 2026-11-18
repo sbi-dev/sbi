@@ -948,10 +948,8 @@ def test_ensemble_mixture_takes_one_observation(method, estimator, request):
         "map": lambda: posterior.set_default_x(x_o).map(),
         "log_prob": lambda: posterior.log_prob(zeros(4, 2), x=x_o),
     }
-    with pytest.raises(ValueError, match=f"`{method}\\(\\)` of an ensemble") as error:
+    with pytest.raises(ValueError, match=f"`{method}\\(\\)` of an ensemble"):
         calls[method]()
-    # The `map()` of a vector field posterior takes one observation.
-    assert ("map(individually=True)" in str(error.value)) == (estimator == "npe")
 
 
 @pytest.mark.parametrize(
