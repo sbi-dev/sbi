@@ -280,6 +280,52 @@ class DirectPosterior(NeuralPosterior):
 
         return self._reshape_to_sample_shape(samples, sample_shape)
 
+    @torch.no_grad()
+    def leakage_correction(
+        self,
+        x: Tensor,
+        num_rejection_samples: int = 10_000,
+        force_update: bool = False,
+        show_progress_bars: bool = False,
+        rejection_sampling_batch_size: int = 10_000,
+    ) -> Tensor:
+        r"""Return leakage correction factor for a leaky posterior density estimate.
+
+        The factor is estimated from the acceptance probability during rejection
+        sampling from the posterior. It is saved for the last `x` and re-estimated
+        whenever `x` or `num_rejection_samples` changes. It is 1 for unbounded priors.
+
+        Arguments:
+            x: Observation at which to estimate the factor.
+            num_rejection_samples: Number of samples used to estimate correction factor.
+            force_update: Whether to re-estimate the factor even if it is saved.
+            show_progress_bars: Whether to show a progress bar during sampling.
+            rejection_sampling_batch_size: Batch size for rejection sampling.
+
+        Returns:
+            Saved or newly-estimated correction factor (as a scalar `Tensor`).
+        """
+        x = self._x_else_default_x(x)
+
+        def acceptance() -> Tensor:
+            return rejection.accept_reject_sample(
+                proposal=self.posterior_estimator.sample,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_samples=num_rejection_samples,
+                show_progress_bars=show_progress_bars,
+                sample_for_correction_factor=True,
+                max_sampling_batch_size=rejection_sampling_batch_size,
+                proposal_sampling_kwargs={
+                    "condition": reshape_to_batch_event(
+                        x, event_shape=self.posterior_estimator.condition_shape
+                    )
+                },
+            )[1]
+
+        return self._cached_leakage_factor(
+            x, num_rejection_samples, self.prior, acceptance, force_update
+        )
+
     def log_prob(
         self,
         theta: Tensor,
@@ -313,7 +359,7 @@ class DirectPosterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
         x = self._process_x(x)
-        theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
+        theta = torch.as_tensor(theta, device=self._device)
 
         event_shape = self.prior.event_shape
         if len(event_shape) > 0:
@@ -323,6 +369,8 @@ class DirectPosterior(NeuralPosterior):
                     f"Expected theta to have event shape {tuple(event_shape)}, "
                     f"but got shape {tuple(actual_shape)}."
                 )
+
+        theta = ensure_theta_batched(theta)
 
         event_shape = self.posterior_estimator.input_shape
         theta_density_estimator = reshape_to_sample_batch_event(
@@ -399,7 +447,7 @@ class DirectPosterior(NeuralPosterior):
             support of the prior; returns -∞ (zero probability) outside.
         """
         x = self._process_x(x)
-        theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
+        theta = torch.as_tensor(theta, device=self._device)
 
         event_shape = self.prior.event_shape
         if len(event_shape) > 0:
@@ -409,6 +457,7 @@ class DirectPosterior(NeuralPosterior):
                     f"Expected theta to have event shape {tuple(event_shape)}, "
                     f"but got shape {tuple(actual_shape)}."
                 )
+        theta = ensure_theta_batched(theta)
 
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).

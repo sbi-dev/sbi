@@ -17,6 +17,7 @@ from sbi.inference import (
     MCMCPosterior,
     likelihood_estimator_based_potential,
 )
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
 from sbi.samplers.mcmc import SliceSamplerSerial, SliceSamplerVectorized
@@ -95,25 +96,24 @@ def test_api_posterior_sampler_set(
 
 def test_direct_posterior_shape_validation():
     """Test malformed theta shapes raise a clean ValueError (issue #2136)."""
-    import torch
-
     from sbi.inference import NPE
     from sbi.utils import BoxUniform
 
-    prior = BoxUniform(low=torch.tensor([-2.0]), high=torch.tensor([2.0]))
-
-    def simulator(theta):
-        return theta + 0.1 * torch.randn_like(theta)
+    box_prior = BoxUniform(
+        low=-2 * torch.ones(1, 2),
+        high=2 * torch.ones(1, 2),
+    )
+    prior = torch.distributions.Independent(box_prior, 1)
 
     theta = prior.sample((20,))
-    x = simulator(theta)
+    x = theta.reshape(20, 2).sum(dim=1, keepdim=True)
 
-    inferer = NPE(prior=prior)
-    inferer.append_simulations(theta, x)
-    density_estimator = inferer.train(max_num_epochs=1, show_train_summary=False)
-    posterior = inferer.build_posterior(density_estimator)
+    inference = NPE(density_estimator="mdn", show_progress_bars=False)
+    estimator = inference.append_simulations(theta, x).train(
+        max_num_epochs=2, show_train_summary=False
+    )
+    posterior = DirectPosterior(posterior_estimator=estimator, prior=prior)
 
-    # Passing a 1D tensor with 2 elements instead of the expected 1.
     bad_theta = torch.tensor([1.0, 2.0])
 
     with pytest.raises(ValueError, match="Expected theta to have event shape"):
@@ -121,6 +121,35 @@ def test_direct_posterior_shape_validation():
 
     with pytest.raises(ValueError, match="Expected theta to have event shape"):
         posterior.potential(bad_theta, x=x[0])
+
+    with pytest.raises(ValueError, match="Expected theta to have event shape"):
+        posterior.log_prob_batched(bad_theta, x=x[:1])
+
+
+def test_direct_posterior_normalized_log_prob():
+    """Test normalized log_prob works with leakage correction."""
+    from sbi.inference import NPE
+    from sbi.utils import BoxUniform
+
+    prior = BoxUniform(low=-2 * torch.ones(1), high=2 * torch.ones(1))
+
+    theta = prior.sample((30,))
+    x = theta + 0.1 * torch.randn_like(theta)
+
+    inference = NPE(prior=prior, show_progress_bars=False)
+    inference.append_simulations(theta, x)
+    estimator = inference.train(max_num_epochs=2, show_train_summary=False)
+    posterior = inference.build_posterior(estimator)
+
+    result = posterior.log_prob(
+        theta[:2],
+        x=x[0],
+        norm_posterior=True,
+        leakage_correction_params={"num_rejection_samples": 100},
+    )
+
+    assert result.shape == (2,)
+    assert torch.isfinite(result).all()
 
 
 def test_nle_non_iid_single_x_multiple_theta():
