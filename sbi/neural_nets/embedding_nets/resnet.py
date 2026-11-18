@@ -138,7 +138,10 @@ class ResNetEmbedding2D(nn.Module):
         By default, convolutional networks are used to model the transformation
         in each of the residual blocks. At the end of the network, a fully
         connected network is applied to map the flattened output of the last
-        stage to the fixed sized output vector.
+        stage to the fixed sized output vector. Its first layer infers its input
+        size from the first input or from a loaded state dict. Until then,
+        counting the parameters raises, and so does an optimizer that sets up
+        per-parameter state at construction, such as Adagrad.
 
         References:
 
@@ -243,8 +246,18 @@ class ResNetEmbedding2D(nn.Module):
 
         self.blocks = nn.Sequential(*blocks)
 
-        # Final transformation is initialized on the first forward pass
-        self.final = None
+        # The flattened size depends on the image size, so the first linear layer
+        # infers its input size on the first forward pass or from a loaded
+        # state dict.
+        self.final = nn.Sequential(
+            nn.AvgPool2d(kernel_size=3, stride=1, padding=1),
+            nn.Flatten(),
+            nn.LazyLinear(c_hidden_fc),
+            activation(),
+            nn.Linear(c_hidden_fc, c_hidden_fc),
+            activation(),
+            nn.Linear(c_hidden_fc, c_out),
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -269,21 +282,6 @@ class ResNetEmbedding2D(nn.Module):
 
         # Apply the residual blocks
         y = self.blocks(x)
-
-        # On first call intitalize the final transformation
-        if self.final is None:
-            # Get the shape of the input to the final layer
-            c_in_final = int(torch.tensor(y.shape[1:]).prod().item())
-
-            self.final = nn.Sequential(
-                nn.AvgPool2d(kernel_size=3, stride=1, padding=1),
-                nn.Flatten(),
-                nn.Linear(c_in_final, self.c_hidden_fc),
-                self.activation(),
-                nn.Linear(self.c_hidden_fc, self.c_hidden_fc),
-                self.activation(),
-                nn.Linear(self.c_hidden_fc, self.c_out),
-            )
 
         # Apply the final transformation
         z = self.final(y)

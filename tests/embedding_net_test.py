@@ -751,6 +751,33 @@ def test_2d_ResNet_cnn_embedding_net(
     _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
+def test_2d_resnet_embedding_head_exists_before_first_call():
+    """An optimizer built first trains the head, and a fresh net loads weights."""
+
+    def build():
+        return ResNetEmbedding2D(
+            c_in=1,
+            c_out=3,
+            c_hidden_fc=8,
+            n_stages=1,
+            blocks_per_stage=[1],
+            c_stages=[4],
+        )
+
+    x = torch.randn(2, 1, 8, 8)
+    trained = build()
+    optimizer = torch.optim.Adam(trained.parameters())
+    trained(x).sum().backward()
+    optimizer.step()
+    optimized = {id(p) for group in optimizer.param_groups for p in group["params"]}
+    assert all(id(p) in optimized for p in trained.parameters())
+
+    fresh = build()
+    fresh.load_state_dict(trained.state_dict())
+    assert torch.allclose(fresh(x), trained(x))
+    assert build().double()(x.double()).dtype == torch.float64
+
+
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
 @pytest.mark.parametrize("n_blocks", (1, 20))
 @pytest.mark.parametrize("c_internal", (2, 20))
