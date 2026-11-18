@@ -1153,3 +1153,15 @@ def test_lru_forward_rejects_invalid_mode():
 
     with pytest.raises(ValueError, match="mode"):
         layer.forward(torch.randn(2, 6, LRU_DEFAULTS["input_dim"]), mode="invalid")
+
+
+def test_embedding_nets_all_lists_every_embedding_net():
+    """A star import gives every embedding net that the package imports."""
+    import sbi.neural_nets.embedding_nets as embedding_nets
+
+    imported = {
+        name
+        for name, obj in vars(embedding_nets).items()
+        if isinstance(obj, type) and issubclass(obj, nn.Module)
+    }
+    assert imported <= set(embedding_nets.__all__)
