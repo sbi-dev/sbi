@@ -147,11 +147,16 @@ def pytest_addoption(parser):
     )
 
 
+@pytest.hookimpl(optionalhook=True)
+def pytest_xdist_setupnodes(config, specs):
+    # Parallel workers would otherwise each start one thread per core in torch,
+    # BLAS and OpenMP. xdist calls this hook in the main process, right before it
+    # starts the workers: they inherit the variable, and the libraries read it when
+    # they load. Inside a worker it would be too late.
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+
+
 def pytest_configure(config):
-    # Parallel workers would otherwise each start one thread per core in torch, BLAS
-    # and OpenMP. Workers inherit this variable; the libraries read it when they load.
-    if config.getoption("dist", "no") != "no":
-        os.environ.setdefault("OMP_NUM_THREADS", "1")
     if not config.getoption("--bm"):
         return
     # Resolve the label at the start, so switching branches during a run does not
