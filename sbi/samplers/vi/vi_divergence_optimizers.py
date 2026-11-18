@@ -268,7 +268,8 @@ class DivergenceOptimizer(ABC):
         self._optimizer.step()
         self._scheduler.step()
         self.update_loss_stats(loss.cpu())
-        if (self.num_step % 50) == 0:
+        # A non-finite loss leaves num_step unchanged; don't snapshot again then.
+        if torch.isfinite(loss) and (self.num_step % 50) == 0:
             self.update_state()
 
     def converged(self, considered_values: int = 50) -> bool:
@@ -301,10 +302,16 @@ class DivergenceOptimizer(ABC):
     def update_loss_stats(self, loss: Tensor, window: int = 20) -> None:
         """Updates current loss statistics of the optimizer
 
+        A non-finite loss is left out, so it neither enters the running statistics
+        nor counts towards the convergence window.
+
         Args:
             loss: New loss value
             window: Window size for running statistics
         """
+        if not torch.isfinite(loss):
+            return
+
         if self.num_step >= len(self.losses):
             self.losses = torch.hstack([self.losses, torch.zeros(2000)])
             self.moving_average = torch.hstack([self.moving_average, torch.zeros(2000)])
@@ -312,16 +319,8 @@ class DivergenceOptimizer(ABC):
             self.moving_slope = torch.hstack([self.moving_slope, torch.zeros(2000)])
 
         if self.num_step == 0:
-            if not torch.isfinite(loss):
-                # Later steps average over this one, so wait for a finite loss.
-                return
             self.losses[self.num_step] = loss
             self.moving_average[self.num_step] = loss
-        elif not torch.isfinite(loss):
-            loss = self.losses[self.num_step - 1]
-            self.moving_average[self.num_step] = self.moving_average[self.num_step - 1]
-            self.moving_std[self.num_step] = self.moving_std[self.num_step - 1]
-            self.moving_slope[self.num_step] = self.moving_slope[self.num_step - 1]
         else:
             self.losses[self.num_step] = loss
             self.moving_average[self.num_step] = (
@@ -340,7 +339,10 @@ class DivergenceOptimizer(ABC):
         self.num_step += 1
 
     def get_loss_stats(self) -> Tuple[Array, Array]:
-        """Returns current loss statistics"""
+        """Returns current loss statistics, NaN before the first finite loss."""
+        if self.num_step == 0:
+            nan = torch.tensor(float("nan"))
+            return nan, nan
         return (
             self.moving_average[self.num_step - 1],
             self.moving_std[self.num_step - 1],

@@ -899,9 +899,7 @@ def test_forward_kl_weights_and_loss_stay_finite(monkeypatch, offset: float):
     assert torch.allclose(torch.stack(weight_maxima), torch.ones(1))
 
 
-def test_non_finite_first_loss_is_left_out_of_loss_stats():
-    """A non-finite first loss, as from a batch entirely outside the support, would
-    otherwise turn the running statistics NaN for the rest of training."""
+def _optimizer_after_losses(losses: list[float]) -> ForwardKLOptimizer:
     prior = MultivariateNormal(zeros(1), eye(1))
     optimizer = ForwardKLOptimizer(
         potential_fn=FakePotential(prior=prior),
@@ -911,12 +909,27 @@ def test_non_finite_first_loss_is_left_out_of_loss_stats():
         lr=1e-3,
         gamma=0.999,
     )
-    optimizer.update_loss_stats(torch.tensor(float("nan")))
-    for loss in torch.linspace(2.0, 1.0, 60):
-        optimizer.update_loss_stats(loss)
+    for loss in losses:
+        optimizer.update_loss_stats(torch.tensor(loss))
+    return optimizer
 
-    assert optimizer.num_step == 60
-    assert torch.isfinite(optimizer.moving_slope[: optimizer.num_step]).all()
+
+def test_non_finite_losses_are_left_out_of_loss_stats():
+    """Non-finite losses, as from a batch entirely outside the support, neither
+    enter the running statistics nor count towards convergence."""
+    nan = float("nan")
+    before_first_finite = _optimizer_after_losses([nan]).get_loss_stats()
+    assert torch.isnan(torch.stack(before_first_finite)).all()
+
+    assert not _optimizer_after_losses([nan, 2.0, 2.0] + [nan] * 49).converged()
+    assert _optimizer_after_losses([nan, 2.0, 2.0] + [2.0] * 49).converged()
+
+    constant = [50.0] * 60
+    with_nan = constant[:30] + [nan] + constant[30:]
+    assert torch.allclose(
+        torch.stack(_optimizer_after_losses(with_nan).get_loss_stats()),
+        torch.stack(_optimizer_after_losses(constant).get_loss_stats()),
+    )
 
 
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
