@@ -651,7 +651,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
 
         surrogate = -torch.sum(weights * logq)
         # Zero-weight particles (log p = -inf) would give 0 * -inf = nan.
-        loss = torch.sum(weights * torch.where(weights > 0, logp - logq, 0.0))
+        loss = torch.sum(weights * torch.where(weights != 0, logp - logq, 0.0))
         return surrogate, loss.detach()
 
 

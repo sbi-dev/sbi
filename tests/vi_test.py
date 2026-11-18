@@ -891,8 +891,10 @@ def test_forward_kl_weights_and_loss_stay_finite(monkeypatch, offset: float):
     surrogate_loss, loss = optimizer.loss(zeros(1))
 
     logq = optimizer.q.log_prob(particles)
-    weights = torch.softmax(target.log_prob(particles) - logq.detach(), dim=0)
-    assert torch.isfinite(loss)
+    logweights = target.log_prob(particles) - logq.detach()
+    weights = torch.softmax(logweights, dim=0)
+    inside = torch.isfinite(logweights)
+    assert torch.allclose(loss, (weights[inside] * logweights[inside]).sum())
     assert torch.allclose(surrogate_loss, -(weights * logq).sum())
     assert torch.allclose(torch.stack(weight_maxima), torch.ones(1))
 
