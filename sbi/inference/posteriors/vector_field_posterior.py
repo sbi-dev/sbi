@@ -195,27 +195,7 @@ class VectorFieldPosterior(NeuralPosterior):
 
         x = self._x_else_default_x(x)
         is_iid = x.shape[0] > 1
-        adjusts_score = is_iid or guidance_method is not None
-        # IID and guidance require transforming the prior to standardized space.
-        if self.vector_field_estimator.compose_enabled and adjusts_score:
-            raise NotImplementedError(
-                "compose_standardization does not yet support iid (x with batch>1) or "
-                "guided sampling. Use a single observation, or disable "
-                "compose_standardization."
-            )
-        if self.sample_with == "ode" and adjusts_score:
-            if is_iid:
-                reason = (
-                    f"x has {x.shape[0]} rows, which are used as iid observations. "
-                    "For independent posteriors of several x, use `sample_batched`. "
-                )
-            else:
-                reason = f"Guidance ('{guidance_method}') is requested. "
-            raise ValueError(
-                reason + "iid observations and guidance adjust the score, which "
-                "only SDE sampling uses. Build the posterior with sample_with='sde'."
-            )
-        self.potential_fn = self.potential_fn.bind(
+        bound = self.potential_fn.bind(
             x,
             x_is_iid=is_iid,
             iid_method=iid_method or self.potential_fn.iid_method,
@@ -223,6 +203,8 @@ class VectorFieldPosterior(NeuralPosterior):
             guidance_method=guidance_method,
             guidance_params=guidance_params,
         )
+        self._check_sample_inputs(x, guidance_method=guidance_method)
+        self.potential_fn = bound
 
         num_samples = torch.Size(sample_shape).numel()
         max_sampling_batch_size = (
@@ -407,6 +389,25 @@ class VectorFieldPosterior(NeuralPosterior):
             samples = self.vector_field_estimator.from_z(samples)
 
         return samples
+
+    def _check_sample_inputs(
+        self, x: Tensor, guidance_method: Optional[str] = None, **kwargs
+    ) -> None:
+        if self.sample_with != "ode":
+            return
+        if x.shape[0] > 1:
+            reason = (
+                f"x has {x.shape[0]} rows, which are used as iid observations. "
+                "For independent posteriors of several x, use `sample_batched`. "
+            )
+        elif guidance_method is not None:
+            reason = f"Guidance ('{guidance_method}') is requested. "
+        else:
+            return
+        raise ValueError(
+            reason + "iid observations and guidance adjust the score, which only SDE "
+            "sampling uses. Build the posterior with sample_with='sde'."
+        )
 
     def sample_via_ode(
         self,

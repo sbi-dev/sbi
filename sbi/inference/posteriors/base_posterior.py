@@ -284,6 +284,9 @@ class NeuralPosterior:
         """
         return None
 
+    def _check_sample_inputs(self, x: Tensor, **kwargs) -> None:
+        """Raise if `sample()` cannot take these inputs."""
+
     def _check_num_observations(self, num_observations: int) -> None:
         """Raise if this posterior takes one observation and gets several."""
         hint = self._one_observation_hint
