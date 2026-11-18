@@ -246,9 +246,7 @@ class ResNetEmbedding2D(nn.Module):
 
         self.blocks = nn.Sequential(*blocks)
 
-        # The flattened size depends on the image size, so the first linear layer
-        # infers its input size on the first forward pass or from a loaded
-        # state dict.
+        # LazyLinear: the flattened size depends on the image size.
         self.final = nn.Sequential(
             nn.AvgPool2d(kernel_size=3, stride=1, padding=1),
             nn.Flatten(),

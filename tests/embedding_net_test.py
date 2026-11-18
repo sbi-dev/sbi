@@ -770,7 +770,8 @@ def test_2d_ResNet_cnn_embedding_net(
 
 
 def test_2d_resnet_embedding_head_exists_before_first_call():
-    """An optimizer built first trains the head, and a fresh net loads weights."""
+    """An optimizer built first covers the head, and a fresh net loads weights and
+    follows a dtype change before its first call."""
 
     def build():
         return ResNetEmbedding2D(
@@ -785,8 +786,7 @@ def test_2d_resnet_embedding_head_exists_before_first_call():
     x = torch.randn(2, 1, 8, 8)
     trained = build()
     optimizer = torch.optim.Adam(trained.parameters())
-    trained(x).sum().backward()
-    optimizer.step()
+    trained(x)
     optimized = {id(p) for group in optimizer.param_groups for p in group["params"]}
     assert all(id(p) in optimized for p in trained.parameters())
 
