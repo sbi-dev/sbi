@@ -7,7 +7,6 @@ from dataclasses import replace
 from functools import partial
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
-import torch
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -15,6 +14,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
+    _z_scored_prior_mog,
 )
 from sbi.neural_nets.estimators.base import (
     ConditionalDensityEstimator,
@@ -22,12 +22,13 @@ from sbi.neural_nets.estimators.base import (
 )
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
+    MultivariateGaussianMDN,
+    ProposalCorrectedMDN,
 )
-from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.mog import MoG, _check_single_gaussian_proposal
 from sbi.neural_nets.net_builders.estimator_configs import MDNConfig
 from sbi.sbi_types import Tracker
 from sbi.utils.sbiutils import del_entries
-from sbi.utils.torchutils import BoxUniform
 
 _MDN_DEFAULT_COMPONENTS = MDNConfig().num_components
 
@@ -50,13 +51,13 @@ class NPE_A(PosteriorEstimatorTrainer):
     and requires Mixture of Gaussians (MoG) density estimators.
 
     Note:
-        In multi-round SNPE-A, the number of MoG components grows multiplicatively
-        with each round: if the proposal has L components and the density estimator
-        has K components, the corrected posterior has L×K components. For many
-        rounds, consider using SNPE-C (APT) instead, which handles multi-round
-        inference more efficiently.
+        The closed-form correction needs a single-Gaussian proposal. As in [1],
+        NPE-A trains one Gaussian in every round but the final one, which trains
+        `num_components`. In a loop over rounds, pass
+        `final_round=(r == num_rounds - 1)` to `train()`. For most multi-round
+        problems, NPE_C is the better choice.
 
-    Example:
+    Example
     --------
 
     ::
@@ -67,23 +68,25 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         # 1. Setup simulator, prior, and observation
         prior = BoxUniform(low=torch.zeros(3), high=torch.ones(3))
-        x_o = torch.randn(1, 3)  # Observed data
 
         def simulator(theta):
             return theta + torch.randn_like(theta) * 0.1
 
+        x_o = simulator(prior.sample((1,)))  # Observed data
+
         # 2. Multi-round inference
         inference = NPE_A(prior=prior, num_components=5)
         proposal = prior
+        num_rounds = 5
 
-        for round_idx in range(5):
+        for r in range(num_rounds):
             theta = proposal.sample((100,))
             x = simulator(theta)
-            density_estimator = inference.append_simulations(
-                theta, x, proposal=proposal
-            ).train()
-            posterior = inference.build_posterior(density_estimator)
-            proposal = posterior.set_default_x(x_o)
+            inference.append_simulations(theta, x, proposal=proposal).train(
+                final_round=(r == num_rounds - 1)
+            )
+            posterior = inference.build_posterior().set_default_x(x_o)
+            proposal = posterior
 
         # 3. Sample from final posterior
         samples = posterior.sample((1000,), x=x_o)
@@ -122,12 +125,10 @@ class NPE_A(PosteriorEstimatorTrainer):
                 will be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. The
                 density estimator needs to provide the methods `.log_prob` and
-                `.sample()` and must return a `ConditionalDensityEstimator`.
-            num_components: Number of components of the mixture of Gaussians.
-                Note: In multi-round SNPE-A, the number of components grows
-                multiplicatively with each round due to the analytical correction
-                (L components in proposal × K components in density = L*K posterior
-                components).
+                `.sample()` and must return a `MixtureDensityEstimator`. It is called
+                with the keyword `num_components`.
+            num_components: Number of mixture components in the final round. All
+                other rounds train a single Gaussian.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -179,10 +180,18 @@ class NPE_A(PosteriorEstimatorTrainer):
         )
         super().__init__(**kwargs)
 
-        if not isinstance(density_estimator, MDNConfig):
-            self._build_neural_net = partial(
-                self._build_neural_net, num_components=num_components
-            )
+        self._num_components = num_components
+        # `train()` binds `num_components`, which differs between rounds.
+        if isinstance(density_estimator, MDNConfig):
+            config, wrap_builder = density_estimator, self._wrap_builder
+
+            def build_from_config(batch_theta, batch_x, num_components):
+                config_k = replace(config, num_components=num_components)
+                return wrap_builder(config_k)(batch_theta, batch_x)
+
+            self._build_neural_net = build_from_config
+        else:
+            self._build_neural_net = density_estimator
 
     def train(
         self,
@@ -197,6 +206,8 @@ class NPE_A(PosteriorEstimatorTrainer):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        final_round: Optional[bool] = None,
+        component_perturbation: float = 5e-3,
     ) -> ConditionalDensityEstimator:
         r"""Return density estimator that approximates the proposal posterior.
 
@@ -206,6 +217,10 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         Training is performed with maximum likelihood on samples from the latest round,
         which leads the algorithm to converge to the proposal posterior.
+
+        As in [1], every round but the final one trains a single Gaussian. The final
+        round copies it `num_components` times with small noise and trains the
+        mixture.
 
         Args:
             training_batch_size: Training batch size.
@@ -231,9 +246,17 @@ class NPE_A(PosteriorEstimatorTrainer):
                 loss and leakage after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
+            final_round: Whether this is the last round. If None (default), the
+                first round is final, and a resumed round keeps its network.
+            component_perturbation: Standard deviation of the noise added to the
+                copies of the Gaussian in the final round.
 
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
+
+        Raises:
+            ValueError: If a non-final round follows a final round, or if
+                `final_round=True` resumes training.
         """
 
         assert not retrain_from_scratch, """Retraining from scratch is not supported in
@@ -246,6 +269,8 @@ class NPE_A(PosteriorEstimatorTrainer):
             entries=(
                 "self",
                 "__class__",
+                "final_round",
+                "component_perturbation",
             ),
         )
 
@@ -261,27 +286,58 @@ class NPE_A(PosteriorEstimatorTrainer):
 
         self._round = max(self._data_round_index)
 
+        if final_round is None:
+            if resume_training and self._neural_net is not None:
+                # Resuming keeps the network, and with it the round's choice.
+                mdn = self._neural_net.net
+                assert isinstance(mdn, MultivariateGaussianMDN)
+                final_round = mdn.num_components > 1
+            else:
+                final_round = self._round == 0
+        num_components = self._num_components if final_round else 1
+        if self._neural_net is None:
+            self._build_neural_net = partial(
+                self._build_neural_net, num_components=num_components
+            )
+        else:
+            mdn = self._neural_net.net
+            assert isinstance(mdn, MultivariateGaussianMDN)
+            if num_components > 1 and mdn.num_components == 1:
+                if resume_training:
+                    raise ValueError(
+                        "`final_round=True` cannot resume training, because it "
+                        "replaces the output layers of the network."
+                    )
+                mdn.expand_components(num_components, component_perturbation)
+            elif num_components == 1 and mdn.num_components > 1:
+                raise ValueError(
+                    "A final round has already trained the mixture. Pass "
+                    "`final_round=False` in the first round of a multi-round run."
+                )
+
         density_estimator = super().train(**kwargs)
 
         return density_estimator
 
     def _get_proposal_mog(
         self,
-        proposal: Union["NPE_A_Posterior", MultivariateNormal, MoG, Any],
+        proposal: Union[NPE_A_Posterior, MultivariateNormal, MoG],
+        density_estimator: MixtureDensityEstimator,
     ) -> MoG:
         """Extract MoG parameters from a proposal distribution.
 
         Supports multiple proposal types:
-        - NPE_A_Posterior: extracts corrected MoG via get_mog_params()
-        - MultivariateNormal: converts to single-component MoG
-        - MoG: uses directly
-        - Any object with get_mog_params(x) method
+        - NPE_A_Posterior: its corrected MoG, from get_mog_params()
+        - MultivariateNormal: converts to single-component MoG over parameters
+        - MoG: a MoG over parameters
 
         Args:
             proposal: The proposal distribution from the previous round.
+            density_estimator: The estimator whose z-scored space the proposal is
+                mapped into.
 
         Returns:
-            MoG parameters from the proposal.
+            MoG parameters from the proposal, in the z-scored space.
 
         Raises:
             ValueError: If NPE_A_Posterior proposal doesn't have default_x set.
@@ -301,123 +357,29 @@ class NPE_A(PosteriorEstimatorTrainer):
                     f"{default_x.shape[0]}. NPE-A only supports single "
                     "observations for correction."
                 )
-            return proposal.get_mog_params(default_x)
+            # The proposal's MoG is in the z-scored space of its own estimator.
+            proposal_estimator = proposal.posterior_estimator
+            if isinstance(proposal_estimator, ProposalCorrectedMDN):
+                proposal_estimator = proposal_estimator.net
+            assert isinstance(proposal_estimator, MixtureDensityEstimator)
+            return density_estimator.transform_mog_from(
+                proposal_estimator, proposal.get_mog_params(default_x)
+            )
 
         if isinstance(proposal, MultivariateNormal):
-            mean: Tensor = proposal.mean.to(self._device)  # type: ignore[assignment]
-            cov: Tensor = proposal.covariance_matrix.to(  # type: ignore[assignment]
-                self._device
+            return density_estimator.transform_mog(
+                MoG.from_gaussian(proposal.mean, proposal.covariance_matrix)
             )
-            return MoG.from_gaussian(mean.unsqueeze(0), cov.unsqueeze(0))
 
         if isinstance(proposal, MoG):
-            return proposal.to(self._device)
+            return density_estimator.transform_mog(proposal)
 
-        # Case 4: Any object with get_mog_params method
-        if hasattr(proposal, "get_mog_params"):
-            # Try to get default_x if available
-            default_x = getattr(proposal, "default_x", None)
-            if default_x is None:
-                raise ValueError(
-                    "Proposal has get_mog_params() but no default_x set. "
-                    "Call proposal.set_default_x(x_o) before using as proposal."
-                )
-            if default_x.shape[0] != 1:
-                raise ValueError(
-                    f"NPE-A requires default_x batch size of 1, got "
-                    f"{default_x.shape[0]}."
-                )
-            mog = proposal.get_mog_params(default_x)
-            if not isinstance(mog, MoG):
-                raise TypeError(
-                    f"Proposal's get_mog_params() must return MoG, "
-                    f"got {type(mog).__name__}."
-                )
-            return mog.to(self._device)
-
-        # Unsupported type
         raise TypeError(
             f"For multi-round NPE-A, proposal must be one of: NPE_A_Posterior, "
-            f"MultivariateNormal, MoG, or an object with get_mog_params() method. "
-            f"Got {type(proposal).__name__}. For custom proposals, construct "
-            f"NPE_A_Posterior directly with your proposal_mog parameter."
+            f"MultivariateNormal or MoG. Got {type(proposal).__name__}. For custom "
+            f"proposals, construct NPE_A_Posterior directly with your proposal_mog "
+            f"parameter, in the estimator's z-scored space."
         )
-
-    def _compute_z_scored_prior_mog(
-        self, density_estimator: MixtureDensityEstimator
-    ) -> Optional[MoG]:
-        """Compute the prior as a MoG in z-scored space (if applicable).
-
-        For SNPE-A correction, the prior needs to be in the same coordinate system
-        as the density estimator's output. When z-scoring is applied to inputs,
-        the density estimator outputs MoG parameters in z-scored space, so the
-        prior must also be transformed to z-scored space.
-
-        For uniform priors (BoxUniform), returns None since uniform priors have
-        zero precision (infinite covariance) and are handled specially in the
-        correction formula.
-
-        Mathematical background:
-            For z-score transform: z = (theta - shift) / scale
-            If theta ~ N(mu, Sigma), then:
-            z ~ N((mu - shift) / scale, Sigma / (scale ⊗ scale))
-            where (scale ⊗ scale)_ij = scale_i * scale_j
-
-        Args:
-            density_estimator: The MixtureDensityEstimator (to get z-score parameters).
-
-        Returns:
-            MoG representation of the z-scored prior for Gaussian priors,
-            or None for uniform priors.
-        """
-        if getattr(density_estimator, "_prior_transform", None) is not None:
-            raise NotImplementedError(
-                "NPE-A's analytic leakage correction does not support "
-                "z_score_theta='transform_to_unconstrained' (it assumes an affine "
-                "z-score). Use 'independent'/'structured', or a different method."
-            )
-
-        # Uniform priors have zero precision, return None
-        if isinstance(self._prior, BoxUniform):
-            return None
-
-        if not isinstance(self._prior, MultivariateNormal):
-            raise TypeError(
-                f"Prior must be MultivariateNormal or BoxUniform, "
-                f"got {type(self._prior).__name__}"
-            )
-
-        # Get prior parameters
-        prior_mean = self._prior.mean
-        prior_cov = self._prior.covariance_matrix
-
-        # Apply z-score transform if enabled
-        if density_estimator.has_input_transform:
-            shift = density_estimator._transform_shift
-            scale = density_estimator._transform_scale
-
-            # Z-scored mean: (mu - shift) / scale
-            z_mean = (prior_mean - shift) / scale
-
-            # Z-scored covariance: Sigma_z[i,j] = Sigma[i,j] / (scale_i * scale_j)
-            scale_outer = scale.unsqueeze(-1) * scale.unsqueeze(-2)
-            z_cov = prior_cov / scale_outer
-        else:
-            z_mean = prior_mean
-            z_cov = prior_cov
-
-        # Validate covariance is positive definite
-        try:
-            torch.linalg.cholesky(z_cov)
-        except RuntimeError as e:
-            raise ValueError(
-                "Z-scored prior covariance is not positive definite. "
-                "This may indicate numerical issues with the z-score transform. "
-                f"Original error: {e}"
-            ) from e
-
-        # Convert to MoG
-        return MoG.from_gaussian(z_mean, z_cov)
 
     def build_posterior(
         self,
@@ -474,7 +436,7 @@ class NPE_A(PosteriorEstimatorTrainer):
             raise TypeError(
                 "NPE_A requires MixtureDensityEstimator, "
                 f"got {type(density_estimator).__name__}. "
-                "Use density_estimator='mdn_snpe_a' when initializing NPE_A."
+                "Use density_estimator=MDNConfig() when initializing NPE_A."
             )
 
         # Compute correction parameters
@@ -485,8 +447,8 @@ class NPE_A(PosteriorEstimatorTrainer):
             proposal_mog = None
             prior_mog = None
         else:
-            proposal_mog = self._get_proposal_mog(proposal)
-            prior_mog = self._compute_z_scored_prior_mog(density_estimator)
+            proposal_mog = self._get_proposal_mog(proposal, density_estimator)
+            prior_mog = _z_scored_prior_mog(self._prior, density_estimator)
 
         # Build the posterior
         self._posterior = NPE_A_Posterior(
@@ -499,6 +461,26 @@ class NPE_A(PosteriorEstimatorTrainer):
         )
 
         return self._posterior
+
+    def _check_proposal(self, proposal: Any) -> None:
+        """Check the proposal: a Gaussian is fine, a mixture raises.
+
+        Args:
+            proposal: The proposal passed to `append_simulations()`.
+
+        Raises:
+            ValueError: If the proposal is a mixture, e.g. a final-round posterior.
+        """
+        if not isinstance(proposal, MultivariateNormal):
+            super()._check_proposal(proposal)
+        if isinstance(proposal, NPE_A_Posterior):
+            estimator = proposal.posterior_estimator
+            if isinstance(estimator, ProposalCorrectedMDN):
+                estimator = estimator.net
+            assert isinstance(estimator, MixtureDensityEstimator)
+            _check_single_gaussian_proposal(estimator.net.num_components)
+        elif isinstance(proposal, MoG):
+            _check_single_gaussian_proposal(proposal.num_components)
 
     def _multiround_loss_is_per_row(self, proposal: Optional[Any]) -> bool:
         """Return True: NPE-A trains on the plain log-prob for any proposal.

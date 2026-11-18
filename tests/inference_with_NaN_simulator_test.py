@@ -2,11 +2,12 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
+import math
 import warnings
 
 import pytest
 import torch
-from torch import eye, ones, zeros
+from torch import eye, nn, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
@@ -303,6 +304,54 @@ def test_inference_with_restriction_estimator():
     check_c2st(samples, target_samples, alg=f"{NPE_C}")
 
 
+def _restricted_box_prior(num_simulations: int = 300, max_num_epochs: int = 2):
+    prior = utils.BoxUniform(-2 * ones(2), 2 * ones(2))
+    theta = prior.sample((num_simulations,))
+    x = theta.clone()
+    x[theta[:, 0] > 1.0] = float("nan")
+    restriction_estimator = RestrictionEstimator(prior=prior)
+    restriction_estimator.append_simulations(theta, x).train(
+        max_num_epochs=max_num_epochs
+    )
+    return restriction_estimator
+
+
+def test_restrict_prior_uses_the_passed_classifier():
+    """`restrict_prior(classifier=...)` decides with the classifier it is given.
+
+    The given classifier predicts `valid` exactly where theta_0 < 0, while the
+    trained one accepts up to theta_0 = 1.
+    """
+    restriction_estimator = _restricted_box_prior()
+    classifier = nn.Linear(2, 2)
+    with torch.no_grad():
+        classifier.weight.copy_(torch.tensor([[0.0, 0.0], [-100.0, 0.0]]))
+        classifier.bias.zero_()
+
+    restricted_prior = restriction_estimator.restrict_prior(
+        classifier=classifier, reweigh_factor=0.5
+    )
+    samples = restricted_prior.sample((200,), print_rejected_frac=False)
+
+    assert (samples[:, 0] < 0.0).all()
+
+
+def test_restrict_prior_with_reweigh_factor():
+    """With `reweigh_factor`, samples lie where simulations are valid (theta_0 <= 1),
+    and a larger factor accepts fewer parameter sets."""
+    restriction_estimator = _restricted_box_prior(1000, max_num_epochs=20)
+
+    restricted_prior = restriction_estimator.restrict_prior(reweigh_factor=0.5)
+    samples = restricted_prior.sample((500,), print_rejected_frac=False)
+    assert (samples[:, 0] > 1.0).float().mean() < 0.05
+
+    acceptance = [
+        restriction_estimator.restrict_prior(reweigh_factor=factor).prior_acceptance()
+        for factor in (0.1, 0.9)
+    ]
+    assert acceptance[1] < acceptance[0]
+
+
 @pytest.mark.parametrize("prior", ("uniform", "gaussian"))
 def test_restricted_prior_log_prob(prior):
     """Test whether the log-prob method of the restricted prior works appropriately."""
@@ -375,3 +424,78 @@ def test_restricted_prior_sir_uses_oversampling_factor():
     restricted_prior.sample((10,), oversampling_factor=4)
 
     assert sum(num_candidates) == 40
+
+
+def test_restricted_prior_log_prob_one_value_per_theta():
+    """log_prob and SIR work when prior and restriction return shape (N, 1)."""
+    # A univariate prior without `Independent` returns log probs of shape (N, 1).
+    prior = torch.distributions.Normal(zeros(1), ones(1))
+
+    def accept_reject_fn(theta):
+        return theta > 0.0
+
+    restricted_prior = utils.RestrictedPrior(prior, accept_reject_fn)
+    theta = torch.tensor([[0.5], [-0.5], [1.0]])
+    log_prob = restricted_prior.log_prob(theta, norm_restricted_prior=False)
+
+    expected = prior.log_prob(theta).squeeze(1)
+    expected[1] = float("-inf")
+    assert torch.equal(log_prob, expected)
+
+    # Keep sizes tiny: a shape bug here builds (N, N) importance weights.
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=prior, sample_with="sir"
+    )
+    samples = restricted_prior.sample((2,), oversampling_factor=4)
+    assert samples.shape == (2, 1) and bool((samples > 0).all())
+
+
+def test_restricted_prior_sir_samples_truncated_prior():
+    """SIR samples follow the prior truncated to the restriction."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+    # A shifted proposal, like a posterior, needs reweighting by the prior.
+    proposal = MultivariateNormal(torch.tensor([0.5, 0.0]), eye(2))
+
+    def accept_reject_fn(theta):
+        return theta[:, 0] > 0.0
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=proposal, sample_with="sir"
+    )
+    samples = restricted_prior.sample((5_000,), oversampling_factor=64)
+
+    assert torch.all(samples[:, 0] > 0.0)
+    # theta_0 follows a standard half-normal distribution, with mean sqrt(2 / pi).
+    assert abs(samples[:, 0].mean().item() - math.sqrt(2 / math.pi)) < 0.05
+
+
+def test_restricted_prior_sir_raises_without_accepted_candidates():
+    """SIR sampling raises instead of looping forever when no candidate is accepted."""
+    prior = utils.BoxUniform(-ones(2), ones(2))
+
+    def reject_all(theta):
+        return zeros(theta.shape[0], dtype=torch.bool)
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, reject_all, posterior=prior, sample_with="sir"
+    )
+    with pytest.raises(RuntimeError, match="finite importance weight"):
+        restricted_prior.sample((10,), oversampling_factor=16)
+
+
+def test_restricted_prior_sir_ignores_rejected_candidates_at_zero_draw(monkeypatch):
+    """A uniform draw of exactly 0 in SIR does not select a rejected candidate."""
+    torch.manual_seed(0)
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def accept_reject_fn(theta):
+        return theta[:, 0] > 0.0
+
+    restricted_prior = utils.RestrictedPrior(
+        prior, accept_reject_fn, posterior=prior, sample_with="sir"
+    )
+    monkeypatch.setattr(torch, "rand", lambda *args, **kwargs: zeros(args[0], 1))
+    samples = restricted_prior.sample((100,), oversampling_factor=8)
+
+    assert torch.all(samples[:, 0] > 0.0)

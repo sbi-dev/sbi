@@ -106,7 +106,6 @@ def _build_mixed_density_estimator(
             nn.Linear(combined_condition.shape[-1], _combined_hf),
             nn.ReLU(),
             nn.Linear(_combined_hf, _combined_hf),
-            nn.ReLU(),
         )
 
     # TODO: add support for optional log-transform in flow builders.

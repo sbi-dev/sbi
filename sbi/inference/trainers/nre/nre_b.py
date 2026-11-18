@@ -35,7 +35,7 @@ class NRE_B(RatioEstimatorTrainer):
     [1] *On Contrastive Learning for Likelihood-free Inference*, Durkan et al.,
         ICML 2020, https://arxiv.org/pdf/2002.03712
 
-    Example:
+    Example
     --------
 
     ::

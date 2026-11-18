@@ -18,6 +18,7 @@ from sbi.inference.potentials.base_potential import (
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import (
+    _apply_to_transform,
     gradient_ascent,
     load_with_version,
     nan_tolerant_input_net,
@@ -29,6 +30,7 @@ from sbi.utils.torchutils import (
     canonical_device,
     ensure_theta_batched,
     infer_tensor_device,
+    move_tensors,
     process_device,
 )
 from sbi.utils.user_input_checks import process_x
@@ -87,7 +89,7 @@ class NeuralPosterior:
             self.theta_transform = theta_transform
 
         self._map = None
-        self._leakage_cache: Optional[Tuple[Tensor, Tensor]] = None
+        self._leakage_cache: Optional[Tuple[Tensor, int, Tensor]] = None
         self._purpose = ""
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
@@ -108,6 +110,47 @@ class NeuralPosterior:
         if validate_nan_input is not None and torch.isnan(x).any():
             validate_nan_input(x)
 
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the posterior to `device` in place and keep its state.
+
+        Moves the potential (with the estimator and the prior), the parameter
+        transform, the default `x`, the cached MAP and the leakage correction cache.
+        A prior or proposal that is the potential's prior keeps pointing to it, and a
+        proposal that is a posterior moves with its own `to()`. A proposal that is
+        neither a posterior nor a torch `Distribution` is left as it is. Subclasses
+        with more state extend this method.
+
+        Args:
+            device: Device to move the posterior to, e.g. `"cpu"` or `"cuda"`.
+
+        Returns:
+            The posterior itself.
+        """
+        device = process_device(device)
+        shared_prior = getattr(self.potential_fn, "prior", None)
+        self.potential_fn.to(device)  # type: ignore[union-attr]
+        for attr in ("prior", "_prior", "proposal"):
+            value = getattr(self, attr, None)
+            if value is None:
+                continue
+            if value is shared_prior:
+                value = self.potential_fn.prior  # type: ignore[union-attr]
+            elif isinstance(value, NeuralPosterior):
+                value = value.to(device)
+            elif isinstance(value, Distribution):
+                value = move_distribution_to_device(value, device)
+            setattr(self, attr, value)
+
+        if self.theta_transform is not None:
+            _apply_to_transform(self.theta_transform, lambda t: t.to(device))
+        self._x, self._map, self._leakage_cache = move_tensors(
+            (self._x, self._map, self._leakage_cache), device
+        )
+
+        self._device = device
+        self.device = device
+        return self
+
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:
@@ -117,12 +160,15 @@ class NeuralPosterior:
         posterior.
 
         Args:
-            theta: Parameters $\theta$.
+            theta: Parameters $\theta$, each evaluated given all of `x`.
+            x: Observation. If None, the default `x`. Several observations, of shape
+                `(num_observations, *x_event_shape)`, are combined as iid trials;
+                posteriors that take one observation (e.g. direct) raise.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -204,37 +250,100 @@ class NeuralPosterior:
         NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
+        Several observations, of shape `(num_observations, *x_event_shape)`, are iid
+        trials. Posteriors that sample with a potential combine them; methods that
+        take one observation raise and name the alternatives. The how-to guide on iid
+        observations lists which posterior does what.
+
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        x = process_x(x, x_event_shape=None)
-        self._assert_finite_x(x)
-
-        self._x = x.to(self._device)
+        self._x = self._process_x(x)
         self._map = None
         return self
+
+    def _process_x(self, x: Optional[Array]) -> Tensor:
+        """Return `x` with shape `(num_observations, *x_event_shape)` on the device.
+
+        Raises if `x` does not match the shape of one observation of the potential,
+        or holds NaN or Inf values that the net embedding `x` does not accept.
+        """
+        if x is None:
+            raise ValueError("x is None. Pass an observation.")
+        x = process_x(x, x_event_shape=self.potential_fn.x_event_shape)
+        self._assert_finite_x(x)
+        return x.to(self._device)
+
+    @property
+    def _one_observation_hint(self) -> Optional[str]:
+        """What to do instead, if this posterior takes exactly one observation `x`.
+
+        `None` (default) means the posterior combines several observations as iid
+        trials. A posterior that evaluates its estimator directly cannot, and
+        returns the alternatives for the error message.
+        """
+        return None
+
+    def _check_num_observations(self, num_observations: int) -> None:
+        """Raise if this posterior takes one observation and gets several."""
+        hint = self._one_observation_hint
+        if hint is not None:
+            _require_one_observation(num_observations, type(self).__name__, hint)
+
+    def _bind_iid(
+        self, x: Tensor, check_num_observations: bool = True
+    ) -> BasePotential:
+        """Return the potential bound to `x`, with its observations as iid trials.
+
+        Warns if the potential marks iid trials as possibly unintended (NPE).
+
+        Args:
+            x: Observations, of shape `(num_observations, *x_event_shape)`.
+            check_num_observations: Whether to raise if this posterior takes one
+                observation and `x` holds several. VI `train()` skips the check,
+                because the single-x q it fits combines observations.
+        """
+        bound = self.potential_fn.bind(x, x_is_iid=True)
+        num_observations = bound.x_o.shape[0]
+        if check_num_observations:
+            self._check_num_observations(num_observations)
+        if num_observations > 1 and bound.warns_on_implicit_iid:
+            # One location for all callers: Python's default filter shows it once.
+            warn(
+                f"x holds {num_observations} observations, which are combined as iid "
+                "trials of one parameter set. For a separate posterior of each "
+                "observation, pass one observation at a time, or use "
+                "`sample_batched()` of a posterior that supports it (e.g. direct "
+                "or MCMC). With many observations, the product amplifies errors in "
+                "the tails of the NPE posteriors; prefer NLE or NRE, or train NPE "
+                "with a permutation-invariant embedding net on sets of trials.",
+                stacklevel=1,
+            )
+        return bound
+
+    def _resolve_x(self) -> Optional[Tensor]:
+        """Return the `x` that methods use when they get none: the default `x`."""
+        return self.default_x
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
             # New x, reset posterior sampler.
             self._posterior_sampler = None
-            x = process_x(x, x_event_shape=None)
-            self._assert_finite_x(x)
-
-            return x.to(self._device)
-        elif self.default_x is None:
+            return self._process_x(x)
+        implicit_x = self._resolve_x()
+        if implicit_x is None:
             raise ValueError(
-                "Context `x` needed when a default has not been set."
+                "Context `x` needed when a default has not been set. "
                 "If you'd like to have a default, use the `.set_default_x()` method."
             )
-        else:
-            return self.default_x
+        return implicit_x
 
     def _cached_leakage_factor(
         self,
         x: Tensor,
+        num_samples: int,
         prior: Any,
         estimate_fn: Callable[[], Tensor],
         force_update: bool = False,
@@ -243,20 +352,74 @@ class NeuralPosterior:
         """Return the leakage correction factor saved for `x`, or estimate it.
 
         The factor is 1 for priors with unbounded support. Otherwise, one factor is
-        saved, for the last `x`, unless `use_cache=False`.
+        saved, for the last `x` and `num_samples`, unless `use_cache=False`.
         """
         if prior_support_is_bounded(prior) is False:
             return torch.ones((), device=self._device)
-        if self._leakage_cache is not None and use_cache and not force_update:
-            cached_x, factor = self._leakage_cache
-            if cached_x.shape == x.shape and torch.allclose(
-                cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
-            ):
+        if use_cache and not force_update:
+            factor = self._cached_value(self._leakage_cache, x, num_samples)
+            if factor is not None:
                 return factor
         factor = estimate_fn()
         if use_cache:
-            self._leakage_cache = (x.detach().clone(), factor)
+            self._leakage_cache = (x.detach().clone(), num_samples, factor)
         return factor
+
+    @staticmethod
+    def _cached_value(
+        cache: Optional[Tuple[Tensor, int, Tensor]], x: Tensor, num_samples: int
+    ) -> Optional[Tensor]:
+        """Return the value of an `(x, num_samples, value)` cache for these arguments.
+
+        `x` matches on any device and with NaN entries. Returns None on a miss.
+        """
+        if cache is None:
+            return None
+        cached_x, cached_num_samples, value = cache
+        if cached_num_samples != num_samples or cached_x.shape != x.shape:
+            return None
+        same_x = torch.allclose(
+            cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
+        )
+        return value if same_x else None
+
+    def _map_inits(
+        self,
+        init_method: Union[str, Tensor],
+        num_init_samples: int,
+        x: Optional[Tensor] = None,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        """Returns the starting points of the MAP optimization.
+
+        Args:
+            init_method: `posterior`, `proposal` or a tensor of starting points, see
+                `map()` of the child classes.
+            num_init_samples: Number of samples to draw for a string `init_method`.
+            x: Observation for `posterior` samples. If None, the default `x`.
+            show_progress_bars: Whether to show a progress bar while sampling.
+        """
+        has_proposal = getattr(self, "proposal", None) is not None
+        if init_method == "posterior":
+            return self.sample(
+                (num_init_samples,), x=x, show_progress_bars=show_progress_bars
+            )
+        elif init_method == "proposal":
+            if not has_proposal:
+                raise ValueError(
+                    f"init_method='proposal' is not available for "
+                    f"{type(self).__name__}, which has no proposal distribution. "
+                    "Use 'posterior', or pass initial locations as a tensor "
+                    "(for example prior samples)."
+                )
+            return self.proposal.sample((num_init_samples,))
+        elif isinstance(init_method, Tensor):
+            return init_method.to(self._device)
+        valid = "'posterior', 'proposal'" if has_proposal else "'posterior'"
+        raise ValueError(
+            f"Invalid init_method '{init_method}'. Use {valid}, or pass "
+            "initial locations as a tensor (for example prior samples)."
+        )
 
     def _calculate_map(
         self,
@@ -271,18 +434,10 @@ class NeuralPosterior:
         """Calculates the maximum-a-posteriori estimate (MAP).
         See `map()` method of child classes for docstring.
         """
-
-        if init_method == "posterior":
-            inits = self.sample(
-                (num_init_samples,), show_progress_bars=show_progress_bars
-            )
-        elif init_method == "proposal":
-            inits = self.proposal.sample((num_init_samples,))  # type: ignore
-        elif isinstance(init_method, Tensor):
-            inits = init_method
-        else:
-            raise ValueError
-
+        inits = self._map_inits(
+            init_method, num_init_samples, show_progress_bars=show_progress_bars
+        )
+        # Read after `_map_inits()`, whose `sample()` may rebind the potential.
         return gradient_ascent(
             potential_fn=self.potential_fn,
             inits=inits,
@@ -320,7 +475,7 @@ class NeuralPosterior:
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -328,9 +483,11 @@ class NeuralPosterior:
                 for the optimization.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be `posterior` or, for posteriors that
+                have a proposal, `proposal`, which samples the respective
+                distribution `num_init_samples` times. If it is a tensor, the tensor
+                is used as the initial locations, so prior-based initialization can
+                be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             save_best_every: The best log-probability is computed, saved in the
@@ -346,18 +503,13 @@ class NeuralPosterior:
         """
         if x is not None:
             raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated."
-                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+                "Passing `x` to `.map()` is no longer supported. "
+                "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 
-        if self.default_x is None:
-            raise ValueError(
-                "Default `x` has not been set."
-                "To set the default, use the `.set_default_x()` method."
-            )
-
+        x_o = self._x_else_default_x(None)
         if self._map is None or force_update:
-            self.potential_fn = self.potential_fn.bind(self.default_x)
+            self.potential_fn = self._bind_iid(x_o)
             self._map = self._calculate_map(
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,
@@ -421,13 +573,16 @@ class NeuralPosterior:
 
         `torch.load(..., map_location=...)` remaps the tensors but not the stored device
         strings. If the restored tensors live on another device than `_device` claims,
-        the device strings of the posterior, its potential and its prior are updated.
+        the posterior is moved there with `to()`, which updates the device strings of
+        the posterior, its potential and its prior.
 
         Args:
             state_dict: State to be restored.
         """
-        # Posteriors pickled by older sbi versions can miss this key.
-        state_dict.setdefault("_leakage_cache", None)
+        # Posteriors pickled by older sbi versions can miss this key, or save it
+        # without the number of samples.
+        if len(state_dict.get("_leakage_cache") or ()) != 3:
+            state_dict["_leakage_cache"] = None
         self.__dict__ = state_dict
 
         actual_device = infer_tensor_device(self)
@@ -435,18 +590,31 @@ class NeuralPosterior:
             self._device
         ):
             return
+        self.to(actual_device)
 
-        # The tensors already live on `actual_device`. Only the device strings, and the
-        # distributions that cache one, must follow.
-        self._device = actual_device
-        if hasattr(self, "device"):
-            self.device = actual_device
-        shared_prior = getattr(self.potential_fn, "prior", None)
-        self.potential_fn.to(actual_device)  # type: ignore[union-attr]
-        for attr in ("prior", "_prior", "proposal"):
-            value = getattr(self, attr, None)
-            if value is shared_prior and value is not None:
-                # The potential moved this object already. Keep sharing it.
-                setattr(self, attr, self.potential_fn.prior)  # type: ignore[union-attr]
-            elif isinstance(value, Distribution):
-                setattr(self, attr, move_distribution_to_device(value, actual_device))
+
+# Advice shared by the errors of posteriors that take one observation.
+_ONE_AT_A_TIME = (
+    "For a separate posterior of each observation, pass one observation at a time"
+)
+_IID_SAMPLERS = (
+    "`sample_with='mcmc'`, `'importance'`, `'rejection'` or `'vi'` (trained with "
+    "`train()`)"
+)
+
+
+def _require_one_observation(num_observations: int, subject: str, hint: str) -> None:
+    """Raise a ValueError if `subject`, which takes one observation, gets several.
+
+    Every posterior method that takes one observation raises through this function,
+    so that all of them give the same message.
+
+    Args:
+        num_observations: Number of observations in `x`.
+        subject: What takes one observation, e.g. a posterior class or a method.
+        hint: What to do instead.
+    """
+    if num_observations > 1:
+        raise ValueError(
+            f"{subject} takes one observation, but x holds {num_observations}. {hint}"
+        )

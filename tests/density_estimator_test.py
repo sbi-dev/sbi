@@ -38,7 +38,7 @@ from sbi.neural_nets.net_builders import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
-from sbi.neural_nets.net_builders.flow import build_zuko_flow
+from sbi.neural_nets.net_builders.flow import ContextSplineMap, build_zuko_flow
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.torchutils import BoxUniform
 
@@ -549,6 +549,40 @@ def test_mixed_density_estimator(
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
 
 
+@pytest.mark.parametrize(
+    "value, dtype",
+    [
+        (-1.0, torch.float32),
+        (1.0, torch.float32),
+        (3.0, torch.float32),
+        (6.0, torch.float32),
+        (2.00000001, torch.float64),  # rounds to 2.0 in float32
+    ],
+)
+def test_categorical_mass_estimator_rejects_unseen_values(value, dtype):
+    estimator = build_categoricalmassestimator(
+        batch_x=torch.tensor([[0.0], [2.0], [5.0]]),
+        batch_y=torch.randn(3, 1),
+        num_categories_per_variable=torch.tensor([3]),
+    )
+    with pytest.raises(ValueError, match="values not seen during training"):
+        estimator.log_prob(
+            torch.tensor([[value]], dtype=dtype), condition=torch.zeros(1, 1)
+        )
+
+
+def test_categorical_mass_estimator_log_prob_of_own_samples():
+    # Integer categories above 2**24 are not exact in float32.
+    estimator = build_categoricalmassestimator(
+        batch_x=torch.tensor([[2**24 + 1], [2**24 + 5]]),
+        batch_y=torch.randn(2, 1),
+        num_categories_per_variable=torch.tensor([2]),
+    )
+    condition = torch.zeros(1, 1)
+    samples = estimator.sample((10,), condition=condition)
+    assert torch.isfinite(estimator.log_prob(samples, condition=condition)).all()
+
+
 @pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
 @pytest.mark.parametrize(
     "x_dist",
@@ -779,3 +813,17 @@ def test_tabpfn_flow_shapes(batch_dim, input_sample_dim):
 
     with pytest.raises(NotImplementedError):
         estimator.loss(inputs[0], condition=condition)
+
+
+def test_context_spline_map_hidden_layers_have_their_own_weights():
+    """Repeating one layer object would make all hidden layers share weights."""
+    net = ContextSplineMap(
+        in_features=1,
+        out_features=4,
+        hidden_features=8,
+        context_features=3,
+        hidden_layers=3,
+    )
+    linears = [m for m in net.spline_predictor if isinstance(m, torch.nn.Linear)]
+
+    assert len({id(m) for m in linears}) == len(linears) == 5

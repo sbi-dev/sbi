@@ -20,8 +20,10 @@ from torch.distributions import (
     MixtureSameFamily,
     MultivariateNormal,
     Normal,
+    Pareto,
     Uniform,
 )
+from torch.testing import assert_close
 
 from sbi.analysis import conditional_potential
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
@@ -61,6 +63,7 @@ from sbi.utils.user_input_checks_utils import (
     MultipleIndependent,
     OneDimPriorWrapper,
     PytorchReturnTypeWrapper,
+    move_distribution_to_device,
 )
 
 
@@ -267,17 +270,11 @@ def test_reinterpreted_batch_dim_prior():
             ),
             Uniform(zeros(1), ones(1)),
         ],  # multiple independent prior with mixed dtypes and event shapes
-        pytest.param(
-            [
-                UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
-                UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
-                Uniform(zeros(1), ones(1)),
-            ],  # combination of multiple independent custom priors
-            marks=pytest.mark.xfail(
-                reason="custom priors cannot be used in MultipleIndependent priors "
-                "(unless they support .to)."
-            ),
-        ),
+        [
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
+            Uniform(zeros(1), ones(1)),
+        ],  # combination of multiple independent custom priors
     ),
 )
 def test_process_prior(prior):
@@ -297,11 +294,90 @@ def test_process_prior(prior):
     )
 
 
+def _support_lower_bound(prior):
+    """Return the lower bound of a prior support, unwrapping nested constraints."""
+    support = prior.support
+    while hasattr(support, "base_constraint"):
+        support = support.base_constraint
+    return support.lower_bound
+
+
+@pytest.mark.parametrize(
+    "prior",
+    (
+        pytest.param(
+            Pareto(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64)),
+            id="pareto",
+        ),
+        pytest.param(
+            Independent(
+                Uniform(zeros(2, dtype=torch.float64), ones(2, dtype=torch.float64)),
+                1,
+            ),
+            id="independent-uniform",
+        ),
+    ),
+)
+def test_process_prior_float64_prior_has_float32_support(prior):
+    """A float64 prior comes out with float32 samples and support."""
+    prior, _, _ = process_prior(prior)
+    assert prior.sample().dtype == torch.float32
+    assert _support_lower_bound(prior).dtype == torch.float32
+
+
+def test_rebuild_keeps_constructor_arguments_outside_arg_constraints(monkeypatch):
+    """Float32 conversion and device moves keep `coords`, which has a default."""
+    pytest.importorskip("pyro", minversion="1.9.1")  # adds `StableWithLogProb`
+    import pyro.distributions as pyro_distributions
+
+    def stable(dtype):
+        stability = torch.tensor([1.5], dtype=dtype)
+        skew = torch.tensor([0.9], dtype=dtype)
+        return pyro_distributions.StableWithLogProb(stability, skew, coords="S")
+
+    prior = stable(torch.float64)
+    processed, _, _ = process_prior(prior)
+    theta = torch.tensor([[0.0], [2.0]])
+    expected = prior.log_prob(theta.double()).squeeze(-1).float()
+    assert_close(processed.log_prob(theta), expected)
+
+    # A move to "meta" rebuilds on any machine; argument validation fails there.
+    monkeypatch.setattr(Distribution, "_validate_args", False)
+    assert move_distribution_to_device(stable(torch.float32), "meta").coords == "S"
+
+
+@pytest.mark.parametrize(
+    "prior",
+    (
+        pytest.param(
+            Independent(
+                Bernoulli(logits=torch.tensor([-100.0, 0.0], dtype=torch.float64)), 1
+            ),
+            id="bernoulli-logits",
+        ),
+        pytest.param(
+            MultivariateNormal(
+                zeros(2, dtype=torch.float64),
+                scale_tril=torch.tensor(
+                    [[1.0, 0.0], [1.0, 2.5e-4]], dtype=torch.float64
+                ),
+            ),
+            id="mvn-scale-tril",
+        ),
+    ),
+)
+def test_process_prior_float64_prior_keeps_parametrization(prior):
+    """The float32 rebuild keeps the precision of the prior's parameters."""
+    processed, _, _ = process_prior(prior)
+    theta = torch.tensor([[1.0, 1.0]])
+    assert_close(processed.log_prob(theta), prior.log_prob(theta.double()).float())
+
+
 def test_process_prior_warns_and_keeps_shapes_for_float64_prior():
     prior = MultivariateNormal(
         zeros(3, dtype=torch.float64), eye(3, dtype=torch.float64)
     )
-    with pytest.warns(UserWarning, match="casts the samples and log probs"):
+    with pytest.warns(UserWarning, match="rebuilds the prior in float32"):
         processed, parameter_dim, _ = process_prior(prior)
 
     assert parameter_dim == 3
@@ -1050,3 +1126,24 @@ def test_proposal_sharing_weights_with_trainer_raises():
 
     with pytest.raises(ValueError, match="same object"):
         inference.append_simulations(theta, x, proposal=unsafe_proposal)
+
+
+def test_proposal_wrapping_the_trainers_network_raises():
+    """From round 2 on, an NPE-A posterior wraps its network in the proposal
+    correction. The check must also find the trainer's network inside it."""
+    prior = BoxUniform(low=zeros(2), high=ones(2))
+    inference = NPE_A(prior=prior, num_components=1, show_progress_bars=False)
+    x_o = 0.5 * ones(1, 2)
+    theta = prior.sample((50,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=1)
+    proposal = inference.build_posterior().set_default_x(x_o)
+    theta = proposal.sample((50,))
+    net_reference = inference.append_simulations(theta, theta, proposal=proposal).train(
+        max_num_epochs=1
+    )
+
+    unsafe_proposal = inference.build_posterior(net_reference).set_default_x(x_o)
+    theta = unsafe_proposal.sample((50,))
+
+    with pytest.raises(ValueError, match="same object"):
+        inference.append_simulations(theta, theta, proposal=unsafe_proposal)

@@ -7,6 +7,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.inference.posteriors.base_posterior import _ONE_AT_A_TIME
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
@@ -36,11 +37,15 @@ class NPE_A_Posterior(DirectPosterior):
         normalization), all MoG parameters (means, precisions) are in z-scored
         coordinates. The prior_mog must also be transformed to z-scored space
         for the correction to be valid. The NPE_A trainer handles this
-        transformation automatically via ``_compute_z_scored_prior_mog()``.
+        transformation automatically in ``build_posterior()``.
     """
 
     # NPE-A does not support `sample_with='mcmc'`.
     _alternative_sampling_method = "using fewer samples or increasing max_sampling_time"
+
+    @property
+    def _one_observation_hint(self) -> str:
+        return f"{_ONE_AT_A_TIME}, or use `sample_batched()` and `log_prob_batched()`."
 
     def __init__(
         self,
@@ -87,10 +92,19 @@ class NPE_A_Posterior(DirectPosterior):
 
         Args:
             state_dict: State to be restored.
+
+        Raises:
+            ValueError: If the pickled proposal is a mixture.
         """
         proposal_mog = state_dict.pop("_proposal_mog", None)
         prior_mog = state_dict.pop("_prior_mog", None)
         state_dict.pop("_apply_correction", None)
+        if proposal_mog is not None and proposal_mog.num_components > 1:
+            raise ValueError(
+                "This NPE-A posterior was saved by sbi 0.26 or 0.27 with a mixture "
+                "proposal, whose correction was wrong (sbi issue #2108). Please "
+                "train it again."
+            )
         if proposal_mog is not None:
             estimator = ProposalCorrectedMDN(
                 state_dict["posterior_estimator"], proposal_mog, prior_mog
