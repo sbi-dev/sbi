@@ -358,7 +358,7 @@ class DirectPosterior(NeuralPosterior):
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
-        x = self._process_x(x)
+        x = self._process_x(self._x_else_default_x(x))
         theta = torch.as_tensor(theta, device=self._device)
 
         event_shape = self.prior.event_shape
