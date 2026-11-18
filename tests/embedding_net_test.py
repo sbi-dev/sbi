@@ -38,6 +38,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.metrics import check_c2st
+from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
@@ -333,6 +334,25 @@ def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
 
     _test_embedding_forward_pass(embedding_net, input_shape, 2 * modes)
     _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("with_positions", (False, True))
+def test_spectral_conv_embedding_on_gpu(with_positions):
+    """The Fourier matrices follow the device of the input."""
+    embedding_net = SpectralConvEmbedding(
+        in_channels=2, modes=4, conv_channels=3, num_layers=2
+    )
+    x = torch.randn(3, 2, 16)
+    if with_positions:
+        positions = torch.sort(torch.rand(3, 16), dim=1).values
+        x = torch.stack([x, positions[:, None].expand(-1, 2, -1)], dim=1)
+    expected = embedding_net(x)
+
+    device = process_device("gpu")
+    output = embedding_net.to(device)(x.to(device))
+
+    assert torch.allclose(output.cpu(), expected, atol=1e-5)
 
 
 BASE_CONFIG = {

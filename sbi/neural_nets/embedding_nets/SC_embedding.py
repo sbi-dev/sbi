@@ -44,6 +44,8 @@ class VFT:
         point_positions: Grid point positions of shape (batch_size, n_points).
             If not provided, equispaced points are used. Positions have to be
             normalized with domain length.
+        device: Device of the data to transform. Defaults to the device of
+            `point_positions`, else the CPU.
     """
 
     def __init__(
@@ -52,7 +54,10 @@ class VFT:
         n_points: int,
         modes: int,
         point_positions: Optional[Tensor] = None,
+        device: Optional[torch.device] = None,
     ):
+        if device is None and point_positions is not None:
+            device = point_positions.device
         self.number_points = n_points
         self.batch_size = batch_size
         self.modes = modes
@@ -61,14 +66,18 @@ class VFT:
             new_times = point_positions[:, None, :]
         else:
             new_times = (
-                (torch.arange(self.number_points) / self.number_points).repeat(
-                    self.batch_size, 1
-                )
+                (
+                    torch.arange(self.number_points, device=device) / self.number_points
+                ).repeat(self.batch_size, 1)
             )[:, None, :]
 
         self.new_times = new_times * 2 * np.pi
 
-        self.X_ = torch.arange(modes).repeat(self.batch_size, 1)[:, :, None].float()
+        self.X_ = (
+            torch.arange(modes, device=device)
+            .repeat(self.batch_size, 1)[:, :, None]
+            .float()
+        )
         # V_fwd: (batch, modes, points) V_inf: (batch, points, modes)
         self.V_fwd, self.V_inv = self.make_matrix()
 
@@ -331,7 +340,9 @@ class SpectralConvEmbedding(nn.Module):
         x = self.fc0(x)  # (batch_size, n_points, in_channels)
 
         # Initialize Fourier transform for arbitrarily spaced points
-        fourier_transform = VFT(batch_size, n_points, self.modes, point_positions)
+        fourier_transform = VFT(
+            batch_size, n_points, self.modes, point_positions, device=x.device
+        )
 
         # Send the data through Fourier layers, output in original space
         for conv, w in zip(self.conv_layers, self.w_layers, strict=False):
