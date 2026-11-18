@@ -121,7 +121,8 @@ def calculate_p_misspecification(
             "(for example, when most samples are identical, as in sparse discrete "
             "data), or with mmd_mode='unbiased' and a single observation."
         )
-    p_val = 1 - (mmds_baseline < mmd).sum().item() / n_shuffle
+    # The observed MMD counts as one draw under H_0, so the p-value is never 0.
+    p_val = (1 + (mmds_baseline >= mmd).sum().item()) / (1 + n_shuffle)
     return p_val, (mmds_baseline, mmd)
 
 

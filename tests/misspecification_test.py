@@ -248,7 +248,9 @@ def test_mmd_many_observations_gives_finite_baseline(n_obs: int):
     )
 
     assert torch.isfinite(mmds_baseline).all()
-    assert p_val < 0.05, f"Expected a small p_val for misspecified data, got {p_val}"
+    # All 20 baseline MMDs are below the observed one, and the observed MMD counts
+    # as one more draw.
+    assert p_val == pytest.approx(1 / 21)
 
 
 def test_mmd_raises_for_non_finite_mmd():
