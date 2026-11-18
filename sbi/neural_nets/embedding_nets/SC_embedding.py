@@ -86,7 +86,7 @@ class VFT:
         Fourier transformation on arbitrary grids
         """
 
-        X_mat = torch.bmm(self.X_, self.new_times)
+        X_mat = self.X_ * self.new_times
         forward_mat = torch.exp(-1j * (X_mat))
 
         inverse_mat = torch.conj(forward_mat.clone()).permute(0, 2, 1)

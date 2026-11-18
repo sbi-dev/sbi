@@ -355,6 +355,15 @@ def test_spectral_conv_embedding_on_gpu(with_positions):
     assert torch.allclose(output.cpu(), expected, atol=1e-5)
 
 
+def test_spectral_conv_embedding_under_autocast():
+    """Mixed precision must not turn the Fourier matrices into complex32."""
+    embedding_net = SpectralConvEmbedding(
+        in_channels=2, modes=4, conv_channels=3, num_layers=2
+    )
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        embedding_net(torch.randn(3, 2, 16))
+
+
 BASE_CONFIG = {
     "pos_emb_base": 10e4,
     "rms_norm_eps": 1e-05,
