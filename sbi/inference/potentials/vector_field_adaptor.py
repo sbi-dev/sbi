@@ -194,7 +194,7 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
     independent scale and shift to each. This allows tempering the posterior, e.g.,
     sharpening or flattening it.
 
-    Example:
+    Example
     --------
 
     ::
@@ -289,7 +289,7 @@ class UniversalGuidance(ScoreAdaptation):
     input and then computing the gradient of a custom guidance function. If no
     analytic gradient is provided, it is obtained via ``torch.autograd``.
 
-    Example:
+    Example
     --------
 
     ::
@@ -401,7 +401,7 @@ class IntervalGuidance(UniversalGuidance):
     ``[lower_bound, upper_bound]``. Built on top of
     :class:`UniversalGuidance`.
 
-    Example:
+    Example
     --------
 
     ::
@@ -513,7 +513,7 @@ class PriorGuide(ScoreAdaptation):
     test prior, then leverages the backward kernel of the diffusion process to
     accurately compute the marginal adjusted posterior score.
 
-    Example:
+    Example
     --------
 
     ::
@@ -732,7 +732,7 @@ class FactorizedNPEScoreFunction(IIDScoreFunction):
     apply corrections for the marginal score at :math:`t > 0`, so post-hoc adjustment
     (e.g., predictor-corrector samplers) may be needed for many observations.
 
-    Example:
+    Example
     --------
 
     ::
@@ -1037,7 +1037,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     factor, assuming that the data is informative enough for the posterior to be
     narrower than the prior.
 
-    Example:
+    Example
     --------
 
     ::
@@ -1141,7 +1141,7 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
     per-observation posterior using the vector field estimator. Has a slight
     initialization overhead but is generally more accurate than a fixed heuristic.
 
-    Example:
+    Example
     --------
 
     ::

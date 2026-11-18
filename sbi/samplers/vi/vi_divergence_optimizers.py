@@ -482,8 +482,8 @@ class ElboOptimizer(DivergenceOptimizer):
             samples = self.q.rsample(torch.Size((num_samples,)))
             log_q = self.q.log_prob(samples)
 
-        self.potential_fn = self.potential_fn.bind(x_o)
-        log_potential = self.potential_fn(samples)
+        self.potential_fn = self.potential_fn.bind(x_o, x_is_iid=True)
+        log_potential = self.potential_fn(samples, track_gradients=True)
         elbo = log_potential - log_q
         return elbo
 
@@ -608,10 +608,12 @@ class ForwardKLOptimizer(DivergenceOptimizer):
 
         Args:
             proposal: The proposal used we currently support only [`q`]
-            weight_transform: A transformation applied to the self-normalized
-                importance weights $w(\theta) \propto p(\theta, x_o)/q(\theta)$, which
-                sum to one over the particles. The transformed weights are normalized
-                again. For example, clamping them can reduce variance.
+            weight_transform: This is a transformation that is applied to the importance
+                weight $w(\theta) = p(\theta, x_o)/q(\theta)$, scaled so that the
+                largest weight of the particles is 1. For example it may be usefull to
+                clamp the weights by a certain rule to reduce variance.
+
+
         """
         super().__init__(*args, **kwargs)
 
@@ -639,12 +641,13 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         if hasattr(self.q, "clear_cache"):
             self.q.clear_cache()
         logq = self.q.log_prob(samples)
-        self.potential_fn = self.potential_fn.bind(x_o)
+        self.potential_fn = self.potential_fn.bind(x_o, x_is_iid=True)
         logp = self.potential_fn(samples)
         with torch.no_grad():
-            # Normalized in log space: exp of raw log-weights under- or overflows.
-            weights = self.weight_transform(torch.softmax(logp - logq, dim=0))
-            weights = weights / weights.sum()
+            logweights = logp - logq
+            # Only relative weights matter; the shift keeps exp() from underflowing.
+            weights = self.weight_transform((logweights - logweights.max()).exp())
+            weights /= weights.sum()
 
         surrogate = -torch.sum(weights * logq)
         # Zero-weight particles (log p = -inf) would give 0 * -inf = nan.

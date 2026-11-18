@@ -43,7 +43,7 @@ class NPSE(VectorFieldTrainer):
     [2] Sequential neural score estimation: Likelihood-free inference with conditional
         score based diffusion models, Sharrock et al., ICML 2024.
 
-    Example:
+    Example
     --------
 
     ::

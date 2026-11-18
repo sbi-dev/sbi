@@ -7,6 +7,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.inference.posteriors.base_posterior import _ONE_AT_A_TIME
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
@@ -41,6 +42,10 @@ class NPE_A_Posterior(DirectPosterior):
 
     # NPE-A does not support `sample_with='mcmc'`.
     _alternative_sampling_method = "using fewer samples or increasing max_sampling_time"
+
+    @property
+    def _one_observation_hint(self) -> str:
+        return f"{_ONE_AT_A_TIME}, or use `sample_batched()` and `log_prob_batched()`."
 
     def __init__(
         self,

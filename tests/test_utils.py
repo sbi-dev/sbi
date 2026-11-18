@@ -168,8 +168,6 @@ def get_normalization_uniform_prior(
 
 
 class PosteriorPotential(BasePotential):
-    allow_iid_x = False  # type: ignore
-
     def __init__(
         self,
         posterior: Distribution,
