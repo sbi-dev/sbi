@@ -292,6 +292,14 @@ class NeuralPosterior:
         if hint is not None:
             _require_one_observation(num_observations, type(self).__name__, hint)
 
+    def _check_x_for_sampling(self, x: Tensor) -> None:
+        """Raise if this posterior cannot sample for `x`.
+
+        The default accepts any processed `x` of the right shape. Posteriors whose q
+        answers for one stored observation override this so that callers can validate
+        all components before drawing one.
+        """
+
     def _bind_iid(
         self, x: Tensor, check_num_observations: bool = True
     ) -> BasePotential:
