@@ -509,6 +509,27 @@ def test_jac_gauss_survives_float32_cancellation():
     assert torch.isfinite(scores).all()
 
 
+@pytest.mark.parametrize("singular", [False, True], ids=["inverse", "floor"])
+def test_jac_gauss_score_has_finite_gradients_at_repeated_eigenvalues(singular):
+    """A Jacobian proportional to I repeats all eigenvalues; -I / s^2 hits the floor."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    estimator = posterior_flow_nn()(prior.sample((100,)), torch.randn(100, 2))
+
+    def score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        z = input - estimator.mean_t_fn(t) * condition
+        variance = estimator.std_fn(t) ** 2 if singular else 1.0
+        return -z / variance - z**3
+
+    estimator.score = score
+    score_fn = JacCorrectedScoreFn(estimator, prior, ensure_lam_psd=False)
+    inputs = torch.zeros(4, 1, 2, requires_grad=True)
+
+    scores = score_fn(inputs, torch.zeros(3, 2), torch.tensor([0.5]))
+    (gradient,) = torch.autograd.grad(scores.sum(), inputs)
+
+    assert torch.isfinite(gradient).all()
+
+
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("predictor", ("euler_maruyama",))
 @pytest.mark.parametrize("corrector", (None, "gibbs", "langevin"))

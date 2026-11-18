@@ -1353,12 +1353,18 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         std = self.vector_field_estimator.std_fn(time)
         cov0 = std**2 * jac + torch.eye(d, device=self.device)[None, None, :, :]
 
-        # For posteriors much narrower than the noise, I + s^2 J cancels below the
-        # rounding error of its unit diagonal. Eigenvalues there are set to that floor.
-        eigenvalues, eigenvectors = torch.linalg.eigh(cov0)
+        # Narrow posteriors cancel I + s^2 J below float rounding. Those matrices get an
+        # eigenvalue floor, without gradient (eigh's is NaN at repeated eigenvalues).
         floor = 10 * torch.finfo(cov0.dtype).eps
-        eigenvalues = torch.where(eigenvalues.abs() < floor, floor, eigenvalues)
-        inverse_cov0 = (eigenvectors / eigenvalues[..., None, :]) @ eigenvectors.mT
+        singular = (torch.linalg.eigvalsh(cov0).abs() < floor).any(-1)
+        inverse_cov0 = torch.zeros_like(cov0)
+        inverse_cov0[~singular] = torch.linalg.inv(cov0[~singular])
+        if singular.any():
+            eigenvalues, eigenvectors = torch.linalg.eigh(cov0[singular].detach())
+            eigenvalues = torch.where(eigenvalues.abs() < floor, floor, eigenvalues)
+            inverse_cov0[singular] = (
+                eigenvectors / eigenvalues[..., None, :]
+            ) @ eigenvectors.mT
 
         denoising_posterior_precision = m**2 / std**2 * inverse_cov0
 
