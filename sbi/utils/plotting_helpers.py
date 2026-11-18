@@ -1,23 +1,17 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import collections
 import logging
+from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import numpy as np
-import six
 import torch
 
 from sbi.utils.torchutils import tensor2numpy
 
 logger = logging.getLogger(__name__)
-
-try:
-    collectionsAbc = collections.abc  # type: ignore
-except AttributeError:
-    collectionsAbc = collections
 
 # for circular import error
 if TYPE_CHECKING:
@@ -55,13 +49,21 @@ def to_list_kwargs(x: "KwargsType", len: int) -> List[Optional[Dict]]:
 
 
 def update(d: Dict, u: Optional[Dict]) -> Dict:
-    """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
+    """Recursively merge user options into a dictionary of defaults, in place.
+
+    Args:
+        d: Default options; nested mappings are merged key by key.
+        u: User options that override `d`. `None` leaves `d` unchanged.
+
+    Returns:
+        The updated dictionary `d`.
+    """
     if u is not None:
-        for k, v in six.iteritems(u):
+        for k, v in u.items():
             dv = d.get(k, {})
-            if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
+            if not isinstance(dv, Mapping):
                 d[k] = v
-            elif isinstance(v, collectionsAbc.Mapping):  # type: ignore
+            elif isinstance(v, Mapping):
                 d[k] = update(dv, v)
             else:
                 d[k] = v
