@@ -9,6 +9,7 @@ import pytest
 import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from matplotlib.pyplot import close, subplots
 from scipy.stats import binom
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -382,6 +383,102 @@ def test_sbc_rank_plot_bands_for_uniform_integer_ranks(plot_type):
             expected -= 9 / 11
             np.testing.assert_allclose(ax.lines[0].get_ydata(), 0, atol=1e-12)
         np.testing.assert_allclose((in_bin_8.min(), in_bin_8.max()), expected)
+    close()
+
+
+@pytest.mark.parametrize("params_in_subplots", (True, False))
+def test_sbc_rank_plot_cdf_diff_axis_fits_large_deviations(params_in_subplots):
+    """The cdf-diff y-axis grows to show deviations beyond 0.5 instead of clipping."""
+    # All ranks 0: the empirical CDF is 1 from the first bin on, about 0.9 above
+    # the uniform CDF there.
+    _, ax = sbc_rank_plot(
+        np.zeros((200, 2)),
+        100,
+        num_bins=10,
+        plot_type="cdf-diff",
+        params_in_subplots=params_in_subplots,
+    )
+    for axis in np.atleast_1d(ax):
+        largest = max(np.abs(line.get_ydata()).max() for line in axis.lines)
+        assert largest == pytest.approx(1 - 10 / 101)
+        assert axis.get_ylim() == (-1.0, 1.0)
+    close()
+
+
+def test_sbc_rank_plot_cdf_diff_axis_keeps_default_for_small_deviations():
+    ranks = np.random.default_rng(0).integers(0, 101, size=(1000, 2))
+    _, ax = sbc_rank_plot(ranks, 100, plot_type="cdf-diff")
+    assert ax.get_ylim() == (-0.5, 0.5)
+    close()
+
+
+def test_sbc_rank_plot_cdf_diff_axis_ignores_hidden_band():
+    # With 5 runs the band reaches beyond 0.5; the curve deviates by 0.4.
+    _, ax = sbc_rank_plot(
+        np.full((5, 1), 50.0),
+        100,
+        num_bins=5,
+        plot_type="cdf-diff",
+        show_uniform_region=False,
+    )
+    assert ax.get_ylim() == (-0.5, 0.5)
+    close()
+
+
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+@pytest.mark.parametrize(
+    "ranks_labels",
+    (["NPE", "NLE"], ["NPE", "NPE"], ["expected under uniformity", "NLE"]),
+)
+def test_sbc_rank_plot_legend_names_each_rank_set(plot_type, ranks_labels):
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 2)) for _ in range(2)]
+    _, ax = sbc_rank_plot(ranks, 100, plot_type=plot_type, ranks_labels=ranks_labels)
+    legend_texts = [text.get_text() for text in ax[0].get_legend().get_texts()]
+    assert legend_texts == [*ranks_labels, "expected under uniformity"]
+    assert ax[1].get_legend() is None
+    close()
+
+
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+@pytest.mark.parametrize(
+    "legend_kwargs, expected",
+    (
+        ({"labels": ["a", "b", "band"]}, ["a", "b", "band"]),
+        ({"handles": [Line2D([], [], label="reference")]}, ["reference"]),
+    ),
+)
+def test_sbc_rank_plot_legend_kwargs_override_entries(
+    plot_type, legend_kwargs, expected
+):
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 1)) for _ in range(2)]
+    _, ax = sbc_rank_plot(ranks, 100, plot_type=plot_type, legend_kwargs=legend_kwargs)
+    legend_texts = [text.get_text() for text in ax[0].get_legend().get_texts()]
+    assert legend_texts == expected
+    close()
+
+
+@pytest.mark.parametrize("show_uniform_region", (True, False))
+def test_sbc_rank_plot_hist_draws_the_band_once(show_uniform_region):
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 2)) for _ in range(2)]
+    _, ax = sbc_rank_plot(
+        ranks, 100, plot_type="hist", show_uniform_region=show_uniform_region
+    )
+    for axis in ax:
+        assert len(axis.collections) == int(show_uniform_region)
+    close()
+
+
+def test_sbc_rank_plot_legend_keeps_entries_already_on_the_axes():
+    fig, ax = subplots(1, 1)
+    ax.bar([10], [0.5], label="reference")  # a container, not an artist
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 1)) for _ in range(2)]
+    sbc_rank_plot(ranks, 100, plot_type="cdf", fig=fig, ax=np.array([ax]))
+    legend_texts = [text.get_text() for text in ax.get_legend().get_texts()]
+    assert "reference" in legend_texts
     close()
 
 

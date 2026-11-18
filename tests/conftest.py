@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import os
 import shutil
 from pathlib import Path
 
@@ -102,6 +103,12 @@ def pytest_addoption(parser):
         default=None,
         help="Comma-separated estimators for the selected mini-benchmark mode",
     )
+    parser.addoption(
+        "--bm-embedding",
+        action="store",
+        default=None,
+        help="Embedding net for x in the npe mini-benchmark: 'fc' adds an FCEmbedding",
+    )
 
     parser.addoption(
         "--bm-label",
@@ -140,12 +147,22 @@ def pytest_addoption(parser):
     )
 
 
+@pytest.hookimpl(optionalhook=True)
+def pytest_xdist_setupnodes(config, specs):
+    # Parallel workers would otherwise each start one thread per core in torch,
+    # BLAS and OpenMP. xdist calls this hook in the main process, right before it
+    # starts the workers: they inherit the variable, and the libraries read it when
+    # they load. Inside a worker it would be too late.
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+
+
 def pytest_configure(config):
+    # pytest-harvest asks xdist for the `dist` option even when xdist is disabled
+    # (`-p no:xdist`), and xdist only defines it when it is loaded.
+    if not config.pluginmanager.hasplugin("xdist"):
+        config.option.dist = "no"
     if not config.getoption("--bm"):
         return
-    # Parallel benchmark workers would otherwise each start one torch thread per core.
-    if hasattr(config, "workerinput"):
-        torch.set_num_threads(1)
     # Resolve the label at the start, so switching branches during a run does not
     # change where its results go.
     config.stash[BENCHMARK_LABEL] = benchmark_label(config.getoption("--bm-label"))

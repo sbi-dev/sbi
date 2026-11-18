@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import math
-from typing import Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Callable, Dict, Literal, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -12,18 +12,17 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Proposal, Shape, TorchTransform
-from sbi.utils.sbiutils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import ensure_theta_batched, move_tensors
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
     r"""Provides importance sampling to sample from the posterior.
 
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
-    `ImportanceSamplingPosterior` allows to estimate the posterior log-probability by
-    estimating the normlalization constant with importance sampling. It also allows to
-    perform importance sampling (with `.sample()`) and to draw approximate samples with
-    sampling-importance-resampling (SIR) (with `.sir_sample()`)
+    `ImportanceSamplingPosterior` estimates the posterior log-probability by
+    estimating the normalization constant with importance sampling. `.sample()` draws
+    approximate samples with sampling-importance-resampling (SIR) by default, or returns
+    samples and their log importance weights with `method="importance"`.
     """
 
     def __init__(
@@ -48,7 +47,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 `.sample()` method. With `sir`, approximate posterior samples are
                 generated with sampling importance resampling (SIR). With
                 `importance`, the `.sample()` method returns a tuple of samples and
-                corresponding importance weights.
+                corresponding log importance weights.
             oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight.
             max_sampling_batch_size: The batch size of samples being drawn from the
@@ -69,7 +68,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         # constant.
         self._log_normalization_cache: Optional[Tuple[Tensor, int, Tensor]] = None
         self.method = method
-        self.theta_transform = theta_transform
 
         self.oversampling_factor = oversampling_factor
         self.max_sampling_batch_size = max_sampling_batch_size
@@ -81,34 +79,12 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         )
         self.x_shape = x_shape
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move the potential, the proposal and x_o to a new device.
-
-        It also reinstantiates the posterior with the new device.
-
-        Args:
-            device: Device on which to move the posterior to.
-        """
-        device = process_device(device)
-        self.device = device
-        self.potential_fn.to(device)  # type: ignore
-        self.proposal.to(device)
-        self._log_normalization_cache = None
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-
-        self.theta_transform = mcmc_transform(self.proposal, device=device)
-        super().__init__(
-            self.potential_fn,
-            theta_transform=self.theta_transform,
-            device=device,
-            x_shape=self.x_shape,
+    def to(self, device: Union[str, torch.device]) -> Self:
+        super().to(device)
+        self._log_normalization_cache = move_tensors(
+            self._log_normalization_cache, self._device
         )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
+        return self
 
     def log_prob(
         self,
@@ -123,6 +99,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
+            x: Observation. If not provided, uses the default `x`. Several
+                observations are combined as iid trials.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -133,7 +111,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         x = self._x_else_default_x(x)
-        self.potential_fn = self.potential_fn.bind(x)
+        self.potential_fn = self._bind_iid(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
@@ -166,6 +144,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             The normalization constant as a scalar tensor.
         """
         x = self._x_else_default_x(x)
+        self.potential_fn = self._bind_iid(x)
         return torch.exp(
             self._estimate_log_normalization_constant(x, num_samples, force_update)
         )
@@ -177,7 +156,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         """Returns the log normalization constant, cached per x and sample count.
 
         The estimate is computed in log space, because the importance weights of
-        e.g. many iid observations underflow when exponentiated.
+        e.g. many iid observations underflow when exponentiated. The caller binds
+        `self.potential_fn` to `x`.
         """
         log_normalization_constant = None
         if not force_update:
@@ -186,7 +166,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             )
         if log_normalization_constant is None:
             _, log_importance_weights = importance_sample(
-                self.potential_fn.bind(x),
+                self.potential_fn,
                 proposal=self.proposal,
                 num_samples=num_samples,
             )
@@ -226,12 +206,13 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Args:
             sample_shape: Shape of samples that are drawn from posterior.
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
-                set via `.set_default_x()`.
+                set via `.set_default_x()`. Several observations are combined as iid
+                trials.
             method: Either of [`sir`|`importance`]. This sets the behavior of the
                 `.sample()` method. With `sir`, approximate posterior samples are
                 generated with sampling importance resampling (SIR). With
                 `importance`, the `.sample()` method returns a tuple of samples and
-                corresponding importance weights.
+                corresponding log importance weights.
             oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight. If not provided, uses the
                 value specified at initialization.
@@ -243,7 +224,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         method = self.method if method is None else method
 
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
         if method == "sir":
             return self._sir_sample(
@@ -267,7 +248,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         raise NotImplementedError(
             "Batched sampling is not implemented for ImportanceSamplingPosterior. \
            Alternatively you can use `sample` in a loop \
-           [posterior.sample(theta, x_o) for x_o in x]."
+           [posterior.sample(sample_shape, x=x_o) for x_o in x]."
         )
 
     def _importance_sample(
@@ -382,7 +363,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.

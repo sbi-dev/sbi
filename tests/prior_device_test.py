@@ -3,7 +3,13 @@
 
 import pytest
 import torch
-from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal, Normal
+from torch.distributions import (
+    Beta,
+    Binomial,
+    Gamma,
+    MultivariateNormal,
+    Normal,
+)
 
 from sbi.utils import RestrictedPrior
 from sbi.utils.torchutils import BoxUniform, process_device

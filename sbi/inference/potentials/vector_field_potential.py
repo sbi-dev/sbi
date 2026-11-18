@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor, nn
@@ -23,7 +23,6 @@ from sbi.samplers.ode_solvers import build_neural_ode
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform, within_support
 from sbi.utils.torchutils import ensure_theta_batched
-from sbi.utils.user_input_checks import process_x
 
 
 class VectorFieldBasedPotential(BasePotential):
@@ -92,6 +91,17 @@ class VectorFieldBasedPotential(BasePotential):
         return self.vector_field_estimator.embedding_net
 
     @property
+    def iid_breaks_normalization(self) -> bool:
+        """The density combined from the iid scores of several observations is
+        unnormalized."""
+        return True
+
+    @property
+    def x_event_shape(self) -> torch.Size:
+        """Shape of one observation: the condition shape of the estimator."""
+        return self.vector_field_estimator.condition_shape
+
+    @property
     def num_iid_observations(self) -> int:
         """Number of iid observations combined: batch size of `x_o` if iid, else 1."""
         if self._x_o is None or not self.x_is_iid:
@@ -108,17 +118,26 @@ class VectorFieldBasedPotential(BasePotential):
             return self.num_iid_observations**-0.5
         return 1.0
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Moves the vector field estimator, prior and x_o to the given device.
-
-        It also sets the device attribute to the given device.
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the vector field estimator, its ODE, the prior and x_o to `device`.
 
         Args:
-            device: Device to move the vector field estimator, prior and x_o to.
+            device: Device to move the potential to.
+
+        Returns:
+            Self for method chaining.
         """
         super().to(device)
         self.vector_field_estimator.to(self.device)
+        self.neural_ode.to(self.device)
+        # Cached flows hold x_o and the ODE's base distribution of the old device.
+        flow_kwargs = getattr(self, "_flow_kwargs", {})
+        if self._x_o is not None:
+            if getattr(self, "flow", None) is not None:
+                self.flow = self.rebuild_flow(**flow_kwargs)
+            if getattr(self, "flows", None) is not None:
+                self.flows = self.rebuild_flows_for_batch(**flow_kwargs)
+        return self
 
     def set_x(
         self,
@@ -168,7 +187,8 @@ class VectorFieldBasedPotential(BasePotential):
         self.iid_params = bound.iid_params
         self.guidance_method = bound.guidance_method
         self.guidance_params = bound.guidance_params
-        if not x_is_iid and (bound._x_o is not None):
+        self._flow_kwargs = bound._flow_kwargs
+        if not bound._x_is_iid and (bound._x_o is not None):
             self.flow = bound.flow
         elif bound._x_o is not None:
             self.flows = bound.flows
@@ -183,7 +203,13 @@ class VectorFieldBasedPotential(BasePotential):
         guidance_params: Optional[Dict[str, Any]] = None,
         **ode_kwargs,
     ) -> "VectorFieldBasedPotential":
-        """Create new potential with x bound, without mutable state."""
+        """Create new potential with x bound, without mutable state.
+
+        With a single observation, `x_is_iid=True` is the same as `False`.
+        """
+        x_o = self._prepare_x_o(x_o)
+        if x_o is not None and x_o.shape[0] == 1:
+            x_is_iid = False
         # IID and guidance require transforming the prior to standardized space.
         if self.vector_field_estimator.compose_enabled:
             if x_is_iid:
@@ -207,12 +233,12 @@ class VectorFieldBasedPotential(BasePotential):
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
         bound._x_o = x_o
         bound._x_is_iid = x_is_iid
         bound.guidance_method = guidance_method
         bound.guidance_params = guidance_params
+        # Kept so that `to()` rebuilds the flows with the same ODE options.
+        bound._flow_kwargs = ode_kwargs
         if not x_is_iid and (bound._x_o is not None):
             bound.flow = bound.rebuild_flow(**ode_kwargs)
         elif bound._x_o is not None:
@@ -311,7 +337,7 @@ class VectorFieldBasedPotential(BasePotential):
         """
         if not self.vector_field_estimator.SCORE_DEFINED:
             raise ValueError(
-                "Gradient is not available since the score"
+                "Gradient is not available since the score "
                 "is not defined for this vector field estimator."
             )
 
@@ -323,7 +349,7 @@ class VectorFieldBasedPotential(BasePotential):
 
         if self._x_o is None:
             raise ValueError(
-                "No observed data x_o is available. Please reinitialize"
+                "No observed data x_o is available. Please reinitialize "
                 "the potential or manually set self._x_o."
             )
 
@@ -368,7 +394,7 @@ class VectorFieldBasedPotential(BasePotential):
         """
         if self._x_o is None:
             raise ValueError(
-                "No observed data x_o is available. Please reinitialize"
+                "No observed data x_o is available. Please reinitialize "
                 "the potential or manually set self._x_o."
             )
         x_density_estimator = reshape_to_batch_event(

@@ -4,7 +4,7 @@ import inspect
 import warnings
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, Literal, Optional, Union
+from typing import Any, Callable, Dict, Literal, Optional, Self, Union
 from warnings import warn
 
 import torch
@@ -13,11 +13,9 @@ from joblib import Parallel, delayed
 from numpy import ndarray
 from torch import Tensor
 from torch import multiprocessing as mp
-from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets.estimators.shape_handling import reshape_to_batch_event
 from sbi.samplers.mcmc import (
     IterateParameters,
     SliceSamplerSerial,
@@ -28,11 +26,10 @@ from sbi.samplers.mcmc import (
 )
 from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.pbar import sampling_desc
+from sbi.utils.pbar import progress_disabled, sampling_desc, tqdm
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import (
     ensure_theta_batched,
-    process_device,
     tensor2numpy,
 )
 from sbi.utils.typechecks import validate_target_accept
@@ -100,7 +97,7 @@ class MCMCPosterior(NeuralPosterior):
             init_strategy_parameters: Dictionary of keyword arguments passed to the
                 init strategy, e.g., for `init_strategy=sir` this could be
                 `num_candidate_samples`, i.e., the number of candidates to find init
-                locations (internal default is `1000`), or `device`.
+                locations (internal default is `10000`), or `device`.
             num_workers: number of cpu cores used to parallelize mcmc
             mp_context: Multiprocessing start method, either `"fork"` or `"spawn"`
                 (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
@@ -149,34 +146,24 @@ class MCMCPosterior(NeuralPosterior):
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """Moves potential_fn, proposal, x_o and theta_transform to the
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the posterior to `device` in place, see `NeuralPosterior.to()`.
 
-        specified device. Reinstantiates the posterior and resets the default x_o.
+        The chain states stored for `init_strategy="latest_sample"` move as well. The
+        sampler of the last run stays for its diagnostics; `sample()` builds a new one.
 
         Args:
             device: Device to move the posterior to.
+
+        Returns:
+            The posterior itself.
         """
-        device = process_device(device)
-        self.device = device
-        self.potential_fn.to(device)  # type: ignore
-        self.proposal.to(device)
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-
-        self.theta_transform = mcmc_transform(self.proposal, device=device)
-
-        super().__init__(
-            self.potential_fn,
-            theta_transform=self.theta_transform,
-            device=device,
-            x_shape=self.x_shape,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
+        super().to(device)
+        init_params = getattr(self, "_mcmc_init_params", None)
+        if init_params is not None:
+            self._mcmc_init_params = init_params.to(self._device)
         self.potential_ = self._prepare_potential(self.method)
+        return self
 
     @property
     def mcmc_method(self) -> str:
@@ -212,6 +199,8 @@ class MCMCPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
+            x: Observation. If not provided, uses the default `x`. Several
+                observations are combined as iid trials.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -227,7 +216,7 @@ class MCMCPosterior(NeuralPosterior):
         warn("The log-probability is unnormalized!", stacklevel=2)
 
         x = self._x_else_default_x(x)
-        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
+        self.potential_fn = self._bind_iid(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -256,7 +245,8 @@ class MCMCPosterior(NeuralPosterior):
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
-                set via `.set_default_x()`.
+                set via `.set_default_x()`. Several observations are combined as iid
+                trials.
             method: MCMC method to use. One of `slice_np`, `slice_np_vectorized`,
                 `hmc_pyro`, `nuts_pyro`, `slice_pymc`, `hmc_pymc`, `nuts_pymc`.
                 If not provided, uses the method specified at initialization.
@@ -286,7 +276,7 @@ class MCMCPosterior(NeuralPosterior):
         """
 
         x = self._x_else_default_x(x)
-        self.potential_fn = self.potential_fn.bind(x, x_is_iid=True)
+        self.potential_fn = self._bind_iid(x)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -409,7 +399,7 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
-        self._assert_finite_x(x)
+        x = self._process_x(x)
 
         # Replace arguments that were not passed with their default.
         method = self.method if method is None else method
@@ -439,13 +429,7 @@ class MCMCPosterior(NeuralPosterior):
             )
             num_chains = torch.Size(sample_shape).numel()
 
-        # custom shape handling to make sure to match the batch size of x and theta
-        # without unnecessary combinations.
-        if len(x.shape) == 1:
-            x = x.unsqueeze(0)
         batch_size = x.shape[0]
-
-        x = reshape_to_batch_event(x, event_shape=x.shape[1:])
 
         # For batched sampling, we want `num_chains` for each observation in the batch.
         # Here we repeat the observations ABC -> AAABBBCCC, so that the chains are
@@ -874,7 +858,7 @@ class MCMCPosterior(NeuralPosterior):
             initial_params={self.param_name: initial_params},
             num_chains=num_chains,
             mp_context=mp_context,
-            disable_progbar=not show_progress_bars,
+            disable_progbar=not show_progress_bars or progress_disabled(),
             transforms={},
         )
         sampler.run()
@@ -946,7 +930,7 @@ class MCMCPosterior(NeuralPosterior):
             tune=warmup_steps,
             chains=num_chains,
             mp_ctx=mp_context,
-            progressbar=show_progress_bars,
+            progressbar=show_progress_bars and not progress_disabled(),
             param_name=self.param_name,
             device=self._device,
             target_accept=target_accept,
@@ -1025,7 +1009,7 @@ class MCMCPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.

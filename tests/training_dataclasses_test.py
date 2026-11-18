@@ -2,12 +2,17 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 
+from dataclasses import asdict
+
 import pytest
 import torch
 
 from sbi.inference import NPE, NRE
 from sbi.inference.trainers._contracts import (
+    LossArgsNPE,
     LossArgsNRE,
+    LossArgsNRE_A,
+    loss_args_to_kwargs,
 )
 from sbi.inference.trainers.nre.bnre import BNRE
 from sbi.inference.trainers.nre.nre_a import NRE_A
@@ -210,3 +215,17 @@ def test_nre_a_train_method_invalid_argument_raises_error(loss_kwargs):
     inference.append_simulations(theta, x)
 
     inference.train(loss_kwargs=loss_kwargs)
+
+
+@pytest.mark.parametrize(
+    "loss_args",
+    [LossArgsNRE_A(), LossArgsNPE(proposal=BoxUniform(torch.zeros(2), torch.ones(2)))],
+)
+def test_loss_args_to_kwargs_keeps_every_field_without_copies(loss_args):
+    """Every field reaches the loss, also one declared with `init=False`, and the
+    values are not copied: a proposal posterior would be copied in every batch."""
+    kwargs = loss_args_to_kwargs(loss_args)
+
+    assert kwargs.keys() == asdict(loss_args).keys()
+    for name, value in kwargs.items():
+        assert value is getattr(loss_args, name)

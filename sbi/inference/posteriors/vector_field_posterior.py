@@ -9,16 +9,16 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import (
+    NeuralPosterior,
+    _require_one_observation,
+)
 from sbi.inference.potentials.vector_field_potential import (
     CallableDifferentiablePotentialFunction,
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
 from sbi.neural_nets.estimators.base import ConditionalVectorFieldEstimator
-from sbi.neural_nets.estimators.shape_handling import (
-    reshape_to_batch_event,
-)
 from sbi.samplers.rejection import rejection
 from sbi.samplers.score.correctors import Corrector
 from sbi.samplers.score.diffuser import Diffuser
@@ -30,7 +30,7 @@ from sbi.utils.sbiutils import (
     warn_if_outside_prior_support,
     within_support,
 )
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 class VectorFieldPosterior(NeuralPosterior):
@@ -109,43 +109,6 @@ class VectorFieldPosterior(NeuralPosterior):
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """Move posterior to device.
-
-        Args:
-            device: device where to move the posterior to.
-        """
-        device = process_device(device)
-        self.device = device
-        if hasattr(self.prior, "to"):
-            self.prior.to(device)  # type: ignore
-        else:
-            raise ValueError("""Prior has no attribute to(device).""")
-        if hasattr(self.vector_field_estimator, "to"):
-            self.vector_field_estimator.to(device)
-        else:
-            raise ValueError("""Posterior estimator has no attribute to(device).""")
-
-        potential_fn, theta_transform = vector_field_estimator_based_potential(
-            self.vector_field_estimator,
-            self.prior,
-            x_o=None,
-            enable_transform=self.enable_transform,
-        )
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-        super().__init__(
-            potential_fn=potential_fn,
-            theta_transform=theta_transform,
-            device=device,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
-
-        self.potential_fn: VectorFieldBasedPotential = potential_fn
-
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -163,7 +126,6 @@ class VectorFieldPosterior(NeuralPosterior):
         guidance_method: Optional[str] = None,
         guidance_params: Optional[Dict] = None,
         max_sampling_batch_size: Optional[int] = None,
-        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
         reject_outside_prior: bool = True,
         max_sampling_time: Optional[float] = None,
@@ -215,11 +177,6 @@ class VectorFieldPosterior(NeuralPosterior):
                 `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
             max_sampling_batch_size: Maximum batch size for sampling.
                 If not provided, uses the value specified at initialization.
-            sample_with: Deprecated, set it at construction instead; will be removed
-                in v0.28.0. Sampling method to use - 'ode' or 'sde'. Note that in
-                order to use the 'sde' sampling method, the vector field estimator
-                must support it and have the SCORE_DEFINED class attribute set to
-                True.
             show_progress_bars: Whether to show a progress bar during sampling.
             reject_outside_prior: If True (default), rejection sampling is used to
                 ensure samples lie within the prior support. If False, samples are drawn
@@ -235,20 +192,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 (default).
         """
 
-        if sample_with is None:
-            sample_with = self.sample_with
-        else:
-            warnings.warn(
-                "Passing `sample_with` to `VectorFieldPosterior.sample()` is "
-                "deprecated since sbi v0.27.0 and will be removed in v0.28.0. Set "
-                "it at construction, e.g. "
-                "`build_posterior(..., sample_with=...)`, instead.",
-                FutureWarning,
-                stacklevel=2,
-            )
-
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
         # IID and guidance require transforming the prior to standardized space.
         if self.vector_field_estimator.compose_enabled and (
@@ -275,7 +219,7 @@ class VectorFieldPosterior(NeuralPosterior):
             else max_sampling_batch_size
         )
 
-        if sample_with == "ode":
+        if self.sample_with == "ode":
             if reject_outside_prior:
                 samples, _ = rejection.accept_reject_sample(
                     proposal=self.sample_via_ode,
@@ -289,7 +233,7 @@ class VectorFieldPosterior(NeuralPosterior):
             else:
                 # Bypass rejection sampling entirely.
                 samples = self.sample_via_ode(torch.Size([num_samples]))
-        elif sample_with == "sde":
+        elif self.sample_with == "sde":
             proposal_sampling_kwargs = {
                 "predictor": predictor,
                 "corrector": corrector,
@@ -319,7 +263,8 @@ class VectorFieldPosterior(NeuralPosterior):
                 )
         else:
             raise ValueError(
-                f"Expected sample_with to be 'ode' or 'sde', but got {sample_with}."
+                "Expected sample_with to be 'ode' or 'sde', but got "
+                f"{self.sample_with}."
             )
 
         if not reject_outside_prior:
@@ -365,8 +310,6 @@ class VectorFieldPosterior(NeuralPosterior):
                 uses the solve_schedule() specific to the estimator.
             max_sampling_batch_size: Maximum batch size for sampling.
                 If not provided, uses the value specified at initialization.
-            sample_with: Deprecated - use `.build_posterior(sample_with=...)` prior to
-                `.sample()`.
             show_progress_bars: Whether to show a progress bar during sampling.
             save_intermediate: Whether to save intermediate results of the diffusion
                 process. If True, the returned tensor has shape
@@ -519,7 +462,6 @@ class VectorFieldPosterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         is_iid = x.shape[0] > 1
         if self.vector_field_estimator.compose_enabled and is_iid:
             raise NotImplementedError(
@@ -571,6 +513,11 @@ class VectorFieldPosterior(NeuralPosterior):
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
         x = self._x_else_default_x(x)
+        _require_one_observation(
+            x.shape[0],
+            "`leakage_correction()` of a vector field posterior",
+            "Pass one observation.",
+        )
 
         def acceptance() -> Tensor:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
@@ -659,7 +606,7 @@ class VectorFieldPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
-        self._assert_finite_x(x)
+        x = self._process_x(x)
         if self.vector_field_estimator.compose_enabled:
             raise NotImplementedError(
                 "compose_standardization does not yet support sample_batched "
@@ -667,7 +614,6 @@ class VectorFieldPosterior(NeuralPosterior):
                 "via sample(), or disable compose_standardization."
             )
         num_samples = torch.Size(sample_shape).numel()
-        x = reshape_to_batch_event(x, self.vector_field_estimator.condition_shape)
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()
@@ -772,7 +718,7 @@ class VectorFieldPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -807,15 +753,20 @@ class VectorFieldPosterior(NeuralPosterior):
 
         if x is not None:
             raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated."
-                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+                "Passing `x` to `.map()` is no longer supported. "
+                "Use `.set_default_x()` to set `x`, and then run `.map()`."
             )
 
         if self.default_x is None:
             raise ValueError(
-                "Default `x` has not been set."
+                "Default `x` has not been set. "
                 "To set the default, use the `.set_default_x()` method."
             )
+        _require_one_observation(
+            self.default_x.shape[0],
+            "`map()` of a vector field posterior",
+            "Set one observation with `set_default_x()`.",
+        )
 
         if self._map is None or force_update:
             # rebuild coarse flow fast for MAP optimization.
