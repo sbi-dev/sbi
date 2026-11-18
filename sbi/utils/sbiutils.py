@@ -990,8 +990,9 @@ def _apply_to_transform(
 ) -> None:
     """Apply fn to all tensors in a transform tree.
 
-    Walks ComposeTransform.parts, IndependentTransform.base_transform,
-    etc., so .to() calls propagate into the transform. A transform that is also
+    Walks ComposeTransform.parts, IndependentTransform.base_transform, the
+    distribution of a CumulativeDistributionTransform, etc., so .to() calls propagate
+    into the transform. A transform that is also
     an `nn.Module` (e.g. a Pyro `TransformModule`) gets `fn` applied to its
     parameters and buffers as well.
 
@@ -1021,9 +1022,9 @@ def _apply_to_transform(
                 object.__setattr__(t, key, _apply_to_tensor(val))
             elif isinstance(val, (list, tuple)):
                 for item in val:
-                    if isinstance(item, TorchTransform):
+                    if isinstance(item, (TorchTransform, Distribution)):
                         _walk(item)
-            elif isinstance(val, TorchTransform):
+            elif isinstance(val, (TorchTransform, Distribution)):
                 _walk(val)
 
     _walk(transform)

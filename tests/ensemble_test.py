@@ -190,7 +190,7 @@ def test_ensemble_map_uses_default_x():
         for _ in range(ensemble_size)
     ]
     ensemble = EnsemblePosterior(posteriors)
-    with pytest.raises(ValueError, match="Default `x` has not been set"):
+    with pytest.raises(ValueError, match="default has not been set"):
         ensemble.map()
     x_o = 2.0 * ones(1, num_dim)
     ensemble.set_default_x(x_o)
@@ -219,10 +219,10 @@ def test_ensemble_map_uses_default_x():
     assert_close(ensemble.map(**map_kwargs), x_o, atol=0.01, rtol=0)
     assert_close(ensemble.map(force_update=True, **map_kwargs), x_o, atol=0.01, rtol=0)
 
-    with pytest.raises(ValueError, match=r"deprecated\. Use `\.set_default_x\(\)`"):
+    with pytest.raises(ValueError, match=r"supported\. Use `\.set_default_x\(\)`"):
         ensemble.map(x=x_o, individually=True)
 
-    with pytest.raises(ValueError, match=r"deprecated\. Use `\.set_default_x\(\)`"):
+    with pytest.raises(ValueError, match=r"supported\. Use `\.set_default_x\(\)`"):
         ensemble.map(x=x_o)
 
 
