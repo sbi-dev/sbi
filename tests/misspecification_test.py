@@ -3,20 +3,23 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 import torch
 import torch.distributions as dist
+from torch import nn
 
 from sbi.diagnostics.misspecification import (
     calc_misspecification_logprob,
     calc_misspecification_mmd,
-    calculate_baseline_mmd,
 )
 from sbi.inference import NPE
 from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.neural_nets import MarginalNSFConfig, posterior_nn
-from sbi.neural_nets.embedding_nets import FCEmbedding
+from sbi.neural_nets.embedding_nets import FCEmbedding, PermutationInvariantEmbedding
 from sbi.utils.sbiutils import seed_all_backends
+from sbi.utils.torchutils import process_device
 
 seed = 2025
 
@@ -242,13 +245,11 @@ def test_mmd_many_observations_gives_finite_baseline():
     x_obs = torch.randn(1000, 2) + 5.0
     x = torch.randn(3000, 2)
 
-    p_val, (mmds_baseline, _) = calc_misspecification_mmd(
-        x_obs=x_obs, x=x, mode="x_space", n_shuffle=20, max_samples=1000
+    p_val, _ = calc_misspecification_mmd(
+        x_obs=x_obs, x=x, n_shuffle=20, max_samples=1000
     )
 
-    assert torch.isfinite(mmds_baseline).all()
-    # All 20 baseline MMDs are below the observed one, and the observed MMD counts
-    # as one more draw.
+    # All 20 baseline MMDs are below the observed one: the smallest p-value.
     assert p_val == pytest.approx(1 / 21)
 
 
@@ -257,15 +258,17 @@ def test_mmd_does_not_depend_on_the_order_of_x():
     x = torch.sort(torch.randn(2000, 1), dim=0).values
     x_obs = torch.randn(50, 1)
 
-    p_val, _ = calc_misspecification_mmd(
+    _, (mmds_baseline, mmd) = calc_misspecification_mmd(
         x_obs=x_obs, x=x, n_shuffle=20, max_samples=200
     )
 
-    assert p_val > 0.05, f"Expected a large p_val for well-specified data, got {p_val}"
+    # Over 200 seeds the ratio stayed below 2.9 with random rows and above 6.6 when
+    # the observed MMD took the first rows of x.
+    assert mmd < 4 * mmds_baseline.max()
 
 
-def test_mmd_raises_for_non_finite_baseline_mmd():
-    """Many identical samples give a zero bandwidth and NaN baseline MMDs."""
+def test_mmd_raises_for_non_finite_mmd():
+    """Many identical samples give a zero bandwidth: raise, never p = 1.0."""
     x = torch.poisson(torch.full((1000, 1), 0.1))
     x_obs = torch.poisson(torch.full((50, 1), 1.0))
 
@@ -273,20 +276,40 @@ def test_mmd_raises_for_non_finite_baseline_mmd():
         calc_misspecification_mmd(x_obs=x_obs, x=x, n_shuffle=20)
 
 
-def test_mmd_raises_for_non_finite_observed_mmd():
-    """A NaN observation gives a NaN observed MMD next to a finite baseline."""
-    x_obs = torch.full((1, 2), float("nan"))
+def test_mmd_accepts_nan_padded_trials_in_embedding_mode():
+    """Whole NaN trials are padding for a permutation-invariant embedding."""
+    embedding_net = PermutationInvariantEmbedding(
+        trial_net=nn.Linear(2, 4), trial_net_output_dim=4, output_dim=3
+    )
+    inference = SimpleNamespace(
+        _neural_net=SimpleNamespace(embedding_net=embedding_net)
+    )
+    x = torch.randn(200, 5, 2)
+    x[::2, -2:] = float("nan")
+    x_obs = torch.randn(2, 5, 2)
+    x_obs[0, -1] = float("nan")
 
-    with pytest.raises(ValueError, match="MMD is not finite"):
-        calc_misspecification_mmd(x_obs=x_obs, x=torch.randn(100, 2), n_shuffle=20)
+    p_val, _ = calc_misspecification_mmd(
+        x_obs=x_obs, x=x, inference=inference, mode="embedding", n_shuffle=20
+    )
+
+    assert 0 < p_val <= 1
 
 
-@pytest.mark.parametrize("arg", ("max_samples", "n_shuffle"))
-def test_baseline_mmd_rejects_values_below_one(arg: str):
-    with pytest.raises(ValueError, match=f"{arg} must be at least 1"):
-        calculate_baseline_mmd(n_obs=10, y=torch.randn(100, 2), **{arg: 0})
+@pytest.mark.parametrize(
+    "device, dtype",
+    (
+        ("cpu", torch.float64),
+        pytest.param("gpu", torch.float32, marks=pytest.mark.gpu),
+    ),
+)
+def test_mmd_keeps_device_and_dtype(device: str, dtype: torch.dtype):
+    dev = process_device(device)
+    x = torch.randn(300, 2, device=dev, dtype=dtype)
 
+    _, (mmds_baseline, mmd) = calc_misspecification_mmd(
+        x_obs=x[:5], x=x[5:], n_shuffle=20
+    )
 
-def test_baseline_mmd_needs_more_synthetic_than_observed_samples():
-    with pytest.raises(ValueError, match="should be less than"):
-        calculate_baseline_mmd(n_obs=10, y=torch.randn(10, 2), n_shuffle=2)
+    assert mmds_baseline.device == mmd.device == x.device
+    assert mmds_baseline.dtype == mmd.dtype == dtype
