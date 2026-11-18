@@ -282,7 +282,7 @@ def test_mmd_accepts_nan_padded_trials_in_embedding_mode():
         trial_net=nn.Linear(2, 4), trial_net_output_dim=4, output_dim=3
     )
     inference = SimpleNamespace(
-        _neural_net=SimpleNamespace(embedding_net=embedding_net)
+        _device="cpu", _neural_net=SimpleNamespace(embedding_net=embedding_net)
     )
     x = torch.randn(200, 5, 2)
     x[::2, -2:] = float("nan")
@@ -313,3 +313,18 @@ def test_mmd_keeps_device_and_dtype(device: str, dtype: torch.dtype):
 
     assert mmds_baseline.device == mmd.device == x.device
     assert mmds_baseline.dtype == mmd.dtype == dtype
+
+
+@pytest.mark.gpu
+def test_mmd_embedding_moves_data_to_the_net_device():
+    """A net trained on a GPU must accept simulations stored on the CPU."""
+    dev = process_device("gpu")
+    embedding_net = nn.Linear(2, 3).to(dev)
+    inference = SimpleNamespace(
+        _device=dev, _neural_net=SimpleNamespace(embedding_net=embedding_net)
+    )
+    x = torch.randn(100, 2)
+
+    calc_misspecification_mmd(
+        x_obs=x[:5], x=x[5:], inference=inference, mode="embedding", n_shuffle=5
+    )

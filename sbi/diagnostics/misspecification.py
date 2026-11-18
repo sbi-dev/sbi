@@ -188,7 +188,8 @@ def calc_misspecification_mmd(
 
     returns:
         p_val, (mmd_baseline,mmd): p-value of the misspecification test
-        (MMDs under H_0, mmd)
+        (MMDs under H_0, mmd), on the device of the compared data (in embedding
+        mode, the device of the trained net)
     """
     if mode == "x_space":
         z_obs = x_obs
@@ -223,8 +224,9 @@ def calc_misspecification_mmd(
             assert_all_finite(data, name, allow_nan=nan_net is not None)
             if validate_nan_input is not None and torch.isnan(data).any():
                 validate_nan_input(data)
-        z_obs = inference._neural_net.embedding_net(x_obs).detach()
-        z = inference._neural_net.embedding_net(x).detach()
+        with torch.no_grad():
+            z_obs = inference._neural_net.embedding_net(x_obs.to(inference._device))
+            z = inference._neural_net.embedding_net(x.to(inference._device))
     else:
         raise ValueError("mode should be either 'x_space' or 'embedding'")
 
