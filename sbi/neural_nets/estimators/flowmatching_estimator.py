@@ -428,16 +428,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
     def _clamp_time(
         self, times: Tensor, effective_t_max: Optional[float] = None
     ) -> Tensor:
-        """Clamp `times` at `self.effective_t_max`, the cutoff of all SDE functions.
-
-        Args:
-            times: SDE time variable in [0,1].
-            effective_t_max: Deprecated per-call cutoff of `drift_fn`, `diffusion_fn`
-                and `mean_t_fn`. If given, it replaces `self.effective_t_max`.
-
-        Returns:
-            The clamped times.
-        """
+        """Clamp `times` at `effective_t_max`, or at the deprecated per-call cutoff."""
         if effective_t_max is None:
             effective_t_max = self.effective_t_max
         else:
@@ -473,9 +464,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Parameters :math:`\theta_t`.
             times: SDE time variable in [0,1].
-            effective_t_max: Deprecated. Set the attribute `effective_t_max` instead,
-                which all SDE functions share. If given, it replaces the cutoff for
-                this call only.
+            effective_t_max: Deprecated, set the attribute `effective_t_max` instead.
 
         Returns:
             Drift function at a given time.
@@ -504,9 +493,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         Args:
             input: Parameters :math:`\theta_t`.
             times: SDE time variable in [0,1].
-            effective_t_max: Deprecated. Set the attribute `effective_t_max` instead,
-                which all SDE functions share. If given, it replaces the cutoff for
-                this call only.
+            effective_t_max: Deprecated, set the attribute `effective_t_max` instead.
 
         Returns:
             Diffusion function at a given time.
@@ -536,9 +523,7 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
 
         Args:
             times: SDE time variable in [0,1].
-            effective_t_max: Deprecated. Set the attribute `effective_t_max` instead,
-                which all SDE functions share. If given, it replaces the cutoff for
-                this call only.
+            effective_t_max: Deprecated, set the attribute `effective_t_max` instead.
 
         Returns:
             Mean function at a given time.

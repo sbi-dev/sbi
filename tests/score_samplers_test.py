@@ -159,10 +159,7 @@ def test_score_fn_guidance_general(sde_type, guidance_method, num_dim):
 @pytest.mark.parametrize("estimator_type", ["ve", "fmpe"])
 @pytest.mark.parametrize("guidance", ["affine_classifier_free", "universal"])
 def test_neutral_guidance_returns_the_score(estimator_type, guidance):
-    """Guidance that changes nothing returns the estimator's score.
-
-    For flow matching, the estimator's `forward` returns the velocity, not the score.
-    """
+    """Guidance that changes nothing returns the score, not FMPE's velocity."""
     num_dim = 2
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
     theta = prior.sample((100,))
@@ -652,11 +649,8 @@ def _build_estimator(estimator_type: str, theta: Tensor, x: Tensor):
 
 
 def _use_exact_gaussian_score(estimator, posterior_var: float) -> None:
-    """Replace the score of `estimator` by the exact score of N(x, posterior_var I).
-
-    The mean depends on x, so the score has one row per observation, as the iid
-    methods expect from a network.
-    """
+    """Replace the score of `estimator` by the exact score of N(x, posterior_var I),
+    with one row per observation, as the iid methods expect."""
 
     def exact_score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
         m, s = estimator.mean_t_fn(t), estimator.std_fn(t)
