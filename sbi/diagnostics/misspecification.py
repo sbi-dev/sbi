@@ -143,8 +143,8 @@ def calc_misspecification_mmd(
         inference: sbi inference object (only used if mode == "embedding")
         mode: space of MMD calculation ("x_space" or "embedding")
         n_shuffle: number of shuffles for computing mmds under H_0
-        max_samples: maximum number of samples to use
-            (when we have too many synthetic samples x)
+        max_samples: maximum number of synthetic samples to compare to the observed
+            data, for the observed MMD and for each MMD under H_0
         mmd_mode: approximation of MMD calculation ("biased" or "unbiased")
 
     returns:

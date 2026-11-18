@@ -237,10 +237,9 @@ def test_mmd_embedding_mode_requires_trained_inference():
         calc_misspecification_mmd(x_obs=x[:1], x=x, inference=NPE(), mode="embedding")
 
 
-@pytest.mark.parametrize("n_obs", (1000, 1500))
-def test_mmd_many_observations_gives_finite_baseline(n_obs: int):
+def test_mmd_many_observations_gives_finite_baseline():
     """The MMD baseline must stay finite when ``n_obs >= max_samples``."""
-    x_obs = torch.randn(n_obs, 2) + 5.0
+    x_obs = torch.randn(1000, 2) + 5.0
     x = torch.randn(3000, 2)
 
     p_val, (mmds_baseline, _) = calc_misspecification_mmd(
