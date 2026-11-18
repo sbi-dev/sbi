@@ -9,6 +9,7 @@ from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 import sbi.utils as utils
+from sbi.inference.trainers._contracts import StartIndexContext
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
 )
@@ -110,6 +111,11 @@ class NPE_B(PosteriorEstimatorTrainer):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
+    def _get_start_index(self, context: StartIndexContext) -> int:
+        # Kept for the loss: its proposal mixture covers the appends trained on.
+        self._start_idx = super()._get_start_index(context)
+        return self._start_idx
+
     def _log_prob_proposal_posterior(
         self,
         theta: Tensor,
@@ -140,25 +146,25 @@ class NPE_B(PosteriorEstimatorTrainer):
         prior = torch.exp(self._prior.log_prob(theta))
 
         # Evaluate proposal
-        # (as theta comes from prior and proposal from previous rounds,
-        # the last proposal is actually a mixture of the prior
-        # and of all the previous proposals with coefficients representing
-        # the proportion of the new theta added at each round)
-        prop = torch.zeros(self._round + 1, device=theta.device)
-        nb_samples = 0  # total number of theta from all the rounds
-
-        for k in range(self._round + 1):
-            nb_samples += self._theta_roundwise[k].size(0)
-            # the number of new theta sampled in the round k
-            prop[k] = self._theta_roundwise[k].size(0)
-
-        prop /= nb_samples
-        log_prop = torch.log(prop).repeat(theta.size(0), 1)
+        # (the training set is a mixture of the proposals of the appends it uses,
+        # each weighted by its number of samples; `None` stands for the prior)
+        appends = [
+            (theta_k.size(0), self._prior if density is None else density)
+            for theta_k, density, round_k in zip(
+                self._theta_roundwise,
+                self._proposal_roundwise,
+                self._data_round_index,
+                strict=True,
+            )
+            if round_k >= self._start_idx
+        ]
+        prop = torch.tensor([n for n, _ in appends], device=theta.device)
+        log_prop = torch.log(prop / prop.sum()).repeat(theta.size(0), 1)
 
         log_previous_proposals = torch.zeros(
-            (theta.size(0), self._round + 1), device=theta.device
+            (theta.size(0), len(appends)), device=theta.device
         )
-        for k, density in enumerate(self._proposal_roundwise):
+        for k, (_, density) in enumerate(appends):
             # we accept the k th proposal log prob to be -Inf at theta
             # meaning that theta is out of the k th proposal range
             log_previous_proposals[:, k] = density.log_prob(theta)
