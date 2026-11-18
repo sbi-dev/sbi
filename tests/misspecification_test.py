@@ -251,6 +251,20 @@ def test_mmd_many_observations_gives_finite_baseline(n_obs: int):
     assert p_val < 0.05, f"Expected a small p_val for misspecified data, got {p_val}"
 
 
+def test_mmd_raises_for_non_finite_mmd():
+    """Many identical samples give a zero bandwidth and a NaN MMD."""
+    x = torch.poisson(torch.full((1000, 1), 0.1))
+    x_obs = torch.poisson(torch.full((50, 1), 1.0))
+
+    with pytest.raises(ValueError, match="MMD is not finite"):
+        calc_misspecification_mmd(x_obs=x_obs, x=x, n_shuffle=20)
+
+
+def test_baseline_mmd_needs_at_least_one_synthetic_sample():
+    with pytest.raises(ValueError, match="max_samples must be at least 1"):
+        calculate_baseline_mmd(n_obs=10, y=torch.randn(100, 2), max_samples=0)
+
+
 def test_baseline_mmd_needs_more_synthetic_than_observed_samples():
     with pytest.raises(ValueError, match="should be less than"):
         calculate_baseline_mmd(n_obs=10, y=torch.randn(10, 2), n_shuffle=2)
