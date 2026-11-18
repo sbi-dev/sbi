@@ -112,7 +112,7 @@ class NPE_B(PosteriorEstimatorTrainer):
         super().__init__(**kwargs)
 
     def _get_start_index(self, context: StartIndexContext) -> int:
-        # Kept for the loss: its proposal mixture covers the appends trained on.
+        """Return the start index, and keep it: the loss mixes only the appends used."""
         self._start_idx = super()._get_start_index(context)
         return self._start_idx
 
