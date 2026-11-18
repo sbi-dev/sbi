@@ -179,7 +179,7 @@ def _cv_bandwidth(
 
 
 # The implementation of KDE was adapted from
-# https://github.com/sbi-benchmark/sbibm/blob/main/sbibm/utils/kde.py
+# https://github.com/sbi-benchmark/sbibm/blob/8b8a21d71f3d1b654d1f5dd15dd912185a20dd7f/sbibm/utils/kde.py
 def get_kde(
     samples: Tensor,
     bandwidth: Union[float, str] = "cv",
