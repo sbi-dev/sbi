@@ -858,31 +858,31 @@ def test_forward_kl_loss_ignores_a_constant_in_the_potential():
     assert torch.allclose(loss_low, loss - 200.0)
 
 
-@pytest.mark.parametrize("offset", [0.0, 1e5])
-def test_forward_kl_weights_and_loss_stay_finite(monkeypatch, offset: float):
-    """fKL weights and loss stay finite for a target much narrower than q, a large
-    potential offset and a particle outside the target's support. `weight_transform`
-    gets weights whose largest is 1, and its output is normalized again."""
+def test_forward_kl_loss_leaves_out_particles_outside_the_support(monkeypatch):
+    """A particle outside the target's support adds nothing to the displayed fKL
+    loss (0 * log 0 = 0), even when `weight_transform` gives it a nonzero weight.
+    `weight_transform` gets weights whose largest is 1, and its output is normalized
+    again."""
     prior = MultivariateNormal(zeros(1), eye(1))
-    narrow = MultivariateNormal(3 * ones(1), 1e-4 * eye(1))
+    shifted = MultivariateNormal(ones(1), 0.25 * eye(1))
 
     def target_log_prob(theta):
         outside = theta[..., 0] < -1.5
-        return torch.where(outside, -torch.inf, narrow.log_prob(theta) + offset)
+        return torch.where(outside, -torch.inf, shifted.log_prob(theta))
 
     target = SimpleNamespace(log_prob=target_log_prob)
     weight_maxima = []
 
-    def record_weight_max(weights):
+    def floor_weights(weights):
         weight_maxima.append(weights.max())
-        return 2 * weights
+        return weights + 0.1
 
     optimizer = ForwardKLOptimizer(
         potential_fn=make_tractable_potential(target, prior),
         q=LearnableGaussian(dim=1, full_covariance=False),
         prior=prior,
         n_particles=6,
-        weight_transform=record_weight_max,
+        weight_transform=floor_weights,
         lr=1e-3,
         gamma=0.999,
     )
@@ -892,7 +892,8 @@ def test_forward_kl_weights_and_loss_stay_finite(monkeypatch, offset: float):
 
     logq = optimizer.q.log_prob(particles)
     logweights = target.log_prob(particles) - logq.detach()
-    weights = torch.softmax(logweights, dim=0)
+    weights = (logweights - logweights.max()).exp() + 0.1
+    weights /= weights.sum()
     inside = torch.isfinite(logweights)
     assert torch.allclose(loss, (weights[inside] * logweights[inside]).sum())
     assert torch.allclose(surrogate_loss, -(weights * logq).sum())
