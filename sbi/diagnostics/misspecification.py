@@ -74,7 +74,6 @@ def calculate_baseline_mmd(
             of synthetic samples compared to the ``n_obs`` samples of the first set
         mode: mode of MMD calculation
     """
-    mmds = torch.zeros(n_shuffle)
     if max_samples < 1:
         raise ValueError(f"max_samples must be at least 1, got {max_samples}.")
     if n_shuffle < 1:
@@ -84,6 +83,7 @@ def calculate_baseline_mmd(
             "n of observed samples should be less than n of synthetic samples"
         )
     n_synthetic = min(max_samples, y.shape[0] - n_obs)
+    mmds = torch.zeros(n_shuffle)
     for i in range(n_shuffle):
         idx = torch.randperm(y.shape[0])
         mmds[i] = compute_rbf_mmd_median_heuristic(
