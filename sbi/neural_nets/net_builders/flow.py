@@ -1207,25 +1207,15 @@ def _get_base_and_transforms(
         tuple of flow base and its transforms.
     """
     build_nf = getattr(zuko.flows, which_nf)
+    flow: Flow = build_nf(
+        features=x_numel,
+        context=y_numel,
+        hidden_features=hidden_features,
+        transforms=num_transforms,
+        **kwargs,
+    )
 
-    if which_nf == "CNF":
-        flow: Flow = build_nf(
-            features=x_numel, context=y_numel, hidden_features=hidden_features, **kwargs
-        )
-        # CNF has a single continuous transform
-        base_transforms = (flow.transform,)
-    else:
-        flow: Flow = build_nf(
-            features=x_numel,
-            context=y_numel,
-            hidden_features=hidden_features,
-            transforms=num_transforms,
-            **kwargs,
-        )
-        # Regular flows have multiple discrete transforms
-        base_transforms = tuple(flow.transform.transforms)
-
-    return flow.base, base_transforms
+    return flow.base, tuple(flow.transform.transforms)
 
 
 def _prepare_x_transforms(
