@@ -506,13 +506,7 @@ def _build_gaussian_score_estimator(
 
 
 def test_langevin_corrector_scores_at_current_time():
-    """The Langevin corrector must score at the samples' current time t0.
-
-    Diffuser.run calls the corrector as corrector(samples, t_next, t_current),
-    so inside correct the samples are at t0 and t1 is the next (smaller) time.
-    The base Corrector documents t0 as the current time and GibbsCorrector
-    scores at t0, so LangevinCorrector must do the same.
-    """
+    """The Langevin corrector scores at the samples' current time t0, not t1."""
     from sbi.samplers.score.correctors import LangevinCorrector
 
     queried_times = []

@@ -75,8 +75,9 @@ class Corrector(ABC):
 
         Args:
             theta: The samples to correct.
-            t0: The current time.
-            t1: The next time.
+            t0: The current time of the samples.
+            t1: The previous, larger time, from which the predictor moved the
+                samples to ``t0``.
 
         Returns:
             Tensor: The corrected samples.

@@ -156,9 +156,9 @@ class Diffuser:
 
         # Step through the diffusion process from t_max to t_min
         for time_step_idx in pbar:
-            # Get current and next time points (going backwards in time)
-            t_current = ts[time_step_idx - 1]  # Previous time point
-            t_next = ts[time_step_idx]  # Current time point
+            # Step from t_current to the smaller t_next (going backwards in time)
+            t_current = ts[time_step_idx - 1]
+            t_next = ts[time_step_idx]
 
             # Apply predictor step
             samples = self.predictor(samples, t_current, t_next)
