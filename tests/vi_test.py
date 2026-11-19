@@ -946,6 +946,56 @@ def test_rolled_back_step_does_not_end_training(monkeypatch):
     assert not optimizer.converged()
 
 
+@pytest.mark.parametrize(
+    "optimizer_class, kwargs",
+    [
+        (IWElboOptimizer, {"n_particles": 3, "K": 2}),
+        (RenyiDivergenceOptimizer, {"n_particles": 6}),
+    ],
+)
+def test_iw_and_alpha_losses_leave_out_particles_outside_the_support(
+    monkeypatch, optimizer_class, kwargs
+):
+    """A particle where the potential is -inf (as a `RestrictedPrior` gives) has
+    weight 0 and adds nothing to the IW or alpha gradient loss (0 * log 0 = 0), as a
+    particle whose weight underflows to 0."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    shifted = MultivariateNormal(ones(1), 0.25 * eye(1))
+    noise = torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]).unsqueeze(-1)
+
+    def loss_and_grads(outside_value):
+        def target_log_prob(theta):
+            outside = theta[..., 0] < -1.5
+            return torch.where(outside, outside_value, shifted.log_prob(theta))
+
+        target = SimpleNamespace(log_prob=target_log_prob)
+        optimizer = optimizer_class(
+            potential_fn=make_tractable_potential(target, prior),
+            q=LearnableGaussian(dim=1, full_covariance=False),
+            prior=prior,
+            lr=1e-3,
+            gamma=0.999,
+            **kwargs,
+        )
+        q = optimizer.q
+
+        def sample_and_log_prob(sample_shape):
+            # Reparameterized, so gradients also flow through the potential.
+            samples = q.loc + q.log_scale.exp() * noise
+            return samples, q.log_prob(samples)
+
+        monkeypatch.setattr(q, "sample_and_log_prob", sample_and_log_prob)
+        surrogate, _ = optimizer.loss(zeros(1))
+        return surrogate, torch.autograd.grad(surrogate, list(q.parameters()))
+
+    surrogate, grads = loss_and_grads(-torch.inf)
+    surrogate_underflow, grads_underflow = loss_and_grads(-1e4)
+    assert torch.allclose(surrogate, surrogate_underflow)
+    for grad, grad_underflow in zip(grads, grads_underflow, strict=True):
+        assert torch.isfinite(grad).all()
+        assert torch.allclose(grad, grad_underflow)
+
+
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
 @pytest.mark.parametrize("dreg_before, dreg_after", [(False, True), (True, False)])
 def test_dreg_changed_by_update_matches_new_optimizer(

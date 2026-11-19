@@ -569,7 +569,10 @@ class IWElboOptimizer(ElboOptimizer):
         elbo_particles = self.generate_elbo_particles(x_o, self.n_particles * self.K)
         elbo_particles = elbo_particles.reshape(self.n_particles, self.K)
         weights = self.get_importance_weight(elbo_particles.clone().detach())
-        surrogate_loss = -(weights * elbo_particles).sum(-1).mean(0)
+        # Outside the support, the weight is 0: 0 * log 0 = 0, not 0 * -inf = nan.
+        outside = (weights == 0) & torch.isneginf(elbo_particles.detach())
+        elbo_particles_masked = torch.where(outside, 0.0, elbo_particles)
+        surrogate_loss = -(weights * elbo_particles_masked).sum(-1).mean(0)
         loss = -(torch.logsumexp(elbo_particles, dim=-1) - np.log(self.K)).mean()
         return surrogate_loss, loss.clone().detach()
 
@@ -743,7 +746,11 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         weights, mean_log_weights = self.get_importance_weight(
             elbo_particles.clone().detach()
         )
-        surrogate_loss = -torch.mean(weights * elbo_particles)
+        # Outside the support, the weight is 0: 0 * log 0 = 0, not 0 * -inf = nan.
+        # For alpha > 1 it is nan there, so the step rolls back.
+        outside = (weights == 0) & torch.isneginf(elbo_particles.detach())
+        elbo_particles_masked = torch.where(outside, 0.0, elbo_particles)
+        surrogate_loss = -torch.mean(weights * elbo_particles_masked)
         loss = -mean_log_weights / (1 - self.alpha)
         return surrogate_loss, loss
 
