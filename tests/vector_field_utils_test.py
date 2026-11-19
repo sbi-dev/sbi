@@ -3,10 +3,11 @@
 
 import pytest
 import torch
-from torch.distributions import Normal
+from scipy.stats import truncnorm
+from torch.distributions import Normal, Uniform
 from torch.special import log_ndtr
 
-from sbi.utils.vector_field_utils import UniformNormalConvolution
+from sbi.utils.vector_field_utils import UniformNormalConvolution, denoise
 
 
 @pytest.mark.parametrize("scale", [0.5, 1.0, 2.0])
@@ -52,3 +53,37 @@ def test_uniform_normal_convolution_narrow_box_is_gaussian(scale: float):
     expected = Normal(0.0, 1.0).log_prob(theta.detach())
     assert torch.allclose(log_prob.detach(), expected, atol=1e-6)
     assert torch.allclose(score, -theta.detach(), rtol=1e-5)
+
+
+@pytest.mark.parametrize(
+    "x_t, s",
+    [
+        (2.0, 0.1),  # whole box 10 to 20 stds below the mode
+        (-1.0, 0.1),  # whole box 10 to 20 stds above the mode
+        (0.5, 0.3),
+        (0.2, 2.0),
+    ],
+)
+def test_uniform_denoise_matches_truncated_normal(x_t: float, s: float):
+    """Denoising a uniform prior gives a normal truncated to the prior support."""
+    low, high = 0.0, 1.0
+    dist = denoise(
+        Uniform(
+            torch.tensor(low, dtype=torch.float64),
+            torch.tensor(high, dtype=torch.float64),
+        ),
+        torch.tensor(1.0, dtype=torch.float64),
+        torch.tensor(s, dtype=torch.float64),
+        torch.tensor(x_t, dtype=torch.float64),
+    )
+    mean, var = truncnorm.stats(
+        (low - x_t) / s, (high - x_t) / s, loc=x_t, scale=s, moments="mv"
+    )
+
+    assert low <= dist.mean.item() <= high
+    assert dist.mean.item() == pytest.approx(mean, rel=1e-8)
+    assert dist.variance.item() == pytest.approx(var, rel=1e-6)
+
+    grid = torch.linspace(low, high, 200001, dtype=torch.float64)
+    integral = torch.trapezoid(dist.log_prob(grid).exp(), grid)
+    assert integral.item() == pytest.approx(1.0, abs=1e-4)
