@@ -154,7 +154,6 @@ class DivergenceOptimizer(ABC):
         self.eps = eps
         self.num_step = 0
         self._num_updates = 0
-        self._rolled_back = False
         self.warm_up_was_done = False
         self.losses = torch.ones(2000)
         self.moving_average = torch.ones(2000)
@@ -264,13 +263,20 @@ class DivergenceOptimizer(ABC):
         self._optimizer.zero_grad()
         surrogate_loss, loss = self.loss(x_o.to(self.device))
         surrogate_loss.backward(retain_graph=self.retain_graph)
-        self._rolled_back = not torch.isfinite(surrogate_loss)
-        if self._rolled_back:
+        grad_norm = nn.utils.clip_grad.clip_grad_norm_(
+            self.q.parameters(), self.clip_value
+        )
+        # A finite surrogate can have nan gradients, e.g. from a potential
+        # `log(density * mask)` for a particle outside the support.
+        rolled_back = not (torch.isfinite(surrogate_loss) and torch.isfinite(grad_norm))
+        if rolled_back:
             self.resolve_state()
-        nn.utils.clip_grad.clip_grad_norm_(self.q.parameters(), self.clip_value)
-        self._optimizer.step()
+            # q restarts towards the prior, so its earlier losses no longer apply.
+            self.reset_loss_stats()
+        else:
+            self._optimizer.step()
+            self.update_loss_stats(loss.cpu())
         self._scheduler.step()
-        self.update_loss_stats(loss.cpu())
         # Counted apart from num_step, which skips non-finite losses.
         self._num_updates += 1
         if (self._num_updates % 50) == 0:
@@ -287,8 +293,7 @@ class DivergenceOptimizer(ABC):
             bool: True if converged, else false.
 
         """
-        # After a rollback, q was just reset and warmed up towards the prior.
-        if self._rolled_back or self.num_step < considered_values:
+        if self.num_step < considered_values:
             return False
         else:
             m = self.moving_slope[

@@ -933,15 +933,36 @@ def test_non_finite_losses_are_left_out_of_loss_stats():
     )
 
 
-def test_rolled_back_step_does_not_end_training(monkeypatch):
-    """A non-finite gradient loss rolls q back and warms it up towards the prior, so
-    training must not stop on that step."""
+@pytest.mark.parametrize("surrogate", ["nan", "nan gradient"])
+def test_rolled_back_step_does_not_end_training(monkeypatch, surrogate: str):
+    """A non-finite gradient loss, or a finite one with nan gradients (as from a
+    potential `log(density * mask)`), rolls q back and warms it up towards the prior.
+    The step makes no update with those gradients, and only the losses after it count
+    towards convergence."""
     optimizer = _optimizer_after_losses([2.0] * 60)
     assert optimizer.converged()
 
-    param = next(optimizer.q.parameters())
-    nan_surrogate = lambda x_o: (param.sum() * float("nan"), torch.tensor(2.0))
-    monkeypatch.setattr(optimizer, "loss", nan_surrogate)
+    loc = next(optimizer.q.parameters())  # zeros: sqrt has an infinite derivative
+    surrogates = {
+        "nan": lambda: loc.sum() * float("nan"),
+        "nan gradient": lambda: (loc.sqrt() * 0).sum(),
+    }
+    loss = lambda x_o: (surrogates[surrogate](), torch.tensor(2.0))
+    monkeypatch.setattr(optimizer, "loss", loss)
+    resolve_state, recovered = optimizer.resolve_state, []
+
+    def record_recovery():
+        resolve_state()
+        recovered.extend(p.detach().clone() for p in optimizer.q.parameters())
+
+    monkeypatch.setattr(optimizer, "resolve_state", record_recovery)
+    optimizer.step(zeros(1))
+    assert not optimizer.converged()
+    assert optimizer.num_step == 0
+    for p, p_recovered in zip(optimizer.q.parameters(), recovered, strict=True):
+        assert torch.equal(p, p_recovered)
+
+    monkeypatch.setattr(optimizer, "loss", lambda x_o: (loc.sum(), torch.tensor(2.0)))
     optimizer.step(zeros(1))
     assert not optimizer.converged()
 
