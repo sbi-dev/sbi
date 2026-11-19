@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
@@ -708,8 +709,11 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             alpha: Determines the alpha divergence to which is used. For alpha < 1 the
                 divergence is more mass covering, for alpha > 1 the divergence is more
                 mode seeking.
-            unbiased: We use the biased bound as proposed in [1], but one can also use
-                an unbiased one.
+            unbiased: Deprecated, will be removed. Instead of the biased estimate of
+                the bound [1], use an unbiased estimate of exp((1 - alpha) * bound).
+                Its gradient is the biased one, scaled by (1 - alpha) times that
+                estimate, so the step size depends on the potential's normalizing
+                constant. Only for alpha < 1.
             dreg: Doubly reparmeterized gradient estimator as proposed in [2]. It is
                 based on the `reduced_variance` already present, but leads to an
                 unbiased estimate on this objective in contrast.
@@ -741,8 +745,24 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             return self.loss_alpha_unbiased(xo)
 
     def loss_alpha_unbiased(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
-        """Unbiased estimate of a surrogate RVB"""
-        elbo_particles = self.generate_elbo_particles(x_o) * (1 - self.alpha)
+        """Unbiased estimate of a surrogate RVB.
+
+        Raises:
+            ValueError: If alpha >= 1.
+        """
+        if self.alpha >= 1:
+            raise ValueError(
+                f"`unbiased=True` needs alpha < 1, got alpha={self.alpha}: for "
+                "alpha > 1 the estimate can be infinite, for alpha = 1 constant."
+            )
+        warnings.warn(
+            "`unbiased=True` is deprecated and will be removed: its gradient is the "
+            "biased one, scaled by a factor that overflows or underflows for "
+            "unnormalized potentials. Use `unbiased=False`.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        elbo_particles = self.generate_elbo_particles(x_o)
         _, mean_log_weights = self.get_importance_weight(elbo_particles)
         surrogate_loss = -torch.exp(mean_log_weights)
         loss = -mean_log_weights / (1 - self.alpha)
