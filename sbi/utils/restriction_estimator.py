@@ -71,9 +71,7 @@ class RestrictionEstimator:
         hidden_features: int = 100,
         num_blocks: int = 2,
         dropout_probability: float = 0.5,
-        z_score: Optional[
-            Literal["independent", "structured", "transform_to_unconstrained", "none"]
-        ] = "independent",
+        z_score: Optional[Literal["independent", "structured", "none"]] = "independent",
         embedding_net: nn.Module = nn.Identity(),
     ) -> None:
         r"""

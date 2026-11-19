@@ -479,6 +479,28 @@ def test_z_scored_embedding_net_old_import_paths():
 
 
 @pytest.mark.parametrize(
+    "builder_name",
+    ["build_maf", "build_zuko_maf", "build_mdn", "build_mlp_classifier"],
+)
+def test_transform_to_unconstrained_raises_for_the_condition(builder_name):
+    """The condition has no distribution to derive the transform from, so the
+    builders raise instead of building without it."""
+    from sbi.neural_nets import net_builders
+
+    build = getattr(net_builders, builder_name)
+    theta, x = torch.rand(20, 3), torch.rand(20, 2)
+    with pytest.raises(ValueError, match="transform_to_unconstrained"):
+        build(theta, x, z_score_y="transform_to_unconstrained")
+
+
+def test_restriction_estimator_input_rejects_transform_to_unconstrained():
+    from sbi.utils.restriction_estimator import build_input_layer
+
+    with pytest.raises(ValueError, match="transform_to_unconstrained"):
+        build_input_layer(torch.randn(20, 3), "transform_to_unconstrained")
+
+
+@pytest.mark.parametrize(
     "z_x",
     [
         None,

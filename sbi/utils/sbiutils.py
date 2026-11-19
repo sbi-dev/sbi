@@ -215,7 +215,11 @@ def z_score_parser(
     Args:
         z_score_flag: str flag for z-scoring method stating whether the data
             dimensions are "structured" or "independent", or does not require z-scoring
-            ("none" or None).
+            ("none" or None). "transform_to_unconstrained" also returns no
+            z-scoring: on the modeled variable, the caller replaces z-scoring with a
+            transform to unconstrained space, derived from the support of a
+            distribution such as the prior. Callers that do not implement this
+            transform must reject the flag.
 
     Returns:
         Flag for whether or not to z-score, and whether data is structured
@@ -573,7 +577,19 @@ def build_z_scored_embedding_net(
     Returns:
         `nn.Sequential(standardizing_net, embedding_net)` if z-scoring is requested,
         otherwise `embedding_net` itself.
+
+    Raises:
+        ValueError: If `z_score` is `transform_to_unconstrained`. It needs the
+            distribution of the variable it transforms, which an input of an
+            embedding net does not have.
     """
+    if z_score == "transform_to_unconstrained":
+        raise ValueError(
+            "`transform_to_unconstrained` is not supported for the condition or "
+            "for classifier inputs. It is only implemented for the modeled "
+            "variable of the Zuko flows and the MDN. Use 'none', 'independent' "
+            "or 'structured' instead."
+        )
     z_score_bool, structured = z_score_parser(z_score)
     if z_score_bool:
         embedding_net = nn.Sequential(

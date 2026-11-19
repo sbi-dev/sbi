@@ -603,7 +603,6 @@ def test_build_zuko_flow_with_valid_unconstrained_transform(x_dist):
         batch_x=batch_x,
         batch_y=batch_y,
         z_score_x="transform_to_unconstrained",
-        z_score_y="transform_to_unconstrained",
         x_dist=x_dist,
     )
     assert isinstance(flow, ZukoFlow)
@@ -623,7 +622,6 @@ def test_build_zuko_flow_missing_x_dist_raises_error():
             batch_x=batch_x,
             batch_y=batch_y,
             z_score_x="transform_to_unconstrained",
-            z_score_y="transform_to_unconstrained",
             x_dist=None,  # No distribution provided
         )
 
