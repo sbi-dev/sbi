@@ -90,7 +90,7 @@ def run_tarp(
         # Drop the same rows that are dropped from thetas and xs below, so that
         # each reference stays paired with its theta.
         is_valid_x, _, _ = handle_invalid_x(xs, exclude_invalid_x=True)
-        references = references[is_valid_x]
+        references = references[is_valid_x.to(references.device)]
 
     thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
 
