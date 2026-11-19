@@ -74,12 +74,19 @@ def run_tarp(
         ecp: Expected coverage probability (``ecp``), see equation 4 of the paper
         alpha: credibility values, ``num_bins + 1`` points evenly spaced over
             ``[0, 1]``, see equation 2 of the paper
+
+    Raises:
+        ValueError: if ``references`` does not have the shape of ``thetas``.
     """
 
     if references is not None:
-        assert references.shape == thetas.shape, (
-            "references must have the same shape as thetas"
-        )
+        if references.shape != thetas.shape:
+            raise ValueError(
+                f"references must have the same shape as thetas, but got "
+                f"{tuple(references.shape)} and {tuple(thetas.shape)}. Pass one "
+                f"reference per theta, also for thetas whose xs contain NaN or Inf: "
+                f"run_tarp drops these rows itself."
+            )
         # Drop the same rows that are dropped from thetas and xs below, so that
         # each reference stays paired with its theta.
         is_valid_x, _, _ = handle_invalid_x(xs, exclude_invalid_x=True)
