@@ -71,8 +71,8 @@ class Predictor(ABC):
 
         Args:
             theta: Parameters.
-            t1: Time.
-            t0: Time.
+            t1: The current time of the samples.
+            t0: The smaller time to move the samples to.
         """
         return self.predict(theta, t1, t0)
 
@@ -82,8 +82,8 @@ class Predictor(ABC):
 
         Args:
             theta: Parameters.
-            t1: Time.
-            t0: Time.
+            t1: The current time of the samples.
+            t0: The smaller time to move the samples to.
         """
         pass
 
