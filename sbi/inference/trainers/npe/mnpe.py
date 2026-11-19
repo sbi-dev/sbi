@@ -36,7 +36,7 @@ class MNPE(NPE_C):
     net will only operate on the continuous parameters, note this to design the
     dimension of the embedding net.
 
-    Example:
+    Example
     --------
 
     ::

@@ -232,8 +232,6 @@ class ConditionedPotential(BasePotential):
 
         Args:
             theta: Free parameters $\theta_i$, batch dimension 1.
-            x_o: Unused keyword argument. Only present to match the signature of the
-                `Potential` class.
             track_gradients: Whether to track gradients.
 
         Returns:
@@ -257,6 +255,21 @@ class ConditionedPotential(BasePotential):
     def x_embedding_net(self) -> Optional[nn.Module]:
         """Delegate to the wrapped potential, like `set_x` and `return_x_o`."""
         return self.potential_fn.x_embedding_net
+
+    @property
+    def x_event_shape(self) -> Optional[torch.Size]:
+        """Delegate to the wrapped potential."""
+        return self.potential_fn.x_event_shape
+
+    @property
+    def warns_on_implicit_iid(self) -> bool:
+        """Delegate to the wrapped potential."""
+        return self.potential_fn.warns_on_implicit_iid
+
+    @property
+    def iid_breaks_normalization(self) -> bool:
+        """Delegate to the wrapped potential."""
+        return self.potential_fn.iid_breaks_normalization
 
     @property
     def x_is_iid(self) -> bool:

@@ -8,9 +8,9 @@ import torch
 from joblib import Parallel, delayed
 from numpy import ndarray
 from torch import Tensor, float32
-from tqdm.auto import tqdm
 
 from sbi.sbi_types import Proposal
+from sbi.utils.pbar import tqdm
 from sbi.utils.sbiutils import seed_all_backends
 
 

@@ -30,7 +30,7 @@ class NLE_A(LikelihoodEstimatorTrainer):
         Autoregressive Flows, Papamakarios et al., AISTATS 2019,
         https://arxiv.org/abs/1805.07226
 
-    Example:
+    Example
     --------
 
     ::

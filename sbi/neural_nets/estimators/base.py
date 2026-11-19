@@ -529,7 +529,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         Args:
             input: variable whose distribution is estimated.
             condition: Conditioning variable.
-            t: Time.
+            times: Time.
 
         Raises:
             NotImplementedError: This method should be implemented by sub-classes.

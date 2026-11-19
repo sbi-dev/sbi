@@ -38,6 +38,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     _mixed_config_from_factory_kwargs,
 )
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle
+from sbi.utils.nn_utils import check_net_device
 
 THETA, X = torch.randn(100, 3), torch.randn(100, 5)
 
@@ -158,6 +159,18 @@ def test_factories_keep_their_roles(factory_fn, input_dim, condition_dim):
 
     assert estimator.input_shape == torch.Size([input_dim])
     assert estimator.condition_shape == torch.Size([condition_dim])
+
+
+def test_check_net_device_handles_nets_without_parameters():
+    """A net without tensors stays as it is; one with only buffers moves."""
+    flatten = torch.nn.Flatten()
+    assert check_net_device(flatten, "meta") is flatten
+
+    # Without affine weights, batch norm keeps only its running statistics.
+    with pytest.warns(UserWarning, match="Moving it to meta"):
+        net = check_net_device(torch.nn.BatchNorm1d(2, affine=False), "meta")
+
+    assert net.running_mean.device.type == "meta"
 
 
 def test_posterior_nn_accepts_valid_extra_kwargs():
