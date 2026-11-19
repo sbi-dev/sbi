@@ -1017,6 +1017,28 @@ def test_iw_and_alpha_losses_leave_out_particles_outside_the_support(
         assert torch.allclose(grad, grad_underflow)
 
 
+def test_rollback_keeps_the_optimizer_settings(monkeypatch):
+    """Recovery resets the optimizer's state, not its configured settings or the
+    learning rate the scheduler has reached."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = ForwardKLOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        optimizer=torch.optim.SGD,
+        momentum=0.9,
+        weight_decay=0.1,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    monkeypatch.setattr(optimizer, "warm_up", lambda num_steps: None)
+    optimizer._optimizer.param_groups[0]["lr"] = 1e-4  # as decayed by the scheduler
+    optimizer.resolve_state()
+    settings = optimizer._optimizer.param_groups[0]
+    assert (settings["momentum"], settings["weight_decay"]) == (0.9, 0.1)
+    assert settings["lr"] == 1e-4
+
+
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
 @pytest.mark.parametrize("dreg_before, dreg_after", [(False, True), (True, False)])
 def test_dreg_changed_by_update_matches_new_optimizer(

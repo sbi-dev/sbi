@@ -144,11 +144,11 @@ class DivergenceOptimizer(ABC):
         self.state_dict = [para.data.clone() for para in self.q.parameters()]
 
         # Init optimizer and scheduler with correct arguments
-        opt_kwargs = filter_kwargs_for_func(optimizer.__init__, kwargs)
+        self._opt_kwargs = filter_kwargs_for_func(optimizer.__init__, kwargs)
         kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
         scheduler_kwargs = filter_kwargs_for_func(scheduler.__init__, kwargs)
 
-        self._optimizer = optimizer(self.q.parameters(), **opt_kwargs)
+        self._optimizer = optimizer(self.q.parameters(), **self._opt_kwargs)
         self._scheduler = scheduler(self._optimizer, **scheduler_kwargs)
         # Loss and summary
         self.eps = eps
@@ -237,7 +237,10 @@ class DivergenceOptimizer(ABC):
         """
         for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             para.data = state_para.data.clone().to(para.device)
-        self._optimizer.__init__(self.q.parameters(), self.learning_rate)
+        scheduled_lrs = [group["lr"] for group in self._optimizer.param_groups]
+        self._optimizer.__init__(self.q.parameters(), **self._opt_kwargs)
+        for group, lr in zip(self._optimizer.param_groups, scheduled_lrs, strict=True):
+            group["lr"] = lr
         self.warm_up(warm_up_rounds)
 
     def loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
@@ -388,11 +391,11 @@ class DivergenceOptimizer(ABC):
             sched_type = type(self._scheduler)
 
         kwargs["lr"] = self.learning_rate
-        opt_kwargs = filter_kwargs_for_func(opt_type.__init__, kwargs)
+        self._opt_kwargs = filter_kwargs_for_func(opt_type.__init__, kwargs)
         kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
         scheduler_kwargs = filter_kwargs_for_func(sched_type.__init__, kwargs)
 
-        self._optimizer = opt_type(self.q.parameters(), **opt_kwargs)
+        self._optimizer = opt_type(self.q.parameters(), **self._opt_kwargs)
         self._scheduler = sched_type(self._optimizer, **scheduler_kwargs)
 
 
