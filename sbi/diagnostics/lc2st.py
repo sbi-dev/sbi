@@ -120,7 +120,7 @@ class LC2ST:
         seed: int = 1,
         num_folds: int = 1,
         num_ensemble: int = 1,
-        classifier: Union[str, Type[BaseEstimator]] = MLPClassifier,
+        classifier: Union[str, Type[BaseEstimator]] = "mlp",
         z_score: bool = False,
         classifier_kwargs: Optional[Dict[str, Any]] = None,
         num_trials_null: int = 100,
@@ -1154,7 +1154,8 @@ def train_lc2st(
 
     # labels - use float32 for skorch NeuralNetBinaryClassifier (BCEWithLogitsLoss),
     # int64 for sklearn classifiers
-    is_skorch = isinstance(clf, NeuralNetBinaryClassifier)
+    base_clf = clf.clf if isinstance(clf, EnsembleClassifier) else clf
+    is_skorch = isinstance(base_clf, NeuralNetBinaryClassifier)
     label_dtype = np.float32 if is_skorch else np.int64
     target = np.concatenate((
         np.zeros((joint_p.shape[0],), dtype=label_dtype),
