@@ -63,7 +63,7 @@ class VFT:
         self.modes = modes
 
         if point_positions is not None:
-            new_times = point_positions[:, None, :]
+            new_times = point_positions[:, None, :].to(device)
         else:
             new_times = (
                 (
@@ -86,6 +86,7 @@ class VFT:
         Fourier transformation on arbitrary grids
         """
 
+        # Elementwise, not bmm: autocast would turn bmm into complex32.
         X_mat = self.X_ * self.new_times
         forward_mat = torch.exp(-1j * (X_mat))
 
@@ -335,7 +336,10 @@ class SpectralConvEmbedding(nn.Module):
         n_points = x.shape[1]
 
         if self.modes > n_points // 2 + 1:
-            raise ValueError("Modes should be at most floor(n_points/2) + 1")
+            raise ValueError(
+                f"modes ({self.modes}) must be at most floor(n_points / 2) + 1 "
+                f"= {n_points // 2 + 1} for {n_points} points."
+            )
 
         x = self.fc0(x)  # (batch_size, n_points, in_channels)
 
