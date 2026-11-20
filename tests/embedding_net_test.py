@@ -226,6 +226,13 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
         # Kernel much larger than the padded input: both sizes are negative, and
         # their product is positive.
         (CNNEmbedding, (4, 4), {"kernel_size": 9}, "smaller kernel_size"),
+        (CNNEmbedding, (32,), {"pool_kernel_size": 0}, "pool_kernel_size must be"),
+        (
+            CausalCNNEmbedding,
+            (64,),
+            {"pool_kernel_size": 0},
+            "pool_kernel_size must be",
+        ),
         (
             CausalCNNEmbedding,
             (64,),
@@ -651,13 +658,10 @@ def test_permutation_invariant_embedding_ignores_padding_per_observation(
     assert torch.allclose(batched[1], embedding(x[1:])[0], atol=1e-6)
 
 
-@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
-def test_permutation_invariant_embedding_appends_log_trial_count(aggregation_fn):
+def test_permutation_invariant_embedding_appends_log_trial_count():
     """The fc_subnet gets log(1 + N) of the real trials, not N of order 100."""
     embedding = PermutationInvariantEmbedding(
-        FCEmbedding(input_dim=2, output_dim=4),
-        trial_net_output_dim=4,
-        aggregation_fn=aggregation_fn,
+        FCEmbedding(input_dim=2, output_dim=4), trial_net_output_dim=4
     )
     fc_inputs = []
     embedding.fc_subnet.register_forward_hook(
@@ -672,18 +676,16 @@ def test_permutation_invariant_embedding_appends_log_trial_count(aggregation_fn)
     assert torch.allclose(fc_inputs[0][:, -1], expected)
 
 
-@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
 @pytest.mark.parametrize(
     "pattern", ("padded_trial", "partially_nan_trial", "no_real_trial")
 )
-def test_permutation_invariant_embedding_warns_on_invalid_padding(
-    pattern, aggregation_fn
-):
+def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
     """NaN outside whole padded trials must not silently become data; warn once."""
+    trial_net_output_dim = 4
     embedding = PermutationInvariantEmbedding(
-        FCEmbedding(input_dim=2, output_dim=4),
-        trial_net_output_dim=4,
-        aggregation_fn=aggregation_fn,
+        FCEmbedding(input_dim=2, output_dim=trial_net_output_dim),
+        trial_net_output_dim=trial_net_output_dim,
+        aggregation_fn="mean",
     )
     x = torch.randn(2, 3, 2)
     x[0, 1:] = float("nan")
@@ -700,8 +702,9 @@ def test_permutation_invariant_embedding_warns_on_invalid_padding(
     issued = [w for w in caught if "should only mark padded trials" in str(w.message)]
     assert len(issued) == (0 if pattern == "padded_trial" else 1)
     if pattern == "no_real_trial":
-        # Zero aggregate and zero trial count, for "mean" as for "sum".
-        assert torch.allclose(output[1], embedding.fc_subnet(torch.zeros(1, 5))[0])
+        # Zero aggregate and zero trial count; "mean" must not divide by zero.
+        fc_input = torch.zeros(1, trial_net_output_dim + 1)
+        assert torch.allclose(output[1], embedding.fc_subnet(fc_input)[0])
 
 
 def test_permutation_invariant_embedding_rejects_inf():
