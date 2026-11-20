@@ -1428,11 +1428,14 @@ class VIPosterior(NeuralPosterior):
         init_method: Union[str, TorchTensor],
         num_init_samples: int,
         x: Optional[TorchTensor] = None,
+        show_progress_bars: bool = False,
     ) -> Tensor:
         # Amortized training leaves `q` untouched, so draw from q(θ|x).
         if self._mode == "amortized" and init_method in ("posterior", "proposal"):
-            return self.sample((num_init_samples,), x=x)
-        return super()._map_inits(init_method, num_init_samples, x)
+            return self.sample(
+                (num_init_samples,), x=x, show_progress_bars=show_progress_bars
+            )
+        return super()._map_inits(init_method, num_init_samples, x, show_progress_bars)
 
     def map(
         self,

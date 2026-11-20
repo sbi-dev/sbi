@@ -257,7 +257,7 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
 
-        posterior_score = self.vf_estimator(input=input, condition=condition, time=time)
+        posterior_score = self.vf_estimator.score(input, condition, time)
         prior_score = self.marginal_prior_score(input, time)
         ll_score = posterior_score - prior_score
         ll_score_mod = ll_score * self.likelihood_scale + self.likelihood_shift
@@ -352,7 +352,7 @@ class UniversalGuidance(ScoreAdaptation):
     ) -> Tensor:
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
-        score = self.vf_estimator(input, condition, time)
+        score = self.vf_estimator.score(input, condition, time)
         m = self.vf_estimator.mean_t_fn(time)
         std = self.vf_estimator.std_fn(time)
 
@@ -368,10 +368,15 @@ class IntervalGuidanceConfig:
     """Configuration for :class:`IntervalGuidance`.
 
     Attributes:
-        lower_bound: Optional lower bound for parameters.
-        upper_bound: Optional upper bound for parameters.
+        lower_bound: Optional lower bound for parameters: a float, or a tensor with
+            one bound per dimension (`-inf` for no bound).
+        upper_bound: Optional upper bound for parameters: a float, or a tensor with
+            one bound per dimension (`inf` for no bound). Each lower bound must be
+            less than its upper bound.
         mask: Optional boolean mask selecting constrained dimensions.
-        scale_factor: Soft-constraint strength.
+        scale_factor: Soft-constraint strength. The log-sigmoid walls have slope
+            `scale_factor * m(t) / std(t)^2`, so that they push the denoised
+            parameters by the same amount at every time.
     """
 
     lower_bound: Optional[Union[float, Tensor]]
@@ -382,10 +387,30 @@ class IntervalGuidanceConfig:
     def __post_init__(self) -> None:
         if self.lower_bound is None and self.upper_bound is None:
             raise ValueError("At least one of lower_bound or upper_bound is required.")
+        # Compare on the CPU, which holds every dtype, without converting the dtype.
+        lower, upper = (
+            b.cpu() if isinstance(b, Tensor) else b
+            for b in (self.lower_bound, self.upper_bound)
+        )
+        for name, bound, no_wall in (
+            ("lower", lower, -math.inf),
+            ("upper", upper, math.inf),
+        ):
+            if bound is None:
+                continue
+            if isinstance(bound, Tensor):
+                bad = bound.isnan().any() or (bound.isinf() & (bound != no_wall)).any()
+            else:
+                bad = math.isnan(bound) or (math.isinf(bound) and bound != no_wall)
+            if bad:
+                raise ValueError(
+                    f"{name}_bound must not be NaN or {-no_wall}: {no_wall} means no "
+                    "bound."
+                )
         if (
-            self.lower_bound is not None
-            and self.upper_bound is not None
-            and self.lower_bound >= self.upper_bound
+            lower is not None
+            and upper is not None
+            and not torch.as_tensor(lower < upper).all()
         ):
             raise ValueError(
                 f"lower_bound ({self.lower_bound}) must be less than "
@@ -439,22 +464,22 @@ class IntervalGuidance(UniversalGuidance):
             input: Tensor, condition: Tensor, m: Tensor, std: Tensor
         ) -> Tensor:
             del condition
-            scale = config.scale_factor / (m**2 * std**2 + 1e-6)
-            upper_bound = (
-                F.logsigmoid(-scale * (input - config.upper_bound))
-                if config.upper_bound is not None
-                else torch.zeros_like(input)
-            )
-            lower_bound = (
-                F.logsigmoid(scale * (input - config.lower_bound))
-                if config.lower_bound is not None
-                else torch.zeros_like(input)
-            )
-            out = upper_bound + lower_bound
+
+            scale = config.scale_factor * m / (std**2 + 1e-6)
+
+            def wall(bound: Optional[Union[float, Tensor]], sign: float) -> Tensor:
+                if bound is None:
+                    return torch.zeros_like(input)
+                bound = torch.as_tensor(bound, dtype=input.dtype, device=input.device)
+                # An infinite bound is no wall, also when `scale` is zero.
+                finite = torch.isfinite(bound)
+                distance = input - torch.where(finite, bound, 0.0)
+                return torch.where(finite, F.logsigmoid(sign * scale * distance), 0.0)
+
+            out = wall(config.lower_bound, 1.0) + wall(config.upper_bound, -1.0)
             if config.mask is not None:
-                if config.mask.shape != out.shape:
-                    config.mask = config.mask.unsqueeze(0).expand_as(out)
-                out = torch.where(config.mask, out, torch.zeros_like(out))
+                mask = config.mask.to(out.device)
+                out = torch.where(mask, out, torch.zeros_like(out))
             return out
 
         super().__init__(
@@ -584,7 +609,7 @@ class PriorGuide(ScoreAdaptation):
             time = torch.tensor([self.vf_estimator.t_min])
 
         input_ = input.detach()
-        score = self.vf_estimator(input=input_, condition=condition, time=time)
+        score = self.vf_estimator.score(input_, condition, time)
         m = self.vf_estimator.mean_t_fn(time)
         std = self.vf_estimator.std_fn(time)
         # Standard Tweedie's formula for denoising
@@ -621,7 +646,8 @@ class PriorGuide(ScoreAdaptation):
             log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
 
         numerator = self.weights[None, :] * torch.exp(log_comp)
-        denom = numerator.sum(dim=1, keepdim=True)
+        # Normalize over the mixture components, the last dimension.
+        denom = numerator.sum(dim=-1, keepdim=True)
         denom = torch.clamp(denom, min=nugget)
         w_tilde = numerator / denom
 
@@ -1327,7 +1353,20 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         std = self.vector_field_estimator.std_fn(time)
         cov0 = std**2 * jac + torch.eye(d, device=self.device)[None, None, :, :]
 
-        denoising_posterior_precision = m**2 / std**2 * torch.inverse(cov0)
+        # Narrow posteriors cancel I + s^2 J below float rounding. Those matrices get an
+        # eigenvalue floor, without gradient (eigh's is NaN at repeated eigenvalues).
+        floor = 10 * torch.finfo(cov0.dtype).eps
+        singular = (torch.linalg.eigvalsh(cov0).abs() < floor).any(-1)
+        inverse_cov0 = torch.zeros_like(cov0)
+        inverse_cov0[~singular] = torch.linalg.inv(cov0[~singular])
+        if singular.any():
+            eigenvalues, eigenvectors = torch.linalg.eigh(cov0[singular].detach())
+            eigenvalues = torch.where(eigenvalues.abs() < floor, floor, eigenvalues)
+            inverse_cov0[singular] = (
+                eigenvectors / eigenvalues[..., None, :]
+            ) @ eigenvectors.mT
+
+        denoising_posterior_precision = m**2 / std**2 * inverse_cov0
 
         return denoising_posterior_precision
 

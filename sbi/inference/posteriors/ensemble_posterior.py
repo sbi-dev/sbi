@@ -285,6 +285,7 @@ class EnsemblePosterior(NeuralPosterior):
         # depend on the draw.
         x = self._x_else_default_x(x)
         self._check_num_observations(x.shape[0])
+        self._check_sample_inputs(x, **kwargs)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indizes = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -299,6 +300,10 @@ class EnsemblePosterior(NeuralPosterior):
             )
         samples = self._stack_and_shuffle(samples, num_samples)
         return samples.reshape(*sample_shape, -1)
+
+    def _check_sample_inputs(self, x: Tensor, **kwargs) -> None:
+        for posterior in self.posteriors:
+            posterior._check_sample_inputs(x, **kwargs)
 
     def sample_batched(
         self,
@@ -567,7 +572,9 @@ class EnsemblePosterior(NeuralPosterior):
 
         else:
             x = self._bind_mixture(None, "map")
-            inits = self._map_inits(init_method, num_init_samples, x)
+            inits = self._map_inits(
+                init_method, num_init_samples, x, show_progress_bars
+            )
             # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(
                 potential_fn=self.potential_fn,

@@ -706,7 +706,8 @@ def test_prior_guide(vector_field_type, prior_type, covariance_type, K):
     train_prior = vector_field_trained_model["prior"]
 
     x_o = zeros(1, num_dim)
-    posterior = inference.build_posterior(score_estimator)
+    # Guidance changes the score, which only SDE sampling uses (FMPE defaults to ODE).
+    posterior = inference.build_posterior(score_estimator, sample_with="sde")
     posterior.set_default_x(x_o)
 
     test_prior_mean = zeros(num_dim) + 0.1

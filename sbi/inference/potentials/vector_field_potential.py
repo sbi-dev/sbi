@@ -187,6 +187,7 @@ class VectorFieldBasedPotential(BasePotential):
         self.iid_params = bound.iid_params
         self.guidance_method = bound.guidance_method
         self.guidance_params = bound.guidance_params
+        self.__dict__.pop("_guided_estimators", None)
         self._flow_kwargs = bound._flow_kwargs
         if not bound._x_is_iid and (bound._x_o is not None):
             self.flow = bound.flow
@@ -314,6 +315,12 @@ class VectorFieldBasedPotential(BasePotential):
             )
             return masked_log_prob
 
+    def __getstate__(self) -> Dict[str, Any]:
+        # Guided estimators may hold local functions; they are rebuilt on first use.
+        state = self.__dict__.copy()
+        state.pop("_guided_estimators", None)
+        return state
+
     def gradient(
         self,
         theta: Tensor,
@@ -354,16 +361,17 @@ class VectorFieldBasedPotential(BasePotential):
             )
 
         if self.guidance_method is not None:
-            score_wrapper, config_cls = get_guidance_method(self.guidance_method)
-            config_params = config_cls(**(self.guidance_params or {}))
-            # Note to make this cross compatible with IID we need make this
-            # wrapper more like a proper estimator.
-            vf_estimator = score_wrapper(
-                self.vector_field_estimator,
-                self.prior,
-                config=config_params,
-                device=device,
-            )
+            # Reused at every step, so that auto_gauss keeps its cached precision.
+            guided = self.__dict__.setdefault("_guided_estimators", {})
+            if device not in guided:
+                score_wrapper, config_cls = get_guidance_method(self.guidance_method)
+                guided[device] = score_wrapper(
+                    self.vector_field_estimator,
+                    self.prior,
+                    config=config_cls(**(self.guidance_params or {})),
+                    device=device,
+                )
+            vf_estimator = guided[device]
         else:
             vf_estimator = self.vector_field_estimator
 
