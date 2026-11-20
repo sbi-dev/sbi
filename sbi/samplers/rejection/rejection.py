@@ -244,6 +244,7 @@ def accept_reject_sample(
     max_sampling_batch_size: int = 10_000,
     proposal_sampling_kwargs: Optional[Dict] = None,
     alternative_method: Optional[str] = None,
+    low_acceptance_hint: Optional[str] = None,
     max_sampling_time: Optional[float] = None,
     return_partial_on_timeout: bool = False,
     **kwargs,
@@ -285,6 +286,9 @@ def accept_reject_sample(
         alternative_method: An alternative method for sampling from the restricted
             proposal. E.g., for SNPE, we suggest to sample with MCMC if the rejection
             rate is too high. Used only for printing during a potential warning.
+        low_acceptance_hint: What a low acceptance rate means for the caller, e.g.
+            leakage for NPE. Appended to the low-acceptance warning and to the
+            timeout error.
         max_sampling_time: Optional maximum allowed sampling time (in seconds).
             If exceeded, the sampling loop is interrupted and a RuntimeError is raised
             unless `return_partial_on_timeout=True`. This prevents infinite or
@@ -363,7 +367,7 @@ def accept_reject_sample(
                 samples = torch.stack(samples, dim=1)
                 samples = samples.reshape(num_collected, *draw_shape)
                 return samples, as_tensor(acceptance_rate, device=samples.device)
-            raise RuntimeError(
+            msg = (
                 "Sampling aborted early because rejection sampling exceeded "
                 "max_sampling_time. This is likely due to extremely low "
                 "acceptance. You can disable rejection sampling using "
@@ -371,6 +375,9 @@ def accept_reject_sample(
                 "the trained estimator. Consider switching to MCMC or VI, or "
                 "checking for model misspecification."
             )
+            if low_acceptance_hint is not None:
+                msg += f" {low_acceptance_hint}"
+            raise RuntimeError(msg)
 
         # Sample and reject.
         with nested_pbar_context():
@@ -448,8 +455,10 @@ def accept_reject_sample(
                     rejection sampling (e.g. via `reject_outside_prior=False` in
                     `posterior.sample()` when available)."""
                 if alternative_method is not None:
-                    warn_msg += f"""Alternatively, consider interrupting (Ctrl-C)
+                    warn_msg += f""" Alternatively, consider interrupting (Ctrl-C)
                     and switching to `{alternative_method}`."""
+                if low_acceptance_hint is not None:
+                    warn_msg += f" {low_acceptance_hint}"
                 logger.warning(warn_msg)
 
             leakage_warning_raised = True  # Ensure warning is raised just once.

@@ -50,6 +50,14 @@ class DirectPosterior(NeuralPosterior):
 
     # Suggested in the warning when rejection sampling accepts few samples.
     _alternative_sampling_method = "build_posterior(..., sample_with='mcmc')"
+    # Explains that warning for NPE.
+    _low_acceptance_hint = (
+        "A low acceptance rate means that most of the posterior estimate lies "
+        "outside the prior bounds (leakage). After multi-round training, leakage "
+        "often grows with every round and the estimate becomes poor; truncated "
+        "proposals (TSNPE) avoid this. See "
+        "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
+    )
 
     def __init__(
         self,
@@ -166,6 +174,7 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
                 alternative_method=self._alternative_sampling_method,
+                low_acceptance_hint=self._low_acceptance_hint,
                 max_sampling_time=max_sampling_time,
                 return_partial_on_timeout=return_partial_on_timeout,
             )[0]
@@ -267,6 +276,7 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
                 alternative_method=self._alternative_sampling_method,
+                low_acceptance_hint=self._low_acceptance_hint,
                 max_sampling_time=max_sampling_time,
                 return_partial_on_timeout=return_partial_on_timeout,
             )[0]

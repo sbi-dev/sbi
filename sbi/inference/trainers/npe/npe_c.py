@@ -38,6 +38,16 @@ from sbi.utils import (
 )
 from sbi.utils.torchutils import assert_all_finite
 
+_DEGENERATE_MOG_LOSS_MSG = (
+    "The multi-round loss of NPE with a mixture density network gives NaN or Inf: "
+    "the mixture components of the posterior estimate have become numerically "
+    "degenerate. This usually follows strong leakage in earlier rounds, i.e., most "
+    "of the posterior estimate lies outside the prior bounds (see the warning 'Only "
+    "x% proposal samples are accepted' when sampling the proposal). Consider "
+    "truncated proposals (TSNPE) or single-round NPE instead, see "
+    "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
+)
+
 
 class NPE_C(PosteriorEstimatorTrainer):
     r"""Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019) [1].
@@ -47,9 +57,11 @@ class NPE_C(PosteriorEstimatorTrainer):
     specific observation x_o. In the first round, NPE-C is equivalent to other NPE
     methods and is fully amortized (direct inference for any new observation). After
     the first round, NPE-C automatically selects between two loss variants depending
-    on the chosen density estimator: the non-atomic loss (for Mixture of Gaussians)
-    which is stable and avoids leakage, or the atomic loss (for flows) which is more
-    flexible but may suffer from leakage issues.
+    on the chosen density estimator: the non-atomic loss (for Mixture of Gaussians),
+    which computes the proposal posterior in closed form, or the atomic loss (for
+    flows), which approximates it with atoms. With either loss, the posterior estimate
+    can leak more and more mass outside the prior bounds over the rounds. Truncated
+    proposals (TSNPE) avoid this, see the FAQ on leakage.
 
     For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
     plain NLL loss.
@@ -340,8 +352,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return the log-probability of the proposal posterior.
 
         If the proposal is a MoG, the density estimator is a MoG, and the prior is
-        either Gaussian or uniform, we use non-atomic loss. Else, use atomic loss (which
-        suffers from leakage).
+        either Gaussian or uniform, we use non-atomic loss. Else, use atomic loss.
 
         Args:
             theta: Batch of parameters θ.
@@ -448,7 +459,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return log-probability of the proposal posterior for MoG proposal.
 
         For MoG proposals and MoG density estimators, this can be done in closed form
-        and does not require atomic loss (i.e. there will be no leakage issues).
+        and does not require atomic loss.
 
         Notation:
 
@@ -497,7 +508,9 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         # Create MoG for proposal posterior and compute log_prob
         # We need precision_factors for MoG, compute via Cholesky
-        precf_pp = torch.linalg.cholesky(prec_pp, upper=True)
+        precf_pp, info = torch.linalg.cholesky_ex(prec_pp, upper=True)
+        if (info != 0).any() or not torch.isfinite(logits_pp).all():
+            raise ValueError(_DEGENERATE_MOG_LOSS_MSG)
         mog_pp = MoG(
             logits=logits_pp,
             means=m_pp,
@@ -507,12 +520,8 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         # Compute the log_prob of theta under the product.
         log_prob_proposal_posterior = mog_pp.log_prob(theta)
-        assert_all_finite(
-            log_prob_proposal_posterior,
-            """the evaluation of the MoG proposal posterior. This is likely due to a
-            numerical instability in the training procedure. Please create an issue on
-            Github.""",
-        )
+        if not torch.isfinite(log_prob_proposal_posterior).all():
+            raise ValueError(_DEGENERATE_MOG_LOSS_MSG)
 
         return log_prob_proposal_posterior
 
