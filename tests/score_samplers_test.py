@@ -347,14 +347,20 @@ def test_gaussian_score_sampling(
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
-def test_heun_sampling_on_time_grid_ending_at_zero(sde_type):
-    """The VP and sub-VP scores diverge at t=0, where Heun's last step ends."""
+@pytest.mark.parametrize(
+    "predictor, corrector", [("heun", None), ("euler_maruyama", "langevin")]
+)
+@pytest.mark.parametrize("t_end", [0.0, 1e-6])
+def test_sampling_on_time_grid_ending_near_zero(sde_type, predictor, corrector, t_end):
+    """The VP and sub-VP scores diverge at t=0 and need a noise scale that stays
+    positive in float32 just above it."""
     score_fn = _build_gaussian_score_estimator(
         sde_type, (2,), torch.ones(2), torch.ones(2)
     )
-    ts = torch.linspace(score_fn.vector_field_estimator.t_max, 0.0, 50)
+    ts = torch.linspace(score_fn.vector_field_estimator.t_max, t_end, 50)
 
-    samples = Diffuser(score_fn, "heun").run(100, ts, show_progress_bars=False)
+    sampler = Diffuser(score_fn, predictor, corrector)
+    samples = sampler.run(100, ts, show_progress_bars=False)
 
     assert torch.isfinite(samples).all()
 
@@ -499,3 +505,29 @@ def _build_gaussian_score_estimator(
     )
 
     return score_fn
+
+
+def test_langevin_corrector_scores_at_current_time():
+    """The Langevin corrector scores at the samples' current time t0, not t1."""
+    from sbi.samplers.score.correctors import LangevinCorrector
+
+    queried_times = []
+
+    class _RecordingGradient:
+        def gradient(self, theta: Tensor, t: Tensor) -> Tensor:
+            queried_times.append(t)
+            return torch.zeros_like(theta)
+
+    class _RecordingPredictor:
+        device = "cpu"
+        potential_fn = _RecordingGradient()
+
+    corrector = LangevinCorrector(
+        predictor=_RecordingPredictor(),
+        num_steps=1,
+        step_size=0.1,
+    )
+
+    corrector(torch.zeros(1, 2), t0=torch.tensor(0.3), t1=torch.tensor(0.5))
+
+    assert [float(t) for t in queried_times] == [pytest.approx(0.3)]

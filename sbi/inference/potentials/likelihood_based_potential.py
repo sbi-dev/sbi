@@ -8,7 +8,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import BasePotential, unpaired_batch_error
 from sbi.neural_nets.estimators import (
     ConditionalDensityEstimator,
     MixedDensityEstimator,
@@ -20,7 +20,6 @@ from sbi.neural_nets.estimators.shape_handling import (
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import mcmc_transform
 from sbi.utils.torchutils import BoxUniform
-from sbi.utils.user_input_checks import process_x
 from sbi.utils.user_input_checks_utils import (
     MultipleIndependent,
     move_distribution_to_device,
@@ -83,9 +82,14 @@ class LikelihoodBasedPotential(BasePotential):
             The potential function $p(x_o|\theta)p(\theta)$.
         """
 
-        super().__init__(prior, x_o, device)
         self.likelihood_estimator = likelihood_estimator
         self.likelihood_estimator.eval()
+        super().__init__(prior, x_o, device)
+
+    @property
+    def x_event_shape(self) -> torch.Size:
+        """Shape of one observation: the input shape of the likelihood estimator."""
+        return self.likelihood_estimator.input_shape
 
     def to(self, device: Union[str, torch.device]) -> "LikelihoodBasedPotential":
         """Move likelihood estimator, prior and x_o to the given device.
@@ -118,9 +122,7 @@ class LikelihoodBasedPotential(BasePotential):
             x_o=None,
             device=self.device,
         )
-        if x_o is not None:
-            x_o = process_x(x_o).to(self.device)
-        bound._x_o = x_o
+        bound._x_o = self._prepare_x_o(x_o)
         bound._x_is_iid = x_is_iid
         return bound
 
@@ -149,11 +151,8 @@ class LikelihoodBasedPotential(BasePotential):
             # Calculate likelihood for each (theta,x) pair separately
             theta_batch_size = theta.shape[0]
             x_batch_size = self.x_o.shape[0]
-            assert theta_batch_size == x_batch_size, (
-                f"Batch size mismatch: {theta_batch_size} and {x_batch_size}.\
-                When performing batched sampling for multiple `x`, the batch size of\
-                `theta` must match the batch size of `x`."
-            )
+            if theta_batch_size != x_batch_size:
+                raise unpaired_batch_error(theta_batch_size, x_batch_size)
             x = self.x_o.unsqueeze(0)
             with torch.set_grad_enabled(track_gradients):
                 log_likelihood_batches = self.likelihood_estimator.log_prob(

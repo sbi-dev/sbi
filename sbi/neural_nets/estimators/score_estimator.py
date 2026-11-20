@@ -615,7 +615,7 @@ class VPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Standard deviation at a given time.
         """
-        std = 1.0 - torch.exp(
+        std = -torch.expm1(
             -0.5 * times**2.0 * (self.beta_max - self.beta_min) - times * self.beta_min
         )
         for _ in range(len(self.input_shape)):
@@ -732,7 +732,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
         Returns:
             Standard deviation at a given time.
         """
-        std = 1.0 - torch.exp(
+        std = -torch.expm1(
             -0.5 * times**2.0 * (self.beta_max - self.beta_min) - times * self.beta_min
         )
         for _ in range(len(self.input_shape)):
@@ -770,8 +770,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator):
             torch.abs(
                 self.noise_schedule(times)
                 * (
-                    1
-                    - torch.exp(
+                    -torch.expm1(
                         -2 * self.beta_min * times
                         - (self.beta_max - self.beta_min) * times**2
                     )
