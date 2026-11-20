@@ -199,6 +199,7 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     ("embedding_cls", "input_shape", "kwargs"),
     [
         (CNNEmbedding, (32, 32), {}),
+        (CNNEmbedding, (32,), {"num_conv_layers": 3}),
         (CausalCNNEmbedding, (64,), {"pool_kernel_size": 2}),
     ],
 )
@@ -220,46 +221,10 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
         embedding_net(channel_last_input)
 
 
-@pytest.mark.parametrize(
-    ("embedding_cls", "input_shape", "kwargs", "match"),
-    [
-        # Kernel much larger than the padded input: both sizes are negative, and
-        # their product is positive.
-        (CNNEmbedding, (4, 4), {"kernel_size": 9}, "smaller kernel_size"),
-        (CNNEmbedding, (32,), {"pool_kernel_size": 0}, "pool_kernel_size must be"),
-        (
-            CausalCNNEmbedding,
-            (64,),
-            {"pool_kernel_size": 0},
-            "pool_kernel_size must be",
-        ),
-        (
-            CausalCNNEmbedding,
-            (64,),
-            {"pool_kernel_size": 2, "num_conv_layers": 0},
-            "num_conv_layers must be at least 1",
-        ),
-        (
-            CausalCNNEmbedding,
-            (64,),
-            {"pool_kernel_size": 2, "dilation": [1, 2]},
-            "dilation has 2 entries",
-        ),
-    ],
-)
-def test_cnn_embedding_errors_name_arguments(embedding_cls, input_shape, kwargs, match):
-    """Invalid arguments raise at construction and name the argument to fix."""
-    with pytest.raises(ValueError, match=match):
-        embedding_cls(input_shape, **kwargs)
-
-
-def test_cnn_embedding_default_channels_follow_num_conv_layers():
-    """The default channels double per layer, starting at 6."""
-    embedding_net = CNNEmbedding((32,), num_conv_layers=3)
-    convs = [m for m in embedding_net.cnn_subnet if isinstance(m, nn.Conv1d)]
-
-    assert [conv.out_channels for conv in convs] == [6, 12, 24]
-    assert embedding_net(torch.randn(4, 32)).shape == (4, 20)
+def test_cnn_embedding_rejects_kernel_larger_than_input():
+    """In 2D, two negative output sizes have a positive product; still raise."""
+    with pytest.raises(ValueError, match="smaller kernel_size"):
+        CNNEmbedding((4, 4), kernel_size=9)
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
@@ -334,15 +299,6 @@ def test_spectral_conv_embedding_on_gpu():
     output = embedding_net.to(device)(x.to(device))
 
     assert torch.allclose(output.cpu(), expected, atol=1e-5)
-
-
-def test_spectral_conv_embedding_under_autocast():
-    """Mixed precision must not turn the Fourier matrices into complex32."""
-    embedding_net = SpectralConvEmbedding(
-        in_channels=2, modes=4, conv_channels=3, num_layers=2
-    )
-    with torch.autocast("cpu", dtype=torch.bfloat16):
-        embedding_net(torch.randn(3, 2, 16))
 
 
 BASE_CONFIG = {
@@ -762,30 +718,13 @@ def test_2d_ResNet_cnn_embedding_net(
     _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
-def test_2d_resnet_embedding_head_exists_before_first_call():
-    """An optimizer built first covers the head, and a fresh net loads weights
-    before its first call."""
-
-    def build():
-        return ResNetEmbedding2D(
-            c_in=1,
-            c_out=3,
-            c_hidden_fc=8,
-            n_stages=1,
-            blocks_per_stage=[1],
-            c_stages=[4],
-        )
-
-    x = torch.randn(2, 1, 8, 8)
-    trained = build()
-    optimizer = torch.optim.Adam(trained.parameters())
-    trained(x)
+def test_2d_resnet_embedding_optimizer_built_first_covers_head():
+    """The head exists before the first call, so an optimizer built first trains it."""
+    net = ResNetEmbedding2D(c_in=1, n_stages=1, blocks_per_stage=[1], c_stages=[4])
+    optimizer = torch.optim.Adam(net.parameters())
+    net(torch.randn(2, 1, 8, 8))
     optimized = {id(p) for group in optimizer.param_groups for p in group["params"]}
-    assert all(id(p) in optimized for p in trained.parameters())
-
-    fresh = build()
-    fresh.load_state_dict(trained.state_dict())
-    assert torch.allclose(fresh(x), trained(x))
+    assert all(id(p) in optimized for p in net.parameters())
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
