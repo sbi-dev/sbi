@@ -18,23 +18,8 @@ described in more detail
 [here](https://arxiv.org/abs/2002.03712), and
 [here](https://arxiv.org/abs/1905.07488). The following fixes are possible:
 
-- use truncated proposals for SNPE (TSNPE)
-
-```python
-from sbi.inference import NPE
-from sbi.utils import RestrictedPrior, get_density_thresholder
-
-inference = NPE(prior)
-proposal = prior
-for _ in range(num_rounds):
-    theta = proposal.sample((num_sims,))
-    x = simulator(theta)
-    _ = inference.append_simulations(theta, x).train(force_first_round_loss=True)
-    posterior = inference.build_posterior().set_default_x(x_o)
-
-    accept_reject_fn = get_density_thresholder(posterior, quantile=1e-4)
-    proposal = RestrictedPrior(prior, accept_reject_fn, sample_with="rejection")
-```
+- use truncated proposals for SNPE (TSNPE), as shown in the
+[guide on sequential methods](https://sbi.readthedocs.io/en/latest/how_to_guide/02_multiround_inference.html#leakage-and-truncated-proposals-tsnpe).
 
 - sample with MCMC: `samples = posterior((num_samples,), x=x_o, sample_with_mcmc=True)`.
 This approach will make sampling slower, but samples will not "leak". It does not
