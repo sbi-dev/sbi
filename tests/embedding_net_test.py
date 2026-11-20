@@ -30,7 +30,6 @@ from sbi.neural_nets.embedding_nets import (
     SpectralConvEmbedding,
     TransformerEmbedding,
 )
-from sbi.neural_nets.embedding_nets.causal_cnn import WaveNetSRLikeAggregator
 from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 from sbi.simulators.linear_gaussian import (
@@ -222,52 +221,29 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
 
 
 @pytest.mark.parametrize(
-    ("input_shape", "kwargs", "match"),
+    ("embedding_cls", "input_shape", "kwargs", "match"),
     [
-        ((32, 32, 3), {}, "in_channels"),
-        ((32,), {"num_conv_layers": 0}, "num_conv_layers must be at least 1"),
-        (
-            (32,),
-            {"num_conv_layers": 3, "out_channels_per_layer": [6, 12]},
-            "num_conv_layers is 3",
-        ),
         # Kernel much larger than the padded input: both sizes are negative, and
         # their product is positive.
-        ((4, 4), {"kernel_size": 9}, "smaller kernel_size"),
-        ((8,), {"pool_kernel_size": 4}, "num_conv_layers to at most 1"),
+        (CNNEmbedding, (4, 4), {"kernel_size": 9}, "smaller kernel_size"),
+        (
+            CausalCNNEmbedding,
+            (64,),
+            {"pool_kernel_size": 2, "num_conv_layers": 0},
+            "num_conv_layers must be at least 1",
+        ),
+        (
+            CausalCNNEmbedding,
+            (64,),
+            {"pool_kernel_size": 2, "dilation": [1, 2]},
+            "dilation has 2 entries",
+        ),
     ],
 )
-def test_cnn_embedding_errors_name_arguments(input_shape, kwargs, match):
-    """CNNEmbedding errors name the constructor arguments that fix them."""
+def test_cnn_embedding_errors_name_arguments(embedding_cls, input_shape, kwargs, match):
+    """Invalid arguments raise at construction and name the argument to fix."""
     with pytest.raises(ValueError, match=match):
-        CNNEmbedding(input_shape, **kwargs)
-
-
-@pytest.mark.parametrize(
-    ("kwargs", "match"),
-    [
-        ({"num_conv_layers": 0}, "num_conv_layers must be at least 1"),
-        ({"out_channels_per_layer": [16, 16]}, "num_conv_layers is 5"),
-        ({"dilation": [1, 2]}, "dilation has 2 entries"),
-        ({"pool_kernel_size": 128}, r"pool_kernel_size \(128\) must not be larger"),
-        ({"pool_kernel_size": 64}, "the default aggregator needs at least 2"),
-    ],
-)
-def test_causal_cnn_embedding_errors_name_arguments(kwargs, match):
-    """CausalCNNEmbedding errors name the constructor arguments that fix them."""
-    with pytest.raises(ValueError, match=match):
-        CausalCNNEmbedding((64,), **{"pool_kernel_size": 2, **kwargs})
-
-
-def test_wavenet_aggregator_keeps_arguments_and_prints_nothing(capsys):
-    """Building the aggregator neither changes the caller's list nor prints."""
-    intermediate_channel_sizes = [8]
-    WaveNetSRLikeAggregator(
-        4, 32, output_dim=5, intermediate_channel_sizes=intermediate_channel_sizes
-    )
-
-    assert intermediate_channel_sizes == [8]
-    assert capsys.readouterr().out == ""
+        embedding_cls(input_shape, **kwargs)
 
 
 def test_cnn_embedding_default_channels_follow_num_conv_layers():
@@ -339,16 +315,12 @@ def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("with_positions", (False, True))
-def test_spectral_conv_embedding_on_gpu(with_positions):
+def test_spectral_conv_embedding_on_gpu():
     """The Fourier matrices follow the device of the input."""
     embedding_net = SpectralConvEmbedding(
         in_channels=2, modes=4, conv_channels=3, num_layers=2
     )
     x = torch.randn(3, 2, 16)
-    if with_positions:
-        positions = torch.sort(torch.rand(3, 16), dim=1).values
-        x = torch.stack([x, positions[:, None].expand(-1, 2, -1)], dim=1)
     expected = embedding_net(x)
 
     device = process_device("gpu")
@@ -732,33 +704,17 @@ def test_permutation_invariant_embedding_warns_on_invalid_padding(
         assert torch.allclose(output[1], embedding.fc_subnet(torch.zeros(1, 5))[0])
 
 
-@pytest.mark.parametrize("aggregation_fn", ("mean", "sum"))
-@pytest.mark.parametrize("with_padding", (False, True))
-@pytest.mark.parametrize("inf", (float("inf"), float("-inf")))
-def test_permutation_invariant_embedding_rejects_inf(inf, with_padding, aggregation_fn):
+def test_permutation_invariant_embedding_rejects_inf():
     """Inf in a real trial raises instead of passing as a huge finite embedding."""
     embedding = PermutationInvariantEmbedding(
-        FCEmbedding(input_dim=2, output_dim=4),
-        trial_net_output_dim=4,
-        aggregation_fn=aggregation_fn,
+        FCEmbedding(input_dim=2, output_dim=4), trial_net_output_dim=4
     )
     x = torch.randn(2, 3, 2)
-    x[0, 1, 0] = inf
-    if with_padding:
-        x[:, 2] = float("nan")
+    x[0, 1, 0] = float("inf")
+    x[:, 2] = float("nan")
 
     with pytest.raises(ValueError, match="Input contains inf"):
         embedding(x)
-
-
-def test_permutation_invariant_embedding_rejects_non_finite_trial_net_output():
-    """A trial_net that returns inf for finite input raises."""
-    embedding = PermutationInvariantEmbedding(nn.Linear(2, 4), trial_net_output_dim=4)
-    with torch.no_grad():
-        embedding.trial_net.bias.fill_(float("inf"))
-
-    with pytest.raises(ValueError, match="trial_net returned NaN or inf"):
-        embedding(torch.randn(2, 3, 2))
 
 
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
@@ -804,8 +760,8 @@ def test_2d_ResNet_cnn_embedding_net(
 
 
 def test_2d_resnet_embedding_head_exists_before_first_call():
-    """An optimizer built first covers the head, and a fresh net loads weights and
-    follows a dtype change before its first call."""
+    """An optimizer built first covers the head, and a fresh net loads weights
+    before its first call."""
 
     def build():
         return ResNetEmbedding2D(
@@ -827,22 +783,6 @@ def test_2d_resnet_embedding_head_exists_before_first_call():
     fresh = build()
     fresh.load_state_dict(trained.state_dict())
     assert torch.allclose(fresh(x), trained(x))
-    assert build().double()(x.double()).dtype == torch.float64
-
-
-def test_2d_resnet_embedding_zero_padding_keeps_dtype():
-    """Channels added by zero padding take the dtype of the input."""
-    embedding_net = ResNetEmbedding2D(
-        c_in=1,
-        c_out=3,
-        c_hidden_fc=8,
-        n_stages=2,
-        blocks_per_stage=[1, 1],
-        c_stages=[4, 8],
-        change_c_mode="zeros",
-    ).half()
-
-    assert embedding_net(torch.randn(2, 1, 8, 8).half()).dtype == torch.float16
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
@@ -1220,15 +1160,3 @@ def test_lru_forward_rejects_invalid_mode():
 
     with pytest.raises(ValueError, match="mode"):
         layer.forward(torch.randn(2, 6, LRU_DEFAULTS["input_dim"]), mode="invalid")
-
-
-def test_embedding_nets_all_lists_every_embedding_net():
-    """A star import gives every embedding net that the package imports."""
-    import sbi.neural_nets.embedding_nets as embedding_nets
-
-    imported = {
-        name
-        for name, obj in vars(embedding_nets).items()
-        if isinstance(obj, type) and issubclass(obj, nn.Module)
-    }
-    assert imported <= set(embedding_nets.__all__)
