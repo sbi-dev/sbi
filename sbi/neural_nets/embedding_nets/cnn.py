@@ -167,6 +167,10 @@ class CNNEmbedding(nn.Module):
         conv_module = nn.Conv2d if use_2d_cnn else nn.Conv1d
         pool_module = nn.MaxPool2d if use_2d_cnn else nn.MaxPool1d
 
+        if pool_kernel_size < 1:
+            raise ValueError(
+                f"pool_kernel_size must be at least 1, but got {pool_kernel_size}."
+            )
         if num_conv_layers < 1:
             raise ValueError(
                 f"num_conv_layers must be at least 1, but got {num_conv_layers}."

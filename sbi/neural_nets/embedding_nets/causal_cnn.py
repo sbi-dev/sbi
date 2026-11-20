@@ -201,6 +201,10 @@ class CausalCNNEmbedding(nn.Module):
         self.input_shape = (in_channels, *input_shape)
 
         total_timepoints = input_shape[0]
+        if pool_kernel_size < 1:
+            raise ValueError(
+                f"pool_kernel_size must be at least 1, but got {pool_kernel_size}."
+            )
         if total_timepoints < pool_kernel_size:
             raise ValueError(
                 f"pool_kernel_size ({pool_kernel_size}) must not be larger than the "
