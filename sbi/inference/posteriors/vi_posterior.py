@@ -224,6 +224,7 @@ class VIPosterior(NeuralPosterior):
 
         # Amortized mode: conditional flow q(θ|x)
         self._amortized_q: Optional[TransformedConditionalZukoFlow] = None
+        self._amortized_theta_event_shape: Optional[tuple[int, ...]] = None
 
         self._num_transforms: int = num_transforms
         self._hidden_features: int = hidden_features
@@ -570,6 +571,9 @@ class VIPosterior(NeuralPosterior):
             self._trained_on = q._trained_on
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
             self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
+            self._amortized_theta_event_shape = getattr(
+                q, "_amortized_theta_event_shape", None
+            )
             if self._amortized_q is not None:
                 self._amortized_q.to(self._device)
             self.vi_method = q.vi_method  # type: ignore
@@ -618,6 +622,45 @@ class VIPosterior(NeuralPosterior):
         self._optimizer_builder = get_VI_method(method)
         return self
 
+    def _check_x_for_sampling(self, x: Tensor) -> None:
+        """Raise if `x` is not a context this q can sample for."""
+        if self._mode == "amortized":
+            if x.shape[0] == 0:
+                raise ValueError("x must hold one observation, but holds none.")
+            self._check_num_observations(x.shape[0])
+            self._check_amortized_condition_shape(x)
+            return
+        if not self._is_trained_on(x):
+            raise ValueError(
+                f"The variational posterior was not fit on the specified "
+                f"observation {x}. Please train using posterior.train()."
+            )
+
+    def _check_amortized_condition_shape(self, x: Tensor) -> None:
+        """Reject conditions whose axes do not match the trained flow."""
+        assert self._amortized_q is not None
+        flow = getattr(self._amortized_q, "_flow", self._amortized_q)
+        condition_shape = tuple(flow.condition_shape)
+        if x.ndim != len(condition_shape) + 1 or tuple(x.shape[1:]) != condition_shape:
+            raise ValueError(
+                f"x must have shape (num_observations, {condition_shape}), but got "
+                f"{tuple(x.shape)}."
+            )
+
+    def _sample_from_amortized_q(self, sample_shape: Shape, x: Tensor) -> Tensor:
+        """Draw from the conditional flow q(θ|x) of amortized VI.
+
+        Args:
+            sample_shape: Shape of the samples drawn for each observation.
+            x: Observations of shape `(num_observations, *x_event_shape)`.
+
+        Returns:
+            Samples of shape `(*sample_shape, num_observations, θ_dim)`.
+        """
+        assert self._amortized_q is not None
+        self._check_amortized_condition_shape(x)
+        return self._amortized_q.sample(torch.Size(sample_shape), condition=x)
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -626,50 +669,35 @@ class VIPosterior(NeuralPosterior):
     ) -> Tensor:
         r"""Draw samples from the variational posterior distribution $p(\theta|x)$.
 
-        For single-x mode (trained via `train()`): samples from q(θ) trained on x_o.
-        For amortized mode (trained via `train_amortized()`): samples from q(θ|x).
+        For single-x mode (trained via `train()`): samples from q(θ) fit to the training
+        context, which may combine several iid observations. For amortized mode (trained
+        via `train_amortized()`): samples from q(θ|x) for one observation. Use
+        `sample_batched()` to sample one posterior per observation.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from the posterior.
-            x: Conditioning observation. In single-x mode, must match trained x_o
+            x: Conditioning observation. In single-x mode, must match the trained x_o
                 (or be None to use the default x, else the trained x_o). In amortized
-                mode, required and can be any observation. For batched observations,
-                shape should be (batch_size, x_dim).
+                mode, one observation, or None to use the default set with
+                `set_default_x()`. Use `sample_batched()` for several observations.
             show_progress_bars: Unused for `VIPosterior` since sampling from the
                 variational distribution is fast. Included for API consistency.
 
         Returns:
-            Samples from posterior with shape (*sample_shape, θ_dim) for single x,
-            or (*sample_shape, batch_size, θ_dim) for batched observations in
-            amortized mode.
+            Samples from posterior with shape `(*sample_shape, θ_dim)`.
 
         Raises:
-            ValueError: If mode requirements are not met.
+            ValueError: If mode requirements are not met, or `x` holds several
+                observations in amortized mode.
         """
         if self._mode == "amortized":
-            # Amortized mode: sample from conditional flow q(θ|x)
             x = self._x_else_default_x(x)
-            if x is None:
-                raise ValueError(
-                    "x is required for amortized mode. Provide an observation or "
-                    "set a default x with set_default_x()."
-                )
-            x = atleast_2d_float32_tensor(x).to(self._device)
-            assert self._amortized_q is not None
-            # samples shape from flow: (*sample_shape, batch_size, θ_dim)
-            samples = self._amortized_q.sample(torch.Size(sample_shape), condition=x)
-            # Match base posterior behavior: drop singleton x batch dimension
-            if x.shape[0] == 1:
-                samples = samples.squeeze(-2)
-            return samples
+            self._check_x_for_sampling(x)
+            return self._sample_from_amortized_q(sample_shape, x).squeeze(-2)
         else:
             # Single-x mode: sample from unconditional flow q(θ)
             x = self._x_else_default_x(x)
-            if not self._is_trained_on(x):
-                raise ValueError(
-                    f"The variational posterior was not fit on the specified "
-                    f"observation {x}. Please train using posterior.train()."
-                )
+            self._check_x_for_sampling(x)
             samples = self.q.sample(torch.Size(sample_shape))
             return samples.reshape((*sample_shape, samples.shape[-1]))
 
@@ -680,35 +708,101 @@ class VIPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        """Sample from posterior for a batch of observations.
+        """Sample one posterior for each observation in a batch.
 
-        In amortized mode, this is efficient as all x values are processed in
-        parallel through the conditional flow.
-
-        In single-x mode, this raises NotImplementedError since the unconditional
-        flow is trained for a specific x_o.
+        Amortized mode processes all observations in parallel through the conditional
+        flow. Single-x mode raises NotImplementedError because q(θ) is fit to one
+        observed data set.
 
         Args:
             sample_shape: Number of samples per observation.
-            x: Batch of observations (num_obs, x_dim).
+            x: Batch of observations of shape `(num_observations, *x_event_shape)`.
             max_sampling_batch_size: Unused for amortized mode (no batching needed).
             show_progress_bars: Unused for amortized mode.
 
         Returns:
-            Samples of shape (*sample_shape, num_obs, θ_dim).
+            Samples of shape `(*sample_shape, num_observations, θ_dim)`, one posterior
+            per observation.
 
         Raises:
             NotImplementedError: If called in single-x mode.
         """
         if self._mode == "amortized":
-            # In amortized mode, sample() handles batched x directly
-            return self.sample(sample_shape, x=x, show_progress_bars=show_progress_bars)
-        else:
-            raise NotImplementedError(
-                "Batched sampling is not implemented for single-x VI mode, because q "
-                "is fit to one observed data set. Use train_amortized() to train an "
-                "amortized posterior, or train a posterior for each observation."
+            return self._sample_from_amortized_q(sample_shape, self._process_x(x))
+        raise NotImplementedError(
+            "Batched sampling is not implemented for single-x VI mode, because q "
+            "is fit to one observed data set. Use train_amortized() to train an "
+            "amortized posterior, or train a posterior for each observation."
+        )
+
+    def _log_prob_from_amortized_q(self, theta: Tensor, x: Tensor) -> Tensor:
+        """Evaluate log q(θ|x) with the conditional flow of amortized VI.
+
+        Args:
+            theta: Parameters of shape `(*sample_shape, num_observations, θ_dim)`.
+                A two-dimensional `(num_observations, θ_dim)` is read as one sample.
+            x: Observations of shape `(num_observations, *x_event_shape)`.
+
+        Returns:
+            Log-probabilities of shape `(*sample_shape, num_observations)`, with a
+            leading observation axis of length one for a two-dimensional `theta`.
+
+        Raises:
+            ValueError: If `theta` or `x` do not match the shapes the flow was trained
+                on, or if their observation axes disagree.
+        """
+        assert self._amortized_q is not None
+        flow = getattr(self._amortized_q, "_flow", self._amortized_q)
+        stored_shape = getattr(self, "_amortized_theta_event_shape", None)
+        if stored_shape is None:
+            wrapper_link = getattr(
+                self._amortized_q, "_link_transform", self.link_transform
             )
+            theta_event_shape = tuple(
+                wrapper_link.forward_shape(torch.Size(flow.input_shape))
+            )
+        else:
+            theta_event_shape = tuple(stored_shape)
+        theta_event_ndim = len(theta_event_shape)
+
+        if tuple(theta.shape[-theta_event_ndim:]) != theta_event_shape:
+            raise ValueError(
+                f"The trailing dimensions of theta must match the constrained theta "
+                f"event shape {theta_event_shape}, but got "
+                f"{tuple(theta.shape[-theta_event_ndim:])}."
+            )
+        observation_axis = theta.shape[-theta_event_ndim - 1]
+        if observation_axis != x.shape[0]:
+            raise ValueError(
+                f"The observation axis of theta ({observation_axis}) must match the "
+                f"number of observations in x ({x.shape[0]})."
+            )
+        self._check_amortized_condition_shape(x)
+
+        sample_shape = theta.shape[: -theta_event_ndim - 1] or torch.Size([1])
+        if theta.numel() == 0:
+            empty = theta.reshape(*sample_shape, observation_axis, *theta_event_shape)
+            return empty.sum(dim=tuple(range(-theta_event_ndim, 0)))
+        theta_flat = theta.reshape(-1, observation_axis, *theta_event_shape)
+        if not theta_flat.is_floating_point():
+            theta_flat = theta_flat.to(torch.get_default_dtype())
+        flat_theta = theta_flat.reshape(-1, *theta_event_shape)
+        in_support = within_support(self._prior, flat_theta).reshape(
+            theta_flat.shape[:2]
+        )
+        theta_eval = theta_flat
+        if not bool(in_support.all()):
+            if bool(in_support.any()):
+                placeholder = theta_flat[in_support][:1].detach()
+            else:
+                placeholder = (
+                    self._prior.sample((1,))
+                    .to(device=theta_flat.device, dtype=theta_flat.dtype)
+                    .reshape(1, *theta_event_shape)
+                )
+            theta_eval = torch.where(in_support.unsqueeze(-1), theta_flat, placeholder)
+        log_probs = self._amortized_q.log_prob(theta_eval, condition=x)
+        return log_probs.reshape(*sample_shape, x.shape[0])
 
     def log_prob(
         self,
@@ -716,36 +810,35 @@ class VIPosterior(NeuralPosterior):
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
     ) -> Tensor:
-        r"""Returns the log-probability of theta under the variational posterior.
+        r"""Return the log-probability of θ under the variational posterior.
 
-        For single-x mode: returns log q(θ).
-        For amortized mode: returns log q(θ|x).
+        For single-x mode: returns log q(θ) for the fit context, which may combine
+        several iid observations. For amortized mode: returns log q(θ|x) for one
+        observation, using `x` or the default set with `set_default_x()`. Use
+        `log_prob_batched()` to evaluate several observations.
 
         Args:
-            theta: Parameters to evaluate, shape (batch_theta, θ_dim).
-            x: Observation. In single-x mode, must match trained x_o (or be None).
-                In amortized mode, required and can be any observation.
-                For single x, shape (1, x_dim) or (x_dim,).
-                For batched x, shape (batch_x, x_dim).
+            theta: Parameters to evaluate, shape `(batch_theta, θ_dim)`.
+            x: Observation. In single-x mode, must match the trained x_o (or be None).
+                In amortized mode, one observation, or None to use the default set with
+                `set_default_x()`. Use `log_prob_batched()` for several observations.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis but increases memory
                 consumption.
 
         Returns:
-            Log-probability of shape (batch,), `-inf` for θ outside the prior
-            support, where batch is:
-            - batch_theta if x has batch size 1 (broadcast x)
-            - batch_x if theta has batch size 1 (broadcast theta)
-            - batch_theta if batch_theta == batch_x (paired evaluation)
+            Log-probability of shape `(batch_theta,)`. In amortized mode, every θ is
+            evaluated under the one observation rather than paired with it. `-inf` for
+            θ outside the prior support.
 
         Raises:
-            ValueError: If mode requirements are not met or batch sizes incompatible.
+            ValueError: If mode requirements are not met, or `x` holds several
+                observations in amortized mode.
         """
         with torch.set_grad_enabled(track_gradients):
             theta = ensure_theta_batched(torch.as_tensor(theta)).to(self._device)
 
             if self._mode == "amortized":
-                # Amortized mode: evaluate log q(θ|x)
                 x = self._x_else_default_x(x)
                 if x is None:
                     raise ValueError(
@@ -753,33 +846,13 @@ class VIPosterior(NeuralPosterior):
                         "set a default x with set_default_x()."
                     )
                 x = atleast_2d_float32_tensor(x).to(self._device)
-                assert self._amortized_q is not None
-
-                # Handle broadcasting between theta and x
-                batch_theta = theta.shape[0]
-                batch_x = x.shape[0]
-
-                if batch_theta != batch_x:
-                    if batch_x == 1:
-                        # Broadcast x to match theta
-                        x = x.expand(batch_theta, -1)
-                    elif batch_theta == 1:
-                        # Broadcast theta to match x
-                        theta = theta.expand(batch_x, -1)
-                    else:
-                        raise ValueError(
-                            f"Batch sizes of theta ({batch_theta}) and x ({batch_x}) "
-                            f"are incompatible. They must be equal, or one must be 1."
-                        )
-
-                # ZukoFlow expects input shape (sample_dim, batch_dim, *event_shape)
-                # Add sample dimension, compute log_prob, then squeeze back
-                theta_with_sample_dim = theta.unsqueeze(0)
-                log_probs = self._amortized_q.log_prob(
-                    theta_with_sample_dim, condition=x
+                if x.shape[0] == 0:
+                    raise ValueError("x must hold one observation, but holds none.")
+                self._check_num_observations(x.shape[0])
+                log_probs = self._log_prob_from_amortized_q(
+                    theta, x.expand(theta.shape[0], *x.shape[1:])
                 ).squeeze(0)
             else:
-                # Single-x mode: evaluate log q(θ)
                 x = self._x_else_default_x(x)
                 if not self._is_trained_on(x):
                     raise ValueError(
@@ -796,14 +869,60 @@ class VIPosterior(NeuralPosterior):
                 torch.tensor(float("-inf"), device=log_probs.device),
             )
 
+    def log_prob_batched(
+        self,
+        theta: Tensor,
+        x: Tensor,
+        track_gradients: bool = False,
+    ) -> Tensor:
+        """Evaluate log q(θ|x) for a batch of observations in amortized mode.
+
+        Mirrors `DirectPosterior.log_prob_batched()`: each θ is evaluated under the
+        observation at the matching batch position, giving one value per sample and
+        observation.
+
+        Args:
+            theta: Parameters of shape `(*sample_shape, num_observations, θ_dim)`.
+                A two-dimensional `(num_observations, θ_dim)` is read as one sample.
+            x: Batch of observations of shape `(num_observations, *x_event_shape)`.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+
+        Returns:
+            Log-probabilities of shape `(*sample_shape, num_observations)`, `-inf` for
+            θ outside the prior support.
+
+        Raises:
+            NotImplementedError: If called in single-x mode.
+        """
+        if self._mode != "amortized":
+            raise NotImplementedError(
+                "Batched log-prob evaluation is not implemented for single-x VI mode, "
+                "because q is fit to one observed data set. Use train_amortized() to "
+                "train an amortized posterior."
+            )
+        with torch.set_grad_enabled(track_gradients):
+            x = self._process_x(x)
+            theta = ensure_theta_batched(torch.as_tensor(theta)).to(self._device)
+            log_probs = self._log_prob_from_amortized_q(theta, x)
+            if log_probs.numel() == 0:
+                return log_probs
+            in_support = within_support(self._prior, theta.flatten(0, -2)).reshape(
+                log_probs.shape
+            )
+            return torch.where(
+                in_support,
+                log_probs,
+                torch.tensor(float("-inf"), device=log_probs.device),
+            )
+
     @property
     def _one_observation_hint(self) -> Optional[str]:
         """The amortized q(θ|x), like a direct posterior, takes one observation."""
         if self._mode != "amortized":
             return None
         return (
-            f"{_ONE_AT_A_TIME}, or use `sample_batched()`. To combine them as iid "
-            "trials, fit q to all of them with `train(x=x)`."
+            f"{_ONE_AT_A_TIME}, or use `sample_batched()` and `log_prob_batched()`. "
+            "To combine them as iid trials, fit q to all of them with `train(x=x)`."
         )
 
     def _resolve_x(self) -> Optional[Tensor]:
@@ -1267,6 +1386,7 @@ class VIPosterior(NeuralPosterior):
                 z_score_theta=z_score_theta,
                 z_score_x=z_score_x,
             )
+            self._amortized_theta_event_shape = tuple(theta_train.shape[1:])
 
         # Ensure potential_fn is on the correct device for amortized training
         self.potential_fn.to(self._device)

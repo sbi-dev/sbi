@@ -28,7 +28,7 @@ from sbi.utils.torchutils import (
     ensure_theta_batched,
     split_leading_dim,
 )
-from sbi.utils.user_input_checks import check_prior
+from sbi.utils.user_input_checks import check_prior, process_x
 
 
 class DirectPosterior(NeuralPosterior):
@@ -101,6 +101,14 @@ class DirectPosterior(NeuralPosterior):
 
         self._purpose = """It samples the posterior network and rejects samples that
             lie outside of the prior bounds."""
+
+    def _check_x_for_sampling(self, x: Tensor) -> None:
+        """Raise unless `x` is one or several observations of the condition shape.
+
+        Normalizing here matches `sample()`: a single observation of the condition
+        shape gets its batch dimension before the shape is checked.
+        """
+        process_x(x, x_event_shape=self.posterior_estimator.condition_shape)
 
     @property
     def _one_observation_hint(self) -> str:

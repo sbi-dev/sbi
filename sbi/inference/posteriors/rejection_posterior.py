@@ -13,6 +13,7 @@ from sbi.inference.potentials.base_potential import BasePotential, CustomPotenti
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Proposal, Shape, TorchTransform
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks import process_x
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -70,6 +71,10 @@ class RejectionPosterior(NeuralPosterior):
             "It provides rejection sampling to .sample() from the posterior and "
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
+
+    def _check_x_for_sampling(self, x: Tensor) -> None:
+        """Raise unless the potential accepts `x`, as its sampling path does."""
+        process_x(x, x_event_shape=self.potential_fn.x_event_shape)
 
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
