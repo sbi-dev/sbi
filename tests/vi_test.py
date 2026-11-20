@@ -14,6 +14,7 @@ from __future__ import annotations
 import pickle
 import warnings
 from copy import deepcopy
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -855,6 +856,94 @@ def test_forward_kl_loss_ignores_a_constant_in_the_potential():
     assert torch.isfinite(surrogate_low)
     assert torch.allclose(surrogate_low, surrogate)
     assert torch.allclose(loss_low, loss - 200.0)
+
+
+def test_forward_kl_loss_leaves_out_particles_outside_the_support(monkeypatch):
+    """A particle outside the target's support adds nothing to the displayed fKL
+    loss (0 * log 0 = 0), even when `weight_transform` gives it a nonzero weight.
+    `weight_transform` gets weights whose largest is 1, and its output is normalized
+    again."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    shifted = MultivariateNormal(ones(1), 0.25 * eye(1))
+
+    def target_log_prob(theta):
+        outside = theta[..., 0] < -1.5
+        return torch.where(outside, -torch.inf, shifted.log_prob(theta))
+
+    target = SimpleNamespace(log_prob=target_log_prob)
+    weight_maxima = []
+
+    def floor_weights(weights):
+        weight_maxima.append(weights.max())
+        return weights + 0.1
+
+    optimizer = ForwardKLOptimizer(
+        potential_fn=make_tractable_potential(target, prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=6,
+        weight_transform=floor_weights,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    particles = torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]).unsqueeze(-1)
+    monkeypatch.setattr(optimizer.q, "sample", lambda sample_shape: particles)
+    surrogate_loss, loss = optimizer.loss(zeros(1))
+
+    logq = optimizer.q.log_prob(particles)
+    logweights = target.log_prob(particles) - logq.detach()
+    weights = (logweights - logweights.max()).exp() + 0.1
+    weights /= weights.sum()
+    inside = torch.isfinite(logweights)
+    assert torch.allclose(loss, (weights[inside] * logweights[inside]).sum())
+    assert torch.allclose(surrogate_loss, -(weights * logq).sum())
+    assert torch.allclose(torch.stack(weight_maxima), torch.ones(1))
+
+
+def _optimizer_after_losses(losses: list[float]) -> ForwardKLOptimizer:
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = ForwardKLOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=4,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    for loss in losses:
+        optimizer.update_loss_stats(torch.tensor(loss))
+    return optimizer
+
+
+def test_non_finite_losses_are_left_out_of_loss_stats():
+    """Non-finite losses, as from a batch entirely outside the support, neither
+    enter the running statistics nor count towards convergence."""
+    nan = float("nan")
+    before_first_finite = _optimizer_after_losses([nan]).get_loss_stats()
+    assert torch.isnan(torch.stack(before_first_finite)).all()
+
+    assert not _optimizer_after_losses([nan, 2.0, 2.0] + [nan] * 49).converged()
+    assert _optimizer_after_losses([nan, 2.0, 2.0] + [2.0] * 49).converged()
+
+    constant = [50.0] * 60
+    with_nan = constant[:30] + [nan] + constant[30:]
+    assert torch.allclose(
+        torch.stack(_optimizer_after_losses(with_nan).get_loss_stats()),
+        torch.stack(_optimizer_after_losses(constant).get_loss_stats()),
+    )
+
+
+def test_rolled_back_step_does_not_end_training(monkeypatch):
+    """A non-finite gradient loss rolls q back and warms it up towards the prior, so
+    training must not stop on that step."""
+    optimizer = _optimizer_after_losses([2.0] * 60)
+    assert optimizer.converged()
+
+    param = next(optimizer.q.parameters())
+    nan_surrogate = lambda x_o: (param.sum() * float("nan"), torch.tensor(2.0))
+    monkeypatch.setattr(optimizer, "loss", nan_surrogate)
+    optimizer.step(zeros(1))
+    assert not optimizer.converged()
 
 
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])

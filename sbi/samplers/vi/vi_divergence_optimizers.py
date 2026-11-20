@@ -153,6 +153,8 @@ class DivergenceOptimizer(ABC):
         # Loss and summary
         self.eps = eps
         self.num_step = 0
+        self._num_updates = 0
+        self._rolled_back = False
         self.warm_up_was_done = False
         self.losses = torch.ones(2000)
         self.moving_average = torch.ones(2000)
@@ -262,13 +264,16 @@ class DivergenceOptimizer(ABC):
         self._optimizer.zero_grad()
         surrogate_loss, loss = self.loss(x_o.to(self.device))
         surrogate_loss.backward(retain_graph=self.retain_graph)
-        if not torch.isfinite(surrogate_loss):
+        self._rolled_back = not torch.isfinite(surrogate_loss)
+        if self._rolled_back:
             self.resolve_state()
         nn.utils.clip_grad.clip_grad_norm_(self.q.parameters(), self.clip_value)
         self._optimizer.step()
         self._scheduler.step()
         self.update_loss_stats(loss.cpu())
-        if (self.num_step % 50) == 0:
+        # Counted apart from num_step, which skips non-finite losses.
+        self._num_updates += 1
+        if (self._num_updates % 50) == 0:
             self.update_state()
 
     def converged(self, considered_values: int = 50) -> bool:
@@ -282,7 +287,8 @@ class DivergenceOptimizer(ABC):
             bool: True if converged, else false.
 
         """
-        if self.num_step < considered_values:
+        # After a rollback, q was just reset and warmed up towards the prior.
+        if self._rolled_back or self.num_step < considered_values:
             return False
         else:
             m = self.moving_slope[
@@ -297,14 +303,21 @@ class DivergenceOptimizer(ABC):
         self.moving_std = torch.ones(2000)
         self.moving_slope = torch.ones(2000)
         self.num_step = 0
+        self._num_updates = 0
 
     def update_loss_stats(self, loss: Tensor, window: int = 20) -> None:
         """Updates current loss statistics of the optimizer
+
+        A non-finite loss is left out, so it neither enters the running statistics
+        nor counts towards the convergence window.
 
         Args:
             loss: New loss value
             window: Window size for running statistics
         """
+        if not torch.isfinite(loss):
+            return
+
         if self.num_step >= len(self.losses):
             self.losses = torch.hstack([self.losses, torch.zeros(2000)])
             self.moving_average = torch.hstack([self.moving_average, torch.zeros(2000)])
@@ -314,11 +327,6 @@ class DivergenceOptimizer(ABC):
         if self.num_step == 0:
             self.losses[self.num_step] = loss
             self.moving_average[self.num_step] = loss
-        elif not torch.isfinite(loss):
-            loss = self.losses[self.num_step - 1]
-            self.moving_average[self.num_step] = self.moving_average[self.num_step - 1]
-            self.moving_std[self.num_step] = self.moving_std[self.num_step - 1]
-            self.moving_slope[self.num_step] = self.moving_slope[self.num_step - 1]
         else:
             self.losses[self.num_step] = loss
             self.moving_average[self.num_step] = (
@@ -337,7 +345,10 @@ class DivergenceOptimizer(ABC):
         self.num_step += 1
 
     def get_loss_stats(self) -> Tuple[Array, Array]:
-        """Returns current loss statistics"""
+        """Returns current loss statistics, NaN before the first finite loss."""
+        if self.num_step == 0:
+            nan = torch.tensor(float("nan"))
+            return nan, nan
         return (
             self.moving_average[self.num_step - 1],
             self.moving_std[self.num_step - 1],
@@ -583,7 +594,7 @@ class IWElboOptimizer(ElboOptimizer):
 
 @register_VI_method(name="fKL")
 class ForwardKLOptimizer(DivergenceOptimizer):
-    """This learns the variational posterior by minimizing the forward KL divergence
+    r"""This learns the variational posterior by minimizing the forward KL divergence
     i.e. $D_KL(p(\theta|x_o)|| q(\theta))$. The typically necessary samples from the
     posterior are not required by using importance sampling techniques.
 
@@ -604,7 +615,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         weight_transform: Callable = lambda x: x,
         **kwargs,
     ):
-        """See `DivergenceOptimizer` for base arguments.
+        r"""See `DivergenceOptimizer` for base arguments.
 
         Args:
             proposal: The proposal used we currently support only [`q`]
@@ -650,7 +661,8 @@ class ForwardKLOptimizer(DivergenceOptimizer):
             weights /= weights.sum()
 
         surrogate = -torch.sum(weights * logq)
-        loss = torch.sum(weights * (logp - logq))
+        # Particles outside the support (log p = -inf) would give 0 * -inf = nan.
+        loss = torch.sum(weights * torch.where(logweights.isfinite(), logweights, 0.0))
         return surrogate, loss.detach()
 
 
