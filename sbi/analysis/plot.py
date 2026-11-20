@@ -2248,7 +2248,7 @@ def pp_plot(
             of shape (n_eval,).
         labels: labels for the estimators, defaults to None.
         colors: colors for the estimators, defaults to None.
-        conf_alpha: significanecee level of the hypothesis test.
+        conf_alpha: significance level of the hypothesis test.
         n_alphas: number of cdf-values to compute the P-P plot, defaults to 100.
         ax: axis to plot on, defaults to None.
         kwargs: additional arguments for matplotlib plotting.
@@ -2344,7 +2344,7 @@ def marginal_plot_with_probs_intensity(
         # create bins: all samples between bin edges are assigned to the same bin
         probs_per_marginal["bins"] = np.searchsorted(bins, probs_per_marginal["s"]) - 1
         probs_per_marginal["bins"][probs_per_marginal["bins"] < 0] = 0
-        # get mean prob for each bin (same as pandas groupy method)
+        # get mean prob for each bin (same as pandas groupby method)
         array_probs = np.concatenate(
             [probs_per_marginal["bins"][:, None], probs_per_marginal["probs"][:, None]],
             axis=1,
@@ -2388,7 +2388,7 @@ def marginal_plot_with_probs_intensity(
         )
         unique_bins = np.unique(group_idx, return_counts=True, axis=0)[0]
 
-        # get mean prob for each bin (same as pandas groupy method)
+        # get mean prob for each bin (same as pandas groupby method)
         mean_probs = np.zeros((len(unique_bins),))
         for i in range(len(unique_bins)):
             idx = np.where((group_idx == unique_bins[i]).all(axis=1))
@@ -2437,7 +2437,7 @@ def pp_plot_lc2st(
             of shape (n_eval,). One array per estimator.
         probs_null: predicted probability under the null hypothesis and evaluated on
             the test set, of shape (n_eval,). One array per null trial.
-        conf_alpha: significanecee level of the hypothesis test.
+        conf_alpha: significance level of the hypothesis test.
         kwargs: additional arguments for `pp_plot`.
 
     Returns:

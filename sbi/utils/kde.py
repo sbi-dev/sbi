@@ -191,7 +191,7 @@ def get_kde(
     """Get KDE estimator with selected bandwidth.
 
     Args:
-        samples: Samples to perfrom KDE on
+        samples: Samples to perform KDE on
         bandwidth: Bandwidth method, 'silvermann' or 'scott' heuristics, or 'cv' for a
             tailored cross validation to find the best bandwidth for passed samples.
         transform: Optional transform applied before running kde.
