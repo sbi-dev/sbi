@@ -6,6 +6,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 import torch
+import zuko
 from torch import nn
 
 from sbi.neural_nets import likelihood_nn
@@ -19,10 +20,12 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MAFConfig,
     MDNConfig,
     MLPClassifierConfig,
+    MarginalMAFConfig,
     MixedConfig,
     NSFConfig,
     PretrainedConfigBase,
     ResNetClassifierConfig,
+    ZukoMAFConfig,
     ZukoNCSFConfig,
     ZukoNSFConfig,
     _NFlowsFlowConfigBase,
@@ -421,3 +424,39 @@ def test_nflows_dtype_reaches_the_base_distribution(batches):
     )
 
     assert estimator.net._distribution._log_z.dtype == torch.float64
+
+
+def _zuko_hidden_layer_widths(estimator: nn.Module) -> list[list[int]]:
+    """Return the hidden-layer widths of each transform's network in a Zuko flow."""
+    nets = [
+        module
+        for name, module in estimator.named_modules()
+        if name.rsplit(".", 1)[-1] == "hyper"
+    ]
+    return [
+        [
+            layer.out_features
+            for layer in net
+            if isinstance(layer, (nn.Linear, zuko.nn.Linear))
+        ][:-1]
+        for net in nets
+    ]
+
+
+@pytest.mark.parametrize(
+    "hidden_features, widths", [(24, [24, 24]), ([24, 32, 16], [24, 32, 16])]
+)
+@pytest.mark.parametrize("marginal", [False, True])
+def test_zuko_hidden_features_set_the_hidden_layers(
+    marginal, hidden_features, widths, batches
+):
+    """An int gives two hidden layers, whatever the number of transforms."""
+    theta, x = batches
+    if marginal:
+        config = MarginalMAFConfig(hidden_features=hidden_features, num_transforms=5)
+        estimator = config.build(theta)
+    else:
+        config = ZukoMAFConfig(hidden_features=hidden_features, num_transforms=5)
+        estimator = config.build(batch_input=theta, batch_condition=x)
+
+    assert _zuko_hidden_layer_widths(estimator) == [widths] * 5
