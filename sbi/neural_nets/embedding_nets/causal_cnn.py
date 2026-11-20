@@ -108,7 +108,6 @@ def WaveNetSRLikeAggregator(
 
     non_causal_layers = []
     for ll in range(len(kernel_sizes)):
-        print(aggregator_out_shape)
         conv_layer = nn.Conv1d(
             in_channels=in_channels if ll == 0 else intermediate_channel_sizes[ll - 1],
             out_channels=intermediate_channel_sizes[ll],
@@ -131,7 +130,6 @@ def WaveNetSRLikeAggregator(
                 / 2
             ),
         )
-    print(aggregator_out_shape)
     aggregator = nn.Sequential(*non_causal_layers, nn.AdaptiveAvgPool1d(1))
     return aggregator
 
