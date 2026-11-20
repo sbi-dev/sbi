@@ -3,6 +3,7 @@
 
 from copy import deepcopy
 from typing import (
+    Any,
     Callable,
     Dict,
     Iterable,
@@ -24,7 +25,7 @@ from torch.nn import Module
 
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow, ZukoUnconditionalFlow
 from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
-from sbi.utils.sbiutils import _apply_to_transform
+from sbi.utils.sbiutils import CallableTransform, _apply_to_transform
 from sbi.utils.torchutils import _base_recursor
 
 _CopyableT = TypeVar("_CopyableT")
@@ -65,21 +66,21 @@ def _linked_sample_and_log_prob(
     return theta, log_prob_z - _sum_log_det(log_det, log_prob_z)
 
 
-class _LinkedFamily(nn.Module):
-    """Variational family that maps a density on unconstrained space to the prior's
-    support through `_link_transform`."""
+def _restore_plain_link(family: nn.Module) -> None:
+    """Move a link pickled as `_link_transform` (sbi 0.26 and 0.27) into the
+    family's `_link` submodule.
 
-    def _apply(self, fn: Callable[[Tensor], Tensor], *args, **kwargs):
-        # `nn.Module.to()` moves parameters and buffers only. The link holds plain
-        # tensors (e.g. the prior's bounds), and a copied family holds its own link.
-        super()._apply(fn, *args, **kwargs)
-        link_transform = getattr(self, "_link_transform", None)
-        if link_transform is not None:
-            _apply_to_transform(link_transform, fn)
-        return self
+    That attribute is plain, or a registered submodule if the link is a module.
+    """
+    if hasattr(family, "_link_transform"):
+        link_transform = family._link_transform
+        del family._link_transform
+        family._link = (
+            None if link_transform is None else CallableTransform(link_transform)
+        )
 
 
-class TransformedZukoFlow(_LinkedFamily):
+class TransformedZukoFlow(nn.Module):
     """Wrapper for Zuko flows that applies a link transform to samples.
 
     This wrapper ensures that:
@@ -108,7 +109,11 @@ class TransformedZukoFlow(_LinkedFamily):
         """
         super().__init__()
         self._flow = flow
-        self._link_transform = link_transform
+        self._link = CallableTransform(link_transform)
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+        _restore_plain_link(self)
 
     @property
     def net(self):
@@ -131,7 +136,7 @@ class TransformedZukoFlow(_LinkedFamily):
         # Sample in unconstrained space
         unconstrained_samples = self._flow.sample(sample_shape)
         # Transform to constrained space
-        constrained_samples = self._link_transform(unconstrained_samples)
+        constrained_samples = self._link.transform(unconstrained_samples)
         assert isinstance(constrained_samples, Tensor)  # Type narrowing for pyright
         return constrained_samples
 
@@ -147,7 +152,7 @@ class TransformedZukoFlow(_LinkedFamily):
         Returns:
             Log probabilities with shape (*batch_shape,).
         """
-        return _linked_log_prob(theta, self._link_transform, self._flow.log_prob)
+        return _linked_log_prob(theta, self._link.transform, self._flow.log_prob)
 
     def sample_and_log_prob(self, sample_shape: Shape) -> tuple[Tensor, Tensor]:
         """Sample from the flow and compute log probabilities efficiently.
@@ -159,10 +164,10 @@ class TransformedZukoFlow(_LinkedFamily):
             Tuple of (samples, log_probs) where samples are in constrained space.
         """
         z, log_prob_z = self._flow.sample_and_log_prob(torch.Size(sample_shape))
-        return _linked_sample_and_log_prob(z, log_prob_z, self._link_transform)
+        return _linked_sample_and_log_prob(z, log_prob_z, self._link.transform)
 
 
-class TransformedConditionalZukoFlow(_LinkedFamily):
+class TransformedConditionalZukoFlow(nn.Module):
     """Conditional counterpart of `TransformedZukoFlow` for amortized VI.
 
     The wrapped flow q(z|x) lives in unconstrained space. Samples and log-probs of
@@ -179,18 +184,22 @@ class TransformedConditionalZukoFlow(_LinkedFamily):
         """
         super().__init__()
         self._flow = flow
-        self._link_transform = link_transform
+        self._link = CallableTransform(link_transform)
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+        _restore_plain_link(self)
 
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         """Sample θ ~ q(θ|x) in constrained space."""
-        theta = self._link_transform(self._flow.sample(sample_shape, condition))
+        theta = self._link.transform(self._flow.sample(sample_shape, condition))
         assert isinstance(theta, Tensor)
         return theta
 
     def log_prob(self, theta: Tensor, condition: Tensor) -> Tensor:
         """Log density of constrained θ, including the Jacobian of the link."""
         return _linked_log_prob(
-            theta, self._link_transform, lambda z: self._flow.log_prob(z, condition)
+            theta, self._link.transform, lambda z: self._flow.log_prob(z, condition)
         )
 
     def sample_and_log_prob(
@@ -200,10 +209,10 @@ class TransformedConditionalZukoFlow(_LinkedFamily):
         z, log_prob_z = self._flow.sample_and_log_prob(
             torch.Size(sample_shape), condition
         )
-        return _linked_sample_and_log_prob(z, log_prob_z, self._link_transform)
+        return _linked_sample_and_log_prob(z, log_prob_z, self._link.transform)
 
 
-class LearnableGaussian(_LinkedFamily):
+class LearnableGaussian(nn.Module):
     """Learnable Gaussian distribution for variational inference.
 
     A simple parametric variational family with learnable mean and covariance.
@@ -230,7 +239,9 @@ class LearnableGaussian(_LinkedFamily):
         super().__init__()
         self._dim = dim
         self._full_cov = full_covariance
-        self._link_transform = link_transform
+        self._link = (
+            None if link_transform is None else CallableTransform(link_transform)
+        )
 
         # Learnable parameters - create on correct device from the start
         self.loc = nn.Parameter(torch.zeros(dim, device=device))
@@ -240,6 +251,10 @@ class LearnableGaussian(_LinkedFamily):
         else:
             # Log scale for numerical stability
             self.log_scale = nn.Parameter(torch.zeros(dim, device=device))
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+        _restore_plain_link(self)
 
     def _base_dist(self) -> Distribution:
         """Get the base Gaussian distribution with current parameters."""
@@ -273,8 +288,8 @@ class LearnableGaussian(_LinkedFamily):
         """
         # Use sample() not rsample() - this is for inference, not training
         samples = self._base_dist().sample(sample_shape)
-        if self._link_transform is not None:
-            samples = self._link_transform(samples)
+        if self._link is not None:
+            samples = self._link.transform(samples)
             assert isinstance(samples, Tensor)  # Type narrowing for pyright
         return samples
 
@@ -287,9 +302,9 @@ class LearnableGaussian(_LinkedFamily):
         Returns:
             Log probabilities with shape (*batch_shape,).
         """
-        if self._link_transform is not None:
+        if self._link is not None:
             return _linked_log_prob(
-                theta, self._link_transform, self._base_dist().log_prob
+                theta, self._link.transform, self._base_dist().log_prob
             )
         return self._base_dist().log_prob(theta)
 
@@ -306,8 +321,8 @@ class LearnableGaussian(_LinkedFamily):
         z = dist.rsample(sample_shape)
         log_prob_z = dist.log_prob(z)
 
-        if self._link_transform is not None:
-            return _linked_sample_and_log_prob(z, log_prob_z, self._link_transform)
+        if self._link is not None:
+            return _linked_sample_and_log_prob(z, log_prob_z, self._link.transform)
         return z, log_prob_z
 
 
