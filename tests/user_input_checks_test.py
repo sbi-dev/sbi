@@ -70,7 +70,7 @@ from sbi.utils.user_input_checks_utils import (
 class UserNumpyUniform:
     """User defined numpy uniform prior.
 
-    Used for testing to mimick a user-defined prior with valid .sample and .log_prob
+    Used for testing to mimic a user-defined prior with valid .sample and .log_prob
     methods.
     """
 
@@ -93,7 +93,7 @@ class UserNumpyUniform:
 
 def linear_gaussian_no_batch(theta):
     """Identity simulator throwing assertion error when called on a batch."""
-    assert theta.ndim == 1, "cant handle batches."
+    assert theta.ndim == 1, "can't handle batches."
     return MultivariateNormal(theta, eye(theta.numel())).sample()
 
 

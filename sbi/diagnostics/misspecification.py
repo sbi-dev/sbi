@@ -14,6 +14,8 @@ from torch import Tensor
 from sbi.inference.trainers.npe.npe_base import PosteriorEstimatorTrainer
 from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.utils.metrics import check_c2st
+from sbi.utils.sbiutils import nan_tolerant_input_net
+from sbi.utils.torchutils import assert_all_finite
 
 
 def rbf_kernel(x: Tensor, y: Tensor, bandwidth: float):
@@ -53,6 +55,30 @@ def compute_rbf_mmd_median_heuristic(x: Tensor, y: Tensor, mode: str = "biased")
     return compute_rbf_mmd(x, y, bandwidth, mode)
 
 
+def _num_synthetic_samples(n_obs: int, n_total: int, max_samples: int) -> int:
+    """Number of synthetic samples compared to ``n_obs`` samples, in each MMD.
+
+    The observed MMD and every MMD under H_0 use this number, so that all of them
+    are computed from sets of the same sizes.
+    """
+    if n_obs < 1:
+        raise ValueError("x_obs must contain at least one observation.")
+    if max_samples < 1:
+        raise ValueError(f"max_samples must be at least 1, got {max_samples}.")
+    if n_obs >= n_total:
+        raise ValueError(
+            "n of observed samples should be less than n of synthetic samples"
+        )
+    n_synthetic = min(max_samples, n_total - n_obs)
+    if n_obs == 1 and n_synthetic == 1:
+        raise ValueError(
+            "With a single observation, the test needs at least two synthetic samples "
+            "per MMD: the MMD between two single samples is the same for any two "
+            "distinct samples. Increase max_samples or the number of samples in x."
+        )
+    return n_synthetic
+
+
 def calculate_baseline_mmd(
     n_obs: int,
     y: Tensor,
@@ -70,20 +96,22 @@ def calculate_baseline_mmd(
             used to determine the number of samples for one set
         y: synthetic data
         n_shuffle: number of shuffles
-        max_samples: maximum number of samples to use
+        max_samples: maximum number of samples in the second set, i.e. the number
+            of synthetic samples compared to the ``n_obs`` samples of the first set
         mode: mode of MMD calculation
     """
-    mmds = torch.zeros(n_shuffle)
-    if n_obs > y.shape[0]:
-        raise ValueError(
-            "n of observed samples should be less than n of synthetic samples"
+    if n_shuffle < 1:
+        raise ValueError(f"n_shuffle must be at least 1, got {n_shuffle}.")
+    n_synthetic = _num_synthetic_samples(n_obs, y.shape[0], max_samples)
+    mmds = []
+    for _ in range(n_shuffle):
+        idx = torch.randperm(y.shape[0], device=y.device)
+        mmds.append(
+            compute_rbf_mmd_median_heuristic(
+                y[idx[:n_obs]], y[idx[n_obs : n_obs + n_synthetic]], mode=mode
+            )
         )
-    for i in range(n_shuffle):
-        idx = torch.randperm(y.shape[0])[:max_samples]
-        mmds[i] = compute_rbf_mmd_median_heuristic(
-            y[idx[:n_obs]], y[idx[n_obs:]], mode=mode
-        )
-    return mmds
+    return torch.stack(mmds)
 
 
 def calculate_p_misspecification(
@@ -99,14 +127,37 @@ def calculate_p_misspecification(
         x_obs: observed data
         x: synthetic data
         n_shuffle: number of shuffles
-        max_samples: maximum number of samples to use
+        max_samples: maximum number of synthetic samples to compare to the observed
+            data
         mode: mode of MMD calculation ("biased" or "unbiased")
     """
+    if x_obs.ndim != 2 or x.ndim != 2 or x_obs.shape[1] != x.shape[1]:
+        raise ValueError(
+            "x_obs and x must have shapes (num_samples, num_features) with the same "
+            "num_features, got "
+            f"{tuple(x_obs.shape)} and {tuple(x.shape)}."
+        )
+    if not (torch.isfinite(x_obs).all() and torch.isfinite(x).all()):
+        raise ValueError(
+            "x_obs and x must not contain NaN or inf values (in embedding mode, "
+            "neither may their embeddings)."
+        )
     mmds_baseline = calculate_baseline_mmd(
         x_obs.shape[0], x, n_shuffle=n_shuffle, max_samples=max_samples, mode=mode
     )
-    mmd = compute_rbf_mmd_median_heuristic(x_obs, x[:max_samples], mode=mode)
-    p_val = 1 - (mmds_baseline < mmd).sum().item() / n_shuffle
+    # Random rows, so that the order of the rows in x does not matter.
+    n_synthetic = _num_synthetic_samples(x_obs.shape[0], x.shape[0], max_samples)
+    idx = torch.randperm(x.shape[0], device=x.device)[:n_synthetic]
+    mmd = compute_rbf_mmd_median_heuristic(x_obs, x[idx], mode=mode)
+    if not (torch.isfinite(mmds_baseline).all() and torch.isfinite(mmd)):
+        raise ValueError(
+            "The MMD is not finite, so the misspecification test has no valid "
+            "p-value. This happens when the median distance between samples is zero "
+            "(for example, when most samples are identical, as in sparse discrete "
+            "data), or with mmd_mode='unbiased' and a single sample in either set."
+        )
+    # The observed MMD counts as one draw under H_0, so the p-value is never 0.
+    p_val = (1 + (mmds_baseline >= mmd).sum().item()) / (1 + n_shuffle)
     return p_val, (mmds_baseline, mmd)
 
 
@@ -121,19 +172,24 @@ def calc_misspecification_mmd(
 ):
     """Misspecification test based on MMD in data- or embedding space.
 
+    The MMDs under H_0 are computed between synthetic samples only, so the p-value
+    is approximate. It is closest to exact when ``x`` holds many more samples than
+    ``x_obs``.
+
     Args:
         x_obs: observed data
         x: synthetic data
         inference: sbi inference object (only used if mode == "embedding")
         mode: space of MMD calculation ("x_space" or "embedding")
         n_shuffle: number of shuffles for computing mmds under H_0
-        max_samples: maximum number of samples to use
-            (when we have too many synthetic samples x)
+        max_samples: maximum number of synthetic samples to compare to the observed
+            data, for the observed MMD and for each MMD under H_0
         mmd_mode: approximation of MMD calculation ("biased" or "unbiased")
 
     returns:
         p_val, (mmd_baseline,mmd): p-value of the misspecification test
-        (MMDs under H_0, mmd)
+        (MMDs under H_0, mmd), on the device of the compared data (in embedding
+        mode, the device of the trained net)
     """
     if mode == "x_space":
         z_obs = x_obs
@@ -161,8 +217,16 @@ def calc_misspecification_mmd(
                 " detection."
             )
 
-        z_obs = inference._neural_net.embedding_net(x_obs).detach()
-        z = inference._neural_net.embedding_net(x).detach()
+        # NaN is allowed only where the embedding net accepts it as padding.
+        nan_net = nan_tolerant_input_net(inference._neural_net.embedding_net)
+        validate_nan_input = getattr(nan_net, "validate_nan_input", None)
+        for data, name in ((x_obs, "x_obs"), (x, "x")):
+            assert_all_finite(data, name, allow_nan=nan_net is not None)
+            if validate_nan_input is not None and torch.isnan(data).any():
+                validate_nan_input(data)
+        with torch.no_grad():
+            z_obs = inference._neural_net.embedding_net(x_obs.to(inference._device))
+            z = inference._neural_net.embedding_net(x.to(inference._device))
     else:
         raise ValueError("mode should be either 'x_space' or 'embedding'")
 
@@ -212,7 +276,7 @@ def calc_misspecification_logprob(
 
     Args:
         x_val: array-like, known samples to compute baseline logprobs
-        x_o: array-like, the test sample or the obervation
+        x_o: array-like, the test sample or the observation
         estimator: marginal distribution estimator
         alpha: significance level (default 0.05)
 

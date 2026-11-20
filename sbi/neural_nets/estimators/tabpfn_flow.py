@@ -472,7 +472,7 @@ class TabPFNFlow(ConditionalDensityEstimator):
         return resolved
 
     def _log_license(self, model_path: str | Path) -> None:
-        # remove ckpt suffix if present for cleaner loggin
+        # remove ckpt suffix if present for cleaner logging
         model_path = Path(model_path).with_suffix("").with_suffix("")
         global _HAS_LOGGED_TABPFN_LICENSE
         if not _HAS_LOGGED_TABPFN_LICENSE:

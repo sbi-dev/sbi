@@ -208,7 +208,7 @@ class ResNetEmbedding2D(nn.Module):
         self.c_out = c_out
         self.activation = activation
 
-        # Intial transformation applied before the residual blocks
+        # Initial transformation applied before the residual blocks
         self.initial = nn.Sequential(
             nn.Conv2d(c_in, c_stages[0], kernel_size=7, stride=2, padding=3),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),

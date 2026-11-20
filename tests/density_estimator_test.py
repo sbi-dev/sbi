@@ -583,7 +583,6 @@ def test_categorical_mass_estimator_log_prob_of_own_samples():
     assert torch.isfinite(estimator.log_prob(samples, condition=condition)).all()
 
 
-@pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
 @pytest.mark.parametrize(
     "x_dist",
     [
@@ -592,7 +591,7 @@ def test_categorical_mass_estimator_log_prob_of_own_samples():
         MultivariateNormal(loc=zeros(5), covariance_matrix=eye(5)),
     ],
 )
-def test_build_zuko_flow_with_valid_unconstrained_transform(which_nf, x_dist):
+def test_build_zuko_flow_with_valid_unconstrained_transform(x_dist):
     """Test that ZukoFlow builds successfully with valid `x_dist`."""
     # input dimension is 5
     batch_x = torch.randn(10, 5)
@@ -600,18 +599,16 @@ def test_build_zuko_flow_with_valid_unconstrained_transform(which_nf, x_dist):
 
     # Test case where x_dist is provided (should not raise an error)
     flow = build_zuko_flow(
-        which_nf=which_nf,
+        which_nf="MAF",
         batch_x=batch_x,
         batch_y=batch_y,
         z_score_x="transform_to_unconstrained",
-        z_score_y="transform_to_unconstrained",
         x_dist=x_dist,
     )
     assert isinstance(flow, ZukoFlow)
 
 
-@pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
-def test_build_zuko_flow_missing_x_dist_raises_error(which_nf):
+def test_build_zuko_flow_missing_x_dist_raises_error():
     """Test that ValueError is raised if `x_dist` is None when required."""
     batch_x = torch.randn(10, 5)
     batch_y = torch.randn(10, 3)
@@ -621,11 +618,10 @@ def test_build_zuko_flow_missing_x_dist_raises_error(which_nf):
         match=r".*distribution.*x_dist.*",
     ):
         build_zuko_flow(
-            which_nf=which_nf,
+            which_nf="MAF",
             batch_x=batch_x,
             batch_y=batch_y,
             z_score_x="transform_to_unconstrained",
-            z_score_y="transform_to_unconstrained",
             x_dist=None,  # No distribution provided
         )
 

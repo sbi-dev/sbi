@@ -215,7 +215,11 @@ def z_score_parser(
     Args:
         z_score_flag: str flag for z-scoring method stating whether the data
             dimensions are "structured" or "independent", or does not require z-scoring
-            ("none" or None).
+            ("none" or None). "transform_to_unconstrained" also returns no
+            z-scoring: on the modeled variable, the caller replaces z-scoring with a
+            transform to unconstrained space, derived from the support of a
+            distribution such as the prior. Callers that do not implement this
+            transform must reject the flag.
 
     Returns:
         Flag for whether or not to z-score, and whether data is structured
@@ -410,7 +414,7 @@ def biject_transform_zuko(
     transform: TorchTransform,
 ) -> zuko.flows.UnconditionalTransform:
     """
-    Wraps a pytorch transform in a Zuko unconditional transfrom on a bounded interval.
+    Wraps a pytorch transform in a Zuko unconditional transform on a bounded interval.
 
     Args:
         transform: a bijective transformation for Zuko, depending on the input
@@ -550,6 +554,48 @@ def standardizing_net(
                             z-scoring."""
 
     return Standardize(t_mean, t_std)
+
+
+def build_z_scored_embedding_net(
+    batch: Tensor,
+    z_score: Optional[str] = "independent",
+    embedding_net: nn.Module = nn.Identity(),
+) -> nn.Module:
+    """Prepends a z-scoring layer to an embedding net if z-scoring is requested.
+
+    Args:
+        batch: Batch of inputs to the embedding net, used to compute the z-score
+            statistics.
+        z_score: Whether to z-score the inputs, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        embedding_net: Embedding net that receives the (z-scored) inputs.
+
+    Returns:
+        `nn.Sequential(standardizing_net, embedding_net)` if z-scoring is requested,
+        otherwise `embedding_net` itself.
+
+    Raises:
+        ValueError: If `z_score` is `transform_to_unconstrained`. It needs the
+            distribution of the variable it transforms, which an input of an
+            embedding net does not have.
+    """
+    if z_score == "transform_to_unconstrained":
+        raise ValueError(
+            "`transform_to_unconstrained` is not supported for the condition or "
+            "for classifier inputs. It is only implemented for the modeled "
+            "variable of the Zuko flows and the MDN. Use 'none', 'independent' "
+            "or 'structured' instead."
+        )
+    z_score_bool, structured = z_score_parser(z_score)
+    if z_score_bool:
+        embedding_net = nn.Sequential(
+            standardizing_net(batch, structured), embedding_net
+        )
+    return embedding_net
 
 
 def handle_invalid_x(
@@ -815,7 +861,7 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
 
     If first checks whether the `distribution` has a `support` attribute (as is the
     case for `torch.distribution`). If it does not, it evaluates the log-probabilty and
-    returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
+    returns whether it is finite or not (this handles e.g. `NeuralPosterior`). Only
     checking whether the log-probabilty is not `-inf` will not work because, as of
     torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
     sample is out of the support (see #451). In `process_prior()`, we set
@@ -1280,7 +1326,7 @@ def gradient_ascent(
     sorted_inits = inits[sort_indices]
     optimize_inits = sorted_inits[-num_to_optimize:]
 
-    # The `_overall` variables store data accross the iterations, whereas the
+    # The `_overall` variables store data across the iterations, whereas the
     # `_iter` variables contain data exclusively extracted from the current
     # iteration. Slicing keeps the batch dim, so `argmax` is `(1, D)` and `max`
     # is `(1,)` on every return path, as in the loop below.
