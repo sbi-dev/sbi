@@ -146,6 +146,10 @@ class NFlowsFlow(ConditionalDensityEstimator):
         samples, log_probs = self.net.sample_and_log_prob(
             num_samples, context=condition
         )
+        # Change from Nflows' convention of (batch_dim, sample_dim) to
+        # (sample_dim, batch_dim) (PyTorch + SBI), as in `sample()`.
+        samples = samples.transpose(0, 1)
+        log_probs = log_probs.transpose(0, 1)
         samples = samples.reshape((*sample_shape, condition_batch_dim, -1))
         log_probs = log_probs.reshape((*sample_shape, -1))
         return samples, log_probs
