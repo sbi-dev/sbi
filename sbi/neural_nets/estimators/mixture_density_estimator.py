@@ -22,7 +22,7 @@ from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.mog import MoG, correct_for_proposal
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import CallableTransform
-from sbi.utils.torchutils import infer_module_device
+from sbi.utils.torchutils import infer_module_device, infer_tensor_device
 
 
 class MultivariateGaussianMDN(nn.Module):
@@ -411,8 +411,18 @@ class MixtureDensityEstimator(ConditionalDensityEstimator):
 
         # Validate that embedding_net output matches MDN input if embedding is provided
         if embedding_net is not None:
+            tensors = [
+                *self._embedding_net.parameters(),
+                *self._embedding_net.buffers(),
+            ]
+            floating = next((t for t in tensors if t.is_floating_point()), None)
             with torch.no_grad():
-                test_input = torch.randn(1, *condition_shape)
+                test_input = torch.randn(
+                    1,
+                    *condition_shape,
+                    device=infer_tensor_device(self._embedding_net),
+                    dtype=None if floating is None else floating.dtype,
+                )
                 test_output = self._embedding_net(test_input)
                 embedded_dim = test_output.shape[-1]
             if embedded_dim != net.context_features:
