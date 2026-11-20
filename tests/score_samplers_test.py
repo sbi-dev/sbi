@@ -66,7 +66,7 @@ def build_random_priors(num_dim: int):
 )
 @pytest.mark.parametrize("num_dim", [1, 2, 3])
 def test_score_fn_iid_on_different_priors(sde_type, iid_method, num_dim):
-    """Test the iid methods work with the most common priors that are used in
+    """Test that the iid methods work with the most common priors that are used in
     practice (or are implemented in this library).
 
     This is mostly because "gauss" based methods do need to perform analytical

@@ -588,7 +588,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
     posterior are not required by using importance sampling techniques.
 
     NOTE: Whereas in the rKL and IWELBO n_particles mainly reduces the variance, in this
-    case it also decrease the bias. Using n_particles=1 is not useful.
+    case it also decreases the bias. Using n_particles=1 is not useful.
 
     References:
         [1] _Variational Refinement for Importance Sampling Using the Forward
