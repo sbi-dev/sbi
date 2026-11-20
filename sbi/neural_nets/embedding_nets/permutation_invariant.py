@@ -71,6 +71,11 @@ class PermutationInvariantEmbedding(nn.Module):
         super().__init__()
         self.trial_net = trial_net
         self.aggregation_dim = aggregation_dim
+        if not isinstance(aggregation_fn, str):
+            raise TypeError(
+                "aggregation_fn must be a string, but got "
+                f"{type(aggregation_fn).__name__}."
+            )
         if aggregation_fn not in ("mean", "sum"):
             raise ValueError("aggregation_fn must be 'mean' or 'sum'.")
         self.aggregation_fn = aggregation_fn
