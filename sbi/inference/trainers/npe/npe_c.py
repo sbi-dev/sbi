@@ -38,6 +38,10 @@ from sbi.utils import (
 )
 from sbi.utils.torchutils import assert_all_finite
 
+# The errors of MoG's check that its parameters are finite.
+_MOG_NOT_FINITE_ERRORS = tuple(
+    f"{name} contains NaN or Inf values" for name in ("logits", "means", "precisions")
+)
 _DEGENERATE_MOG_LOSS_MSG = (
     "The multi-round loss of NPE with a mixture density network gives NaN or Inf: "
     "the mixture components of the posterior estimate have become numerically "
@@ -493,7 +497,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         try:
             mog_d = self._neural_net.get_uncorrected_mog(x)
         except ValueError as e:
-            if "NaN or Inf" not in str(e):  # Not MoG's check of its parameters.
+            if str(e) not in _MOG_NOT_FINITE_ERRORS:
                 raise
             raise ValueError(_DEGENERATE_MOG_LOSS_MSG) from e
         norm_logits_d = mog_d.log_weights  # Already normalized
