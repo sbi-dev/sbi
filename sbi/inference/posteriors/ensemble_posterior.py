@@ -405,7 +405,7 @@ class EnsemblePosterior(NeuralPosterior):
 
         NOTE: this method is chainable, i.e. will return the EnsemblePosterior
         object so that calls like
-        `posterior_ensemble.set_default_x(my_x).sample(mytheta)` are possible.
+        `posterior_ensemble.set_default_x(my_x).sample((1000,))` are possible.
 
         Args:
             x: The default observation to set for every posterior $p_i(theta|x)$ in the
