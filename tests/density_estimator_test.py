@@ -224,6 +224,37 @@ def test_density_estimator_sample_shapes(
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
 
 
+@pytest.mark.parametrize(
+    "density_estimator_build_fn",
+    (build_mdn, build_mnle, build_mnpe, build_categoricalmassestimator),
+)
+@pytest.mark.parametrize("sample_shape", ((), (3,), (2, 3)))
+@pytest.mark.parametrize("batch_dim", (1, 4))
+def test_density_estimator_sample_and_log_prob_shapes(
+    density_estimator_build_fn, sample_shape, batch_dim
+):
+    """The inherited `sample_and_log_prob` keeps every sample dimension, also for
+    batched conditions."""
+    # The categorical estimator needs every input column discrete; the helper makes
+    # only the last one discrete.
+    categorical = density_estimator_build_fn == build_categoricalmassestimator
+    density_estimator, _, conditions, input_event_shape = (
+        _build_density_estimator_and_tensors(
+            density_estimator_build_fn, (1,) if categorical else (2,), (3,), batch_dim
+        )
+    )
+    samples, log_probs = density_estimator.sample_and_log_prob(
+        torch.Size(sample_shape), condition=conditions
+    )
+    assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
+    assert log_probs.shape == (*sample_shape, batch_dim)
+    separate = torch.stack([
+        density_estimator.log_prob(sample.unsqueeze(0), conditions)[0]
+        for sample in samples.reshape(-1, batch_dim, *input_event_shape)
+    ])
+    assert torch.allclose(log_probs, separate.reshape(*sample_shape, batch_dim))
+
+
 @pytest.mark.parametrize("density_estimator_build_fn", model_builders)
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
