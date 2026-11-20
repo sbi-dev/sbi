@@ -474,6 +474,7 @@ class DirectPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
+                low_acceptance_hint=self._low_acceptance_hint,
                 proposal_sampling_kwargs={
                     "condition": reshape_to_batch_event(
                         x, event_shape=self.posterior_estimator.condition_shape

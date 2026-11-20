@@ -244,9 +244,9 @@ def accept_reject_sample(
     max_sampling_batch_size: int = 10_000,
     proposal_sampling_kwargs: Optional[Dict] = None,
     alternative_method: Optional[str] = None,
-    low_acceptance_hint: Optional[str] = None,
     max_sampling_time: Optional[float] = None,
     return_partial_on_timeout: bool = False,
+    low_acceptance_hint: Optional[str] = None,
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:
     r"""Returns samples from a proposal according to an acceptance criterion.
@@ -286,9 +286,6 @@ def accept_reject_sample(
         alternative_method: An alternative method for sampling from the restricted
             proposal. E.g., for SNPE, we suggest to sample with MCMC if the rejection
             rate is too high. Used only for printing during a potential warning.
-        low_acceptance_hint: What a low acceptance rate means for the caller, e.g.
-            leakage for NPE. Appended to the low-acceptance warning and to the
-            timeout error.
         max_sampling_time: Optional maximum allowed sampling time (in seconds).
             If exceeded, the sampling loop is interrupted and a RuntimeError is raised
             unless `return_partial_on_timeout=True`. This prevents infinite or
@@ -297,6 +294,9 @@ def accept_reject_sample(
         return_partial_on_timeout: If True and `max_sampling_time` is exceeded, return
             the samples collected so far instead of raising a RuntimeError. A warning
             will be issued indicating the partial return. Default is False.
+        low_acceptance_hint: What a low acceptance rate means for the caller, e.g.
+            leakage for NPE. Appended to the low-acceptance warnings, and to the
+            timeout error when the acceptance rate is below `warn_acceptance`.
         kwargs: Absorb additional unused arguments that can be passed to
             `rejection_sample()`. Warn if not empty.
 
@@ -375,7 +375,11 @@ def accept_reject_sample(
                 "the trained estimator. Consider switching to MCMC or VI, or "
                 "checking for model misspecification."
             )
-            if low_acceptance_hint is not None:
+            if (
+                low_acceptance_hint is not None
+                and num_samples_possible > 0
+                and acceptance_rate.min().item() < warn_acceptance
+            ):
                 msg += f" {low_acceptance_hint}"
             raise RuntimeError(msg)
 
@@ -446,6 +450,7 @@ def accept_reject_sample(
                         normalizing constant at all
                         (`log_prob(..., norm_posterior=False)`. The latter will
                         result in an unnormalized `log_prob()`."""
+                    + (f" {low_acceptance_hint}" if low_acceptance_hint else "")
                 )
             else:
                 warn_msg = f"""Only {min_acceptance_rate:.3%} proposal samples are

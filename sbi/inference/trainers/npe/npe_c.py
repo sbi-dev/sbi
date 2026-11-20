@@ -41,9 +41,10 @@ from sbi.utils.torchutils import assert_all_finite
 _DEGENERATE_MOG_LOSS_MSG = (
     "The multi-round loss of NPE with a mixture density network gives NaN or Inf: "
     "the mixture components of the posterior estimate have become numerically "
-    "degenerate. This usually follows strong leakage in earlier rounds, i.e., most "
-    "of the posterior estimate lies outside the prior bounds (see the warning 'Only "
-    "x% proposal samples are accepted' when sampling the proposal). Consider "
+    "degenerate. With a bounded prior, this usually follows strong leakage in "
+    "earlier rounds, i.e., most of the posterior estimate lies outside the prior "
+    "bounds (see the warning 'Only x% proposal samples are accepted' when sampling "
+    "the proposal). Consider "
     "truncated proposals (TSNPE) or single-round NPE instead, see "
     "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
 )
@@ -489,7 +490,10 @@ class NPE_C(PosteriorEstimatorTrainer):
 
         # Get the density estimator MoG at the training data x
         assert isinstance(self._neural_net, MixtureDensityEstimator)
-        mog_d = self._neural_net.get_uncorrected_mog(x)
+        try:
+            mog_d = self._neural_net.get_uncorrected_mog(x)
+        except ValueError as e:  # MoG rejects NaN or Inf parameters.
+            raise ValueError(_DEGENERATE_MOG_LOSS_MSG) from e
         norm_logits_d = mog_d.log_weights  # Already normalized
         m_d = mog_d.means
         prec_d = mog_d.precisions
@@ -594,6 +598,10 @@ class NPE_C(PosteriorEstimatorTrainer):
         # A pair whose precision is not positive definite has infinite mass; it gets
         # zero weight (MoG rejects -inf logits).
         if not normalizable.any(dim=1).all():
+            if self._prior_mog is None:
+                # Without a prior term, a pair's precision is the sum of two positive
+                # definite matrices: it fails only numerically.
+                raise ValueError(_DEGENERATE_MOG_LOSS_MSG)
             raise ValueError(
                 "No component of the MoG proposal posterior is normalizable for some "
                 "rows: the proposal and the density estimator are both wider than the "
