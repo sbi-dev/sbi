@@ -154,13 +154,13 @@ def test_mixed_rejects_a_continuous_model_it_cannot_build(continuous):
         MixedConfig(continuous=continuous)
 
 
-def test_mixed_requires_explicit_auxiliary_widths_for_per_transform_widths():
+def test_mixed_requires_explicit_auxiliary_widths_for_layer_widths():
     """Fallback widths require the continuous config to hold one integer."""
     with pytest.raises(ValueError, match="hidden_features"):
         MixedConfig(continuous=ZukoNSFConfig(hidden_features=[16, 16]))
 
 
-def test_mixed_accepts_per_transform_widths_with_explicit_auxiliary_widths():
+def test_mixed_accepts_layer_widths_with_explicit_auxiliary_widths():
     """The categorical and combined nets can be sized independently."""
     config = MixedConfig(
         continuous=ZukoNSFConfig(hidden_features=[16, 16]),
