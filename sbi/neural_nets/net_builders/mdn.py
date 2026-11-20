@@ -46,7 +46,7 @@ def build_mdn(
             - `transform_to_unconstrained`: transform inputs to unconstrained space
             using the prior's support. Requires `x_dist` to be provided.
         z_score_y: Whether to z-score ys passing into the network, same options as
-            z_score_x.
+            z_score_x except `transform_to_unconstrained`.
         hidden_features: Number of hidden features.
         num_components: Number of components.
         embedding_net: Optional embedding network for y.
