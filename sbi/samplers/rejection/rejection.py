@@ -369,18 +369,20 @@ def accept_reject_sample(
                 return samples, as_tensor(acceptance_rate, device=samples.device)
             msg = (
                 "Sampling aborted early because rejection sampling exceeded "
-                "max_sampling_time. This is likely due to extremely low "
-                "acceptance. You can disable rejection sampling using "
-                "`reject_outside_prior=False` to draw samples directly from "
-                "the trained estimator. Consider switching to MCMC or VI, or "
-                "checking for model misspecification."
+                "max_sampling_time."
             )
             if (
-                low_acceptance_hint is not None
-                and num_samples_possible > 0
+                num_samples_possible > 0
                 and acceptance_rate.min().item() < warn_acceptance
             ):
-                msg += f" {low_acceptance_hint}"
+                msg += (
+                    " This is likely due to extremely low acceptance. You can "
+                    "disable rejection sampling using `reject_outside_prior=False` "
+                    "to draw samples directly from the trained estimator. Consider "
+                    "switching to MCMC or VI, or checking for model misspecification."
+                )
+                if low_acceptance_hint is not None:
+                    msg += f" {low_acceptance_hint}"
             raise RuntimeError(msg)
 
         # Sample and reject.

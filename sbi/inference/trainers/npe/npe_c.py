@@ -492,7 +492,9 @@ class NPE_C(PosteriorEstimatorTrainer):
         assert isinstance(self._neural_net, MixtureDensityEstimator)
         try:
             mog_d = self._neural_net.get_uncorrected_mog(x)
-        except ValueError as e:  # MoG rejects NaN or Inf parameters.
+        except ValueError as e:
+            if "NaN or Inf" not in str(e):  # Not MoG's check of its parameters.
+                raise
             raise ValueError(_DEGENERATE_MOG_LOSS_MSG) from e
         norm_logits_d = mog_d.log_weights  # Already normalized
         m_d = mog_d.means
