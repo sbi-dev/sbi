@@ -251,7 +251,7 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
 
 
 def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
-    """Biased approximation of the squared maximum-mean discrepancy (MMD) [1].
+    """Biased approximation of the maximum-mean discrepancy (MMD) [1].
     The sample-based MMD relies on kernel evaluations between x_i and y_i. This
     implementation only features a Gaussian kernel with lengthscale `scale`.
 
@@ -262,7 +262,8 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
             the lengthscale is chosen based on a median heuristic.
 
     Return:
-        A single scalar for the squared MMD.
+        A single scalar for the MMD, i.e. the square root of the biased estimate of
+        the squared MMD.
 
     References:
         [1] Gretton, A., et al. (2012). A kernel two-sample test.
@@ -277,6 +278,9 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     yy = f(y, y)
 
     s = torch.median(torch.sqrt(torch.cat((xx, xy, yy)))) if scale is None else scale
+    # The median distance is zero when most samples are repeated values, so clamp it
+    # as in `unbiased_mmd_squared`, to avoid a NaN from `-inf * 0` below.
+    s = torch.clamp(s, min=1e-8) if isinstance(s, torch.Tensor) else max(s, 1e-8)
     c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
@@ -291,7 +295,9 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     mmd_square = kxx - 2 * kxy + kyy
     del kxx, kxy, kyy
 
-    return torch.sqrt(mmd_square)
+    # The estimate is non-negative, but rounding can make it slightly negative when the
+    # samples are (almost) the same, which would give a NaN from the square root.
+    return torch.sqrt(torch.clamp(mmd_square, min=0.0))
 
 
 def biased_mmd_hypothesis_test(x: Tensor, y: Tensor, alpha=0.05):
