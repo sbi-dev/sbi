@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
@@ -144,17 +145,16 @@ class DivergenceOptimizer(ABC):
         self.state_dict = [para.data.clone() for para in self.q.parameters()]
 
         # Init optimizer and scheduler with correct arguments
-        opt_kwargs = filter_kwargs_for_func(optimizer.__init__, kwargs)
+        self._opt_kwargs = filter_kwargs_for_func(optimizer.__init__, kwargs)
         kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
         scheduler_kwargs = filter_kwargs_for_func(scheduler.__init__, kwargs)
 
-        self._optimizer = optimizer(self.q.parameters(), **opt_kwargs)
+        self._optimizer = optimizer(self.q.parameters(), **self._opt_kwargs)
         self._scheduler = scheduler(self._optimizer, **scheduler_kwargs)
         # Loss and summary
         self.eps = eps
         self.num_step = 0
         self._num_updates = 0
-        self._rolled_back = False
         self.warm_up_was_done = False
         self.losses = torch.ones(2000)
         self.moving_average = torch.ones(2000)
@@ -238,7 +238,10 @@ class DivergenceOptimizer(ABC):
         """
         for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             para.data = state_para.data.clone().to(para.device)
-        self._optimizer.__init__(self.q.parameters(), self.learning_rate)
+        scheduled_lrs = [group["lr"] for group in self._optimizer.param_groups]
+        self._optimizer.__init__(self.q.parameters(), **self._opt_kwargs)
+        for group, lr in zip(self._optimizer.param_groups, scheduled_lrs, strict=True):
+            group["lr"] = lr
         self.warm_up(warm_up_rounds)
 
     def loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
@@ -264,13 +267,20 @@ class DivergenceOptimizer(ABC):
         self._optimizer.zero_grad()
         surrogate_loss, loss = self.loss(x_o.to(self.device))
         surrogate_loss.backward(retain_graph=self.retain_graph)
-        self._rolled_back = not torch.isfinite(surrogate_loss)
-        if self._rolled_back:
+        grad_norm = nn.utils.clip_grad.clip_grad_norm_(
+            self.q.parameters(), self.clip_value
+        )
+        # A finite surrogate can have nan gradients, e.g. from a potential
+        # `log(density * mask)` for a particle outside the support.
+        rolled_back = not (torch.isfinite(surrogate_loss) and torch.isfinite(grad_norm))
+        if rolled_back:
             self.resolve_state()
-        nn.utils.clip_grad.clip_grad_norm_(self.q.parameters(), self.clip_value)
-        self._optimizer.step()
+            # q restarts towards the prior, so its earlier losses no longer apply.
+            self.reset_loss_stats()
+        else:
+            self._optimizer.step()
+            self.update_loss_stats(loss.cpu())
         self._scheduler.step()
-        self.update_loss_stats(loss.cpu())
         # Counted apart from num_step, which skips non-finite losses.
         self._num_updates += 1
         if (self._num_updates % 50) == 0:
@@ -287,8 +297,7 @@ class DivergenceOptimizer(ABC):
             bool: True if converged, else false.
 
         """
-        # After a rollback, q was just reset and warmed up towards the prior.
-        if self._rolled_back or self.num_step < considered_values:
+        if self.num_step < considered_values:
             return False
         else:
             m = self.moving_slope[
@@ -383,11 +392,11 @@ class DivergenceOptimizer(ABC):
             sched_type = type(self._scheduler)
 
         kwargs["lr"] = self.learning_rate
-        opt_kwargs = filter_kwargs_for_func(opt_type.__init__, kwargs)
+        self._opt_kwargs = filter_kwargs_for_func(opt_type.__init__, kwargs)
         kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
         scheduler_kwargs = filter_kwargs_for_func(sched_type.__init__, kwargs)
 
-        self._optimizer = opt_type(self.q.parameters(), **opt_kwargs)
+        self._optimizer = opt_type(self.q.parameters(), **self._opt_kwargs)
         self._scheduler = sched_type(self._optimizer, **scheduler_kwargs)
 
 
@@ -569,7 +578,10 @@ class IWElboOptimizer(ElboOptimizer):
         elbo_particles = self.generate_elbo_particles(x_o, self.n_particles * self.K)
         elbo_particles = elbo_particles.reshape(self.n_particles, self.K)
         weights = self.get_importance_weight(elbo_particles.clone().detach())
-        surrogate_loss = -(weights * elbo_particles).sum(-1).mean(0)
+        # Outside the support, the weight is 0: 0 * log 0 = 0, not 0 * -inf = nan.
+        outside = (weights == 0) & torch.isneginf(elbo_particles.detach())
+        elbo_particles_masked = torch.where(outside, 0.0, elbo_particles)
+        surrogate_loss = -(weights * elbo_particles_masked).sum(-1).mean(0)
         loss = -(torch.logsumexp(elbo_particles, dim=-1) - np.log(self.K)).mean()
         return surrogate_loss, loss.clone().detach()
 
@@ -697,8 +709,11 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             alpha: Determines the alpha divergence to which is used. For alpha < 1 the
                 divergence is more mass covering, for alpha > 1 the divergence is more
                 mode seeking.
-            unbiased: We use the biased bound as proposed in [1], but one can also use
-                an unbiased one.
+            unbiased: Deprecated, will be removed. Instead of the biased estimate of
+                the bound [1], use an unbiased estimate of exp((1 - alpha) * bound).
+                Its gradient is the biased one, scaled by (1 - alpha) times that
+                estimate, so the step size depends on the potential's normalizing
+                constant. Only for alpha < 1.
             dreg: Doubly reparmeterized gradient estimator as proposed in [2]. It is
                 based on the `reduced_variance` already present, but leads to an
                 unbiased estimate on this objective in contrast.
@@ -730,8 +745,24 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             return self.loss_alpha_unbiased(xo)
 
     def loss_alpha_unbiased(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
-        """Unbiased estimate of a surrogate RVB"""
-        elbo_particles = self.generate_elbo_particles(x_o) * (1 - self.alpha)
+        """Unbiased estimate of a surrogate RVB.
+
+        Raises:
+            ValueError: If alpha >= 1.
+        """
+        if self.alpha >= 1:
+            raise ValueError(
+                f"`unbiased=True` needs alpha < 1, got alpha={self.alpha}: for "
+                "alpha > 1 the estimate can be infinite, for alpha = 1 constant."
+            )
+        warnings.warn(
+            "`unbiased=True` is deprecated and will be removed: its gradient is the "
+            "biased one, scaled by a factor that overflows or underflows for "
+            "unnormalized potentials. Use `unbiased=False`.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        elbo_particles = self.generate_elbo_particles(x_o)
         _, mean_log_weights = self.get_importance_weight(elbo_particles)
         surrogate_loss = -torch.exp(mean_log_weights)
         loss = -mean_log_weights / (1 - self.alpha)
@@ -743,7 +774,11 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         weights, mean_log_weights = self.get_importance_weight(
             elbo_particles.clone().detach()
         )
-        surrogate_loss = -torch.mean(weights * elbo_particles)
+        # Outside the support, the weight is 0: 0 * log 0 = 0, not 0 * -inf = nan.
+        # For alpha > 1 it is nan there, so the step rolls back.
+        outside = (weights == 0) & torch.isneginf(elbo_particles.detach())
+        elbo_particles_masked = torch.where(outside, 0.0, elbo_particles)
+        surrogate_loss = -torch.mean(weights * elbo_particles_masked)
         loss = -mean_log_weights / (1 - self.alpha)
         return surrogate_loss, loss
 
