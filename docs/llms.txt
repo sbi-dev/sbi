@@ -46,7 +46,7 @@ otherwise make up most of the output.
 - [Expected Coverage](https://sbi.readthedocs.io/en/latest/how_to_guide/15_expected_coverage.html): Joint posterior calibration check
 - [Simulation-Based Calibration](https://sbi.readthedocs.io/en/latest/how_to_guide/16_sbc.html): Per-parameter marginal calibration
 - [TARP](https://sbi.readthedocs.io/en/latest/how_to_guide/17_tarp.html): Calibration without density evaluation
-- [L-C2ST](https://sbi.readthedocs.io/en/latest/how_to_guide/13_diagnostics_lc2st.html): Per-observation local coverage test
+- [L-C2ST](https://sbi.readthedocs.io/en/latest/how_to_guide/13_diagnostics_lc2st.html): Per-observation posterior check with a classifier
 - [Model Misspecification](https://sbi.readthedocs.io/en/latest/how_to_guide/18_model_misspecification.html): Detecting if x_o is outside simulator range
 
 ## Advanced Topics
