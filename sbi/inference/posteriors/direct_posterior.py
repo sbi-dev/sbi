@@ -280,6 +280,52 @@ class DirectPosterior(NeuralPosterior):
 
         return self._reshape_to_sample_shape(samples, sample_shape)
 
+    @torch.no_grad()
+    def leakage_correction(
+        self,
+        x: Tensor,
+        num_rejection_samples: int = 10_000,
+        force_update: bool = False,
+        show_progress_bars: bool = False,
+        rejection_sampling_batch_size: int = 10_000,
+    ) -> Tensor:
+        r"""Return leakage correction factor for a leaky posterior density estimate.
+
+        The factor is estimated from the acceptance probability during rejection
+        sampling from the posterior. It is saved for the last `x` and re-estimated
+        whenever `x` or `num_rejection_samples` changes. It is 1 for unbounded priors.
+
+        Arguments:
+            x: Observation at which to estimate the factor.
+            num_rejection_samples: Number of samples used to estimate correction factor.
+            force_update: Whether to re-estimate the factor even if it is saved.
+            show_progress_bars: Whether to show a progress bar during sampling.
+            rejection_sampling_batch_size: Batch size for rejection sampling.
+
+        Returns:
+            Saved or newly-estimated correction factor (as a scalar `Tensor`).
+        """
+        x = self._x_else_default_x(x)
+
+        def acceptance() -> Tensor:
+            return rejection.accept_reject_sample(
+                proposal=self.posterior_estimator.sample,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_samples=num_rejection_samples,
+                show_progress_bars=show_progress_bars,
+                sample_for_correction_factor=True,
+                max_sampling_batch_size=rejection_sampling_batch_size,
+                proposal_sampling_kwargs={
+                    "condition": reshape_to_batch_event(
+                        x, event_shape=self.posterior_estimator.condition_shape
+                    )
+                },
+            )[1]
+
+        return self._cached_leakage_factor(
+            x, num_rejection_samples, self.prior, acceptance, force_update
+        )
+
     def log_prob(
         self,
         theta: Tensor,
@@ -312,9 +358,21 @@ class DirectPosterior(NeuralPosterior):
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
-        x = self._x_else_default_x(x)
+        x = self._process_x(self._x_else_default_x(x))
+        theta = torch.as_tensor(theta, device=self._device)
 
-        theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
+        event_shape = self.prior.event_shape
+        if len(event_shape) > 0:
+            actual_shape = theta.shape[-len(event_shape) :]
+            if actual_shape != event_shape:
+                raise ValueError(
+                    f"Expected theta to have event shape {tuple(event_shape)}, "
+                    f"but got shape {tuple(actual_shape)}."
+                )
+
+        theta = ensure_theta_batched(theta)
+
+        event_shape = self.posterior_estimator.input_shape
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
@@ -385,15 +443,25 @@ class DirectPosterior(NeuralPosterior):
                 These parameters only have an effect if `norm_posterior=True`.
 
         Returns:
-            `(len(θ), B)`-shaped log posterior probability $\\log p(\theta|x)$\\ for θ \
-            in the support of the prior, -∞ (corresponding to 0 probability) outside.
+            `(len(θ), B)`-shaped log posterior probability for θ in the
+            support of the prior; returns -∞ (zero probability) outside.
         """
-
         x = self._process_x(x)
-        theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
+        theta = torch.as_tensor(theta, device=self._device)
+
+        event_shape = self.prior.event_shape
+        if len(event_shape) > 0:
+            actual_shape = theta.shape[-len(event_shape) :]
+            if actual_shape != event_shape:
+                raise ValueError(
+                    f"Expected theta to have event shape {tuple(event_shape)}, "
+                    f"but got shape {tuple(actual_shape)}."
+                )
+        theta = ensure_theta_batched(theta)
+
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
-        # overwise, the leading is sample.
+        # otherwise, the leading is sample.
         num_leading = len(theta.shape) - len(event_shape)
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, event_shape, leading_is_sample=(num_leading > 1)
@@ -428,115 +496,3 @@ class DirectPosterior(NeuralPosterior):
             )
 
             return masked_log_prob - log_factor
-
-    @torch.no_grad()
-    def leakage_correction(
-        self,
-        x: Tensor,
-        num_rejection_samples: int = 10_000,
-        force_update: bool = False,
-        show_progress_bars: bool = False,
-        rejection_sampling_batch_size: int = 10_000,
-    ) -> Tensor:
-        r"""Return leakage correction factor for a leaky posterior density estimate.
-
-        The factor is estimated from the acceptance probability during rejection
-        sampling from the posterior. It is saved for the last `x` and re-estimated
-        whenever `x` or `num_rejection_samples` changes. It is 1 for unbounded priors.
-
-        Arguments:
-            x: Observation at which to estimate the factor.
-            num_rejection_samples: Number of samples used to estimate correction factor.
-            force_update: Whether to re-estimate the factor even if it is saved.
-            show_progress_bars: Whether to show a progress bar during sampling.
-            rejection_sampling_batch_size: Batch size for rejection sampling.
-
-        Returns:
-            Saved or newly-estimated correction factor, one per observation in `x`.
-        """
-        x = self._x_else_default_x(x)
-
-        def acceptance() -> Tensor:
-            return rejection.accept_reject_sample(
-                proposal=self.posterior_estimator.sample,
-                accept_reject_fn=lambda theta: within_support(self.prior, theta),
-                num_samples=num_rejection_samples,
-                show_progress_bars=show_progress_bars,
-                sample_for_correction_factor=True,
-                max_sampling_batch_size=rejection_sampling_batch_size,
-                proposal_sampling_kwargs={
-                    "condition": reshape_to_batch_event(
-                        x, event_shape=self.posterior_estimator.condition_shape
-                    )
-                },
-            )[1]
-
-        return self._cached_leakage_factor(
-            x, num_rejection_samples, self.prior, acceptance, force_update
-        )
-
-    def map(
-        self,
-        x: Optional[Tensor] = None,
-        num_iter: int = 1_000,
-        num_to_optimize: int = 100,
-        learning_rate: float = 0.01,
-        init_method: Union[str, Tensor] = "posterior",
-        num_init_samples: int = 1_000,
-        save_best_every: int = 10,
-        show_progress_bars: bool = False,
-        force_update: bool = False,
-    ) -> Tensor:
-        r"""Returns the maximum-a-posteriori estimate (MAP).
-
-        The method can be interrupted (Ctrl-C) when the user sees that the
-        log-probability converges. The best estimate will be saved in `self._map` and
-        can be accessed with `self.map()`. The MAP is obtained by running gradient
-        ascent from a given number of starting positions (samples from the posterior
-        with the highest log-probability). After the optimization is done, we select the
-        parameter set that has the highest log-probability after the optimization.
-
-        Warning: The default values used by this function are not well-tested. They
-        might require hand-tuning for the problem at hand.
-
-        For developers: if the prior is a `BoxUniform`, we carry out the optimization
-        in unbounded space and transform the result back into bounded space.
-
-        Args:
-            x: No longer supported; use `.set_default_x()` before `.map()`.
-            num_iter: Number of optimization steps that the algorithm takes
-                to find the MAP.
-            learning_rate: Learning rate of the optimizer.
-            init_method: How to select the starting parameters for the optimization. If
-                it is a string, it must be `posterior`, which samples the
-                posterior `num_init_samples` times. If it is a tensor, the tensor is
-                used as the initial locations, so prior-based initialization can be
-                done by passing prior samples.
-            num_init_samples: Draw this number of samples from the posterior and
-                evaluate the log-probability of all of them.
-            num_to_optimize: From the drawn `num_init_samples`, use the
-                `num_to_optimize` with highest log-probability as the initial points
-                for the optimization.
-            save_best_every: The best log-probability is computed, saved in the
-                `map`-attribute, and printed every `save_best_every`-th iteration.
-                Computing the best log-probability creates a significant overhead
-                (thus, the default is `10`.)
-            show_progress_bars: Whether to show a progressbar during sampling from the
-                posterior.
-            force_update: Whether to re-calculate the MAP when x is unchanged and
-                have a cached value.
-
-        Returns:
-            The MAP estimate.
-        """
-        return super().map(
-            x=x,
-            num_iter=num_iter,
-            num_to_optimize=num_to_optimize,
-            learning_rate=learning_rate,
-            init_method=init_method,
-            num_init_samples=num_init_samples,
-            save_best_every=save_best_every,
-            show_progress_bars=show_progress_bars,
-            force_update=force_update,
-        )

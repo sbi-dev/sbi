@@ -128,16 +128,24 @@ class RatioBasedPotential(BasePotential):
             # Move to cpu for comparison with prior.
             return log_ratio_trial_sum + self.prior.log_prob(theta)  # type: ignore
         else:
-            # Calculate likelihood ratio for each (theta,x) pair separately
-
+            # Calculate likelihood ratio for each (theta, x) pair separately.
             theta_batch_size = theta.shape[0]
             x_batch_size = self.x_o.shape[0]
-            if theta_batch_size != x_batch_size:
-                raise unpaired_batch_error(theta_batch_size, x_batch_size)
+
+            if x_batch_size == 1:
+                x = self.x_o.expand(theta_batch_size, *self.x_o.shape[1:])
+            else:
+                if theta_batch_size != x_batch_size:
+                    raise unpaired_batch_error(theta_batch_size, x_batch_size)
+                x = self.x_o
             with torch.set_grad_enabled(track_gradients):
-                log_ratio_batches = self.ratio_estimator(theta, self.x_o)
+                log_ratio_batches = self.ratio_estimator(theta, x)
                 log_ratio_batches = log_ratio_batches.reshape(-1)
-            return log_ratio_batches + self.prior.log_prob(theta)  # type: ignore
+
+            log_prior = self.prior.log_prob(theta)  # type: ignore
+            log_prior = log_prior.reshape(theta_batch_size, -1).sum(dim=-1)
+
+            return log_ratio_batches + log_prior
 
 
 def _log_ratios_over_trials(
