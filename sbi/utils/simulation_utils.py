@@ -11,7 +11,7 @@ from torch import Tensor, float32
 
 from sbi.sbi_types import Proposal
 from sbi.utils.pbar import tqdm
-from sbi.utils.sbiutils import seed_all_backends
+from sbi.utils.sbiutils import seed_random_states
 
 
 # Refactoring following #1175. tl:dr: letting joblib iterate over numpy arrays
@@ -66,7 +66,7 @@ def simulate_for_sbi(
 
     else:
         # Cast theta to numpy for better joblib performance (seee #1175)
-        seed_all_backends(seed)
+        seed_random_states(seed)
         theta = proposal.sample((num_simulations,))
 
         # Parse the simulation_batch_size logic
@@ -85,7 +85,7 @@ def simulate_for_sbi(
 
             # define seeded simulator.
             def simulator_seeded(theta: ndarray, seed: int) -> Tensor:
-                seed_all_backends(seed)
+                seed_random_states(seed)
                 return simulator(theta)
 
             try:  # catch TypeError to give more informative error message
