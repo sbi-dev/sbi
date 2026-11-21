@@ -685,31 +685,74 @@ class UniformNormalPosterior(Distribution):
         self.b = self.standard_normal.cdf(self.beta)
         self.Z = torch.clamp(self.b - self.a, min=1e-8)  # Avoid division by zero
 
+        # The normalizer and the moments are evaluated in float64 (MPS has no
+        # float64): the variance subtracts terms of order alpha**2 in the tails.
+        work_dtype = (
+            self.sigma.dtype if self.sigma.device.type == "mps" else torch.float64
+        )
+        alpha = self.alpha.to(work_dtype)
+        beta = self.beta.to(work_dtype)
+        self._alpha_w, self._beta_w = alpha, beta
+
+        # log Z without cancellation: b - a underflows when the whole interval
+        # lies far in one tail, so mirror it onto the left tail, where
+        # Phi(beta) - Phi(alpha) = Phi(-alpha) - Phi(-beta), and use log_ndtr.
+        flip = alpha + beta > 0
+        lower = torch.where(flip, -beta, alpha)
+        upper = torch.where(flip, -alpha, beta)
+        log_cdf_lower = torch.special.log_ndtr(lower)
+        log_cdf_upper = torch.special.log_ndtr(upper)
+
+        # On an interval much narrower than sigma the density is nearly flat, and
+        # the two log-CDF values can round to the same number. Use the uniform
+        # limit there: Z = width * pdf(midpoint).
+        width = beta - alpha
+        mid = (alpha + beta) / 2
+        self._narrow = width * (1 + mid.abs()) < 1e-4
+        # Each log only sees the inputs of the branch that uses it: a log(0) in
+        # the discarded branch would still make the gradients NaN.
+        one = torch.ones_like(width)
+        tail_gap = torch.where(
+            self._narrow, one, -torch.expm1(log_cdf_lower - log_cdf_upper)
+        )
+        log_Z = log_cdf_upper + torch.log(tail_gap)
+        narrow_width = torch.where(self._narrow, width, one)
+        narrow_log_Z = torch.log(narrow_width) + self.standard_normal.log_prob(mid)
+        self._log_Z_w = torch.where(self._narrow, narrow_log_Z, log_Z)
+        self.log_Z = self._log_Z_w.to(self.sigma.dtype)
+
         batch_shape = torch.broadcast_shapes(
             self.low.shape, self.high.shape, self.m.shape, self.s.shape, self.x_t.shape
         )
         event_shape = torch.Size()
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
+    def _pdf_over_Z(self, z: Tensor) -> Tensor:
+        """Standard normal pdf at ``z`` divided by Z, computed in log space."""
+        return torch.exp(self.standard_normal.log_prob(z) - self._log_Z_w)
+
     @property
     def mean(self) -> Tensor:
-        # Standard normal pdf values
-        phi_alpha = torch.exp(self.standard_normal.log_prob(self.alpha))
-        phi_beta = torch.exp(self.standard_normal.log_prob(self.beta))
-
-        return self.mu + self.sigma * (phi_alpha - phi_beta) / self.Z
+        # Standard normal pdf values, divided by Z
+        alpha, beta = self._alpha_w, self._beta_w
+        shift = self._pdf_over_Z(alpha) - self._pdf_over_Z(beta)
+        shift = torch.where(self._narrow, (alpha + beta) / 2, shift)
+        return self.mu + self.sigma * shift.to(self.sigma.dtype)
 
     @property
     def variance(self) -> Tensor:
-        phi_alpha = torch.exp(self.standard_normal.log_prob(self.alpha))
-        phi_beta = torch.exp(self.standard_normal.log_prob(self.beta))
+        alpha, beta = self._alpha_w, self._beta_w
+        phi_alpha = self._pdf_over_Z(alpha)
+        phi_beta = self._pdf_over_Z(beta)
 
-        term = (phi_alpha - phi_beta) / self.Z
-        variance_adjustment = (
-            1 + (self.alpha * phi_alpha - self.beta * phi_beta) / self.Z - term**2
+        term = phi_alpha - phi_beta
+        variance_adjustment = 1 + alpha * phi_alpha - beta * phi_beta - term**2
+        # Uniform limit on a narrow interval: width**2 / 12.
+        variance_adjustment = torch.where(
+            self._narrow, (beta - alpha) ** 2 / 12, variance_adjustment
         )
 
-        return self.sigma**2 * variance_adjustment
+        return self.sigma**2 * variance_adjustment.to(self.sigma.dtype)
 
     def sample(self, sample_shape: torch.Size = torch.Size()) -> Tensor:
         # Inverse CDF sampling for a truncated normal
@@ -721,7 +764,7 @@ class UniformNormalPosterior(Distribution):
 
     def log_prob(self, x: Tensor) -> Tensor:
         normal = Normal(self.mu, self.sigma, validate_args=False)
-        lp = normal.log_prob(x) - torch.log(self.Z)
+        lp = normal.log_prob(x) - self.log_Z
         return torch.where((x >= self.low) & (x <= self.high), lp, -torch.inf)
 
 
