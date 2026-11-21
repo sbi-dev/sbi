@@ -260,6 +260,26 @@ def test_wasserstein_2_squared_far_from_origin_in_float32(n: int):
     assert torch.allclose(distances, torch.tensor([0.0, 1.0]), atol=1e-5)
 
 
+@pytest.mark.parametrize(
+    "x",
+    (
+        # Two clusters far apart: centering on the mean leaves both far out.
+        torch.cat([torch.zeros(16, 1), torch.full((16, 1), 20000.0)]),
+    ),
+)
+def test_wasserstein_2_squared_spread_float32_points(x: torch.Tensor):
+    """A unit shift costs 1 for every point, even with points far apart."""
+    assert wasserstein_2_squared(x, x + 1).item() == pytest.approx(1.0, rel=1e-5)
+
+
+def test_wasserstein_2_squared_keeps_small_differences_beside_large_values():
+    """Half the points move by 1 next to points at 2**26: the cost is 0.5."""
+    big = torch.full((16, 1), 2.0**26)
+    x = torch.cat([torch.zeros(16, 1), big])
+    y = torch.cat([torch.ones(16, 1), big])
+    assert wasserstein_2_squared(x, y).item() == pytest.approx(0.5, rel=1e-4)
+
+
 @pytest.mark.parametrize("dtype", (torch.float16, torch.bfloat16))
 def test_wasserstein_2_squared_half_precision_many_points(dtype: torch.dtype):
     """Half-precision inputs with more than 25 points still get a cost matrix."""
