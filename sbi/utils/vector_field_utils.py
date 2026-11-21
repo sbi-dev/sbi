@@ -702,7 +702,6 @@ class UniformNormalPosterior(Distribution):
         upper = torch.where(flip, -alpha, beta)
         log_cdf_lower = torch.special.log_ndtr(lower)
         log_cdf_upper = torch.special.log_ndtr(upper)
-        log_Z = log_cdf_upper + torch.log(-torch.expm1(log_cdf_lower - log_cdf_upper))
 
         # On an interval much narrower than sigma the density is nearly flat, and
         # the two log-CDF values can round to the same number. Use the uniform
@@ -710,7 +709,15 @@ class UniformNormalPosterior(Distribution):
         width = beta - alpha
         mid = (alpha + beta) / 2
         self._narrow = width * (1 + mid.abs()) < 1e-4
-        narrow_log_Z = torch.log(width) + self.standard_normal.log_prob(mid)
+        # Each log only sees the inputs of the branch that uses it: a log(0) in
+        # the discarded branch would still make the gradients NaN.
+        one = torch.ones_like(width)
+        tail_gap = torch.where(
+            self._narrow, one, -torch.expm1(log_cdf_lower - log_cdf_upper)
+        )
+        log_Z = log_cdf_upper + torch.log(tail_gap)
+        narrow_width = torch.where(self._narrow, width, one)
+        narrow_log_Z = torch.log(narrow_width) + self.standard_normal.log_prob(mid)
         self._log_Z_w = torch.where(self._narrow, narrow_log_Z, log_Z)
         self.log_Z = self._log_Z_w.to(self.sigma.dtype)
 

@@ -101,9 +101,26 @@ def test_uniform_denoise_narrow_interval_in_float32():
 
     assert torch.isfinite(dist.log_Z)
     assert dist.mean.item() == pytest.approx((low + high) / 2, rel=1e-5)
-    assert dist.variance.item() == pytest.approx((high - low) ** 2 / 12, rel=1e-4)
+    assert dist.variance.item() == pytest.approx(
+        (high - low) ** 2 / 12, rel=1e-4, abs=0
+    )
     inside = dist.log_prob(torch.tensor(high / 2))
     assert torch.isfinite(inside)
+
+
+def test_uniform_denoise_narrow_interval_has_finite_gradients():
+    """A log(0) in the discarded branch must not turn the gradients into NaN."""
+    # Narrow enough that the two log-CDF values are equal even in float64.
+    low, high = 0.0, 1e-20
+    x_t = torch.tensor(0.0, requires_grad=True)
+    s = torch.tensor(1.0, requires_grad=True)
+    dist = denoise(
+        Uniform(torch.tensor(low), torch.tensor(high)), torch.tensor(1.0), s, x_t
+    )
+    (dist.log_prob(torch.tensor(high / 2)) + dist.mean + dist.variance).backward()
+
+    assert x_t.grad is not None and torch.isfinite(x_t.grad)
+    assert s.grad is not None and torch.isfinite(s.grad)
 
 
 @pytest.mark.parametrize("x_t", [-0.8, 2.4])
