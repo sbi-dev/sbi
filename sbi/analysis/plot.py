@@ -2405,7 +2405,7 @@ def marginal_plot_with_probs_intensity(
             for j in range(len(y) - 1):
                 facecolor = cmap(norm(weights.T[j, i]))
                 # if no sample in bin, set color to white
-                if weights.T[j, i] == np.nan:
+                if np.isnan(weights.T[j, i]):
                     facecolor = "white"
                 rect = Rectangle(
                     (x[i], y[j]),
