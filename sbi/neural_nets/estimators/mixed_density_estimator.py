@@ -40,7 +40,7 @@ class MixedDensityEstimator(ConditionalDensityEstimator):
             condition_shape: Shape of the condition. If not provided, it will assume a
                 1D input.
             embedding_net: Embedding net for the condition.
-            log_transform_input: whether to transform the continous part of the data
+            log_transform_input: whether to transform the continuous part of the data
                 into logarithmic domain before training. This is helpful for bounded
                 data, e.g.,for reaction times.
         """

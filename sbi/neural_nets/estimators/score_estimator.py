@@ -197,7 +197,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         mean = self.approx_marginal_mean(time)
         std = self.approx_marginal_std(time)
 
-        # As input to the neural net we want to have something that changes proportianl
+        # As input to the neural net we want to have something that changes proportional
         # to how the scores change
         time_enc = self.std_fn(time)
 
@@ -219,7 +219,7 @@ class ConditionalScoreEstimator(ConditionalVectorFieldEstimator):
         score_pred = score_pred.reshape(*batch_shape, *score_pred.shape[1:])
 
         # Output pre-conditioned score
-        # The learnable part will be largly scaled at the beginning of the diffusion
+        # The learnable part will be largely scaled at the beginning of the diffusion
         # and the gaussian part (where it should end up) will dominate at the end of
         # the diffusion.
         scale = self.mean_t_fn(time) / self.std_fn(time)
@@ -1243,7 +1243,7 @@ class VariancePreservingSDE:
         Returns:
             Standard deviation at a given time.
         """
-        std = 1.0 - torch.exp(
+        std = -torch.expm1(
             -0.5 * times**2.0 * (self.beta_max - self.beta_min) - times * self.beta_min
         )
         for _ in range(len(self.input_shape)):
@@ -1303,7 +1303,7 @@ class VPScoreEstimator(ConditionalScoreEstimator, VariancePreservingSDE):
             integrated over [0, T], the marginal distribution at time T should
             approximate N(0, I).
 
-    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+    NOTE: Together with t_min and t_max they ultimately define the loss function.
         Changing these might also require changing t_min and t_max to find a good
         tradeoff between bias and variance.
     """
@@ -1439,7 +1439,7 @@ class SubVariancePreservingSDE:
         Returns:
             Standard deviation at a given time.
         """
-        std = 1.0 - torch.exp(
+        std = -torch.expm1(
             -0.5 * times**2.0 * (self.beta_max - self.beta_min) - times * self.beta_min
         )
         for _ in range(len(self.input_shape)):
@@ -1481,8 +1481,7 @@ class SubVariancePreservingSDE:
             torch.abs(
                 self.noise_schedule(times)
                 * (
-                    1
-                    - torch.exp(
+                    -torch.expm1(
                         -2 * self.beta_min * times
                         - (self.beta_max - self.beta_min) * times**2
                     )
@@ -1514,7 +1513,7 @@ class SubVPScoreEstimator(ConditionalScoreEstimator, SubVariancePreservingSDE):
             integrated over [0, T], the marginal distribution at time T should
             approximate N(0, I).
 
-    NOTE: Together with t_min and t_max they ultimatively define the loss function.
+    NOTE: Together with t_min and t_max they ultimately define the loss function.
         Changing these might also require changing t_min and t_max to find a good
         tradeoff between bias and variance.
     """

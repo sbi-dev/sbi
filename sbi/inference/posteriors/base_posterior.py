@@ -248,7 +248,7 @@ class NeuralPosterior:
         printing it).
 
         NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
-        that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
+        that calls like `posterior.set_default_x(my_x).sample((1000,))` are possible.
 
         Several observations, of shape `(num_observations, *x_event_shape)`, are iid
         trials. Posteriors that sample with a potential combine them; methods that

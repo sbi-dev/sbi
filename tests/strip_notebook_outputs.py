@@ -18,7 +18,7 @@ class StripOutputExceptPlotsAndPrintsPreprocessor(Preprocessor):
     ) -> tuple:
         """Preprocess a cell
 
-        Note, this method will be called internall by the Preprocessor.preprocess
+        Note, this method will be called internally by the Preprocessor.preprocess
         method and needs to have this specific signature.
 
         Args:

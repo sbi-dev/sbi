@@ -194,11 +194,11 @@ def check_if_prior_on_device(
     device: Union[str, torch.device], prior: Optional[Any] = None
 ) -> None:
     """Try to sample from the prior, and check that the returned data is on the correct
-    trainin device. If the prior is `None`, simplys pass.
+    training device. If the prior is `None`, simply pass.
 
     Args:
         device: target torch training device
-        prior: any simulator outputing torch `Tensor`
+        prior: any simulator outputting torch `Tensor`
     """
     if prior is None:
         pass
@@ -939,7 +939,7 @@ def move_all_tensor_to_device(obj: object, device: Union[str, torch.device]) -> 
 
     def action(o: object) -> object:
         if isinstance(o, Tensor) and o.requires_grad and o.is_leaf:
-            # Moving leaf tensors inplace is hard. Cant call .to as this would create a
+            # Moving leaf tensors inplace is hard. Can't call .to as this would create a
             # copy and thus results in non-leaf tensors.
             if canonical_device(o.device) != canonical_device(device):
                 raise ValueError(

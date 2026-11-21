@@ -239,7 +239,7 @@ class EnsemblePosterior(NeuralPosterior):
             TypeError if weights are provided in an unsupported format.
 
         Args:
-            weights: Assignes weight to each posterior distribution.
+            weights: Assigns weight to each posterior distribution.
         """
         if weights is None:
             self._weights = torch.tensor([
@@ -404,8 +404,8 @@ class EnsemblePosterior(NeuralPosterior):
         printing one exemplary component of the ensemble).
 
         NOTE: this method is chainable, i.e. will return the EnsemblePosterior
-        object so that calls like `posterior_enemble.set_default_x(my_x).sample(mytheta)
-        ` are possible.
+        object so that calls like
+        `posterior_ensemble.set_default_x(my_x).sample((1000,))` are possible.
 
         Args:
             x: The default observation to set for every posterior $p_i(theta|x)$ in the

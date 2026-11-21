@@ -75,8 +75,9 @@ class Corrector(ABC):
 
         Args:
             theta: The samples to correct.
-            t0: The current time.
-            t1: The next time.
+            t0: The current time of the samples.
+            t1: The previous, larger time, from which the predictor moved the
+                samples to ``t0``.
 
         Returns:
             Tensor: The corrected samples.
@@ -121,10 +122,13 @@ class LangevinCorrector(Corrector):
     def correct(self, theta: Tensor, t0: Tensor, t1: Optional[Tensor] = None) -> Tensor:
         """Correct the samples using unadjusted Langevin dynamics.
 
-        Does not explicitly depend on the current time.
+        Evaluates the score at the samples' current time ``t0``. Skips the correction
+        at ``t0 == 0``, where the VP and sub-VP scores diverge.
         """
+        if t0 == 0:
+            return theta
         for _ in range(self.num_steps):
-            score = self.predictor.potential_fn.gradient(theta, t1)
+            score = self.predictor.potential_fn.gradient(theta, t0)
             eps = self.std * torch.randn_like(theta, device=self.device)
             theta = theta + self.step_size * score + eps
 
@@ -137,7 +141,7 @@ class GibbsCorrector(Corrector):
         """(Pseudo) Gibbs sampling corrector.
 
         Iteratively adds back noise according to the correct forward SDE, then removes
-        noise using the predictor. Hence, approximatly sampling form the joint
+        noise using the predictor. Hence, approximately sampling from the joint
         distribution using Gibbs sampling (if the two conditional distributions are
         compatible).
 
