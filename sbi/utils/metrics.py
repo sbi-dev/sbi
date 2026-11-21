@@ -355,8 +355,13 @@ def wasserstein_2_squared(
             "if x.ndim=2 or x.ndim=3."
         )
 
-    # Evaluate the cost matrix based on the default l2 cost
-    cost_matrix = torch.cdist(x, y, 2) ** 2
+    # Evaluate the cost matrix based on the default l2 cost. The matrix
+    # multiplication shortcut of cdist (|x|^2 + |y|^2 - 2 x.y) cancels for points
+    # far from the origin, e.g. it returns 0 in float32 for 10000 and 10001.
+    # Subtract the points pairwise instead: every backend and dtype supports it
+    # (cdist's direct mode is not available on MPS or in half precision), and a
+    # difference of nearby points is exact, wherever they lie.
+    cost_matrix = (x.unsqueeze(-2) - y.unsqueeze(-3)).pow(2).sum(-1)
 
     coupling = regularized_ot_dual(
         a,
