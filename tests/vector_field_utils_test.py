@@ -87,3 +87,38 @@ def test_uniform_denoise_matches_truncated_normal(x_t: float, s: float):
     grid = torch.linspace(low, high, 200001, dtype=torch.float64)
     integral = torch.trapezoid(dist.log_prob(grid).exp(), grid)
     assert integral.item() == pytest.approx(1.0, abs=1e-4)
+
+
+def test_uniform_denoise_narrow_interval_in_float32():
+    """A prior interval far narrower than the noise stays finite in float32."""
+    low, high = 0.0, 1e-8
+    dist = denoise(
+        Uniform(torch.tensor(low), torch.tensor(high)),
+        torch.tensor(1.0),
+        torch.tensor(1.0),
+        torch.tensor(0.0),
+    )
+
+    assert torch.isfinite(dist.log_Z)
+    assert dist.mean.item() == pytest.approx((low + high) / 2, rel=1e-5)
+    assert dist.variance.item() == pytest.approx((high - low) ** 2 / 12, rel=1e-4)
+    inside = dist.log_prob(torch.tensor(high / 2))
+    assert torch.isfinite(inside)
+
+
+@pytest.mark.parametrize("x_t", [-0.8, 2.4])
+def test_uniform_denoise_far_tail_variance_in_float32(x_t: float):
+    """The float32 variance in a far tail is positive and matches truncnorm."""
+    low, high, s = 0.0, 1.0, 0.02
+    dist = denoise(
+        Uniform(torch.tensor(low), torch.tensor(high)),
+        torch.tensor(1.0),
+        torch.tensor(s),
+        torch.tensor(x_t),
+    )
+    _, var = truncnorm.stats(
+        (low - x_t) / s, (high - x_t) / s, loc=x_t, scale=s, moments="mv"
+    )
+
+    assert dist.variance.item() > 0
+    assert dist.variance.item() == pytest.approx(var, rel=1e-3)
