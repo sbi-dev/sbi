@@ -448,6 +448,14 @@ def test_lc2st_normalization_handles_constant_dimensions(cal_data):
     assert lc2st.trained_clfs is not None
 
 
+def test_lc2st_accepts_posterior_samples_that_require_grad(cal_data):
+    """Samples that require grad must be detached before conversion to numpy."""
+    posterior_samples = cal_data.posterior_samples.clone().requires_grad_()
+    lc2st = LC2ST(cal_data.thetas, cal_data.xs, posterior_samples, num_trials_null=1)
+    lc2st.train_on_observed_data()
+    assert lc2st.trained_clfs is not None
+
+
 # =============================================================================
 # Input Validation Tests
 # =============================================================================

@@ -335,6 +335,22 @@ def test_posterior_zscore(true_theta, post_samples, expected_zscore, raises_exce
         )
 
 
+def test_posterior_zscore_keeps_torch_device():
+    """posterior_zscore must not convert to numpy, which fails on a GPU.
+
+    Tensors on the "meta" device cannot be converted to numpy either, so they
+    stand in for GPU tensors here.
+    """
+    post_samples = torch.zeros(10, 2, device="meta")
+    for true_theta in ([2.0, 4.0], torch.tensor([2.0, 4.0])):
+        assert posterior_zscore(true_theta, post_samples).device.type == "meta"
+
+    post_samples = torch.tensor([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0]])
+    true_theta = torch.tensor([2.0, 4.0], requires_grad=True)
+    zscore = posterior_zscore(true_theta, post_samples.requires_grad_())
+    assert torch.allclose(zscore, torch.tensor([0.0, 1.0]))
+
+
 @pytest.mark.parametrize(
     "distance_func, identical_inputs",
     [

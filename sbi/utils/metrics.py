@@ -531,12 +531,15 @@ def posterior_zscore(
     if len(post_samples) == 0:
         raise ValueError("Input samples are empty")
 
-    if not isinstance(true_theta, torch.Tensor):
-        true_theta = torch.tensor(true_theta, dtype=torch.float32)
     if not isinstance(post_samples, torch.Tensor):
         post_samples = torch.tensor(post_samples, dtype=torch.float32)
-
-    true_theta = np.atleast_1d(true_theta)
+    # Keep `true_theta` in torch and on the device of the samples: converting it
+    # to numpy fails for tensors on a GPU or tensors that require grad.
+    true_theta = torch.atleast_1d(
+        torch.as_tensor(
+            true_theta, dtype=post_samples.dtype, device=post_samples.device
+        )
+    )
     if post_samples.ndim == 1:
         post_samples = post_samples[:, None]
 
