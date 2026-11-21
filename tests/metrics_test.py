@@ -260,6 +260,14 @@ def test_wasserstein_2_squared_far_from_origin_in_float32(n: int):
     assert torch.allclose(distances, torch.tensor([0.0, 1.0]), atol=1e-5)
 
 
+@pytest.mark.parametrize("dtype", (torch.float16, torch.bfloat16))
+def test_wasserstein_2_squared_half_precision_many_points(dtype: torch.dtype):
+    """Half-precision inputs with more than 25 points still get a cost matrix."""
+    x = torch.zeros((32, 1), dtype=dtype)
+    y = x + 1
+    assert wasserstein_2_squared(x, y).item() == pytest.approx(1.0, rel=1e-2)
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "test", (unbiased_mmd_squared_hypothesis_test, biased_mmd_hypothesis_test)
