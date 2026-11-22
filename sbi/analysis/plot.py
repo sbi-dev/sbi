@@ -1789,7 +1789,10 @@ def _sbc_rank_plot(
     for idx, rank in enumerate(ranks_list):
         assert isinstance(rank, (Tensor, np.ndarray))
         # Bin in float64, like the bands: float32 edges can shift a rank by one bin.
-        ranks_list[idx] = ensure_numpy(rank).astype(np.float64)
+        rank_np = ensure_numpy(rank).astype(np.float64)
+        if rank_np.ndim == 1:
+            rank_np = rank_np[:, None]
+        ranks_list[idx] = rank_np
     if not all(((r >= 0) & (r <= num_posterior_samples)).all() for r in ranks_list):
         raise ValueError(
             f"Ranks must lie in [0, num_posterior_samples={num_posterior_samples}]. "
@@ -1850,6 +1853,7 @@ def _sbc_rank_plot(
             )
             ax = np.atleast_1d(ax)  # type: ignore
         else:
+            ax = np.atleast_1d(ax)
             assert ax.size >= num_parameters, (
                 "There must be at least as many subplots as parameters."
             )

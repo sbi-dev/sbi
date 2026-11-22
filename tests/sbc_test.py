@@ -344,3 +344,61 @@ def test_sbc_batch_sampling(batch_sampling: bool, gaussian_setup: Dict):
     assert ranks.shape == (num_sbc_runs, gaussian_setup["num_dim"]), (
         f"Ranks shape incorrect with batched_sampling={batch_sampling}"
     )
+
+
+def test_check_sbc_1d_inputs():
+    """Test that check_sbc and uniformity checks handle 1D tensors without error."""
+    from sbi.diagnostics.sbc import (
+        check_prior_vs_dap,
+        check_uniformity_c2st,
+        check_uniformity_frequentist,
+    )
+
+    num_sbc_runs = 100
+    num_posterior_samples = 1000
+
+    ranks_1d = torch.randint(0, num_posterior_samples + 1, (num_sbc_runs,))
+    prior_1d = torch.randn(num_sbc_runs)
+    dap_1d = torch.randn(num_sbc_runs)
+
+    ks_pvals = check_uniformity_frequentist(ranks_1d, num_posterior_samples)
+    assert ks_pvals.shape == (1,)
+
+    c2st_ranks = check_uniformity_c2st(ranks_1d, num_posterior_samples)
+    assert c2st_ranks.shape == (1,)
+
+    c2st_dap = check_prior_vs_dap(prior_1d, dap_1d)
+    assert c2st_dap.shape == (1,)
+
+    checks = check_sbc(
+        ranks_1d, prior_1d, dap_1d, num_posterior_samples=num_posterior_samples
+    )
+    assert checks["ks_pvals"].shape == (1,)
+    assert checks["c2st_ranks"].shape == (1,)
+    assert checks["c2st_dap"].shape == (1,)
+
+
+@pytest.mark.parametrize("plot_type", ["cdf", "cdf-diff", "hist"])
+def test_sbc_rank_plot_1d_ranks(plot_type: str):
+    """Test that sbc_rank_plot supports 1D ranks across all plot types."""
+    import matplotlib.pyplot as plt
+
+    ranks_1d = torch.randint(0, 500, (50,))
+    fig, ax = sbc_rank_plot(ranks_1d, num_posterior_samples=500, plot_type=plot_type)
+    assert fig is not None
+    assert ax is not None
+    plt.close(fig)
+
+
+@pytest.mark.parametrize("plot_type", ["cdf", "hist"])
+def test_sbc_rank_plot_with_single_axes(plot_type: str):
+    """Test that sbc_rank_plot accepts a single Axes object without error."""
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots()
+    ranks = torch.randint(0, 500, (50, 1))
+    fig_out, ax_out = sbc_rank_plot(
+        ranks, num_posterior_samples=500, plot_type=plot_type, fig=fig, ax=ax
+    )
+    assert fig_out is fig
+    plt.close(fig)
