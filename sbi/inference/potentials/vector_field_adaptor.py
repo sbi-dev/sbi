@@ -18,6 +18,7 @@ from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 from sbi.utils.vector_field_utils import (
+    _NegativePart,
     add_diag_or_dense,
     denoise,
     fit_gmm_ratio,
@@ -1369,6 +1370,9 @@ def ensure_lam_positive_definite(
     r"""
     Ensure that the matrix is positive definite.
 
+    Each posterior precision gets the negative part of `Lam`, divided by `N - 1`,
+    plus a nugget. The gradient stays finite when `Lam` has repeated eigenvalues.
+
     Args:
         denoising_prior_precision: The prior precision tensor.
         denoising_posterior_precision: The posterior precision tensor.
@@ -1391,15 +1395,18 @@ def ensure_lam_positive_definite(
 
     is_diag = Lam.ndim == 3
     if d > 1 and not is_diag:
-        eigenvalues, eigenvectors = torch.linalg.eigh(Lam)
-        corrected_eigs = torch.where(
-            eigenvalues <= 0, -eigenvalues, torch.zeros_like(eigenvalues)
-        )
-        corrected_eigs = corrected_eigs / (N - 1)
+        eigenvalues = torch.linalg.eigvalsh(Lam)
+        nonpositive = eigenvalues <= 0
+        negative_semidefinite = nonpositive.all(-1)[..., None, None]
+        mixed_signs = nonpositive.any(-1)[..., None, None] & ~negative_semidefinite
+        # The negative part of `Lam` is zero if `Lam` is positive definite, and `-Lam`
+        # if it is negative semidefinite. Only mixed signs need eigenvectors, and
+        # `_NegativePart` gives them a backward that is finite at repeated eigenvalues.
+        Lam_corr = torch.where(negative_semidefinite, -Lam, 0.0)
+        if mixed_signs.any():
+            Lam_corr = torch.where(mixed_signs, _NegativePart.apply(Lam), Lam_corr)
+        Lam_corr = Lam_corr / (N - 1)
 
-        Lam_corr = torch.einsum(
-            '...ij,...j,...kj->...ik', eigenvectors, corrected_eigs, eigenvectors
-        )
         # The nugget must survive rounding in `Lam` and in each posterior precision.
         eps = torch.finfo(Lam.dtype).eps
         nugget = torch.maximum(
