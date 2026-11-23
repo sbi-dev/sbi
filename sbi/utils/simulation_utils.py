@@ -268,7 +268,7 @@ def _call_in_worker(*args: Any) -> Any:
             pickle.loads(pickle.dumps(error))
         except Exception:
             # Such an exception would break joblib's worker pool on its way back.
-            notes = " ".join(error.__notes__)
+            notes = " ".join(getattr(error, "__notes__", []))
             raise RuntimeError(f"{type(error).__name__}: {error}. {notes}") from None
         raise
 
