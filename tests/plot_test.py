@@ -754,6 +754,31 @@ def test_marginal_plot_validates_diag_style():
         marginal_plot(torch.randn(100, 3), diag="cond")
 
 
+@pytest.mark.parametrize(
+    "plot, dims, subset, centers",
+    [
+        (marginal_plot, 2, None, [0, 50]),
+        (marginal_plot, 1, None, [0]),
+        (marginal_plot, 2, [0], [0]),
+        (pairplot, 2, [0], [0]),
+    ],
+    ids=[
+        "marginal_plot",
+        "marginal_plot_1d",
+        "marginal_plot_subset",
+        "pairplot_subset",
+    ],
+)
+def test_plot_panels_show_their_own_dimension(plot, dims, subset, centers):
+    """Each panel of a one-row or single-panel plot shows its own dimension."""
+    samples = torch.stack([torch.randn(500), torch.randn(500) + 50], dim=1)[:, :dims]
+    _, axes = plot(samples, subset=subset)
+    for ax, center in zip(np.atleast_1d(axes), centers, strict=True):
+        extent = ax.patches[0].get_path().get_extents()
+        assert center - 10 < extent.x0 < extent.x1 < center + 10
+    close()
+
+
 # --- Tests for discrete_indices support ---
 
 
