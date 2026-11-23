@@ -43,5 +43,6 @@ that these algorithms can have different issues and potential pitfalls.
 
 A mixture density network as density estimator does not avoid leakage. With a uniform
 prior, and with the direct posterior of an earlier round (the default of
-`build_posterior()`) as proposal, multi-round NPE then uses a closed-form loss ("Using
-NPE_C with non-atomic loss"), but its estimate can leak as well.
+`build_posterior()`, also with an MDN) as proposal, multi-round NPE then uses a
+closed-form loss ("Using NPE_C with non-atomic loss"), but its estimate can leak as
+well.
