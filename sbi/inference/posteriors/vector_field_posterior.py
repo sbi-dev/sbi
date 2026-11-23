@@ -10,6 +10,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import (
+    _LEAKAGE_HINT,
     NeuralPosterior,
     _require_one_observation,
 )
@@ -230,6 +231,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
                     return_partial_on_timeout=return_partial_on_timeout,
+                    low_acceptance_hint=_LEAKAGE_HINT,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -255,6 +257,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
                     return_partial_on_timeout=return_partial_on_timeout,
+                    low_acceptance_hint=_LEAKAGE_HINT,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -648,6 +651,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
                     return_partial_on_timeout=return_partial_on_timeout,
+                    low_acceptance_hint=_LEAKAGE_HINT,
                 )
             else:
                 # Bypass rejection sampling.
@@ -677,6 +681,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
                     return_partial_on_timeout=return_partial_on_timeout,
+                    low_acceptance_hint=_LEAKAGE_HINT,
                 )
             else:
                 # Bypass rejection sampling.
