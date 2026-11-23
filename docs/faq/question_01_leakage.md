@@ -1,4 +1,4 @@
-# What should I do when my 'posterior samples are outside the prior support' in SNPE?
+# What should I do when 'only x% proposal samples are accepted' in SNPE?
 
 When working with **multi-round** NPE (i.e., SNPE), you might have experienced the
 following warning:
@@ -31,8 +31,9 @@ described in more detail
 
 - sample with MCMC: `posterior = inference.build_posterior(sample_with="mcmc")`, then
 `samples = posterior.sample((num_samples,), x=x_o)`.
-This approach will make sampling slower, but samples will not "leak". It does not
-improve a poor estimate, though.
+MCMC samples only within the prior bounds, so samples will not "leak". At very low
+acceptance rates, it can be faster than rejection sampling. It does not improve a poor
+estimate, though.
 
 - resort to single-round NPE and (if necessary) increase your simulation budget.
 
