@@ -9,7 +9,8 @@ remaining 10000 samples. You can prevent very long runtimes by setting
 `max_sampling_time` to limit runtime, or disabling rejection sampling (e.g. via
 `reject_outside_prior=False` in `posterior.sample()` when available). Alternatively,
 consider interrupting (Ctrl-C) and switching to
-`build_posterior(..., sample_with='mcmc')`.
+`build_posterior(..., sample_with='mcmc')`. A low acceptance rate means that most of
+the posterior estimate lies outside the prior bounds (leakage). ...
 ```
 
 Setting `reject_outside_prior=False` skips the rejection step. Sampling gets faster,
@@ -41,5 +42,6 @@ estimate, though.
 that these algorithms can have different issues and potential pitfalls.
 
 A mixture density network as density estimator does not avoid leakage. With a uniform
-prior, multi-round NPE then uses a closed-form loss ("Using NPE_C with non-atomic
-loss"), but its estimate can leak as well.
+prior and the posterior of an earlier round as proposal, multi-round NPE then uses a
+closed-form loss ("Using NPE_C with non-atomic loss"), but its estimate can leak as
+well.
