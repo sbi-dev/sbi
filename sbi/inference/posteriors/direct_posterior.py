@@ -49,7 +49,9 @@ class DirectPosterior(NeuralPosterior):
     """
 
     # Suggested in the warning when rejection sampling accepts few samples.
-    _alternative_sampling_method = "build_posterior(..., sample_with='mcmc')"
+    _alternative_sampling_method: Optional[str] = (
+        "build_posterior(..., sample_with='mcmc')"
+    )
     # Explains that warning for NPE.
     _low_acceptance_hint = (
         "A low acceptance rate means that most of the posterior estimate lies "

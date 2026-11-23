@@ -41,7 +41,7 @@ class NPE_A_Posterior(DirectPosterior):
     """
 
     # NPE-A does not support `sample_with='mcmc'`.
-    _alternative_sampling_method = "using fewer samples or increasing max_sampling_time"
+    _alternative_sampling_method = None
 
     @property
     def _one_observation_hint(self) -> str:
