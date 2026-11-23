@@ -57,7 +57,7 @@ def WaveNetSRLikeAggregator(
     stride_sizes: Union[int, List] = 1,
 ) -> nn.Module:
     """
-    Creates a non-causal 1D CNN aggregator based on the WaveNet speach recognition task
+    Creates a non-causal 1D CNN aggregator based on the WaveNet speech recognition task
 
     By default this function creates an aggregator with two CNN layers,
     after every convolution a maxpooling operation halves the number of timepoints.
@@ -152,7 +152,7 @@ class CausalCNNEmbedding(nn.Module):
         aggregator: Optional[nn.Module] = None,
         output_dim: int = 20,
     ):
-        """Intitialize embedding network that uses 1D causal convolutions.
+        """Initialize embedding network that uses 1D causal convolutions.
 
         This is a simplified version of the architecture introduced for
         the speech recognition task in the WaveNet paper (van den Oord, et al. (2016))
@@ -163,7 +163,7 @@ class CausalCNNEmbedding(nn.Module):
         If you do not provide an aggregator network yourself, a default aggregator
         is used. This default aggregator is based on the WaveNet paper's description
         of their Speech Recognition Task, and uses non-causal convolutions and pooling
-        layers, and global average poolingg to obtain a final low dimensional embedding.
+        layers, and global average pooling to obtain a final low dimensional embedding.
 
         Args:
             input_shape: Spatial input shape without batch or channel dimensions,

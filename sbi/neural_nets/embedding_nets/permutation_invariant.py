@@ -57,7 +57,7 @@ class PermutationInvariantEmbedding(nn.Module):
                 input_dim is the dimensionality of a single trial. Produces output
                 (batch, latent_dim).
                 Remark: This network should be large enough as it acts on all (iid)
-                inputs seperatley and needs enough capacity to process the information
+                inputs separately and needs enough capacity to process the information
                 of all inputs.
             trial_net_output_dim: Dimensionality of the output of the trial_net.
             aggregation_fn: Function to aggregate the trial embeddings. Defaults to

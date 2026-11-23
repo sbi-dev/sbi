@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 import torch
 import torch.distributions as dist
+from torch import nn
 
 from sbi.diagnostics.misspecification import (
     calc_misspecification_logprob,
@@ -14,8 +17,9 @@ from sbi.diagnostics.misspecification import (
 from sbi.inference import NPE
 from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.neural_nets import MarginalNSFConfig, posterior_nn
-from sbi.neural_nets.embedding_nets import FCEmbedding
+from sbi.neural_nets.embedding_nets import FCEmbedding, PermutationInvariantEmbedding
 from sbi.utils.sbiutils import seed_all_backends
+from sbi.utils.torchutils import process_device
 
 seed = 2025
 
@@ -234,3 +238,93 @@ def test_mmd_embedding_mode_requires_trained_inference():
 
     with pytest.raises(ValueError, match="No neural net found"):
         calc_misspecification_mmd(x_obs=x[:1], x=x, inference=NPE(), mode="embedding")
+
+
+def test_mmd_many_observations_gives_finite_baseline():
+    """The MMD baseline must stay finite when ``n_obs >= max_samples``."""
+    x_obs = torch.randn(1000, 2) + 5.0
+    x = torch.randn(3000, 2)
+
+    p_val, _ = calc_misspecification_mmd(
+        x_obs=x_obs, x=x, n_shuffle=20, max_samples=1000
+    )
+
+    # All 20 baseline MMDs are below the observed one: the smallest p-value.
+    assert p_val == pytest.approx(1 / 21)
+
+
+def test_mmd_does_not_depend_on_the_order_of_x():
+    """Sorted synthetic samples must not make a correct model look misspecified."""
+    x = torch.sort(torch.randn(2000, 1), dim=0).values
+    x_obs = torch.randn(50, 1)
+
+    _, (mmds_baseline, mmd) = calc_misspecification_mmd(
+        x_obs=x_obs, x=x, n_shuffle=20, max_samples=200
+    )
+
+    # Over 200 seeds the ratio stayed below 2.9 with random rows and above 6.6 when
+    # the observed MMD took the first rows of x.
+    assert mmd < 4 * mmds_baseline.max()
+
+
+def test_mmd_raises_for_non_finite_mmd():
+    """Many identical samples give a zero bandwidth: raise, never p = 1.0."""
+    x = torch.poisson(torch.full((1000, 1), 0.1))
+    x_obs = torch.poisson(torch.full((50, 1), 1.0))
+
+    with pytest.raises(ValueError, match="MMD is not finite"):
+        calc_misspecification_mmd(x_obs=x_obs, x=x, n_shuffle=20)
+
+
+def test_mmd_accepts_nan_padded_trials_in_embedding_mode():
+    """Whole NaN trials are padding for a permutation-invariant embedding."""
+    embedding_net = PermutationInvariantEmbedding(
+        trial_net=nn.Linear(2, 4), trial_net_output_dim=4, output_dim=3
+    )
+    inference = SimpleNamespace(
+        _device="cpu", _neural_net=SimpleNamespace(embedding_net=embedding_net)
+    )
+    x = torch.randn(200, 5, 2)
+    x[::2, -2:] = float("nan")
+    x_obs = torch.randn(2, 5, 2)
+    x_obs[0, -1] = float("nan")
+
+    p_val, _ = calc_misspecification_mmd(
+        x_obs=x_obs, x=x, inference=inference, mode="embedding", n_shuffle=20
+    )
+
+    assert 0 < p_val <= 1
+
+
+@pytest.mark.parametrize(
+    "device, dtype",
+    (
+        ("cpu", torch.float64),
+        pytest.param("gpu", torch.float32, marks=pytest.mark.gpu),
+    ),
+)
+def test_mmd_keeps_device_and_dtype(device: str, dtype: torch.dtype):
+    dev = process_device(device)
+    x = torch.randn(300, 2, device=dev, dtype=dtype)
+
+    _, (mmds_baseline, mmd) = calc_misspecification_mmd(
+        x_obs=x[:5], x=x[5:], n_shuffle=20
+    )
+
+    assert mmds_baseline.device == mmd.device == x.device
+    assert mmds_baseline.dtype == mmd.dtype == dtype
+
+
+@pytest.mark.gpu
+def test_mmd_embedding_moves_data_to_the_net_device():
+    """A net trained on a GPU must accept simulations stored on the CPU."""
+    dev = process_device("gpu")
+    embedding_net = nn.Linear(2, 3).to(dev)
+    inference = SimpleNamespace(
+        _device=dev, _neural_net=SimpleNamespace(embedding_net=embedding_net)
+    )
+    x = torch.randn(100, 2)
+
+    calc_misspecification_mmd(
+        x_obs=x[:5], x=x[5:], inference=inference, mode="embedding", n_shuffle=5
+    )

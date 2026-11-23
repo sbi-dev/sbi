@@ -704,7 +704,7 @@ def test_lru_isolated(
     batch_size: int = 16,
     sequence_len: int = 50,
 ):
-    """Run some random data trough an LRU layer."""
+    """Run some random data through an LRU layer."""
     lru = LRU(
         input_dim=input_dim,
         state_dim=state_dim,
@@ -822,7 +822,7 @@ def test_lru_embedding_net_isolated(
     batch_size: int = 16,
     sequence_len: int = 50,
 ):
-    """Run some random data trough an LRUEmbedding network."""
+    """Run some random data through an LRUEmbedding network."""
     embedding_net = LRUEmbedding(
         input_dim=input_dim,  # = observation_dim
         output_dim=output_dim,

@@ -189,7 +189,7 @@ Examples
     embedding_net = FCEmbedding(input_dim=8, output_dim=20)
 ```
 
-For code linting and formating, we use [`ruff`](https://docs.astral.sh/ruff/),
+For code linting and formatting, we use [`ruff`](https://docs.astral.sh/ruff/),
 which is installed alongside `sbi`.
 
 You can exclude slow tests and those which require a GPU with
