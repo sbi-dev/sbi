@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import pickle
+import random
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -123,13 +124,15 @@ def simulate_from_theta(
             simulator. If None, all parameter sets are simulated in one call.
         simulator_is_batched: Whether the simulator takes a batch of parameter sets
             per call. If False, it is called once per parameter set.
-        seed: Seed for reproducibility. Every simulator call is seeded with its own
-            seed derived from `seed`, so for noise drawn on the CPU the outputs do
-            not depend on `num_workers`. Afterwards, the global random state is
-            seeded with another seed derived from `seed`. Without a seed, one worker
-            uses the current random state; more workers seed every call from
-            numpy's global random state. Seeding needs joblib's default process
-            workers: with a thread backend, a seed raises an error.
+        seed: Seed for reproducibility. Every simulator call gets its own seed
+            derived from `seed`, for the random states of Python, numpy and
+            PyTorch on the CPU. So for noise drawn on the CPU, the outputs do not
+            depend on `num_workers`; PyTorch's GPU generators are not seeded per
+            call. Afterwards, the global random state is seeded with another seed
+            derived from `seed`. Without a seed, one worker uses the current random
+            state; more workers seed every call from numpy's global random state.
+            Seeding needs joblib's default process workers: with a thread backend,
+            a seed raises an error.
         show_progress_bar: Whether to show a progress bar.
 
     Returns:
@@ -228,7 +231,10 @@ def _call(
 ) -> Any:
     """Runs one simulator call for `theta`, which starts at row `start`."""
     if seed is not None:
-        seed_all_backends(seed)
+        # The CPU generators only: seeding the GPU ones takes ten times as long.
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.default_generator.manual_seed(seed)
     try:
         output = simulator(theta)
         if output is None:
