@@ -1037,7 +1037,8 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
             conditions,
         )
 
-        if self.ensure_lam_psd:
+        # One observation has nothing to combine, and the guard divides by N - 1.
+        if self.ensure_lam_psd and N > 1:
             prior_precision, posterior_precisions = ensure_lam_positive_definite(
                 prior_precision,
                 posterior_precisions,
@@ -1478,9 +1479,11 @@ def ensure_lam_positive_definite(
         # A diagonal Lam, or a 1 x 1 one, is corrected elementwise; the precisions may
         # mix diagonal and dense layouts.
         eps = torch.finfo(Lam.dtype).eps
+        max_posterior_precision = denoising_posterior_precision.abs().amax(1, True)
+        if max_posterior_precision.ndim < Lam.ndim:  # diagonal next to a dense 1 x 1
+            max_posterior_precision = max_posterior_precision.unsqueeze(-1)
         nugget = torch.maximum(
-            100 * eps * Lam.abs() / N,
-            eps * denoising_posterior_precision.abs().amax(1, keepdim=True),
+            100 * eps * Lam.abs() / N, eps * max_posterior_precision
         ).clamp(min=precision_nugget)
         Lam_corr = torch.where(Lam > 0, torch.zeros_like(Lam), -Lam) / (N - 1) + nugget
         denoising_posterior_precision = add_diag_or_dense(
