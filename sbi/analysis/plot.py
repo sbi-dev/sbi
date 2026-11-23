@@ -2284,7 +2284,8 @@ def pp_plot(
     )
 
     # pp_vals for the observed data
-    if isinstance(scores, dict):
+    is_dict_scores = isinstance(scores, dict)
+    if is_dict_scores:
         scores_items = list(scores.items())
     else:
         scores_items = [(None, s) for s in scores]
@@ -2294,7 +2295,7 @@ def pp_plot(
         plot_kwargs = kwargs.copy()
         if labels is not None:
             plot_kwargs["label"] = labels[i]
-        elif key is not None:
+        elif is_dict_scores:
             plot_kwargs["label"] = str(key)
         if colors is not None:
             plot_kwargs["color"] = colors[i]

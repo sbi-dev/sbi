@@ -909,4 +909,10 @@ def test_pp_plot_and_pp_plot_lc2st_accept_list_and_dict(
     # Test pp_plot_lc2st
     ax_lc2st = pp_plot_lc2st(probs=scores, probs_null=scores_null, conf_alpha=0.05)
     assert isinstance(ax_lc2st, Axes)
+
+    # Test dictionary with None as key supplies "None" as label
+    ax_none = pp_plot({None: scores_data[0]}, null_data, true_null, conf_alpha=0.05)
+    legend_none = ax_none.legend()
+    assert "None" in [t.get_text() for t in legend_none.get_texts()]
+
     close("all")
