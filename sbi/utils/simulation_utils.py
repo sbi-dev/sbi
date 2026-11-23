@@ -76,7 +76,7 @@ def simulate_for_sbi(
         )
     x = simulate_from_theta(
         simulator,
-        theta.clone(),  # A simulator may change its input in place.
+        theta,
         num_workers=num_workers,
         simulation_batch_size=simulation_batch_size,
         simulator_is_batched=simulator_is_batched,
@@ -84,6 +84,8 @@ def simulate_for_sbi(
         show_progress_bar=show_progress_bar,
     )
     try:
+        if isinstance(x, list):  # E.g. tensors and arrays mixed.
+            x = torch.stack([torch.as_tensor(row) for row in x])
         x = torch.as_tensor(x)
         if x.is_complex():
             raise TypeError("complex simulator outputs")
@@ -172,6 +174,8 @@ def simulate_from_theta(
     seed = None if seed is None else int(seed)
     num_workers = effective_n_jobs(num_workers)  # E.g. 1 for -1 on one CPU.
     uses_threads = num_workers > 1 and _check_backend(seed)
+    # A copy, as a simulator may change its input in place.
+    theta = theta.clone() if isinstance(theta, Tensor) else theta.copy()
 
     # One entry of `thetas` per simulator call.
     all_in_one_call = simulation_batch_size is None
@@ -198,9 +202,9 @@ def simulate_from_theta(
             (t.detach().to("cpu", copy=True) if isinstance(t, Tensor) else t, *rest)
             for t, *rest in calls
         )
+        run = _call if uses_threads else _call_in_worker
         outputs = parallel(
-            delayed(_call_in_worker)(simulator, simulator_is_batched, *task)
-            for task in tasks
+            delayed(run)(simulator, simulator_is_batched, *task) for task in tasks
         )
     collected = []
     try:
@@ -218,7 +222,7 @@ def simulate_from_theta(
     if seed is not None:
         # A child of `seed` keeps later draws from repeating those of this call.
         child = np.random.SeedSequence(seed).spawn(1)[0]
-        seed_all_backends(int(child.generate_state(1)[0]))
+        _seed_cpu_random_states(int(child.generate_state(1)[0]))
     return _join(collected, simulator_is_batched)
 
 
@@ -231,10 +235,7 @@ def _call(
 ) -> Any:
     """Runs one simulator call for `theta`, which starts at row `start`."""
     if seed is not None:
-        # The CPU generators only: seeding the GPU ones takes ten times as long.
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.default_generator.manual_seed(seed)
+        _seed_cpu_random_states(seed)
     try:
         output = simulator(theta)
         if output is None:
@@ -332,6 +333,17 @@ def _check_backend(seed: Optional[int]) -> bool:
             "share one random state. Use joblib's default backend, or pass no seed."
         )
     return uses_threads
+
+
+def _seed_cpu_random_states(seed: int) -> None:
+    """Seeds Python's `random`, numpy and PyTorch's CPU generator.
+
+    Unlike `seed_all_backends`, it leaves cuDNN alone and skips PyTorch's GPU
+    generators, which take ten times as long to seed.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.default_generator.manual_seed(seed)
 
 
 def _is_int(value: Any) -> bool:

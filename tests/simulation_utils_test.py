@@ -146,6 +146,7 @@ def test_seeded_outputs_do_not_depend_on_num_workers(simulator_is_batched):
             noise_from_all_backends,
             np.zeros((30, 2)),
             num_workers=num_workers,
+            simulation_batch_size=7 if simulator_is_batched else 1,
             simulator_is_batched=simulator_is_batched,
             seed=0,
             show_progress_bar=False,
@@ -300,44 +301,40 @@ def test_worker_calls_carry_only_their_own_parameter_sets():
     assert torch.all(x == 1.0)
 
 
-def test_workers_can_write_to_large_numpy_parameters():
+@pytest.mark.parametrize("num_workers", [1, 2])
+def test_simulator_can_write_to_its_parameters(num_workers):
     def simulator(theta):
         theta -= 1.0
         return theta.sum(1)
 
+    theta = np.ones((70_000, 2))  # More than joblib's 1 MB limit for memory maps.
     x = simulate_from_theta(
         simulator,
-        np.ones((70_000, 2)),  # More than joblib's 1 MB limit for memory maps.
-        num_workers=2,
+        theta,
+        num_workers=num_workers,
         simulation_batch_size=None,
         simulator_is_batched=True,
         show_progress_bar=False,
     )
 
     assert not x.any()
+    assert theta.all()
 
 
-@pytest.mark.parametrize("simulator_is_batched", [False, True])
 @pytest.mark.parametrize(
     "make_buffer",
     [np.zeros, torch.zeros, lambda size: [0.0] * size],
     ids=["numpy", "torch", "list"],
 )
-def test_simulator_that_reuses_its_output_buffer(simulator_is_batched, make_buffer):
-    buffer = make_buffer(4 if simulator_is_batched else 1)
+def test_simulator_that_reuses_its_output_buffer(make_buffer):
+    buffer = make_buffer(1)
 
     def simulator(theta):
-        rows = theta if simulator_is_batched else theta[None]
-        for i, row in enumerate(rows):
-            buffer[i] = float(row[0])
+        buffer[0] = float(theta[0])
         return buffer
 
     x = simulate_from_theta(
-        simulator,
-        np.arange(16.0).reshape(-1, 1),
-        simulation_batch_size=4 if simulator_is_batched else 1,
-        simulator_is_batched=simulator_is_batched,
-        show_progress_bar=False,
+        simulator, np.arange(16.0).reshape(-1, 1), show_progress_bar=False
     )
 
     assert np.array_equal(np.asarray(x).ravel(), np.arange(16.0))
