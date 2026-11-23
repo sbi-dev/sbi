@@ -453,7 +453,8 @@ def test_posterior_shrinkage_1d_inputs():
     assert not torch.isnan(shrinkage[0])
 
 
-def test_metrics_mixed_devices():
+@pytest.mark.parametrize("ref_is_accelerator", (False, True))
+def test_metrics_mixed_devices(ref_is_accelerator: bool):
     device = (
         "mps"
         if torch.backends.mps.is_available()
@@ -462,36 +463,39 @@ def test_metrics_mixed_devices():
     if device is None:
         pytest.skip("No secondary device available for mixed device testing")
 
-    x_cpu = torch.randn(50, 2)
-    y_dev = (torch.randn(50, 2) + 2.0).to(device)
+    ref_dev = device if ref_is_accelerator else "cpu"
+    comp_dev = "cpu" if ref_is_accelerator else device
+
+    x_ref = torch.randn(50, 2, device=ref_dev)
+    y_comp = torch.randn(50, 2, device=comp_dev) + 2.0
 
     # c2st
-    assert c2st(x_cpu, y_dev) > 0.8
+    assert c2st(x_ref, y_comp) > 0.8
 
     # posterior_shrinkage
-    shrink = posterior_shrinkage(x_cpu, y_dev)
+    shrink = posterior_shrinkage(x_ref, y_comp)
     assert shrink.shape == (2,)
 
     # wasserstein_2_squared
-    w = wasserstein_2_squared(x_cpu, y_dev)
+    w = wasserstein_2_squared(x_ref, y_comp)
     assert w.ndim == 0 and not torch.isnan(w)
 
     # unbiased_mmd_squared & biased_mmd
-    u = unbiased_mmd_squared(x_cpu, y_dev)
+    u = unbiased_mmd_squared(x_ref, y_comp)
     assert u.ndim == 0 and not torch.isnan(u)
-    b = biased_mmd(x_cpu, y_dev)
+    b = biased_mmd(x_ref, y_comp)
     assert b.ndim == 0 and not torch.isnan(b)
 
     # l1, l2, mse
-    assert l1(x_cpu, y_dev).shape == (50,)
-    assert l2(x_cpu, y_dev).shape == (50,)
-    assert mse_distance(x_cpu, y_dev).shape == (50,)
+    assert l1(x_ref, y_comp).shape == (50,)
+    assert l2(x_ref, y_comp).shape == (50,)
+    assert mse_distance(x_ref, y_comp).shape == (50,)
 
     # Distance wrapper
     dist = Distance("l2")
-    assert dist(x_cpu[0], y_dev).shape == (50,)
+    assert dist(x_ref[0], y_comp).shape == (50,)
     dist_batched = Distance("l2", batch_size=10)
-    assert dist_batched(x_cpu[0], y_dev).shape == (50,)
+    assert dist_batched(x_ref[0], y_comp).shape == (50,)
 
 
 def test_wasserstein_1d_mixed_ranks():
