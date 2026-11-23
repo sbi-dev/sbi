@@ -125,6 +125,7 @@ def marginal_plot(
                 "diag_kwargs": diag_kwargs,
                 "fig_kwargs": fig_kwargs,
             },
+            samples=sample_data,
             diag=diag,
             sample_names=sample_names,
         )
@@ -279,6 +280,7 @@ def pairplot(
                 "fig_kwargs": fig_kwargs,
                 "discrete_indices": discrete_indices,
             },
+            samples=sample_data,
             diag=diag,
             sample_names=sample_names,
             upper=upper,
@@ -1128,6 +1130,7 @@ def _warn_deprecated_kwargs(
     func_name: str,
     kwargs: Dict[str, Any],
     ignored: Dict[str, Any],
+    samples: PreparedSamples,
     diag: Optional[Union[str, Sequence[Optional[str]]]],
     sample_names: Optional[List[Optional[str]]],
     upper: Optional[Union[str, Sequence[Optional[str]]]] = None,
@@ -1139,6 +1142,7 @@ def _warn_deprecated_kwargs(
         kwargs: The deprecated keyword arguments that were passed.
         ignored: Newer arguments that the old implementation does not use. Those
             that are not None are named in the warning.
+        samples: The sample set(s) passed to the old implementation.
         diag: The diagonal style(s). Named in the warning if the old
             implementation does not draw them as asked.
         sample_names: Names of the `LabeledSamples`, which the old implementation
@@ -1153,14 +1157,15 @@ def _warn_deprecated_kwargs(
         "`*_kwargs` arguments (see `sbi.analysis.plotting_classes`)."
     )
     dropped = [name for name, value in ignored.items() if value is not None]
-    # Per sample, the old diagonal draws "hist" or "kde" if asked. Otherwise it draws
-    # scatter lines if that sample's upper style is "scatter", and nothing if not.
-    n = max(len(x) if isinstance(x, list) else 1 for x in (diag, upper))
+    # Per sample set, the old diagonal draws "hist" or "kde" if asked. Otherwise it
+    # draws scatter lines if that set's upper style is "scatter", and nothing if not.
+    # Like the old implementation, use one style per set and ignore extra entries.
+    n = len(samples) if isinstance(samples, list) else 1
     diags = diag if isinstance(diag, list) else [diag] * n
     uppers = upper if isinstance(upper, list) else [upper] * n
     if any(
         d not in ("hist", "kde", "scatter" if u == "scatter" else None)
-        for d, u in zip(diags, uppers, strict=False)
+        for d, u in zip(diags[:n], uppers[:n], strict=False)
     ):
         dropped.append("diag")
     if any(sample_names or []):
