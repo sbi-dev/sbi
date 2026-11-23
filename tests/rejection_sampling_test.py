@@ -52,10 +52,13 @@ def test_accept_reject_sample_timeout():
 def test_accept_reject_sample_timeout_blames_only_low_acceptance(
     accept, suggest_options, blames, bypass
 ):
-    """The timeout error blames low acceptance only after a low-acceptance batch."""
+    """The timeout error blames low acceptance only after a low-acceptance batch.
+
+    The deadline leaves ample time for the first batch and runs out during it.
+    """
 
     def slow_proposal(shape, **kwargs):
-        time.sleep(0.05)
+        time.sleep(0.5)
         return torch.randn(shape[0], 1)
 
     with pytest.raises(RuntimeError, match="rejection sampling exceeded") as error:
@@ -64,7 +67,7 @@ def test_accept_reject_sample_timeout_blames_only_low_acceptance(
             accept_reject_fn=lambda x: torch.full((x.shape[0],), accept),
             num_samples=20,
             max_sampling_batch_size=10,
-            max_sampling_time=0.01,
+            max_sampling_time=0.2,
             suggest_sampling_options=suggest_options,
         )
     assert ("low acceptance" in str(error.value)) == blames
