@@ -642,6 +642,9 @@ class PriorGuide(ScoreAdaptation):
         eye = torch.eye(d, dtype=score.dtype, device=score.device)
         m_, s2 = ((v * torch.ones_like(score))[..., :1, None] for v in (m, std**2))
         cov0 = s2 / m_**2 * (eye + s2 * jac)
+        # A nonfinite particle gets a NaN score instead of failing the whole batch.
+        finite = cov0.isfinite().all(-1).all(-1)
+        cov0 = torch.where(finite[..., None, None], cov0, eye)
         eigenvalues, eigenvectors = torch.linalg.eigh(0.5 * (cov0 + cov0.mT))
         cov0 = (eigenvectors * eigenvalues.clamp(min=0)[..., None, :]) @ eigenvectors.mT
 
@@ -662,7 +665,8 @@ class PriorGuide(ScoreAdaptation):
 
         # The paper's Eq. (15): v times the derivative of mu0 with respect to theta_t,
         # (I + std^2 J) / m = m cov0 / std^2.
-        return score + (m_ / s2 * cov0 @ v[..., None]).squeeze(-1)
+        guided = score + (m_ / s2 * cov0 @ v[..., None]).squeeze(-1)
+        return torch.where(finite[..., None], guided, torch.nan)
 
 
 class CombinedIIDScore(ScoreAdaptation):
@@ -951,23 +955,13 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         """
         # NOTE: This is for the uniform distribution and distributions that do not
         # implement a log_prob.
+        m = self.vector_field_estimator.mean_t_fn(time)
+        std = self.vector_field_estimator.std_fn(time)
         try:
-            with torch.enable_grad():
-                inputs = inputs.clone().detach().requires_grad_(True)
-                m = self.vector_field_estimator.mean_t_fn(time)
-                std = self.vector_field_estimator.std_fn(time)
-                p = marginalize(self.prior, m, std)
-                log_p = p.log_prob(inputs)
-                prior_score = torch.autograd.grad(
-                    log_p,
-                    inputs,
-                    grad_outputs=torch.ones_like(log_p),
-                    create_graph=True,
-                )[0].detach()
+            marginal_prior = marginalize(self.prior, m, std)
         except Exception:
-            prior_score = torch.zeros_like(inputs)
-
-        return prior_score
+            return torch.zeros_like(inputs)
+        return compute_score(marginal_prior, inputs)
 
     def marginal_denoising_prior_precision_fn(
         self, time: Tensor, inputs: Tensor
@@ -1407,16 +1401,20 @@ def compute_score(p: Distribution, inputs: Tensor) -> Tensor:
     Returns:
         The score tensor, same shape as ``inputs``.
     """
+    # Differentiable in `inputs` when they require grad, so that the Jacobian of a
+    # combined iid score (prior_guide) includes the prior term.
+    keep_graph = inputs.requires_grad
     try:
         with torch.enable_grad():
-            inputs = inputs.detach().clone().requires_grad_(True)
+            if not keep_graph:
+                inputs = inputs.detach().clone().requires_grad_(True)
             log_prob = p.log_prob(inputs)
             score = torch.autograd.grad(
                 log_prob,
                 inputs,
                 grad_outputs=torch.ones_like(log_prob),
-                create_graph=True,
-            )[0].detach()
+                create_graph=keep_graph,
+            )[0]
     except Exception:
         score = torch.zeros_like(inputs)
     return score

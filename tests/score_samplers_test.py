@@ -17,6 +17,7 @@ from sbi.inference.potentials.vector_field_adaptor import (
     AffineClassifierFreeGuidance,
     AffineClassifierFreeGuidanceConfig,
     AutoGaussCorrectedScoreFn,
+    CombinedIIDScore,
     FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
     IntervalGuidance,
@@ -223,13 +224,21 @@ def test_prior_guide_score_does_not_depend_on_the_batch_layout(covariance_type):
 
 
 @pytest.mark.parametrize("estimator_type", ["ve", "vp", "fmpe"])
-def test_prior_guide_score_is_exact_for_gaussians(estimator_type):
-    """For the posterior N(8, 0.25) and the prior ratio N(0, 0.5), whose tail holds
-    the posterior, prior_guide returns the exact score of the guided posterior."""
+@pytest.mark.parametrize("num_observations", [1, 3])
+def test_prior_guide_score_is_exact_for_gaussians(estimator_type, num_observations):
+    """For posteriors N(8, 0.25) per observation, combined by `gauss` with the true
+    precision, and the prior ratio N(0, 0.5), whose tail holds the posterior,
+    prior_guide returns the exact score of the guided posterior."""
     prior = MultivariateNormal(torch.zeros(1), torch.eye(1))
     theta = torch.randn(100, 1)
     estimator = _build_estimator(estimator_type, theta, theta)
     _use_exact_gaussian_score(estimator, posterior_var=0.25)
+    if num_observations > 1:
+        precision = torch.full((1, 1), 4.0)
+        estimator = CombinedIIDScore(
+            estimator,
+            GaussCorrectedScoreFn(estimator, prior, posterior_precision=precision),
+        )
     guidance = PriorGuide(
         estimator,
         prior,
@@ -240,12 +249,16 @@ def test_prior_guide_score_is_exact_for_gaussians(estimator_type):
         torch.zeros(1, 1),
         torch.full((1, 1), 0.5),
     )
-    guided_var = 1 / (1 / 0.25 + 1 / 0.5)
-    guided_mean, x_o = guided_var * 8.0 / 0.25, torch.full((3, 1), 8.0)
+    # Each observation multiplies the prior N(0, 1) by a likelihood of precision 3.
+    posterior_precision = 1 + 3 * num_observations
+    posterior_mean = num_observations * 8.0 * 4 / posterior_precision
+    guided_var = 1 / (posterior_precision + 1 / 0.5)
+    guided_mean = guided_var * posterior_precision * posterior_mean
+    x_o = torch.full((num_observations, 1), 8.0)
 
     for time in (torch.tensor([0.05]), torch.tensor([0.5]), torch.tensor([0.9])):
         m, s = estimator.mean_t_fn(time), estimator.std_fn(time)
-        theta = m * guided_mean + torch.tensor([[-0.5], [0.0], [0.7]])
+        theta = m * guided_mean + torch.tensor([-0.5, 0.0, 0.7]).reshape(3, 1, 1)
         exact = -(theta - m * guided_mean) / (m**2 * guided_var + s**2)
         torch.testing.assert_close(guidance(theta, x_o, time), exact, atol=1e-4, rtol=0)
 
