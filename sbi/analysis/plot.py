@@ -10,6 +10,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Sequence,
     Tuple,
     TypeVar,
     Union,
@@ -123,10 +124,9 @@ def marginal_plot(
             ignored={
                 "diag_kwargs": diag_kwargs,
                 "fig_kwargs": fig_kwargs,
-                "LabeledSamples names": sample_names
-                if any(sample_names or [])
-                else None,
             },
+            diag=diag,
+            sample_names=sample_names,
         )
         return _marginal_plot_dep(
             samples=sample_data,
@@ -278,10 +278,10 @@ def pairplot(
                 "lower_kwargs": lower_kwargs,
                 "fig_kwargs": fig_kwargs,
                 "discrete_indices": discrete_indices,
-                "LabeledSamples names": sample_names
-                if any(sample_names or [])
-                else None,
             },
+            diag=diag,
+            sample_names=sample_names,
+            upper=upper,
         )
         return _pairplot_dep(
             samples=sample_data,
@@ -1125,7 +1125,12 @@ def _prepare_fig_kwargs(
 
 
 def _warn_deprecated_kwargs(
-    func_name: str, kwargs: Dict, ignored: Dict[str, Any]
+    func_name: str,
+    kwargs: Dict[str, Any],
+    ignored: Dict[str, Any],
+    diag: Optional[Union[str, Sequence[Optional[str]]]],
+    sample_names: Optional[List[Optional[str]]],
+    upper: Optional[Union[str, Sequence[Optional[str]]]] = None,
 ) -> None:
     """Warn that `kwargs` make `func_name` use its old implementation.
 
@@ -1134,6 +1139,11 @@ def _warn_deprecated_kwargs(
         kwargs: The deprecated keyword arguments that were passed.
         ignored: Newer arguments that the old implementation does not use. Those
             that are not None are named in the warning.
+        diag: The diagonal style(s). Named in the warning if the old
+            implementation does not draw them.
+        sample_names: Names of the `LabeledSamples`, which the old implementation
+            drops. Named in the warning if any is set.
+        upper: The upper-triangle style(s) of `pairplot`.
     """
     message = (
         f"`{func_name}` got the deprecated keyword arguments {sorted(kwargs)}. "
@@ -1141,6 +1151,13 @@ def _warn_deprecated_kwargs(
         "Pass `FigOptions` fields in `fig_kwargs` and plot styles in the "
         "`*_kwargs` arguments (see `sbi.analysis.plotting_classes`)."
     )
+    # The old diagonal draws "scatter" only when the upper triangle is scatter too.
+    drawn = {"hist", "kde", None} | ({"scatter"} if upper == "scatter" else set())
+    styles = diag if isinstance(diag, list) else [diag]
+    if any(style not in drawn for style in styles):
+        ignored = {**ignored, "diag": diag}
+    if any(sample_names or []):
+        ignored = {**ignored, "LabeledSamples names": sample_names}
     dropped = [name for name, value in ignored.items() if value is not None]
     if dropped:
         message += f" This call uses the old implementation, which ignores {dropped}."

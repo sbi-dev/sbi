@@ -169,6 +169,17 @@ def test_pairplot_dep(
             lambda s: pairplot(LabeledSamples(s, name="a"), legend=True),
             "ignores ['LabeledSamples names']",
         ),
+        (lambda s: pairplot(s, legend=True, diag="bar"), "ignores ['diag']"),
+        (
+            lambda s: marginal_plot(s, legend=True, diag="scatter"),
+            "ignores ['diag']",
+        ),
+        (
+            lambda s: pairplot(
+                s, legend=True, diag="scatter", upper="scatter", upper_kwargs={}
+            ),
+            "ignores ['upper_kwargs']",
+        ),
         (lambda s: plt.pairplot_dep(s), "`pairplot_dep`"),
         (lambda s: plt.marginal_plot_dep(s), "`marginal_plot_dep`"),
         (lambda s: PlotOffDiagOptions(), "`PlotOffDiagOptions`"),
@@ -179,6 +190,9 @@ def test_pairplot_dep(
         "pairplot_ignored",
         "marginal_plot_ignored",
         "labeled_samples_ignored",
+        "pairplot_diag_ignored",
+        "marginal_plot_diag_ignored",
+        "pairplot_scatter_diag_drawn",
         "pairplot_dep",
         "marginal_plot_dep",
         "PlotOffDiagOptions",
