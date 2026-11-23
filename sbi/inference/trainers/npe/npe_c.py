@@ -21,7 +21,7 @@ from sbi.neural_nets.estimators.base import (
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
-from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.mog import MoG, MoGNotFiniteError
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -38,18 +38,14 @@ from sbi.utils import (
 )
 from sbi.utils.torchutils import assert_all_finite
 
-# The errors of MoG's check that its parameters are finite.
-_MOG_NOT_FINITE_ERRORS = tuple(
-    f"{name} contains NaN or Inf values" for name in ("logits", "means", "precisions")
-)
 _DEGENERATE_MOG_LOSS_MSG = (
     "The multi-round loss of NPE with a mixture density network gives NaN or Inf: "
     "the mixture components of the posterior estimate have become numerically "
     "degenerate. With a bounded prior, this usually follows strong leakage in "
     "earlier rounds, i.e., most of the posterior estimate lies outside the prior "
     "bounds (see the warning 'Only x% proposal samples are accepted' when sampling "
-    "the proposal). Consider "
-    "truncated proposals (TSNPE) or single-round NPE instead, see "
+    "the proposal). Truncated proposals (TSNPE) keep leakage from growing over "
+    "rounds, and single-round NPE avoids this loss, see "
     "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
 )
 
@@ -66,7 +62,7 @@ class NPE_C(PosteriorEstimatorTrainer):
     which computes the proposal posterior in closed form, or the atomic loss (for
     flows), which approximates it with atoms. With either loss, the posterior estimate
     can leak more and more mass outside the prior bounds over the rounds. Truncated
-    proposals (TSNPE) avoid this, see the FAQ on leakage.
+    proposals (TSNPE) keep it from growing, see the FAQ on leakage.
 
     For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
     plain NLL loss.
@@ -492,41 +488,41 @@ class NPE_C(PosteriorEstimatorTrainer):
         m_p = mog_p.means
         prec_p = mog_p.precisions
 
-        # Get the density estimator MoG at the training data x
         assert isinstance(self._neural_net, MixtureDensityEstimator)
-        try:
-            mog_d = self._neural_net.get_uncorrected_mog(x)
-        except ValueError as e:
-            if str(e) not in _MOG_NOT_FINITE_ERRORS:
-                raise
-            raise ValueError(_DEGENERATE_MOG_LOSS_MSG) from e
-        norm_logits_d = mog_d.log_weights  # Already normalized
-        m_d = mog_d.means
-        prec_d = mog_d.precisions
-
         theta = self._neural_net._transform_input(theta)
 
-        # Compute the MoG parameters of the proposal posterior.
-        (
-            logits_pp,
-            m_pp,
-            prec_pp,
-            cov_pp,
-        ) = self._automatic_posterior_transformation(
-            norm_logits_p, m_p, prec_p, norm_logits_d, m_d, prec_d
-        )
+        # Numerical failures (non-finite parameters, matrices that are not positive
+        # definite in float32) get one error that names their usual cause.
+        try:
+            # Get the density estimator MoG at the training data x
+            mog_d = self._neural_net.get_uncorrected_mog(x)
 
-        # Create MoG for proposal posterior and compute log_prob
-        # We need precision_factors for MoG, compute via Cholesky
-        precf_pp, info = torch.linalg.cholesky_ex(prec_pp, upper=True)
-        if (info != 0).any() or not torch.isfinite(logits_pp).all():
-            raise ValueError(_DEGENERATE_MOG_LOSS_MSG)
-        mog_pp = MoG(
-            logits=logits_pp,
-            means=m_pp,
-            precisions=prec_pp,
-            precision_factors=precf_pp,
-        )
+            # Compute the MoG parameters of the proposal posterior.
+            (
+                logits_pp,
+                m_pp,
+                prec_pp,
+                cov_pp,
+            ) = self._automatic_posterior_transformation(
+                norm_logits_p,
+                m_p,
+                prec_p,
+                mog_d.log_weights,  # Already normalized
+                mog_d.means,
+                mog_d.precisions,
+            )
+
+            # Create MoG for proposal posterior and compute log_prob
+            # We need precision_factors for MoG, compute via Cholesky
+            precf_pp = torch.linalg.cholesky(prec_pp, upper=True)
+            mog_pp = MoG(
+                logits=logits_pp,
+                means=m_pp,
+                precisions=prec_pp,
+                precision_factors=precf_pp,
+            )
+        except (MoGNotFiniteError, torch.linalg.LinAlgError) as e:
+            raise ValueError(_DEGENERATE_MOG_LOSS_MSG) from e
 
         # Compute the log_prob of theta under the product.
         log_prob_proposal_posterior = mog_pp.log_prob(theta)
