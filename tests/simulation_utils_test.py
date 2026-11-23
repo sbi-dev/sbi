@@ -9,16 +9,12 @@ import torch
 from joblib import parallel_config
 
 from sbi.inference import simulate_for_sbi
-from sbi.utils import BoxUniform, parallelize_simulator, simulate_from_theta
+from sbi.utils import BoxUniform, simulate_from_theta
 from sbi.utils.torchutils import process_device
 
 
 def double(theta):
     return theta * 2.0
-
-
-def torch_double(theta):
-    return theta.double()
 
 
 def numpy_total(theta):
@@ -41,19 +37,6 @@ def noise_from_all_backends(theta):
 def fails_for_negative(theta):
     if (theta < 0).any():
         raise ValueError("negative parameter")
-    return theta * 2.0
-
-
-class SolverError(Exception):
-    """An exception that cannot be unpickled: `args` holds one message."""
-
-    def __init__(self, code, detail):
-        super().__init__(f"code {code}: {detail}")
-
-
-def fails_with_solver_error(theta):
-    if (theta < 0).any():
-        raise SolverError(3, "diverged")
     return theta * 2.0
 
 
@@ -80,7 +63,7 @@ def test_simulate_from_theta_matches_simulator(simulator_is_batched, num_workers
         double,
         theta,
         num_workers=num_workers,
-        simulation_batch_size=3,
+        simulation_batch_size=3 if simulator_is_batched else 1,
         simulator_is_batched=simulator_is_batched,
         show_progress_bar=False,
     )
@@ -91,7 +74,7 @@ def test_simulate_from_theta_matches_simulator(simulator_is_batched, num_workers
 @pytest.mark.parametrize(
     "simulator, num_workers, simulator_is_batched, x_shape",
     [
-        (torch_double, 1, True, (20, 3)),
+        (lambda theta: theta.double(), 1, True, (20, 3)),
         (numpy_total, 2, True, (20, 1)),
         (summary_list, 2, False, (20, 2)),
     ],
@@ -132,61 +115,10 @@ def test_simulator_gets_theta_type_for_any_num_workers(device):
 
         assert type(x) is type(theta)
         assert x.dtype == theta.dtype
-        if device != "numpy":
-            assert x.device == theta.device
-
-    x = simulate_from_theta(double, theta[:0], show_progress_bar=False)
-
-    assert type(x) is type(theta)
-    if device != "numpy":
-        assert x.device == theta.device
-
-
-def test_list_of_tensors_becomes_one_tensor():
-    x = simulate_from_theta(
-        lambda t: [t[0], t[1]], torch.ones(3, 2), show_progress_bar=False
-    )
-
-    assert isinstance(x, torch.Tensor)
-    assert x.shape == (3, 2)
-
-
-@pytest.mark.parametrize("num_workers", [1, 2])
-def test_list_of_tensors_becomes_one_tensor_despite_failures(num_workers):
-    def simulator(theta):
-        if (theta < 0).any():
-            raise ValueError("negative parameter")
-        return [[row[0], row[1]] for row in theta]
-
-    theta = torch.ones(40, 2)
-    theta[7] = -1.0
-    with pytest.warns(UserWarning, match="1 of 40 simulations failed"):
-        x = simulate_from_theta(
-            simulator,
-            theta,
-            num_workers=num_workers,
-            simulator_is_batched=True,
-            on_error="nan",
-            show_progress_bar=False,
-        )
-
-    assert isinstance(x, torch.Tensor)
-    assert torch.isnan(x[7]).all()
-    assert torch.equal(x[8:], theta[8:])
-
-
-def test_simulator_without_return_raises():
-    with pytest.raises(ValueError, match="miss a `return`"):
-        simulate_from_theta(lambda t: None, torch.ones(3, 2), show_progress_bar=False)
-
-
-def test_simulate_for_sbi_rejects_complex_outputs(prior):
-    with pytest.raises(TypeError, match="real numeric"):
-        simulate_for_sbi(lambda t: t * 1j, prior, 4, show_progress_bar=False)
 
 
 @pytest.mark.gpu
-def test_simulate_for_sbi_returns_numpy_outputs_on_theta_device():
+def test_simulate_for_sbi_returns_x_on_theta_device():
     device = process_device("gpu")
     prior = BoxUniform(-torch.ones(3, device=device), torch.ones(3, device=device))
 
@@ -197,24 +129,36 @@ def test_simulate_for_sbi_returns_numpy_outputs_on_theta_device():
     assert x.device == theta.device
 
 
-@pytest.mark.gpu
-@pytest.mark.parametrize("num_workers", [1, 2])
-def test_tensors_in_list_outputs_stay_on_theta_device(num_workers):
-    theta = torch.arange(4.0, device=process_device("gpu")).unsqueeze(1)
+@pytest.mark.parametrize(
+    "simulator",
+    [lambda theta: theta * 1j, lambda theta: ["sim.npy"] * len(theta)],
+    ids=["complex", "paths"],
+)
+def test_simulate_for_sbi_rejects_outputs_that_are_not_real_numbers(prior, simulator):
+    with pytest.raises(TypeError, match="real numeric"):
+        simulate_for_sbi(simulator, prior, 4, show_progress_bar=False)
 
-    x = simulate_from_theta(
-        lambda t: [torch.zeros(int(t[0]) + 1, device=t.device)],
-        theta,
-        num_workers=num_workers,
-        show_progress_bar=False,
-    )
 
-    assert [row[0].shape[0] for row in x] == [1, 2, 3, 4]
-    assert {row[0].device for row in x} == {theta.device}
+@pytest.mark.parametrize("simulator_is_batched", [False, True])
+def test_seeded_outputs_do_not_depend_on_num_workers(simulator_is_batched):
+    x, x_with_workers = [
+        simulate_from_theta(
+            noise_from_all_backends,
+            np.zeros((30, 2)),
+            num_workers=num_workers,
+            simulator_is_batched=simulator_is_batched,
+            seed=0,
+            show_progress_bar=False,
+        )
+        for num_workers in [1, 2]
+    ]
+
+    assert len(np.unique(x, axis=0)) == 30
+    assert np.array_equal(x, x_with_workers)
 
 
 def test_simulate_for_sbi_reproducible_with_seed(prior):
-    def run(seed, num_workers=2):
+    def run(seed, num_workers):
         return simulate_for_sbi(
             numpy_noise,
             prior,
@@ -222,97 +166,42 @@ def test_simulate_for_sbi_reproducible_with_seed(prior):
             num_workers=num_workers,
             seed=seed,
             show_progress_bar=False,
-        )[1]
-
-    assert torch.equal(run(seed=0), run(seed=0))
-    assert not torch.equal(run(seed=0), run(seed=1))
-    # "auto" makes tasks of 7 and of 5 parameter sets.
-    assert torch.equal(run(seed=0), run(seed=0, num_workers=3))
-
-
-@pytest.mark.parametrize("simulator_is_batched", [False, True])
-def test_seeded_run_leaves_a_new_random_state_for_any_num_workers(
-    prior, simulator_is_batched
-):
-    def run(num_workers):
-        theta, _ = simulate_for_sbi(
-            numpy_noise,
-            prior,
-            10,
-            num_workers=num_workers,
-            seed=0,
-            simulator_is_batched=simulator_is_batched,
-            show_progress_bar=False,
         )
-        return theta, prior.sample((10,))
 
-    (theta, after), (_, after_with_workers) = run(1), run(2)
+    theta, x = run(torch.tensor(0), num_workers=1)
+    after = prior.sample((50,))
+    theta_with_workers, x_with_workers = run(0, num_workers=2)
 
+    after_with_workers = prior.sample((50,))
+
+    assert torch.equal(x, x_with_workers)
+    assert not torch.equal(x, run(1, num_workers=1)[1])
+    # Draws after a seeded call do not repeat it, for any number of workers.
     assert not torch.equal(after, theta)
     assert torch.equal(after, after_with_workers)
 
 
-def test_seed_leaves_the_same_random_state_for_any_num_workers():
-    def draw_after_seeded_call(num_workers):
-        simulate_from_theta(
-            numpy_noise,
-            np.zeros((4, 2)),
-            num_workers=num_workers,
-            seed=0,
-            show_progress_bar=False,
-        )
-        return np.random.rand()
-
-    assert draw_after_seeded_call(1) == draw_after_seeded_call(2)
-
-
-def test_unseeded_workers_follow_numpy_state_for_any_num_workers():
-    def run(num_workers):
+def test_unseeded_workers_follow_numpy_state():
+    def run():
         np.random.seed(0)
         return simulate_from_theta(
-            numpy_noise,
-            np.zeros((30, 2)),
-            num_workers=num_workers,
-            show_progress_bar=False,
+            numpy_noise, np.zeros((30, 2)), num_workers=2, show_progress_bar=False
         )
 
-    # "auto" makes tasks of 4 and of 3 parameter sets.
-    assert np.array_equal(run(2), run(3))
-
-
-@pytest.mark.parametrize(
-    "simulator_is_batched, runs",
-    [
-        (False, [(1, 1), (2, 7)]),
-        (True, [(1, "auto"), (2, "auto")]),
-    ],
-)
-def test_seeded_outputs_do_not_depend_on_workers_or_batch_size(
-    simulator_is_batched, runs
-):
-    """`runs` are (num_workers, simulation_batch_size) pairs."""
-    x, *others = [
-        simulate_from_theta(
-            noise_from_all_backends,
-            np.zeros((30, 2)),
-            num_workers=num_workers,
-            simulation_batch_size=simulation_batch_size,
-            simulator_is_batched=simulator_is_batched,
-            seed=0,
-            show_progress_bar=False,
-        )
-        for num_workers, simulation_batch_size in runs
-    ]
+    x = run()
 
     assert len(np.unique(x, axis=0)) == 30
-    for other in others:
-        assert np.array_equal(other, x)
+    assert np.array_equal(x, run())
 
 
 @pytest.mark.parametrize(
     "single_theta_simulator",
-    [lambda theta: np.ravel(theta) * 2.0, lambda theta: "sim.npy"],
-    ids=["flattened", "one_path"],
+    [
+        lambda theta: np.ravel(theta) * 2.0,
+        lambda theta: "sim.npy",
+        lambda theta: (theta, theta, theta),
+    ],
+    ids=["flattened", "one_path", "tuple"],
 )
 def test_wrongly_batched_simulator_raises(single_theta_simulator):
     with pytest.raises(ValueError, match="simulator_is_batched=False"):
@@ -323,6 +212,11 @@ def test_wrongly_batched_simulator_raises(single_theta_simulator):
             simulator_is_batched=True,
             show_progress_bar=False,
         )
+
+
+def test_batch_size_without_a_batched_simulator_raises():
+    with pytest.raises(ValueError, match="simulator_is_batched=True"):
+        simulate_from_theta(double, torch.rand(6, 2), simulation_batch_size=3)
 
 
 @pytest.mark.parametrize("simulator_is_batched", [True, False])
@@ -337,7 +231,8 @@ def test_simulate_from_theta_returns_paths_in_order(simulator_is_batched):
     x = simulate_from_theta(
         write,
         theta,
-        simulation_batch_size=2,
+        num_workers=2,
+        simulation_batch_size=2 if simulator_is_batched else 1,
         simulator_is_batched=simulator_is_batched,
         show_progress_bar=False,
     )
@@ -345,66 +240,54 @@ def test_simulate_from_theta_returns_paths_in_order(simulator_is_batched):
     assert x == [f"sim_{i}.npy" for i in range(5)]
 
 
-@pytest.mark.parametrize("num_workers, simulator_is_batched", [(2, False), (1, True)])
-def test_on_error_nan_keeps_finished_simulations(num_workers, simulator_is_batched):
-    theta = torch.ones(8, 2)
-    theta[3] = -1.0
-    failed = torch.zeros(8, dtype=torch.bool)
-    failed[[2, 3] if simulator_is_batched else [3]] = True
+def test_outputs_of_different_shapes_come_back_as_a_list():
+    x = simulate_from_theta(
+        lambda theta: torch.zeros(int(theta[0])),
+        torch.arange(1.0, 4.0).unsqueeze(1),
+        show_progress_bar=False,
+    )
 
-    with pytest.warns(UserWarning, match="simulations failed") as record:
-        x = simulate_from_theta(
-            fails_for_negative,
-            theta,
-            num_workers=num_workers,
-            simulation_batch_size=2,
-            simulator_is_batched=simulator_is_batched,
-            on_error="nan",
-            show_progress_bar=False,
-        )
-
-    assert len(record) == 1
-    assert f"{int(failed.sum())} of 8 simulations failed" in str(record[0].message)
-    assert torch.isnan(x[failed]).all()
-    assert torch.equal(x[~failed], theta[~failed] * 2.0)
+    assert [len(row) for row in x] == [1, 2, 3]
 
 
-@pytest.mark.parametrize("on_error, num_workers", [("raise", 2), ("nan", 1)])
-def test_simulator_error_keeps_type_and_names_parameter_set(on_error, num_workers):
-    theta = -torch.ones(4, 2) if on_error == "nan" else torch.ones(4, 2)
+@pytest.mark.parametrize("num_workers", [1, 2])
+def test_simulator_error_keeps_type_and_names_parameter_set(num_workers):
+    theta = torch.ones(4, 2)
     theta[2] = -1.0
 
     with pytest.raises(ValueError, match="negative parameter") as error:
         simulate_from_theta(
-            fails_for_negative,
-            theta,
-            num_workers=num_workers,
-            on_error=on_error,
-            show_progress_bar=False,
+            fails_for_negative, theta, num_workers=num_workers, show_progress_bar=False
         )
 
-    assert "theta[" in " ".join(error.value.__notes__)
+    assert "theta[2]" in " ".join(error.value.__notes__)
 
 
-@pytest.mark.parametrize("num_workers", [1, 2])
-def test_auto_gives_a_batched_simulator_one_parameter_set_per_call(prior, num_workers):
+def test_simulator_without_return_raises():
+    with pytest.raises(ValueError, match="miss a `return`"):
+        simulate_from_theta(lambda t: None, torch.ones(3, 2), show_progress_bar=False)
+
+
+@pytest.mark.parametrize(
+    "simulation_batch_size, num_workers, call_size",
+    [(1, 2, 1.0), (7, 1, 7.0), (None, 1, 35.0)],
+)
+def test_batched_simulator_gets_simulation_batch_size_parameter_sets(
+    prior, simulation_batch_size, num_workers, call_size
+):
     _, x = simulate_for_sbi(
-        batch_sizes, prior, 40, num_workers=num_workers, show_progress_bar=False
+        batch_sizes,
+        prior,
+        35,
+        num_workers=num_workers,
+        simulation_batch_size=simulation_batch_size,
+        show_progress_bar=False,
     )
 
-    assert torch.all(x == 1.0)
+    assert torch.all(x == call_size)
 
 
-def test_batch_size_none_gives_all_parameter_sets_in_one_call(prior):
-    with pytest.warns(FutureWarning, match="simulation_batch_size=None"):
-        _, x = simulate_for_sbi(
-            batch_sizes, prior, 40, simulation_batch_size=None, show_progress_bar=False
-        )
-
-    assert torch.all(x == 40.0)
-
-
-def test_worker_tasks_carry_only_their_own_parameter_sets():
+def test_worker_calls_carry_only_their_own_parameter_sets():
     x = simulate_from_theta(
         storage_ratio,
         torch.rand(40, 2),
@@ -417,72 +300,25 @@ def test_worker_tasks_carry_only_their_own_parameter_sets():
     assert torch.all(x == 1.0)
 
 
-def test_simulate_for_sbi_runs_a_parallel_simulator_with_its_settings(prior):
-    def run(simulator, **kwargs):
-        return simulate_for_sbi(
-            simulator, prior, 40, seed=0, show_progress_bar=False, **kwargs
-        )[1]
-
-    parallel = parallelize_simulator(numpy_noise, num_workers=2)
-    expected = run(numpy_noise, num_workers=2, simulator_is_batched=False)
-
-    assert torch.equal(run(parallel), expected)
-    # Copies the marker; runs as a batched simulator.
-    run(torch.no_grad()(parallel))
-
-
-@pytest.mark.parametrize(
-    "on_error, parallel_on_error", [("nan", "raise"), ("raise", "nan")]
-)
-def test_simulate_for_sbi_fails_single_simulations_of_a_parallel_simulator(
-    prior, on_error, parallel_on_error
-):
-    simulator = parallelize_simulator(
-        fails_for_negative, num_workers=2, on_error=parallel_on_error
-    )
-
-    with pytest.warns(UserWarning, match="simulations failed"):
-        theta, x = simulate_for_sbi(
-            simulator, prior, 40, seed=0, on_error=on_error, show_progress_bar=False
-        )
-
-    failed = (theta < 0).any(-1)
-    assert torch.isnan(x[failed]).all()
-    assert torch.equal(x[~failed], theta[~failed] * 2.0)
-
-
-def test_unknown_on_error_raises():
-    with pytest.raises(ValueError, match="on_error"):
-        simulate_from_theta(double, torch.ones(4, 2), on_error="ignore")
-
-
-def test_parallelize_simulator_forwards_settings():
-    @parallelize_simulator(
-        num_workers=2,
-        simulation_batch_size=3,
-        simulator_is_batched=True,
-        on_error="nan",
-    )
+def test_workers_can_write_to_large_numpy_parameters():
     def simulator(theta):
-        if (theta < 0).any():
-            raise ValueError("negative parameter")
-        return np.full((len(theta), 1), float(len(theta)))
+        theta -= 1.0
+        return theta.sum(1)
 
-    theta = np.ones((10, 1))
-    theta[9] = -1.0
-    with pytest.warns(UserWarning, match="1 of 10 simulations failed"):
-        x = simulator(theta)
+    x = simulate_from_theta(
+        simulator,
+        np.ones((70_000, 2)),  # More than joblib's 1 MB limit for memory maps.
+        num_workers=2,
+        simulation_batch_size=None,
+        simulator_is_batched=True,
+        show_progress_bar=False,
+    )
 
-    assert np.array_equal(x[:9], np.full((9, 1), 3.0))
-    assert np.isnan(x[9]).all()
+    assert not x.any()
 
 
 @pytest.mark.parametrize("simulator_is_batched", [False, True])
-@pytest.mark.parametrize(
-    "make_buffer",
-    [np.zeros, torch.zeros, lambda size: [0.0] * size],
-    ids=["numpy", "torch", "list"],
-)
+@pytest.mark.parametrize("make_buffer", [np.zeros, torch.zeros], ids=["numpy", "torch"])
 def test_simulator_that_reuses_its_output_buffer(simulator_is_batched, make_buffer):
     buffer = make_buffer(4 if simulator_is_batched else 1)
 
@@ -495,71 +331,12 @@ def test_simulator_that_reuses_its_output_buffer(simulator_is_batched, make_buff
     x = simulate_from_theta(
         simulator,
         np.arange(16.0).reshape(-1, 1),
-        simulation_batch_size=4,
+        simulation_batch_size=4 if simulator_is_batched else 1,
         simulator_is_batched=simulator_is_batched,
         show_progress_bar=False,
     )
 
     assert np.array_equal(np.asarray(x).ravel(), np.arange(16.0))
-
-
-def test_unpicklable_simulator_error_keeps_parallel_results():
-    theta = torch.ones(8, 2)
-    theta[3] = -1.0
-
-    with pytest.warns(UserWarning, match="1 of 8 simulations failed"):
-        x = simulate_from_theta(
-            fails_with_solver_error,
-            theta,
-            num_workers=2,
-            on_error="nan",
-            show_progress_bar=False,
-        )
-
-    assert torch.isnan(x[3]).all()
-    assert torch.equal(x[torch.arange(8) != 3], theta[torch.arange(8) != 3] * 2.0)
-
-
-@pytest.mark.parametrize("container", [list, tuple])
-def test_simulator_that_reuses_an_array_inside_a_list(container):
-    array = np.zeros(1)
-
-    def simulator(theta):
-        array[0] = float(theta[0])
-        return container([array])
-
-    x = simulate_from_theta(
-        simulator,
-        np.arange(4.0).reshape(-1, 1),
-        simulation_batch_size=4,
-        show_progress_bar=False,
-    )
-
-    assert np.array_equal(np.asarray(x).ravel(), np.arange(4.0))
-
-
-@pytest.mark.parametrize(
-    "output, dtype",
-    [(torch.tensor([2**24 + 1]), torch.float64), (np.float32([0.5]), np.float32)],
-    ids=["integer_tensor", "float32_array"],
-)
-def test_failed_simulations_keep_outputs_exact(output, dtype):
-    def simulator(theta):
-        if theta[0] < 0:
-            raise ValueError("negative parameter")
-        return output
-
-    with pytest.warns(UserWarning, match="1 of 2 simulations failed"):
-        x = simulate_from_theta(
-            simulator,
-            torch.tensor([[1.0], [-1.0]]),
-            on_error="nan",
-            show_progress_bar=False,
-        )
-
-    assert x.dtype == dtype
-    assert x[0].item() == output.item()
-    assert np.isnan(x[1].item())
 
 
 def test_thread_workers_run_without_seed_and_reject_one():
@@ -570,21 +347,6 @@ def test_thread_workers_run_without_seed_and_reject_one():
         with pytest.raises(ValueError, match="process workers"):
             simulate_from_theta(
                 double, np.zeros((8, 2)), num_workers=2, seed=0, show_progress_bar=False
-            )
-        with pytest.raises(ValueError, match="process workers"):
-            simulate_for_sbi(
-                double,
-                BoxUniform(-torch.ones(2), torch.ones(2)),
-                8,
-                num_workers=2,
-                seed=0,
-            )
-        with pytest.raises(ValueError, match="process workers"):
-            simulate_for_sbi(
-                parallelize_simulator(double, num_workers=2),
-                BoxUniform(-torch.ones(2), torch.ones(2)),
-                8,
-                seed=0,
             )
 
     assert len(np.unique(x, axis=0)) == 8

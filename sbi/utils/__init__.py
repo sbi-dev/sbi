@@ -31,7 +31,6 @@ from sbi.utils.sbiutils import (
     mog_log_prob,
     nle_nre_apt_msg_on_invalid_x,
     npe_msg_on_invalid_x,
-    seed_all_backends,
     standardizing_net,
     standardizing_transform,
     warn_if_invalid_for_zscoring,
@@ -60,7 +59,7 @@ from sbi.utils.torchutils import (
     tensor2numpy,
     tile,
 )
-from sbi.utils.simulation_utils import parallelize_simulator, simulate_from_theta
+from sbi.utils.simulation_utils import simulate_from_theta
 from sbi.utils.typechecks import (
     is_bool,
     is_int,
@@ -84,8 +83,6 @@ __all__ = [
     "process_prior",
     "process_simulator",
     "simulate_from_theta",
-    "parallelize_simulator",
-    "seed_all_backends",
     "BoxUniform",
     "MultipleIndependent",
     "RestrictedPrior",

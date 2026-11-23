@@ -4,7 +4,6 @@
 from typing import (
     Any,
     List,
-    Literal,
     Optional,
     Protocol,
     Sequence,
@@ -24,8 +23,6 @@ from torch.utils.tensorboard.writer import SummaryWriter
 Array = Union[np.ndarray, torch.Tensor]
 Shape = Union[torch.Size, Tuple[int, ...]]
 SimulationOutput = Union[torch.Tensor, np.ndarray, List[Any]]
-OnError = Literal["raise", "nan"]
-SimulationBatchSize = Union[int, Literal["auto"], None]
 
 T = TypeVar("T")
 OneOrMore = Union[T, Sequence[T]]
