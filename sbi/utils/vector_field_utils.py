@@ -405,12 +405,12 @@ def denoise_mixture(
     """
     mixture_dist = p.mixture_distribution
     component_dist = p.component_distribution
+    # The component axis goes between the batch of x_t and the event.
+    x_t = x_t.unsqueeze(-1 - len(p.event_shape))
     denoised_components = denoise(component_dist, m, s, x_t)
-    mixture_logits = mixture_dist.logits
     # Update the logits to reflect the new likelihoods
     component_loglikelihood = marginalize(component_dist, m, s).log_prob(x_t)
-    # Update the logits to reflect the new likelihoods
-    denoised_logits = mixture_logits[None, ...] + component_loglikelihood
+    denoised_logits = mixture_dist.logits + component_loglikelihood
     # Normalize the logits
     denoised_logits = denoised_logits - denoised_logits.logsumexp(dim=-1, keepdims=True)
     return MixtureSameFamily(
@@ -849,17 +849,10 @@ def fit_gmm(
         gmm.covariances_, dtype=samples.dtype, device=samples.device
     )
 
-    # Decide on univariate or multivariate based on feature dimension
-    d = means.shape[-1]
-    if d == 1:
-        means = means.squeeze(-1)
-        covariances = covariances.squeeze(-1).squeeze(-1)
-        std = torch.sqrt(covariances)
-        components = Normal(means, std, validate_args=False)
-    else:
-        components = MultivariateNormal(
-            means, covariance_matrix=covariances, validate_args=False
-        )
+    # Multivariate also in one dimension, so that the GMM keeps the event (1,).
+    components = MultivariateNormal(
+        means, covariance_matrix=covariances, validate_args=False
+    )
 
     # Construct and return the MixtureSameFamily distribution
     return MixtureSameFamily(
