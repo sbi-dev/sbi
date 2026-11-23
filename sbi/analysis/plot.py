@@ -1470,7 +1470,6 @@ def _arrange_grid(
     excl_upper = all(v is None for v in upper_funcs)
     excl_diag = all(v is None for v in diag_funcs)
     flat = excl_lower and excl_upper
-    single_panel = len(subset) == 1
     _legend_handles: Optional[tuple] = None  # type: ignore
     # select the subset of rows and cols to be plotted
     if flat:
@@ -1488,6 +1487,9 @@ def _arrange_grid(
             rows,
             cols,
         ), f"Passed axes must match subplot shape: {rows, cols}."
+    # `axes` is one Axes, a row of Axes or a grid, depending on the layout and on
+    # the caller. Index the panels through one (rows, cols) grid.
+    grid = np.asarray(axes, dtype=object).reshape(rows, cols)
 
     # Style figure
     fig.subplots_adjust(**fig_kwargs.fig_subplots_adjust)
@@ -1503,12 +1505,7 @@ def _arrange_grid(
             else:
                 current = "lower"
 
-            if single_panel:
-                ax = axes  # pyright: ignore reportIndexIssue
-            elif flat:
-                ax = axes[col_idx]  # pyright: ignore reportIndexIssue
-            else:
-                ax = axes[row_idx, col_idx]  # pyright: ignore reportIndexIssue
+            ax = grid[row_idx, col_idx]
             # Diagonals
             _format_subplot(
                 ax,  # pyright: ignore reportArgumentType
@@ -1533,7 +1530,7 @@ def _arrange_grid(
                         diag_f = diag_funcs[sample_ind]
                         diag_kw = diag_kwargs[sample_ind]
                         # Override diagonal for discrete dimensions: use bar.
-                        if col in discrete_set and diag_f is not plt_bar_1d:
+                        if col in discrete_set and diag_f not in (None, plt_bar_1d):
                             diag_f = plt_bar_1d
                             bar_defaults = get_default_diag_kwargs("bar", sample_ind)
                             user_mpl = (diag_kw or {}).get("mpl_kwargs", {})
@@ -1621,41 +1618,39 @@ def _arrange_grid(
     # first diagonal cell.
     if fig_kwargs.legend and _legend_handles is not None:
         handles, legend_labels = _legend_handles
-        if not single_panel and not flat:
+        if not flat:
             legend_kw = fig_kwargs.legend_kwargs.copy()
             legend_kw.setdefault("loc", "center")
             legend_kw.setdefault("frameon", False)
             if excl_lower and rows > 1:
                 # Lower triangle is empty: use bottom-left cell.
-                legend_ax = axes[-1, 0]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                legend_ax = grid[-1, 0]
                 _place_legend_in_empty_cell(
                     legend_ax, handles, legend_labels, legend_kw
                 )
             elif excl_upper and rows > 1:
                 # Upper triangle is empty: use top-right cell.
-                legend_ax = axes[0, -1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                legend_ax = grid[0, -1]
                 _place_legend_in_empty_cell(
                     legend_ax, handles, legend_labels, legend_kw
                 )
             else:
                 # Both triangles plotted: fall back to first diagonal cell.
-                axes[0, 0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportIndexIssue, reportOptionalSubscript, reportOptionalMemberAccess]
-        elif single_panel:
-            axes.legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportOptionalMemberAccess]
-        elif flat:
-            axes[0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportIndexIssue, reportOptionalSubscript, reportOptionalMemberAccess]
+                grid[0, 0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)
+        else:
+            grid[0, 0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)
 
     # Add dots if we subset
     if len(subset) < dim:
-        if single_panel or flat:
-            ax = np.atleast_1d(axes)[-1]
+        if flat:
+            ax = grid[0, -1]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
             text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
-                ax = axes[row, len(subset) - 1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                ax = grid[row, -1]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
                 text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
