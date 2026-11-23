@@ -256,7 +256,8 @@ def _call(
             isinstance(output, (Tensor, np.ndarray)) and output.ndim > 0
         )
         if not sized or len(output) != len(theta):
-            got = f"{len(output)} outputs" if sized else type(output).__name__
+            got = f"a {type(output).__name__}"
+            got += f" of length {len(output)}" if sized else ""
             raise ValueError(
                 f"The simulator returned {got} for a batch of {len(theta)} parameter "
                 "sets. It must return one output per parameter set: a tensor, array "
