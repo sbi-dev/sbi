@@ -1356,7 +1356,10 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         # Narrow posteriors cancel I + s^2 J below float rounding. Those matrices get an
         # eigenvalue floor, without gradient (eigh's is NaN at repeated eigenvalues).
         floor = 10 * torch.finfo(cov0.dtype).eps
-        singular = (torch.linalg.eigvalsh(cov0).abs() < floor).any(-1)
+        # A nonfinite matrix makes only its score NaN; eigvalsh would fail the batch.
+        finite = cov0.isfinite().all((-2, -1))
+        singular = torch.zeros_like(finite)
+        singular[finite] = (torch.linalg.eigvalsh(cov0[finite]).abs() < floor).any(-1)
         inverse_cov0 = torch.zeros_like(cov0)
         inverse_cov0[~singular] = torch.linalg.inv(cov0[~singular])
         if singular.any():

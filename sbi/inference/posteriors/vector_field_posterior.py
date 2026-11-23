@@ -115,14 +115,18 @@ class VectorFieldPosterior(NeuralPosterior):
         """Raise if this posterior cannot sample `x`, with guidance if requested.
 
         Iid trials and guidance need the SDE sampler, and composed standardization does
-        not support iid trials yet.
+        not support them yet.
         """
-        if self.vector_field_estimator.compose_enabled and x.shape[0] > 1:
+        is_iid = x.shape[0] > 1
+        if self.vector_field_estimator.compose_enabled and (
+            is_iid or guidance_method is not None
+        ):
             raise NotImplementedError(
-                "compose_standardization does not yet support iid (x with batch>1). "
-                "Use a single observation, or disable compose_standardization."
+                "compose_standardization does not yet support iid (x with batch>1) "
+                "or guided sampling. Use a single observation without guidance, or "
+                "disable compose_standardization."
             )
-        if x.shape[0] > 1 and self.sample_with == "ode":
+        if is_iid and self.sample_with == "ode":
             raise ValueError(
                 "The ODE sampler draws one posterior per observation. Use "
                 "sample_with='sde' to sample several observations as iid trials, or "

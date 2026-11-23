@@ -128,6 +128,7 @@ class VectorFieldBasedPotential(BasePotential):
             Self for method chaining.
         """
         super().to(device)
+        self.__dict__.pop("_guided_estimators", None)
         self.vector_field_estimator.to(self.device)
         self.neural_ode.to(self.device)
         # Cached flows hold x_o and the ODE's base distribution of the old device.
