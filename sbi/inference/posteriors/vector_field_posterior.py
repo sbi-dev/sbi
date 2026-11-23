@@ -109,6 +109,31 @@ class VectorFieldPosterior(NeuralPosterior):
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
 
+    def _check_x(
+        self, x: Tensor, guidance_method: Optional[str] = None, **kwargs
+    ) -> None:
+        """Raise if this posterior cannot sample `x`, with guidance if requested.
+
+        Iid trials and guidance need the SDE sampler, and composed standardization does
+        not support iid trials yet.
+        """
+        if self.vector_field_estimator.compose_enabled and x.shape[0] > 1:
+            raise NotImplementedError(
+                "compose_standardization does not yet support iid (x with batch>1). "
+                "Use a single observation, or disable compose_standardization."
+            )
+        if x.shape[0] > 1 and self.sample_with == "ode":
+            raise ValueError(
+                "The ODE sampler draws one posterior per observation. Use "
+                "sample_with='sde' to sample several observations as iid trials, or "
+                "`sample_batched()` for one posterior per observation."
+            )
+        if guidance_method is not None and self.sample_with == "ode":
+            raise ValueError(
+                f"The ODE sampler ignores guidance ('{guidance_method}'), which "
+                "adjusts the score. Use sample_with='sde' for guided sampling."
+            )
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -194,8 +219,9 @@ class VectorFieldPosterior(NeuralPosterior):
         """
 
         x = self._x_else_default_x(x)
+        self._check_x(x, guidance_method=guidance_method)
         is_iid = x.shape[0] > 1
-        bound = self.potential_fn.bind(
+        self.potential_fn = self.potential_fn.bind(
             x,
             x_is_iid=is_iid,
             iid_method=iid_method or self.potential_fn.iid_method,
@@ -203,8 +229,6 @@ class VectorFieldPosterior(NeuralPosterior):
             guidance_method=guidance_method,
             guidance_params=guidance_params,
         )
-        self._check_sample_inputs(x, guidance_method=guidance_method)
-        self.potential_fn = bound
 
         num_samples = torch.Size(sample_shape).numel()
         max_sampling_batch_size = (
@@ -389,25 +413,6 @@ class VectorFieldPosterior(NeuralPosterior):
             samples = self.vector_field_estimator.from_z(samples)
 
         return samples
-
-    def _check_sample_inputs(
-        self, x: Tensor, guidance_method: Optional[str] = None, **kwargs
-    ) -> None:
-        if self.sample_with != "ode":
-            return
-        if x.shape[0] > 1:
-            reason = (
-                f"x has {x.shape[0]} rows, which are used as iid observations. "
-                "For independent posteriors of several x, use `sample_batched`. "
-            )
-        elif guidance_method is not None:
-            reason = f"Guidance ('{guidance_method}') is requested. "
-        else:
-            return
-        raise ValueError(
-            reason + "iid observations and guidance adjust the score, which only SDE "
-            "sampling uses. Build the posterior with sample_with='sde'."
-        )
 
     def sample_via_ode(
         self,

@@ -248,7 +248,7 @@ class NeuralPosterior:
         printing it).
 
         NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
-        that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
+        that calls like `posterior.set_default_x(my_x).sample((1000,))` are possible.
 
         Several observations, of shape `(num_observations, *x_event_shape)`, are iid
         trials (see the how-to guide on iid observations).
@@ -284,14 +284,19 @@ class NeuralPosterior:
         """
         return None
 
-    def _check_sample_inputs(self, x: Tensor, **kwargs) -> None:
-        """Raise if `sample()` cannot take these inputs."""
-
     def _check_num_observations(self, num_observations: int) -> None:
         """Raise if this posterior takes one observation and gets several."""
         hint = self._one_observation_hint
         if hint is not None:
             _require_one_observation(num_observations, type(self).__name__, hint)
+
+    def _check_x(self, x: Tensor, **kwargs) -> None:
+        """Raise if this posterior cannot answer for the processed `x`.
+
+        The default accepts any `x`. Posteriors with further conditions on `x` override
+        it, so that an ensemble can check all components before it draws one. `kwargs`
+        holds the options of `sample()`.
+        """
 
     def _bind_iid(
         self, x: Tensor, check_num_observations: bool = True
@@ -604,14 +609,15 @@ _IID_SAMPLERS = (
 
 
 def _require_one_observation(num_observations: int, subject: str, hint: str) -> None:
-    """Raise a ValueError if `subject`, which takes one observation, gets several.
+    """Raise a ValueError if `subject`, which takes one observation, gets another
+    number of observations.
 
     Args:
         num_observations: Number of observations in `x`.
         subject: What takes one observation, e.g. a posterior class or a method.
         hint: What to do instead.
     """
-    if num_observations > 1:
+    if num_observations != 1:
         raise ValueError(
             f"{subject} takes one observation, but x holds {num_observations}. {hint}"
         )

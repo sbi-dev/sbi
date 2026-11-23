@@ -211,11 +211,11 @@ def test_canonical_shorthands_do_not_warn():
 @pytest.mark.parametrize(
     "x_o, sample_kwargs, reason",
     [
-        (torch.zeros(3, 2), {}, "x has 3 rows"),
+        (torch.zeros(3, 2), {}, "draws one posterior per observation"),
         (
             torch.zeros(1, 2),
             {"guidance_method": "interval", "guidance_params": {}},
-            "Guidance",
+            "ignores guidance",
         ),
     ],
     ids=["iid", "guidance"],
