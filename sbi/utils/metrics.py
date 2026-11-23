@@ -255,7 +255,11 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
             return torch.sum((a[None, ...] - b[:, None, :]) ** 2, dim=-1).reshape(-1)
         else:
             m, n = a.shape[0], b.shape[0]
-            ix = torch.tril_indices(m, n, offset=-1, device=a.device)
+            if a.device.type == "mps":
+                # PyTorch registers no MPS kernel for tril_indices.
+                ix = torch.tril_indices(m, n, offset=-1).to(a.device)
+            else:
+                ix = torch.tril_indices(m, n, offset=-1, device=a.device)
             return torch.sum(
                 (a[None, ...] - b[:, None, :]) ** 2, dim=-1, keepdim=False
             )[ix[0, :], ix[1, :]].reshape(-1)
@@ -387,10 +391,11 @@ def wasserstein_2_squared(
     """
     if x.device != y.device:
         y = y.to(x.device)
-    if x.ndim == 1 and y.ndim == 1:
+    if x.ndim == 1:
         x = x.unsqueeze(1)
+    if y.ndim == 1:
         y = y.unsqueeze(1)
-    elif x.ndim != y.ndim:
+    if x.ndim != y.ndim:
         raise ValueError(
             "Please make sure that 'x' and 'y' have the same number of dimensions, "
             f"got x.ndim={x.ndim} and y.ndim={y.ndim}."
@@ -739,9 +744,9 @@ class Distance:
             assert x_o.ndim + 1 == x.ndim
         else:
             assert x.ndim >= 2, "simulated data needs batch dimension"
-        if x_o.device != x.device:
-            x = x.to(x_o.device)
         if self.batch_size == -1:
+            if x_o.device != x.device:
+                x = x.to(x_o.device)
             return self.distance_fn(x_o, x)
         else:
             return self._batched_distance(x_o, x)
@@ -757,7 +762,10 @@ class Distance:
             x: Simulated data
         """
         return torch.cat([
-            self.distance_fn(x_o, x_batch).reshape(x_batch.shape[0])
+            self.distance_fn(
+                x_o,
+                x_batch.to(x_o.device) if x_o.device != x_batch.device else x_batch,
+            ).reshape(x_batch.shape[0])
             for x_batch in x.split(self.batch_size)
         ])
 

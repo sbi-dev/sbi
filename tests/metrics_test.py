@@ -490,6 +490,34 @@ def test_metrics_mixed_devices():
     # Distance wrapper
     dist = Distance("l2")
     assert dist(x_cpu[0], y_dev).shape == (50,)
+    dist_batched = Distance("l2", batch_size=10)
+    assert dist_batched(x_cpu[0], y_dev).shape == (50,)
+
+
+def test_wasserstein_1d_mixed_ranks():
+    x_1d = torch.randn(100)
+    y_2d = torch.randn(120, 1)
+    w1 = wasserstein_2_squared(x_1d, y_2d)
+    w2 = wasserstein_2_squared(y_2d, x_1d)
+    assert w1.ndim == 0 and not torch.isnan(w1)
+    assert w2.ndim == 0 and not torch.isnan(w2)
+
+
+def test_metrics_invalid_ndim_raises():
+    x_3d = torch.randn(10, 10, 2)
+    y_3d = torch.randn(10, 10, 2)
+    with pytest.raises(ValueError, match="expects 1D or 2D inputs"):
+        c2st(x_3d, y_3d)
+    with pytest.raises(ValueError, match="expects 1D or 2D inputs"):
+        posterior_shrinkage(x_3d, y_3d)
+    with pytest.raises(ValueError, match="expects 1D or 2D inputs"):
+        unbiased_mmd_squared(x_3d, y_3d)
+    with pytest.raises(ValueError, match="expects 1D or 2D inputs"):
+        biased_mmd(x_3d, y_3d)
+    with pytest.raises(ValueError, match="same number of dimensions"):
+        wasserstein_2_squared(torch.randn(10, 2), torch.randn(10, 10, 2))
+    with pytest.raises(ValueError, match="only implemented"):
+        wasserstein_2_squared(torch.randn(2, 2, 2, 2), torch.randn(2, 2, 2, 2))
 
 
 @pytest.mark.parametrize(
