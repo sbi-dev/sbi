@@ -1096,7 +1096,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         prior: Distribution,
         posterior_precision: Optional[Tensor] = None,
         scale_from_prior_precision: float = 2.0,
-        enable_lam_psd: bool = False,
+        enable_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
         device: Union[str, torch.device] = "cpu",
     ) -> None:
