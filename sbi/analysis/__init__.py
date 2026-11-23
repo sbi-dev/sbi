@@ -27,7 +27,6 @@ from sbi.analysis.plotting_classes import (
     KdeDiagOptions,
     KdeOffDiagOptions,
     LabeledSamples,
-    PlotOffDiagOptions,
     ScatterDiagOptions,
     ScatterOffDiagOptions,
 )

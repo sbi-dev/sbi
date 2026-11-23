@@ -164,14 +164,6 @@ class ContourOffDiagOptions(OffDiagOptions):
 
 
 @dataclass(frozen=True)
-class PlotOffDiagOptions(OffDiagOptions):
-    def __post_init__(self):
-        mpl_kwargs_defaults = {"aspect": "auto"}
-        updated = {**mpl_kwargs_defaults, **self.mpl_kwargs}
-        object.__setattr__(self, "mpl_kwargs", updated)
-
-
-@dataclass(frozen=True)
 class FigOptions:
     """
     Configuration options for customizing Matplotlib figures.
@@ -330,8 +322,6 @@ def get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict[str, 
         offdiag_options = ScatterOffDiagOptions(mpl_kwargs=dict(color=_set_color(i)))
     elif offdiag == "contour" or offdiag == "contourf":
         offdiag_options = ContourOffDiagOptions(mpl_kwargs=dict(colors=_set_color(i)))
-    elif offdiag == "plot":
-        offdiag_options = PlotOffDiagOptions(mpl_kwargs=dict(color=_set_color(i)))
     else:
         return {}
     return asdict(offdiag_options)

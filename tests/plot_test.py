@@ -84,7 +84,6 @@ def test_nan_inf(samples, limits):
 @pytest.mark.parametrize("figsize", ((5, 5),))
 @pytest.mark.parametrize("labels", (None, ["a", "b", "c"]))
 @pytest.mark.parametrize("ticks", (None, [[-3, 0, 3], [-3, 0, 3], [0, 1, 2, 3]]))
-@pytest.mark.parametrize("offdiag", (None,))
 @pytest.mark.parametrize("diag_kwargs", (None, {"mpl_kwargs": {"bins": 10}}))
 @pytest.mark.parametrize("upper_kwargs", (None,))
 @pytest.mark.parametrize("fig_kwargs", (None, {"points_labels": ["a"], "legend": True}))
@@ -99,7 +98,6 @@ def test_pairplot(
     figsize,
     labels,
     ticks,
-    offdiag,
     diag_kwargs,
     upper_kwargs,
     lower_kwargs,
@@ -129,25 +127,6 @@ def test_pairplot_offdiag_cells_plot_column_on_x(style):
             assert np.nan_to_num(np.asarray(image.get_array(), dtype=float)).max() > 0
         if ax.collections:
             assert sum(len(p.vertices) for c in ax.collections for p in c.get_paths())
-    close()
-
-
-@pytest.mark.parametrize("samples", (torch.randn(100, 2), [torch.randn(100, 2)] * 2))
-@pytest.mark.parametrize("labels", (None, ["a", "b"]))
-@pytest.mark.parametrize("legend", (True, False))
-@pytest.mark.parametrize("offdiag", ("hist", "scatter"))
-@pytest.mark.parametrize("samples_labels", (["a", "b"], None))
-@pytest.mark.parametrize("points_labels", (["a", "b"], None))
-@pytest.mark.parametrize("points", (None, torch.ones(2)))
-def test_pairplot_dep(
-    samples, labels, legend, offdiag, samples_labels, points_labels, points
-):
-    # uses old style keywords, checks backward compatibility
-    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
-
-    assert isinstance(fig, Figure)
-    assert isinstance(axs, np.ndarray)
-    assert isinstance(axs[0, 0], Axes)
     close()
 
 
@@ -547,30 +526,18 @@ def test_plotting_fails_for_insufficient_sample_label_length():
     close()
 
 
-def test_pairplot_warns_on_offdiag_argument():
-    """
-    Verify that `pairplot` raises a warning when using the `offdiag` argument.
-    """
-
-    posterior_samples = torch.randn(100, 3)
-
-    with pytest.warns():
-        _ = pairplot(samples=posterior_samples, offdiag="contour")
-
-    close()
-
-
-def test_pairplot_raises_error_on_offdiag_and_upper_conflict():
-    """
-    Verify that `pairplot` raises a ValueError when using the `offdiag`
-    and `upper` argument together.
-    """
-
-    posterior_samples = torch.randn(100, 3)
-
-    with pytest.raises(ValueError):
-        _ = pairplot(samples=posterior_samples, offdiag="contour", upper="scatter")
-
+@pytest.mark.parametrize(
+    "plot_function, kwargs",
+    (
+        (pairplot, {"offdiag": "contour"}),
+        (pairplot, {"legend": True}),
+        (marginal_plot, {"legend": True}),
+    ),
+)
+def test_removed_plot_kwargs_are_rejected(plot_function, kwargs):
+    """The deprecated arguments no longer exist on the plotting functions."""
+    with pytest.raises(TypeError):
+        plot_function(torch.randn(100, 2), **kwargs)
     close()
 
 
