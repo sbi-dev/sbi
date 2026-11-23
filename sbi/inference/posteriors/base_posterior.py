@@ -590,10 +590,7 @@ class NeuralPosterior:
 # Explains the low-acceptance warning of rejection sampling within the prior support.
 _LEAKAGE_HINT = (
     "A low acceptance rate means that most of the posterior estimate lies outside "
-    "the prior bounds (leakage). After multi-round training, leakage often grows with "
-    "every round and the estimate becomes poor; truncated proposals (TSNPE) keep it "
-    "from growing. See "
-    "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
+    "the prior bounds (leakage)."
 )
 # Advice shared by the errors of posteriors that take one observation.
 _ONE_AT_A_TIME = (

@@ -44,7 +44,7 @@ _DEGENERATE_MOG_LOSS_MSG = (
     "degenerate. With a bounded prior, this usually follows strong leakage in "
     "earlier rounds, i.e., most of the posterior estimate lies outside the prior "
     "bounds (see the warning 'Only x% proposal samples are accepted' when sampling "
-    "the proposal). Truncated proposals (TSNPE) keep leakage from growing over "
+    "the proposal). Truncated proposals (TSNPE) can keep leakage from growing over "
     "rounds, and single-round NPE avoids this loss, see "
     "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
 )
@@ -62,7 +62,7 @@ class NPE_C(PosteriorEstimatorTrainer):
     which computes the proposal posterior in closed form, or the atomic loss (for
     flows), which approximates it with atoms. With either loss, the posterior estimate
     can leak more and more mass outside the prior bounds over the rounds. Truncated
-    proposals (TSNPE) keep it from growing, see the FAQ on leakage.
+    proposals (TSNPE) can keep it from growing, see the FAQ on leakage.
 
     For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
     plain NLL loss.

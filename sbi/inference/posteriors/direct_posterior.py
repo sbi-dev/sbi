@@ -31,6 +31,13 @@ from sbi.utils.torchutils import (
 )
 from sbi.utils.user_input_checks import check_prior
 
+_NPE_LEAKAGE_HINT = (
+    f"{_LEAKAGE_HINT} After multi-round training, leakage often grows with every "
+    "round and the estimate becomes poor; truncated proposals (TSNPE) can keep it "
+    "from growing. See "
+    "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
+)
+
 
 class DirectPosterior(NeuralPosterior):
     r"""Posterior based on neural networks that directly estimate the posterior (NPE).
@@ -170,7 +177,7 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
                 alternative_method=self._alternative_sampling_method,
-                low_acceptance_hint=_LEAKAGE_HINT,
+                low_acceptance_hint=_NPE_LEAKAGE_HINT,
                 max_sampling_time=max_sampling_time,
                 return_partial_on_timeout=return_partial_on_timeout,
             )[0]
@@ -273,7 +280,7 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
                 alternative_method=self._alternative_sampling_method,
-                low_acceptance_hint=_LEAKAGE_HINT,
+                low_acceptance_hint=_NPE_LEAKAGE_HINT,
                 max_sampling_time=max_sampling_time,
                 return_partial_on_timeout=return_partial_on_timeout,
             )[0]
@@ -471,7 +478,7 @@ class DirectPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
-                low_acceptance_hint=_LEAKAGE_HINT,
+                low_acceptance_hint=_NPE_LEAKAGE_HINT,
                 proposal_sampling_kwargs={
                     "condition": reshape_to_batch_event(
                         x, event_shape=self.posterior_estimator.condition_shape
