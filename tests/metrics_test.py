@@ -17,6 +17,7 @@ from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import (
     Distance,
+    biased_mmd,
     biased_mmd_hypothesis_test,
     c2st,
     l1,
@@ -26,6 +27,7 @@ from sbi.utils.metrics import (
     posterior_shrinkage,
     posterior_zscore,
     regularized_ot_dual,
+    unbiased_mmd_squared,
     unbiased_mmd_squared_hypothesis_test,
     wasserstein_2_squared,
     wasserstein_distance,
@@ -418,3 +420,90 @@ def test_batched_distance_matches_unbatched(distance, x_o_shape, batch_size):
     actual = Distance(distance, batch_size=batch_size)(x_o, x)
 
     assert torch.allclose(actual, expected)
+
+
+@pytest.mark.parametrize("classifier", ("rf", "mlp"))
+def test_c2st_1d_inputs(classifier: str):
+    torch.manual_seed(0)
+    x = torch.randn(200)
+    y = torch.randn(200) + 4.0
+    score = c2st(x, y, classifier=classifier)
+    assert score > 0.8
+
+
+def test_wasserstein_and_mmd_1d_inputs():
+    x = torch.randn(100)
+    y = torch.randn(120) + 1.0
+
+    w = wasserstein_2_squared(x, y)
+    assert w.ndim == 0 and not torch.isnan(w)
+
+    u = unbiased_mmd_squared(x, y)
+    assert u.ndim == 0 and not torch.isnan(u)
+
+    b = biased_mmd(x, y)
+    assert b.ndim == 0 and not torch.isnan(b)
+
+
+def test_posterior_shrinkage_1d_inputs():
+    prior_samples = torch.randn(100)
+    post_samples = 0.5 * torch.randn(100)
+    shrinkage = posterior_shrinkage(prior_samples, post_samples)
+    assert shrinkage.shape == (1,)
+    assert not torch.isnan(shrinkage[0])
+
+
+def test_metrics_mixed_devices():
+    device = (
+        "mps"
+        if torch.backends.mps.is_available()
+        else ("cuda" if torch.cuda.is_available() else None)
+    )
+    if device is None:
+        pytest.skip("No secondary device available for mixed device testing")
+
+    x_cpu = torch.randn(50, 2)
+    y_dev = (torch.randn(50, 2) + 2.0).to(device)
+
+    # c2st
+    assert c2st(x_cpu, y_dev) > 0.8
+
+    # posterior_shrinkage
+    shrink = posterior_shrinkage(x_cpu, y_dev)
+    assert shrink.shape == (2,)
+
+    # wasserstein_2_squared
+    w = wasserstein_2_squared(x_cpu, y_dev)
+    assert w.ndim == 0 and not torch.isnan(w)
+
+    # unbiased_mmd_squared & biased_mmd
+    u = unbiased_mmd_squared(x_cpu, y_dev)
+    assert u.ndim == 0 and not torch.isnan(u)
+    b = biased_mmd(x_cpu, y_dev)
+    assert b.ndim == 0 and not torch.isnan(b)
+
+    # l1, l2, mse
+    assert l1(x_cpu, y_dev).shape == (50,)
+    assert l2(x_cpu, y_dev).shape == (50,)
+    assert mse_distance(x_cpu, y_dev).shape == (50,)
+
+    # Distance wrapper
+    dist = Distance("l2")
+    assert dist(x_cpu[0], y_dev).shape == (50,)
+
+
+@pytest.mark.parametrize(
+    "metric_fn",
+    (
+        c2st,
+        posterior_shrinkage,
+        wasserstein_2_squared,
+        unbiased_mmd_squared,
+        biased_mmd,
+    ),
+)
+def test_metrics_feature_mismatch_raises(metric_fn):
+    x = torch.randn(50, 2)
+    y = torch.randn(50, 3)
+    with pytest.raises(ValueError, match="match"):
+        metric_fn(x, y)
