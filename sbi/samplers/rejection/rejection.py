@@ -298,9 +298,9 @@ def accept_reject_sample(
         low_acceptance_hint: What a low acceptance rate means for the caller, e.g.
             leakage for NPE. Appended to the low-acceptance warnings, and to the
             timeout error when the acceptance rate is below `warn_acceptance`.
-        suggest_sampling_options: Whether the low-acceptance warning suggests
-            `max_sampling_time` and `reject_outside_prior=False`. Set it to False
-            when the caller does not offer these options.
+        suggest_sampling_options: Whether the low-acceptance warning and the timeout
+            error suggest `max_sampling_time` and `reject_outside_prior=False`. Set it
+            to False when the caller does not offer these options.
         kwargs: Absorb additional unused arguments that can be passed to
             `rejection_sample()`. Warn if not empty.
 
