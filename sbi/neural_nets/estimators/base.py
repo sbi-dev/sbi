@@ -529,7 +529,7 @@ class ConditionalVectorFieldEstimator(ConditionalEstimator, ABC):
         Args:
             input: variable whose distribution is estimated.
             condition: Conditioning variable.
-            t: Time.
+            times: Time.
 
         Raises:
             NotImplementedError: This method should be implemented by sub-classes.
@@ -762,8 +762,7 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
             Sample-wise log probabilities.
         """
 
-        self._neural_net.eval()
-        return self._neural_net.log_prob(x)
+        return self.net.log_prob(x)
 
     def sample(self, sample_shape: torch.Size) -> Tensor:
         r"""Return samples from the density estimator.
@@ -775,7 +774,7 @@ class UnconditionalDensityEstimator(UnconditionalEstimator):
             Samples of shape `(*sample_shape, batch_dim, *event_shape_input)`.
         """
 
-        return self._neural_net.sample(sample_shape)
+        return self.net.sample(sample_shape)
 
     def sample_and_log_prob(self, sample_shape: torch.Size) -> Tuple[Tensor, Tensor]:
         r"""Return samples and their density from the density estimator.

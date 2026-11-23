@@ -71,8 +71,8 @@ class Predictor(ABC):
 
         Args:
             theta: Parameters.
-            t1: Time.
-            t0: Time.
+            t1: The current time of the samples.
+            t0: The smaller time to move the samples to.
         """
         return self.predict(theta, t1, t0)
 
@@ -82,8 +82,8 @@ class Predictor(ABC):
 
         Args:
             theta: Parameters.
-            t1: Time.
-            t0: Time.
+            t1: The current time of the samples.
+            t0: The smaller time to move the samples to.
         """
         pass
 
@@ -101,7 +101,7 @@ class EulerMaruyama(Predictor):
         Args:
             potential_fn: Score-based potential to predict.
             eta: Mediates how much noise is added during sampling i.e.
-                for values approaching 0 this becomes the deterministic probabilifty
+                for values approaching 0 this becomes the deterministic probability
                 flow ODE. For large values it becomes a more stochastic reverse SDE.
                 Defaults to 1.0.
         """

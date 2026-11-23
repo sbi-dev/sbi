@@ -117,6 +117,7 @@ def test_compose_affine_rejects_invalid_values(affine_name, value):
 
 
 @pytest.mark.gpu
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
 def test_affine_contract_cuda():
     estimator = _build().cuda()
     theta = (100.0 + 5.0 * torch.randn(10, NUM_DIM)).cuda()

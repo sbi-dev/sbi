@@ -10,6 +10,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Sequence,
     Tuple,
     TypeVar,
     Union,
@@ -23,6 +24,7 @@ import numpy as np
 import torch
 from matplotlib import cm
 from matplotlib import pyplot as plt
+from matplotlib.artist import Artist
 from matplotlib.axes import Axes
 from matplotlib.colors import Normalize
 from matplotlib.figure import Figure, FigureBase
@@ -106,7 +108,8 @@ def marginal_plot(
             see the source code in `FigOptions`.
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
-        **kwargs: Additional arguments to adjust the plot (deprecated)
+        **kwargs: Deprecated, will be removed in v0.29.0. Pass `FigOptions` fields
+            in `fig_kwargs` and plot styles in `diag_kwargs` instead.
     Returns: figure and axis of posterior distribution plot
     """
 
@@ -116,8 +119,18 @@ def marginal_plot(
 
     # backwards compatibility
     if len(kwargs) > 0:
-        fig, axes = _use_deprecated_plot(
-            marginal_plot_dep,
+        _warn_deprecated_kwargs(
+            "marginal_plot",
+            kwargs,
+            ignored={
+                "diag_kwargs": diag_kwargs,
+                "fig_kwargs": fig_kwargs,
+            },
+            samples=sample_data,
+            diag=diag,
+            sample_names=sample_names,
+        )
+        return _marginal_plot_dep(
             samples=sample_data,
             points=points,
             limits=limits,
@@ -130,7 +143,6 @@ def marginal_plot(
             axes=axes,
             **kwargs,
         )
-        return fig, axes
 
     sample_data, _, limits = prepare_for_plot(sample_data, limits)
 
@@ -210,22 +222,22 @@ def pairplot(
             if they exist, the 4th, 5th and so on).
         upper: Plotting style for upper diagonal, {hist, scatter, contour, kde,
             None}.
-        lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
+        lower: Plotting style for lower diagonal, {hist, scatter, contour, kde,
             None}.
         diag: Plotting style for diagonal, {hist, scatter, kde, bar}.
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
-        offdiag: deprecated, use upper instead.
+        offdiag: Deprecated, will be removed in v0.29.0. Use `upper` instead.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
             see the source code in `KdeDiagOptions`, `HistDiagOptions`,
             `ScatterDiagOptions` or `BarDiagOptions`.
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
             see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
-            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+            `ScatterOffDiagOptions` or `ContourOffDiagOptions`.
         lower_kwargs: Additional arguments to adjust the lower diagonal plot,
             see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
-            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+            `ScatterOffDiagOptions` or `ContourOffDiagOptions`.
         fig_kwargs: Additional arguments to adjust the overall figure,
             see the source code in `FigOptions`
         fig: matplotlib figure to plot on.
@@ -235,7 +247,8 @@ def pairplot(
             diagonal (instead of kde/hist) and scatter with jitter on the
             off-diagonal (instead of kde/contour). This prevents crashes from
             KDE on integer-valued data.
-        **kwargs: Additional arguments to adjust the plot (deprecated).
+        **kwargs: Deprecated, will be removed in v0.29.0. Pass `FigOptions` fields
+            in `fig_kwargs` and plot styles in the `*_kwargs` arguments instead.
 
     Returns: figure and axis of posterior distribution plot
     """
@@ -257,8 +270,23 @@ def pairplot(
 
     # Backwards compatibility
     if len(kwargs) > 0:
-        fig, axes = _use_deprecated_plot(
-            pairplot_dep,
+        _warn_deprecated_kwargs(
+            "pairplot",
+            kwargs,
+            ignored={
+                "lower": lower,
+                "diag_kwargs": diag_kwargs,
+                "upper_kwargs": upper_kwargs,
+                "lower_kwargs": lower_kwargs,
+                "fig_kwargs": fig_kwargs,
+                "discrete_indices": discrete_indices,
+            },
+            samples=sample_data,
+            diag=diag,
+            sample_names=sample_names,
+            upper=upper,
+        )
+        return _pairplot_dep(
             samples=sample_data,
             points=points,
             limits=limits,
@@ -273,7 +301,6 @@ def pairplot(
             axes=axes,
             **kwargs,
         )
-        return fig, axes
 
     sample_data, dim, limits = prepare_for_plot(sample_data, limits, points)
 
@@ -717,10 +744,13 @@ def _format_subplot(
 
 
 def _place_legend_in_empty_cell(ax, handles, labels, legend_kw):
-    """Place a legend in an empty off-diagonal cell, hiding spines and ticks."""
+    """Place a legend in an empty off-diagonal cell, hiding spines, ticks and labels."""
     ax.axis("on")
     ax.set_xticks([])
     ax.set_yticks([])
+    # A bottom-row cell got its x-label before it was turned off.
+    ax.set_xlabel("")
+    ax.set_ylabel("")
     for spine in ax.spines.values():
         spine.set_visible(False)
     ax.legend(handles, labels, **legend_kw)
@@ -1097,26 +1127,54 @@ def _prepare_fig_kwargs(
     return replace(fig_kwargs, samples_labels=sample_labels)
 
 
-def _use_deprecated_plot(
-    deprecated_method: Callable, **kwargs
-) -> Tuple[FigureBase, Axes]:
-    """
-    Issues a deprecation warning and invokes the old-style plotting method.
+def _warn_deprecated_kwargs(
+    func_name: str,
+    kwargs: Dict[str, Any],
+    ignored: Dict[str, Any],
+    samples: PreparedSamples,
+    diag: Optional[Union[str, Sequence[Optional[str]]]],
+    sample_names: Optional[List[Optional[str]]],
+    upper: Optional[Union[str, Sequence[Optional[str]]]] = None,
+) -> None:
+    """Warn that `kwargs` make `func_name` use its old implementation.
 
     Args:
-        deprecated_method: The deprecated plotting function.
-        **kwargs: Arbitrary keyword arguments passed to the deprecated function.
-
-    Returns:
-        The figure and axes objects returned by the plotting function.
+        func_name: Public name of the plotting function.
+        kwargs: The deprecated keyword arguments that were passed.
+        ignored: Newer arguments that the old implementation does not use. Those
+            that are not None are named in the warning.
+        samples: The sample set(s) passed to the old implementation.
+        diag: The diagonal style(s). Named in the warning if the old
+            implementation does not draw them as asked.
+        sample_names: Names of the `LabeledSamples`, which the old implementation
+            drops. Named in the warning if any is set.
+        upper: The upper-triangle style(s) of `pairplot`. They decide whether the
+            old implementation draws scatter lines on the diagonal.
     """
-
-    warn(
-        "you passed deprecated arguments **kwargs, use fig_kwargs instead.",
-        DeprecationWarning,
-        stacklevel=2,
+    message = (
+        f"`{func_name}` got the deprecated keyword arguments {sorted(kwargs)}. "
+        "They are deprecated since sbi v0.23.0 and will be removed in v0.29.0. "
+        "Pass `FigOptions` fields in `fig_kwargs` and plot styles in the "
+        "`*_kwargs` arguments (see `sbi.analysis.plotting_classes`)."
     )
-    return deprecated_method(**kwargs)
+    dropped = [name for name, value in ignored.items() if value is not None]
+    # Per sample set, the old diagonal draws "hist" or "kde" if asked. Otherwise it
+    # draws scatter lines if that set's upper style is "scatter", and nothing if not.
+    # Like the old implementation, use one style per set and ignore extra entries.
+    n = len(samples) if isinstance(samples, list) else 1
+    diags = diag if isinstance(diag, list) else [diag] * n
+    uppers = upper if isinstance(upper, list) else [upper] * n
+    if any(
+        d not in ("hist", "kde", "scatter" if u == "scatter" else None)
+        for d, u in zip(diags[:n], uppers[:n], strict=False)
+    ):
+        dropped.append("diag")
+    if any(sample_names or []):
+        dropped.append("LabeledSamples names")
+    if dropped:
+        message += f" This call uses the old implementation, which ignores {dropped}."
+    # stacklevel=3 points at the line that called `pairplot` or `marginal_plot`.
+    warn(message, FutureWarning, stacklevel=3)
 
 
 def _prepare_upper(
@@ -1143,7 +1201,13 @@ def _prepare_upper(
                 "You have passed mismatching values to both upper and offdiag"
                 " arguments. offdiag is deprecated, use upper instead."
             )
-        warn("offdiag is deprecated, use upper or lower instead.", stacklevel=2)
+        # stacklevel=3 points at the line that called `pairplot`.
+        warn(
+            "`offdiag` is deprecated since sbi v0.23.0 and will be removed in "
+            "v0.29.0. Use `upper` instead.",
+            FutureWarning,
+            stacklevel=3,
+        )
     return offdiag or upper
 
 
@@ -1566,25 +1630,27 @@ def _arrange_grid(
                 if fig_kwargs.legend and col == subset[0]:
                     _legend_handles = ax.get_legend_handles_labels()  # pyright: ignore reportOptionalMemberAccess
 
-            # Off-diagonals
-
-            # upper
-            elif current == "upper":
-                if excl_upper:
+            # Off-diagonals: both triangles plot x = column, y = row.
+            else:
+                if current == "upper":
+                    funcs, kwargs, excluded = upper_funcs, upper_kwargs, excl_upper
+                else:
+                    funcs, kwargs, excluded = lower_funcs, lower_kwargs, excl_lower
+                if excluded:
                     ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
                     col_discrete = col in discrete_set
                     row_discrete = row in discrete_set
                     for sample_ind, sample in enumerate(samples):
-                        upper_f = upper_funcs[sample_ind]
-                        upper_kw = upper_kwargs[sample_ind]
+                        offdiag_f = funcs[sample_ind]
+                        offdiag_kw = kwargs[sample_ind]
                         samples_col = sample[:, col]
                         samples_row = sample[:, row]
                         if col_discrete or row_discrete:
-                            upper_f, upper_kw, samples_col, samples_row = (
+                            offdiag_f, offdiag_kw, samples_col, samples_row = (
                                 _discrete_offdiag_override(
-                                    upper_f,
-                                    upper_kw,
+                                    offdiag_f,
+                                    offdiag_kw,
                                     samples_col,
                                     samples_row,
                                     col_discrete,
@@ -1592,55 +1658,14 @@ def _arrange_grid(
                                     sample_ind,
                                 )
                             )
-                        if callable(upper_f):
-                            upper_f(
+                        if callable(offdiag_f):
+                            offdiag_f(
                                 ax,
                                 samples_col,
                                 samples_row,
                                 limits[col],
                                 limits[row],
-                                upper_kw,
-                            )
-                    if len(points) > 0:
-                        for n, v in enumerate(points):
-                            ax.plot(  # pyright: ignore reportOptionalMemberAccess
-                                v[:, col],
-                                v[:, row],
-                                color=fig_kwargs.points_colors[n],
-                                **fig_kwargs.points_offdiag,
-                            )
-            # lower
-            elif current == "lower":
-                if excl_lower:
-                    ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
-                else:
-                    row_discrete = row in discrete_set
-                    col_discrete = col in discrete_set
-                    for sample_ind, sample in enumerate(samples):
-                        lower_f = lower_funcs[sample_ind]
-                        lower_kw = lower_kwargs[sample_ind]
-                        samples_row_l = sample[:, row]
-                        samples_col_l = sample[:, col]
-                        if row_discrete or col_discrete:
-                            lower_f, lower_kw, samples_row_l, samples_col_l = (
-                                _discrete_offdiag_override(
-                                    lower_f,
-                                    lower_kw,
-                                    samples_row_l,
-                                    samples_col_l,
-                                    row_discrete,
-                                    col_discrete,
-                                    sample_ind,
-                                )
-                            )
-                        if callable(lower_f):
-                            lower_f(
-                                ax,
-                                samples_row_l,
-                                samples_col_l,
-                                limits[row],
-                                limits[col],
-                                lower_kw,
+                                offdiag_kw,
                             )
                     if len(points) > 0:
                         for n, v in enumerate(points):
@@ -1726,6 +1751,8 @@ def sbc_rank_plot(
         ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters), or
             list of Tensors when comparing several sets of ranks, e.g., set of ranks
             obtained from different methods.
+        num_posterior_samples: number of posterior samples used to compute the
+            ranks. Ranks must lie in [0, num_posterior_samples].
         num_bins: number of bins used for binning the ranks, default is
             num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
             histograms.
@@ -1737,6 +1764,10 @@ def sbc_rank_plot(
 
     Returns:
         fig, ax: figure and axis objects.
+
+    Raises:
+        ValueError: If a rank lies outside [0, num_posterior_samples], or if
+            plot_type is not "hist", "cdf" or "cdf-diff".
 
     """
 
@@ -1783,6 +1814,8 @@ def _sbc_rank_plot(
         ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters), or
             list of Tensors when comparing several sets of ranks, e.g., set of ranks
             obtained from different methods.
+        num_posterior_samples: number of posterior samples used to compute the
+            ranks. Ranks must lie in [0, num_posterior_samples].
         num_bins: number of bins used for binning the ranks, default is
             num_sbc_runs / 10 for CDF and cdf-diff plots, num_sbc_runs / 20 for
             histograms.
@@ -1793,10 +1826,8 @@ def _sbc_rank_plot(
         colors: list of colors for each parameter dimension, or each set of ranks.
         num_repeats: number of repeats for each empirical CDF step (resolution).
         line_alpha: alpha for cdf lines or histograms.
-        show_uniform_region: whether to plot the region showing the cdfs expected under
-            uniformity.
-        uniform_region_alpha: alpha for region showing the cdfs expected under
-            uniformity.
+        show_uniform_region: whether to plot the region expected under uniformity.
+        uniform_region_alpha: alpha for the region expected under uniformity.
         xlim_offset_factor: factor for empty space left and right of the histogram.
         num_cols: number of subplot columns, e.g., when plotting ranks of many
             parameters.
@@ -1820,7 +1851,13 @@ def _sbc_rank_plot(
         ranks_list = ranks
     for idx, rank in enumerate(ranks_list):
         assert isinstance(rank, (Tensor, np.ndarray))
-        ranks_list[idx] = ensure_numpy(rank)
+        # Bin in float64, like the bands: float32 edges can shift a rank by one bin.
+        ranks_list[idx] = ensure_numpy(rank).astype(np.float64)
+    if not all(((r >= 0) & (r <= num_posterior_samples)).all() for r in ranks_list):
+        raise ValueError(
+            f"Ranks must lie in [0, num_posterior_samples={num_posterior_samples}]. "
+            "Pass the number of posterior samples used to compute the ranks."
+        )
 
     plot_types = ["hist", "cdf", "cdf-diff"]
     if plot_type not in plot_types:
@@ -1858,6 +1895,12 @@ def _sbc_rank_plot(
         )
     num_bins = max(num_bins, 1)
     assert isinstance(num_bins, int)
+    diff = plot_type == "cdf-diff"
+    cdf_ylim = (
+        _cdf_diff_ylim(ranks_list, num_bins, num_posterior_samples, show_uniform_region)
+        if diff
+        else (0.0, 1.0)
+    )
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
     if params_in_subplots:
@@ -1883,26 +1926,31 @@ def _sbc_rank_plot(
                 row_idx = jj // num_cols
                 plt.sca(ax[col_idx] if num_rows == 1 else ax[row_idx, col_idx])
 
-                if plot_type == "cdf":
+                if plot_type in ("cdf", "cdf-diff"):
                     _plot_ranks_as_cdf(
                         ranki[:, jj],  # type: ignore
                         num_bins,
+                        num_posterior_samples,
                         num_repeats,
                         ranks_label=ranks_labels[ii],
                         color=f"C{ii}" if colors is None else colors[ii],
                         xlabel=f"posterior ranks {parameter_labels[jj]}",
-                        # Show legend and ylabel only in first subplot.
+                        # Show ylabel only in first subplot.
                         show_ylabel=jj == 0,
                         alpha=line_alpha,
+                        diff=diff,
+                        ylim=cdf_ylim,
                     )
                     if ii == 0 and show_uniform_region:
                         _plot_cdf_region_expected_under_uniformity(
                             num_sbc_runs,
                             num_bins,
+                            num_posterior_samples,
                             num_repeats,
                             alpha=uniform_region_alpha,
+                            diff=diff,
                         )
-                elif plot_type == "hist":
+                else:
                     _plot_ranks_as_hist(
                         ranki[:, jj],  # type: ignore
                         num_bins,
@@ -1910,52 +1958,28 @@ def _sbc_rank_plot(
                         ranks_label=ranks_labels[ii],
                         color="firebrick" if colors is None else colors[ii],
                         xlabel=f"posterior rank {parameter_labels[jj]}",
-                        # Show legend and ylabel only in first subplot.
                         show_ylabel=show_ylabel,
                         alpha=line_alpha,
                         xlim_offset_factor=xlim_offset_factor,
                     )
-                    # Plot expected uniform band.
-                    _plot_hist_region_expected_under_uniformity(
-                        num_sbc_runs,
-                        num_bins,
-                        num_posterior_samples,
-                        alpha=uniform_region_alpha,
-                    )
-                    # show legend only in first subplot.
-                    if jj == 0 and ranks_labels[ii] is not None:
-                        plt.legend(**legend_kwargs)
-
-                elif plot_type == "cdf-diff":
-                    _plot_ranks_as_cdf_diff(
-                        ranki[:, jj],  # type: ignore
-                        num_bins,
-                        num_repeats,
-                        ranks_label=ranks_labels[ii],
-                        color=f"C{ii}" if colors is None else colors[ii],
-                        xlabel=f"posterior ranks {parameter_labels[jj]}",
-                        show_ylabel=jj == 0,
-                        alpha=line_alpha,
-                    )
                     if ii == 0 and show_uniform_region:
-                        _plot_cdf_diff_region_expected_under_uniformity(
+                        _plot_hist_region_expected_under_uniformity(
                             num_sbc_runs,
                             num_bins,
-                            num_repeats,
+                            num_posterior_samples,
                             alpha=uniform_region_alpha,
                         )
-
-                else:
-                    raise ValueError(
-                        f"plot_type {plot_type} not defined, use one in {plot_types}"
-                    )
-                # Remove empty subplots.
+        if plot_type == "hist" or num_ranks > 1:
+            plt.sca(ax.flat[0])
+            _sbc_legend(legend_kwargs)
+        # Remove empty subplots.
         col_idx += 1
         while num_rows > 1 and col_idx < num_cols:
             ax[row_idx, col_idx].axis("off")
             col_idx += 1
 
     # When there is only one set of ranks show all params in a single subplot.
+    # Only "cdf" and "cdf-diff" get here: "hist" always uses subplots.
     else:
         if fig is None or ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -1963,51 +1987,31 @@ def _sbc_rank_plot(
         plt.sca(ax)
         ranki = ranks_list[0]
         for jj in range(num_parameters):
-            if plot_type == "cdf":
-                _plot_ranks_as_cdf(
-                    ranki[:, jj],  # type: ignore
-                    num_bins,
-                    num_repeats,
-                    ranks_label=parameter_labels[jj],
-                    color=f"C{jj}" if colors is None else colors[jj],
-                    xlabel="posterior rank",
-                    # Plot ylabel and legend at last.
-                    show_ylabel=jj == (num_parameters - 1),
-                    alpha=line_alpha,
-                )
-            elif plot_type == "cdf-diff":
-                _plot_ranks_as_cdf_diff(
-                    ranki[:, jj],  # type: ignore
-                    num_bins,
-                    num_repeats,
-                    ranks_label=parameter_labels[jj],
-                    color=f"C{jj}" if colors is None else colors[jj],
-                    xlabel="posterior rank",
-                    # Plot ylabel and legend at last.
-                    show_ylabel=jj == (num_parameters - 1),
-                    alpha=line_alpha,
-                )
-            else:
-                raise ValueError(
-                    f"plot_type {plot_type} not defined, use one in {plot_types}"
-                )
+            _plot_ranks_as_cdf(
+                ranki[:, jj],  # type: ignore
+                num_bins,
+                num_posterior_samples,
+                num_repeats,
+                ranks_label=parameter_labels[jj],
+                color=f"C{jj}" if colors is None else colors[jj],
+                xlabel="posterior rank",
+                # Plot ylabel and legend at last.
+                show_ylabel=jj == (num_parameters - 1),
+                alpha=line_alpha,
+                diff=diff,
+                ylim=cdf_ylim,
+            )
         if show_uniform_region:
-            if plot_type == "cdf":
-                _plot_cdf_region_expected_under_uniformity(
-                    num_sbc_runs,
-                    num_bins,
-                    num_repeats,
-                    alpha=uniform_region_alpha,
-                )
-            else:
-                _plot_cdf_diff_region_expected_under_uniformity(
-                    num_sbc_runs,
-                    num_bins,
-                    num_repeats,
-                    alpha=uniform_region_alpha,
-                )
+            _plot_cdf_region_expected_under_uniformity(
+                num_sbc_runs,
+                num_bins,
+                num_posterior_samples,
+                num_repeats,
+                alpha=uniform_region_alpha,
+                diff=diff,
+            )
         # show legend on the last subplot.
-        plt.legend(**legend_kwargs)
+        _sbc_legend(legend_kwargs)
 
     return fig, ax  # pyright: ignore[reportReturnType]
 
@@ -2044,6 +2048,7 @@ def _plot_ranks_as_hist(
     plt.hist(
         ranks,
         bins=num_bins,
+        range=(0, num_posterior_samples),
         label=ranks_label,
         color=color,
         alpha=alpha,
@@ -2062,6 +2067,7 @@ def _plot_ranks_as_hist(
 def _plot_ranks_as_cdf(
     ranks: np.ndarray,
     num_bins: int,
+    num_posterior_samples: int,
     num_repeats: int,
     ranks_label: Optional[str] = None,
     xlabel: Optional[str] = None,
@@ -2069,13 +2075,20 @@ def _plot_ranks_as_cdf(
     alpha: float = 0.8,
     show_ylabel: bool = True,
     num_ticks: int = 3,
+    diff: bool = False,
+    ylim: Tuple[float, float] = (0.0, 1.0),
 ) -> None:
     """Plot ranks as empirical CDFs on the current axis.
+
+    With `diff=True`, plot the difference between the empirical CDF and the
+    uniform CDF instead. Positive values mean more ranks accumulated than
+    expected, negative fewer.
 
     Args:
         ranks: SBC ranks in shape (num_sbc_runs, ).
         num_bins: number of bins for the histogram, recommendation is
             num_sbc_runs / 10.
+        num_posterior_samples: number of posterior samples used for ranking.
         num_repeats: number of repeats of each CDF step, i.e., resolution of the
             empirical CDF.
         ranks_label: label for the ranks, e.g., when comparing ranks of different
@@ -2083,145 +2096,143 @@ def _plot_ranks_as_cdf(
         xlabel: label for the current parameter.
         color: line color for the cdf.
         alpha: line transparency.
-        show_ylabel: whether to show y-label "empirical CDF".
+        show_ylabel: whether to show the y-label.
         num_ticks: number of ticks on the x-axis.
+        diff: whether to plot the difference to the uniform CDF.
+        ylim: y range.
 
     """
-    # Generate histogram of ranks.
-    hist, *_ = np.histogram(ranks, bins=num_bins, density=False)
-    # Construct empirical CDF.
-    histcs = hist.cumsum()
+    if diff:
+        offset = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
+        ylabel = "empirical CDF - uniform CDF"
+    else:
+        offset = 0.0
+        ylabel = "empirical CDF"
+    yticks = np.linspace(*ylim, 3)
+
     # Plot cdf and repeat each stair step
     plt.plot(
-        np.linspace(0, num_bins, num_repeats * num_bins),
-        np.repeat(histcs / histcs.max(), num_repeats),
+        _cdf_x(num_bins, num_posterior_samples, num_repeats),
+        np.repeat(_ecdf(ranks, num_bins, num_posterior_samples) - offset, num_repeats),
         label=ranks_label,
         color=color,
         alpha=alpha,
     )
 
     if show_ylabel:
-        plt.yticks(np.linspace(0, 1, 3))
-        plt.ylabel("empirical CDF")
+        plt.yticks(yticks)
+        plt.ylabel(ylabel)
     else:
         # Plot ticks only
-        plt.yticks(np.linspace(0, 1, 3), [])
+        plt.yticks(yticks, [])
 
-    plt.ylim(0, 1)
-    plt.xlim(0, num_bins)
-    plt.xticks(np.linspace(0, num_bins, num_ticks))
+    if diff:
+        plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
+    plt.ylim(*ylim)
+    plt.xlim(0, num_posterior_samples)
+    plt.xticks(np.linspace(0, num_posterior_samples, num_ticks))
     plt.xlabel("posterior rank" if xlabel is None else xlabel)
 
 
-def _plot_ranks_as_cdf_diff(
-    ranks: np.ndarray,
-    num_bins: int,
-    num_repeats: int,
-    ranks_label: Optional[str] = None,
-    xlabel: Optional[str] = None,
-    color: Optional[str] = None,
-    alpha: float = 0.8,
-    show_ylabel: bool = True,
-    num_ticks: int = 3,
-) -> None:
-    """Plot the difference between the empirical CDF and the uniform CDF.
+_UNIFORM_REGION_LABEL = "expected under uniformity"
+_UNIFORM_REGION_GID = "sbc-uniform-region"
 
-    Positive values mean more ranks accumulated than expected, negative fewer.
 
-    Args:
-        ranks: SBC ranks in shape (num_sbc_runs, )
-        num_bins: number of bins for the histogram.
-        num_repeats: number of repeats of each CDF step, i.e., resolution of the
-            empirical CDF.
-        ranks_label: label for the ranks, e.g., when comparing ranks of different
-            methods.
-        xlabel: label for the current parameter.
-        color: line color for the cdf.
-        alpha: line transparency.
-        show_ylabel: whether to show y-label.
-        num_ticks: number of ticks on the x-axis.
-    """
-    hist, *_ = np.histogram(ranks, bins=num_bins, density=False)
+def _ecdf(ranks: np.ndarray, num_bins: int, num_posterior_samples: int) -> np.ndarray:
+    """Empirical CDF of the ranks at the right edge of each bin over [0, N]."""
+    hist, _ = np.histogram(ranks, bins=num_bins, range=(0, num_posterior_samples))
     histcs = hist.cumsum()
-    ecdf = histcs / histcs.max()
-    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
-    diff = ecdf - uniform_cdf
+    return histcs / histcs.max()
 
-    plt.plot(
-        np.linspace(0, num_bins, num_repeats * num_bins),
-        np.repeat(diff, num_repeats),
-        label=ranks_label,
-        color=color,
-        alpha=alpha,
+
+def _cdf_diff_ylim(
+    ranks_list: List[np.ndarray],
+    num_bins: int,
+    num_posterior_samples: int,
+    include_band: bool,
+) -> Tuple[float, float]:
+    """Symmetric y range for cdf-diff plots that fits every curve and the band.
+
+    The range is at least (-0.5, 0.5) and grows in steps of 0.1 up to (-1, 1).
+    """
+    uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
+    deviations = [
+        _ecdf(param_ranks, num_bins, num_posterior_samples) - uniform_cdf
+        for ranks in ranks_list
+        for param_ranks in ranks.T
+    ]
+    if include_band:
+        num_sbc_runs = ranks_list[0].shape[0]
+        _, lower, upper = _uniform_cdf_band(
+            num_sbc_runs, num_bins, num_posterior_samples
+        )
+        deviations += [lower - uniform_cdf, upper - uniform_cdf]
+    largest = max(np.abs(deviation).max() for deviation in deviations)
+    # Round before ceil, so that 0.9 does not become 1.0 from float error.
+    half_range = max(0.5, float(np.ceil(round(largest * 10, 6))) / 10)
+    return -half_range, half_range
+
+
+def _uniform_rank_bin_probs(num_bins: int, num_posterior_samples: int) -> np.ndarray:
+    """Probability of each bin when the ranks are uniform on 0, ..., N.
+
+    Bins over [0, N] can hold different numbers of the N + 1 integer ranks: for
+    N = 10 and 10 bins, the last bin holds ranks 9 and 10.
+    """
+    counts, _ = np.histogram(
+        np.arange(num_posterior_samples + 1),
+        bins=num_bins,
+        range=(0, num_posterior_samples),
     )
+    return counts / (num_posterior_samples + 1)
 
-    if show_ylabel:
-        plt.yticks(np.linspace(-0.5, 0.5, 3))
-        plt.ylabel("empirical CDF - uniform CDF")
-    else:
-        plt.yticks(np.linspace(-0.5, 0.5, 3), [])
 
-    plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
-    plt.ylim(-0.5, 0.5)
-    plt.xlim(0, num_bins)
-    plt.xticks(np.linspace(0, num_bins, num_ticks))
-    plt.xlabel("posterior rank" if xlabel is None else xlabel)
+def _cdf_x(num_bins: int, num_posterior_samples: int, num_repeats: int) -> np.ndarray:
+    """x positions of the CDF steps in rank units, num_repeats per bin."""
+    return np.linspace(0, num_posterior_samples, num_repeats * num_bins)
+
+
+def _uniform_cdf_band(
+    num_sbc_runs: int, num_bins: int, num_posterior_samples: int
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Uniform CDF at each bin, and the 99% band of the empirical CDF around it."""
+    uniform_cdf = _uniform_rank_bin_probs(num_bins, num_posterior_samples).cumsum()
+    # Decrease the last entry by epsilon to find valid confidence intervals.
+    p = uniform_cdf.copy()
+    p[-1] -= 1e-9
+    lower = binom(num_sbc_runs, p).ppf(0.005)
+    upper = binom(num_sbc_runs, p).ppf(0.995)
+    return uniform_cdf, lower / lower.max(), upper / upper.max()
 
 
 def _plot_cdf_region_expected_under_uniformity(
     num_sbc_runs: int,
     num_bins: int,
+    num_posterior_samples: int,
     num_repeats: int,
     alpha: float = 0.2,
     color: str = "gray",
+    diff: bool = False,
 ) -> None:
-    """Plot region of empirical cdfs expected under uniformity on the current axis."""
+    """Plot region of empirical cdfs expected under uniformity on the current axis.
 
-    # Construct uniform histogram.
-    uni_bins = binom(num_sbc_runs, p=1 / num_bins).ppf(0.5) * np.ones(num_bins)
-    uni_bins_cdf = uni_bins.cumsum() / uni_bins.sum()
-    # Decrease value one in last entry by epsilon to find valid
-    # confidence intervals.
-    uni_bins_cdf[-1] -= 1e-9
+    With `diff=True`, plot the region of their differences to the uniform CDF.
+    """
 
-    lower = [binom(num_sbc_runs, p=p).ppf(0.005) for p in uni_bins_cdf]
-    upper = [binom(num_sbc_runs, p=p).ppf(0.995) for p in uni_bins_cdf]
+    uniform_cdf, lower, upper = _uniform_cdf_band(
+        num_sbc_runs, num_bins, num_posterior_samples
+    )
+    offset = uniform_cdf if diff else 0.0
 
     # Plot grey area with expected ECDF.
     plt.fill_between(
-        x=np.linspace(0, num_bins, num_repeats * num_bins),
-        y1=np.repeat(lower / np.max(lower), num_repeats),
-        y2=np.repeat(upper / np.max(upper), num_repeats),  # pyright: ignore[reportArgumentType]
+        x=_cdf_x(num_bins, num_posterior_samples, num_repeats),
+        y1=np.repeat(lower - offset, num_repeats),
+        y2=np.repeat(upper - offset, num_repeats),
         color=color,
         alpha=alpha,
-        label="expected under uniformity",
-    )
-
-
-def _plot_cdf_diff_region_expected_under_uniformity(
-    num_sbc_runs: int,
-    num_bins: int,
-    num_repeats: int,
-    alpha: float = 0.2,
-    color: str = "gray",
-) -> None:
-    """Plot region of empirical CDF differences expected under uniformity."""
-
-    uni_bins = binom(num_sbc_runs, p=1 / num_bins).ppf(0.5) * np.ones(num_bins)
-    uni_bins_cdf = uni_bins.cumsum() / uni_bins.sum()
-    uni_bins_cdf[-1] -= 1e-9
-
-    lower = [binom(num_sbc_runs, p=p).ppf(0.005) for p in uni_bins_cdf]
-    upper = [binom(num_sbc_runs, p=p).ppf(0.995) for p in uni_bins_cdf]
-
-    uniform_cdf = np.linspace(1 / num_bins, 1, num_bins)
-    plt.fill_between(
-        x=np.linspace(0, num_bins, num_repeats * num_bins),
-        y1=np.repeat(np.array(lower) / np.max(lower) - uniform_cdf, num_repeats),
-        y2=np.repeat(np.array(upper) / np.max(upper) - uniform_cdf, num_repeats),
-        color=color,
-        alpha=alpha,
-        label="expected under uniformity",
+        label=_UNIFORM_REGION_LABEL,
+        gid=_UNIFORM_REGION_GID,
     )
 
 
@@ -2232,10 +2243,12 @@ def _plot_hist_region_expected_under_uniformity(
     alpha: float = 0.2,
     color: str = "gray",
 ) -> None:
-    """Plot region of empirical cdfs expected under uniformity."""
+    """Plot one flat band that holds the 99% interval of every bin under uniformity."""
 
-    lower = binom(num_sbc_runs, p=1 / (num_bins + 1)).ppf(0.005)
-    upper = binom(num_sbc_runs, p=1 / (num_bins + 1)).ppf(0.995)
+    # Binomial quantiles grow with p, so this band holds every bin's interval.
+    p = _uniform_rank_bin_probs(num_bins, num_posterior_samples)
+    lower = binom(num_sbc_runs, p=p.min()).ppf(0.005)
+    upper = binom(num_sbc_runs, p=p.max()).ppf(0.995)
 
     # Plot grey area with expected ECDF.
     plt.fill_between(
@@ -2244,8 +2257,30 @@ def _plot_hist_region_expected_under_uniformity(
         y2=np.repeat(upper, num_bins),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
-        label="expected under uniformity",
+        label=_UNIFORM_REGION_LABEL,
+        gid=_UNIFORM_REGION_GID,
     )
+
+
+def _sbc_legend(legend_kwargs: Dict) -> None:
+    """Add a legend that lists the uniformity band once, after the curves.
+
+    `handles` and `labels` in `legend_kwargs` take precedence; custom `handles`
+    keep their own labels.
+    """
+    if "handles" in legend_kwargs:
+        plt.legend(**legend_kwargs)
+        return
+    entries = list(zip(*plt.gca().get_legend_handles_labels(), strict=True))
+    is_band = [
+        isinstance(handle, Artist) and handle.get_gid() == _UNIFORM_REGION_GID
+        for handle, _ in entries
+    ]
+    curves = [entry for entry, band in zip(entries, is_band, strict=True) if not band]
+    bands = [entry for entry, band in zip(entries, is_band, strict=True) if band]
+    handles = [handle for handle, _ in curves + bands[:1]]
+    labels = [label for _, label in curves + bands[:1]]
+    plt.legend(**{"handles": handles, "labels": labels, **legend_kwargs})
 
 
 # Diagnostics for hypothesis tests
@@ -2276,7 +2311,7 @@ def pp_plot(
             of shape (n_eval,).
         labels: labels for the estimators, defaults to None.
         colors: colors for the estimators, defaults to None.
-        conf_alpha: significanecee level of the hypothesis test.
+        conf_alpha: significance level of the hypothesis test.
         n_alphas: number of cdf-values to compute the P-P plot, defaults to 100.
         ax: axis to plot on, defaults to None.
         kwargs: additional arguments for matplotlib plotting.
@@ -2343,7 +2378,7 @@ def marginal_plot_with_probs_intensity(
         n_bins: number of bins for the histogram, defaults to 20.
         vmin: minimum value for the color intensity, defaults to 0.
         vmax: maximum value for the color intensity, defaults to 1.
-        cmap: colormap for the color intensity, defaults to "Spectral_r".
+        cmap_name: colormap for the color intensity, defaults to "Spectral_r".
         show_colorbar: whether to show the colorbar, defaults to True.
         label: label for the colorbar, defaults to None.
         ax (matplotlib.axes.Axes): axes to plot on, defaults to None.
@@ -2372,7 +2407,7 @@ def marginal_plot_with_probs_intensity(
         # create bins: all samples between bin edges are assigned to the same bin
         probs_per_marginal["bins"] = np.searchsorted(bins, probs_per_marginal["s"]) - 1
         probs_per_marginal["bins"][probs_per_marginal["bins"] < 0] = 0
-        # get mean prob for each bin (same as pandas groupy method)
+        # get mean prob for each bin (same as pandas groupby method)
         array_probs = np.concatenate(
             [probs_per_marginal["bins"][:, None], probs_per_marginal["probs"][:, None]],
             axis=1,
@@ -2416,7 +2451,7 @@ def marginal_plot_with_probs_intensity(
         )
         unique_bins = np.unique(group_idx, return_counts=True, axis=0)[0]
 
-        # get mean prob for each bin (same as pandas groupy method)
+        # get mean prob for each bin (same as pandas groupby method)
         mean_probs = np.zeros((len(unique_bins),))
         for i in range(len(unique_bins)):
             idx = np.where((group_idx == unique_bins[i]).all(axis=1))
@@ -2465,7 +2500,7 @@ def pp_plot_lc2st(
             of shape (n_eval,). One array per estimator.
         probs_null: predicted probability under the null hypothesis and evaluated on
             the test set, of shape (n_eval,). One array per null trial.
-        conf_alpha: significanecee level of the hypothesis test.
+        conf_alpha: significance level of the hypothesis test.
         kwargs: additional arguments for `pp_plot`.
 
     Returns:
@@ -2522,7 +2557,21 @@ def plot_tarp(
 
 # TO BE DEPRECATED
 # ----------------
-def pairplot_dep(
+def pairplot_dep(*args, **kwargs) -> Tuple[FigureBase, Axes]:
+    """Deprecated, will be removed in sbi v0.29.0. Use `pairplot` instead.
+
+    Takes the arguments of `_pairplot_dep`.
+    """
+    warn(
+        "`pairplot_dep` is deprecated since sbi v0.28.0 and will be removed in "
+        "v0.29.0. Use `pairplot` with `fig_kwargs` and the `*_kwargs` arguments.",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return _pairplot_dep(*args, **kwargs)
+
+
+def _pairplot_dep(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
@@ -2703,7 +2752,21 @@ def pairplot_dep(
     )
 
 
-def marginal_plot_dep(
+def marginal_plot_dep(*args, **kwargs) -> Tuple[FigureBase, Axes]:
+    """Deprecated, will be removed in sbi v0.29.0. Use `marginal_plot` instead.
+
+    Takes the arguments of `_marginal_plot_dep`.
+    """
+    warn(
+        "`marginal_plot_dep` is deprecated since sbi v0.28.0 and will be removed "
+        "in v0.29.0. Use `marginal_plot` with `fig_kwargs` and `diag_kwargs`.",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return _marginal_plot_dep(*args, **kwargs)
+
+
+def _marginal_plot_dep(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]

@@ -3,7 +3,6 @@
 
 import warnings
 from abc import ABC, abstractmethod
-from dataclasses import asdict
 from typing import (
     Any,
     Callable,
@@ -36,6 +35,7 @@ from sbi.inference.trainers._contracts import (
     LossArgsNPE,
     StartIndexContext,
     TrainConfig,
+    loss_args_to_kwargs,
 )
 from sbi.inference.trainers.base import (
     LossArgs,
@@ -55,10 +55,10 @@ from sbi.neural_nets.estimators.shape_handling import (
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
     _DENSITY_CONFIGS,
-    _ESTIMATOR_CONFIG_BASES,
     DensityConfigBase,
     MAFConfig,
     PretrainedConfigBase,
+    _PerModelConfigBase,
 )
 from sbi.sbi_types import TorchTransform, Tracker
 from sbi.utils import (
@@ -149,7 +149,7 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
                 stacklevel=3,
             )
             self._build_neural_net = posterior_nn(model=density_estimator)
-        elif isinstance(density_estimator, _ESTIMATOR_CONFIG_BASES):
+        elif isinstance(density_estimator, _PerModelConfigBase):
             if not isinstance(density_estimator, self._ALLOWED_BUILDER_TYPES):
                 allowed = " or ".join(t.__name__ for t in self._ALLOWED_BUILDER_TYPES)
                 hint = self._BUILDER_TYPE_HINT or getattr(
@@ -741,7 +741,9 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
             )
 
         # Take negative loss here to get validation log_prob.
-        losses = self._loss(theta_batch, x_batch, masks_batch, **asdict(loss_args))
+        losses = self._loss(
+            theta_batch, x_batch, masks_batch, **loss_args_to_kwargs(loss_args)
+        )
 
         return losses
 

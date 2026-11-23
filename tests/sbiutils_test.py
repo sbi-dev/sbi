@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import logging
 import warnings
 from typing import Tuple
 
@@ -24,6 +25,7 @@ from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
+    clamp_and_warn,
     gradient_ascent,
     mcmc_transform,
     warn_if_invalid_for_zscoring,
@@ -439,6 +441,65 @@ def test_kde_cv_bandwidth_falls_back_for_concentrated_weights():
     assert kde.kde.bandwidth == get_kde(samples, "cv").kde.bandwidth
 
 
+@pytest.mark.parametrize("z_score", (None, "none", "independent", "structured"))
+def test_build_z_scored_embedding_net(z_score):
+    """Prepends a z-scoring layer only when asked, and never copies the net."""
+    from sbi.utils.sbiutils import build_z_scored_embedding_net, standardizing_net
+
+    batch = 3.0 + 2.0 * torch.randn(50, 4)
+    embedding_net = torch.nn.Linear(4, 2)
+
+    net = build_z_scored_embedding_net(batch, z_score, embedding_net)
+
+    if z_score in (None, "none"):
+        assert net is embedding_net
+    else:
+        assert isinstance(net, torch.nn.Sequential)
+        assert net[1] is embedding_net
+        expected = standardizing_net(batch, structured_dims=z_score == "structured")
+        torch.testing.assert_close(net[0](batch), expected(batch))
+
+
+def test_z_scored_embedding_net_old_import_paths():
+    """The classifier and restriction-estimator names keep working."""
+    from sbi.neural_nets.net_builders.classifier import (
+        build_z_scored_embedding_net as classifier_helper,
+    )
+    from sbi.utils.restriction_estimator import build_input_layer
+    from sbi.utils.sbiutils import build_z_scored_embedding_net
+
+    assert classifier_helper is build_z_scored_embedding_net
+    embedding_net = torch.nn.Identity()
+    net = build_input_layer(
+        batch_theta=torch.randn(20, 3),
+        z_score_theta="none",
+        embedding_net_theta=embedding_net,
+    )
+    assert net is embedding_net
+
+
+@pytest.mark.parametrize(
+    "builder_name",
+    ["build_maf", "build_zuko_maf", "build_mdn", "build_mlp_classifier"],
+)
+def test_transform_to_unconstrained_raises_for_the_condition(builder_name):
+    """The condition has no distribution to derive the transform from, so the
+    builders raise instead of building without it."""
+    from sbi.neural_nets import net_builders
+
+    build = getattr(net_builders, builder_name)
+    theta, x = torch.rand(20, 3), torch.rand(20, 2)
+    with pytest.raises(ValueError, match="transform_to_unconstrained"):
+        build(theta, x, z_score_y="transform_to_unconstrained")
+
+
+def test_restriction_estimator_input_rejects_transform_to_unconstrained():
+    from sbi.utils.restriction_estimator import build_input_layer
+
+    with pytest.raises(ValueError, match="transform_to_unconstrained"):
+        build_input_layer(torch.randn(20, 3), "transform_to_unconstrained")
+
+
 @pytest.mark.parametrize(
     "z_x",
     [
@@ -572,6 +633,16 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
             # `x_dist` is read only by the unconstrained transform.
             if modeled_z == "transform_to_unconstrained" and implements_transform:
                 kwargs["x_dist"] = dist
+
+        # NCSF models data on [-pi, pi), so its config offers no z-score. An
+        # argument left at the factory default gives way to that.
+        if model == "zuko_ncsf" and modeled_z in (
+            "structured",
+            "transform_to_unconstrained",
+        ):
+            with pytest.raises(ValueError, match="z_score_input"):
+                build_fn(**kwargs)(theta, model_x)
+            continue
 
         unsupported = (
             modeled_z == "transform_to_unconstrained" and not implements_transform
@@ -909,3 +980,12 @@ def test_gradient_ascent_returns_map_in_prior_space(inits, atol):
     assert argmax.shape == (1, 2)
     assert max_val.shape == (1,)
     assert torch.allclose(argmax, optimum, atol=atol)
+
+
+def test_sbi_warnings_use_module_loggers(caplog):
+    """A root-logger call configures the root logger on first use, after which the
+    user's own `logging.basicConfig()` silently does nothing."""
+    with caplog.at_level(logging.WARNING):
+        clamp_and_warn("learning_rate", 5.0, 0.0, 1.0)
+
+    assert [record.name for record in caplog.records] == ["sbi.utils.sbiutils"]

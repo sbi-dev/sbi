@@ -8,7 +8,11 @@ import torch
 from torch import Tensor, log
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import (
+    _IID_SAMPLERS,
+    _ONE_AT_A_TIME,
+    NeuralPosterior,
+)
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
@@ -22,7 +26,6 @@ from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
 from sbi.utils.torchutils import (
     ensure_theta_batched,
-    process_device,
     split_leading_dim,
 )
 from sbi.utils.user_input_checks import check_prior
@@ -99,45 +102,15 @@ class DirectPosterior(NeuralPosterior):
         self._purpose = """It samples the posterior network and rejects samples that
             lie outside of the prior bounds."""
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """Move posterior_estimator, prior and x_o to device.
-
-        Changes the device attribute, reinstanciates the
-        posterior, and resets the default x.
-
-        Args:
-            device: device where to move the posterior to.
-        """
-        device = process_device(device)
-        self.device = device
-        if hasattr(self.prior, "to"):
-            self.prior.to(device)  # type: ignore
-        else:
-            raise ValueError("""Prior has no attribute to(device).""")
-        if hasattr(self.posterior_estimator, "to"):
-            self.posterior_estimator.to(device)
-        else:
-            raise ValueError("""Posterior estimator has no attribute to(device).""")
-
-        potential_fn, theta_transform = posterior_estimator_based_potential(
-            self.posterior_estimator,
-            self.prior,
-            x_o=None,
-            enable_transform=self.enable_transform,
+    @property
+    def _one_observation_hint(self) -> str:
+        return (
+            f"{_ONE_AT_A_TIME}, or use `sample_batched()` and `log_prob_batched()`. "
+            "To combine them as iid trials, use a posterior built with "
+            f"{_IID_SAMPLERS}. For a direct posterior of several trials, train with "
+            "a permutation-invariant embedding net on sets of trials, and pass each "
+            "set as one observation."
         )
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-
-        super().__init__(
-            potential_fn=potential_fn,
-            theta_transform=theta_transform,
-            device=device,
-            x_shape=self.x_shape,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
 
     def sample(
         self,
@@ -175,17 +148,7 @@ class DirectPosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
-        x = reshape_to_batch_event(
-            x, event_shape=self.posterior_estimator.condition_shape
-        )
-        if x.shape[0] > 1:
-            raise ValueError(
-                ".sample() supports only `batchsize == 1`. If you intend "
-                "to sample multiple observations, use `.sample_batched()`. "
-                "If you intend to sample i.i.d. observations, set up the "
-                "posterior density estimator with an appropriate permutation "
-                "invariant embedding net."
-            )
+        self._check_num_observations(x.shape[0])
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -264,10 +227,8 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Samples from the posteriors of shape (*sample_shape, B, *input_shape)
         """
-        self._assert_finite_x(x)
+        x = self._process_x(x)
         num_samples = torch.Size(sample_shape).numel()
-        condition_shape = self.posterior_estimator.condition_shape
-        x = reshape_to_batch_event(x.to(self._device), event_shape=condition_shape)
         num_xos = x.shape[0]
 
         # throw warning if num_x * num_samples is too large
@@ -357,24 +318,14 @@ class DirectPosterior(NeuralPosterior):
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, theta.shape[1:], leading_is_sample=True
         )
-        x_density_estimator = reshape_to_batch_event(
-            x, event_shape=self.posterior_estimator.condition_shape
-        )
-        if x_density_estimator.shape[0] > 1:
-            raise ValueError(
-                ".log_prob() supports only `batchsize == 1`. If you intend "
-                "to evaluate given multiple observations, use `.log_prob_batched()`. "
-                "If you intend to evaluate given i.i.d. observations, set up the "
-                "posterior density estimator with an appropriate permutation "
-                "invariant embedding net."
-            )
+        self._check_num_observations(x.shape[0])
 
         self.posterior_estimator.eval()
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
             unnorm_log_prob = self.posterior_estimator.log_prob(
-                theta_density_estimator, condition=x_density_estimator
+                theta_density_estimator, condition=x
             )
             # `log_prob` supports only a single observation (i.e. `batchsize==1`).
             # We now remove this additional dimension.
@@ -438,12 +389,11 @@ class DirectPosterior(NeuralPosterior):
             in the support of the prior, -∞ (corresponding to 0 probability) outside.
         """
 
-        self._assert_finite_x(x)
+        x = self._process_x(x)
         theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
-        x = x.to(self._device)
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
-        # overwise, the leading is sample.
+        # otherwise, the leading is sample.
         num_leading = len(theta.shape) - len(event_shape)
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, event_shape, leading_is_sample=(num_leading > 1)
@@ -492,7 +442,7 @@ class DirectPosterior(NeuralPosterior):
 
         The factor is estimated from the acceptance probability during rejection
         sampling from the posterior. It is saved for the last `x` and re-estimated
-        whenever `x` changes. It is 1 for unbounded priors.
+        whenever `x` or `num_rejection_samples` changes. It is 1 for unbounded priors.
 
         Arguments:
             x: Observation at which to estimate the factor.
@@ -502,8 +452,9 @@ class DirectPosterior(NeuralPosterior):
             rejection_sampling_batch_size: Batch size for rejection sampling.
 
         Returns:
-            Saved or newly-estimated correction factor (as a scalar `Tensor`).
+            Saved or newly-estimated correction factor, one per observation in `x`.
         """
+        x = self._x_else_default_x(x)
 
         def acceptance() -> Tensor:
             return rejection.accept_reject_sample(
@@ -520,7 +471,9 @@ class DirectPosterior(NeuralPosterior):
                 },
             )[1]
 
-        return self._cached_leakage_factor(x, self.prior, acceptance, force_update)
+        return self._cached_leakage_factor(
+            x, num_rejection_samples, self.prior, acceptance, force_update
+        )
 
     def map(
         self,
@@ -550,14 +503,15 @@ class DirectPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it must be `posterior`, which samples the
+                posterior `num_init_samples` times. If it is a tensor, the tensor is
+                used as the initial locations, so prior-based initialization can be
+                done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the

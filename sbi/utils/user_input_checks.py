@@ -31,12 +31,11 @@ from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     OneDimPriorWrapper,
-    PytorchReturnTypeWrapper,
+    convert_distribution_to_float32,
 )
 
 if TYPE_CHECKING:
     from sbi.neural_nets.net_builders.estimator_configs import (
-        _EstimatorBuilderBase,
         _PerModelConfigBase,
     )
 
@@ -120,7 +119,7 @@ def process_prior(
             - `theta_numel`: Dimensionality of a single sample from the prior.
             - `prior_returns_numpy`: Whether the prior originally returned NumPy arrays.
 
-    Example:
+    Example
     --------
 
     ::
@@ -274,21 +273,22 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     prior_dtype = prior.sample().dtype
     if prior_dtype != float32:
         warnings.warn(
-            f"Prior has dtype {prior_dtype}. sbi casts the samples and log probs of "
-            "the prior to float32.",
+            f"Prior has dtype {prior_dtype}. sbi rebuilds the prior in float32 or, "
+            "if that fails, casts its samples and log probs to float32.",
             stacklevel=2,
         )
-        prior = PytorchReturnTypeWrapper(
-            prior, return_type=float32, validate_args=False
-        )
+        prior = convert_distribution_to_float32(prior)
 
-    # This will fail for float64 priors.
     check_prior_return_type(prior)
 
     # Potentially required wrapper if the prior returns an additional sample dimension
-    # for `.log_prob()`.
+    # for `.log_prob()`. Prefer `Independent`: the vector field methods recognise it
+    # and use exact formulas for it.
     if prior.log_prob(prior.sample(torch.Size((10,)))).shape == torch.Size([10, 1]):
-        prior = OneDimPriorWrapper(prior, validate_args=False)
+        if prior.batch_shape == torch.Size([1]):
+            prior = Independent(prior, 1, validate_args=False)
+        else:
+            prior = OneDimPriorWrapper(prior, validate_args=False)
 
     theta_numel = prior.sample().numel()
 
@@ -533,7 +533,7 @@ def process_simulator(
             simulator: processed simulator that returns :class:`torch.Tensor` \
                 and can handle batches of parameters.
 
-    Example:
+    Example
     --------
 
     ::
@@ -644,51 +644,44 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
 def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
-    This means that `x` is returned with a `batch_dim`.
-
-    If `x_shape` is `None`, the shape is not checked.
+    This means that `x` is returned with a `batch_dim`. With `x_event_shape`, an `x`
+    of exactly that shape is one observation and gets a batch dimension of 1, and any
+    other shape than `(num_observations, *x_event_shape)` raises a ValueError. If
+    `x_event_shape` is `None`, the shape is not checked.
 
     Args:
         x: Observed data as provided by the user.
-        x_event_shape: Prescribed shape - either directly provided by the user at init
-            or inferred by sbi by running a simulation and checking the output. Does not
-            contain a batch dimension.
+        x_event_shape: Shape of one observation, without batch dimension.
 
     Returns:
-        x: Observed data with shape ready for usage in sbi.
+        x: Observed data of shape `(num_observations, *x_event_shape)`.
+
+    Raises:
+        ValueError: If `x` does not match `x_event_shape`.
     """
-
+    input_shape = tuple(torch.as_tensor(x).shape)
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
-    if x_event_shape is not None and len(x_event_shape) > len(x.shape):
-        raise ValueError(
-            f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
-            f"from simulations) is {x_event_shape}. We are raising this error because "
-            f"len(x_event_shape) > len(x.shape)"
-        )
+    if x_event_shape is None:
+        return x
 
-    # If x_shape is provided, we can fix a missing batch dim for >1D data.
-    if x_event_shape is not None and len(x_event_shape) == len(x.shape):
+    if len(x.shape) == len(x_event_shape):
         x = x.unsqueeze(0)
-
-    input_x_shape = x.shape
-
-    if x_event_shape is not None:
-        # Number of trials can change for every new x, but single trial x shape must
-        # match.
-        assert input_x_shape[1:] == x_event_shape, (
-            f"Observed data shape ({input_x_shape[1:]}) must match "
-            f"the shape of simulated data x ({x_event_shape})."
+    if x.shape[1:] != x_event_shape:
+        event = tuple(x_event_shape)
+        raise ValueError(
+            f"x has shape {input_shape}, but one observation has shape {event}. "
+            f"Pass one observation of shape {event}, or several of shape "
+            f"(num_observations, {', '.join(str(d) for d in event)})."
         )
     return x
 
 
 def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
-    """Assert requirements for simulator, prior and observation for usage in sbi.
+    """Assert requirements for simulator and prior for usage in sbi.
 
     Args:
         simulator: simulator function
         prior: prior (Distribution like)
-        x_shape: Shape of single simulation output $x$.
     """
     check_prior_support(prior)
     num_prior_samples = 1
@@ -711,7 +704,7 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
 
 
 def check_estimator_arg(
-    estimator: Union[str, Callable, "_PerModelConfigBase", "_EstimatorBuilderBase"],
+    estimator: Union[str, Callable, "_PerModelConfigBase"],
 ) -> None:
     """Check (density or ratio) estimator argument passed by the user.
 
@@ -721,16 +714,16 @@ def check_estimator_arg(
     Args:
         estimator: The estimator argument to check.
     """
-    from sbi.neural_nets.net_builders.estimator_configs import _ESTIMATOR_CONFIG_BASES
+    from sbi.neural_nets.net_builders.estimator_configs import _PerModelConfigBase
 
-    if isinstance(estimator, type) and issubclass(estimator, _ESTIMATOR_CONFIG_BASES):
+    if isinstance(estimator, type) and issubclass(estimator, _PerModelConfigBase):
         raise TypeError(
             f"Got the config class {estimator.__name__}, not an instance. "
             f"Use {estimator.__name__}()."
         )
 
     if not (
-        isinstance(estimator, (str, *_ESTIMATOR_CONFIG_BASES))
+        isinstance(estimator, (str, _PerModelConfigBase))
         or (isinstance(estimator, Callable) and not isinstance(estimator, nn.Module))
     ):
         raise TypeError(

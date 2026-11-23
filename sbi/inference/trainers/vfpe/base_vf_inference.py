@@ -3,7 +3,7 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import asdict, replace
+from dataclasses import replace
 from typing import Any, Callable, ClassVar, Dict, Optional, Self, Sequence, Tuple, Union
 
 import torch
@@ -19,13 +19,18 @@ from sbi.inference.potentials.vector_field_potential import (
     VectorFieldBasedPotential,
     vector_field_estimator_based_potential,
 )
-from sbi.inference.trainers._contracts import LossArgsVF, StartIndexContext, TrainConfig
+from sbi.inference.trainers._contracts import (
+    LossArgsVF,
+    StartIndexContext,
+    TrainConfig,
+    loss_args_to_kwargs,
+)
 from sbi.inference.trainers.base import LossArgs
 from sbi.neural_nets.estimators import ConditionalVectorFieldEstimator
 from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
 from sbi.neural_nets.net_builders.estimator_configs import (
     VF_MODELS,
-    _ESTIMATOR_CONFIG_BASES,
+    _PerModelConfigBase,
 )
 from sbi.neural_nets.net_builders.vector_field_nets import VectorFieldConfigBase
 from sbi.sbi_types import TorchTransform, Tracker
@@ -93,7 +98,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
 
         check_estimator_arg(vector_field_estimator_builder)
 
-        if isinstance(vector_field_estimator_builder, _ESTIMATOR_CONFIG_BASES):
+        if isinstance(vector_field_estimator_builder, _PerModelConfigBase):
             if not isinstance(
                 vector_field_estimator_builder, self._ALLOWED_CONFIG_TYPE
             ):
@@ -231,7 +236,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         matching methods (FMPE).
 
         The denoising score matching loss has a high
-        variance, which makes it more difficult to detect converegence. To reduce this
+        variance, which makes it more difficult to detect convergence. To reduce this
         variance, we evaluate the validation loss at a fixed set of times. We also use
         the exponential moving average of the training and validation losses, as opposed
         to the other `trainer` classes, which track the loss directly.
@@ -547,7 +552,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
             theta=theta_batch,
             x=x_batch,
             masks=masks_batch,
-            **asdict(loss_args),
+            **loss_args_to_kwargs(loss_args),
         )
 
         return losses
@@ -611,7 +616,7 @@ class VectorFieldTrainer(NeuralInference[ConditionalVectorFieldEstimator], ABC):
         ema_loss_decay = summarization_kwargs.get("ema_loss_decay")
         assert ema_loss_decay is not None and isinstance(ema_loss_decay, float)
 
-        # NOTE: Due to the inherently noisy nature we do instead log a exponential
+        # NOTE: Due to the inherently noisy nature we do instead log an exponential
         # moving average of the training loss.
         if len(self._summary["training_loss"]) == 0:
             train_loss_ema = train_loss

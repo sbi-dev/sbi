@@ -12,8 +12,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Proposal, Shape, TorchTransform
-from sbi.utils import mcmc_transform
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -72,34 +71,6 @@ class RejectionPosterior(NeuralPosterior):
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        """
-        Move potential fucntion, proposal and x_o to the device.
-
-        This method reinstantiates the posterior and resets the default x_o
-
-        Args:
-            device: The device to move the posterior to.
-        """
-        device = process_device(device)
-        self.device = device
-        self.potential_fn.to(device)  # type: ignore
-        self.proposal.to(device)
-        x_o = None
-        if hasattr(self, "_x") and (self._x is not None):
-            x_o = self._x.to(device)
-
-        self.theta_transform = mcmc_transform(self.proposal, device=device)
-        super().__init__(
-            self.potential_fn,
-            theta_transform=self.theta_transform,
-            device=device,
-            x_shape=self.x_shape,
-        )
-        # super().__init__ erases the self._x, so we need to set it again
-        if x_o is not None:
-            self.set_default_x(x_o)
-
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:
@@ -107,6 +78,8 @@ class RejectionPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
+            x: Observation. If not provided, uses the default `x`. Several
+                observations are combined as iid trials.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -121,7 +94,7 @@ class RejectionPosterior(NeuralPosterior):
         )
         warn("The log-probability is unnormalized!", stacklevel=2)
 
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
@@ -148,7 +121,8 @@ class RejectionPosterior(NeuralPosterior):
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
             x: Conditioning observation $x_o$. If not provided, uses the default `x`
-                set via `.set_default_x()`.
+                set via `.set_default_x()`. Several observations are combined as iid
+                trials.
             max_sampling_batch_size: Maximum batch size for rejection sampling.
                 If not provided, uses the value specified at initialization.
             num_samples_to_find_max: Number of samples to find the maximum of the
@@ -175,7 +149,7 @@ class RejectionPosterior(NeuralPosterior):
             Samples from posterior.
         """
         num_samples = torch.Size(sample_shape).numel()
-        self.potential_fn = self.potential_fn.bind(self._x_else_default_x(x))
+        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
         potential = partial(self.potential_fn, track_gradients=True)
 
@@ -235,7 +209,7 @@ class RejectionPosterior(NeuralPosterior):
         raise NotImplementedError(
             "Batched sampling is not implemented for RejectionPosterior. \
             Alternatively you can use `sample` in a loop \
-            [posterior.sample(theta, x_o) for x_o in x]."
+            [posterior.sample(sample_shape, x=x_o) for x_o in x]."
         )
 
     def map(
@@ -266,14 +240,16 @@ class RejectionPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be either `posterior` or `proposal`, which
+                samples the respective distribution `num_init_samples` times (the
+                proposal is the prior for posteriors from `build_posterior()`). If it
+                is a tensor, the tensor is used as the initial locations, so
+                prior-based initialization can be done by passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the

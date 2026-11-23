@@ -4,7 +4,16 @@
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, Literal, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    Iterable,
+    Literal,
+    Optional,
+    Self,
+    Union,
+)
 
 import numpy as np
 import torch
@@ -12,14 +21,13 @@ from torch import Tensor, nn
 from torch.distributions import Distribution
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
-from tqdm.auto import tqdm
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import _ONE_AT_A_TIME, NeuralPosterior
+from sbi.utils.pbar import tqdm
 
 if TYPE_CHECKING:
     from sbi.inference.posteriors.posterior_parameters import VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
-from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.neural_nets.net_builders.flow import (
@@ -27,10 +35,14 @@ from sbi.neural_nets.net_builders.flow import (
     build_zuko_unconditional_flow,
 )
 from sbi.samplers.vi.vi_divergence_optimizers import get_VI_method
-from sbi.samplers.vi.vi_quality_control import get_quality_metric
+from sbi.samplers.vi.vi_quality_control import (
+    QualityControlError,
+    get_quality_metric,
+)
 from sbi.samplers.vi.vi_utils import (
     AdaptedVariationalDistribution,
     LearnableGaussian,
+    TransformedConditionalZukoFlow,
     TransformedZukoFlow,
     check_variational_distribution,
     detach_and_deepcopy,
@@ -41,12 +53,17 @@ from sbi.sbi_types import (
     TorchTensor,
     TorchTransform,
 )
-from sbi.utils.sbiutils import mcmc_transform
+from sbi.utils.sbiutils import (
+    _apply_to_transform,
+    mcmc_transform,
+    within_support,
+)
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
-    process_device,
+    move_tensors,
 )
+from sbi.utils.user_input_checks import process_x
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 # Supported Zuko flow types for VI (lowercase names)
@@ -207,7 +224,7 @@ class VIPosterior(NeuralPosterior):
         self._mode: Optional[Literal["single_x", "amortized"]] = None
 
         # Amortized mode: conditional flow q(θ|x)
-        self._amortized_q: Optional[ConditionalDensityEstimator] = None
+        self._amortized_q: Optional[TransformedConditionalZukoFlow] = None
 
         self._num_transforms: int = num_transforms
         self._hidden_features: int = hidden_features
@@ -239,45 +256,32 @@ class VIPosterior(NeuralPosterior):
             "can evaluate the _normalized_ posterior density with .log_prob()."
         )
 
-    def to(self, device: Union[str, torch.device]) -> "VIPosterior":
-        """Move all components to the given device.
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the posterior and its variational distributions to `device` in place.
+
+        The optimizer is reset; `train()` builds a new one.
 
         Args:
             device: The device to move the posterior to.
 
         Returns:
-            self for method chaining.
+            The posterior itself.
         """
-        device = process_device(device)
-        self._device = device
+        super().to(device)
+        device = self._device
+        _apply_to_transform(self.link_transform, lambda t: t.to(device))
+        self._trained_on = move_tensors(self._trained_on, device)
 
-        # Move potential (which moves prior, x_o, and estimator).
-        self.potential_fn.to(device)  # type: ignore
-        self._prior = move_distribution_to_device(self._prior, device)
-
-        # Rebuild link_transform on new device (same logic as __init__).
-        if self.theta_transform is None:
-            self.link_transform = mcmc_transform(self._prior, device=device).inv
-        else:
-            self.link_transform = self.theta_transform.inv
-
-        # Move cached tensors.
-        if self._x is not None:
-            self._x = self._x.to(device)
-        if self._map is not None:
-            self._map = self._map.to(device)
-        if self._trained_on is not None:
-            self._trained_on = self._trained_on.to(device)
-
-        # Move variational distributions.
         if hasattr(self, "_q") and hasattr(self._q, "to"):
             self._q.to(device)  # type: ignore[union-attr]
-        # Update link_transform reference on q if it caches one.
-        if hasattr(self, "_q") and hasattr(self._q, "_link_transform"):
-            self._q._link_transform = self.link_transform  # type: ignore[union-attr]
         if self._amortized_q is not None:
             self._amortized_q.to(device)
-
+        q_spec = getattr(self, "_q_spec", None)
+        if q_spec is not None and q_spec.init_snapshot is not None:
+            q_spec.init_snapshot = move_distribution_to_device(
+                q_spec.init_snapshot, device
+            )
+        self._optimizer = None
         return self
 
     def _build_unconditional_flow(
@@ -410,7 +414,7 @@ class VIPosterior(NeuralPosterior):
         hidden_features: int = 32,
         z_score_theta: Literal["none", "independent", "structured"] = "independent",
         z_score_x: Literal["none", "independent", "structured"] = "independent",
-    ) -> ConditionalDensityEstimator:
+    ) -> TransformedConditionalZukoFlow:
         """Build a conditional Zuko flow for amortized variational inference.
 
         Args:
@@ -426,7 +430,7 @@ class VIPosterior(NeuralPosterior):
                 structured data like images.
 
         Returns:
-            ConditionalDensityEstimator: The constructed conditional flow q(θ|x).
+            TransformedConditionalZukoFlow: The conditional flow q(θ|x) in prior space.
 
         Raises:
             ValueError: If flow_type is not supported.
@@ -441,15 +445,20 @@ class VIPosterior(NeuralPosterior):
                     f"Supported types: {[t.name for t in ZukoFlowType]}."
                 ) from e
 
-        return build_zuko_flow(
+        # The flow models θ in unconstrained space; the wrapper maps it to the prior
+        # support so that bounded priors are not evaluated outside their support.
+        flow = build_zuko_flow(
             flow_type.value.upper(),
-            batch_x=theta,  # θ is what we model
+            batch_x=self.link_transform.inv(theta),  # unconstrained θ is modelled
             batch_y=x,  # x is the condition
             z_score_x=z_score_theta,  # z-score for θ (naming mismatch)
             z_score_y=z_score_x,  # z-score for x condition
             num_transforms=num_transforms,
             hidden_features=hidden_features,
-        ).to(self._device)
+        )
+        return TransformedConditionalZukoFlow(flow, self.link_transform).to(
+            self._device
+        )
 
     @property
     def q(
@@ -553,13 +562,26 @@ class VIPosterior(NeuralPosterior):
                 q = self._build_q_from_spec()
             self._trained_on = None
         elif isinstance(q, VIPosterior):
-            # A copy, so that later `set_q` calls on one posterior stay local to it.
-            self._q_spec = replace(q._q_spec)
-            self._trained_on = q._trained_on
+            # A copy, so that later `set_q` or `to` calls on one posterior stay local
+            # to it.
+            snapshot = q._q_spec.init_snapshot
+            if snapshot is not None:
+                snapshot = detach_and_deepcopy(snapshot)
+            self._q_spec = replace(q._q_spec, init_snapshot=snapshot)
+            self._trained_on = (
+                None if q._trained_on is None else q._trained_on.to(self._device)
+            )
             self._mode = getattr(q, "_mode", None)  # Copy mode from source
+            self._amortized_q = deepcopy(getattr(q, "_amortized_q", None))
+            if self._amortized_q is not None:
+                self._amortized_q.to(self._device)
             self.vi_method = q.vi_method  # type: ignore
-            self._prior = q._prior
-            self._x = q._x
+            # Moving the source moves its prior in place, so the copy needs its own.
+            self._prior = move_distribution_to_device(
+                detach_and_deepcopy(q._prior), self._device
+            )
+            self._x = None if q._x is None else q._x.to(self._device)
+            self._map = None
             q = detach_and_deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
             if hasattr(q, "to"):
@@ -599,6 +621,26 @@ class VIPosterior(NeuralPosterior):
         self._optimizer_builder = get_VI_method(method)
         return self
 
+    def _check_x(self, x: Tensor) -> None:
+        """Raise if `x` is not the one observation this q answers for."""
+        if self._mode == "amortized":
+            self._check_num_observations(x.shape[0])
+            self._check_condition_shape(x)
+        elif not self._is_trained_on(x):
+            raise ValueError(
+                f"The variational posterior was not fit on the specified "
+                f"observation {x}. Please train using posterior.train()."
+            )
+
+    def _check_condition_shape(self, x: Tensor) -> None:
+        """Raise unless `x` matches the observation shape q was trained on.
+
+        A hand-written potential may declare no shape, and a default `x` may be set
+        before training, so `x` is checked where q uses it.
+        """
+        assert self._amortized_q is not None
+        process_x(x, x_event_shape=self._amortized_q.condition_shape)
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -607,52 +649,35 @@ class VIPosterior(NeuralPosterior):
     ) -> Tensor:
         r"""Draw samples from the variational posterior distribution $p(\theta|x)$.
 
-        For single-x mode (trained via `train()`): samples from q(θ) trained on x_o.
-        For amortized mode (trained via `train_amortized()`): samples from q(θ|x).
+        For single-x mode (trained via `train()`): samples from q(θ) fit to the training
+        context, which may combine several iid observations. For amortized mode (trained
+        via `train_amortized()`): samples from q(θ|x) for one observation. Use
+        `sample_batched()` to sample one posterior per observation.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from the posterior.
-            x: Conditioning observation. In single-x mode, must match trained x_o
-                (or be None to use default). In amortized mode, required and can be
-                any observation. For batched observations, shape should be
-                (batch_size, x_dim).
+            x: Conditioning observation. In single-x mode, must match the trained x_o
+                (or be None to use the default x, else the trained x_o). In amortized
+                mode, one observation, or None to use the default set with
+                `set_default_x()`. Use `sample_batched()` for several observations.
             show_progress_bars: Unused for `VIPosterior` since sampling from the
                 variational distribution is fast. Included for API consistency.
 
         Returns:
-            Samples from posterior with shape (*sample_shape, θ_dim) for single x,
-            or (*sample_shape, batch_size, θ_dim) for batched observations in
-            amortized mode.
+            Samples from posterior with shape `(*sample_shape, θ_dim)`.
 
         Raises:
-            ValueError: If mode requirements are not met.
+            ValueError: If mode requirements are not met, or `x` holds several
+                observations in amortized mode.
         """
+        x = self._x_else_default_x(x)
+        self._check_x(x)
         if self._mode == "amortized":
-            # Amortized mode: sample from conditional flow q(θ|x)
-            x = self._x_else_default_x(x)
-            if x is None:
-                raise ValueError(
-                    "x is required for amortized mode. Provide an observation or "
-                    "set a default x with set_default_x()."
-                )
-            x = atleast_2d_float32_tensor(x).to(self._device)
             assert self._amortized_q is not None
-            # samples shape from flow: (*sample_shape, batch_size, θ_dim)
             samples = self._amortized_q.sample(torch.Size(sample_shape), condition=x)
-            # Match base posterior behavior: drop singleton x batch dimension
-            if x.shape[0] == 1:
-                samples = samples.squeeze(-2)
-            return samples
-        else:
-            # Single-x mode: sample from unconditional flow q(θ)
-            x = self._x_else_default_x(x)
-            if self._trained_on is None or (x != self._trained_on).any():
-                raise ValueError(
-                    f"The variational posterior was not fit on the specified "
-                    f"observation {x}. Please train using posterior.train()."
-                )
-            samples = self.q.sample(torch.Size(sample_shape))
-            return samples.reshape((*sample_shape, samples.shape[-1]))
+            return samples.squeeze(-2)
+        samples = self.q.sample(torch.Size(sample_shape))
+        return samples.reshape((*sample_shape, samples.shape[-1]))
 
     def sample_batched(
         self,
@@ -661,35 +686,35 @@ class VIPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        """Sample from posterior for a batch of observations.
+        """Sample one posterior for each observation in a batch.
 
-        In amortized mode, this is efficient as all x values are processed in
-        parallel through the conditional flow.
-
-        In single-x mode, this raises NotImplementedError since the unconditional
-        flow is trained for a specific x_o.
+        Amortized mode processes all observations in parallel through the conditional
+        flow. Single-x mode raises NotImplementedError because q(θ) is fit to one
+        observed data set.
 
         Args:
             sample_shape: Number of samples per observation.
-            x: Batch of observations (num_obs, x_dim).
+            x: Batch of observations of shape `(num_observations, *x_event_shape)`.
             max_sampling_batch_size: Unused for amortized mode (no batching needed).
             show_progress_bars: Unused for amortized mode.
 
         Returns:
-            Samples of shape (*sample_shape, num_obs, θ_dim).
+            Samples of shape `(*sample_shape, num_observations, θ_dim)`, one posterior
+            per observation.
 
         Raises:
             NotImplementedError: If called in single-x mode.
         """
         if self._mode == "amortized":
-            # In amortized mode, sample() handles batched x directly
-            return self.sample(sample_shape, x=x, show_progress_bars=show_progress_bars)
-        else:
-            raise NotImplementedError(
-                "Batched sampling is not implemented for single-x VI mode. "
-                "Use train_amortized() to train an amortized posterior, or "
-                "call sample() in a loop: [posterior.sample(shape, x_o) for x_o in x]."
-            )
+            assert self._amortized_q is not None
+            x = self._process_x(x)
+            self._check_condition_shape(x)
+            return self._amortized_q.sample(torch.Size(sample_shape), condition=x)
+        raise NotImplementedError(
+            "Batched sampling is not implemented for single-x VI mode, because q "
+            "is fit to one observed data set. Use train_amortized() to train an "
+            "amortized posterior, or train a posterior for each observation."
+        )
 
     def log_prob(
         self,
@@ -697,77 +722,151 @@ class VIPosterior(NeuralPosterior):
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
     ) -> Tensor:
-        r"""Returns the log-probability of theta under the variational posterior.
+        r"""Return the log-probability of θ under the variational posterior.
 
-        For single-x mode: returns log q(θ).
-        For amortized mode: returns log q(θ|x).
+        For single-x mode: returns log q(θ) for the fit context, which may combine
+        several iid observations. For amortized mode: returns log q(θ|x) for one
+        observation, using `x` or the default set with `set_default_x()`. Use
+        `log_prob_batched()` to evaluate several observations.
 
         Args:
-            theta: Parameters to evaluate, shape (batch_theta, θ_dim).
-            x: Observation. In single-x mode, must match trained x_o (or be None).
-                In amortized mode, required and can be any observation.
-                For single x, shape (1, x_dim) or (x_dim,).
-                For batched x, shape (batch_x, x_dim).
+            theta: Parameters to evaluate, shape `(*sample_shape, θ_dim)`.
+            x: Observation. In single-x mode, must match the trained x_o (or be None).
+                In amortized mode, one observation, or None to use the default set with
+                `set_default_x()`. Use `log_prob_batched()` for several observations.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis but increases memory
                 consumption.
 
         Returns:
-            Log-probability of shape (batch,) where batch is:
-            - batch_theta if x has batch size 1 (broadcast x)
-            - batch_x if theta has batch size 1 (broadcast theta)
-            - batch_theta if batch_theta == batch_x (paired evaluation)
+            Log-probability of shape `sample_shape`. In amortized mode, every θ is
+            evaluated under the one observation rather than paired with it. `-inf` for
+            θ outside the prior support.
 
         Raises:
-            ValueError: If mode requirements are not met or batch sizes incompatible.
+            ValueError: If mode requirements are not met, or `x` holds several
+                observations in amortized mode.
         """
         with torch.set_grad_enabled(track_gradients):
             theta = ensure_theta_batched(torch.as_tensor(theta)).to(self._device)
-
+            x = self._x_else_default_x(x)
+            self._check_x(x)
             if self._mode == "amortized":
-                # Amortized mode: evaluate log q(θ|x)
-                x = self._x_else_default_x(x)
-                if x is None:
-                    raise ValueError(
-                        "x is required for amortized mode. Provide an observation or "
-                        "set a default x with set_default_x()."
-                    )
-                x = atleast_2d_float32_tensor(x).to(self._device)
-                assert self._amortized_q is not None
+                return self.log_prob_batched(
+                    theta.unsqueeze(-2), x, track_gradients=track_gradients
+                ).squeeze(-1)
+            log_probs = self.q.log_prob(theta)
+            # The inverse link clamps θ outside the support onto its boundary, which
+            # would give such θ a finite density.
+            return torch.where(
+                within_support(self._prior, theta),
+                log_probs,
+                torch.tensor(float("-inf"), device=log_probs.device),
+            )
 
-                # Handle broadcasting between theta and x
-                batch_theta = theta.shape[0]
-                batch_x = x.shape[0]
+    def log_prob_batched(
+        self,
+        theta: Tensor,
+        x: Tensor,
+        track_gradients: bool = False,
+    ) -> Tensor:
+        """Evaluate log q(θ|x) for a batch of observations in amortized mode.
 
-                if batch_theta != batch_x:
-                    if batch_x == 1:
-                        # Broadcast x to match theta
-                        x = x.expand(batch_theta, -1)
-                    elif batch_theta == 1:
-                        # Broadcast theta to match x
-                        theta = theta.expand(batch_x, -1)
-                    else:
-                        raise ValueError(
-                            f"Batch sizes of theta ({batch_theta}) and x ({batch_x}) "
-                            f"are incompatible. They must be equal, or one must be 1."
-                        )
+        Mirrors `DirectPosterior.log_prob_batched()`: each θ is evaluated under the
+        observation at the matching batch position, giving one value per sample and
+        observation.
 
-                # ZukoFlow expects input shape (sample_dim, batch_dim, *event_shape)
-                # Add sample dimension, compute log_prob, then squeeze back
-                theta_with_sample_dim = theta.unsqueeze(0)
-                log_probs = self._amortized_q.log_prob(
-                    theta_with_sample_dim, condition=x
+        Args:
+            theta: Parameters of shape `(*sample_shape, num_observations, θ_dim)`. An
+                observation axis of length one broadcasts over `x`.
+            x: Batch of observations of shape `(num_observations, *x_event_shape)`.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+
+        Returns:
+            Log-probabilities of shape `(*sample_shape, num_observations)`, `-inf` for
+            θ outside the prior support.
+
+        Raises:
+            NotImplementedError: If called in single-x mode.
+        """
+        if self._mode != "amortized":
+            raise NotImplementedError(
+                "Batched log-prob evaluation is not implemented for single-x VI mode, "
+                "because q is fit to one observed data set. Use train_amortized() to "
+                "train an amortized posterior."
+            )
+        assert self._amortized_q is not None
+        with torch.set_grad_enabled(track_gradients):
+            x = self._process_x(x)
+            self._check_condition_shape(x)
+            theta = ensure_theta_batched(torch.as_tensor(theta)).to(self._device)
+            *sample_shape, num_observations, theta_dim = theta.shape
+            # A prior of one parameter can have event shape `()` and batch shape `(1,)`.
+            prior_dim = (self._prior.batch_shape + self._prior.event_shape).numel()
+            if theta_dim != prior_dim:
+                raise ValueError(
+                    f"theta must hold {prior_dim} parameters along its last axis, but "
+                    f"holds {theta_dim}."
                 )
-                return log_probs.squeeze(0)
-            else:
-                # Single-x mode: evaluate log q(θ)
-                x = self._x_else_default_x(x)
-                if self._trained_on is None or (x != self._trained_on).any():
-                    raise ValueError(
-                        f"The variational posterior was not fit on the specified "
-                        f"observation {x}. Please train using posterior.train()."
-                    )
-                return self.q.log_prob(theta)
+            if num_observations not in (1, x.shape[0]):
+                raise ValueError(
+                    f"theta holds {num_observations} observations along its "
+                    f"second-last axis, but x holds {x.shape[0]}."
+                )
+            # Like `DirectPosterior.log_prob_batched()`: a `(num_observations, θ_dim)`
+            # theta is one sample.
+            sample_shape = sample_shape or [1]
+            theta = theta.expand(*sample_shape, x.shape[0], theta_dim)
+            dtype = next(self._amortized_q.parameters()).dtype
+            if theta.numel() == 0:
+                return theta.to(dtype).sum(-1)
+            # The inverse link clamps θ outside the support onto its boundary, which
+            # would give such θ a finite density. Check before casting to the flow's
+            # dtype, which could round θ onto the boundary.
+            in_support = within_support(self._prior, theta.reshape(-1, theta_dim))
+            num_samples = torch.Size(sample_shape).numel()
+            log_probs = self._amortized_q.log_prob(
+                theta.to(dtype).reshape(num_samples, x.shape[0], theta_dim), condition=x
+            ).reshape(*sample_shape, x.shape[0])
+            return torch.where(
+                in_support.reshape(log_probs.shape),
+                log_probs,
+                torch.tensor(float("-inf"), device=log_probs.device),
+            )
+
+    @property
+    def _one_observation_hint(self) -> Optional[str]:
+        """The amortized q(θ|x), like a direct posterior, takes one observation."""
+        if self._mode != "amortized":
+            return None
+        return (
+            f"{_ONE_AT_A_TIME}, or use `sample_batched()` and `log_prob_batched()`. "
+            "To combine them as iid trials, fit q to all of them with `train(x=x)`."
+        )
+
+    def _resolve_x(self) -> Optional[Tensor]:
+        """Return the default `x`, else the `x` the single-x q was fit to.
+
+        A single-x q answers for one observation only, so `sample()`, `log_prob()`,
+        `potential()` and `map()` fall back to it when no `x` is given.
+        """
+        if self.default_x is None and self._mode == "single_x":
+            return self._trained_on
+        return self.default_x
+
+    def _is_trained_on(self, x: Tensor) -> bool:
+        """Whether q was trained on `x`: the same shape and the same values.
+
+        Comparing values alone would broadcast, so that a q trained on one observation
+        would pass for several copies of it. NaN entries pad sets of trials for
+        permutation-invariant embeddings, so matching NaNs count as equal.
+        """
+        trained_on = self._trained_on
+        return (
+            trained_on is not None
+            and trained_on.shape == x.shape
+            and torch.allclose(x, trained_on, rtol=0, atol=0, equal_nan=True)
+        )
 
     def train(
         self,
@@ -787,10 +886,11 @@ class VIPosterior(NeuralPosterior):
         quality_control_metric: str = "psis",
         **kwargs,
     ) -> "VIPosterior":
-        """This method trains the variational posterior for a single observation.
+        """This method trains the variational posterior for one observed data set.
 
         Args:
-            x: The observation, optional, defaults to self._x.
+            x: The observation, optional, defaults to self._x. Several observations
+                are combined as iid trials.
             n_particles: Number of samples to approximate expectations within the
                 variational bounds. The larger the more accurate are gradient
                 estimates, but the computational cost per iteration increases.
@@ -826,7 +926,8 @@ class VIPosterior(NeuralPosterior):
                 stick_the_landing: If one should use the STL estimator (only for rKL,
                     IW, alpha).
                 dreg: If one should use the DREG estimator (only for rKL, IW, alpha).
-                weight_transform: Callable applied to importance weights (only for fKL)
+                weight_transform: Callable applied to importance weights (only for
+                    fKL), scaled so that the largest weight is 1.
         Returns:
             VIPosterior: `VIPosterior` (can be used to chain calls).
 
@@ -884,14 +985,19 @@ class VIPosterior(NeuralPosterior):
                 **kwargs,
             )
 
-        # Check context
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(  # type: ignore
-            self._device
-        )
-        if not torch.isfinite(x).all():
-            raise ValueError("x contains NaN or Inf values.")
+        # Check context. Training does not fall back to the x of an earlier fit.
+        if x is not None:
+            x = self._process_x(x)
+        elif self.default_x is not None:
+            x = self.default_x
+        else:
+            raise ValueError(
+                "Pass `x` to `train()`, or set a default with `.set_default_x()`."
+            )
+        # The single-x q combines observations, also while an amortized q is in place.
+        bound_potential = self._bind_iid(x, check_num_observations=False)
 
-        already_trained = self._trained_on is not None and (x == self._trained_on).all()
+        already_trained = self._is_trained_on(x)
 
         # Optimize
         optimizer = self._optimizer
@@ -928,9 +1034,8 @@ class VIPosterior(NeuralPosterior):
                 break
         # Training finished:
         self._trained_on = x
-
-        # Bind potential_fn to the trained x so it can be used for sampling/evaluation
-        self.potential_fn = self.potential_fn.bind(x)
+        self.potential_fn = bound_potential
+        self._map = None
 
         if self._mode == "amortized":
             warnings.warn(
@@ -942,26 +1047,53 @@ class VIPosterior(NeuralPosterior):
             self._amortized_q = None
         self._mode = "single_x"
 
-        # Evaluate quality
+        # Evaluate quality; retrain once if q fails it and can be rebuilt.
         if quality_control:
-            try:
-                self.evaluate(quality_control_metric=quality_control_metric)
-            except Exception as e:
-                print(
-                    f"Quality control showed a low quality of the variational "
-                    f"posterior. We are automatically retraining the variational "
-                    f"posterior from scratch with a smaller learning rate. "
-                    f"Alternatively, if you want to skip quality control, please "
-                    f"retrain with `VIPosterior.train(..., quality_control=False)`. "
-                    f"\nThe error that occured is: {e}"
+            error = self._quality_control_error(quality_control_metric)
+            if error is not None and self._q_spec.kind != "instance":
+                warnings.warn(
+                    f"Quality control failed: {error} Retraining the variational "
+                    "posterior from scratch, once, with a 10 times smaller learning "
+                    "rate. To skip quality control, pass `quality_control=False`.",
+                    UserWarning,
+                    stacklevel=2,
                 )
                 self.train(
+                    x=x,
+                    n_particles=n_particles,
                     learning_rate=learning_rate * 0.1,
+                    gamma=gamma,
+                    max_num_iters=max_num_iters,
+                    min_num_iters=min_num_iters,
+                    clip_value=clip_value,
+                    warm_up_rounds=warm_up_rounds,
                     retrain_from_scratch=True,
                     reset_optimizer=True,
+                    show_progress_bar=show_progress_bar,
+                    check_for_convergence=check_for_convergence,
+                    quality_control=False,
+                    **kwargs,
+                )
+                error = self._quality_control_error(quality_control_metric)
+            if error is not None:
+                warnings.warn(
+                    f"Quality control failed: {error} The variational posterior may "
+                    "be unreliable.",
+                    UserWarning,
+                    stacklevel=2,
                 )
 
         return self
+
+    def _quality_control_error(
+        self, quality_control_metric: str
+    ) -> Optional[QualityControlError]:
+        """Return the error of the quality control's basic checks, if any."""
+        try:
+            self.evaluate(quality_control_metric=quality_control_metric)
+        except QualityControlError as error:
+            return error
+        return None
 
     def train_amortized(
         self,
@@ -1081,6 +1213,11 @@ class VIPosterior(NeuralPosterior):
         x = atleast_2d_float32_tensor(x).to(self._device)
 
         # Validate inputs
+        if x.ndim != 2:
+            raise ValueError(
+                "train_amortized() takes x of shape (num_simulations, x_dim), but got "
+                f"{tuple(x.shape)}. Flatten each observation into one feature axis."
+            )
         if theta.shape[0] != x.shape[0]:
             raise ValueError(
                 f"Batch size mismatch: theta has {theta.shape[0]} samples, "
@@ -1163,6 +1300,16 @@ class VIPosterior(NeuralPosterior):
         use_val_subset = validation_batch_size < x_val.shape[0]
 
         # Build or rebuild the conditional flow (z-score on training data only)
+        if (
+            self._amortized_q is not None
+            and not retrain_from_scratch
+            and x.shape[1:] != self._amortized_q.condition_shape
+        ):
+            raise ValueError(
+                f"x has shape {tuple(x.shape)}, but the amortized q was trained on "
+                f"observations of shape {tuple(self._amortized_q.condition_shape)}. "
+                "Pass retrain_from_scratch=True to fit a new q."
+            )
         if self._amortized_q is None or retrain_from_scratch:
             self._amortized_q = self._build_conditional_flow(
                 theta_train,
@@ -1262,6 +1409,7 @@ class VIPosterior(NeuralPosterior):
                 stacklevel=2,
             )
         self._mode = "amortized"
+        self._map = None
 
         return self
 
@@ -1323,8 +1471,22 @@ class VIPosterior(NeuralPosterior):
         quality_control_fn, quality_control_msg = get_quality_metric(
             quality_control_metric
         )
+        if self._mode == "single_x" and self._trained_on is not None:
+            # Score q against the x it was fit to, not the x bound last.
+            self.potential_fn = self._bind_iid(self._trained_on)
         metric = round(float(quality_control_fn(self, N=N)), 3)
         print(f"Quality Score: {metric} " + quality_control_msg)
+
+    def _map_inits(
+        self,
+        init_method: Union[str, TorchTensor],
+        num_init_samples: int,
+        x: Optional[TorchTensor] = None,
+    ) -> Tensor:
+        # Amortized training leaves `q` untouched, so draw from q(θ|x).
+        if self._mode == "amortized" and init_method in ("posterior", "proposal"):
+            return self.sample((num_init_samples,), x=x)
+        return super()._map_inits(init_method, num_init_samples, x)
 
     def map(
         self,
@@ -1354,14 +1516,17 @@ class VIPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Deprecated - use `.set_default_x()` prior to `.map()`.
+            x: No longer supported; use `.set_default_x()` before `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be either `posterior` or `proposal`. For
+                `VIPosterior` both draw `num_init_samples` samples from the variational
+                distribution, not the prior (in amortized mode, from q(θ|x) for the
+                default `x`). If it is a tensor, the tensor is used
+                as the initial locations, so prior-based initialization can be done by
+                passing prior samples.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the

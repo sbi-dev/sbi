@@ -1,44 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from typing import TYPE_CHECKING
+
 from sbi.neural_nets.net_builders.categorial import build_categoricalmassestimator
 from sbi.neural_nets.net_builders.classifier import (
     build_linear_classifier,
     build_mlp_classifier,
     build_resnet_classifier,
-)
-from sbi.neural_nets.net_builders.estimator_configs import (
-    ClassifierConfigBase,
-    DensityConfigBase,
-    LinearClassifierConfig,
-    MADEConfig,
-    MAFConfig,
-    MAFRQSConfig,
-    MDNConfig,
-    MLPClassifierConfig,
-    MarginalBPFConfig,
-    MarginalConfigBase,
-    MarginalGFConfig,
-    MarginalMAFConfig,
-    MarginalNAFConfig,
-    MarginalNCSFConfig,
-    MarginalNICEConfig,
-    MarginalNSFConfig,
-    MarginalSOSPFConfig,
-    MarginalUNAFConfig,
-    MixedConfig,
-    NSFConfig,
-    ResNetClassifierConfig,
-    TabPFNConfig,
-    ZukoBPFConfig,
-    ZukoGFConfig,
-    ZukoMAFConfig,
-    ZukoNAFConfig,
-    ZukoNCSFConfig,
-    ZukoNICEConfig,
-    ZukoNSFConfig,
-    ZukoSOSPFConfig,
-    ZukoUNAFConfig,
 )
 from sbi.neural_nets.net_builders.flow import (
     build_made,
@@ -58,15 +27,7 @@ from sbi.neural_nets.net_builders.flow import (
 )
 from sbi.neural_nets.net_builders.mdn import build_mdn
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle, build_mnpe
-from sbi.neural_nets.net_builders.vector_field_nets import (
-    AdaMLPConfig,
-    FlowMatchingConfig,
-    MLPConfig,
-    ScoreConfigBase,
-    SubVPScoreConfig,
-    TransformerConfig,
-    VEScoreConfig,
-    VPScoreConfig,
-    VectorFieldConfigBase,
-    VectorFieldNetConfigBase,
-)
+from sbi.utils.removed_names import removed_names_getattr
+
+if not TYPE_CHECKING:
+    __getattr__ = removed_names_getattr(__name__)

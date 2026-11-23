@@ -22,8 +22,8 @@ from sbi.utils.nn_utils import MADEMoGWrapper, get_numel
 from sbi.utils.sbiutils import (
     assert_transform_to_unconstrained_supported,
     biject_transform_zuko,
+    build_z_scored_embedding_net,
     mcmc_transform,
-    standardizing_net,
     standardizing_transform,
     standardizing_transform_zuko,
     z_score_parser,
@@ -42,12 +42,8 @@ transform_to_unconstrained_suggestion = (
 def build_made(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_x: Literal["none", "independent", "structured"] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: int = 50,
     num_mixture_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
@@ -91,7 +87,7 @@ def build_made(
         transform_zx = standardizing_transform(batch_x, structured_x)
         transform = transforms.CompositeTransform([transform_zx, transform])
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     distribution = MADEMoGWrapper(
         features=x_numel,
@@ -118,12 +114,8 @@ def build_made(
 def build_maf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_x: Literal["none", "independent", "structured"] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -196,7 +188,7 @@ def build_maf(
             standardizing_transform(batch_x, structured_x)
         ] + transform_list
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     # Combine transforms
     transform = transforms.CompositeTransform(transform_list)
@@ -213,12 +205,8 @@ def build_maf(
 def build_maf_rqs(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_x: Literal["none", "independent", "structured"] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -315,7 +303,7 @@ def build_maf_rqs(
             standardizing_transform(batch_x, structured_x)
         ] + transform_list
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
@@ -332,12 +320,8 @@ def build_maf_rqs(
 def build_nsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_x: Literal["none", "independent", "structured"] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -443,7 +427,7 @@ def build_nsf(
             standardizing_transform(batch_x, structured_x)
         ] + transform_list
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     distribution = get_base_dist(x_numel, **kwargs)
 
@@ -463,9 +447,7 @@ def build_zuko_nice(
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -522,9 +504,7 @@ def build_zuko_maf(
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -578,13 +558,12 @@ def build_zuko_nsf(
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     num_bins: int = 10,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -618,10 +597,11 @@ def build_zuko_nsf(
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         num_bins: The number of bins in the spline transformations. Defaults to 10.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NSF"
-    additional_kwargs = {"bins": num_bins, **kwargs}
+    additional_kwargs = {"bins": num_bins, "randperm": randperm, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -640,16 +620,13 @@ def build_zuko_nsf(
 def build_zuko_ncsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_x: Literal["none"] = "none",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     num_bins: int = 10,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     r"""
@@ -664,24 +641,24 @@ def build_zuko_ncsf(
         | https://arxiv.org/abs/2002.02428
 
     Arguments:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_x: Batch of xs, used to infer dimensionality.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network, can be one of:
+        z_score_x: Must be `none`: a z-score would move xs off :math:`[-\pi, \pi[`.
+        z_score_y: Whether to z-score ys passing into the network, can be one of:
             - `none`, or None: do not z-score.
             - `independent`: z-score each dimension independently.
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
-        z_score_y: Whether to z-score ys passing into the network, same options as
-            z_score_x.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         num_bins: The number of bins in the spline transformations. Defaults to 10.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "NCSF"
-    additional_kwargs = {"bins": num_bins, **kwargs}
+    additional_kwargs = {"bins": num_bins, "randperm": randperm, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -703,14 +680,13 @@ def build_zuko_sospf(
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     degree: int = 4,
     polynomials: int = 3,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -736,10 +712,16 @@ def build_zuko_sospf(
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         degree: The degree of the polynomials. Defaults to 4.
         polynomials: The number of polynomials. Defaults to 3.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "SOSPF"
-    additional_kwargs = {"degree": degree, "polynomials": polynomials, **kwargs}
+    additional_kwargs = {
+        "degree": degree,
+        "polynomials": polynomials,
+        "randperm": randperm,
+        **kwargs,
+    }
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -761,9 +743,7 @@ def build_zuko_naf(
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -831,9 +811,7 @@ def build_zuko_unaf(
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -895,73 +873,13 @@ def build_zuko_unaf(
     return flow
 
 
-def build_zuko_cnf(
-    batch_x: Tensor,
-    batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
-    hidden_features: Union[Sequence[int], int] = 50,
-    num_transforms: int = 5,
-    embedding_net: nn.Module = nn.Identity(),
-    **kwargs,
-) -> ZukoFlow:
-    """
-    Build a Continuous Normalizing Flow (CNF) with a free-form Jacobian transformation.
-
-    References:
-        | Neural Ordinary Differential Equations (Chen el al., 2018)
-        | https://arxiv.org/abs/1806.07366
-
-        | FFJORD: Free-form Continuous Dynamics for Scalable Reversible
-        | Generative Models (Grathwohl et al., 2018)
-        | https://arxiv.org/abs/1810.01367
-
-    Arguments:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network, can be one of:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean and std
-            over the entire batch, instead of per-dimension. Should be used when each
-            sample is, for example, a time series or an image.
-        z_score_y: Whether to z-score ys passing into the network, same options as
-            z_score_x.
-        hidden_features: The number of hidden features in the flow. Defaults to 50.
-        num_transforms: The number of transformations in the flow. Defaults to 5.
-        embedding_net: The embedding network to use. Defaults to nn.Identity().
-        **kwargs: Additional keyword arguments to pass to the flow constructor.
-    """
-    which_nf = "CNF"
-    additional_kwargs = {**kwargs}
-    flow = build_zuko_flow(
-        which_nf,
-        batch_x,
-        batch_y,
-        z_score_x,
-        z_score_y,
-        hidden_features,
-        num_transforms,
-        embedding_net,
-        **additional_kwargs,
-    )
-
-    return flow
-
-
 def build_zuko_gf(
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -1020,13 +938,12 @@ def build_zuko_bpf(
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
     degree: int = 16,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """
@@ -1057,10 +974,11 @@ def build_zuko_bpf(
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         degree: The degree :math:`M` of the Bernstein polynomial.
+        randperm: Whether to use random permutations in the flow. Defaults to False.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
     """
     which_nf = "BPF"
-    additional_kwargs = {"degree": degree, **kwargs}
+    additional_kwargs = {"degree": degree, "randperm": randperm, **kwargs}
     flow = build_zuko_flow(
         which_nf,
         batch_x,
@@ -1083,9 +1001,7 @@ def build_zuko_flow(
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ] = "independent",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "independent",
+    z_score_y: Literal["none", "independent", "structured"] = "independent",
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -1116,7 +1032,7 @@ def build_zuko_flow(
             - `transform_to_unconstrained`: Transforms to
             an unbounded space if bounds from `x_dist` are given.
         z_score_y: Whether to z-score ys passing into the network, same options as
-            z_score_x.
+            z_score_x except `transform_to_unconstrained`.
         hidden_features: The number of hidden features in the flow. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
@@ -1149,13 +1065,13 @@ def build_zuko_flow(
     )
 
     # Get x transforms (z-score or logit transform)
-    x_transforms = _prepare_x_transforms(z_score_x, batch_x, x_dist)
+    x_transforms = _prepare_x_transforms(which_nf, z_score_x, batch_x, x_dist)
 
     # Combine all transforms
     transforms = x_transforms + base_transforms
 
     # Maybe add y-z-scoring via embedding network
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
 
     # Create final neural network
     neural_net = zuko.flows.Flow(transforms, base)
@@ -1173,12 +1089,8 @@ def build_zuko_flow(
 def build_tabpfn_flow(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "none",
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ] = "none",
+    z_score_x: Literal["none", "independent", "structured"] = "none",
+    z_score_y: Literal["none", "independent", "structured"] = "none",
     embedding_net: nn.Module = nn.Identity(),
     regressor_init_kwargs: Optional[dict] = None,
     max_context_size: int = 10_000,
@@ -1215,7 +1127,7 @@ def build_tabpfn_flow(
             f"got '{z_score_x}'. TabPFN performs extensive preprocessing internally."
         )
 
-    embedding_net = _prepare_y_embedding(z_score_y, batch_y, embedding_net)
+    embedding_net = build_z_scored_embedding_net(batch_y, z_score_y, embedding_net)
     flow = TabPFNFlow(
         input_shape=batch_x[0].shape,
         condition_shape=batch_y[0].shape,
@@ -1255,28 +1167,19 @@ def _get_base_and_transforms(
         tuple of flow base and its transforms.
     """
     build_nf = getattr(zuko.flows, which_nf)
+    flow: Flow = build_nf(
+        features=x_numel,
+        context=y_numel,
+        hidden_features=hidden_features,
+        transforms=num_transforms,
+        **kwargs,
+    )
 
-    if which_nf == "CNF":
-        flow: Flow = build_nf(
-            features=x_numel, context=y_numel, hidden_features=hidden_features, **kwargs
-        )
-        # CNF has a single continuous transform
-        base_transforms = (flow.transform,)
-    else:
-        flow: Flow = build_nf(
-            features=x_numel,
-            context=y_numel,
-            hidden_features=hidden_features,
-            transforms=num_transforms,
-            **kwargs,
-        )
-        # Regular flows have multiple discrete transforms
-        base_transforms = tuple(flow.transform.transforms)
-
-    return flow.base, base_transforms
+    return flow.base, tuple(flow.transform.transforms)
 
 
 def _prepare_x_transforms(
+    which_nf: str,
     z_score_x: Literal[
         "none", "independent", "structured", "transform_to_unconstrained"
     ],
@@ -1287,13 +1190,22 @@ def _prepare_x_transforms(
     Prepare transforms to prepend for x processing.
 
     Args:
+        which_nf: The type of normalizing flow the transforms are prepended to.
         z_score_x: Type of x preprocessing.
         batch_x: Batch of x data.
         x_dist: Distribution for unconstrained transformation.
 
     Returns:
         Tuple of transforms to prepend (empty tuple if no preprocessing).
+
+    Raises:
+        ValueError: If an NCSF gets any x preprocessing.
     """
+    if which_nf == "NCSF" and z_score_x not in (None, "none"):
+        raise ValueError(
+            "NCSF models data on [-pi, pi), which any transform of x would move. "
+            f"Use z_score_x='none' instead of {z_score_x!r}."
+        )
     transforms = ()
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x == "transform_to_unconstrained":
@@ -1304,7 +1216,7 @@ def _prepare_x_transforms(
             )
         if not hasattr(x_dist, "support"):
             raise ValueError(
-                "`x_dist` requires a `.support` attribute for"
+                "`x_dist` requires a `.support` attribute for "
                 "an unconstrained transformation."
             )
         transform_to_unconstrained = biject_transform_zuko(
@@ -1321,9 +1233,7 @@ def _prepare_x_transforms(
 def build_zuko_unconditional_flow(
     which_nf: str,
     batch_x: Tensor,
-    z_score_x: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ],
+    z_score_x: Literal["none", "independent", "structured"],
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     **kwargs,
@@ -1367,18 +1277,12 @@ def build_zuko_unconditional_flow(
         which_nf, x_numel, 0, hidden_features, num_transforms, **kwargs
     )
 
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
-        # TODO: Check whether first base transform, then z-score is correct (it's the
-        # other way around in the conditional flows).
-        transforms = (
-            *base_transforms,
-            standardizing_transform_zuko(batch_x, structured_x),
-        )
-    else:
-        transforms = base_transforms
+    # z-score first, so that the flow transforms see standardized data.
+    transforms = (
+        _prepare_x_transforms(which_nf, z_score_x, batch_x, x_dist=None)
+        + base_transforms
+    )
 
-    # Combine transforms.
     neural_net = zuko.flows.Flow(transforms, base)
 
     flow = ZukoUnconditionalFlow(
@@ -1389,37 +1293,13 @@ def build_zuko_unconditional_flow(
     return flow
 
 
-def _prepare_y_embedding(
-    z_score_y: Literal[
-        "none", "independent", "structured", "transform_to_unconstrained"
-    ],
-    batch_y: Tensor,
-    embedding_net: nn.Module,
-) -> nn.Module:
-    """
-    Prepend the embedding network for y, adding z-scoring if needed.
-
-    Args:
-        z_score_y: Type of y preprocessing.
-        batch_y: Batch of y data.
-        embedding_net: Original embedding network.
-
-    Returns:
-        Modified embedding network.
-    """
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
-    if z_score_y_bool:
-        return nn.Sequential(standardizing_net(batch_y, structured_y), embedding_net)
-    return embedding_net
-
-
 class ContextSplineMap(nn.Module):
     """
     Neural network from `context` to the spline parameters.
 
     We cannot use the resnet as conditioner to learn each dimension conditioned
     on the other dimensions (because there is only one). Instead, we learn the
-    spline parameters directly. In the case of conditinal density estimation,
+    spline parameters directly. In the case of conditional density estimation,
     we make the spline parameters conditional on the context. This is
     implemented in this class.
     """
@@ -1446,16 +1326,12 @@ class ContextSplineMap(nn.Module):
         # a scaling factor for initializations.
         self.hidden_features = hidden_features
 
-        # Use a non-linearity because otherwise, there will be a linear
-        # mapping from context features onto distribution parameters.
-
-        # Initialize with input layer.
+        # ReLUs between the layers make the map from context features to spline
+        # parameters nonlinear.
         layer_list = [nn.Linear(context_features, hidden_features), nn.ReLU()]
-        # Add hidden layers.
-        layer_list += [
-            nn.Linear(hidden_features, hidden_features),
-            nn.ReLU(),
-        ] * hidden_layers
+        # Add hidden layers, each with its own weights.
+        for _ in range(hidden_layers):
+            layer_list += [nn.Linear(hidden_features, hidden_features), nn.ReLU()]
         # Add output layer.
         layer_list += [nn.Linear(hidden_features, out_features)]
         self.spline_predictor = nn.Sequential(*layer_list)

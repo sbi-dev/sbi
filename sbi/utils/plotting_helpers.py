@@ -1,38 +1,21 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import collections
 import logging
+from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import numpy as np
-import six
 import torch
 
 from sbi.utils.torchutils import tensor2numpy
 
-try:
-    collectionsAbc = collections.abc  # type: ignore
-except AttributeError:
-    collectionsAbc = collections
+logger = logging.getLogger(__name__)
 
 # for circular import error
 if TYPE_CHECKING:
     from sbi.analysis.plot import KwargsType
-
-
-def hex2rgb(hex: str) -> List[int]:
-    """Pass 16 to the integer function for change of base"""
-    return [int(hex[i : i + 2], 16) for i in range(1, 6, 2)]
-
-
-def rgb2hex(RGB: List[int]) -> str:
-    """Components need to be integers for hex to make sense"""
-    RGB = [int(x) for x in RGB]
-    return "#" + "".join([
-        "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
-    ])
 
 
 def to_list_string(
@@ -66,13 +49,21 @@ def to_list_kwargs(x: "KwargsType", len: int) -> List[Optional[Dict]]:
 
 
 def update(d: Dict, u: Optional[Dict]) -> Dict:
-    """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
+    """Recursively merge user options into a dictionary of defaults, in place.
+
+    Args:
+        d: Default options; nested mappings are merged key by key.
+        u: User options that override `d`. `None` leaves `d` unchanged.
+
+    Returns:
+        The updated dictionary `d`.
+    """
     if u is not None:
-        for k, v in six.iteritems(u):
+        for k, v in u.items():
             dv = d.get(k, {})
-            if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
+            if not isinstance(dv, Mapping):
                 d[k] = v
-            elif isinstance(v, collectionsAbc.Mapping):  # type: ignore
+            elif isinstance(v, Mapping):
                 d[k] = update(dv, v)
             else:
                 d[k] = v
@@ -95,9 +86,9 @@ def handle_nan_infs(samples: List[np.ndarray]) -> List[np.ndarray]:
     """Check if there are NaNs or Infs in the samples."""
     for i in range(len(samples)):
         if np.isnan(samples[i]).any():
-            logging.warning("NaNs found in samples, omitting datapoints.")
+            logger.warning("NaNs found in samples, omitting datapoints.")
         if np.isinf(samples[i]).any():
-            logging.warning("Infs found in samples, omitting datapoints.")
+            logger.warning("Infs found in samples, omitting datapoints.")
             # cast inf to nan, so they are omitted in the next step
             samples[i] = np.nan_to_num(
                 samples[i], nan=np.nan, posinf=np.nan, neginf=np.nan
