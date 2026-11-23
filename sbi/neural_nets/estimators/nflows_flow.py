@@ -150,6 +150,6 @@ class NFlowsFlow(ConditionalDensityEstimator):
         # (sample_dim, batch_dim) (PyTorch + SBI), as in `sample()`.
         samples = samples.transpose(0, 1)
         log_probs = log_probs.transpose(0, 1)
-        samples = samples.reshape((*sample_shape, condition_batch_dim, -1))
+        samples = samples.reshape(*sample_shape, condition_batch_dim, *self.input_shape)
         log_probs = log_probs.reshape((*sample_shape, -1))
         return samples, log_probs

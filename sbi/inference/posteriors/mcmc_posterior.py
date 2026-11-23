@@ -193,14 +193,14 @@ class MCMCPosterior(NeuralPosterior):
         """Returns sampler created by `sample`."""
         return self._posterior_sampler
 
-    def set_mcmc_method(self, method: str) -> "NeuralPosterior":
-        """Sets sampling method to for MCMC and returns `NeuralPosterior`.
+    def set_mcmc_method(self, method: str) -> "MCMCPosterior":
+        """Sets sampling method for MCMC and returns `MCMCPosterior`.
 
         Args:
             method: Method to use.
 
         Returns:
-            `NeuralPosterior` for chainable calls.
+            `MCMCPosterior` for chainable calls.
 
         Raises:
             NotImplementedError: If `method` is not an MCMC method of sbi.
