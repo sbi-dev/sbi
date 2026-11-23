@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
+import time
 import warnings
 from unittest.mock import patch
 
@@ -38,6 +39,36 @@ def test_accept_reject_sample_timeout():
             num_samples=5,
             max_sampling_time=0.01,
         )
+
+
+@pytest.mark.parametrize(
+    "accept, suggest_options, blames, bypass",
+    (
+        (True, True, False, False),
+        (False, True, True, True),
+        (False, False, True, False),
+    ),
+)
+def test_accept_reject_sample_timeout_blames_only_low_acceptance(
+    accept, suggest_options, blames, bypass
+):
+    """The timeout error blames low acceptance only after a low-acceptance batch."""
+
+    def slow_proposal(shape, **kwargs):
+        time.sleep(0.05)
+        return torch.randn(shape[0], 1)
+
+    with pytest.raises(RuntimeError, match="rejection sampling exceeded") as error:
+        accept_reject_sample(
+            proposal=slow_proposal,
+            accept_reject_fn=lambda x: torch.full((x.shape[0],), accept),
+            num_samples=20,
+            max_sampling_batch_size=10,
+            max_sampling_time=0.01,
+            suggest_sampling_options=suggest_options,
+        )
+    assert ("low acceptance" in str(error.value)) == blames
+    assert ("reject_outside_prior" in str(error.value)) == bypass
 
 
 def test_rejection_sample_timeout():
