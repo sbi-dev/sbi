@@ -344,7 +344,8 @@ def plt_hist_1d(
         if diag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
             binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
-            hist_kwargs["bins"] = np.arange(limits[0], limits[1] + binsize, binsize)
+            low, high = np.asarray(limits)
+            hist_kwargs["bins"] = np.arange(low, high + binsize, binsize)
         else:
             # TODO: add more bin heuristics
             pass

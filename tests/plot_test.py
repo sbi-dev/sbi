@@ -754,6 +754,13 @@ def test_marginal_plot_validates_diag_style():
         marginal_plot(torch.randn(100, 3), diag="cond")
 
 
+@pytest.mark.filterwarnings("error:__array__ implementation:DeprecationWarning")
+def test_pairplot_hist_bins_from_tensor_limits():
+    """The histogram bins are computed without numpy converting torch tensors."""
+    pairplot(torch.randn(100, 2))
+    close()
+
+
 @pytest.mark.parametrize(
     "plot, dims, subset, centers",
     [
