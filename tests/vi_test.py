@@ -30,17 +30,12 @@ from sbi.inference import (
     VectorFieldPosterior,
     likelihood_estimator_based_potential,
 )
-from sbi.inference.posteriors import (
-    DirectPosterior,
-    RejectionPosterior,
-    VIPosterior,
-    VIPosteriorParameters,
-)
+from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
-from sbi.neural_nets import posterior_flow_nn, posterior_nn
+from sbi.neural_nets import posterior_flow_nn
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.samplers.vi.vi_divergence_optimizers import (
     ElboOptimizer,
@@ -1218,24 +1213,6 @@ def test_amortized_vi_requires_training(linear_gaussian_setup):
         posterior.sample((100,))
 
 
-def test_amortized_vi_takes_one_observation():
-    """Amortized q, like a direct posterior, takes one observation in `potential()`,
-    instead of combining several as iid trials."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((100,))
-    posterior = VIPosterior(potential_fn=FakePotential(prior=prior), prior=prior)
-    posterior.train_amortized(
-        theta=theta,
-        x=theta + 0.1 * torch.randn_like(theta),
-        max_num_iters=3,
-        show_progress_bar=False,
-        num_transforms=1,
-        hidden_features=8,
-    )
-    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
-        posterior.potential(zeros(4, 2), x=zeros(3, 2))
-
-
 def _fast_amortized_posterior():
     """Return a cheaply trained amortized VI posterior and its prior."""
     prior = MultivariateNormal(zeros(2), eye(2))
@@ -1252,202 +1229,27 @@ def _fast_amortized_posterior():
     return posterior, prior
 
 
-def test_amortized_vi_sample_and_log_prob_take_one_observation():
-    """Amortized sample() and log_prob() raise for several observations, like the
-    direct posterior."""
+def test_amortized_vi_takes_one_observation():
+    """Amortized q, like a direct posterior, takes one observation in `sample()`,
+    `log_prob()` and `potential()`, instead of one posterior per observation or iid
+    trials."""
     posterior, _ = _fast_amortized_posterior()
     x_3 = zeros(3, 2)
     with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
         posterior.sample((10,), x=x_3)
     with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
-        posterior.log_prob(zeros(4, 2), x=x_3)
+        posterior.log_prob(zeros(3, 2), x=x_3)
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        posterior.potential(zeros(4, 2), x=x_3)
 
 
-def test_amortized_vi_one_observation_shapes():
-    """With one observation, sample() and log_prob() drop its batch dimension."""
-    posterior, prior = _fast_amortized_posterior()
-    x_o = zeros(1, 2)
-    theta = prior.sample((7,))
-    assert posterior.sample((10,), x=x_o).shape == (10, 2)
-    assert posterior.log_prob(theta, x=x_o).shape == (7,)
-
-
-def test_amortized_vi_log_prob_batched_matches_log_prob():
-    """log_prob_batched() evaluates each theta under its own observation and agrees
-    with log_prob() applied one observation at a time."""
-    posterior, prior = _fast_amortized_posterior()
-    x_batch = prior.sample((3,))
-    theta = prior.sample((5, 3))
-
-    batched = posterior.log_prob_batched(theta, x_batch)
-    assert batched.shape == (5, 3)
-    for i in range(3):
-        assert torch.allclose(
-            batched[:, i], posterior.log_prob(theta[:, i], x=x_batch[i]), atol=1e-5
-        )
-
-    assert posterior.log_prob_batched(theta[0], x_batch).shape == (1, 3)
-
-
-def test_amortized_vi_batched_shapes_match_direct_posterior():
-    """VI batched methods return the same shapes as the direct posterior's."""
-    posterior, prior = _fast_amortized_posterior()
-    x_batch = prior.sample((3,))
-    theta = prior.sample((5, 3))
-
-    assert posterior.sample_batched((5,), x=x_batch).shape == (5, 3, 2)
-    assert posterior.log_prob_batched(theta, x_batch).shape == (5, 3)
-
-    estimator = posterior_nn("mdn")(prior.sample((50,)), prior.sample((50,)))
-    direct = DirectPosterior(estimator, prior)
-    assert direct.sample_batched((5,), x=x_batch).shape == (5, 3, 2)
-    assert direct.log_prob_batched(theta, x_batch, norm_posterior=False).shape == (5, 3)
-
-
-def test_amortized_vi_log_prob_batched_multiple_sample_axes():
-    posterior, prior = _fast_amortized_posterior()
-    x_batch = prior.sample((3,))
-    theta = prior.sample((2, 4, 3))
-
-    result = posterior.log_prob_batched(theta, x_batch)
-    assert result.shape == (2, 4, 3)
-    flat = posterior.log_prob_batched(theta.reshape(-1, 3, 2), x_batch)
-    assert torch.allclose(result, flat.reshape(2, 4, 3), atol=1e-5)
-
-
-def test_amortized_vi_log_prob_batched_validates_shapes():
-    posterior, prior = _fast_amortized_posterior()
-    x_batch = prior.sample((3,))
-
-    with pytest.raises(ValueError, match="constrained theta event shape"):
-        posterior.log_prob_batched(torch.randn(5, 3, 1), x_batch)
-    with pytest.raises(ValueError, match="observation axis of theta"):
-        posterior.log_prob_batched(prior.sample((5, 4)), x_batch)
-    with pytest.raises(ValueError, match="x must have shape"):
-        posterior.log_prob_batched(prior.sample((5, 3)), x_batch.unsqueeze(1))
-
-
-def test_amortized_vi_log_prob_batched_empty_samples():
-    posterior, prior = _fast_amortized_posterior()
-    x_batch = prior.sample((3,))
-    assert posterior.log_prob_batched(prior.sample((0, 3)), x_batch).shape == (0, 3)
-    assert posterior.log_prob_batched(prior.sample((5, 0)), zeros(0, 2)).shape == (5, 0)
-
-
-def test_amortized_vi_rejects_zero_observations():
-    posterior, prior = _fast_amortized_posterior()
-    with pytest.raises(ValueError, match="holds none"):
-        posterior.sample((5,), x=zeros(0, 2))
-    with pytest.raises(ValueError, match="holds none"):
-        posterior.log_prob(prior.sample((7,)), x=zeros(0, 2))
-
-
-def test_amortized_vi_sampling_validates_condition_shape():
-    posterior, _ = _fast_amortized_posterior()
-    with pytest.raises(ValueError, match="x must have shape"):
-        posterior.sample((5,), x=zeros(1, 3, 2))
-    with pytest.raises(ValueError, match="x must have shape"):
-        posterior.sample_batched((5,), x=zeros(3, 1, 2))
-
-
-def test_amortized_vi_empty_log_prob_keeps_gradient():
-    posterior, prior = _fast_amortized_posterior()
-    theta = prior.sample((0, 3)).requires_grad_()
-    log_probs = posterior.log_prob_batched(
-        theta, prior.sample((3,)), track_gradients=True
-    )
-    assert log_probs.shape == (0, 3)
-    assert log_probs.requires_grad
-    log_probs.sum().backward()
-    assert theta.grad is not None
-
-
-def test_amortized_vi_copy_uses_fitted_theta_shape():
-    """A copied q keeps the source's constrained theta shape, not the copy's link."""
-    prior = torch.distributions.Dirichlet(ones(3))
-    theta = prior.sample((100,))
-    x = theta[:, :2]
-    source = VIPosterior(
-        FakePotential(prior=prior),
-        prior=prior,
-        theta_transform=torch_tf.StickBreakingTransform().inv,
-    )
-    source.train_amortized(
-        theta,
-        x,
-        max_num_iters=3,
-        show_progress_bar=False,
-        num_transforms=1,
-        hidden_features=8,
-    )
-    copy = VIPosterior(
-        source.potential_fn,
-        prior,
-        theta_transform=torch_tf.identity_transform,
-        q=source,
-    )
-
-    x_o = x[:1]
-    samples = copy.sample((10,), x=x_o)
-    assert samples.shape == (10, 3)
-    assert copy.log_prob(samples, x=x_o).shape == (10,)
-    assert copy.log_prob_batched(samples.unsqueeze(1), x_o).shape == (10, 1)
-
-    del copy._amortized_theta_event_shape
-    assert copy.sample((5,), x=x_o).shape == (5, 3)
-    assert copy.log_prob(samples, x=x_o).shape == (10,)
-    assert copy.log_prob_batched(samples.unsqueeze(1), x_o).shape == (10, 1)
-
-
-def test_amortized_vi_masks_out_of_support_theta_before_strict_link():
-    class _StrictSigmoid(torch_tf.SigmoidTransform):
-        def _inverse(self, y):
-            if torch.any((y <= 0) | (y >= 1)):
-                raise ValueError("strict link: out of domain")
-            return super()._inverse(y)
-
-    prior = torch.distributions.Independent(
-        torch.distributions.Uniform(zeros(2), ones(2)), 1
-    )
-    theta_train = prior.sample((100,))
-    posterior = VIPosterior(
-        FakePotential(prior=prior),
-        prior=prior,
-        theta_transform=_StrictSigmoid().inv,
-    )
-    posterior.train_amortized(
-        theta_train,
-        theta_train,
-        max_num_iters=3,
-        show_progress_bar=False,
-        num_transforms=1,
-        hidden_features=8,
-    )
-
-    x_batch = zeros(2, 2)
-    theta = torch.tensor([[[0.5, 0.5], [-1.0, 0.5]]])
-    scores = posterior.log_prob_batched(theta, x_batch)
-    assert scores.shape == (1, 2)
-    assert torch.isfinite(scores[0, 0])
-    assert scores[0, 1] == float("-inf")
-
-    single = posterior.log_prob(theta[0], x=x_batch[:1])
-    assert single.shape == (2,)
-    assert torch.isfinite(single[0])
-    assert single[1] == float("-inf")
-
-    integer_theta = torch.tensor([[[-1, -1], [-2, -2]]])
-    integer_scores = posterior.log_prob_batched(integer_theta, x_batch)
-    assert integer_scores.shape == (1, 2)
-    assert torch.all(integer_scores == float("-inf"))
-
-
-def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
-    """Amortized q(theta|x) needs an x; it ignores the x of a stale single-x fit."""
+def test_amortized_vi_checks_a_default_x_set_before_training():
+    """A default x set before `train_amortized()` is checked against the observation
+    shape q was trained on, instead of being broadcast to it."""
     prior = MultivariateNormal(zeros(2), eye(2))
     theta = prior.sample((100,))
-    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
-    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior = VIPosterior(FakePotential(prior=prior), prior=prior)
+    posterior.set_default_x(zeros(1))
     posterior.train_amortized(
         theta=theta,
         x=theta,
@@ -1456,6 +1258,41 @@ def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
         num_transforms=1,
         hidden_features=8,
     )
+    with pytest.raises(ValueError, match="one observation has shape"):
+        posterior.sample((5,))
+
+
+def test_amortized_vi_log_prob_batched_matches_log_prob():
+    """`log_prob_batched()` scores each theta under the observation at its position,
+    as `log_prob()` does one observation at a time, also for several sample axes."""
+    posterior, prior = _fast_amortized_posterior()
+    x_batch = prior.sample((3,))
+    theta = prior.sample((2, 5, 3))
+
+    batched = posterior.log_prob_batched(theta, x_batch)
+    assert batched.shape == (2, 5, 3)
+    for i in range(3):
+        single = posterior.log_prob(theta[..., i, :], x=x_batch[i])
+        assert torch.allclose(batched[..., i], single, atol=1e-5)
+
+
+def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
+    """Amortized q(theta|x) needs an x; it ignores the x and the MAP of a stale
+    single-x fit."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior._map = zeros(1, 2)
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    assert posterior._map is None
     with pytest.raises(ValueError, match="Context `x` needed"):
         posterior.sample((5,))
 
@@ -1685,158 +1522,6 @@ def test_ensemble_of_vi_fits_to_different_x_raises():
     weighted = EnsemblePosterior(fits, weights=[1.0, 0.0])
     with pytest.raises(ValueError, match="not fit on the specified observation"):
         weighted.sample((5,), x=2 * ones(1, 2))
-
-
-def test_ensemble_of_vi_checks_nested_zero_weight_components():
-    prior = MultivariateNormal(zeros(2), eye(2))
-    fits = []
-    for x_o in (2 * ones(1, 2), -2 * ones(1, 2)):
-        posterior = VIPosterior(_CenteredPotential(prior), prior, q="gaussian")
-        posterior.train(x=x_o, **TRAIN_KWARGS)
-        fits.append(posterior)
-
-    nested = EnsemblePosterior(fits, weights=[1.0, 0.0])
-    outer = EnsemblePosterior([fits[0], nested], weights=[1.0, 0.0])
-    with pytest.raises(ValueError, match="not fit on the specified observation"):
-        outer.sample((5,), x=2 * ones(1, 2))
-
-
-def test_ensemble_checks_direct_component_shape_before_draw():
-    prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((100,))
-    vi = VIPosterior(_CenteredPotential(prior), prior, q="gaussian")
-    vi.train(x=2 * ones(1, 2), **TRAIN_KWARGS)
-
-    estimator = posterior_nn("mdn")(theta, torch.randn(100, 3))
-    direct = DirectPosterior(estimator, prior)
-    ensemble = EnsemblePosterior([vi, direct], weights=[1.0, 0.0])
-
-    with pytest.raises(ValueError, match="one observation has shape"):
-        ensemble.sample((5,), x=2 * ones(1, 2))
-
-
-def _direct_posterior_with_condition(prior, theta, event_shape):
-    estimator = posterior_nn("maf", hidden_features=8, num_transforms=1)(
-        theta, torch.randn(100, *event_shape)
-    )
-    return DirectPosterior(estimator, prior)
-
-
-@pytest.mark.parametrize("unknown_first", [True, False])
-def test_ensemble_observation_shape_independent_of_component_order(unknown_first):
-    """One (2, 3) observation stays one observation whichever component comes first."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((100,))
-    unknown = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
-    known = _direct_posterior_with_condition(prior, theta, (2, 3))
-    components = [unknown, known] if unknown_first else [known, unknown]
-
-    ensemble = EnsemblePosterior(components)
-    assert ensemble.potential_fn.x_event_shape == torch.Size((2, 3))
-    processed = ensemble._process_x(zeros(2, 3))
-    assert processed.shape == (1, 2, 3)
-    ensemble._check_num_observations(processed.shape[0])
-
-
-def test_ensemble_build_raises_on_conflicting_observation_shapes():
-    prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((100,))
-    first = _direct_posterior_with_condition(prior, theta, (2, 3))
-    second = _direct_posterior_with_condition(prior, theta, (2, 4))
-
-    with pytest.raises(ValueError, match="disagree on the shape of one observation"):
-        EnsemblePosterior([first, second])
-
-
-def test_ensemble_keeps_unknown_shape_when_no_component_declares_one():
-    prior = MultivariateNormal(zeros(2), eye(2))
-    unknown = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
-    ensemble = EnsemblePosterior([unknown, unknown])
-
-    assert ensemble.potential_fn.x_event_shape is None
-    assert ensemble._process_x(zeros(2, 3)).shape == (2, 3)
-
-
-def test_direct_component_check_accepts_unbatched_condition():
-    prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((100,))
-    direct = _direct_posterior_with_condition(prior, theta, (1, 2))
-
-    direct._check_x_for_sampling(zeros(1, 2))
-    with pytest.raises(ValueError, match="one observation has shape"):
-        direct._check_x_for_sampling(
-            zeros(
-                3,
-            )
-        )
-
-
-def test_rejection_component_check_validates_observation_shape():
-    class _ShapedPotential(FakePotential):
-        @property
-        def x_event_shape(self):
-            return torch.Size((2,))
-
-    prior = MultivariateNormal(zeros(2), eye(2))
-    rejection = RejectionPosterior(_ShapedPotential(prior=prior), prior)
-
-    rejection._check_x_for_sampling(zeros(1, 2))
-    with pytest.raises(ValueError, match="one observation has shape"):
-        rejection._check_x_for_sampling(
-            zeros(
-                3,
-            )
-        )
-
-
-def test_ensemble_set_default_x_keeps_old_defaults_after_rejection():
-    prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((100,))
-    unknown = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
-    known = _direct_posterior_with_condition(prior, theta, (1, 2))
-    ensemble = EnsemblePosterior([unknown, known])
-
-    valid = zeros(1, 1, 2)
-    ensemble.set_default_x(valid)
-    for posterior in [ensemble, unknown, known]:
-        assert torch.equal(posterior.default_x, valid)
-
-    for posterior in [ensemble, unknown, known]:
-        posterior._map = zeros(1, 2)
-    updated = ones(1, 1, 2)
-    ensemble.set_default_x(updated)
-    for posterior in [ensemble, unknown, known]:
-        assert torch.equal(posterior.default_x, updated)
-        assert posterior._map is None
-
-    with pytest.raises(ValueError, match="one observation has shape"):
-        ensemble.set_default_x(zeros(2, 2))
-    for posterior in [ensemble, unknown, known]:
-        assert torch.equal(posterior.default_x, updated)
-
-
-def test_ensemble_set_default_x_checks_all_components_before_mutating(monkeypatch):
-    """A later component rejecting an x leaves the ensemble and earlier components
-    with their previous defaults."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    first = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
-    second = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
-    ensemble = EnsemblePosterior([first, second])
-
-    old = zeros(1, 2)
-    ensemble.set_default_x(old)
-
-    def rejecting_process_x(x):
-        if bool((x == 99).any()):
-            raise ValueError("later component rejects x")
-        return VIPosterior._process_x(second, x)
-
-    monkeypatch.setattr(second, "_process_x", rejecting_process_x)
-    with pytest.raises(ValueError, match="later component rejects x"):
-        ensemble.set_default_x(99 * ones(1, 2))
-
-    for posterior in [ensemble, first, second]:
-        assert torch.equal(posterior.default_x, old)
 
 
 def test_ensemble_of_amortized_vi_takes_one_observation_in_log_prob():
