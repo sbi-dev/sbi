@@ -226,7 +226,7 @@ def pairplot(
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
-        offdiag: deprecated, use upper instead.
+        offdiag: Deprecated, will be removed in v0.29.0. Use `upper` instead.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
             see the source code in `KdeDiagOptions`, `HistDiagOptions`,
             `ScatterDiagOptions` or `BarDiagOptions`.
@@ -1189,7 +1189,13 @@ def _prepare_upper(
                 "You have passed mismatching values to both upper and offdiag"
                 " arguments. offdiag is deprecated, use upper instead."
             )
-        warn("offdiag is deprecated, use upper or lower instead.", stacklevel=2)
+        # stacklevel=3 points at the line that called `pairplot`.
+        warn(
+            "`offdiag` is deprecated since sbi v0.23.0 and will be removed in "
+            "v0.29.0. Use `upper` instead.",
+            FutureWarning,
+            stacklevel=3,
+        )
     return offdiag or upper
 
 
