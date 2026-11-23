@@ -110,6 +110,24 @@ class VectorFieldPosterior(NeuralPosterior):
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
 
+    def _check_x(self, x: Tensor) -> None:
+        """Raise if this posterior cannot sample several observations as iid trials.
+
+        Iid trials need the SDE sampler, and composed standardization does not support
+        them yet.
+        """
+        if self.vector_field_estimator.compose_enabled and x.shape[0] > 1:
+            raise NotImplementedError(
+                "compose_standardization does not yet support iid (x with batch>1). "
+                "Use a single observation, or disable compose_standardization."
+            )
+        if x.shape[0] > 1 and self.sample_with == "ode":
+            raise ValueError(
+                "The ODE sampler draws one posterior per observation. Use "
+                "sample_with='sde' to sample several observations as iid trials, or "
+                "`sample_batched()` for one posterior per observation."
+            )
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -195,15 +213,13 @@ class VectorFieldPosterior(NeuralPosterior):
         """
 
         x = self._x_else_default_x(x)
+        self._check_x(x)
         is_iid = x.shape[0] > 1
-        # IID and guidance require transforming the prior to standardized space.
-        if self.vector_field_estimator.compose_enabled and (
-            is_iid or guidance_method is not None
-        ):
+        # Guidance requires transforming the prior to standardized space.
+        if self.vector_field_estimator.compose_enabled and guidance_method is not None:
             raise NotImplementedError(
-                "compose_standardization does not yet support iid (x with batch>1) or "
-                "guided sampling. Use a single observation, or disable "
-                "compose_standardization."
+                "compose_standardization does not yet support guided sampling. "
+                "Disable compose_standardization."
             )
         self.potential_fn = self.potential_fn.bind(
             x,
