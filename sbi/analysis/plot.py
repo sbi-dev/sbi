@@ -2267,10 +2267,10 @@ def pp_plot(
     ax_.plot(alphas, pp_vals_true, "--", color="black", label="True Null (H0)")
 
     # pp_vals for the estimated null hypothesis over the multiple trials
-    pp_vals_null = []
-    for t in range(len(scores_null)):
-        pp_vals_null.append(pp_vals(scores_null[t], alphas))
-    pp_vals_null = np.array(pp_vals_null)
+    scores_null_list = (
+        list(scores_null.values()) if isinstance(scores_null, dict) else scores_null
+    )
+    pp_vals_null = np.array([pp_vals(s, alphas) for s in scores_null_list])
 
     # confidence region
     quantiles = np.quantile(pp_vals_null, [conf_alpha / 2, 1 - conf_alpha / 2], axis=0)
@@ -2284,13 +2284,21 @@ def pp_plot(
     )
 
     # pp_vals for the observed data
-    for i, p_ in enumerate(scores):
+    if isinstance(scores, dict):
+        scores_items = list(scores.items())
+    else:
+        scores_items = [(None, s) for s in scores]
+
+    for i, (key, p_) in enumerate(scores_items):
         pp_vals_o = pp_vals(p_, alphas)
+        plot_kwargs = kwargs.copy()
         if labels is not None:
-            kwargs["label"] = labels[i]
+            plot_kwargs["label"] = labels[i]
+        elif key is not None:
+            plot_kwargs["label"] = str(key)
         if colors is not None:
-            kwargs["color"] = colors[i]
-        ax_.plot(alphas, pp_vals_o, **kwargs)
+            plot_kwargs["color"] = colors[i]
+        ax_.plot(alphas, pp_vals_o, **plot_kwargs)
     return ax_
 
 
