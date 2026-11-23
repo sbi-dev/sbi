@@ -459,6 +459,21 @@ class IntervalGuidance(UniversalGuidance):
             config: Configuration specifying the interval bounds.
             device: The device on which to evaluate the potential.
         """
+        # A bound that broadcasts beyond the parameters would add walls.
+        shape = torch.Size(vf_estimator.input_shape)
+        for name in ("lower_bound", "upper_bound", "mask"):
+            value = getattr(config, name)
+            if not isinstance(value, Tensor):
+                continue
+            try:
+                fits = torch.broadcast_shapes(value.shape, shape) == shape
+            except RuntimeError:
+                fits = False
+            if not fits:
+                raise ValueError(
+                    f"{name} has shape {tuple(value.shape)}, but the parameters "
+                    f"have shape {tuple(shape)}."
+                )
 
         def interval_fn(
             input: Tensor, condition: Tensor, m: Tensor, std: Tensor
@@ -594,13 +609,11 @@ class PriorGuide(ScoreAdaptation):
         )
         super().__init__(vf_estimator, prior, device)
 
-    def _sigma0_t2(self, std: Tensor) -> Tensor:
-        # From PriorGuide Eq. (12): sigma(t)^2 / (1 + sigma(t)^2)
-        # NOTE: This can be improved similar to the AutoGauss or
-        # JAC methods for IIDScoreFunctions i.e. this assumes
-        # identity covariance but one can also use an estimator
-        # of the posterior covariance.
-        return std**2 / (1.0 + std**2)
+    def _sigma0_t2(self, m: Tensor, std: Tensor) -> Tensor:
+        # Variance of theta_0 given theta_t = m theta_0 + std eps for a posterior with
+        # identity covariance (PriorGuide Eq. (12) for m = 1). An estimate of the
+        # posterior covariance, as in the AutoGauss or JAC iid methods, would refine it.
+        return std**2 / (m**2 + std**2)
 
     def __call__(
         self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None
@@ -619,24 +632,27 @@ class PriorGuide(ScoreAdaptation):
         # NOTE: For now this assumes that sigma0_t2 is at most a vector
         # representing a diagonal matrix. This has to be adapted if
         # _sigma0_t2 is changed.
-        sigma0_t2 = self._sigma0_t2(std)
+        sigma0_t2 = self._sigma0_t2(m, std).to(mu0.dtype)
         sigma0_t2 = sigma0_t2.reshape(-1)
         if sigma0_t2.numel() == 1:
             sigma0_t2 = sigma0_t2.expand(mu0.shape[-1])
         nugget = self.config.nugget
+        weights, means, cov = (
+            p.to(mu0.dtype) for p in (self.weights, self.means, self.cov)
+        )
         if self.config.covariance_type == "diag":
-            cov_e = self.cov + sigma0_t2 + nugget
-            diff = mu0[..., None, :] - self.means
+            cov_e = cov + sigma0_t2 + nugget
+            diff = mu0[..., None, :] - means
             log_det = torch.log(cov_e).sum(-1)
             quad = (diff**2 / cov_e).sum(-1)
             d = diff.shape[-1]
             log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
         else:
             nugget_eye = nugget * torch.eye(
-                sigma0_t2.shape[-1], device=sigma0_t2.device
+                sigma0_t2.shape[-1], device=sigma0_t2.device, dtype=mu0.dtype
             )
-            cov_e = self.cov + torch.diag_embed(sigma0_t2) + nugget_eye
-            diff = mu0[..., None, :] - self.means
+            cov_e = cov + torch.diag_embed(sigma0_t2) + nugget_eye
+            diff = mu0[..., None, :] - means
             chol = torch.linalg.cholesky(cov_e)
             diff_col = diff[..., None]
             solve = torch.cholesky_solve(diff_col, chol)
@@ -645,13 +661,10 @@ class PriorGuide(ScoreAdaptation):
             d = diff.shape[-1]
             log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
 
-        numerator = self.weights[None, :] * torch.exp(log_comp)
-        # Normalize over the mixture components, the last dimension.
-        denom = numerator.sum(dim=-1, keepdim=True)
-        denom = torch.clamp(denom, min=nugget)
-        w_tilde = numerator / denom
+        # Normalized in log space, so that far in the tails they still sum to one.
+        w_tilde = torch.softmax(torch.log(weights) + log_comp, dim=-1)
 
-        diff = self.means - mu0[..., None, :]
+        diff = means - mu0[..., None, :]
         if self.config.covariance_type == "diag":
             v_i = diff / cov_e
         else:
@@ -660,10 +673,30 @@ class PriorGuide(ScoreAdaptation):
             v_i = torch.linalg.solve(cov_e, diff.unsqueeze(-1)).squeeze(-1)
 
         v = torch.sum(w_tilde[..., None] * v_i, dim=-2)
-        mu0_adjusted = mu0 + std**2 * v
-        score_adjusted = (mu0_adjusted * m - input_) / (std**2 + nugget)
+        # The gradient of log E[ratio(theta_0) | theta_t]: v times the derivative of
+        # mu0 with respect to theta_t, which is m sigma0^2 / std^2.
+        return score + m / (m**2 + std**2) * v
 
-        return score_adjusted
+
+class CombinedIIDScore(ScoreAdaptation):
+    """The score of several iid observations, combined by an iid method.
+
+    Guidance wrapped around it adjusts the combined posterior once, instead of once
+    per observation.
+    """
+
+    def __init__(
+        self,
+        vf_estimator: ConditionalVectorFieldEstimator,
+        iid_score_fn: "IIDScoreFunction",
+    ) -> None:
+        super().__init__(vf_estimator, iid_score_fn.prior, iid_score_fn.device)
+        self.iid_score_fn = iid_score_fn
+
+    def __call__(
+        self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None
+    ) -> Tensor:
+        return self.iid_score_fn(input, condition, time)
 
 
 class IIDScoreFunction(ABC):

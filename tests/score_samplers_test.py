@@ -222,6 +222,33 @@ def test_prior_guide_score_does_not_depend_on_the_batch_layout(covariance_type):
         )
 
 
+@pytest.mark.parametrize("estimator_type", ["ve", "vp", "fmpe"])
+def test_prior_guide_score_is_exact_for_gaussians(estimator_type):
+    """For the posterior N(8, 1) and the prior ratio N(0, 0.5), whose tail holds the
+    posterior, prior_guide returns the exact score of the guided posterior."""
+    prior = MultivariateNormal(torch.zeros(1), torch.eye(1))
+    theta = torch.randn(100, 1)
+    estimator = _build_estimator(estimator_type, theta, theta)
+    _use_exact_gaussian_score(estimator, posterior_var=1.0)
+    guidance = PriorGuide(
+        estimator,
+        prior,
+        PriorGuideConfig(train_prior=prior, test_prior=prior, K=1, num_steps=1),
+    )
+    guidance.weights, guidance.means, guidance.cov = (
+        torch.ones(1),
+        torch.zeros(1, 1),
+        torch.full((1, 1), 0.5),
+    )
+    guided_var, guided_mean, x_o = 1 / 3, 8 / 3, torch.full((3, 1), 8.0)
+
+    for time in (torch.tensor([0.05]), torch.tensor([0.5]), torch.tensor([0.9])):
+        m, s = estimator.mean_t_fn(time), estimator.std_fn(time)
+        theta = m * guided_mean + torch.tensor([[-0.5], [0.0], [0.7]])
+        exact = -(theta - m * guided_mean) / (m**2 * guided_var + s**2)
+        torch.testing.assert_close(guidance(theta, x_o, time), exact, atol=1e-4, rtol=0)
+
+
 @pytest.mark.parametrize("estimator_type", ["ve", "vp", "subvp", "fmpe"])
 def test_interval_guidance_samples_the_truncated_posterior(estimator_type):
     """With the exact score of N(0, sd^2), a lower bound at 0 gives the half-normal."""
@@ -276,6 +303,8 @@ def test_interval_guidance_takes_one_bound_per_dimension():
     assert not torch.allclose(per_dimension[..., 0], unguided[..., 0])
     torch.testing.assert_close(per_dimension, masked)
     torch.testing.assert_close(zero_strength, unguided)
+    with pytest.raises(ValueError, match="parameters have shape"):
+        guided_score(lower_bound=torch.zeros(3), upper_bound=None)
     with pytest.raises(ValueError, match="must be less than"):
         IntervalGuidanceConfig(
             lower_bound=torch.tensor([0.0, 2.0]), upper_bound=torch.tensor([1.0, 1.0])
@@ -349,42 +378,31 @@ def test_auto_gauss_estimates_the_precision_once_with_guidance():
     pickle.dumps(posterior)
 
 
-@pytest.mark.parametrize("sde_type", ["vp", "ve"])
-@pytest.mark.parametrize("iid_method", ["fnpe", "gauss"])
-@pytest.mark.parametrize(
-    "guidance_method",
-    [
-        ("affine_classifier_free", {"likelihood_scale": 0.7}),
-        ("interval", {"lower_bound": 0.0, "upper_bound": 1.0}),
-    ],
-)
-def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_method):
-    """Test that guidance can be combined with IID score accumulation."""
-    num_dim = 2
-    mean0 = torch.zeros(num_dim)
-    std0 = torch.ones(num_dim)
-    score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
-
-    x_o_iid = torch.ones((5, 1))
-    guidance_name, guidance_params = guidance_method
-    score_fn = score_fn.bind(
-        x_o_iid,
-        x_is_iid=True,
-        iid_method=iid_method,
-        guidance_method=guidance_name,
-        guidance_params=guidance_params,
+@pytest.mark.parametrize("iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss"])
+def test_guidance_adjusts_the_combined_iid_posterior_once(iid_method):
+    """A prior shift moves the score of three iid observations once, not three times."""
+    estimator = _build_estimator("vp", torch.randn(100, 1), torch.randn(100, 1))
+    _use_exact_gaussian_score(estimator, posterior_var=0.5)
+    potential, _ = vector_field_estimator_based_potential(
+        estimator, MultivariateNormal(torch.zeros(1), torch.eye(1)), x_o=None
     )
+    budget = {"precision_est_budget": 100, "precision_initial_sampler_steps": 5}
+    iid_kwargs = {
+        "x_is_iid": True,
+        "iid_method": iid_method,
+        "iid_params": budget if iid_method == "auto_gauss" else None,
+    }
+    x_o, theta, time = torch.randn(3, 1), torch.randn(4, 1, 1), torch.tensor([0.4])
 
-    inputs = torch.ones((1, 1, num_dim))
-    time = torch.ones(1)
+    plain = potential.bind(x_o, **iid_kwargs).gradient(theta, time)
+    guided = potential.bind(
+        x_o,
+        guidance_method="affine_classifier_free",
+        guidance_params={"prior_shift": 1.0},
+        **iid_kwargs,
+    ).gradient(theta, time)
 
-    for prior in build_random_priors(num_dim):
-        score_fn.prior = prior
-        output = score_fn.gradient(inputs, time=time)
-        assert output.shape == (1, 1, num_dim), (
-            f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
-        )
-        assert torch.isfinite(output).all(), "Output contains non-finite values"
+    torch.testing.assert_close(guided - plain, torch.ones_like(plain))
 
 
 @pytest.mark.parametrize(
