@@ -4,15 +4,23 @@ When working with **multi-round** NPE (i.e., SNPE), you might have experienced t
 following warning:
 
 ```python
-Only x% posterior samples are within the prior support. It may take a long time to
-collect the remaining 10000 samples. Consider interrupting (Ctrl-C) and switching to
-'sample_with_mcmc=True'.
+Only x% proposal samples are accepted. It may take a long time to collect the
+remaining 10000 samples. You can prevent very long runtimes by setting
+`max_sampling_time` to limit runtime, or disabling rejection sampling (e.g. via
+`reject_outside_prior=False` in `posterior.sample()` when available). Alternatively,
+consider interrupting (Ctrl-C) and switching to
+`build_posterior(..., sample_with='mcmc')`.
 ```
+
+Setting `reject_outside_prior=False` skips the rejection step. Sampling gets faster,
+but the samples are no longer restricted to the prior bounds and can lie outside them.
 
 The warning means that most of the posterior estimate lies outside the prior bounds.
 This is called leakage. In multi-round NPE, leakage can grow with every round, and the
 estimate then becomes poor inside the prior bounds as well. With a mixture density
-network, training can eventually fail with NaN values. The reason for leakage is
+network, training can eventually fail with NaN values. `log_prob()` shows the same
+leakage: it estimates its normalizing constant from the fraction of samples within the
+prior bounds, and warns when this fraction is small. The reason for leakage is
 described in more detail
 [here](https://arxiv.org/abs/2210.04815),
 [here](https://arxiv.org/abs/2002.03712), and
@@ -21,7 +29,8 @@ described in more detail
 - use truncated proposals for SNPE (TSNPE), as shown in the
 [guide on sequential methods](https://sbi.readthedocs.io/en/latest/how_to_guide/02_multiround_inference.html#leakage-and-truncated-proposals-tsnpe).
 
-- sample with MCMC: `samples = posterior((num_samples,), x=x_o, sample_with_mcmc=True)`.
+- sample with MCMC: `posterior = inference.build_posterior(sample_with="mcmc")`, then
+`samples = posterior.sample((num_samples,), x=x_o)`.
 This approach will make sampling slower, but samples will not "leak". It does not
 improve a poor estimate, though.
 
