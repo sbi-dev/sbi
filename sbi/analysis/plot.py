@@ -1140,10 +1140,11 @@ def _warn_deprecated_kwargs(
         ignored: Newer arguments that the old implementation does not use. Those
             that are not None are named in the warning.
         diag: The diagonal style(s). Named in the warning if the old
-            implementation does not draw them.
+            implementation does not draw them as asked.
         sample_names: Names of the `LabeledSamples`, which the old implementation
             drops. Named in the warning if any is set.
-        upper: The upper-triangle style(s) of `pairplot`.
+        upper: The upper-triangle style(s) of `pairplot`. They decide whether the
+            old implementation draws scatter lines on the diagonal.
     """
     message = (
         f"`{func_name}` got the deprecated keyword arguments {sorted(kwargs)}. "
@@ -1151,14 +1152,19 @@ def _warn_deprecated_kwargs(
         "Pass `FigOptions` fields in `fig_kwargs` and plot styles in the "
         "`*_kwargs` arguments (see `sbi.analysis.plotting_classes`)."
     )
-    # The old diagonal draws "scatter" only when the upper triangle is scatter too.
-    drawn = {"hist", "kde", None} | ({"scatter"} if upper == "scatter" else set())
-    styles = diag if isinstance(diag, list) else [diag]
-    if any(style not in drawn for style in styles):
-        ignored = {**ignored, "diag": diag}
-    if any(sample_names or []):
-        ignored = {**ignored, "LabeledSamples names": sample_names}
     dropped = [name for name, value in ignored.items() if value is not None]
+    # Per sample, the old diagonal draws "hist" or "kde" if asked. Otherwise it draws
+    # scatter lines if that sample's upper style is "scatter", and nothing if not.
+    n = max(len(x) if isinstance(x, list) else 1 for x in (diag, upper))
+    diags = diag if isinstance(diag, list) else [diag] * n
+    uppers = upper if isinstance(upper, list) else [upper] * n
+    if any(
+        d not in ("hist", "kde", "scatter" if u == "scatter" else None)
+        for d, u in zip(diags, uppers, strict=False)
+    ):
+        dropped.append("diag")
+    if any(sample_names or []):
+        dropped.append("LabeledSamples names")
     if dropped:
         message += f" This call uses the old implementation, which ignores {dropped}."
     # stacklevel=3 points at the line that called `pairplot` or `marginal_plot`.
