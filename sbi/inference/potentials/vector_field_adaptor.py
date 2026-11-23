@@ -1475,13 +1475,16 @@ def ensure_lam_positive_definite(
             denoising_posterior_precision, Lam_corr, batch_dims=2
         )
     else:
-        # For one-dimensional case, treat Lam as a vector by putting it on the diagonal.
+        # A diagonal Lam, or a 1 x 1 one, is corrected elementwise; the precisions may
+        # mix diagonal and dense layouts.
         eps = torch.finfo(Lam.dtype).eps
         nugget = torch.maximum(
             100 * eps * Lam.abs() / N,
             eps * denoising_posterior_precision.abs().amax(1, keepdim=True),
         ).clamp(min=precision_nugget)
         Lam_corr = torch.where(Lam > 0, torch.zeros_like(Lam), -Lam) / (N - 1) + nugget
-        denoising_posterior_precision = denoising_posterior_precision + Lam_corr
+        denoising_posterior_precision = add_diag_or_dense(
+            denoising_posterior_precision, Lam_corr, batch_dims=2
+        )
 
     return denoising_prior_precision, denoising_posterior_precision
