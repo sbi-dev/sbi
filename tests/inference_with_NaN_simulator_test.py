@@ -405,7 +405,7 @@ def test_restricted_prior_log_prob(prior):
         "Accepted theta have zero probability."
     )
     assert torch.all(restricted_prior_probs[torch.logical_not(valid_thetas)] == 0.0), (
-        "Rejected theta has non-zero probablity."
+        "Rejected theta has non-zero probability."
     )
 
 

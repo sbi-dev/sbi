@@ -101,7 +101,7 @@ def psis_diagnostics(
     p(\theta, x_o)$ thus $\log w(\theta) = \log \frac{p(\theta, x_o)}{q(\theta)} =
     \log p(x_o)$ is constant. This function will fit a Generalized Pareto
     distribution to the tails of w. The shape parameter k serves as metric as detailed
-    in [1]. In short it is related to the variance of a importance sampling estimate,
+    in [1]. In short it is related to the variance of an importance sampling estimate,
     especially for k > 1 the variance will be infinite.
 
     NOTE: In our experience this metric does distinguish "very bad" from "ok", but

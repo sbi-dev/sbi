@@ -147,10 +147,12 @@ def test_embedding_api_with_multiple_trials(
         s = posterior.sample((1,), x=x_o)
         _ = posterior.potential(s)
     else:
-        s = posterior.sample_batched((1,), x=x_o).squeeze(0)
-        # potentials take `theta` as (batch_shape, event_shape), so squeeze sample_dim
-        s = s.squeeze(0)
-        _ = posterior.potential(s)
+        s = posterior.sample_batched((1,), x=x_o)
+        if posterior_method == "direct":
+            _ = posterior.log_prob_batched(s, x=x_o)
+        else:
+            # The sets of trials are combined as iid observations.
+            _ = posterior.potential(s.squeeze(0))
 
 
 @pytest.mark.parametrize("input_shape", [(32,), (32, 32), (32, 64)])
@@ -702,7 +704,7 @@ def test_lru_isolated(
     batch_size: int = 16,
     sequence_len: int = 50,
 ):
-    """Run some random data trough an LRU layer."""
+    """Run some random data through an LRU layer."""
     lru = LRU(
         input_dim=input_dim,
         state_dim=state_dim,
@@ -820,7 +822,7 @@ def test_lru_embedding_net_isolated(
     batch_size: int = 16,
     sequence_len: int = 50,
 ):
-    """Run some random data trough an LRUEmbedding network."""
+    """Run some random data through an LRUEmbedding network."""
     embedding_net = LRUEmbedding(
         input_dim=input_dim,  # = observation_dim
         output_dim=output_dim,

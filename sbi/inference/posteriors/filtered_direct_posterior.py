@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
+from sbi.inference.posteriors.base_posterior import _ONE_AT_A_TIME
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.sbi_types import Shape
@@ -24,6 +25,11 @@ class FilteredDirectPosterior(DirectPosterior):
     simulations and updates the underlying `TabPFNFlow` context before delegating to
     `DirectPosterior` sampling / log-probability logic.
     """
+
+    @property
+    def _one_observation_hint(self) -> str:
+        """Filtering picks the context per observation, so there is no batched path."""
+        return f"{_ONE_AT_A_TIME}."
 
     def __init__(
         self,

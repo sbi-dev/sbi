@@ -77,15 +77,18 @@ def mnle_trained_accurate(request, mnle_prior):
 
 @pytest.mark.mcmc
 @pytest.mark.gpu
-def test_mnle_on_device(mnle_prior, mcmc_params_fast: MCMCPosteriorParameters):
+def test_mnle_on_device(mcmc_params_fast: MCMCPosteriorParameters):
     """Test MNLE API on device."""
     device = process_device("gpu")
     skip_if_mps_op_unsupported(device, "aten::binomial")
-    mnle_prior.to(device)
-    theta = mnle_prior.sample((100,))
+    # Its own prior: `.to()` moves a prior in place, and the module-scoped
+    # `mnle_prior` is shared with the cpu tests.
+    prior = MixedData().get_prior()
+    prior.to(device)
+    theta = prior.sample((100,))
     x = mixed_simulator(theta)
 
-    trainer = MNLE(prior=mnle_prior, device=device)
+    trainer = MNLE(prior=prior, device=device)
     trainer.append_simulations(theta, x.to(device)).train(max_num_epochs=10)
 
     posterior = trainer.build_posterior(posterior_parameters=mcmc_params_fast)
@@ -258,7 +261,7 @@ def test_mnle_with_experimental_conditions(
     """Test MNLE c2st accuracy when conditioned on a subset of the parameters, e.g.,
     experimental conditions.
 
-    MNLE is trained a on simulator with 3D parameter space. After training, the
+    MNLE is trained on a simulator with 3D parameter space. After training, the
     categorical parameter is set to a fixed value (conditioned posterior), and the
     accuracy of the conditioned posterior is tested against the true posterior.
     """

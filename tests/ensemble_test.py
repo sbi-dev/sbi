@@ -6,13 +6,15 @@ from __future__ import annotations
 from dataclasses import asdict
 
 import pytest
+import torch
 from torch import eye, ones, randn_like, tensor, zeros
 from torch.distributions import Categorical, MixtureSameFamily, MultivariateNormal
 from torch.testing import assert_close
 
 from sbi.inference import NLE_A, NPE_C, NRE_A
-from sbi.inference.posteriors import EnsemblePosterior
+from sbi.inference.posteriors import DirectPosterior, EnsemblePosterior
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
+from sbi.neural_nets import posterior_nn
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -190,7 +192,7 @@ def test_ensemble_map_uses_default_x():
         for _ in range(ensemble_size)
     ]
     ensemble = EnsemblePosterior(posteriors)
-    with pytest.raises(ValueError, match="Default `x` has not been set"):
+    with pytest.raises(ValueError, match="default has not been set"):
         ensemble.map()
     x_o = 2.0 * ones(1, num_dim)
     ensemble.set_default_x(x_o)
@@ -224,6 +226,52 @@ def test_ensemble_map_uses_default_x():
 
     with pytest.raises(ValueError, match=r"supported\. Use `\.set_default_x\(\)`"):
         ensemble.map(x=x_o)
+
+
+def _posterior_with_x_shape(x_event_shape=None):
+    """Return an untrained direct posterior, which declares `x_event_shape`, or for
+    None a posterior with a hand-written potential, which declares no shape."""
+    gaussian = MultivariateNormal(zeros(2), eye(2))
+    if x_event_shape is None:
+        return TractablePosterior(_GaussianShiftPotential(gaussian, gaussian))
+    estimator = posterior_nn("maf", hidden_features=8, num_transforms=1)(
+        gaussian.sample((10,)), torch.randn(10, *x_event_shape)
+    )
+    return DirectPosterior(estimator, gaussian)
+
+
+def test_ensemble_takes_the_observation_shape_its_components_declare():
+    """Components without a declared shape do not decide it, in either order, and
+    components that declare different shapes cannot form an ensemble."""
+    unknown, known = _posterior_with_x_shape(), _posterior_with_x_shape((2, 3))
+    for components in ([unknown, known], [known, unknown]):
+        assert EnsemblePosterior(components)._process_x(zeros(2, 3)).shape == (1, 2, 3)
+    with pytest.raises(ValueError, match="disagree on the shape of one observation"):
+        EnsemblePosterior([known, _posterior_with_x_shape((2, 4))])
+
+
+def test_ensemble_set_default_x_keeps_defaults_after_rejection():
+    """A rejected `x` leaves every default and cached MAP in place. An accepted one
+    replaces the defaults and clears every MAP, the ensemble's included."""
+    components = [_posterior_with_x_shape(), _posterior_with_x_shape((1, 2))]
+    ensemble = EnsemblePosterior(components)
+    posteriors = [ensemble, *components]
+    old = zeros(1, 1, 2)
+    ensemble.set_default_x(old)
+    for posterior in posteriors:
+        posterior._map = zeros(1, 2)
+
+    with pytest.raises(ValueError, match="one observation has shape"):
+        ensemble.set_default_x(zeros(2, 2))
+    for posterior in posteriors:
+        assert torch.equal(posterior.default_x, old)
+        assert posterior._map is not None
+
+    new = ones(1, 1, 2)
+    ensemble.set_default_x(new)
+    for posterior in posteriors:
+        assert torch.equal(posterior.default_x, new)
+        assert posterior._map is None
 
 
 def test_ensemble_to_keeps_default_x():
