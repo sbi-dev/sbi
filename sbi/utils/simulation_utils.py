@@ -85,7 +85,7 @@ def simulate_for_sbi(
     )
     try:
         if isinstance(x, list):  # E.g. tensors and arrays mixed.
-            x = torch.stack([torch.as_tensor(row) for row in x])
+            x = torch.stack([torch.as_tensor(row).cpu() for row in x])
         x = torch.as_tensor(x)
         if x.is_complex():
             raise TypeError("complex simulator outputs")
@@ -130,7 +130,7 @@ def simulate_from_theta(
             derived from `seed`, for the random states of Python, numpy and
             PyTorch on the CPU. So for noise drawn on the CPU, the outputs do not
             depend on `num_workers`; PyTorch's GPU generators are not seeded per
-            call. Afterwards, the global random state is seeded with another seed
+            call. Afterwards, these CPU random states are seeded with another seed
             derived from `seed`. Without a seed, one worker uses the current random
             state; more workers seed every call from numpy's global random state.
             Seeding needs joblib's default process workers: with a thread backend,
