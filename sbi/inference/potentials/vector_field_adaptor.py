@@ -551,7 +551,9 @@ class PriorGuide(ScoreAdaptation):
 
     Fits a Gaussian mixture model to the ratio between a training prior and a
     test prior, then leverages the backward kernel of the diffusion process to
-    accurately compute the marginal adjusted posterior score.
+    accurately compute the marginal adjusted posterior score. Unlike the paper, which
+    assumes a posterior N(0, I), the backward kernel's covariance comes from the
+    Jacobian of the score, which costs one backward pass per parameter dimension.
 
     Example
     --------
@@ -609,73 +611,58 @@ class PriorGuide(ScoreAdaptation):
         )
         super().__init__(vf_estimator, prior, device)
 
-    def _sigma0_t2(self, m: Tensor, std: Tensor) -> Tensor:
-        # Variance of theta_0 given theta_t = m theta_0 + std eps for a posterior with
-        # identity covariance (PriorGuide Eq. (12) for m = 1). An estimate of the
-        # posterior covariance, as in the AutoGauss or JAC iid methods, would refine it.
-        return std**2 / (m**2 + std**2)
-
     def __call__(
         self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None
     ) -> Tensor:
         if time is None:
-            time = torch.tensor([self.vf_estimator.t_min])
-
-        input_ = input.detach()
-        score = self.vf_estimator.score(input_, condition, time)
+            time = torch.tensor([self.vf_estimator.t_min], device=input.device)
+        d = input.shape[-1]
+        # The Jacobian of the score, one backward pass per dimension. Each particle's
+        # score depends only on that particle, for any layout of inputs and conditions.
+        with torch.enable_grad():
+            input_ = input.detach().requires_grad_(True)
+            score = self.vf_estimator.score(input_, condition, time)
+            jac = torch.stack(
+                [
+                    torch.autograd.grad(
+                        score[..., i].sum(), input_, retain_graph=i < d - 1
+                    )[0]
+                    for i in range(d)
+                ],
+                dim=-2,
+            )
+        score = score.detach()
         m = self.vf_estimator.mean_t_fn(time)
         std = self.vf_estimator.std_fn(time)
-        # Standard Tweedie's formula for denoising
-        mu0 = (input_ + std**2 * score) / m
+        mu0 = (input_.detach() + std**2 * score) / m
 
-        # Prior adjustment
-        # NOTE: For now this assumes that sigma0_t2 is at most a vector
-        # representing a diagonal matrix. This has to be adapted if
-        # _sigma0_t2 is changed.
-        sigma0_t2 = self._sigma0_t2(m, std).to(mu0.dtype)
-        sigma0_t2 = sigma0_t2.reshape(-1)
-        if sigma0_t2.numel() == 1:
-            sigma0_t2 = sigma0_t2.expand(mu0.shape[-1])
-        nugget = self.config.nugget
+        # Covariance of theta_0 given theta_t by Tweedie's second-order formula, exact
+        # for Gaussian posteriors; the paper's Eq. (12) assumes the posterior N(0, I).
+        # Floored at zero where an imperfect score makes it indefinite.
+        eye = torch.eye(d, dtype=score.dtype, device=score.device)
+        m_, s2 = ((v * torch.ones_like(score))[..., :1, None] for v in (m, std**2))
+        cov0 = s2 / m_**2 * (eye + s2 * jac)
+        eigenvalues, eigenvectors = torch.linalg.eigh(0.5 * (cov0 + cov0.mT))
+        cov0 = (eigenvectors * eigenvalues.clamp(min=0)[..., None, :]) @ eigenvectors.mT
+
         weights, means, cov = (
-            p.to(mu0.dtype) for p in (self.weights, self.means, self.cov)
+            p.to(score.dtype) for p in (self.weights, self.means, self.cov)
         )
         if self.config.covariance_type == "diag":
-            cov_e = cov + sigma0_t2 + nugget
-            diff = mu0[..., None, :] - means
-            log_det = torch.log(cov_e).sum(-1)
-            quad = (diff**2 / cov_e).sum(-1)
-            d = diff.shape[-1]
-            log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
-        else:
-            nugget_eye = nugget * torch.eye(
-                sigma0_t2.shape[-1], device=sigma0_t2.device, dtype=mu0.dtype
-            )
-            cov_e = cov + torch.diag_embed(sigma0_t2) + nugget_eye
-            diff = mu0[..., None, :] - means
-            chol = torch.linalg.cholesky(cov_e)
-            diff_col = diff[..., None]
-            solve = torch.cholesky_solve(diff_col, chol)
-            quad = (diff_col * solve).sum(-2).squeeze(-1)
-            log_det = 2.0 * torch.log(torch.diagonal(chol, dim1=-2, dim2=-1)).sum(-1)
-            d = diff.shape[-1]
-            log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
-
-        # Normalized in log space, so that far in the tails they still sum to one.
-        w_tilde = torch.softmax(torch.log(weights) + log_comp, dim=-1)
-
+            cov = torch.diag_embed(cov)
+        cov_e = cov + cov0[..., None, :, :] + self.config.nugget * eye
         diff = means - mu0[..., None, :]
-        if self.config.covariance_type == "diag":
-            v_i = diff / cov_e
-        else:
-            # Solve per-component for full covariance; support shared or
-            # per-component cov.
-            v_i = torch.linalg.solve(cov_e, diff.unsqueeze(-1)).squeeze(-1)
+        chol = torch.linalg.cholesky(cov_e)
+        v_i = torch.cholesky_solve(diff[..., None], chol).squeeze(-1)
+        quad = (diff * v_i).sum(-1)
+        log_det = 2.0 * torch.log(torch.diagonal(chol, dim1=-2, dim2=-1)).sum(-1)
+        # Normalized in log space, so that far in the tails they still sum to one.
+        w_tilde = torch.softmax(torch.log(weights) - 0.5 * (log_det + quad), dim=-1)
+        v = (w_tilde[..., None] * v_i).sum(-2)
 
-        v = torch.sum(w_tilde[..., None] * v_i, dim=-2)
-        # The gradient of log E[ratio(theta_0) | theta_t]: v times the derivative of
-        # mu0 with respect to theta_t, which is m sigma0^2 / std^2.
-        return score + m / (m**2 + std**2) * v
+        # The paper's Eq. (15): v times the derivative of mu0 with respect to theta_t,
+        # (I + std^2 J) / m = m cov0 / std^2.
+        return score + (m_ / s2 * cov0 @ v[..., None]).squeeze(-1)
 
 
 class CombinedIIDScore(ScoreAdaptation):

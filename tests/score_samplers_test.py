@@ -224,12 +224,12 @@ def test_prior_guide_score_does_not_depend_on_the_batch_layout(covariance_type):
 
 @pytest.mark.parametrize("estimator_type", ["ve", "vp", "fmpe"])
 def test_prior_guide_score_is_exact_for_gaussians(estimator_type):
-    """For the posterior N(8, 1) and the prior ratio N(0, 0.5), whose tail holds the
-    posterior, prior_guide returns the exact score of the guided posterior."""
+    """For the posterior N(8, 0.25) and the prior ratio N(0, 0.5), whose tail holds
+    the posterior, prior_guide returns the exact score of the guided posterior."""
     prior = MultivariateNormal(torch.zeros(1), torch.eye(1))
     theta = torch.randn(100, 1)
     estimator = _build_estimator(estimator_type, theta, theta)
-    _use_exact_gaussian_score(estimator, posterior_var=1.0)
+    _use_exact_gaussian_score(estimator, posterior_var=0.25)
     guidance = PriorGuide(
         estimator,
         prior,
@@ -240,7 +240,8 @@ def test_prior_guide_score_is_exact_for_gaussians(estimator_type):
         torch.zeros(1, 1),
         torch.full((1, 1), 0.5),
     )
-    guided_var, guided_mean, x_o = 1 / 3, 8 / 3, torch.full((3, 1), 8.0)
+    guided_var = 1 / (1 / 0.25 + 1 / 0.5)
+    guided_mean, x_o = guided_var * 8.0 / 0.25, torch.full((3, 1), 8.0)
 
     for time in (torch.tensor([0.05]), torch.tensor([0.5]), torch.tensor([0.9])):
         m, s = estimator.mean_t_fn(time), estimator.std_fn(time)
