@@ -492,11 +492,14 @@ class NPE_C(PosteriorEstimatorTrainer):
         theta = self._neural_net._transform_input(theta)
 
         # Numerical failures (non-finite parameters, matrices that are not positive
-        # definite in float32) get one error that names their usual cause.
+        # definite in float32) get one error that names their usual cause. Other
+        # errors of the network, e.g. of its embedding, keep their own.
         try:
             # Get the density estimator MoG at the training data x
             mog_d = self._neural_net.get_uncorrected_mog(x)
-
+        except MoGNotFiniteError as e:
+            raise ValueError(_DEGENERATE_MOG_LOSS_MSG) from e
+        try:
             # Compute the MoG parameters of the proposal posterior.
             (
                 logits_pp,
