@@ -13,8 +13,24 @@ from torch import Tensor, as_tensor
 from sbi.sbi_types import AcceptRejectFn, Proposal, SampleProposal
 from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc, tqdm
 from sbi.utils.sbiutils import gradient_ascent
+from sbi.utils.torchutils import (
+    empty_samples,
+    infer_empty_draw,
+    raise_if_empty_batch,
+)
 
 logger = logging.getLogger(__name__)
+
+_MAX_DRAWS_WITHOUT_ACCEPTANCE_FACTOR = 100
+
+
+def _no_progress_error(num_draws: int) -> RuntimeError:
+    """Error for a rejection loop that has not accepted a single draw."""
+    return RuntimeError(
+        f"No samples were accepted after {num_draws} draws from the proposal. "
+        "This is likely due to an extremely low acceptance rate. Use "
+        "`max_sampling_time` to limit runtime or switch to MCMC or VI."
+    )
 
 
 def rejection_sample(
@@ -71,8 +87,15 @@ def rejection_sample(
         device: Device on which to sample.
 
     Returns:
-        Accepted samples and acceptance rate as scalar Tensor.
+        Accepted samples and acceptance rate as scalar Tensor. A request with
+        `num_samples == 0` returns empty samples and a `nan` acceptance rate.
     """
+    if num_samples == 0:
+        draw_shape, draw_device = infer_empty_draw(proposal)
+        return empty_samples((0,), draw_shape, draw_device), as_tensor(
+            float("nan"), device=draw_device
+        )
+
     if theta_transform is None:
         theta_transform = torch_tf.IndependentTransform(
             torch_tf.identity_transform, reinterpreted_batch_ndims=1
@@ -310,8 +333,10 @@ def accept_reject_sample(
             `rejection_sample()`. Warn if not empty.
 
     Returns:
-        Accepted samples of shape `(sample_dim, batch_dim, *event_shape)`, and
-        acceptance rates for each observation.
+        Accepted samples of shape `(sample_dim, *event_shape)` for one observation, or
+        `(sample_dim, num_xos, *event_shape)` for several, and acceptance rates for
+        each observation. A request with `num_samples == 0` returns empty samples and
+        `nan` acceptance rates.
     """
     if kwargs:
         logger.warning(
@@ -325,13 +350,25 @@ def accept_reject_sample(
     if proposal_sampling_kwargs is None:
         proposal_sampling_kwargs = {}
 
+    condition = proposal_sampling_kwargs.get("condition")
+    if condition is not None:
+        raise_if_empty_batch(condition)
+
     num_remaining = num_samples
 
     # NOTE: We might want to change this to a more general approach in the future.
     # Currently limited to a single "batch_dim" for the condition.
     # But this would require giving the method the condition_shape explicitly...
-    if "condition" in proposal_sampling_kwargs:
-        num_xos = proposal_sampling_kwargs["condition"].shape[0]
+    if condition is not None:
+        num_xos = condition.shape[0]
+
+    if num_samples == 0:
+        draw_shape, proposal_device = infer_empty_draw(
+            proposal, proposal_sampling_kwargs
+        )
+        device = getattr(condition, "device", proposal_device)
+        samples = empty_samples((0,), draw_shape, device)
+        return samples, torch.full((num_xos,), float("nan"), device=device)
 
     pbar = tqdm(
         disable=not show_progress_bars or is_nested(),
@@ -397,6 +434,15 @@ def accept_reject_sample(
                 if low_acceptance_hint is not None:
                     msg += f" {low_acceptance_hint}"
             raise RuntimeError(msg)
+
+        if (
+            max_sampling_time is None
+            and num_samples_possible
+            >= _MAX_DRAWS_WITHOUT_ACCEPTANCE_FACTOR * max_sampling_batch_size
+            and (num_sampled_total == 0).any()
+        ):
+            pbar.close()
+            raise _no_progress_error(num_samples_possible)
 
         # Sample and reject.
         with nested_pbar_context():

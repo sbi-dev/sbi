@@ -369,6 +369,75 @@ def split_leading_dim(x: Tensor, shape: Shape) -> Tensor:
     return torch.reshape(x, new_shape)
 
 
+def raise_if_empty_batch(x: Tensor, name: str = "x") -> None:
+    """Raise a `ValueError` if the batch dimension of `x` is empty.
+
+    Args:
+        x: Tensor whose first dimension is the batch dimension.
+        name: Name of the tensor in the error message.
+
+    Raises:
+        ValueError: If `x` has no entries along its batch dimension.
+    """
+    if x.shape[0] == 0:
+        raise ValueError(
+            f"{name} must contain at least one observation, but its batch dimension "
+            f"is empty: {tuple(x.shape)}."
+        )
+
+
+def empty_samples(
+    sample_shape: Shape, inner_shape: Shape, device: Union[str, torch.device]
+) -> Tensor:
+    """Return an empty sample tensor of shape `sample_shape + inner_shape`.
+
+    Args:
+        sample_shape: Leading sample dimensions of the request.
+        inner_shape: Shape of a single sample, e.g. `(*event_shape)` or
+            `(batch_dim, *event_shape)`.
+        device: Device of the returned tensor.
+
+    Returns:
+        Empty tensor with the shape a non-empty request of `sample_shape` would have.
+    """
+    return torch.empty((*torch.Size(sample_shape), *inner_shape), device=device)
+
+
+def infer_empty_draw(
+    proposal: Any, sampling_kwargs: Optional[Dict] = None
+) -> Tuple[torch.Size, torch.device]:
+    """Infer the shape and device of a zero-length draw from `proposal`.
+
+    Requesting zero samples is cheap, and it takes the shape of a single draw from the
+    object that owns the shape, e.g. a conditional estimator or a restricted prior.
+
+    Args:
+        proposal: Callable or object with a `sample()` method taking a sample shape.
+        sampling_kwargs: Keyword arguments forwarded to the draw, e.g. `condition`.
+
+    Returns:
+        Shape after the sample dimension, and the device of the draw.
+
+    Raises:
+        ValueError: If the zero-length draw fails.
+    """
+    sample = getattr(proposal, "sample", proposal)
+    try:
+        draw = sample(torch.Size((0,)), **(sampling_kwargs or {}))
+    except (
+        AttributeError,
+        NotImplementedError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as error:
+        raise ValueError(
+            "Cannot determine the shape and device of an empty sample request: a "
+            f"zero-length draw from {type(proposal).__name__} failed with {error}."
+        ) from error
+    return draw.shape[1:], draw.device
+
+
 def merge_leading_dims(x: Tensor, num_dims: int) -> Tensor:
     """Reshapes the tensor `x` such that the first `num_dims` dimensions are merged
     to one.

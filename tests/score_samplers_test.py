@@ -421,6 +421,39 @@ def test_fnpe_divergence_error_names_cause():
         posterior.sample((100,), x=torch.ones((1000, 1)), steps=100)
 
 
+@pytest.mark.parametrize("num_samples", (5, 0))
+def test_sample_rejects_empty_observation_batch(num_samples):
+    """`sample()` must reject an empty x even for a zero-sample request."""
+    estimator = _build_gaussian_score_estimator(
+        "vp", (2,), torch.ones(2), torch.ones(2)
+    ).vector_field_estimator
+    prior = Independent(Normal(torch.zeros(2), torch.ones(2)), 1)
+    posterior = VectorFieldPosterior(estimator, prior)
+
+    with pytest.raises(ValueError, match="batch dimension"):
+        posterior.sample((num_samples,), x=torch.empty(0, 1))
+
+
+def test_sample_returns_partial_results_flat(monkeypatch):
+    """A short rejection batch must not be reshaped to the requested count."""
+    estimator = _build_gaussian_score_estimator(
+        "vp", (2,), torch.ones(2), torch.ones(2)
+    ).vector_field_estimator
+    prior = Independent(Normal(torch.zeros(2), torch.ones(2)), 1)
+    posterior = VectorFieldPosterior(estimator, prior, sample_with="ode")
+
+    def partial_sample(**kwargs):
+        return torch.randn(3, 1, 2), torch.tensor(0.5)
+
+    monkeypatch.setattr(
+        "sbi.inference.posteriors.vector_field_posterior.rejection.accept_reject_sample",
+        partial_sample,
+    )
+
+    samples = posterior.sample((10,), x=torch.ones(1), return_partial_on_timeout=True)
+    assert samples.shape == (3, 2)
+
+
 @pytest.mark.parametrize(
     "diverged, value",
     (

@@ -31,6 +31,7 @@ from sbi.utils.sbiutils import (
     warn_if_outside_prior_support,
     within_support,
 )
+from sbi.utils.torchutils import empty_samples, raise_if_empty_batch, split_leading_dim
 
 
 class VectorFieldPosterior(NeuralPosterior):
@@ -212,6 +213,7 @@ class VectorFieldPosterior(NeuralPosterior):
         """
 
         x = self._x_else_default_x(x)
+        raise_if_empty_batch(x)
         self._check_x(x)
         is_iid = x.shape[0] > 1
         # Guidance requires transforming the prior to standardized space.
@@ -230,6 +232,11 @@ class VectorFieldPosterior(NeuralPosterior):
         )
 
         num_samples = torch.Size(sample_shape).numel()
+        if num_samples == 0:
+            return empty_samples(
+                sample_shape, self.vector_field_estimator.input_shape, self._device
+            )
+
         max_sampling_batch_size = (
             self.max_sampling_batch_size
             if max_sampling_batch_size is None
@@ -289,10 +296,19 @@ class VectorFieldPosterior(NeuralPosterior):
         if not reject_outside_prior:
             warn_if_outside_prior_support(self.prior, samples)
 
-        samples = samples.reshape(
-            sample_shape + self.vector_field_estimator.input_shape
-        )
-        return samples
+        if (
+            samples.ndim == len(self.vector_field_estimator.input_shape) + 2
+            and samples.shape[1] == 1
+        ):
+            samples = samples[:, 0]
+        return self._reshape_to_sample_shape(samples, sample_shape)
+
+    @staticmethod
+    def _reshape_to_sample_shape(samples: Tensor, sample_shape: Shape) -> Tensor:
+        """Reshape full samples into `sample_shape`; keep partial results flat."""
+        if samples.shape[0] != torch.Size(sample_shape).numel():
+            return samples
+        return split_leading_dim(samples, sample_shape)
 
     def _sample_via_diffusion(
         self,
@@ -637,6 +653,17 @@ class VectorFieldPosterior(NeuralPosterior):
         condition_dim = len(self.vector_field_estimator.condition_shape)
         batch_shape = x.shape[:-condition_dim]
         batch_size = batch_shape.numel()
+        if batch_size == 0:
+            raise ValueError(
+                "x must contain at least one observation, but its batch dimension "
+                f"is empty: {tuple(x.shape)}."
+            )
+        if num_samples == 0:
+            return empty_samples(
+                sample_shape,
+                (*batch_shape, *self.vector_field_estimator.input_shape),
+                self._device,
+            )
         self.potential_fn = self.potential_fn.bind(x)
 
         max_sampling_batch_size = (
@@ -671,9 +698,7 @@ class VectorFieldPosterior(NeuralPosterior):
             else:
                 # Bypass rejection sampling.
                 samples = self.sample_via_ode(torch.Size([num_samples]))
-            samples = samples.reshape(
-                sample_shape + batch_shape + self.vector_field_estimator.input_shape
-            )
+            samples = self._reshape_to_sample_shape(samples, sample_shape)
         elif self.sample_with == "sde":
             proposal_sampling_kwargs = {
                 "predictor": predictor,
@@ -703,9 +728,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 samples = self._sample_via_diffusion(
                     (num_samples,), **proposal_sampling_kwargs
                 )
-            samples = samples.reshape(
-                sample_shape + batch_shape + self.vector_field_estimator.input_shape
-            )
+            samples = self._reshape_to_sample_shape(samples, sample_shape)
 
         if not reject_outside_prior:
             warn_if_outside_prior_support(self.prior, samples)

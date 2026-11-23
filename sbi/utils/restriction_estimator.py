@@ -666,7 +666,11 @@ class RestrictedPrior(Distribution):
                 a `posterior` at initialization.
             device: Device used for sampling and evaluating.
         """
-        super().__init__(validate_args=False)
+        super().__init__(
+            batch_shape=prior.batch_shape,
+            event_shape=prior.event_shape,
+            validate_args=False,
+        )
         self._prior = prior
         self._accept_reject_fn = accept_reject_fn
         self._posterior = posterior  # Only used for SIR.
@@ -747,6 +751,10 @@ class RestrictedPrior(Distribution):
 
         num_samples = torch.Size(sample_shape).numel()
         sample_with = self._sample_with if sample_with is None else sample_with
+
+        if num_samples == 0:
+            draw_shape = self._prior.batch_shape + self._prior.event_shape
+            return torch.empty((*sample_shape, *draw_shape), device=self._device)
 
         if sample_with == "rejection":
             samples, acceptance_rate = rejection.accept_reject_sample(
