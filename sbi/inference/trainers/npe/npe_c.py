@@ -40,12 +40,13 @@ from sbi.utils.torchutils import assert_all_finite
 
 _DEGENERATE_MOG_LOSS_MSG = (
     "The multi-round loss of NPE with a mixture density network gives NaN or Inf: "
-    "the mixture components of the posterior estimate have become numerically "
-    "degenerate. With a bounded prior, this usually follows strong leakage in "
-    "earlier rounds, i.e., most of the posterior estimate lies outside the prior "
-    "bounds (see the warning 'Only x% proposal samples are accepted' when sampling "
-    "the proposal). Truncated proposals (TSNPE) can keep leakage from growing over "
-    "rounds, and single-round NPE avoids this loss, see "
+    "some mixture components of the posterior estimate are so ill-conditioned that "
+    "float32 round-off breaks the closed-form loss. With a bounded prior, such "
+    "components can follow strong leakage in earlier rounds, i.e., most of the "
+    "posterior estimate lies outside the prior bounds (see the warning 'Only x% "
+    "proposal samples are accepted' when sampling the proposal). Truncated proposals "
+    "(TSNPE) can keep leakage from growing over rounds, and single-round NPE avoids "
+    "this loss, see "
     "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
 )
 
@@ -295,13 +296,20 @@ class NPE_C(PosteriorEstimatorTrainer):
                     precisions_p, precisions_d
                 )
                 if not normalizable.all():
+                    # Without a prior term, a pair's precision is the sum of two
+                    # positive definite matrices: it fails only numerically.
+                    cause = (
+                        "are not positive definite in float32: their components are "
+                        "extremely ill-conditioned"
+                        if self._prior_mog is None
+                        else "still have infinite mass: the proposal and the density "
+                        "estimator are both wider than the prior"
+                    )
                     warnings.warn(
-                        "After training, some components of the MoG proposal "
-                        "posterior still have infinite mass: the proposal and the "
-                        "density estimator are both wider than the prior. The loss "
-                        "gives them zero weight, so the posterior estimate may be "
-                        "biased. A flow density estimator does not use this "
-                        "closed-form loss.",
+                        f"After training, some components of the MoG proposal "
+                        f"posterior {cause}. The loss gives them zero weight, so the "
+                        "posterior estimate may be biased. A flow density estimator "
+                        "does not use this closed-form loss.",
                         stacklevel=3,
                     )
                     return
