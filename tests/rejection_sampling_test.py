@@ -2,8 +2,8 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
-import time
 import warnings
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -54,20 +54,26 @@ def test_accept_reject_sample_timeout_blames_only_low_acceptance(
 ):
     """The timeout error blames low acceptance only after a low-acceptance batch.
 
-    The deadline leaves ample time for the first batch and runs out during it.
+    A fake clock lets each batch take one second, so the deadline of half a second
+    always runs out during the first batch.
     """
+    clock = [0.0]
 
     def slow_proposal(shape, **kwargs):
-        time.sleep(0.5)
+        clock[0] += 1.0
         return torch.randn(shape[0], 1)
 
-    with pytest.raises(RuntimeError, match="rejection sampling exceeded") as error:
+    fake_time = SimpleNamespace(time=lambda: clock[0])
+    with (
+        patch("sbi.samplers.rejection.rejection.time", fake_time),
+        pytest.raises(RuntimeError, match="rejection sampling exceeded") as error,
+    ):
         accept_reject_sample(
             proposal=slow_proposal,
             accept_reject_fn=lambda x: torch.full((x.shape[0],), accept),
             num_samples=20,
             max_sampling_batch_size=10,
-            max_sampling_time=0.2,
+            max_sampling_time=0.5,
             suggest_sampling_options=suggest_options,
         )
     assert ("low acceptance" in str(error.value)) == blames
