@@ -161,14 +161,17 @@ def rejection_sample(
                     )
                     samples = torch.cat(accepted)
                     return samples, as_tensor(acceptance_rate)
-                raise RuntimeError(
+                msg = (
                     "Sampling aborted early because rejection sampling exceeded "
-                    "max_sampling_time. This is likely due to extremely low "
-                    "acceptance. You can disable rejection sampling using "
-                    "`reject_outside_prior=False` to draw samples directly from "
-                    "the trained estimator. Consider switching to MCMC or VI, or "
-                    "checking for model misspecification."
+                    "max_sampling_time."
                 )
+                if num_sampled_total > 0 and acceptance_rate < warn_acceptance:
+                    msg += (
+                        " This is likely due to extremely low acceptance. Consider "
+                        "switching to MCMC or VI, or checking for model "
+                        "misspecification."
+                    )
+                raise RuntimeError(msg)
 
             # Sample and reject.
             with nested_pbar_context():
@@ -376,12 +379,16 @@ def accept_reject_sample(
                 num_samples_possible > 0
                 and acceptance_rate.min().item() < warn_acceptance
             ):
-                msg += (
-                    " This is likely due to extremely low acceptance. You can "
-                    "disable rejection sampling using `reject_outside_prior=False` "
-                    "to draw samples directly from the trained estimator. Consider "
-                    "switching to MCMC or VI, or checking for model misspecification."
-                )
+                msg += " This is likely due to extremely low acceptance."
+                if suggest_sampling_options:
+                    msg += (
+                        " You can disable rejection sampling using "
+                        "`reject_outside_prior=False` to draw samples directly from "
+                        "the trained estimator."
+                    )
+                if alternative_method is not None:
+                    msg += f" Consider switching to `{alternative_method}`."
+                msg += " Low acceptance can also point to model misspecification."
                 if low_acceptance_hint is not None:
                     msg += f" {low_acceptance_hint}"
             raise RuntimeError(msg)
