@@ -198,7 +198,7 @@ def test_unseeded_workers_follow_numpy_state():
     "single_theta_simulator",
     [
         lambda theta: np.ravel(theta) * 2.0,
-        lambda theta: "sim.npy",
+        lambda theta: "sim",  # As long as the batch.
         lambda theta: (theta, theta, theta),
     ],
     ids=["flattened", "one_path", "tuple"],
@@ -318,7 +318,11 @@ def test_workers_can_write_to_large_numpy_parameters():
 
 
 @pytest.mark.parametrize("simulator_is_batched", [False, True])
-@pytest.mark.parametrize("make_buffer", [np.zeros, torch.zeros], ids=["numpy", "torch"])
+@pytest.mark.parametrize(
+    "make_buffer",
+    [np.zeros, torch.zeros, lambda size: [0.0] * size],
+    ids=["numpy", "torch", "list"],
+)
 def test_simulator_that_reuses_its_output_buffer(simulator_is_batched, make_buffer):
     buffer = make_buffer(4 if simulator_is_batched else 1)
 
