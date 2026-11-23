@@ -748,6 +748,12 @@ def test_plotting_style_arguments_validation(kwargs):
     close()
 
 
+def test_marginal_plot_validates_diag_style():
+    """`marginal_plot` rejects an unknown `diag` style instead of drawing nothing."""
+    with pytest.raises(ValueError, match="Expected diag"):
+        marginal_plot(torch.randn(100, 3), diag="cond")
+
+
 # --- Tests for discrete_indices support ---
 
 

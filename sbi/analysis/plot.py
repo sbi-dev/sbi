@@ -96,7 +96,7 @@ def marginal_plot(
         subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
             plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
             if they exist, the 4th, 5th and so on).
-        diag: Plotting style for 1D marginals, {hist, kde cond, None}.
+        diag: Plotting style for 1D marginals, {hist, scatter, kde, bar, None}.
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
@@ -114,6 +114,8 @@ def marginal_plot(
     sample_data, labels, limits, ticks, sample_names = _unpack_labeled_samples(
         samples, labels, limits, ticks
     )
+
+    _validate_plotting_style(diag, DiagLiteral, "diag")
 
     # backwards compatibility
     if len(kwargs) > 0:
