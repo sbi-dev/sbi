@@ -284,11 +284,9 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     # Potentially required wrapper if the prior returns an additional sample dimension
     # for `.log_prob()`. Prefer `Independent`: the vector field methods recognise it
     # and use exact formulas for it.
+    prior = maybe_wrap_batched_1d_prior(prior)
     if prior.log_prob(prior.sample(torch.Size((10,)))).shape == torch.Size([10, 1]):
-        if prior.batch_shape == torch.Size([1]):
-            prior = Independent(prior, 1, validate_args=False)
-        else:
-            prior = OneDimPriorWrapper(prior, validate_args=False)
+        prior = OneDimPriorWrapper(prior, validate_args=False)
 
     theta_numel = prior.sample().numel()
 
