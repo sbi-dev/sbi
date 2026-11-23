@@ -286,7 +286,7 @@ class EnsemblePosterior(NeuralPosterior):
         # depend on the draw.
         x = self._x_else_default_x(x)
         self._check_num_observations(x.shape[0])
-        self._check_x_for_sampling(x)
+        self._check_x(x)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indizes = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -387,7 +387,7 @@ class EnsemblePosterior(NeuralPosterior):
         log_probs = torch.stack([
             posterior.log_prob(theta, x=x, **kwargs) for posterior in self.posteriors
         ])
-        log_weights = torch.log(self._weights).reshape(-1, 1)
+        log_weights = torch.log(self._weights).reshape(-1, *[1] * (log_probs.ndim - 1))
 
         if individually:
             return log_weights, log_probs
@@ -416,21 +416,16 @@ class EnsemblePosterior(NeuralPosterior):
             `EnsemblePosterior` that will use a default `x` when not explicitly
             passed.
         """
-        # Validate every component before changing any default or clearing a cache.
-        processed_x = self._process_x(x)
+        super().set_default_x(x)
         for posterior in self.posteriors:
-            posterior._process_x(processed_x)
-
-        super().set_default_x(processed_x)
-        for posterior in self.posteriors:
-            posterior.set_default_x(processed_x)
+            posterior.set_default_x(self._x)
 
         return self
 
-    def _check_x_for_sampling(self, x: Tensor) -> None:
+    def _check_x(self, x: Tensor) -> None:
         """Raise unless every component, including nested ensembles, can take `x`."""
         for posterior in self.posteriors:
-            posterior._check_x_for_sampling(x)
+            posterior._check_x(posterior._process_x(x))
 
     def _check_mixture_observations(self, num_observations: int, method: str) -> None:
         """Raise if a weighted mixture of NPE or vector field components gets several
@@ -647,7 +642,7 @@ class EnsemblePotential(BasePotential):
         """
         self._weights = weights
         self.potential_fns = potential_fns
-        self._x_event_shape = _resolve_x_event_shape(potential_fns)
+        _resolve_x_event_shape(potential_fns)
         super().__init__(prior, x_o, device)
         if self._x_o is not None:
             self.potential_fns = [p.bind(self._x_o) for p in self.potential_fns]
@@ -670,7 +665,7 @@ class EnsemblePotential(BasePotential):
     @property
     def x_event_shape(self) -> Optional[torch.Size]:
         """Shape of one observation, as agreed on by all components."""
-        return self._x_event_shape
+        return _resolve_x_event_shape(self.potential_fns)
 
     @property
     def warns_on_implicit_iid(self) -> bool:

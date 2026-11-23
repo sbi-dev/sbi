@@ -292,12 +292,11 @@ class NeuralPosterior:
         if hint is not None:
             _require_one_observation(num_observations, type(self).__name__, hint)
 
-    def _check_x_for_sampling(self, x: Tensor) -> None:
-        """Raise if this posterior cannot sample for `x`.
+    def _check_x(self, x: Tensor) -> None:
+        """Raise if this posterior cannot answer for the processed `x`.
 
-        The default accepts any processed `x` of the right shape. Posteriors whose q
-        answers for one stored observation override this so that callers can validate
-        all components before drawing one.
+        The default accepts any `x`. Posteriors with further conditions on `x` override
+        it, so that an ensemble can check all components before it draws one.
         """
 
     def _bind_iid(
@@ -606,7 +605,8 @@ _IID_SAMPLERS = (
 
 
 def _require_one_observation(num_observations: int, subject: str, hint: str) -> None:
-    """Raise a ValueError if `subject`, which takes one observation, gets several.
+    """Raise a ValueError if `subject`, which takes one observation, gets another
+    number of observations.
 
     Every posterior method that takes one observation raises through this function,
     so that all of them give the same message.
@@ -616,7 +616,7 @@ def _require_one_observation(num_observations: int, subject: str, hint: str) -> 
         subject: What takes one observation, e.g. a posterior class or a method.
         hint: What to do instead.
     """
-    if num_observations > 1:
+    if num_observations != 1:
         raise ValueError(
             f"{subject} takes one observation, but x holds {num_observations}. {hint}"
         )
