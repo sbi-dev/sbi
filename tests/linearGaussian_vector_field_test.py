@@ -969,7 +969,7 @@ def test_denoise_mixture_weights_equal_posterior():
 
     marginals = Normal(m * loc, (m**2 * scale**2 + s**2).sqrt())
     expected = torch.softmax(weights.log() + marginals.log_prob(x_t), dim=-1)
-    torch.testing.assert_close(denoised.mixture_distribution.probs[0], expected)
+    torch.testing.assert_close(denoised.mixture_distribution.probs, expected)
 
 
 def test_estimate_posterior_precision_rejects_small_budget():
