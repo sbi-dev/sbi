@@ -181,6 +181,11 @@ class TransformedConditionalZukoFlow(_LinkedFamily):
         self._flow = flow
         self._link_transform = link_transform
 
+    @property
+    def condition_shape(self) -> torch.Size:
+        """Shape of one observation x that the flow is conditioned on."""
+        return self._flow.condition_shape
+
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         """Sample θ ~ q(θ|x) in constrained space."""
         theta = self._link_transform(self._flow.sample(sample_shape, condition))
