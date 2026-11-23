@@ -12,6 +12,9 @@ consider interrupting (Ctrl-C) and switching to
 `build_posterior(..., sample_with='mcmc')`.
 ```
 
+Setting `reject_outside_prior=False` only makes sampling faster: the samples then
+include those outside the prior bounds.
+
 The reason for this issue is described in more detail
 [here](https://arxiv.org/abs/2210.04815),
 [here](https://arxiv.org/abs/2002.03712), and
