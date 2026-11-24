@@ -273,8 +273,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             show_progress_bars=show_progress_bars,
         )
 
-        samples = samples.reshape((*sample_shape, -1)).to(self._device)
-        return samples, log_importance_weights.to(self._device)
+        samples = samples.reshape((*sample_shape, *samples.shape[1:])).to(self._device)
+        return samples, log_importance_weights.reshape(sample_shape).to(self._device)
 
     def _sir_sample(
         self,
@@ -322,7 +322,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             max_sampling_batch_size=max_sampling_batch_size,
         )
 
-        return samples.reshape((*sample_shape, -1)).to(self._device)
+        return samples.reshape((*sample_shape, *samples.shape[1:])).to(self._device)
 
     def _map_inits(
         self,
