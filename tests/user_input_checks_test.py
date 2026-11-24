@@ -102,6 +102,12 @@ def numpy_linear_gaussian(theta):
     return diagonal_linear_gaussian(torch.as_tensor(theta, dtype=torch.float32)).numpy()
 
 
+def numpy_only_simulator(theta):
+    """Simulator that only accepts numpy arrays and returns a numpy array."""
+    assert isinstance(theta, np.ndarray), f"Expected ndarray, got {type(theta)}."
+    return np.sin(theta).astype(np.float32)
+
+
 def list_simulator(theta):
     return list(theta)
 
@@ -746,6 +752,61 @@ def test_process_simulator(simulator: Callable, prior: Distribution, x_shape: Tu
         "Processed simulator must return as many data points as parameters in batch."
     )
     assert x.shape[1:] == x_shape
+
+
+def test_process_simulator_passes_numpy_to_numpy_only_simulator():
+    """A numpy-only simulator must receive ndarrays, not Tensors."""
+    prior, _, prior_returns_numpy = process_prior(
+        UserNumpyUniform(zeros(2), ones(2), return_numpy=True)
+    )
+    assert prior_returns_numpy
+    simulator = process_simulator(numpy_only_simulator, prior, prior_returns_numpy)
+
+    for batch in (prior.sample((5,)), prior.sample((5,)).numpy()):
+        x = simulator(batch)
+
+        assert isinstance(x, Tensor)
+        assert x.shape == (5, 2)
+        assert_close(x, torch.as_tensor(np.sin(np.asarray(batch))))
+
+    check_sbi_inputs(simulator, prior)
+
+
+def test_process_simulator_keeps_tensor_input_for_torch_simulator():
+    """A torch simulator must still receive Tensors."""
+
+    def torch_only_simulator(theta):
+        assert isinstance(theta, Tensor), f"Expected Tensor, got {type(theta)}."
+        return torch.sin(theta)
+
+    prior, _, prior_returns_numpy = process_prior(BoxUniform(zeros(2), ones(2)))
+    assert not prior_returns_numpy
+    simulator = process_simulator(torch_only_simulator, prior, prior_returns_numpy)
+
+    x = simulator(prior.sample((5,)))
+
+    assert isinstance(x, Tensor)
+    assert x.shape == (5, 2)
+
+
+def test_simulate_for_sbi_with_numpy_only_simulator():
+    """Simulation and the input check work with a strict numpy simulator."""
+    prior, _, prior_returns_numpy = process_prior(
+        UserNumpyUniform(zeros(2), ones(2), return_numpy=True)
+    )
+    simulator = process_simulator(numpy_only_simulator, prior, prior_returns_numpy)
+
+    for num_workers in (1, 2):
+        theta, x = simulate_for_sbi(
+            simulator,
+            prior,
+            num_simulations=6,
+            num_workers=num_workers,
+            show_progress_bar=False,
+        )
+
+        assert theta.shape == (6, 2)
+        assert x.shape == (6, 2)
 
 
 @pytest.mark.parametrize(
