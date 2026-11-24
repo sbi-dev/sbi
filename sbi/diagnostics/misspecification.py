@@ -34,9 +34,19 @@ def compute_rbf_mmd(x: Tensor, y: Tensor, bandwidth: float = 1.0, mode: str = "b
     if mode == "biased":
         mmd = torch.mean(x_kernel) + torch.mean(y_kernel) - 2 * torch.mean(xy_kernel)
     elif mode == "unbiased":
+        n, m = x_kernel.shape[0], y_kernel.shape[0]
+        if n < 2 or m < 2:
+            raise ValueError(
+                "The unbiased MMD needs at least two samples in each set, got "
+                f"{n} and {m}. Use the biased MMD instead (mmd_mode='biased' in "
+                "calc_misspecification_mmd)."
+            )
+        # The unbiased estimator averages k(x_i, x_j) over pairs with i != j only,
+        # so the diagonal k(x_i, x_i) is left out of the within-sample terms.
         mmd = (
-            torch.sum(x_kernel) / (x_kernel.shape[0] * (x_kernel.shape[0] - 1))
-            + torch.sum(y_kernel) / (y_kernel.shape[0] * (y_kernel.shape[0] - 1))
+            (torch.sum(x_kernel) - torch.sum(torch.diagonal(x_kernel))) / (n * (n - 1))
+            + (torch.sum(y_kernel) - torch.sum(torch.diagonal(y_kernel)))
+            / (m * (m - 1))
             - 2 * torch.mean(xy_kernel)
         )
     else:
