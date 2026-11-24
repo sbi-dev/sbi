@@ -196,19 +196,20 @@ def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
 
 
 def _mmd_lengthscale(
-    squared_distances: Tensor, scale: Optional[float]
+    scale: Optional[float], *squared_distances: Tensor
 ) -> Union[Tensor, float]:
     """Return `scale`, or the median of the pairwise distances if it is None.
 
-    Either is floored at 1e-8. The median is zero when most samples are identical,
-    as in discrete data; the floor then gives a kernel that is 1 for identical
+    The median is floored at 1e-8: it is zero when most samples are identical, as
+    in discrete data, and the floor then gives a kernel that is 1 for identical
     samples and 0 otherwise, instead of NaN.
     """
     if scale is None:
-        return torch.clamp(torch.median(torch.sqrt(squared_distances)), min=1e-8)
+        distances = torch.sqrt(torch.cat(squared_distances))
+        return torch.clamp(torch.median(distances), min=1e-8)
     if scale <= 0:
         raise ValueError(f"scale must be positive, got {scale}.")
-    return max(scale, 1e-8)
+    return scale
 
 
 def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
@@ -248,7 +249,7 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     xy = f(x, y, diag=True)
     yy = f(y, y)
 
-    s = _mmd_lengthscale(torch.cat((xx, xy, yy)), scale)
+    s = _mmd_lengthscale(scale, xx, xy, yy)
     c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
@@ -291,7 +292,7 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     xy = f(x, y)
     yy = f(y, y)
 
-    s = _mmd_lengthscale(torch.cat((xx, xy, yy)), scale)
+    s = _mmd_lengthscale(scale, xx, xy, yy)
     c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
