@@ -1107,12 +1107,14 @@ class MaskedVectorFieldTrainer(
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(num_variables, num_variables)`, used for all samples.
+
                 - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
-                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
-                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                  attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                  set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if `None`, the edge mask generator used in training is evaluated at
                   the condition mask; by default this is full attention.
+
             vector_field_estimator: The trained masked vector field estimator to
                 use. If `None`, the network trained last is used.
             prior: Distribution over the latent variables. It is used to reject
@@ -1163,8 +1165,8 @@ class MaskedVectorFieldTrainer(
                 Expected shape: `(num_variables, num_variables)`, used for all samples.
 
                 - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
-                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
-                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                  attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                  set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if `None`, the edge mask generator used in training is evaluated at
                   the condition mask; by default this is full attention.

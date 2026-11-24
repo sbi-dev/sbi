@@ -1109,7 +1109,9 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
             t: Diffusion time, float, of shape `(batch_size,)` or a scalar.
             condition_mask: A boolean mask indicating the role of each variable.
                 Expected shape: `(batch_size, num_variables)`.
+
                     - `True` (or `1`): The variable at this position is observed and its
+
                     features will be used for conditioning.
                     - `False` (or `0`): The variable at this position is latent and its
                     features are subject to inference.
@@ -1117,7 +1119,9 @@ class VectorFieldSimformer(MaskedVectorFieldNet):
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`, or
                 `(num_variables, num_variables)` for one mask shared by the batch.
+
                     - `True` (or `1`): Attention from query index i to key index j is
+
                     allowed (i attends to j). See note below.
                     - `False` (or `0`): No edge exists between these variables.
                     - Self-edges (the diagonal) are always added, so every node

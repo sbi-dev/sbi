@@ -162,3 +162,5 @@ Passing a model string directly to a trainer emits a ``FutureWarning``.
    sbi.neural_nets.posterior_flow_nn
    sbi.neural_nets.posterior_nn
    sbi.neural_nets.posterior_score_nn
+   sbi.neural_nets.simformer_flow_nn
+   sbi.neural_nets.simformer_score_nn

@@ -679,20 +679,21 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
                 Expected shape: `(batch_size, num_variables)`.
 
                 - `True` (or `1`): The variable at this position is observed and its
-                    features will be used for conditioning.
+                  features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
-                    features are subject to inference.
+                  features are subject to inference.
+
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
 
                 - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
-                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
-                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                  attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                  set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
+                  mask, we suggest you to use None instead of ones
+                  to save memory resources
 
         Returns:
             The estimated vector field, in the original space.
@@ -778,20 +779,22 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
                 Expected shape: `(batch_size, num_variables)`.
 
                 - `True` (or `1`): The variable at this position is observed and its
-                    features will be used for conditioning.
+                  features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
-                    features are subject to inference.
+                  features are subject to inference.
+
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
 
                 - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
-                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
-                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                  attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                  set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
+                  mask, we suggest you to use None instead of ones
+                  to save memory resources
+
             rebalance_loss: If True, the loss for each batch item is divided by the
                 number of latent (unobserved) entries in that item (nodes times
                 features). This is useful when the number of latent variables varies
@@ -934,20 +937,21 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
                 Expected shape: `(batch_size, num_variables)`.
 
                 - `True` (or `1`): The variable at this position is observed and its
-                    features will be used for conditioning.
+                  features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
-                    features are subject to inference.
+                  features are subject to inference.
+
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
 
                 - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
-                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
-                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                  attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                  set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
+                  mask, we suggest you to use None instead of ones
+                  to save memory resources
 
         Returns:
             Estimated vector field :math:`v(\text{inputs}_t, t; x_o)`.
@@ -978,20 +982,21 @@ class MaskedFlowMatchingEstimator(MaskedConditionalVectorFieldEstimator):
                 Expected shape: `(batch_size, num_variables)`.
 
                 - `True` (or `1`): The variable at this position is observed and its
-                    features will be used for conditioning.
+                  features will be used for conditioning.
                 - `False` (or `0`): The variable at this position is latent and its
-                    features are subject to inference.
+                  features are subject to inference.
+
             edge_mask: A boolean mask defining the adjacency matrix of the directed
                 acyclic graph (DAG) representing dependencies among variables.
                 Expected shape: `(batch_size, num_variables, num_variables)`.
 
                 - `True` (or `1`): variable `i` depends on variable `j`, i.e., node `i`
-                    attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
-                    set `edge_mask[i, j] = True`. Self-edges are always added.
+                  attends to node `j` (`edge_mask[i, j]`). For a DAG edge `j -> i`,
+                  set `edge_mask[i, j] = True`. Self-edges are always added.
                 - `False` (or `0`): No edge exists between these variables.
                 - if None, it will be equivalent to a full attention (i.e., full ones)
-                    mask, we suggest you to use None instead of ones
-                    to save memory resources
+                  mask, we suggest you to use None instead of ones
+                  to save memory resources
 
         Returns:
             Score function of the vector field estimator.
