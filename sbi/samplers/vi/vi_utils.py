@@ -181,6 +181,11 @@ class TransformedConditionalZukoFlow(_LinkedFamily):
         self._flow = flow
         self._link_transform = link_transform
 
+    @property
+    def condition_shape(self) -> torch.Size:
+        """Shape of one observation x that the flow is conditioned on."""
+        return self._flow.condition_shape
+
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         """Sample θ ~ q(θ|x) in constrained space."""
         theta = self._link_transform(self._flow.sample(sample_shape, condition))
@@ -353,11 +358,11 @@ def check_parameters_modules_attribute(q: VariationalDistribution) -> None:
                 trainable += 1
         assert (
             trainable > 0
-        ), """Nothing to train, atleast one of the parameters must have an enabled
+        ), """Nothing to train, at least one of the parameters must have an enabled
             gradient."""
     if not hasattr(q, "modules"):
         raise ValueError(
-            """The variational distribution requires an modules attribute, which returns
+            """The variational distribution requires a modules attribute, which returns
             an iterable of parameters."""
         )
     else:
@@ -386,7 +391,7 @@ def check_sample_shape_and_support(q: Distribution, prior: Distribution) -> None
         "The event shape of q must match that of the prior"
     )
     assert q.batch_shape == prior.batch_shape, (
-        "The batch sahpe of q must match that of the prior"
+        "The batch shape of q must match that of the prior"
     )
 
     sample_shape = torch.Size((1000,))

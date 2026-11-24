@@ -101,7 +101,7 @@ class EulerMaruyama(Predictor):
         Args:
             potential_fn: Score-based potential to predict.
             eta: Mediates how much noise is added during sampling i.e.
-                for values approaching 0 this becomes the deterministic probabilifty
+                for values approaching 0 this becomes the deterministic probability
                 flow ODE. For large values it becomes a more stochastic reverse SDE.
                 Defaults to 1.0.
         """

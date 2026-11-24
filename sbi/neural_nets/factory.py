@@ -409,11 +409,9 @@ def posterior_score_nn(
     ] = "mlp",
     sde_type: str = "ve",
     z_score_theta: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        Literal["independent", "structured", "none"]
     ] = "independent",
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -504,11 +502,9 @@ def posterior_flow_nn(
         VectorFieldNet,
     ] = "mlp",
     z_score_theta: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        Literal["independent", "structured", "none"]
     ] = "independent",
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -595,9 +591,7 @@ def posterior_flow_nn(
 
 def marginal_nn(
     model: ZukoFlowType,
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,

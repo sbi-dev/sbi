@@ -771,7 +771,7 @@ class TransformerEmbedding(nn.Module):
         Args:
             pos_emb: position encoding to be used, currently available:
                 {"rotary", "positional", "none"}
-            pos_emb_base: base used to construct the positinal encoding
+            pos_emb_base: base used to construct the positional encoding
             rms_norm_eps: noise added to the rms variance computation
             ffn: feedforward layer after used after computing the attention:
                 {"mlp", "moe"}
@@ -799,7 +799,7 @@ class TransformerEmbedding(nn.Module):
                 preprocessing the images
             image_size: dimension of the squared image used to created
                 the positional encoders
-                a rectagular image can be used at training/inference time by
+                a rectangular image can be used at training/inference time by
                 resampling the encoders
             patch_size: size of the square patches used to create the
                 positional encoders

@@ -45,7 +45,7 @@ def reshape_to_sample_batch_event(
         # A single datapoint is passed. Add batch and sample dim artificially.
         return theta_or_x.unsqueeze(0).unsqueeze(0)
     elif len(leading_theta_or_x_shape) == 1:
-        # Either a batch dimension or an sample dimension was passed.
+        # Either a batch dimension or a sample dimension was passed.
         return theta_or_x.unsqueeze(1) if leading_is_sample else theta_or_x.unsqueeze(0)
     elif len(leading_theta_or_x_shape) == 2:
         # Batch dimension and sample dimension were passed.
