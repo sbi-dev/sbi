@@ -45,7 +45,7 @@ def reshape_to_sample_batch_event(
         # A single datapoint is passed. Add batch and sample dim artificially.
         return theta_or_x.unsqueeze(0).unsqueeze(0)
     elif len(leading_theta_or_x_shape) == 1:
-        # Either a batch dimension or an sample dimension was passed.
+        # Either a batch dimension or a sample dimension was passed.
         return theta_or_x.unsqueeze(1) if leading_is_sample else theta_or_x.unsqueeze(0)
     elif len(leading_theta_or_x_shape) == 2:
         # Batch dimension and sample dimension were passed.
@@ -70,6 +70,17 @@ def reshape_to_batch_event(theta_or_x: Tensor, event_shape: torch.Size) -> Tenso
     Returns:
         A tensor of shape `(batch, event)`.
     """
+    # Check for degenerate case, it is used by the Simformer
+    # when the user requires a full latent tensor, i.e., the user
+    # is effectively using the Simformer as a "data generator"
+    if event_shape == torch.Size([0]):
+        if theta_or_x.numel() == 0:
+            return theta_or_x
+        else:
+            raise ValueError(
+                "event_shape is torch.Size([0]) but theta_or_x is not an empty tensor."
+            )
+
     # `2` for image data, `3` for video data, ...
     event_shape_dim = len(event_shape)
 

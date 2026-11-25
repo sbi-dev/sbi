@@ -45,8 +45,9 @@ class PermutationInvariantEmbedding(nn.Module):
         It then aggregates the trial embeddings across the aggregation dimension to
         construct a permutation invariant embedding across iid trials.
         The resulting embedding is processed further using an additional fully
-        connected net. The input to the final embedding net is the trial_net output
-        plus the number of trials N: (batch, trial_net_output_dim + 1)
+        connected net. The input to the final embedding net is the aggregated
+        trial_net output plus log(1 + N), with N the number of real trials:
+        (batch, trial_net_output_dim + 1).
 
         If the data x has varying number of trials per batch element, missing trials
         should be encoded as NaNs. In the forward pass, the NaNs are masked.
@@ -57,7 +58,7 @@ class PermutationInvariantEmbedding(nn.Module):
                 input_dim is the dimensionality of a single trial. Produces output
                 (batch, latent_dim).
                 Remark: This network should be large enough as it acts on all (iid)
-                inputs seperatley and needs enough capacity to process the information
+                inputs separately and needs enough capacity to process the information
                 of all inputs.
             trial_net_output_dim: Dimensionality of the output of the trial_net.
             aggregation_fn: Function to aggregate the trial embeddings. Defaults to
@@ -70,10 +71,13 @@ class PermutationInvariantEmbedding(nn.Module):
         super().__init__()
         self.trial_net = trial_net
         self.aggregation_dim = aggregation_dim
-        assert aggregation_fn in [
-            "mean",
-            "sum",
-        ], "aggregation_fn must be 'mean' or 'sum'."
+        if not isinstance(aggregation_fn, str):
+            raise TypeError(
+                "aggregation_fn must be a string, but got "
+                f"{type(aggregation_fn).__name__}."
+            )
+        if aggregation_fn not in ("mean", "sum"):
+            raise ValueError("aggregation_fn must be 'mean' or 'sum'.")
         self.aggregation_fn = aggregation_fn
 
         # construct fully connected layers
@@ -121,6 +125,8 @@ class PermutationInvariantEmbedding(nn.Module):
             x: Input tensor (batch_size, permutation_dim, input_dim)
         Returns:
             Network output (batch_size, output_dim).
+        Raises:
+            ValueError: If `x` contains inf, or the trial_net returns NaN or inf.
         """
 
         if not getattr(self, "_warned_nan_padding", False):
@@ -137,6 +143,12 @@ class PermutationInvariantEmbedding(nn.Module):
         is_real_trial = ~torch.isnan(x).all(-1)
         trial_counts = is_real_trial.sum(dim=self.aggregation_dim).unsqueeze(-1)
 
+        # nan_to_num below would turn inf into a finite number.
+        if torch.isinf(x).any():
+            raise ValueError(
+                "Input contains inf. Only NaN is allowed, to mark padded trials."
+            )
+
         # apply trial net with nan entries replaced with 0
         masked_x = torch.nan_to_num(x, nan=0.0)
         trial_embeddings = self.trial_net(masked_x)
@@ -144,15 +156,21 @@ class PermutationInvariantEmbedding(nn.Module):
         trial_embeddings = trial_embeddings * is_real_trial.unsqueeze(-1).float()
 
         # Take mean over permutation dimension divide by number of trials
-        # (instead of just taking torch.mean) to account for masking.
+        # (instead of just taking torch.mean) to account for masking. Observations
+        # without real trials get a zero embedding, as with "sum".
         if self.aggregation_fn == "mean":
-            combined_embedding = (
-                trial_embeddings.sum(dim=self.aggregation_dim) / trial_counts
-            )
+            combined_embedding = trial_embeddings.sum(
+                dim=self.aggregation_dim
+            ) / trial_counts.clamp(min=1)
         else:
             combined_embedding = trial_embeddings.sum(dim=self.aggregation_dim)
 
-        assert not torch.isnan(combined_embedding).any(), "NaNs in embedding."
+        if not torch.isfinite(combined_embedding).all():
+            raise ValueError(
+                "Non-finite value in the aggregated trial embedding: the trial_net "
+                "returned NaN or inf."
+            )
 
-        # add number of trials as additional input
-        return self.fc_subnet(torch.cat([combined_embedding, trial_counts], dim=1))
+        # The raw count would be of order 100 next to inputs of order 1.
+        log_trial_counts = torch.log1p(trial_counts.to(combined_embedding.dtype))
+        return self.fc_subnet(torch.cat([combined_embedding, log_trial_counts], dim=1))

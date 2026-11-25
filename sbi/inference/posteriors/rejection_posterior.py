@@ -137,9 +137,10 @@ class RejectionPosterior(NeuralPosterior):
                 directly from the proposal without rejection, which is faster but may
                 include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised. Only
-                applies when `reject_outside_prior=True` (no effect otherwise since
-                direct sampling from the proposal is fast).
+                If exceeded, sampling is aborted and a RuntimeError is raised. The
+                limit is checked between sampling batches, so a running batch is not
+                interrupted. Only applies when `reject_outside_prior=True` (no
+                effect otherwise since direct sampling from the proposal is fast).
             return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
                 return the samples collected so far instead of raising a RuntimeError.
                 A warning will be issued. Only applies when `reject_outside_prior=True`

@@ -10,6 +10,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import (
     _IID_SAMPLERS,
+    _LEAKAGE_HINT,
     _ONE_AT_A_TIME,
     NeuralPosterior,
 )
@@ -30,6 +31,13 @@ from sbi.utils.torchutils import (
 )
 from sbi.utils.user_input_checks import check_prior
 
+_NPE_LEAKAGE_HINT = (
+    f"{_LEAKAGE_HINT} After multi-round training, leakage often grows with every "
+    "round and the estimate becomes poor; truncated proposals (TSNPE) can keep it "
+    "from growing. See "
+    "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
+)
+
 
 class DirectPosterior(NeuralPosterior):
     r"""Posterior based on neural networks that directly estimate the posterior (NPE).
@@ -49,7 +57,9 @@ class DirectPosterior(NeuralPosterior):
     """
 
     # Suggested in the warning when rejection sampling accepts few samples.
-    _alternative_sampling_method = "build_posterior(..., sample_with='mcmc')"
+    _alternative_sampling_method: Optional[str] = (
+        "build_posterior(..., sample_with='mcmc')"
+    )
 
     def __init__(
         self,
@@ -138,9 +148,10 @@ class DirectPosterior(NeuralPosterior):
                 directly from the neural density estimator without rejection, which is
                 faster but may include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised. Only
-                applies when `reject_outside_prior=True` (no effect otherwise since
-                direct sampling is fast).
+                If exceeded, sampling is aborted and a RuntimeError is raised. The
+                limit is checked between sampling batches, so a running batch is not
+                interrupted. Only applies when `reject_outside_prior=True` (no
+                effect otherwise since direct sampling is fast).
             return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
                 return the samples collected so far instead of raising a RuntimeError.
                 A warning will be issued. Only applies when `reject_outside_prior=True`
@@ -166,6 +177,7 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
                 alternative_method=self._alternative_sampling_method,
+                low_acceptance_hint=_NPE_LEAKAGE_HINT,
                 max_sampling_time=max_sampling_time,
                 return_partial_on_timeout=return_partial_on_timeout,
             )[0]
@@ -218,8 +230,9 @@ class DirectPosterior(NeuralPosterior):
                 directly from the neural density estimator without rejection, which is
                 faster but may include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised. Only
-                applies when `reject_outside_prior=True`.
+                If exceeded, sampling is aborted and a RuntimeError is raised. The
+                limit is checked between sampling batches, so a running batch is not
+                interrupted. Only applies when `reject_outside_prior=True`.
             return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
                 return the samples collected so far instead of raising a RuntimeError.
                 A warning will be issued. Only applies when `reject_outside_prior=True`.
@@ -267,6 +280,7 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_batch_size=max_sampling_batch_size,
                 proposal_sampling_kwargs={"condition": x},
                 alternative_method=self._alternative_sampling_method,
+                low_acceptance_hint=_NPE_LEAKAGE_HINT,
                 max_sampling_time=max_sampling_time,
                 return_partial_on_timeout=return_partial_on_timeout,
             )[0]
@@ -393,7 +407,7 @@ class DirectPosterior(NeuralPosterior):
         theta = ensure_theta_batched(torch.as_tensor(theta, device=self._device))
         event_shape = self.posterior_estimator.input_shape
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
-        # overwise, the leading is sample.
+        # otherwise, the leading is sample.
         num_leading = len(theta.shape) - len(event_shape)
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, event_shape, leading_is_sample=(num_leading > 1)
@@ -464,6 +478,7 @@ class DirectPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
+                low_acceptance_hint=_NPE_LEAKAGE_HINT,
                 proposal_sampling_kwargs={
                     "condition": reshape_to_batch_event(
                         x, event_shape=self.posterior_estimator.condition_shape

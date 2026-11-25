@@ -94,9 +94,9 @@ class DivergenceOptimizer(ABC):
                 the same prior within it.
             n_particles: Number of samples used to estimate gradients.
             clip_value: Norm value on which gradients are clipped.
-            optimizer: Base class for an pytorch optimizer. We support on of [SGD, Adam,
+            optimizer: Base class for a pytorch optimizer. We support one of [SGD, Adam,
                 Adadelta, RMSprop, Adagrad, Adamax, AdamW, ASGD].
-            scheduler: Base class for an pytorch scheduler. We support on of
+            scheduler: Base class for a pytorch scheduler. We support one of
                 [CosineAnnealingLR, ExponentialLR, CosineAnnealingWarmRestarts,
                 CyclicLR, LambdaLR, StepLR]. Note that you may have to pass additional
                 arguments of the scheduling method, this can be passed within the
@@ -287,7 +287,7 @@ class DivergenceOptimizer(ABC):
             self.update_state()
 
     def converged(self, considered_values: int = 50) -> bool:
-        """Determines convergence based on a estimate of the slope of the loss
+        """Determines convergence based on an estimate of the slope of the loss
         function. If it is smaller than `eps` then this function will return true.
 
         Args:
@@ -522,7 +522,7 @@ class ElboOptimizer(DivergenceOptimizer):
 @register_VI_method(name="IW")
 class IWElboOptimizer(ElboOptimizer):
     r"""This learns the variational posterior by minimizing the importance weighted
-    ELBO, which is an tighter bound to the evidence but also promotes a support covering
+    ELBO, which is a tighter bound to the evidence but also promotes a support covering
     behaviour.
 
     NOTE: The gradient estimates of this loss lose signal-to-noise ratio as K grows,
@@ -575,7 +575,7 @@ class IWElboOptimizer(ElboOptimizer):
 
         Returns:
             surrogate_loss: Loss to differentiate.
-            loss: Loss to diplay.
+            loss: Loss to display.
 
         """
         elbo_particles = self.generate_elbo_particles(x_o, self.n_particles * self.K)
@@ -614,7 +614,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
     posterior are not required by using importance sampling techniques.
 
     NOTE: Whereas in the rKL and IWELBO n_particles mainly reduces the variance, in this
-    case it also decrease the bias. Using n_particles=1 is not usefull.
+    case it also decreases the bias. Using n_particles=1 is not useful.
 
     References:
         [1] _Variational Refinement for Importance Sampling Using the Forward
@@ -636,7 +636,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
             proposal: The proposal used we currently support only [`q`]
             weight_transform: This is a transformation that is applied to the importance
                 weight $w(\theta) = p(\theta, x_o)/q(\theta)$, scaled so that the
-                largest weight of the particles is 1. For example it may be usefull to
+                largest weight of the particles is 1. For example it may be useful to
                 clamp the weights by a certain rule to reduce variance.
 
 
@@ -676,8 +676,12 @@ class ForwardKLOptimizer(DivergenceOptimizer):
             weights /= weights.sum()
 
         surrogate = -torch.sum(weights * logq)
-        # Particles outside the support (log p = -inf) would give 0 * -inf = nan.
-        loss = torch.sum(weights * torch.where(logweights.isfinite(), logweights, 0.0))
+        # Particles outside the support (log p = -inf) have no KL term, and a weight
+        # that `weight_transform` gave them must not shrink the others.
+        inside = logweights.isfinite()
+        inside_weights = torch.where(inside, weights, 0.0)
+        loss = (inside_weights * torch.where(inside, logweights, 0.0)).sum()
+        loss = loss / inside_weights.sum()
         return surrogate, loss.detach()
 
 
