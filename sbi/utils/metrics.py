@@ -52,7 +52,7 @@ class MLPClassifierModule(nn.Module):
         Returns:
             Output logits of shape `(batch, output_dim)`.
         """
-        return self.sequential(X.float())
+        return self.sequential(X.to(self.sequential[0].weight.dtype))
 
 
 def c2st(
