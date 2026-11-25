@@ -937,8 +937,8 @@ def test_non_finite_losses_are_left_out_of_loss_stats():
 def test_rolled_back_step_does_not_end_training(monkeypatch, surrogate: str):
     """A non-finite gradient loss, or a finite one with nan gradients (as from a
     potential `log(density * mask)`), rolls q back and warms it up towards the prior.
-    The step makes no update with those gradients, and only the losses after it count
-    towards convergence."""
+    The step makes no update with those gradients, restarts the loss statistics and
+    still counts towards the snapshot schedule."""
     optimizer = _optimizer_after_losses([2.0] * 60)
     assert optimizer.converged()
 
@@ -956,15 +956,14 @@ def test_rolled_back_step_does_not_end_training(monkeypatch, surrogate: str):
         recovered.extend(p.detach().clone() for p in optimizer.q.parameters())
 
     monkeypatch.setattr(optimizer, "resolve_state", record_recovery)
+    optimizer._num_updates = 49  # this step is due for a snapshot
     optimizer.step(zeros(1))
     assert not optimizer.converged()
     assert optimizer.num_step == 0
-    for p, p_recovered in zip(optimizer.q.parameters(), recovered, strict=True):
+    params = zip(optimizer.q.parameters(), recovered, optimizer.state_dict, strict=True)
+    for p, p_recovered, p_snapshot in params:
         assert torch.equal(p, p_recovered)
-
-    monkeypatch.setattr(optimizer, "loss", lambda x_o: (loc.sum(), torch.tensor(2.0)))
-    optimizer.step(zeros(1))
-    assert not optimizer.converged()
+        assert torch.equal(p, p_snapshot)
 
 
 @pytest.mark.parametrize(

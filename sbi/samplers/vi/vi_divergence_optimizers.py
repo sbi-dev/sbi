@@ -276,7 +276,7 @@ class DivergenceOptimizer(ABC):
         if rolled_back:
             self.resolve_state()
             # q restarts towards the prior, so its earlier losses no longer apply.
-            self.reset_loss_stats()
+            self._clear_loss_stats()
         else:
             self._optimizer.step()
             self.update_loss_stats(loss.cpu())
@@ -306,13 +306,16 @@ class DivergenceOptimizer(ABC):
             return abs(m).item() < self.eps
 
     def reset_loss_stats(self) -> None:
-        """This will reset the loss statistics."""
+        """Resets the loss statistics and restarts the snapshot schedule."""
+        self._clear_loss_stats()
+        self._num_updates = 0
+
+    def _clear_loss_stats(self) -> None:
         self.losses = torch.ones(2000)
         self.moving_average = torch.ones(2000)
         self.moving_std = torch.ones(2000)
         self.moving_slope = torch.ones(2000)
         self.num_step = 0
-        self._num_updates = 0
 
     def update_loss_stats(self, loss: Tensor, window: int = 20) -> None:
         """Updates current loss statistics of the optimizer
