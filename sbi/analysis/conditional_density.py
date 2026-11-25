@@ -128,9 +128,10 @@ def conditional_corrcoeff(
     Args:
         density: Probability density function with `.log_prob()` function.
         limits: Limits within which to evaluate the `density`.
-        condition: Values to condition the `density` on. If a batch of conditions is
-            passed, we compute the conditional correlation matrix for each of them and
-            return the average conditional correlation matrix.
+        condition: Values to condition the `density` on, of shape `(num_dim,)` or
+            `(batch_size, num_dim)`. If a batch of conditions is passed, we compute
+            the conditional correlation matrix for each of them and return the average
+            conditional correlation matrix.
         subset: Evaluate the conditional distribution only on a subset of dimensions,
             at least two distinct ones. Rows and columns of the returned matrix follow
             the order of `subset`. If `None` this function uses all dimensions.
@@ -144,6 +145,7 @@ def conditional_corrcoeff(
 
     device = density._device if hasattr(density, "_device") else "cpu"
 
+    condition = ensure_theta_batched(condition)
     dims = range(condition.shape[1])
     # Indexing `dims` maps negative indices to their dimension and rejects
     # out-of-range ones.
