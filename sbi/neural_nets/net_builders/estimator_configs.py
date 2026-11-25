@@ -244,8 +244,7 @@ class MarginalConfigBase(_PerModelConfigBase):
     its settings carry Zuko's own parameter names.
 
     Args:
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width.
+        hidden_features: Hidden-layer widths (an int gives two layers).
         num_transforms: Number of transforms in the flow.
         z_score_input: Whether to z-score the samples $x$, one of `none`,
             `independent`, or `structured`.  Unconditional flows do not
@@ -582,8 +581,7 @@ class _ZukoDensityConfigBase(_UnconstrainedCapableConfigBase):
     """Base for the conditional Zuko flows.
 
     Args:
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width.
+        hidden_features: Hidden-layer widths (an int gives two layers).
         num_transforms: Number of transforms in the flow.
     """
 

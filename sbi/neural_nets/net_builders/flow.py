@@ -475,8 +475,7 @@ def build_zuko_nice(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         randmask: Whether to use random masks in the flow. Defaults to False.
@@ -530,8 +529,7 @@ def build_zuko_maf(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         randperm: Whether to use random permutations in the flow. Defaults to False.
@@ -595,8 +593,7 @@ def build_zuko_nsf(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         num_bins: The number of bins in the spline transformations. Defaults to 10.
@@ -653,8 +650,7 @@ def build_zuko_ncsf(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         num_bins: The number of bins in the spline transformations. Defaults to 10.
@@ -711,8 +707,7 @@ def build_zuko_sospf(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         degree: The degree of the polynomials. Defaults to 4.
@@ -779,8 +774,7 @@ def build_zuko_naf(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         randperm: Whether features are randomly permuted between transformations or not.
@@ -848,8 +842,7 @@ def build_zuko_unaf(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         randperm: Whether features are randomly permuted between transformations or not.
@@ -916,8 +909,7 @@ def build_zuko_gf(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         components: The number of components in the Gaussian mixture model.
@@ -978,8 +970,7 @@ def build_zuko_bpf(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         degree: The degree :math:`M` of the Bernstein polynomial.
@@ -1042,8 +1033,7 @@ def build_zuko_flow(
             an unbounded space if bounds from `x_dist` are given.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x except `transform_to_unconstrained`.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         embedding_net: The embedding network to use. Defaults to nn.Identity().
         x_dist: The distribution over x, used to determine the bounds for the
@@ -1270,8 +1260,7 @@ def build_zuko_unconditional_flow(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
-        hidden_features: Hidden-layer widths of each transform's network. An int
-            gives two hidden layers of that width. Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
 
