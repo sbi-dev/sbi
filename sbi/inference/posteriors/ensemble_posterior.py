@@ -249,10 +249,11 @@ class EnsemblePosterior(NeuralPosterior):
             )
         elif isinstance(weights, (Tensor, List)):
             weights_tensor = torch.as_tensor(weights, dtype=torch.float32)
-            if (
-                weights_tensor.ndim != 1
-                or weights_tensor.shape[0] != self.num_components
-            ):
+            if weights_tensor.ndim != 1:
+                raise ValueError(
+                    f"Weights must be 1D, got {weights_tensor.ndim}D tensor."
+                )
+            if weights_tensor.shape[0] != self.num_components:
                 raise ValueError(
                     f"Number of weights ({weights_tensor.shape[0]}) does not match "
                     f"number of posteriors ({self.num_components})."
@@ -305,8 +306,20 @@ class EnsemblePosterior(NeuralPosterior):
         sample_shape = torch.Size(sample_shape)
         num_samples = sample_shape.numel()
         if num_samples == 0:
-            empty = self.posteriors[0].sample(torch.Size((0,)), x=x, **kwargs)
-            return empty.reshape(sample_shape + empty.shape[1:])
+            try:
+                empty = self.posteriors[0].sample(
+                    torch.Size((0,)),
+                    x=x,
+                    **dict(kwargs, show_progress_bars=False),
+                )
+                return empty.reshape(sample_shape + empty.shape[1:])
+            except Exception:
+                pass
+            try:
+                empty = self.posteriors[0].sample(torch.Size((0,)), x=x, **kwargs)
+                return empty.reshape(sample_shape + empty.shape[1:])
+            except Exception:
+                return self._empty_sample(sample_shape)
 
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -333,8 +346,22 @@ class EnsemblePosterior(NeuralPosterior):
         sample_shape = torch.Size(sample_shape)
         num_samples = sample_shape.numel()
         if num_samples == 0:
-            empty = self.posteriors[0].sample_batched(torch.Size((0,)), x=x, **kwargs)
-            return empty.reshape(sample_shape + empty.shape[1:])
+            try:
+                empty = self.posteriors[0].sample_batched(
+                    torch.Size((0,)),
+                    x=x,
+                    **dict(kwargs, show_progress_bars=False),
+                )
+                return empty.reshape(sample_shape + empty.shape[1:])
+            except Exception:
+                pass
+            try:
+                empty = self.posteriors[0].sample_batched(
+                    torch.Size((0,)), x=x, **kwargs
+                )
+                return empty.reshape(sample_shape + empty.shape[1:])
+            except Exception:
+                return self._empty_sample_batched(sample_shape, x.shape[0])
 
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -351,6 +378,40 @@ class EnsemblePosterior(NeuralPosterior):
             )
         samples = self._stack_and_shuffle(samples, num_samples)
         return samples.reshape(sample_shape + samples.shape[1:])
+
+    def _empty_sample(self, sample_shape: torch.Size) -> Tensor:
+        """Return an empty sample tensor of shape `sample_shape + event_shape`."""
+        if self.prior is not None:
+            try:
+                dummy = self.prior.sample((0,))
+                event_shape = dummy.shape[1:]
+                dtype = dummy.dtype
+            except Exception:
+                event_shape = getattr(self.prior, "event_shape", torch.Size([1]))
+                dtype = torch.float32
+        else:
+            event_shape = torch.Size([1])
+            dtype = torch.float32
+        empty = torch.empty((0, *event_shape), dtype=dtype, device=self.device)
+        return empty.reshape(sample_shape + event_shape)
+
+    def _empty_sample_batched(self, sample_shape: torch.Size, num_obs: int) -> Tensor:
+        """Return an empty sample tensor of shape
+        `sample_shape + (num_obs, *event_shape)`.
+        """
+        if self.prior is not None:
+            try:
+                dummy = self.prior.sample((0,))
+                event_shape = dummy.shape[1:]
+                dtype = dummy.dtype
+            except Exception:
+                event_shape = getattr(self.prior, "event_shape", torch.Size([1]))
+                dtype = torch.float32
+        else:
+            event_shape = torch.Size([1])
+            dtype = torch.float32
+        empty = torch.empty((0, num_obs, *event_shape), dtype=dtype, device=self.device)
+        return empty.reshape(sample_shape + (num_obs, *event_shape))
 
     @staticmethod
     def _stack_and_shuffle(samples: List[Tensor], num_samples: int) -> Tensor:

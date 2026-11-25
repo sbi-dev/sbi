@@ -374,6 +374,12 @@ def test_ensemble_weights_length_and_value_validation():
     with pytest.raises(ValueError, match="does not match number of posteriors"):
         EnsemblePosterior(posteriors, weights=[1.0])
 
+    with pytest.raises(ValueError, match="Weights must be 1D"):
+        EnsemblePosterior(posteriors, weights=tensor(1.0))
+
+    with pytest.raises(ValueError, match="Weights must be 1D"):
+        EnsemblePosterior(posteriors, weights=ones(2, 2))
+
     with pytest.raises(ValueError, match="must be non-negative and sum to a positive"):
         EnsemblePosterior(posteriors, weights=[-1.0, 2.0])
 
@@ -410,6 +416,31 @@ def test_ensemble_zero_samples(method: str):
         posterior_cls(PosteriorPotential(MultivariateNormal(zeros(2), eye(2)), prior))
         for _ in range(2)
     ]
+    ensemble = EnsemblePosterior(posteriors)
+    ensemble.set_default_x(zeros(1, 2))
+
+    if method == "sample":
+        samples_zero = ensemble.sample((0,))
+        assert samples_zero.shape == (0, 2)
+        samples_zero_2d = ensemble.sample((0, 5))
+        assert samples_zero_2d.shape == (0, 5, 2)
+    else:
+        samples_zero = ensemble.sample_batched((0,), x=zeros(3, 2))
+        assert samples_zero.shape == (0, 3, 2)
+        samples_zero_2d = ensemble.sample_batched((0, 4), x=zeros(3, 2))
+        assert samples_zero_2d.shape == (0, 4, 3, 2)
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_zero_samples_direct_posterior(method: str):
+    """Zero-sample requests with DirectPosterior components (which use rejection
+    sampling) must return an empty tensor cleanly without crashing.
+    """
+    gaussian = MultivariateNormal(zeros(2), eye(2))
+    estimator = posterior_nn("maf", hidden_features=8, num_transforms=1)(
+        gaussian.sample((10,)), torch.randn(10, 2)
+    )
+    posteriors = [DirectPosterior(estimator, gaussian) for _ in range(2)]
     ensemble = EnsemblePosterior(posteriors)
     ensemble.set_default_x(zeros(1, 2))
 
