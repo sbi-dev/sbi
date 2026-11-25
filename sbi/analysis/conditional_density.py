@@ -150,6 +150,11 @@ def conditional_corrcoeff(
     device = getattr(density, "_device", None) or infer_tensor_device(density) or "cpu"
 
     condition = ensure_theta_batched(condition)
+    if condition.ndim != 2 or len(condition) == 0:
+        raise ValueError(
+            "`condition` needs shape (num_dim,) or (batch_size, num_dim) with "
+            f"batch_size > 0, got {tuple(condition.shape)}."
+        )
     dims = range(condition.shape[1])
     # Indexing `dims` maps negative indices to their dimension and rejects
     # out-of-range ones.
