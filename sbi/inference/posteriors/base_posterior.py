@@ -170,21 +170,7 @@ class NeuralPosterior:
         """
         self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
-        theta = torch.as_tensor(theta)
-
-        prior = getattr(self.potential_fn, "prior", None)
-        if prior is not None and len(prior.event_shape) > 0:
-            event_shape = prior.event_shape
-            actual_shape = theta.shape[-len(event_shape) :]
-
-            if actual_shape != event_shape:
-                raise ValueError(
-                    f"Expected theta to have event shape {tuple(event_shape)}, "
-                    f"but got shape {tuple(actual_shape)}."
-                )
-
-        theta = ensure_theta_batched(theta)
-
+        theta = self._theta_batched(theta)
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients
         )
@@ -347,6 +333,22 @@ class NeuralPosterior:
     def _resolve_x(self) -> Optional[Tensor]:
         """Return the `x` that methods use when they get none: the default `x`."""
         return self.default_x
+
+    def _theta_batched(self, theta: Array) -> Tensor:
+        """Return `theta` as a tensor with a batch dimension.
+
+        Raises:
+            ValueError: If `theta` does not end in the event shape of the prior.
+        """
+        theta = torch.as_tensor(theta)
+        prior = getattr(self.potential_fn, "prior", None)
+        event_shape = getattr(prior, "event_shape", torch.Size())
+        if event_shape and theta.shape[-len(event_shape) :] != event_shape:
+            raise ValueError(
+                f"theta has shape {tuple(theta.shape)}, but the prior has "
+                f"{event_shape.numel()} parameters (event shape {tuple(event_shape)})."
+            )
+        return ensure_theta_batched(theta)
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:

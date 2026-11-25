@@ -12,7 +12,6 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Proposal, Shape, TorchTransform
-from sbi.utils.torchutils import ensure_theta_batched
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -96,7 +95,7 @@ class RejectionPosterior(NeuralPosterior):
 
         self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = self._theta_batched(theta)
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients
         )

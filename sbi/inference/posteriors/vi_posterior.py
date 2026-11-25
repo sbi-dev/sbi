@@ -60,7 +60,6 @@ from sbi.utils.sbiutils import (
 )
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
-    ensure_theta_batched,
     move_tensors,
 )
 from sbi.utils.user_input_checks import process_x
@@ -748,7 +747,7 @@ class VIPosterior(NeuralPosterior):
                 observations in amortized mode.
         """
         with torch.set_grad_enabled(track_gradients):
-            theta = ensure_theta_batched(torch.as_tensor(theta)).to(self._device)
+            theta = self._theta_batched(theta).to(self._device)
             x = self._x_else_default_x(x)
             self._check_x(x)
             if self._mode == "amortized":
@@ -799,7 +798,7 @@ class VIPosterior(NeuralPosterior):
         with torch.set_grad_enabled(track_gradients):
             x = self._process_x(x)
             self._check_condition_shape(x)
-            theta = ensure_theta_batched(torch.as_tensor(theta)).to(self._device)
+            theta = self._theta_batched(theta).to(self._device)
             *sample_shape, num_observations, theta_dim = theta.shape
             # A prior of one parameter can have event shape `()` and batch shape `(1,)`.
             prior_dim = (self._prior.batch_shape + self._prior.event_shape).numel()
