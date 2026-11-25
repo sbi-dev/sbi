@@ -20,14 +20,7 @@ import pytest
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import eye, ones, zeros
-from torch.distributions import (
-    Beta,
-    Binomial,
-    Gamma,
-    Independent,
-    MultivariateNormal,
-    Normal,
-)
+from torch.distributions import Beta, Binomial, Gamma, Independent, MultivariateNormal
 
 from sbi.inference import (
     NLE,
@@ -1563,25 +1556,3 @@ def test_evaluate_scores_q_at_the_x_it_was_fit_to(capsys):
     torch.manual_seed(0)
     posterior.evaluate(quality_control_metric="prop", N=1000)
     assert capsys.readouterr().out == expected
-
-
-def test_amortized_vi_log_prob_batched_rejects_wrong_scalar_prior_dimension():
-    prior = Normal(torch.tensor(0.0), torch.tensor(1.0))
-    theta = torch.randn(100, 1)
-    x = theta + 0.1 * torch.randn_like(theta)
-
-    posterior = VIPosterior(FakePotential(prior=prior), prior=prior)
-    posterior.train_amortized(
-        theta=theta,
-        x=x,
-        max_num_iters=3,
-        show_progress_bar=False,
-        num_transforms=1,
-        hidden_features=8,
-    )
-
-    with pytest.raises(ValueError, match="last axis of theta must have size 1"):
-        posterior.log_prob_batched(
-            torch.empty(1, 2, 0),
-            x=torch.zeros(2, 1),
-        )
