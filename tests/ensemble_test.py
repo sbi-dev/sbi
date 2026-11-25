@@ -475,3 +475,39 @@ def test_ensemble_sample_preserves_multidimensional_event_shape():
 
     samples_batched = ensemble.sample_batched((5,), x=zeros(3, 2))
     assert samples_batched.shape == (5, 3, 2, 3)
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_zero_samples_prior_free_fallback(method: str):
+    """Zero-sample requests on an ensemble without a prior where components raise
+    must derive the event shape from the components rather than hardcoding [1].
+    """
+
+    class _FailingPriorFreePosterior(TractablePosterior):
+        def __init__(self, event_shape=(4,)):
+            self.event_shape = event_shape
+            super().__init__(
+                PosteriorPotential(MultivariateNormal(zeros(4), eye(4)), prior=None)
+            )
+
+        def sample(self, sample_shape=torch.Size(), x=None, **kwargs):
+            raise RuntimeError("Cannot sample")
+
+        def sample_batched(self, sample_shape=torch.Size(), x=None, **kwargs):
+            raise RuntimeError("Cannot sample batched")
+
+    posteriors = [_FailingPriorFreePosterior((4,)), _FailingPriorFreePosterior((4,))]
+    ensemble = EnsemblePosterior(posteriors)
+    ensemble.set_default_x(zeros(1, 4))
+    assert ensemble.prior is None
+
+    if method == "sample":
+        samples = ensemble.sample((0,))
+        assert samples.shape == (0, 4)
+        samples_2d = ensemble.sample((0, 3))
+        assert samples_2d.shape == (0, 3, 4)
+    else:
+        samples = ensemble.sample_batched((0,), x=zeros(5, 4))
+        assert samples.shape == (0, 5, 4)
+        samples_2d = ensemble.sample_batched((0, 2), x=zeros(5, 4))
+        assert samples_2d.shape == (0, 2, 5, 4)

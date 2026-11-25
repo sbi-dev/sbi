@@ -379,19 +379,69 @@ class EnsemblePosterior(NeuralPosterior):
         samples = self._stack_and_shuffle(samples, num_samples)
         return samples.reshape(sample_shape + samples.shape[1:])
 
-    def _empty_sample(self, sample_shape: torch.Size) -> Tensor:
-        """Return an empty sample tensor of shape `sample_shape + event_shape`."""
+    def _fallback_event_shape_and_dtype(self) -> Tuple[torch.Size, torch.dtype]:
+        """Derive the parameter event shape and dtype from prior or components."""
         if self.prior is not None:
             try:
                 dummy = self.prior.sample((0,))
-                event_shape = dummy.shape[1:]
-                dtype = dummy.dtype
+                return dummy.shape[1:], dummy.dtype
             except Exception:
-                event_shape = getattr(self.prior, "event_shape", torch.Size([1]))
-                dtype = torch.float32
-        else:
-            event_shape = torch.Size([1])
-            dtype = torch.float32
+                event_shape = getattr(self.prior, "event_shape", None)
+                if event_shape is not None:
+                    return torch.Size(event_shape), torch.float32
+
+        # When the ensemble has no prior, derive event shape from the components.
+        for component in self.posteriors:
+            for attr in ("event_shape", "theta_shape"):
+                shape = getattr(component, attr, None)
+                if shape is not None:
+                    return torch.Size(shape), torch.float32
+
+            param_dim = getattr(component, "parameter_dim", None)
+            if isinstance(param_dim, int):
+                return torch.Size([param_dim]), torch.float32
+
+            for dist_attr in ("prior", "_prior", "proposal"):
+                dist = getattr(component, dist_attr, None)
+                if dist is not None:
+                    try:
+                        dummy = dist.sample((0,))
+                        return dummy.shape[1:], dummy.dtype
+                    except Exception:
+                        shape = getattr(dist, "event_shape", None)
+                        if shape is not None:
+                            return torch.Size(shape), torch.float32
+
+            estimator = getattr(component, "posterior_estimator", None)
+            if estimator is not None:
+                shape = getattr(estimator, "input_shape", None)
+                if callable(shape):
+                    shape = shape()
+                if shape is not None:
+                    return torch.Size(shape), torch.float32
+
+            potential = getattr(component, "potential_fn", None)
+            if potential is not None:
+                for attr in ("theta_shape", "event_shape", "input_shape"):
+                    shape = getattr(potential, attr, None)
+                    if shape is not None:
+                        return torch.Size(shape), torch.float32
+                for dist_attr in ("prior", "proposal"):
+                    dist = getattr(potential, dist_attr, None)
+                    if dist is not None:
+                        try:
+                            dummy = dist.sample((0,))
+                            return dummy.shape[1:], dummy.dtype
+                        except Exception:
+                            shape = getattr(dist, "event_shape", None)
+                            if shape is not None:
+                                return torch.Size(shape), torch.float32
+
+        return torch.Size([1]), torch.float32
+
+    def _empty_sample(self, sample_shape: torch.Size) -> Tensor:
+        """Return an empty sample tensor of shape `sample_shape + event_shape`."""
+        event_shape, dtype = self._fallback_event_shape_and_dtype()
         empty = torch.empty((0, *event_shape), dtype=dtype, device=self.device)
         return empty.reshape(sample_shape + event_shape)
 
@@ -399,17 +449,7 @@ class EnsemblePosterior(NeuralPosterior):
         """Return an empty sample tensor of shape
         `sample_shape + (num_obs, *event_shape)`.
         """
-        if self.prior is not None:
-            try:
-                dummy = self.prior.sample((0,))
-                event_shape = dummy.shape[1:]
-                dtype = dummy.dtype
-            except Exception:
-                event_shape = getattr(self.prior, "event_shape", torch.Size([1]))
-                dtype = torch.float32
-        else:
-            event_shape = torch.Size([1])
-            dtype = torch.float32
+        event_shape, dtype = self._fallback_event_shape_and_dtype()
         empty = torch.empty((0, num_obs, *event_shape), dtype=dtype, device=self.device)
         return empty.reshape(sample_shape + (num_obs, *event_shape))
 
