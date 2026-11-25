@@ -13,7 +13,9 @@ from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.net_builders.vector_field_nets import (
     AdaMLPConfig,
     FlowMatchingConfig,
+    VectorFieldSimformer,
     build_adamlp_network,
+    build_simformer_network,
     build_standard_mlp_network,
     build_transformer_network,
 )
@@ -140,6 +142,59 @@ def test_vector_field_builders_shape_and_build(
     assert out.shape == inputs.shape
 
 
+SIMFORMER_CASE = [
+    pytest.param(
+        build_simformer_network,
+        kw,
+        id="simformer-" + "-".join(f"{k}={v}" for k, v in kw.items()),
+    )
+    for kw in _grid(
+        hidden_features=[64, 128],
+        num_layers=[2, 4],
+        num_heads=[4, 8],
+        mlp_ratio=[2, 4, 8],
+        ada_time=[True, False],
+    )
+]
+
+
+@pytest.mark.parametrize("builder, builder_kwargs", SIMFORMER_CASE)
+@pytest.mark.parametrize("time_emb_type", ["sinusoidal", "random_fourier"])
+@pytest.mark.parametrize("time_embedding_dim", [8, 16])
+@pytest.mark.parametrize("batch_dim", [1, 3])
+@pytest.mark.parametrize("input_dim", [(1,), (3,), (1, 1), (2, 1), (3, 5)])
+def test_simformer_builder_shape_and_build(
+    builder,
+    builder_kwargs,
+    time_emb_type,
+    time_embedding_dim,
+    batch_dim,
+    input_dim,
+):
+    # Inputs / conditions
+    x = torch.randn(10, *input_dim)
+
+    net = builder(
+        batch_x=x,
+        batch_y=x,
+        time_embedding_dim=time_embedding_dim,
+        time_emb_type=time_emb_type,
+        **builder_kwargs,
+    )
+
+    # Forward pass
+    inputs = torch.randn(batch_dim, *input_dim)
+    t = torch.rand(batch_dim)
+    condition_mask = torch.ones(input_dim[0], dtype=torch.bool)
+
+    out = net(
+        inputs,
+        t,
+        condition_mask=condition_mask,
+    )
+    assert out.shape == inputs.shape
+
+
 def test_mlp_ratio_reaches_the_ada_mlp_global_mlp():
     """`mlp_ratio` controls the width of the global MLP's intermediate blocks."""
     estimator = FlowMatchingConfig(
@@ -147,3 +202,67 @@ def test_mlp_ratio_reaches_the_ada_mlp_global_mlp():
     ).build(torch.randn(10, 2), torch.randn(10, 3))
     expand = estimator.net.global_mlp.mlp_blocks[0][1]
     assert expand.out_features == 8 * expand.in_features
+
+
+@pytest.mark.parametrize("ada_time", [False, True])
+def test_simformer_edge_mask_without_self_edges_has_no_nan(ada_time):
+    """A DAG without self-edges leaves sink nodes with no key to attend to."""
+    net = VectorFieldSimformer(in_features=2, num_nodes=3, ada_time=ada_time)
+    # Node 0 attends to node 1, node 1 to node 2; node 2 has an empty row.
+    edge_mask = torch.tensor([[0, 1, 0], [0, 0, 1], [0, 0, 0]], dtype=torch.bool)
+    out = net(
+        torch.randn(4, 3, 2),
+        torch.rand(4),
+        condition_mask=torch.zeros(3, dtype=torch.bool),
+        edge_mask=edge_mask.expand(4, 3, 3),
+    )
+    assert not out.isnan().any()
+
+
+@pytest.mark.parametrize("ada_time", [False, True])
+def test_simformer_edge_mask_direction(ada_time):
+    """`edge_mask[i, j] = True` means node `i` depends on (attends to) node `j`.
+
+    For the DAG edge `0 -> 1`, only `edge_mask[1, 0]` is set: the output of node 1
+    must depend on the input of node 0, but not the other way around.
+    """
+    torch.manual_seed(0)
+    net = VectorFieldSimformer(in_features=1, num_nodes=2, ada_time=ada_time)
+    edge_mask = torch.tensor([[0, 0], [1, 0]], dtype=torch.bool)
+    inputs = torch.randn(1, 2, 1, requires_grad=True)
+    out = net(
+        inputs,
+        torch.rand(1),
+        condition_mask=torch.zeros(1, 2, dtype=torch.bool),
+        edge_mask=edge_mask.unsqueeze(0),
+    )
+    grad_node0 = torch.autograd.grad(out[0, 0].sum(), inputs, retain_graph=True)[0]
+    grad_node1 = torch.autograd.grad(out[0, 1].sum(), inputs)[0]
+    assert grad_node0[0, 1].abs().item() == 0.0, "node 0 must not see node 1"
+    assert grad_node1[0, 0].abs().item() > 0.0, "node 1 must see node 0"
+
+
+@pytest.mark.parametrize("ada_time", [False, True])
+def test_simformer_shared_and_per_sample_edge_masks_agree(ada_time):
+    """A `(T, T)` edge mask, the same mask repeated over the batch, and a batch of
+    different masks give the outputs of the corresponding per-sample evaluations."""
+    torch.manual_seed(0)
+    net = VectorFieldSimformer(in_features=2, num_nodes=3, ada_time=ada_time).eval()
+    inputs, times = torch.randn(4, 3, 2), torch.rand(4)
+    condition_mask = torch.zeros(4, 3, dtype=torch.bool)
+    chain = torch.tensor([[1, 0, 0], [1, 1, 0], [0, 1, 1]], dtype=torch.bool)
+
+    shared = net(inputs, times, condition_mask, edge_mask=chain)
+    repeated = net(inputs, times, condition_mask, edge_mask=chain.expand(4, 3, 3))
+    assert torch.allclose(shared, repeated, atol=1e-6)
+
+    per_sample = torch.stack([chain, chain.T, torch.ones(3, 3).bool(), chain])
+    batched = net(inputs, times, condition_mask, edge_mask=per_sample)
+    for i in range(4):
+        single = net(
+            inputs[i : i + 1],
+            times[i : i + 1],
+            condition_mask[i : i + 1],
+            edge_mask=per_sample[i],
+        )
+        assert torch.allclose(batched[i : i + 1], single, atol=1e-5)

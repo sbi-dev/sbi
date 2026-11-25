@@ -1219,12 +1219,11 @@ def test_amortized_vi_requires_training(linear_gaussian_setup):
         posterior.sample((100,))
 
 
-def test_amortized_vi_takes_one_observation():
-    """Amortized q, like a direct posterior, takes one observation in `potential()`,
-    instead of combining several as iid trials."""
+def _fast_amortized_posterior():
+    """Return a cheaply trained amortized VI posterior and its prior."""
     prior = MultivariateNormal(zeros(2), eye(2))
     theta = prior.sample((100,))
-    posterior = VIPosterior(potential_fn=FakePotential(prior=prior), prior=prior)
+    posterior = VIPosterior(FakePotential(prior=prior), prior=prior)
     posterior.train_amortized(
         theta=theta,
         x=theta + 0.1 * torch.randn_like(theta),
@@ -1233,16 +1232,30 @@ def test_amortized_vi_takes_one_observation():
         num_transforms=1,
         hidden_features=8,
     )
+    return posterior, prior
+
+
+def test_amortized_vi_takes_one_observation():
+    """Amortized q, like a direct posterior, takes one observation in `sample()`,
+    `log_prob()` and `potential()`, instead of one posterior per observation or iid
+    trials."""
+    posterior, _ = _fast_amortized_posterior()
+    x_3 = zeros(3, 2)
     with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
-        posterior.potential(zeros(4, 2), x=zeros(3, 2))
+        posterior.sample((10,), x=x_3)
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        posterior.log_prob(zeros(3, 2), x=x_3)
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        posterior.potential(zeros(4, 2), x=x_3)
 
 
-def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
-    """Amortized q(theta|x) needs an x; it ignores the x of a stale single-x fit."""
+def test_amortized_vi_checks_a_default_x_set_before_training():
+    """A default x set before `train_amortized()` is checked against the observation
+    shape q was trained on, instead of being broadcast to it."""
     prior = MultivariateNormal(zeros(2), eye(2))
     theta = prior.sample((100,))
-    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
-    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior = VIPosterior(FakePotential(prior=prior), prior=prior)
+    posterior.set_default_x(zeros(1))
     posterior.train_amortized(
         theta=theta,
         x=theta,
@@ -1251,6 +1264,41 @@ def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
         num_transforms=1,
         hidden_features=8,
     )
+    with pytest.raises(ValueError, match="one observation has shape"):
+        posterior.sample((5,))
+
+
+def test_amortized_vi_log_prob_batched_matches_log_prob():
+    """`log_prob_batched()` scores each theta under the observation at its position,
+    as `log_prob()` does one observation at a time, also for several sample axes."""
+    posterior, prior = _fast_amortized_posterior()
+    x_batch = prior.sample((3,))
+    theta = prior.sample((2, 5, 3))
+
+    batched = posterior.log_prob_batched(theta, x_batch)
+    assert batched.shape == (2, 5, 3)
+    for i in range(3):
+        single = posterior.log_prob(theta[..., i, :], x=x_batch[i])
+        assert torch.allclose(batched[..., i], single, atol=1e-5)
+
+
+def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
+    """Amortized q(theta|x) needs an x; it ignores the x and the MAP of a stale
+    single-x fit."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior._map = zeros(1, 2)
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    assert posterior._map is None
     with pytest.raises(ValueError, match="Context `x` needed"):
         posterior.sample((5,))
 
@@ -1476,6 +1524,10 @@ def test_ensemble_of_vi_fits_to_different_x_raises():
     with pytest.raises(ValueError, match="do not all use the same observation"):
         EnsemblePosterior(fits).sample((5,))
     assert EnsemblePosterior([fits[0], fits[0]]).sample((5,)).shape == (5, 2)
+
+    weighted = EnsemblePosterior(fits, weights=[1.0, 0.0])
+    with pytest.raises(ValueError, match="not fit on the specified observation"):
+        weighted.sample((5,), x=2 * ones(1, 2))
 
 
 def test_ensemble_of_amortized_vi_takes_one_observation_in_log_prob():

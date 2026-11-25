@@ -46,6 +46,36 @@ class VectorFieldNet(nn.Module, ABC):
         pass
 
 
+class MaskedVectorFieldNet(nn.Module, ABC):
+    """Abstract base class for vector field networks with masking support.
+
+    Used by models that require conditioning and edge masking, such as Siformer.
+    """
+
+    @abstractmethod
+    def forward(
+        self,
+        inputs: Tensor,
+        t: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Compute the vector field with support for conditioning and edge masks.
+
+        Args:
+            inputs: Input tensor containing parameters or states.
+            t: Time parameter (scalar or batched).
+            condition_mask: Mask indicating which parts of the input
+            are conditioned (v. latent).
+            edge_mask: Optional mask specifying dependencies between inputs
+            (edges in the DAG). If None, it defaults to a mask of ones.
+
+        Returns:
+            Tensor representing the vector field evaluated at the provided points.
+        """
+        pass
+
+
 def _diag_gaussian_log_prob(x: Tensor, mean: Tensor, var: Tensor) -> Tensor:
     """Log-probability of a diagonal Gaussian evaluated at x."""
     diff = x[:, None, :] - mean[None, :, :]

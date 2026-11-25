@@ -4,6 +4,8 @@
 
 ### ⚠️ Breaking Changes
 
+* **`PermutationInvariantEmbedding` passes log(1 + N) instead of the trial count N** ([#2113](https://github.com/sbi-dev/sbi/pull/2113)): the embedding appended the raw number of real trials N to the aggregated trial embedding before its fully connected net. With 100 trials, that input was about 100 next to inputs of order 1, which scales badly when the number of trials varies. It now appends log(1 + N), which is 0 for an observation without real trials.
+  * A network trained before this change gives different outputs after it, also when it was saved with `save()` or pickled whole, because the forward pass changed. Retrain it.
 * **Zuko flows get two hidden layers for an int `hidden_features`** ([#2115](https://github.com/sbi-dev/sbi/pull/2115)): sbi passed an int width to zuko as one hidden layer per transform, so at the defaults each transform's network had five hidden layers instead of two. An int now gives two hidden layers of that width, zuko's own default; a list still sets the hidden-layer widths directly. The default networks of the `zuko_*` density estimators, the zuko marginal flows and the VI flows are smaller as a result. sbi's own `maf` and `nsf` do not change.
   * A state dict saved from such a zuko flow before this change does not load into a flow built after it. To rebuild the old network, pass `hidden_features=[w] * num_transforms`, for example `[50] * 5` at the defaults. Posteriors and inference objects saved with `save()` or pickled whole keep loading, because they store the network itself.
 
