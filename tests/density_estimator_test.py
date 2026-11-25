@@ -830,7 +830,7 @@ def test_inverse_transform_maps_samples_to_the_base_distribution(build_fn):
     """inverse_transform must embed (z-score) the condition, as sample() does."""
     theta = torch.randn(500, 2)
     x = 100.0 + 10.0 * torch.randn(500, 2)
-    estimator = build_fn(theta, x, z_score_x="independent")
+    estimator = build_fn(theta, x, z_score_y="independent")
     x_o = x[:1]
 
     with torch.no_grad():
