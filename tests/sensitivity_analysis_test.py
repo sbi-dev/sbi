@@ -287,6 +287,19 @@ def test_find_directions_raises_without_property(posterior_stub) -> None:
         )
 
 
+@pytest.mark.parametrize("d", [1, 3])
+def test_find_directions_eigenvalues_do_not_depend_on_num_samples(d) -> None:
+    """Tests that the eigenvalues estimate E[grad grad^T], which is I for the stub."""
+    torch.manual_seed(0)
+    a = ActiveSubspace(_PosteriorStub(d=d))
+    for num_monte_carlo_samples in (100, 1000):
+        evals, _ = a.find_directions(
+            posterior_log_prob_as_property=True,
+            num_monte_carlo_samples=num_monte_carlo_samples,
+        )
+        assert torch.allclose(evals, torch.ones(d), atol=0.5)
+
+
 @pytest.mark.parametrize("norm_gradients", [True, False])
 def test_project_after_find_directions(
     norm_gradients, toy_theta_property, posterior_stub
