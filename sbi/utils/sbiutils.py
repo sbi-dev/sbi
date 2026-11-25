@@ -850,9 +850,20 @@ def prior_support_is_bounded(prior: Any) -> Optional[bool]:
         support = prior.support
     except (NotImplementedError, AttributeError):
         return None
-    while hasattr(support, "base_constraint"):
-        support = support.base_constraint
-    return not isinstance(support, constraints._Real)
+    return not _constraint_is_real(support)
+
+
+def _constraint_is_real(constraint: constraints.Constraint) -> bool:
+    """Return whether a constraint is the real space, including concatenations.
+
+    `MultipleIndependent` priors have a `cat` support that joins the supports of their
+    parts, so it is the real space only if every part is.
+    """
+    while hasattr(constraint, "base_constraint"):
+        constraint = constraint.base_constraint
+    if isinstance(constraint, (constraints._Cat, constraints._Stack)):
+        return all(_constraint_is_real(c) for c in constraint.cseq)
+    return isinstance(constraint, constraints._Real)
 
 
 def within_support(distribution: Any, samples: Tensor) -> Tensor:
@@ -1024,6 +1035,8 @@ def mcmc_transform(
     1) When the prior support is bounded, it transforms the parameters into unbounded
     space.
     2) It z-scores the parameters such that MCMC is performed in a z-scored space.
+    Priors whose mean or standard deviation is not finite (e.g. Cauchy) are not
+    z-scored.
 
     Args:
         prior: The prior distribution.
@@ -1039,10 +1052,12 @@ def mcmc_transform(
     """
     if enable_transform:
 
-        def prior_mean_std_transform(prior, device):
+        def prior_mean_std_transform(prior):
             try:
-                prior_mean = prior.mean.to(device)
-                prior_std = prior.stddev.to(device)
+                # Built on the prior's device, so `check_transform` can use prior
+                # samples. The transform is moved to `device` at the end.
+                prior_mean = prior.mean
+                prior_std = prior.stddev
             except (NotImplementedError, AttributeError):
                 warnings.warn(
                     "The passed discrete prior has no mean or stddev attribute, "
@@ -1051,8 +1066,21 @@ def mcmc_transform(
                     stacklevel=2,
                 )
                 theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
-                prior_mean = theta.mean(dim=0).to(device)
-                prior_std = theta.std(dim=0).to(device)
+                prior_mean = theta.mean(dim=0)
+                prior_std = theta.std(dim=0)
+            if not (
+                prior_mean.isfinite().all()
+                and prior_std.isfinite().all()
+                and (prior_std > 0).all()
+            ):
+                # E.g. a Cauchy prior: there is no finite mean and std to z-score with.
+                warnings.warn(
+                    "The prior mean or standard deviation is not finite, or the "
+                    "standard deviation is zero, so the parameters are not z-scored "
+                    "for MCMC.",
+                    stacklevel=2,
+                )
+                return torch_tf.identity_transform
             transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
             return transform
 
@@ -1069,7 +1097,7 @@ def mcmc_transform(
             support = unwrap_mixture_support(prior.support, prior.event_shape, device)
             transform = biject_to(support)
         else:
-            transform = prior_mean_std_transform(prior, device)
+            transform = prior_mean_std_transform(prior)
     else:
         transform = torch_tf.identity_transform
 
