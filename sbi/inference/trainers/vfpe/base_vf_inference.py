@@ -895,7 +895,7 @@ class MaskedVectorFieldTrainer(
                 much VRAM can set to 'cpu' to store data on system memory instead.
 
         Returns:
-            MaskedVectorFieldInference object
+            MaskedVectorFieldTrainer object
                 (returned so that this function is chainable).
         """
 
