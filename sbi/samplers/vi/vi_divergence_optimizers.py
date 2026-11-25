@@ -117,7 +117,7 @@ class DivergenceOptimizer(ABC):
 
         self.n_particles = n_particles
         self.clip_value = clip_value
-        self.learning_rate = kwargs.get("lr", 1e-3)
+        self.learning_rate = kwargs.setdefault("lr", 1e-3)
         self.retain_graph = kwargs.get("retain_graph", False)
         self._kwargs = kwargs
 
@@ -240,7 +240,8 @@ class DivergenceOptimizer(ABC):
             para.data = state_para.data.clone().to(para.device)
         # Settings in `param_groups` stay, including those a scheduler changes.
         self._optimizer.state.clear()
-        self.warm_up(warm_up_rounds)
+        if self.prior is not None:
+            self.warm_up(warm_up_rounds)
 
     def loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the loss function which is optimized.
@@ -305,9 +306,11 @@ class DivergenceOptimizer(ABC):
             return abs(m).item() < self.eps
 
     def reset_loss_stats(self) -> None:
-        """Resets the loss statistics and restarts the snapshot schedule."""
+        """Resets the loss statistics, and restarts the snapshot schedule from the
+        current q."""
         self._clear_loss_stats()
         self._num_updates = 0
+        self.update_state()
 
     def _clear_loss_stats(self) -> None:
         self.losses = torch.ones(2000)
@@ -789,7 +792,10 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         outside = (weights == 0) & torch.isneginf(elbo_particles.detach())
         elbo_particles_masked = torch.where(outside, 0.0, elbo_particles)
         surrogate_loss = -torch.mean(weights * elbo_particles_masked)
-        loss = -mean_log_weights / (1 - self.alpha)
+        if self.alpha == 1:  # The bound is the ELBO, where the formula gives 0 / 0.
+            loss = -elbo_particles.detach().mean()
+        else:
+            loss = -mean_log_weights / (1 - self.alpha)
         return surrogate_loss, loss
 
     def get_importance_weight(self, elbo_particles: Tensor) -> Tuple[Tensor, Tensor]:
