@@ -747,7 +747,7 @@ class VIPosterior(NeuralPosterior):
                 observations in amortized mode.
         """
         with torch.set_grad_enabled(track_gradients):
-            theta = self._theta_batched(theta).to(self._device)
+            theta = self._theta_batched(theta, self._prior).to(self._device)
             x = self._x_else_default_x(x)
             self._check_x(x)
             if self._mode == "amortized":
@@ -798,15 +798,8 @@ class VIPosterior(NeuralPosterior):
         with torch.set_grad_enabled(track_gradients):
             x = self._process_x(x)
             self._check_condition_shape(x)
-            theta = self._theta_batched(theta).to(self._device)
+            theta = self._theta_batched(theta, self._prior).to(self._device)
             *sample_shape, num_observations, theta_dim = theta.shape
-            # A prior of one parameter can have event shape `()` and batch shape `(1,)`.
-            prior_dim = (self._prior.batch_shape + self._prior.event_shape).numel()
-            if theta_dim != prior_dim:
-                raise ValueError(
-                    f"theta must hold {prior_dim} parameters along its last axis, but "
-                    f"holds {theta_dim}."
-                )
             if num_observations not in (1, x.shape[0]):
                 raise ValueError(
                     f"theta holds {num_observations} observations along its "

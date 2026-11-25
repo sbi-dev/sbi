@@ -334,19 +334,29 @@ class NeuralPosterior:
         """Return the `x` that methods use when they get none: the default `x`."""
         return self.default_x
 
-    def _theta_batched(self, theta: Array) -> Tensor:
+    def _theta_batched(self, theta: Array, prior: Optional[Any] = None) -> Tensor:
         """Return `theta` as a tensor with a batch dimension.
 
+        Args:
+            theta: Parameters.
+            prior: The prior to check `theta` against. If None, the prior of the
+                potential.
+
         Raises:
-            ValueError: If `theta` does not end in the event shape of the prior.
+            ValueError: If `theta` does not end in the shape of one parameter set of
+                the prior.
         """
         theta = torch.as_tensor(theta)
-        prior = getattr(self.potential_fn, "prior", None)
-        event_shape = getattr(prior, "event_shape", torch.Size())
-        if event_shape and theta.shape[-len(event_shape) :] != event_shape:
+        if prior is None:
+            prior = getattr(self.potential_fn, "prior", None)
+        # A prior of one parameter can have event shape `()` and batch shape `(1,)`.
+        shape = torch.Size(
+            getattr(prior, "batch_shape", ()) + getattr(prior, "event_shape", ())
+        )
+        if shape and theta.shape[-len(shape) :] != shape:
             raise ValueError(
                 f"theta has shape {tuple(theta.shape)}, but the prior has "
-                f"{event_shape.numel()} parameters (event shape {tuple(event_shape)})."
+                f"{shape.numel()} parameters (shape {tuple(shape)})."
             )
         return ensure_theta_batched(theta)
 
