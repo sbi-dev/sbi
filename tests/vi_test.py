@@ -948,6 +948,11 @@ def test_rolled_back_step_does_not_end_training(monkeypatch):
     optimizer.step(zeros(1))
     assert not optimizer.converged()
 
+    finite_surrogate = lambda x_o: (param.sum() * 0 + 2.0, torch.tensor(2.0))
+    monkeypatch.setattr(optimizer, "loss", finite_surrogate)
+    optimizer.step(zeros(1))
+    assert optimizer.converged()
+
 
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
 @pytest.mark.parametrize("dreg_before, dreg_after", [(False, True), (True, False)])
