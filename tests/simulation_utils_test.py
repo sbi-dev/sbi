@@ -8,8 +8,8 @@ import pytest
 import torch
 from joblib import parallel_config
 
-from sbi.inference import simulate_for_sbi
-from sbi.utils import BoxUniform, simulate_from_theta
+from sbi.inference import simulate_for_sbi, simulate_from_theta
+from sbi.utils import BoxUniform
 from sbi.utils.torchutils import process_device
 
 

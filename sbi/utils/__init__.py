@@ -59,7 +59,6 @@ from sbi.utils.torchutils import (
     tensor2numpy,
     tile,
 )
-from sbi.utils.simulation_utils import simulate_from_theta
 from sbi.utils.typechecks import (
     is_bool,
     is_int,
@@ -82,7 +81,6 @@ from sbi.utils.user_input_checks_utils import MultipleIndependent
 __all__ = [
     "process_prior",
     "process_simulator",
-    "simulate_from_theta",
     "BoxUniform",
     "MultipleIndependent",
     "RestrictedPrior",
