@@ -1580,7 +1580,7 @@ def test_amortized_vi_log_prob_batched_rejects_wrong_scalar_prior_dimension():
         hidden_features=8,
     )
 
-    with pytest.raises(ValueError, match="theta dimension 0"):
+    with pytest.raises(ValueError, match="last axis of theta must have size 1"):
         posterior.log_prob_batched(
             torch.empty(1, 2, 0),
             x=torch.zeros(2, 1),
