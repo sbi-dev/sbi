@@ -680,17 +680,27 @@ class MCMCPosterior(NeuralPosterior):
         self._check_latest_sample_supply(init_strategy, len(x) * num_chains_per_x)
 
         potential_ = self.potential_fn
-        initial_params = []
-        for xi in x:
-            # Build init function with bound potential for this specific xi
-            potential_bound = potential_.bind(xi)
+        if init_strategy == "latest_sample":
+            # Build the iterator once, so that each xi continues its own chains.
             init_fn = self._build_mcmc_init_fn(
                 self.proposal,
-                potential_fn=potential_bound,
+                potential_fn=potential_,
                 transform=self.theta_transform,
-                init_strategy=init_strategy,  # type: ignore
+                init_strategy=init_strategy,
                 **kwargs,
             )
+        initial_params = []
+        for xi in x:
+            if init_strategy != "latest_sample":
+                # Build init function with bound potential for this specific xi
+                potential_bound = potential_.bind(xi)
+                init_fn = self._build_mcmc_init_fn(
+                    self.proposal,
+                    potential_fn=potential_bound,
+                    transform=self.theta_transform,
+                    init_strategy=init_strategy,  # type: ignore
+                    **kwargs,
+                )
 
             # Parallelize inits for resampling or sir.
             if num_workers > 1 and (
