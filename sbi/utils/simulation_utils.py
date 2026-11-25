@@ -201,8 +201,9 @@ def simulate_from_theta(
     if num_workers == 1:
         outputs = (_call(simulator, simulator_is_batched, *call) for call in calls)
     else:
-        # Copy-on-write, as joblib passes large arrays as read-only memory maps.
-        parallel = Parallel(n_jobs=num_workers, return_as="generator", mmap_mode="c")
+        # No memory maps: joblib would pass large arrays read-only, and the calls
+        # share no parameters.
+        parallel = Parallel(n_jobs=num_workers, return_as="generator", max_nbytes=None)
         # Copies, as a pickled view of a tensor sends all of `theta`.
         tasks = (
             (t.detach().to("cpu", copy=True) if isinstance(t, Tensor) else t, *rest)
