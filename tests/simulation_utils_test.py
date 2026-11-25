@@ -158,6 +158,33 @@ def test_seeded_outputs_do_not_depend_on_num_workers(simulator_is_batched):
     assert np.array_equal(x, x_with_workers)
 
 
+def test_seeded_outputs_do_not_depend_on_the_number_of_simulations():
+    x, x_of_first_rows = [
+        simulate_from_theta(
+            numpy_noise, np.zeros((n, 2)), seed=0, show_progress_bar=False
+        )
+        for n in [10, 3]
+    ]
+
+    assert np.array_equal(x[:3], x_of_first_rows)
+
+
+@pytest.mark.gpu
+def test_seed_reproduces_noise_drawn_on_the_gpu():
+    theta = torch.zeros(4, 2, device=process_device("gpu"))
+    x, x_again = [
+        simulate_from_theta(
+            lambda theta: theta + torch.randn(theta.shape, device=theta.device),
+            theta,
+            seed=0,
+            show_progress_bar=False,
+        )
+        for _ in range(2)
+    ]
+
+    assert torch.equal(x, x_again)
+
+
 def test_simulate_for_sbi_reproducible_with_seed(prior):
     def run(seed, num_workers):
         return simulate_for_sbi(

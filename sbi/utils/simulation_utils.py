@@ -129,12 +129,13 @@ def simulate_from_theta(
         seed: Seed for reproducibility. Every simulator call gets its own seed
             derived from `seed`, for the random states of Python, numpy and
             PyTorch on the CPU. So for noise drawn on the CPU, the outputs do not
-            depend on `num_workers`; PyTorch's GPU generators are not seeded per
-            call. Afterwards, these CPU random states are seeded with another seed
-            derived from `seed`. Without a seed, one worker uses the current random
-            state; more workers seed every call from numpy's global random state.
-            Seeding needs joblib's default process workers: with a thread backend,
-            a seed raises an error.
+            depend on `num_workers`. PyTorch's GPU generators are seeded once
+            before the first call, so noise drawn on a GPU is reproducible with one
+            worker only. Afterwards, the CPU random states are seeded with another
+            seed derived from `seed`. Without a seed, one worker uses the current
+            random state; more workers seed every call from numpy's global random
+            state. Seeding needs joblib's default process workers: with a thread
+            backend, a seed raises an error.
         show_progress_bar: Whether to show a progress bar.
 
     Returns:
@@ -185,10 +186,15 @@ def simulate_from_theta(
         thetas: List[Array] = [theta[start : start + call_size] for start in starts]
     else:
         thetas = list(theta)
+    if seed is not None:
+        # Children of `seed`, so that no draw repeats those that sampled `theta`.
+        children = np.random.SeedSequence(seed).spawn(2)
+        seed_after_call, gpu_seed = (int(c.generate_state(1)[0]) for c in children)
+        torch.manual_seed(gpu_seed)  # Seeds the generators of all devices.
     seeds: Sequence[Optional[int]] = [None] * len(thetas)
     # Without seeds, worker processes would not follow the caller's random state.
     if seed is not None or (num_workers > 1 and not uses_threads):
-        seeds = _distinct_seeds(len(thetas), seed)
+        seeds = _call_seeds(len(thetas), seed)
 
     calls = zip(thetas, starts, seeds, strict=True)
     outputs: Iterable[Any]
@@ -220,9 +226,7 @@ def simulate_from_theta(
         raise
 
     if seed is not None:
-        # A child of `seed` keeps later draws from repeating those of this call.
-        child = np.random.SeedSequence(seed).spawn(1)[0]
-        _seed_cpu_random_states(int(child.generate_state(1)[0]))
+        _seed_cpu_random_states(seed_after_call)
     return _join(collected, simulator_is_batched)
 
 
@@ -342,7 +346,7 @@ def _seed_cpu_random_states(seed: int) -> None:
     generators, which take ten times as long to seed.
     """
     random.seed(seed)
-    np.random.seed(seed)
+    np.random.seed([seed & 0xFFFFFFFF, seed >> 32])  # It takes 32-bit words.
     torch.default_generator.manual_seed(seed)
 
 
@@ -350,13 +354,11 @@ def _is_int(value: Any) -> bool:
     return isinstance(value, (int, np.integer)) and not isinstance(value, bool)
 
 
-def _distinct_seeds(num_seeds: int, seed: Optional[int]) -> List[int]:
-    """Returns distinct seeds derived from `seed`, so that no two calls share noise.
+def _call_seeds(num_seeds: int, seed: Optional[int]) -> List[int]:
+    """Returns one 64-bit seed per call; call i gets the same seed for any `num_seeds`.
 
     With `seed=None`, the seeds follow the global numpy random state.
     """
     if seed is None:
         seed = np.random.randint(2**31)
-    # `np.random.seed` accepts seeds below 2**32.
-    seeds = np.random.default_rng(seed).choice(2**32, size=num_seeds, replace=False)
-    return seeds.tolist()
+    return np.random.default_rng(seed).integers(2**63, size=num_seeds).tolist()
