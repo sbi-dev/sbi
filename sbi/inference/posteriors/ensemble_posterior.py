@@ -394,7 +394,7 @@ class EnsemblePosterior(NeuralPosterior):
         for component in self.posteriors:
             for attr in ("event_shape", "theta_shape"):
                 shape = getattr(component, attr, None)
-                if shape is not None:
+                if shape is not None and len(shape) > 0:
                     return torch.Size(shape), torch.float32
 
             param_dim = getattr(component, "parameter_dim", None)
@@ -403,39 +403,55 @@ class EnsemblePosterior(NeuralPosterior):
 
             for dist_attr in ("prior", "_prior", "proposal"):
                 dist = getattr(component, dist_attr, None)
-                if dist is not None:
+                while dist is not None:
                     try:
                         dummy = dist.sample((0,))
-                        return dummy.shape[1:], dummy.dtype
+                        if dummy.ndim > 1:
+                            return dummy.shape[1:], dummy.dtype
                     except Exception:
-                        shape = getattr(dist, "event_shape", None)
-                        if shape is not None:
-                            return torch.Size(shape), torch.float32
+                        pass
+                    shape = getattr(dist, "event_shape", None)
+                    if shape is not None and len(shape) > 0:
+                        return torch.Size(shape), torch.float32
+                    batch_shape = getattr(dist, "batch_shape", None)
+                    if batch_shape is not None and len(batch_shape) > 0:
+                        return torch.Size(batch_shape), torch.float32
+                    dist = getattr(dist, "_prior", None) or getattr(
+                        dist, "full_prior", None
+                    )
 
             estimator = getattr(component, "posterior_estimator", None)
             if estimator is not None:
                 shape = getattr(estimator, "input_shape", None)
                 if callable(shape):
                     shape = shape()
-                if shape is not None:
+                if shape is not None and len(shape) > 0:
                     return torch.Size(shape), torch.float32
 
             potential = getattr(component, "potential_fn", None)
             if potential is not None:
                 for attr in ("theta_shape", "event_shape", "input_shape"):
                     shape = getattr(potential, attr, None)
-                    if shape is not None:
+                    if shape is not None and len(shape) > 0:
                         return torch.Size(shape), torch.float32
                 for dist_attr in ("prior", "proposal"):
                     dist = getattr(potential, dist_attr, None)
-                    if dist is not None:
+                    while dist is not None:
                         try:
                             dummy = dist.sample((0,))
-                            return dummy.shape[1:], dummy.dtype
+                            if dummy.ndim > 1:
+                                return dummy.shape[1:], dummy.dtype
                         except Exception:
-                            shape = getattr(dist, "event_shape", None)
-                            if shape is not None:
-                                return torch.Size(shape), torch.float32
+                            pass
+                        shape = getattr(dist, "event_shape", None)
+                        if shape is not None and len(shape) > 0:
+                            return torch.Size(shape), torch.float32
+                        batch_shape = getattr(dist, "batch_shape", None)
+                        if batch_shape is not None and len(batch_shape) > 0:
+                            return torch.Size(batch_shape), torch.float32
+                        dist = getattr(dist, "_prior", None) or getattr(
+                            dist, "full_prior", None
+                        )
 
         return torch.Size([1]), torch.float32
 

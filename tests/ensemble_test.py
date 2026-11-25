@@ -12,7 +12,11 @@ from torch.distributions import Categorical, MixtureSameFamily, MultivariateNorm
 from torch.testing import assert_close
 
 from sbi.inference import NLE_A, NPE_C, NRE_A
-from sbi.inference.posteriors import DirectPosterior, EnsemblePosterior
+from sbi.inference.posteriors import (
+    DirectPosterior,
+    EnsemblePosterior,
+    MCMCPosterior,
+)
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
 from sbi.neural_nets import posterior_nn
 from sbi.simulators.linear_gaussian import (
@@ -478,16 +482,21 @@ def test_ensemble_sample_preserves_multidimensional_event_shape():
 
 
 @pytest.mark.parametrize("method", ["sample", "sample_batched"])
-def test_ensemble_zero_samples_prior_free_fallback(method: str):
+@pytest.mark.parametrize("event_shape", [(4,), (2, 3)])
+def test_ensemble_zero_samples_prior_free_fallback(method: str, event_shape: tuple):
     """Zero-sample requests on an ensemble without a prior where components raise
-    must derive the event shape from the components rather than hardcoding [1].
+    must derive the event shape from the components rather than hardcoding [1],
+    supporting both 1D and multi-axis event shapes.
     """
 
     class _FailingPriorFreePosterior(TractablePosterior):
         def __init__(self, event_shape=(4,)):
             self.event_shape = event_shape
+            prod_dim = int(torch.prod(torch.tensor(event_shape)))
             super().__init__(
-                PosteriorPotential(MultivariateNormal(zeros(4), eye(4)), prior=None)
+                PosteriorPotential(
+                    MultivariateNormal(zeros(prod_dim), eye(prod_dim)), prior=None
+                )
             )
 
         def sample(self, sample_shape=torch.Size(), x=None, **kwargs):
@@ -496,18 +505,58 @@ def test_ensemble_zero_samples_prior_free_fallback(method: str):
         def sample_batched(self, sample_shape=torch.Size(), x=None, **kwargs):
             raise RuntimeError("Cannot sample batched")
 
-    posteriors = [_FailingPriorFreePosterior((4,)), _FailingPriorFreePosterior((4,))]
+    posteriors = [
+        _FailingPriorFreePosterior(event_shape),
+        _FailingPriorFreePosterior(event_shape),
+    ]
     ensemble = EnsemblePosterior(posteriors)
-    ensemble.set_default_x(zeros(1, 4))
+    ensemble.set_default_x(zeros(1, 2))
     assert ensemble.prior is None
 
     if method == "sample":
         samples = ensemble.sample((0,))
-        assert samples.shape == (0, 4)
+        assert samples.shape == (0, *event_shape)
         samples_2d = ensemble.sample((0, 3))
-        assert samples_2d.shape == (0, 3, 4)
+        assert samples_2d.shape == (0, 3, *event_shape)
     else:
-        samples = ensemble.sample_batched((0,), x=zeros(5, 4))
-        assert samples.shape == (0, 5, 4)
-        samples_2d = ensemble.sample_batched((0, 2), x=zeros(5, 4))
-        assert samples_2d.shape == (0, 2, 5, 4)
+        samples = ensemble.sample_batched((0,), x=zeros(5, 2))
+        assert samples.shape == (0, 5, *event_shape)
+        samples_2d = ensemble.sample_batched((0, 2), x=zeros(5, 2))
+        assert samples_2d.shape == (0, 2, 5, *event_shape)
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_zero_samples_mcmc_restricted_prior(method: str):
+    """Zero-sample requests on an ensemble of prior-free MCMCPosteriors with
+    RestrictedPrior proposal must derive the event shape from the wrapped prior.
+    """
+    from sbi.inference.potentials.base_potential import BasePotential
+    from sbi.utils.restriction_estimator import RestrictedPrior
+
+    class _DummyPotential(BasePotential):
+        def __init__(self):
+            super().__init__(prior=None, x_o=None)
+
+        def __call__(self, theta, track_gradients=True):
+            return -0.5 * (theta**2).sum(-1)
+
+    prior = MultivariateNormal(zeros(3), eye(3))
+    rp = RestrictedPrior(
+        prior=prior,
+        accept_reject_fn=lambda th: torch.ones(len(th), dtype=torch.bool),
+    )
+    posteriors = [MCMCPosterior(_DummyPotential(), proposal=rp) for _ in range(2)]
+    ensemble = EnsemblePosterior(posteriors)
+    ensemble.set_default_x(zeros(1, 3))
+    assert ensemble.prior is None
+
+    if method == "sample":
+        samples = ensemble.sample((0,))
+        assert samples.shape == (0, 3)
+        samples_2d = ensemble.sample((0, 4))
+        assert samples_2d.shape == (0, 4, 3)
+    else:
+        samples = ensemble.sample_batched((0,), x=zeros(5, 3))
+        assert samples.shape == (0, 5, 3)
+        samples_2d = ensemble.sample_batched((0, 2), x=zeros(5, 3))
+        assert samples_2d.shape == (0, 2, 5, 3)
