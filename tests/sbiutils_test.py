@@ -941,12 +941,18 @@ def test_mdn_prior_transform_is_read_only():
     assert est._prior_transform is not None
 
 
-@pytest.mark.parametrize("orientation", ["concrete", "inverse", "composed_inverse"])
+@pytest.mark.parametrize(
+    "orientation", ["concrete", "inverse", "composed_inverse", "nested_inverse"]
+)
 def test_callable_transform_preserves_orientation_and_dtype(orientation):
     """CallableTransform safely owns concrete and inverse transforms."""
     import pickle
 
-    from torch.distributions.transforms import AffineTransform, ComposeTransform
+    from torch.distributions.transforms import (
+        AffineTransform,
+        ComposeTransform,
+        SigmoidTransform,
+    )
 
     from sbi.utils.sbiutils import CallableTransform
 
@@ -958,6 +964,9 @@ def test_callable_transform_preserves_orientation_and_dtype(orientation):
             transform,
             AffineTransform(torch.ones(2), 3 * torch.ones(2)),
         ]).inv
+    elif orientation == "nested_inverse":
+        # The VI link of a `theta_transform` that ends in a logit.
+        transform = ComposeTransform([transform, SigmoidTransform().inv]).inv
 
     wrapped = pickle.loads(pickle.dumps(CallableTransform(transform)))
     x = torch.ones(2)
