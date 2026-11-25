@@ -22,7 +22,11 @@ from sbi.utils.conditional_density_utils import (
     compute_corrcoeff,
     extract_and_transform_mog,
 )
-from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
+from sbi.utils.torchutils import (
+    atleast_2d_float32_tensor,
+    ensure_theta_batched,
+    infer_tensor_device,
+)
 
 
 def eval_conditional_density(
@@ -143,7 +147,7 @@ def conditional_corrcoeff(
     or `(len(subset), len(subset))` if `subset` was specified.
     """
 
-    device = density._device if hasattr(density, "_device") else "cpu"
+    device = getattr(density, "_device", None) or infer_tensor_device(density) or "cpu"
 
     condition = ensure_theta_batched(condition)
     dims = range(condition.shape[1])
