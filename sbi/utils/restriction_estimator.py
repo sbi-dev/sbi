@@ -483,12 +483,35 @@ class RestrictionEstimator:
         return converged
 
 
+class DensityThresholder:
+    r"""True for $\theta$ whose log-probability under `dist` exceeds a threshold.
+
+    Args:
+        dist: Distribution with `.log_prob()`.
+        log_prob_threshold: Log-probability above which $\theta$ is accepted.
+    """
+
+    def __init__(self, dist: Any, log_prob_threshold: float) -> None:
+        self._dist = dist
+        # A float has no device, so the comparison works wherever `dist` is.
+        self._log_prob_threshold = log_prob_threshold
+
+    def __call__(self, theta: Tensor) -> Tensor:
+        return self._dist.log_prob(theta) > self._log_prob_threshold
+
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move `dist` if it is a `Distribution` or has `to()`; return `self`."""
+        if isinstance(self._dist, Distribution) or hasattr(self._dist, "to"):
+            self._dist = move_distribution_to_device(self._dist, device)
+        return self
+
+
 def get_density_thresholder(
     dist: Any,
     quantile: float = 1e-4,
     num_samples_to_estimate_support: int = 1_000_000,
-) -> Callable:
-    """Returns function that thresholds a density at a particular `1-quantile`.
+) -> DensityThresholder:
+    r"""Returns function that thresholds a density at a particular `1-quantile`.
 
     Reference:
     Deistler et al. (2022): "Truncated proposals for scalable and hassle-free
@@ -505,7 +528,7 @@ def get_density_thresholder(
             but slower.
 
     Returns:
-        Callabe which is true for $\theta$ in the `1-quantile` high-probability region
+        Callable which is true for $\theta$ in the `1-quantile` high-probability region
         of the `dist`.
     """
     samples = dist.sample((num_samples_to_estimate_support,))
@@ -514,13 +537,7 @@ def get_density_thresholder(
     log_prob_threshold = sorted_log_probs[
         int(quantile * num_samples_to_estimate_support)
     ]
-
-    def density_thresholder(theta: Tensor) -> Tensor:
-        theta_log_probs = dist.log_prob(theta)
-        predictions = theta_log_probs > log_prob_threshold
-        return predictions.bool()
-
-    return density_thresholder
+    return DensityThresholder(dist, log_prob_threshold.item())
 
 
 class AcceptRejectFunction:
@@ -677,10 +694,10 @@ class RestrictedPrior(Distribution):
     def to(self, device: Union[str, torch.device]) -> Self:
         """Move the restricted prior to `device` in place.
 
-        Moves the prior and the posterior used for `sir`. The classifier of an
-        `AcceptRejectFunction` stays on its device and evaluates parameters from any
-        device. A user's own accept/reject callable, e.g. from
-        `get_density_thresholder()`, is not moved.
+        Moves the prior, the posterior used for `sir`, and an accept/reject callable
+        that has a `to()` method, e.g. the one from `get_density_thresholder()`. The
+        classifier of an `AcceptRejectFunction` stays on its device and evaluates
+        parameters from any device.
 
         Args:
             device: Device to move the restricted prior to.
@@ -690,10 +707,13 @@ class RestrictedPrior(Distribution):
         """
         device = process_device(device)
         self._prior = move_distribution_to_device(self._prior, device)
-        if isinstance(self._posterior, Distribution):
+        if self._posterior is not None:
             self._posterior = move_distribution_to_device(self._posterior, device)
-        elif self._posterior is not None:
-            self._posterior.to(device)
+        if hasattr(self._accept_reject_fn, "to"):
+            # A `to()` can move in place and return None, or return a moved copy.
+            moved = self._accept_reject_fn.to(device)
+            if moved is not None:
+                self._accept_reject_fn = moved
         self.acceptance_rate = move_tensors(self.acceptance_rate, device)
         # Set last: if the prior cannot move, the restricted prior keeps its device.
         self._device = device
