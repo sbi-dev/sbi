@@ -17,7 +17,10 @@ from sbi.inference.trainers.vfpe.npse import NPSE
 from sbi.neural_nets import FlowMatchingConfig, VEScoreConfig
 from sbi.neural_nets.embedding_nets import CNNEmbedding
 from sbi.neural_nets.estimators import UnconditionalDensityEstimator
-from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
+from sbi.neural_nets.estimators.shape_handling import (
+    reshape_to_batch_event,
+    reshape_to_sample_batch_event,
+)
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
 from sbi.neural_nets.net_builders import (
     build_categoricalmassestimator,
@@ -120,6 +123,11 @@ def get_batch_context(nsamples: int, condition_shape: tuple[int, ...]) -> torch.
         pytest.param((1, 2, 3), (1, 2, 3), (1, 3), False, marks=pytest.mark.xfail),
         pytest.param((1, 2, 3), (2, 1, 3), (3), False, marks=pytest.mark.xfail),
         pytest.param((1, 2, 3), (2, 1, 3), (3), True, marks=pytest.mark.xfail),
+        # Scalar event_shape = () -- regression tests for the shape[-0:] edge case
+        ((), (1, 1), (), False),
+        ((3,), (1, 3), (), False),
+        ((3,), (3, 1), (), True),
+        ((2, 3), (2, 3), (), True),
     ),
 )
 def test_shape_handling_utility_for_density_estimator(
@@ -136,6 +144,30 @@ def test_shape_handling_utility_for_density_estimator(
     assert output.shape == target_shape, (
         f"Shapes of Output ({output.shape}) and target shape ({target_shape}) do not "
         f"match."
+    )
+
+
+def test_reshape_to_batch_event_scalar_event():
+    """Regression test: reshape_to_batch_event must not crash for scalar event_shape.
+
+    Prior to the fix, `tensor.shape[-0:]` returned the full shape rather than an
+    empty slice, causing a spurious RuntimeError when event_shape == torch.Size([]).
+    This is a real scenario: likelihood_based_potential.py calls
+    ``reshape_to_batch_event(theta, event_shape=theta.shape[1:])`` and when theta
+    is 1-D (scalar parameter space) theta.shape[1:] == torch.Size([]).
+    """
+    # 1-D batch of scalars -- the common NLE/NRE scalar-parameter case
+    x_batch = torch.tensor([1.0, 2.0, 3.0])
+    result = reshape_to_batch_event(x_batch, torch.Size([]))
+    assert result.shape == torch.Size([3]), (
+        f"Expected shape (3,) for 1-D batch with scalar event, got {result.shape}"
+    )
+
+    # Single scalar -- should be wrapped into a batch of size 1
+    x_scalar = torch.tensor(2.5)
+    result = reshape_to_batch_event(x_scalar, torch.Size([]))
+    assert result.shape == torch.Size([1]), (
+        f"Expected shape (1,) for 0-D scalar with scalar event, got {result.shape}"
     )
 
 
