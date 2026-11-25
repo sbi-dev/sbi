@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from copy import deepcopy
 from math import floor
 from typing import Any, Callable, Literal, Optional, Self, Tuple, Union
@@ -446,8 +447,7 @@ class RestrictionEstimator:
             reweigh_factor=reweigh_factor,
         )
 
-        prior_device = infer_tensor_device(self._prior) or "cpu"
-        return RestrictedPrior(self._prior, accept_reject_fn, device=prior_device)
+        return RestrictedPrior(self._prior, accept_reject_fn)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         r"""
@@ -694,7 +694,7 @@ class RestrictedPrior(Distribution):
         accept_reject_fn: Callable,
         posterior: Optional[Any] = None,
         sample_with: str = "rejection",
-        device: str = "cpu",
+        device: Optional[str] = None,
     ) -> None:
         r"""Initialize the simulation-informed prior.
 
@@ -713,15 +713,38 @@ class RestrictedPrior(Distribution):
             sample_with: Either of [`rejection`|`sir`]. Sets that method that is used
                 to sample from the restricted prior. If `sir`, youu must have passed
                 a `posterior` at initialization.
-            device: Device used for sampling and evaluating.
+            device: Deprecated and ignored. The restricted prior uses the device of
+                its prior; move it with `to()`.
         """
         super().__init__(validate_args=False)
         self._prior = prior
         self._accept_reject_fn = accept_reject_fn
         self._posterior = posterior  # Only used for SIR.
         self._sample_with = sample_with
-        self._device = process_device(device)
         self.acceptance_rate = None  # Only defined for rejection sampling.
+        if device is not None:
+            warnings.warn(
+                "The `device` argument of `RestrictedPrior` is deprecated and ignored. "
+                "The restricted prior uses the device of its prior; move it with "
+                "`.to(device)`.",
+                FutureWarning,
+                stacklevel=2,
+            )
+
+    @property
+    def _device(self) -> str:
+        """Device of the prior's tensors, or the CPU for a prior without tensors."""
+        return infer_tensor_device(self._prior) or "cpu"
+
+    @property
+    def batch_shape(self) -> torch.Size:
+        """Batch shape of the prior."""
+        return getattr(self._prior, "batch_shape", torch.Size())
+
+    @property
+    def event_shape(self) -> torch.Size:
+        """Event shape of the prior."""
+        return getattr(self._prior, "event_shape", torch.Size())
 
     def to(self, device: Union[str, torch.device]) -> Self:
         """Move the restricted prior to `device` in place.
@@ -738,34 +761,30 @@ class RestrictedPrior(Distribution):
             The restricted prior itself.
         """
         device = process_device(device)
+        # First: a user callable that refuses the device leaves the prior in place.
+        self._accept_reject_fn = move_distribution_to_device(
+            self._accept_reject_fn, device
+        )
         self._prior = move_distribution_to_device(self._prior, device)
-        if self._posterior is not None:
-            self._posterior = move_distribution_to_device(self._posterior, device)
-        if hasattr(self._accept_reject_fn, "to"):
-            # A `to()` can move in place and return None, or return a moved copy.
-            moved = self._accept_reject_fn.to(device)
-            if moved is not None:
-                self._accept_reject_fn = moved
+        self._posterior = move_distribution_to_device(self._posterior, device)
         self.acceptance_rate = move_tensors(self.acceptance_rate, device)
-        # Set last: if the prior cannot move, the restricted prior keeps its device.
-        self._device = device
         return self
 
     def __setstate__(self, state: dict) -> None:
         """Set the state when being loaded from pickle.
 
-        `torch.load(..., map_location=...)` remaps the tensors but not the device
-        strings, so `_device` and the prior's device are set to where the prior's
+        `torch.load(..., map_location=...)` remaps the tensors but not a device string
+        the prior keeps, e.g. that of a `BoxUniform`, so the prior moves to where its
         tensors are. Other objects may not be restored yet, so they are not touched.
 
         Args:
             state: State to be restored.
         """
+        state.pop("_device", None)  # Stored by older versions; now read from the prior.
         self.__dict__.update(state)
         prior_device = infer_tensor_device(self._prior)
-        if prior_device is not None and prior_device != self._device:
+        if prior_device is not None:
             self._prior = move_distribution_to_device(self._prior, prior_device)
-            self._device = prior_device
 
     def sample(
         self,
