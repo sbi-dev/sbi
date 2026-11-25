@@ -450,6 +450,17 @@ def test_restricted_prior_log_prob_one_value_per_theta():
     assert samples.shape == (2, 1) and bool((samples > 0).all())
 
 
+def test_density_thresholder_keeps_quantile_of_univariate_prior():
+    """The threshold is the quantile also when log_prob returns shape (N, 1)."""
+    torch.manual_seed(0)
+    prior = torch.distributions.Normal(zeros(1), ones(1))
+    thresholder = utils.get_density_thresholder(
+        prior, quantile=0.1, num_samples_to_estimate_support=10_000
+    )
+    accepted = thresholder(prior.sample((10_000,))).float().mean()
+    assert abs(accepted - 0.9) < 0.02, f"accepted fraction {accepted:.3f}"
+
+
 def test_restricted_prior_sir_samples_truncated_prior():
     """SIR samples follow the prior truncated to the restriction."""
     torch.manual_seed(0)

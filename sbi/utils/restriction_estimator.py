@@ -484,11 +484,11 @@ class RestrictionEstimator:
 
 
 class DensityThresholder:
-    r"""True for $\theta$ whose log-probability under `dist` exceeds a threshold.
+    r"""True for $\theta$ whose log-probability under `dist` reaches a threshold.
 
     Args:
         dist: Distribution with `.log_prob()`.
-        log_prob_threshold: Log-probability above which $\theta$ is accepted.
+        log_prob_threshold: Lowest log-probability at which $\theta$ is accepted.
     """
 
     def __init__(self, dist: Any, log_prob_threshold: float) -> None:
@@ -497,12 +497,21 @@ class DensityThresholder:
         self._log_prob_threshold = log_prob_threshold
 
     def __call__(self, theta: Tensor) -> Tensor:
-        return self._dist.log_prob(theta) > self._log_prob_threshold
+        log_probs = self._dist.log_prob(theta)
+        # Inclusive, since a flat density puts every sample at the threshold, but
+        # never at zero density: float rounding can make the threshold -inf.
+        return (log_probs >= self._log_prob_threshold) & (log_probs > float("-inf"))
 
     def to(self, device: Union[str, torch.device]) -> Self:
-        """Move `dist` if it is a `Distribution` or has `to()`; return `self`."""
-        if isinstance(self._dist, Distribution) or hasattr(self._dist, "to"):
-            self._dist = move_distribution_to_device(self._dist, device)
+        """Move `dist` to `device`, if it is a `Distribution` or has `to()`.
+
+        Args:
+            device: Device to move `dist` to.
+
+        Returns:
+            The thresholder itself.
+        """
+        self._dist = move_distribution_to_device(self._dist, process_device(device))
         return self
 
 
@@ -511,7 +520,7 @@ def get_density_thresholder(
     quantile: float = 1e-4,
     num_samples_to_estimate_support: int = 1_000_000,
 ) -> DensityThresholder:
-    r"""Returns function that thresholds a density at a particular `1-quantile`.
+    r"""Return a thresholder of a density at a particular `1-quantile`.
 
     Reference:
     Deistler et al. (2022): "Truncated proposals for scalable and hassle-free
@@ -528,12 +537,14 @@ def get_density_thresholder(
             but slower.
 
     Returns:
-        Callable which is true for $\theta$ in the `1-quantile` high-probability region
-        of the `dist`.
+        `DensityThresholder`, a callable which is true for $\theta$ in the
+        `1-quantile` high-probability region of `dist`. Its `to()` moves `dist`.
 
     Raises:
-        ValueError: If `quantile` is not in [0, 1) or
-            `num_samples_to_estimate_support` is smaller than 1.
+        ValueError: If `quantile` is not in [0, 1),
+            `num_samples_to_estimate_support` is smaller than 1, `dist.log_prob()`
+            returns more than one value per sample or gives none of its own samples a
+            positive density.
     """
     if not 0.0 <= quantile < 1.0 or num_samples_to_estimate_support < 1:
         raise ValueError(
@@ -542,11 +553,23 @@ def get_density_thresholder(
         )
     samples = dist.sample((num_samples_to_estimate_support,))
     log_probs = dist.log_prob(samples)
+    if log_probs.numel() != num_samples_to_estimate_support:
+        raise ValueError(
+            "`dist.log_prob()` must return one value per sample, got shape "
+            f"{tuple(log_probs.shape)}. Wrap a batched distribution in "
+            "`torch.distributions.Independent`."
+        )
+    # A 1D distribution can return shape (N, 1), which `torch.sort` would not sort.
+    log_probs = log_probs.reshape(-1)
+    # NaN sorts last and could become the cutoff at a high quantile.
+    log_probs = log_probs[~torch.isnan(log_probs)]
+    if not (log_probs > float("-inf")).any():
+        raise ValueError(
+            "`dist.log_prob()` gives none of its own samples a positive density."
+        )
     sorted_log_probs, _ = torch.sort(log_probs)
-    log_prob_threshold = sorted_log_probs[
-        int(quantile * num_samples_to_estimate_support)
-    ]
-    return DensityThresholder(dist, log_prob_threshold.item())
+    log_prob_threshold = sorted_log_probs[int(quantile * log_probs.numel())].item()
+    return DensityThresholder(dist, log_prob_threshold)
 
 
 class AcceptRejectFunction:
