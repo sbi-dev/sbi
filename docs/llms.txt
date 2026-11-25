@@ -22,6 +22,7 @@ otherwise make up most of the output.
 - [Bayesian Workflow](https://sbi.readthedocs.io/en/latest/tutorials/01_Bayesian_workflow.html): Full workflow with diagnostics and analysis
 - [Implemented Methods](https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html): All NPE, NLE, NRE, FMPE variants with code
 - [Vector Field Methods](https://sbi.readthedocs.io/en/latest/advanced_tutorials/19_vector_field_methods.html): FMPE and NPSE — flow matching and score matching for SBI
+- [Simformer](https://sbi.readthedocs.io/en/latest/advanced_tutorials/22_simformer.html): One model for the joint of all variables; posteriors, likelihoods and any other conditional from a single training run
 
 ## How-To Guides
 
