@@ -101,7 +101,9 @@ class ConditionalEstimator(nn.Module, ABC):
                 f"be compatible with condition_shape {exp_condition_shape}."
             )
         else:
-            condition_shape = condition.shape[-len(self.condition_shape) :]
+            condition_shape = condition.shape[
+                condition.dim() - len(self.condition_shape) :
+            ]
             if condition_shape != exp_condition_shape:
                 raise ValueError(
                     f"Shape of condition {condition_shape} does not match the "
@@ -131,7 +133,7 @@ class ConditionalEstimator(nn.Module, ABC):
                 f"be compatible with the provided input_shape {exp_input_shape}."
             )
         else:
-            input_shape = input.shape[-len(self.input_shape) :]
+            input_shape = input.shape[input.dim() - len(self.input_shape) :]
             if input_shape != exp_input_shape:
                 raise ValueError(
                     f"Shape of input {input_shape} does not match the "
@@ -722,7 +724,7 @@ class UnconditionalEstimator(nn.Module, ABC):
                 f"be compatible with the provided input_shape {exp_input_shape}."
             )
         else:
-            input_shape = input.shape[-len(self.input_shape) :]
+            input_shape = input.shape[input.dim() - len(self.input_shape) :]
             if input_shape != exp_input_shape:
                 raise ValueError(
                     f"Shape of input {input_shape} does not match the "
