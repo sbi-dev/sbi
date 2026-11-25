@@ -6,7 +6,6 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 import torch
-import zuko
 from torch import nn
 
 from sbi.neural_nets import likelihood_nn
@@ -35,6 +34,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 from sbi.neural_nets.net_builders.flow import build_zuko_flow, get_base_dist
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils import BoxUniform
+from tests.test_utils import zuko_hidden_layer_widths
 
 DENSITY_MODELS = sorted(_DENSITY_CONFIGS)
 # TabPFN needs the optional dependency and a fitted regressor, so it takes part
@@ -426,23 +426,6 @@ def test_nflows_dtype_reaches_the_base_distribution(batches):
     assert estimator.net._distribution._log_z.dtype == torch.float64
 
 
-def _zuko_hidden_layer_widths(estimator: nn.Module) -> list[list[int]]:
-    """Return the hidden-layer widths of each transform's network in a Zuko flow."""
-    nets = [
-        module
-        for name, module in estimator.named_modules()
-        if name.rsplit(".", 1)[-1] == "hyper"
-    ]
-    return [
-        [
-            layer.out_features
-            for layer in net
-            if isinstance(layer, (nn.Linear, zuko.nn.Linear))
-        ][:-1]
-        for net in nets
-    ]
-
-
 @pytest.mark.parametrize(
     "hidden_features, widths", [(24, [24, 24]), ([24, 32, 16], [24, 32, 16])]
 )
@@ -459,4 +442,4 @@ def test_zuko_hidden_features_set_the_hidden_layers(
         config = ZukoMAFConfig(hidden_features=hidden_features, num_transforms=5)
         estimator = config.build(batch_input=theta, batch_condition=x)
 
-    assert _zuko_hidden_layer_widths(estimator) == [widths] * 5
+    assert zuko_hidden_layer_widths(estimator) == [widths] * 5

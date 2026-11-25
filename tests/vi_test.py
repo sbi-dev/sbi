@@ -14,6 +14,7 @@ from __future__ import annotations
 import pickle
 import warnings
 from copy import deepcopy
+from dataclasses import asdict
 
 import numpy as np
 import pytest
@@ -61,6 +62,7 @@ from sbi.utils.sbiutils import (
     within_support,
 )
 from sbi.utils.user_input_checks import process_x
+from tests.test_utils import zuko_hidden_layer_widths
 
 # Supported variational families for VI
 FLOWS = ["maf", "nsf", "naf", "unaf", "nice", "sospf", "gaussian", "gaussian_diag"]
@@ -458,6 +460,24 @@ def test_every_flow_family_pickles(q: str):
     expected = posterior._q.sample((3,))
     torch.manual_seed(0)
     assert torch.allclose(reloaded._q.sample((3,)), expected)
+
+
+@pytest.mark.parametrize(
+    "hidden_features, widths", [(24, [24, 24]), ([24] * 3, [24] * 3)]
+)
+def test_vi_hidden_features_set_the_hidden_layers(hidden_features, widths):
+    """An int gives two hidden layers; a list, as old checkpoints need, sets them."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    params = VIPosteriorParameters(
+        q="maf", num_transforms=3, hidden_features=hidden_features
+    )
+    posterior = VIPosterior(FakePotential(prior=prior), prior, **asdict(params))
+    posterior.train_amortized(
+        prior.sample((32,)), torch.randn(32, 2), max_num_iters=2, batch_size=16
+    )
+
+    assert zuko_hidden_layer_widths(posterior._q) == [widths] * 3
+    assert zuko_hidden_layer_widths(posterior._amortized_q) == [widths] * 3
 
 
 def test_vi_family_pickled_with_plain_link_attribute():
