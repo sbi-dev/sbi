@@ -388,6 +388,6 @@ def test_posterior_rejects_theta_of_another_width():
     potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
     posterior = ImportanceSamplingPosterior(potential_fn, proposal=prior)
 
-    match = r"theta has shape \(4, 1\), but the prior has 2 parameters"
+    match = r"theta has shape \(4, 1\), but the prior has 2 parameter"
     with pytest.raises(ValueError, match=match):
         posterior.potential(zeros(4, 1), x=zeros(1, 3))

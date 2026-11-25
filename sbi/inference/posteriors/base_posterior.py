@@ -334,31 +334,29 @@ class NeuralPosterior:
         """Return the `x` that methods use when they get none: the default `x`."""
         return self.default_x
 
-    def _theta_batched(self, theta: Array, prior: Optional[Any] = None) -> Tensor:
+    def _theta_batched(self, theta: Array) -> Tensor:
         """Return `theta` as a tensor with a batch dimension.
 
         Args:
             theta: Parameters.
-            prior: The prior to check `theta` against. If None, the prior of the
-                potential.
 
         Raises:
-            ValueError: If `theta` does not end in the shape of one parameter set of
-                the prior.
+            ValueError: If the last axis of `theta` does not hold one value per
+                parameter of the prior.
         """
         theta = torch.as_tensor(theta)
+        prior = getattr(self, "_prior", None)
         if prior is None:
             prior = getattr(self.potential_fn, "prior", None)
-        # A prior of one parameter can have event shape `()` and batch shape `(1,)`.
-        shape = torch.Size(
-            getattr(prior, "batch_shape", ()) + getattr(prior, "event_shape", ())
-        )
-        if shape and theta.shape[-len(shape) :] != shape:
-            raise ValueError(
-                f"theta has shape {tuple(theta.shape)}, but the prior has "
-                f"{shape.numel()} parameters: theta needs shape {tuple(shape)} or "
-                f"(batch_size, {', '.join(map(str, shape))})."
-            )
+        if isinstance(prior, Distribution):
+            # A prior of one parameter can have batch and event shape `()` or `(1,)`.
+            num_parameters = (prior.batch_shape + prior.event_shape).numel()
+            if theta.shape[-1:] != (num_parameters,):
+                raise ValueError(
+                    f"theta has shape {tuple(theta.shape)}, but the prior has "
+                    f"{num_parameters} parameter(s): theta needs shape "
+                    f"({num_parameters},) or (batch_size, {num_parameters})."
+                )
         return ensure_theta_batched(theta)
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
