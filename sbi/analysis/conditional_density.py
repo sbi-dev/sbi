@@ -131,8 +131,9 @@ def conditional_corrcoeff(
         condition: Values to condition the `density` on. If a batch of conditions is
             passed, we compute the conditional correlation matrix for each of them and
             return the average conditional correlation matrix.
-        subset: Evaluate the conditional distribution only on a subset of dimensions.
-            If `None` this function uses all dimensions.
+        subset: Evaluate the conditional distribution only on a subset of dimensions,
+            at least two distinct ones. Rows and columns of the returned matrix follow
+            the order of `subset`. If `None` this function uses all dimensions.
         resolution: Number of grid points on which the conditional distribution is
             evaluated. A higher value increases the accuracy of the estimated
             correlation but also increases the computational cost.
@@ -143,7 +144,14 @@ def conditional_corrcoeff(
 
     device = density._device if hasattr(density, "_device") else "cpu"
 
-    subset_ = subset if subset is not None else range(condition.shape[1])
+    dims = range(condition.shape[1])
+    # Indexing `dims` maps negative indices to their dimension and rejects
+    # out-of-range ones.
+    subset_ = list(dims) if subset is None else [dims[i] for i in subset]
+    if len(set(subset_)) != len(subset_) or len(subset_) < 2:
+        raise ValueError(
+            f"`subset` needs at least two distinct dimensions, got {subset_}."
+        )
 
     correlation_matrices = []
     for cond in condition:
