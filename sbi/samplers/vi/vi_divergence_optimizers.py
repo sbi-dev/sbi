@@ -690,6 +690,10 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
     NOTE: For alpha < 1 the divergence is more mass covering, for alpha > 1 the
     divergence is more mode seeking.
 
+    NOTE: For alpha > 1, a particle where the potential is -inf (outside the support)
+    makes the divergence infinite, so the step rolls back, as for the reverse KL. Use
+    alpha < 1 for such potentials.
+
     NOTE: For small alpha, you i.e. alpha=0.1 you may require to
     turn on stick_the_landing or dreg.
 
