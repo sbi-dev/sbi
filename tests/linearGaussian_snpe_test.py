@@ -773,7 +773,7 @@ def test_sample_conditional(mcmc_params_accurate: MCMCPosteriorParameters):
 
 
 def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
-    """Test whether the conditional density infered from MDN parameters of a
+    """Test whether the conditional density inferred from MDN parameters of a
     `DirectPosterior` matches analytical results for MVN. This uses a n-D joint and
     conditions on the last m values to generate a conditional.
 

@@ -28,8 +28,10 @@ from sbi.utils.sbiutils import (
     clamp_and_warn,
     gradient_ascent,
     mcmc_transform,
+    standardizing_net,
     warn_if_invalid_for_zscoring,
     z_score_parser,
+    z_standardization,
 )
 
 
@@ -441,6 +443,65 @@ def test_kde_cv_bandwidth_falls_back_for_concentrated_weights():
     assert kde.kde.bandwidth == get_kde(samples, "cv").kde.bandwidth
 
 
+@pytest.mark.parametrize("z_score", (None, "none", "independent", "structured"))
+def test_build_z_scored_embedding_net(z_score):
+    """Prepends a z-scoring layer only when asked, and never copies the net."""
+    from sbi.utils.sbiutils import build_z_scored_embedding_net, standardizing_net
+
+    batch = 3.0 + 2.0 * torch.randn(50, 4)
+    embedding_net = torch.nn.Linear(4, 2)
+
+    net = build_z_scored_embedding_net(batch, z_score, embedding_net)
+
+    if z_score in (None, "none"):
+        assert net is embedding_net
+    else:
+        assert isinstance(net, torch.nn.Sequential)
+        assert net[1] is embedding_net
+        expected = standardizing_net(batch, structured_dims=z_score == "structured")
+        torch.testing.assert_close(net[0](batch), expected(batch))
+
+
+def test_z_scored_embedding_net_old_import_paths():
+    """The classifier and restriction-estimator names keep working."""
+    from sbi.neural_nets.net_builders.classifier import (
+        build_z_scored_embedding_net as classifier_helper,
+    )
+    from sbi.utils.restriction_estimator import build_input_layer
+    from sbi.utils.sbiutils import build_z_scored_embedding_net
+
+    assert classifier_helper is build_z_scored_embedding_net
+    embedding_net = torch.nn.Identity()
+    net = build_input_layer(
+        batch_theta=torch.randn(20, 3),
+        z_score_theta="none",
+        embedding_net_theta=embedding_net,
+    )
+    assert net is embedding_net
+
+
+@pytest.mark.parametrize(
+    "builder_name",
+    ["build_maf", "build_zuko_maf", "build_mdn", "build_mlp_classifier"],
+)
+def test_transform_to_unconstrained_raises_for_the_condition(builder_name):
+    """The condition has no distribution to derive the transform from, so the
+    builders raise instead of building without it."""
+    from sbi.neural_nets import net_builders
+
+    build = getattr(net_builders, builder_name)
+    theta, x = torch.rand(20, 3), torch.rand(20, 2)
+    with pytest.raises(ValueError, match="transform_to_unconstrained"):
+        build(theta, x, z_score_y="transform_to_unconstrained")
+
+
+def test_restriction_estimator_input_rejects_transform_to_unconstrained():
+    from sbi.utils.restriction_estimator import build_input_layer
+
+    with pytest.raises(ValueError, match="transform_to_unconstrained"):
+        build_input_layer(torch.randn(20, 3), "transform_to_unconstrained")
+
+
 @pytest.mark.parametrize(
     "z_x",
     [
@@ -631,6 +692,19 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     # plt.plot(x_zstructured.T)
     # plt.title('z-scored: structured dims');
     # plt.show()
+
+
+@pytest.mark.parametrize("event_shape", [(1, 6, 6), (3, 6, 6), (2, 18)])
+def test_structured_z_scoring_uses_all_event_dims(event_shape):
+    """Structured std is the per-sample std over the whole event, whatever its shape."""
+    batch = torch.randn(50, *event_shape) * 3.0 + 1.0
+    expected_std = batch.flatten(start_dim=1).std(dim=1).mean()
+
+    _, t_std = z_standardization(batch, structured_dims=True)
+    z_net = standardizing_net(batch, structured_dims=True)
+
+    assert torch.allclose(t_std, expected_std)
+    assert torch.allclose(z_net._std, expected_std)
 
 
 @pytest.mark.parametrize(

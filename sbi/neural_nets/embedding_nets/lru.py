@@ -342,7 +342,7 @@ class LRU(nn.Module):
                 f"expected {expected_state_shape}"  # fmt: skip
             )
 
-        # Detemine which mode to run the forward method with.
+        # Determine which mode to run the forward method with.
         mode = mode or self.mode
         match mode:
             case "scan":
@@ -393,7 +393,7 @@ class LRU(nn.Module):
             x.append(x_t)
         x = torch.stack(x, dim=1)
 
-        # Reverse the temporal oder of the 2nd block, i.e., 2nd direction.
+        # Reverse the temporal order of the 2nd block, i.e., 2nd direction.
         if self.bidirectional:
             x = torch.cat(
                 [
