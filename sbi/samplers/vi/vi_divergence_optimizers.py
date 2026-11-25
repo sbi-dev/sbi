@@ -145,11 +145,11 @@ class DivergenceOptimizer(ABC):
         self.state_dict = [para.data.clone() for para in self.q.parameters()]
 
         # Init optimizer and scheduler with correct arguments
-        self._opt_kwargs = filter_kwargs_for_func(optimizer.__init__, kwargs)
+        opt_kwargs = filter_kwargs_for_func(optimizer.__init__, kwargs)
         kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
         scheduler_kwargs = filter_kwargs_for_func(scheduler.__init__, kwargs)
 
-        self._optimizer = optimizer(self.q.parameters(), **self._opt_kwargs)
+        self._optimizer = optimizer(self.q.parameters(), **opt_kwargs)
         self._scheduler = scheduler(self._optimizer, **scheduler_kwargs)
         # Loss and summary
         self.eps = eps
@@ -238,10 +238,8 @@ class DivergenceOptimizer(ABC):
         """
         for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             para.data = state_para.data.clone().to(para.device)
-        scheduled_lrs = [group["lr"] for group in self._optimizer.param_groups]
-        self._optimizer.__init__(self.q.parameters(), **self._opt_kwargs)
-        for group, lr in zip(self._optimizer.param_groups, scheduled_lrs, strict=True):
-            group["lr"] = lr
+        # Settings in `param_groups` stay, including those a scheduler changes.
+        self._optimizer.state.clear()
         self.warm_up(warm_up_rounds)
 
     def loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
@@ -281,9 +279,10 @@ class DivergenceOptimizer(ABC):
             self._optimizer.step()
             self.update_loss_stats(loss.cpu())
         self._scheduler.step()
-        # Counted apart from num_step, which skips non-finite losses.
+        # Counted apart from num_step, which skips non-finite losses and restarts on a
+        # rollback. A rolled-back q is no snapshot.
         self._num_updates += 1
-        if (self._num_updates % 50) == 0:
+        if not rolled_back and (self._num_updates % 50) == 0:
             self.update_state()
 
     def converged(self, considered_values: int = 50) -> bool:
@@ -395,11 +394,11 @@ class DivergenceOptimizer(ABC):
             sched_type = type(self._scheduler)
 
         kwargs["lr"] = self.learning_rate
-        self._opt_kwargs = filter_kwargs_for_func(opt_type.__init__, kwargs)
+        opt_kwargs = filter_kwargs_for_func(opt_type.__init__, kwargs)
         kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
         scheduler_kwargs = filter_kwargs_for_func(sched_type.__init__, kwargs)
 
-        self._optimizer = opt_type(self.q.parameters(), **self._opt_kwargs)
+        self._optimizer = opt_type(self.q.parameters(), **opt_kwargs)
         self._scheduler = sched_type(self._optimizer, **scheduler_kwargs)
 
 
@@ -694,8 +693,8 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
     NOTE: For alpha < 1 the divergence is more mass covering, for alpha > 1 the
     divergence is more mode seeking.
 
-    NOTE: For alpha > 1, a particle where the potential is -inf (outside the support)
-    makes the divergence infinite, so the step rolls back, as for the reverse KL. Use
+    NOTE: For alpha >= 1, a particle where the potential is -inf (outside the support)
+    makes the alpha loss nan, so the step rolls back, as for the reverse KL. Use
     alpha < 1 for such potentials.
 
     NOTE: For small alpha, you i.e. alpha=0.1 you may require to
@@ -786,7 +785,7 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             elbo_particles.clone().detach()
         )
         # Outside the support, the weight is 0: 0 * log 0 = 0, not 0 * -inf = nan.
-        # For alpha > 1 it is nan there, so the step rolls back.
+        # For alpha >= 1 it is nan there, so the step rolls back.
         outside = (weights == 0) & torch.isneginf(elbo_particles.detach())
         elbo_particles_masked = torch.where(outside, 0.0, elbo_particles)
         surrogate_loss = -torch.mean(weights * elbo_particles_masked)

@@ -959,8 +959,8 @@ def test_non_finite_losses_are_left_out_of_loss_stats():
 def test_rolled_back_step_does_not_end_training(monkeypatch, surrogate: str):
     """A non-finite gradient loss, or a finite one with nan gradients (as from a
     potential `log(density * mask)`), rolls q back and warms it up towards the prior.
-    The step makes no update with those gradients, restarts the loss statistics and
-    still counts towards the snapshot schedule."""
+    The step makes no update with those gradients, restarts the loss statistics, and
+    counts towards the snapshot schedule without a snapshot of the rolled-back q."""
     optimizer = _optimizer_after_losses([2.0] * 60)
     assert optimizer.converged()
 
@@ -979,13 +979,14 @@ def test_rolled_back_step_does_not_end_training(monkeypatch, surrogate: str):
 
     monkeypatch.setattr(optimizer, "resolve_state", record_recovery)
     optimizer._num_updates = 49  # this step is due for a snapshot
+    snapshot = [p.clone() for p in optimizer.state_dict]
     optimizer.step(zeros(1))
-    assert not optimizer.converged()
     assert optimizer.num_step == 0
-    params = zip(optimizer.q.parameters(), recovered, optimizer.state_dict, strict=True)
-    for p, p_recovered, p_snapshot in params:
+    assert optimizer._num_updates == 50
+    for p, p_recovered in zip(optimizer.q.parameters(), recovered, strict=True):
         assert torch.equal(p, p_recovered)
-        assert torch.equal(p, p_snapshot)
+    for p_snapshot, p_before in zip(optimizer.state_dict, snapshot, strict=True):
+        assert torch.equal(p_snapshot, p_before)
 
 
 @pytest.mark.parametrize(
@@ -1039,8 +1040,8 @@ def test_iw_and_alpha_losses_leave_out_particles_outside_the_support(
 
 
 def test_rollback_keeps_the_optimizer_settings(monkeypatch):
-    """Recovery resets the optimizer's state, not its configured settings or the
-    learning rate the scheduler has reached."""
+    """Recovery resets the optimizer's state, not its settings, including those a
+    scheduler has changed."""
     prior = MultivariateNormal(zeros(1), eye(1))
     optimizer = ForwardKLOptimizer(
         potential_fn=FakePotential(prior=prior),
@@ -1053,11 +1054,16 @@ def test_rollback_keeps_the_optimizer_settings(monkeypatch):
         gamma=0.999,
     )
     monkeypatch.setattr(optimizer, "warm_up", lambda num_steps: None)
-    optimizer._optimizer.param_groups[0]["lr"] = 1e-4  # as decayed by the scheduler
+    for p in optimizer.q.parameters():
+        p.grad = torch.ones_like(p)
+    optimizer._optimizer.step()  # fills the momentum buffers
+    settings = optimizer._optimizer.param_groups[0]
+    settings.update(lr=1e-4, momentum=0.5)  # as a scheduler may set them
     optimizer.resolve_state()
     settings = optimizer._optimizer.param_groups[0]
-    assert (settings["momentum"], settings["weight_decay"]) == (0.9, 0.1)
-    assert settings["lr"] == 1e-4
+    kept = [settings[key] for key in ("lr", "momentum", "weight_decay")]
+    assert kept == [1e-4, 0.5, 0.1]
+    assert not optimizer._optimizer.state
 
 
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
