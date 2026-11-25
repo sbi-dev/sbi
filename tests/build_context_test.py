@@ -16,7 +16,10 @@ from sbi.neural_nets._build_context import (
     ZScoreStats,
     compute_z_score_stats,
 )
-from sbi.neural_nets.estimators.base import ConditionalEstimatorBuildFn
+from sbi.neural_nets.estimators.base import (
+    ConditionalEstimator,
+    ConditionalEstimatorBuildFn,
+)
 
 
 def test_zscore_config_defaults():
@@ -142,3 +145,18 @@ def test_deprecated_alias_works_with_future_warning():
         from sbi.neural_nets.estimators.base import ConditionalEstimatorBuilder
 
     assert ConditionalEstimatorBuilder is ConditionalEstimatorBuildFn
+
+
+class EmptyShapeEstimator(ConditionalEstimator):
+    def __init__(self):
+        super().__init__(input_shape=(), condition_shape=())
+
+    def loss(self, input, condition, **kwargs):
+        return torch.zeros(input.shape[0])
+
+
+def test_conditional_estimator_accepts_empty_event_shapes():
+    estimator = EmptyShapeEstimator()
+
+    estimator._check_input_shape(torch.randn(3))
+    estimator._check_condition_shape(torch.randn(3))

@@ -805,6 +805,15 @@ class VIPosterior(NeuralPosterior):
             self._check_condition_shape(x)
             theta = self._theta_batched(theta).to(self._device)
             *sample_shape, num_observations, theta_dim = theta.shape
+            expected_theta_dim = torch.Size(
+                self._prior.batch_shape + self._prior.event_shape
+            ).numel()
+
+            if theta_dim != expected_theta_dim:
+                raise ValueError(
+                    f"theta dimension {theta_dim} does not match prior dimension "
+                    f"{expected_theta_dim}."
+                )
             if num_observations not in (1, x.shape[0]):
                 raise ValueError(
                     f"theta holds {num_observations} observations along its "
