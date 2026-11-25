@@ -456,11 +456,11 @@ class VIPosteriorParameters(PosteriorParameters):
 
         if self.num_transforms < 1:
             raise ValueError(f"num_transforms must be >= 1, got {self.num_transforms}")
-        widths = (
-            [self.hidden_features]
-            if isinstance(self.hidden_features, int)
-            else self.hidden_features
-        )
+        if isinstance(self.hidden_features, Sequence):
+            widths = self.hidden_features
+        else:
+            object.__setattr__(self, "hidden_features", int(self.hidden_features))
+            widths = [self.hidden_features]
         if any(width < 1 for width in widths):
             raise ValueError(
                 f"hidden_features must be >= 1, got {self.hidden_features}"
