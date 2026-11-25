@@ -154,7 +154,12 @@ class ConditionalEstimator(nn.Module, ABC):
             input: Expanded to `(sample_dim, batch_dim, *input_event_shape)`.
             condition: Expanded to `(sample_dim, batch_dim, *condition_event_shape)`.
             batch_dim: The broadcast batch dimension.
+
+        Raises:
+            ValueError: If `input` or `condition` does not end in its event shape.
         """
+        self._check_input_shape(input)
+        self._check_condition_shape(condition)
         input_event_dims = len(self.input_shape)
         condition_event_dims = len(self.condition_shape)
 
