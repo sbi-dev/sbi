@@ -802,7 +802,11 @@ class RestrictedPrior(Distribution):
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-                alternative_method="sample_with='sir'",
+                # SIR needs a posterior; `sample()` has no time limit or bypass.
+                alternative_method=(
+                    "sample_with='sir'" if self._posterior is not None else None
+                ),
+                suggest_sampling_options=False,
             )
             # NOTE: This currently requires a float acceptance rate. A previous version
             # of accept_reject_sample returned a float. In favour to batched sampling
