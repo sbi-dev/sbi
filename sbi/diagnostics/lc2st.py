@@ -616,8 +616,10 @@ class LC2ST:
         Returns:
             self, for method chaining.
         """
-        # Set random state
-        if seed is not None:
+        # skorch takes no `random_state`: seed the CPU torch and numpy generators it
+        # draws from instead, for this training only.
+        seed_skorch = seed is not None and self.clf_class is NeuralNetBinaryClassifier
+        if seed is not None and not seed_skorch:
             if "random_state" in self.clf_kwargs:
                 warnings.warn(
                     "Overwriting 'random_state' in classifier_kwargs because "
@@ -628,9 +630,18 @@ class LC2ST:
             self.clf_kwargs["random_state"] = seed
 
         # Train the classifier
-        trained_clfs = self._train(
-            self.theta_p, self.theta_q, self.x_p, self.x_q, verbosity=verbosity
-        )
+        np_state = np.random.get_state()
+        with torch.random.fork_rng(devices=[], enabled=seed_skorch):
+            if seed_skorch:
+                torch.default_generator.manual_seed(seed)  # type: ignore[arg-type]
+                np.random.seed(seed)
+            try:
+                trained_clfs = self._train(
+                    self.theta_p, self.theta_q, self.x_p, self.x_q, verbosity=verbosity
+                )
+            finally:
+                if seed_skorch:
+                    np.random.set_state(np_state)
         self.trained_clfs = trained_clfs
 
         # Update state: preserve READY (re-training is a valid workflow, e.g.
