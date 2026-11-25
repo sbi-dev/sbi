@@ -140,10 +140,10 @@ class NPE_B(PosteriorEstimatorTrainer):
         # Evaluate prior
         # we accept prior log prob to be -Inf at theta
         # meaning that theta is out of the prior range (the weight is thus 0)
+        log_prior = self._prior.log_prob(theta)
         utils.assert_not_nan_or_plus_inf(
-            self._prior.log_prob(theta), "prior log probs of proposal samples"
+            log_prior, "prior log probs of proposal samples"
         )
-        prior = torch.exp(self._prior.log_prob(theta))
 
         # Evaluate proposal
         # (the training set is a mixture of the proposals of the appends it uses,
@@ -173,11 +173,10 @@ class NPE_B(PosteriorEstimatorTrainer):
             )
 
         log_proposal = torch.logsumexp(log_prop + log_previous_proposals, dim=1)
-        proposal = torch.exp(log_proposal)
 
-        # Construct the importance weights and normalize them
-        importance_weights = prior / proposal
-        importance_weights /= importance_weights.sum()
+        # Normalized importance weights, in log space: exp() of a log prob underflows
+        # to 0 in float32 for high-dimensional theta
+        importance_weights = torch.softmax(log_prior - log_proposal, dim=0)
 
         theta = reshape_to_sample_batch_event(theta, theta.shape[1:])
         # Reshape the density estimator log probs
