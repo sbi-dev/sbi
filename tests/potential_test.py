@@ -222,6 +222,36 @@ def test_bind_preserves_estimator(potential_type: str):
     assert bound.x_o is not None
 
 
+def test_vector_field_bind_preserves_iid_params():
+    """bind() without iid_params keeps the constructor-configured dict.
+
+    `VectorFieldPosterior.sample()` rebinds the potential with `iid_params=None`,
+    so dropping the configured dict there silently changes the iid score.
+    """
+    prior = BoxUniform(zeros(2), ones(2))
+    theta = prior.sample((20,))
+    iid_params = {"prior_score_weight": lambda t: torch.ones_like(t)}
+    potential = VectorFieldBasedPotential(
+        posterior_score_nn()(theta, torch.randn(20, 2)),
+        prior,
+        iid_method="fnpe",
+        iid_params=iid_params,
+    )
+    x_o = torch.randn(2, 2)
+
+    bound = potential.bind(x_o, x_is_iid=True)
+    assert bound.iid_method == "fnpe"
+    assert bound.iid_params is iid_params
+
+    # Repeated binds during sampling must keep the configured parameters too.
+    assert bound.bind(x_o, x_is_iid=True).iid_params is iid_params
+
+    # An explicitly passed dict still overrides the configured one.
+    override = {"prior_score_weight": lambda t: torch.zeros_like(t)}
+    explicitly_bound = potential.bind(x_o, x_is_iid=True, iid_params=override)
+    assert explicitly_bound.iid_params is override
+
+
 def test_vector_field_potential_marginalizes_1d_prior_exactly():
     """A processed 1-D prior keeps the exact marginal, not a Gaussian mixture fit."""
     prior, _, _ = process_prior(Normal(zeros(1), ones(1)))
