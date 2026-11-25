@@ -86,8 +86,8 @@ def c2st(
     std is set to 1 to avoid division by zero.
 
     Args:
-        X: Samples from one distribution.
-        Y: Samples from another distribution.
+        X: Samples from one distribution of shape (m, d) or (m,).
+        Y: Samples from another distribution of shape (n, d) or (n,).
         seed: Seed for the sklearn classifier and the KFold cross-validation.
         n_folds: Number of folds to use.
         metric: sklearn compliant metric to use for the scoring parameter of
@@ -122,6 +122,22 @@ def c2st(
         https://scikit-learn.org/stable/modules/cross_validation.html [4]:
         https://github.com/psteinb/c2st/
     """
+
+    if X.ndim == 1:
+        X = X.unsqueeze(1)
+    if Y.ndim == 1:
+        Y = Y.unsqueeze(1)
+    if X.ndim != 2 or Y.ndim != 2:
+        raise ValueError(
+            f"c2st expects 1D or 2D inputs, got X with shape {tuple(X.shape)} "
+            f"and Y with shape {tuple(Y.shape)}."
+        )
+    if X.shape[-1] != Y.shape[-1]:
+        raise ValueError(
+            f"Feature dimensions of X ({X.shape[-1]}) and Y ({Y.shape[-1]}) must match."
+        )
+    if X.device != Y.device:
+        Y = Y.to(X.device)
 
     # the default configuration
     if classifier == "rf":
@@ -201,8 +217,8 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     implementation only features a Gaussian kernel with lengthscale `scale`.
 
     Args:
-        x: Data of shape (m, d)
-        y: Data of shape (n, d)
+        x: Data of shape (m, d) or (m,)
+        y: Data of shape (n, d) or (n,)
         scale: Lengthscale of the exponential kernel. If not specified,
             the lengthscale is chosen based on a median heuristic.
 
@@ -212,6 +228,22 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     References:
         [1] Gretton, A., et al. (2012). A kernel two-sample test.
     """
+    if x.ndim == 1:
+        x = x.unsqueeze(1)
+    if y.ndim == 1:
+        y = y.unsqueeze(1)
+    if x.ndim != 2 or y.ndim != 2:
+        raise ValueError(
+            f"unbiased_mmd_squared expects 1D or 2D inputs, got x with shape "
+            f"{tuple(x.shape)} and y with shape {tuple(y.shape)}."
+        )
+    if x.shape[-1] != y.shape[-1]:
+        raise ValueError(
+            f"Feature dimensions of x ({x.shape[-1]}) and y ({y.shape[-1]}) must match."
+        )
+    if x.device != y.device:
+        y = y.to(x.device)
+
     nx, ny = x.shape[0], y.shape[0]
     assert nx != 1 and ny != 1, (
         "The unbiased MMD estimator is not defined "
@@ -223,7 +255,11 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
             return torch.sum((a[None, ...] - b[:, None, :]) ** 2, dim=-1).reshape(-1)
         else:
             m, n = a.shape[0], b.shape[0]
-            ix = torch.tril_indices(m, n, offset=-1)
+            if a.device.type == "mps":
+                # PyTorch registers no MPS kernel for tril_indices.
+                ix = torch.tril_indices(m, n, offset=-1).to(a.device)
+            else:
+                ix = torch.tril_indices(m, n, offset=-1, device=a.device)
             return torch.sum(
                 (a[None, ...] - b[:, None, :]) ** 2, dim=-1, keepdim=False
             )[ix[0, :], ix[1, :]].reshape(-1)
@@ -256,8 +292,8 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     implementation only features a Gaussian kernel with lengthscale `scale`.
 
     Args:
-        x: Data of shape (m, d)
-        y: Data of shape (n, d)
+        x: Data of shape (m, d) or (m,)
+        y: Data of shape (n, d) or (n,)
         scale: Lengthscale of the exponential kernel. If not specified,
             the lengthscale is chosen based on a median heuristic.
 
@@ -267,6 +303,22 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     References:
         [1] Gretton, A., et al. (2012). A kernel two-sample test.
     """
+    if x.ndim == 1:
+        x = x.unsqueeze(1)
+    if y.ndim == 1:
+        y = y.unsqueeze(1)
+    if x.ndim != 2 or y.ndim != 2:
+        raise ValueError(
+            f"biased_mmd expects 1D or 2D inputs, got x with shape "
+            f"{tuple(x.shape)} and y with shape {tuple(y.shape)}."
+        )
+    if x.shape[-1] != y.shape[-1]:
+        raise ValueError(
+            f"Feature dimensions of x ({x.shape[-1]}) and y ({y.shape[-1]}) must match."
+        )
+    if x.device != y.device:
+        y = y.to(x.device)
+
     nx, ny = x.shape[0], y.shape[0]
 
     def f(a, b):
@@ -323,8 +375,8 @@ def wasserstein_2_squared(
     'relative_epsilon' to 0, the squared Wasserstein-2 distance is recovered.
 
     Args:
-        x: Data of shape (B, m, d) or (m, d)
-        y: Data of shape (B, n, d) or (n, d)
+        x: Data of shape (B, m, d), (m, d), or (m,)
+        y: Data of shape (B, n, d), (n, d), or (n,)
         relative_epsilon: Entropic regularization, relative to the mean squared
             distance between the points of x and y. See `regularized_ot_dual`.
         max_iter: Maximum number of Sinkhorn iterations. See `regularized_ot_dual`.
@@ -337,9 +389,21 @@ def wasserstein_2_squared(
         [1] Peyré, G., & Cuturi, M. (2019). Computational optimal transport:
             With applications to data science.
     """
-    assert x.ndim == y.ndim, (
-        "Please make sure that 'x' and 'y' are both either batched or not."
-    )
+    if x.device != y.device:
+        y = y.to(x.device)
+    if x.ndim == 1:
+        x = x.unsqueeze(1)
+    if y.ndim == 1:
+        y = y.unsqueeze(1)
+    if x.ndim != y.ndim:
+        raise ValueError(
+            "Please make sure that 'x' and 'y' have the same number of dimensions, "
+            f"got x.ndim={x.ndim} and y.ndim={y.ndim}."
+        )
+    if x.shape[-1] != y.shape[-1]:
+        raise ValueError(
+            f"Feature dimensions of x ({x.shape[-1]}) and y ({y.shape[-1]}) must match."
+        )
     if x.ndim == 2:
         nx, ny = x.shape[0], y.shape[0]
         a = torch.ones(nx, dtype=x.dtype, device=x.device) / nx
@@ -351,8 +415,8 @@ def wasserstein_2_squared(
         b = torch.ones((batch_size, ny), dtype=x.dtype, device=x.device) / ny
     else:
         raise ValueError(
-            "This implementation of Wasserstein is only implemented, "
-            "if x.ndim=2 or x.ndim=3."
+            "This implementation of Wasserstein is only implemented "
+            "if x.ndim=1, x.ndim=2 or x.ndim=3."
         )
 
     # Evaluate the cost matrix based on the default l2 cost
@@ -408,6 +472,11 @@ def regularized_ot_dual(
         "Please make sure that 'a' and 'b' are both either batched or not, "
         f"currently a.ndim={a.ndim} and b.ndim={b.ndim}"
     )
+
+    if a.device != b.device:
+        b = b.to(a.device)
+    if cost.device != a.device:
+        cost = cost.to(a.device)
 
     batched = True
     if a.ndim == 1 and b.ndim == 1:
@@ -476,9 +545,9 @@ def posterior_shrinkage(
 
     Parameters
     ----------
-    prior_samples : array_like or torch.Tensor [n_samples, n_params]
+    prior_samples : array_like or torch.Tensor [n_samples, n_params] or [n_samples]
         Samples from the prior distribution.
-    post_samples : array-like or torch.Tensor [n_samples, n_params]
+    post_samples : array-like or torch.Tensor [n_samples, n_params] or [n_samples]
         Samples from the posterior distribution.
 
     Returns
@@ -491,14 +560,30 @@ def posterior_shrinkage(
         raise ValueError("Input samples are empty")
 
     if not isinstance(prior_samples, torch.Tensor):
-        prior_samples = torch.tensor(prior_samples, dtype=torch.float32)
+        prior_samples = torch.as_tensor(prior_samples, dtype=torch.float32)
     if not isinstance(post_samples, torch.Tensor):
-        post_samples = torch.tensor(post_samples, dtype=torch.float32)
+        post_samples = torch.as_tensor(post_samples, dtype=torch.float32)
 
     if prior_samples.ndim == 1:
         prior_samples = prior_samples[:, None]
     if post_samples.ndim == 1:
         post_samples = post_samples[:, None]
+
+    if prior_samples.ndim != 2 or post_samples.ndim != 2:
+        raise ValueError(
+            "posterior_shrinkage expects 1D or 2D inputs, got prior_samples with shape "
+            f"{tuple(prior_samples.shape)} and post_samples with shape "
+            f"{tuple(post_samples.shape)}."
+        )
+
+    if prior_samples.shape[1] != post_samples.shape[1]:
+        raise ValueError(
+            f"Parameter dimensions of prior_samples ({prior_samples.shape[1]}) and "
+            f"post_samples ({post_samples.shape[1]}) must match."
+        )
+
+    if prior_samples.device != post_samples.device:
+        post_samples = post_samples.to(prior_samples.device)
 
     prior_std = torch.std(prior_samples, dim=0)
     post_std = torch.std(post_samples, dim=0)
@@ -560,6 +645,8 @@ def l2(x: Tensor, y: Tensor, axis: int = -1) -> Tensor:
         Tensor: A tensor containing the L2 distance between x and y along the
             specified axis.
     """
+    if x.device != y.device:
+        y = y.to(x.device)
     return torch.sqrt(torch.sum((x - y) ** 2, dim=axis))
 
 
@@ -577,6 +664,8 @@ def l1(x: Tensor, y: Tensor, axis: int = -1) -> Tensor:
         Tensor: A tensor containing the L1 distance between x and y along the
             specified axis.
     """
+    if x.device != y.device:
+        y = y.to(x.device)
     return torch.sum(torch.abs(x - y), dim=axis)
 
 
@@ -656,6 +745,8 @@ class Distance:
         else:
             assert x.ndim >= 2, "simulated data needs batch dimension"
         if self.batch_size == -1:
+            if x_o.device != x.device:
+                x = x.to(x_o.device)
             return self.distance_fn(x_o, x)
         else:
             return self._batched_distance(x_o, x)
@@ -671,7 +762,10 @@ class Distance:
             x: Simulated data
         """
         return torch.cat([
-            self.distance_fn(x_o, x_batch).reshape(x_batch.shape[0])
+            self.distance_fn(
+                x_o,
+                x_batch.to(x_o.device) if x_o.device != x_batch.device else x_batch,
+            ).reshape(x_batch.shape[0])
             for x_batch in x.split(self.batch_size)
         ])
 
@@ -690,6 +784,8 @@ def mse_distance(x_o: Tensor, x: Tensor) -> Tensor:
     Returns:
         The MSE distance.
     """
+    if x_o.device != x.device:
+        x = x.to(x_o.device)
     return torch.mean((x_o - x) ** 2, dim=-1)
 
 
