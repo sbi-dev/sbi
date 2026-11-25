@@ -1364,9 +1364,10 @@ class MaskedVectorFieldTrainer(
             context.force_first_round_loss or context.resume_training
         ):
             raise ValueError(
-                "This network has already been trained. To continue training on "
-                "the appended simulations, call `.train(force_first_round_loss=True)` "
-                "or `.train(resume_training=True)`, or create a new trainer."
+                "This network has already been trained. To train on appended "
+                "simulations, call `.train(force_first_round_loss=True)`. To continue "
+                "training on the same simulations, call "
+                "`.train(resume_training=True)`. Or create a new trainer."
             )
         return 0
 
