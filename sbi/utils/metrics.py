@@ -203,10 +203,15 @@ def _mmd_lengthscale(
     The median is floored at 1e-8: it is zero when most samples are identical, as
     in discrete data, and the floor then gives a kernel that is 1 for identical
     samples and 0 otherwise, instead of NaN.
+
+    Raises:
+        ValueError: If `scale` is zero or negative.
     """
     if scale is None:
-        distances = torch.sqrt(torch.cat(squared_distances))
-        return torch.clamp(torch.median(distances), min=1e-8)
+        # Square root after the median: its gradient is inf at a zero distance, and
+        # NaN once the median multiplies it by zero.
+        median = torch.median(torch.cat(squared_distances))
+        return torch.sqrt(torch.clamp(median, min=1e-16))
     if scale <= 0:
         raise ValueError(f"scale must be positive, got {scale}.")
     return scale
