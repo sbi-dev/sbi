@@ -35,6 +35,10 @@ class NPE_B(PosteriorEstimatorTrainer):
     For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
     plain NLL loss.
 
+    In multi-round inference, invalid simulations that the first round discards make
+    the posterior somewhat too wide. To avoid this, pass `discard_prior_samples=True`
+    to `train()` in later rounds.
+
     [1] *Flexible statistical inference for mechanistic models of neural
         dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017.
         https://arxiv.org/abs/1711.01861
