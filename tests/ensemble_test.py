@@ -390,6 +390,15 @@ def test_ensemble_weights_length_and_value_validation():
     with pytest.raises(ValueError, match="must be non-negative and sum to a positive"):
         EnsemblePosterior(posteriors, weights=[0.0, 0.0])
 
+    # Preserve float64 precision through validation and normalization
+    weights_small = torch.tensor([1e-100, 1e-100], dtype=torch.float64)
+    ens_small = EnsemblePosterior(posteriors, weights=weights_small)
+    assert torch.allclose(ens_small.weights, torch.tensor([0.5, 0.5]))
+
+    weights_large = torch.tensor([1e200, 1e200], dtype=torch.float64)
+    ens_large = EnsemblePosterior(posteriors, weights=weights_large)
+    assert torch.allclose(ens_large.weights, torch.tensor([0.5, 0.5]))
+
 
 class _MultiDimEventPosterior(TractablePosterior):
     def __init__(self, event_shape=(2, 3)):
@@ -545,6 +554,16 @@ def test_ensemble_zero_samples_mcmc_restricted_prior(method: str):
         prior=prior,
         accept_reject_fn=lambda th: torch.ones(len(th), dtype=torch.bool),
     )
+    # Spy on proposal sampling to verify zero-sample calls do not draw proposal samples
+    proposal_sample_calls = []
+    orig_rp_sample = rp.sample
+
+    def spy_rp_sample(*args, **kwargs):
+        proposal_sample_calls.append((args, kwargs))
+        return orig_rp_sample(*args, **kwargs)
+
+    rp.sample = spy_rp_sample
+
     posteriors = [MCMCPosterior(_DummyPotential(), proposal=rp) for _ in range(2)]
     ensemble = EnsemblePosterior(posteriors)
     ensemble.set_default_x(zeros(1, 3))
@@ -560,3 +579,7 @@ def test_ensemble_zero_samples_mcmc_restricted_prior(method: str):
         assert samples.shape == (0, 5, 3)
         samples_2d = ensemble.sample_batched((0, 2), x=zeros(5, 3))
         assert samples_2d.shape == (0, 2, 5, 3)
+
+    # Verify that zero-sample requests do not initialize samplers or
+    # draw proposal candidates
+    assert len(proposal_sample_calls) == 0

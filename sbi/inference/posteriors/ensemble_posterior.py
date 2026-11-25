@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import List, Optional, Self, Tuple, Union
+from typing import Any, List, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -248,7 +248,9 @@ class EnsemblePosterior(NeuralPosterior):
                 (self.num_components,), 1.0 / self.num_components
             )
         elif isinstance(weights, (Tensor, List)):
-            weights_tensor = torch.as_tensor(weights, dtype=torch.float32)
+            weights_tensor = torch.as_tensor(weights)
+            if not weights_tensor.is_floating_point():
+                weights_tensor = weights_tensor.to(dtype=torch.float32)
             if weights_tensor.ndim != 1:
                 raise ValueError(
                     f"Weights must be 1D, got {weights_tensor.ndim}D tensor."
@@ -262,7 +264,8 @@ class EnsemblePosterior(NeuralPosterior):
                 raise ValueError(
                     "Weights must be non-negative and sum to a positive value."
                 )
-            self._weights = weights_tensor / weights_tensor.sum()
+            normalized = weights_tensor / weights_tensor.sum()
+            self._weights = normalized.to(dtype=torch.float32)
         else:
             raise TypeError
         self._weights = self._weights.to(self.device)
@@ -306,20 +309,7 @@ class EnsemblePosterior(NeuralPosterior):
         sample_shape = torch.Size(sample_shape)
         num_samples = sample_shape.numel()
         if num_samples == 0:
-            try:
-                empty = self.posteriors[0].sample(
-                    torch.Size((0,)),
-                    x=x,
-                    **dict(kwargs, show_progress_bars=False),
-                )
-                return empty.reshape(sample_shape + empty.shape[1:])
-            except Exception:
-                pass
-            try:
-                empty = self.posteriors[0].sample(torch.Size((0,)), x=x, **kwargs)
-                return empty.reshape(sample_shape + empty.shape[1:])
-            except Exception:
-                return self._empty_sample(sample_shape)
+            return self._empty_sample(sample_shape)
 
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -346,22 +336,7 @@ class EnsemblePosterior(NeuralPosterior):
         sample_shape = torch.Size(sample_shape)
         num_samples = sample_shape.numel()
         if num_samples == 0:
-            try:
-                empty = self.posteriors[0].sample_batched(
-                    torch.Size((0,)),
-                    x=x,
-                    **dict(kwargs, show_progress_bars=False),
-                )
-                return empty.reshape(sample_shape + empty.shape[1:])
-            except Exception:
-                pass
-            try:
-                empty = self.posteriors[0].sample_batched(
-                    torch.Size((0,)), x=x, **kwargs
-                )
-                return empty.reshape(sample_shape + empty.shape[1:])
-            except Exception:
-                return self._empty_sample_batched(sample_shape, x.shape[0])
+            return self._empty_sample_batched(sample_shape, x.shape[0])
 
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -380,15 +355,27 @@ class EnsemblePosterior(NeuralPosterior):
         return samples.reshape(sample_shape + samples.shape[1:])
 
     def _fallback_event_shape_and_dtype(self) -> Tuple[torch.Size, torch.dtype]:
-        """Derive the parameter event shape and dtype from prior or components."""
+        """Derive the parameter event shape and dtype from prior or components
+        without invoking samplers or drawing samples.
+        """
+
+        def _extract_shape_from_dist(dist: Any) -> Optional[torch.Size]:
+            while dist is not None:
+                shape = getattr(dist, "event_shape", None)
+                if shape is not None and len(shape) > 0:
+                    return torch.Size(shape)
+                batch_shape = getattr(dist, "batch_shape", None)
+                if batch_shape is not None and len(batch_shape) > 0:
+                    return torch.Size(batch_shape)
+                dist = getattr(dist, "_prior", None) or getattr(
+                    dist, "full_prior", None
+                )
+            return None
+
         if self.prior is not None:
-            try:
-                dummy = self.prior.sample((0,))
-                return dummy.shape[1:], dummy.dtype
-            except Exception:
-                event_shape = getattr(self.prior, "event_shape", None)
-                if event_shape is not None:
-                    return torch.Size(event_shape), torch.float32
+            shape = _extract_shape_from_dist(self.prior)
+            if shape is not None:
+                return shape, torch.float32
 
         # When the ensemble has no prior, derive event shape from the components.
         for component in self.posteriors:
@@ -403,22 +390,9 @@ class EnsemblePosterior(NeuralPosterior):
 
             for dist_attr in ("prior", "_prior", "proposal"):
                 dist = getattr(component, dist_attr, None)
-                while dist is not None:
-                    try:
-                        dummy = dist.sample((0,))
-                        if dummy.ndim > 1:
-                            return dummy.shape[1:], dummy.dtype
-                    except Exception:
-                        pass
-                    shape = getattr(dist, "event_shape", None)
-                    if shape is not None and len(shape) > 0:
-                        return torch.Size(shape), torch.float32
-                    batch_shape = getattr(dist, "batch_shape", None)
-                    if batch_shape is not None and len(batch_shape) > 0:
-                        return torch.Size(batch_shape), torch.float32
-                    dist = getattr(dist, "_prior", None) or getattr(
-                        dist, "full_prior", None
-                    )
+                shape = _extract_shape_from_dist(dist)
+                if shape is not None:
+                    return shape, torch.float32
 
             estimator = getattr(component, "posterior_estimator", None)
             if estimator is not None:
@@ -436,22 +410,9 @@ class EnsemblePosterior(NeuralPosterior):
                         return torch.Size(shape), torch.float32
                 for dist_attr in ("prior", "proposal"):
                     dist = getattr(potential, dist_attr, None)
-                    while dist is not None:
-                        try:
-                            dummy = dist.sample((0,))
-                            if dummy.ndim > 1:
-                                return dummy.shape[1:], dummy.dtype
-                        except Exception:
-                            pass
-                        shape = getattr(dist, "event_shape", None)
-                        if shape is not None and len(shape) > 0:
-                            return torch.Size(shape), torch.float32
-                        batch_shape = getattr(dist, "batch_shape", None)
-                        if batch_shape is not None and len(batch_shape) > 0:
-                            return torch.Size(batch_shape), torch.float32
-                        dist = getattr(dist, "_prior", None) or getattr(
-                            dist, "full_prior", None
-                        )
+                    shape = _extract_shape_from_dist(dist)
+                    if shape is not None:
+                        return shape, torch.float32
 
         return torch.Size([1]), torch.float32
 
