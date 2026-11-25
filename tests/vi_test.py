@@ -894,9 +894,12 @@ def test_forward_kl_loss_leaves_out_particles_outside_the_support(monkeypatch):
     logweights = target.log_prob(particles) - logq.detach()
     weights = (logweights - logweights.max()).exp() + 0.1
     weights /= weights.sum()
-    inside = torch.isfinite(logweights)
-    assert torch.allclose(loss, (weights[inside] * logweights[inside]).sum())
     assert torch.allclose(surrogate_loss, -(weights * logq).sum())
+
+    # The displayed loss averages over the particles inside the support only.
+    inside = logweights[1:]
+    inside_weights = (inside - inside.max()).exp() + 0.1
+    assert torch.allclose(loss, (inside_weights / inside_weights.sum() * inside).sum())
     assert torch.allclose(torch.stack(weight_maxima), torch.ones(1))
 
 

@@ -661,8 +661,10 @@ class ForwardKLOptimizer(DivergenceOptimizer):
             weights /= weights.sum()
 
         surrogate = -torch.sum(weights * logq)
-        # Particles outside the support (log p = -inf) would give 0 * -inf = nan.
-        loss = torch.sum(weights * torch.where(logweights.isfinite(), logweights, 0.0))
+        # Particles outside the support (log p = -inf) have no KL term, and a weight
+        # that `weight_transform` gave them must not shrink the others.
+        inside = logweights.isfinite()
+        loss = (weights[inside] * logweights[inside]).sum() / weights[inside].sum()
         return surrogate, loss.detach()
 
 
