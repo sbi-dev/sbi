@@ -664,7 +664,9 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         # Particles outside the support (log p = -inf) have no KL term, and a weight
         # that `weight_transform` gave them must not shrink the others.
         inside = logweights.isfinite()
-        loss = (weights[inside] * logweights[inside]).sum() / weights[inside].sum()
+        inside_weights = torch.where(inside, weights, 0.0)
+        loss = (inside_weights * torch.where(inside, logweights, 0.0)).sum()
+        loss = loss / inside_weights.sum()
         return surrogate, loss.detach()
 
 
