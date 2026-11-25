@@ -18,6 +18,10 @@ from torch import Tensor
 from torch.nn import functional as F
 
 
+class MoGNotFiniteError(ValueError):
+    """Raised when a parameter of a `MoG` contains NaN or Inf values."""
+
+
 @dataclass
 class MoG:
     """Mixture of Gaussians parameters and operations.
@@ -94,11 +98,11 @@ class MoG:
 
         # Validate no NaN or Inf values in input tensors
         if not torch.all(torch.isfinite(self.logits)):
-            raise ValueError("logits contains NaN or Inf values")
+            raise MoGNotFiniteError("logits contains NaN or Inf values")
         if not torch.all(torch.isfinite(self.means)):
-            raise ValueError("means contains NaN or Inf values")
+            raise MoGNotFiniteError("means contains NaN or Inf values")
         if not torch.all(torch.isfinite(self.precisions)):
-            raise ValueError("precisions contains NaN or Inf values")
+            raise MoGNotFiniteError("precisions contains NaN or Inf values")
 
         # Compute precision_factors if not provided
         # precision = A^T @ A where A is upper triangular (precision_factors)
