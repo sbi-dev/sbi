@@ -238,8 +238,18 @@ class DivergenceOptimizer(ABC):
         """
         for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             para.data = state_para.data.clone().to(para.device)
-        # Settings in `param_groups` stay, including those a scheduler changes.
-        self._optimizer.state.clear()
+        # A fresh state from the constructor (Adagrad up to torch 2.9 builds it only
+        # there), then the settings in `param_groups`, including a scheduler's.
+        settings = [
+            {key: value for key, value in group.items() if key != "params"}
+            for group in self._optimizer.param_groups
+        ]
+        defaults = filter_kwargs_for_func(
+            type(self._optimizer).__init__, self._optimizer.defaults
+        )
+        self._optimizer.__init__(self.q.parameters(), **defaults)
+        for group, kept in zip(self._optimizer.param_groups, settings, strict=True):
+            group.update(kept)
         if self.prior is not None:
             self.warm_up(warm_up_rounds)
 
