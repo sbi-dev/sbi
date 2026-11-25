@@ -45,7 +45,11 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import BoxUniform, MultipleIndependent, mcmc_transform
 from sbi.utils.metrics import c2st, check_c2st
-from sbi.utils.sbiutils import _apply_to_transform, within_support
+from sbi.utils.sbiutils import (
+    CallableTransform,
+    _apply_to_transform,
+    within_support,
+)
 from sbi.utils.user_input_checks import process_x
 
 # Supported variational families for VI
@@ -463,6 +467,8 @@ def test_vi_family_pickled_with_plain_link_attribute():
     theta = torch.tensor([[0.3, 0.7]])
     loaded = pickle.loads(pickle.dumps(old))
     assert torch.equal(loaded.log_prob(theta), q.log_prob(theta))
+    assert isinstance(loaded._link, CallableTransform)
+    assert not hasattr(loaded, "_link_transform")
 
 
 def test_deepcopy_of_trained_posterior_rewires_optimizer():
