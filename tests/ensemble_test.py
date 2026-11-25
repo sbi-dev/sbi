@@ -355,3 +355,92 @@ def test_ensemble_raises_for_partial_samples(method: str):
 
     with pytest.raises(ValueError, match="of 100 samples"):
         getattr(ensemble, method)((10, 10), x=zeros(1, 1))
+
+
+def test_ensemble_weights_length_and_value_validation():
+    """`EnsemblePosterior` must raise `ValueError` for mismatched weight count,
+    negative weights, or zero sum.
+    """
+    prior = MultivariateNormal(zeros(2), eye(2))
+    posteriors = [
+        TractablePosterior(
+            PosteriorPotential(MultivariateNormal(zeros(2), eye(2)), prior)
+        )
+        for _ in range(2)
+    ]
+    with pytest.raises(ValueError, match="does not match number of posteriors"):
+        EnsemblePosterior(posteriors, weights=[0.2, 0.3, 0.5])
+
+    with pytest.raises(ValueError, match="does not match number of posteriors"):
+        EnsemblePosterior(posteriors, weights=[1.0])
+
+    with pytest.raises(ValueError, match="must be non-negative and sum to a positive"):
+        EnsemblePosterior(posteriors, weights=[-1.0, 2.0])
+
+    with pytest.raises(ValueError, match="must be non-negative and sum to a positive"):
+        EnsemblePosterior(posteriors, weights=[0.0, 0.0])
+
+
+class _MultiDimEventPosterior(TractablePosterior):
+    def __init__(self, event_shape=(2, 3)):
+        self.event_shape = event_shape
+        prior = MultivariateNormal(zeros(6), eye(6))
+        super().__init__(PosteriorPotential(prior, prior))
+
+    def sample(self, sample_shape=torch.Size(), x=None, **kwargs):
+        sample_shape = torch.Size(sample_shape)
+        return zeros(*sample_shape, *self.event_shape)
+
+    def sample_batched(self, sample_shape=torch.Size(), x=None, **kwargs):
+        sample_shape = torch.Size(sample_shape)
+        num_x = x.shape[0] if x is not None else 1
+        return zeros(*sample_shape, num_x, *self.event_shape)
+
+
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_zero_samples(method: str):
+    """Zero-sample requests must return an empty tensor with the correct shape
+    without calling multinomial sampling.
+    """
+    prior = MultivariateNormal(zeros(2), eye(2))
+    posterior_cls = (
+        TractablePosterior if method == "sample" else _BatchedTractablePosterior
+    )
+    posteriors = [
+        posterior_cls(PosteriorPotential(MultivariateNormal(zeros(2), eye(2)), prior))
+        for _ in range(2)
+    ]
+    ensemble = EnsemblePosterior(posteriors)
+    ensemble.set_default_x(zeros(1, 2))
+
+    if method == "sample":
+        samples_zero = ensemble.sample((0,))
+        assert samples_zero.shape == (0, 2)
+        samples_zero_2d = ensemble.sample((0, 5))
+        assert samples_zero_2d.shape == (0, 5, 2)
+    else:
+        samples_zero = ensemble.sample_batched((0,), x=zeros(3, 2))
+        assert samples_zero.shape == (0, 3, 2)
+        samples_zero_2d = ensemble.sample_batched((0, 4), x=zeros(3, 2))
+        assert samples_zero_2d.shape == (0, 4, 3, 2)
+
+
+def test_ensemble_sample_preserves_multidimensional_event_shape():
+    """`sample()` must preserve multi-dimensional parameter event shapes without
+    flattening them to a single dimension.
+    """
+    posteriors = [_MultiDimEventPosterior((2, 3)), _MultiDimEventPosterior((2, 3))]
+    ensemble = EnsemblePosterior(posteriors)
+    ensemble.set_default_x(zeros(1, 2))
+
+    samples_single = ensemble.sample(())
+    assert samples_single.shape == (2, 3)
+
+    samples_1d = ensemble.sample((5,))
+    assert samples_1d.shape == (5, 2, 3)
+
+    samples_2d = ensemble.sample((4, 7))
+    assert samples_2d.shape == (4, 7, 2, 3)
+
+    samples_batched = ensemble.sample_batched((5,), x=zeros(3, 2))
+    assert samples_batched.shape == (5, 3, 2, 3)

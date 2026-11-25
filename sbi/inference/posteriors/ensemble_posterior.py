@@ -237,16 +237,31 @@ class EnsemblePosterior(NeuralPosterior):
 
         Raises:
             TypeError if weights are provided in an unsupported format.
+            ValueError if weights length does not match the number of components or
+                if weights are negative or sum to zero.
 
         Args:
             weights: Assigns weight to each posterior distribution.
         """
         if weights is None:
-            self._weights = torch.tensor([
-                1.0 / self.num_components for _ in range(self.num_components)
-            ])
+            self._weights = torch.full(
+                (self.num_components,), 1.0 / self.num_components
+            )
         elif isinstance(weights, (Tensor, List)):
-            self._weights = torch.tensor(weights) / sum(weights)
+            weights_tensor = torch.as_tensor(weights, dtype=torch.float32)
+            if (
+                weights_tensor.ndim != 1
+                or weights_tensor.shape[0] != self.num_components
+            ):
+                raise ValueError(
+                    f"Number of weights ({weights_tensor.shape[0]}) does not match "
+                    f"number of posteriors ({self.num_components})."
+                )
+            if (weights_tensor < 0).any() or weights_tensor.sum() <= 0:
+                raise ValueError(
+                    "Weights must be non-negative and sum to a positive value."
+                )
+            self._weights = weights_tensor / weights_tensor.sum()
         else:
             raise TypeError
         self._weights = self._weights.to(self.device)
@@ -287,20 +302,25 @@ class EnsemblePosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         self._check_num_observations(x.shape[0])
         self._check_x(x)
-        num_samples = torch.Size(sample_shape).numel()
-        posterior_indizes = torch.multinomial(
+        sample_shape = torch.Size(sample_shape)
+        num_samples = sample_shape.numel()
+        if num_samples == 0:
+            empty = self.posteriors[0].sample(torch.Size((0,)), x=x, **kwargs)
+            return empty.reshape(sample_shape + empty.shape[1:])
+
+        posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
         )
         samples = []
         for posterior_index, sample_size in torch.vstack(
-            posterior_indizes.unique(return_counts=True)
+            posterior_indices.unique(return_counts=True)
         ).T:
             sample_shape_c = torch.Size((int(sample_size),))
             samples.append(
                 self.posteriors[posterior_index].sample(sample_shape_c, x=x, **kwargs)
             )
         samples = self._stack_and_shuffle(samples, num_samples)
-        return samples.reshape(*sample_shape, -1)
+        return samples.reshape(sample_shape + samples.shape[1:])
 
     def sample_batched(
         self,
@@ -310,7 +330,12 @@ class EnsemblePosterior(NeuralPosterior):
     ) -> Tensor:
         # Guard here so validation of `x` does not depend on the component draw.
         x = self._process_x(x)
-        num_samples = torch.Size(sample_shape).numel()
+        sample_shape = torch.Size(sample_shape)
+        num_samples = sample_shape.numel()
+        if num_samples == 0:
+            empty = self.posteriors[0].sample_batched(torch.Size((0,)), x=x, **kwargs)
+            return empty.reshape(sample_shape + empty.shape[1:])
+
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
         )
