@@ -530,7 +530,16 @@ def get_density_thresholder(
     Returns:
         Callable which is true for $\theta$ in the `1-quantile` high-probability region
         of the `dist`.
+
+    Raises:
+        ValueError: If `quantile` is not in [0, 1) or
+            `num_samples_to_estimate_support` is smaller than 1.
     """
+    if not 0.0 <= quantile < 1.0 or num_samples_to_estimate_support < 1:
+        raise ValueError(
+            "`quantile` must be in [0, 1) and `num_samples_to_estimate_support` at "
+            f"least 1, got {quantile} and {num_samples_to_estimate_support}."
+        )
     samples = dist.sample((num_samples_to_estimate_support,))
     log_probs = dist.log_prob(samples)
     sorted_log_probs, _ = torch.sort(log_probs)
