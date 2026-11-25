@@ -460,12 +460,6 @@ def test_every_flow_family_pickles(q: str):
     assert torch.allclose(reloaded._q.sample((3,)), expected)
 
 
-def test_gf_warns_that_it_ignores_hidden_features():
-    prior = MultivariateNormal(zeros(2), eye(2))
-    with pytest.warns(UserWarning, match="no effect"):
-        VIPosterior(FakePotential(prior=prior), prior, q="gf", hidden_features=64)
-
-
 def test_vi_family_pickled_with_plain_link_attribute():
     """Families pickled by sbi 0.26 and 0.27 held the link as `_link_transform`."""
     link = mcmc_transform(BoxUniform(zeros(2), ones(2))).inv

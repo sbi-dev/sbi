@@ -68,7 +68,6 @@ from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 # Supported Zuko flow types for VI (lowercase names)
 _ZUKO_FLOW_TYPES = {"maf", "nsf", "naf", "unaf", "nice", "sospf", "gf"}
-_DEFAULT_HIDDEN_FEATURES = 50
 
 # Type for supported variational family strings
 VariationalFamily = Literal[
@@ -134,7 +133,7 @@ class VIPosterior(NeuralPosterior):
         parameters: Optional[Iterable] = None,
         modules: Optional[Iterable] = None,
         num_transforms: int = 5,
-        hidden_features: int = _DEFAULT_HIDDEN_FEATURES,
+        hidden_features: int = 50,
         z_score_theta: Literal["none", "independent", "structured"] = "independent",
         z_score_x: Literal["none", "independent", "structured"] = "independent",
     ):
@@ -546,15 +545,6 @@ class VIPosterior(NeuralPosterior):
         elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
                 if q in _ZUKO_FLOW_TYPES:
-                    if q == "gf" and self._hidden_features != _DEFAULT_HIDDEN_FEATURES:
-                        warnings.warn(
-                            f"hidden_features={self._hidden_features} has no effect "
-                            "on q='gf' for a single observation: an unconditional "
-                            "Gaussianization flow has no network. It only sizes the "
-                            "flow of amortized VI. Use num_transforms instead.",
-                            UserWarning,
-                            stacklevel=2,
-                        )
                     self._q_spec = _QSpec(kind="flow", flow_type=q)
                     q = self._build_unconditional_flow(q)
                 elif q in ("gaussian", "gaussian_diag"):
