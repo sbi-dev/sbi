@@ -728,6 +728,22 @@ class RestrictedPrior(Distribution):
         self._device = device
         return self
 
+    def __setstate__(self, state: dict) -> None:
+        """Set the state when being loaded from pickle.
+
+        `torch.load(..., map_location=...)` remaps the tensors but not the device
+        strings, so `_device` and the prior's device are set to where the prior's
+        tensors are. Other objects may not be restored yet, so they are not touched.
+
+        Args:
+            state: State to be restored.
+        """
+        self.__dict__.update(state)
+        prior_device = infer_tensor_device(self._prior)
+        if prior_device is not None and prior_device != self._device:
+            self._prior = move_distribution_to_device(self._prior, prior_device)
+            self._device = prior_device
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
