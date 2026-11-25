@@ -229,7 +229,13 @@ class VectorFieldBasedPotential(BasePotential):
             x_o=None,
             device=self.device,
             iid_method=iid_method if iid_method is not None else self.iid_method,
-            iid_params=iid_params if iid_params is not None else self.iid_params,
+            iid_params=(
+                iid_params
+                if iid_params is not None
+                else self.iid_params
+                if iid_method in (None, self.iid_method)
+                else None
+            ),
             neural_ode_backend=self.neural_ode_backend,
         )
         bound.neural_ode.params.update(self.neural_ode.params)

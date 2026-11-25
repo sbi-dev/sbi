@@ -93,6 +93,8 @@ class VectorFieldPosterior(NeuralPosterior):
         )
         # Set the potential function type.
         self.potential_fn: VectorFieldBasedPotential = potential_fn
+        self._initial_iid_method = potential_fn.iid_method
+        self._initial_iid_params = potential_fn.iid_params
 
         self.prior = prior
         self.enable_transform = enable_transform
@@ -108,6 +110,20 @@ class VectorFieldPosterior(NeuralPosterior):
 
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
+
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
+
+        Posteriors pickled before the iid config was stored separately lack the
+        `_initial_iid_*` fields; restore them from the saved potential.
+
+        Args:
+            state_dict: State to be restored.
+        """
+        potential_fn = state_dict["potential_fn"]
+        state_dict.setdefault("_initial_iid_method", potential_fn.iid_method)
+        state_dict.setdefault("_initial_iid_params", potential_fn.iid_params)
+        super().__setstate__(state_dict)
 
     def _check_x(self, x: Tensor) -> None:
         """Raise if this posterior cannot sample several observations as iid trials.
@@ -168,10 +184,12 @@ class VectorFieldPosterior(NeuralPosterior):
                 estimator's `solve_schedule` with `steps` points is used. If
                 `sample_with` is "ode", this is ignored.
             iid_method: Which method to use for computing the score in the iid setting.
-                We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss". The
-                fnpe method is simple and generally applicable. However, it can become
-                inaccurate already for quite a few iid samples (as it based on heuristic
-                approximations), and should be used at best only with a `corrector`. The
+                An override applies to this call only; without it, the constructor
+                configuration is used. We currently support "fnpe", "gauss",
+                "auto_gauss", "jac_gauss". The fnpe method is simple and generally
+                applicable. However, it can become inaccurate already for quite a few
+                iid samples (as it is based on heuristic approximations), and should be
+                used at best only with a `corrector`. The
                 "gauss" methods are more accurate, by aiming for an efficient
                 approximation of the correct marginal score in the iid case. This
                 however requires estimating some hyperparamters, which is done in a
@@ -180,8 +198,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 "auto_gauss" for these reasons. Note that in order to use the iid
                 method, the vector field estimator must support it and have
                 SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.
-            iid_params: Additional parameters passed to the iid method. See the specific
-                `IIDScoreFunction` child class for details.
+            iid_params: Additional parameters passed to the iid method. An override
+                applies to this call only; without it, the constructor configuration is
+                used. See the specific `IIDScoreFunction` child class for details.
             guidance_method: Method to guide the diffusion process. If None, no guidance
                 is used. Currently we support `affine_classifier_free`, which allows to
                 scale and shift the "likelihood" or "prior" score contribution. This can
@@ -219,11 +238,20 @@ class VectorFieldPosterior(NeuralPosterior):
                 "compose_standardization does not yet support guided sampling. "
                 "Disable compose_standardization."
             )
+        effective_iid_method = (
+            iid_method if iid_method is not None else self._initial_iid_method
+        )
+        if iid_params is not None:
+            effective_iid_params = iid_params
+        elif effective_iid_method != self._initial_iid_method:
+            effective_iid_params = {}
+        else:
+            effective_iid_params = self._initial_iid_params or {}
         self.potential_fn = self.potential_fn.bind(
             x,
             x_is_iid=is_iid,
-            iid_method=iid_method or self.potential_fn.iid_method,
-            iid_params=iid_params,
+            iid_method=effective_iid_method,
+            iid_params=effective_iid_params,
             guidance_method=guidance_method,
             guidance_params=guidance_params,
         )
