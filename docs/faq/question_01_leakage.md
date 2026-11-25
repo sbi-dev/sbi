@@ -1,4 +1,4 @@
-# What should I do when my 'posterior samples are outside the prior support' in SNPE?
+# What should I do when 'only x% proposal samples are accepted' in SNPE?
 
 When working with **multi-round** NPE (i.e., SNPE), you might have experienced the
 following warning:
@@ -9,47 +9,40 @@ remaining 10000 samples. You can prevent very long runtimes by setting
 `max_sampling_time` to limit runtime, or disabling rejection sampling (e.g. via
 `reject_outside_prior=False` in `posterior.sample()` when available). Alternatively,
 consider interrupting (Ctrl-C) and switching to
-`build_posterior(..., sample_with='mcmc')`.
+`build_posterior(..., sample_with='mcmc')`. A low acceptance rate means that most of
+the posterior estimate lies outside the prior bounds (leakage). ...
 ```
 
 Setting `reject_outside_prior=False` skips the rejection step. Sampling gets faster,
 but the samples are no longer restricted to the prior bounds and can lie outside them.
 
-The reason for this issue is described in more detail
+The warning means that most of the posterior estimate lies outside the prior bounds.
+This is called leakage. In multi-round NPE, leakage can grow with every round, and the
+estimate then becomes poor inside the prior bounds as well. With a mixture density
+network, training can eventually fail with NaN values. `log_prob()` shows the same
+leakage: it estimates its normalizing constant from the fraction of samples within the
+prior bounds, and warns when this fraction is small. The reason for leakage is
+described in more detail
 [here](https://arxiv.org/abs/2210.04815),
 [here](https://arxiv.org/abs/2002.03712), and
 [here](https://arxiv.org/abs/1905.07488). The following fixes are possible:
 
-- use truncated proposals for SNPE (TSNPE)
-
-```python
-from sbi.inference import NPE
-from sbi.utils import RestrictedPrior, get_density_thresholder
-
-inference = NPE(prior)
-proposal = prior
-for _ in range(num_rounds):
-    theta = proposal.sample((num_sims,))
-    x = simulator(theta)
-    _ = inference.append_simulations(theta, x).train(force_first_round_loss=True)
-    posterior = inference.build_posterior().set_default_x(x_o)
-
-    accept_reject_fn = get_density_thresholder(posterior, quantile=1e-4)
-    proposal = RestrictedPrior(prior, accept_reject_fn, sample_with="rejection")
-```
+- use truncated proposals for SNPE (TSNPE), as shown in the
+[guide on sequential methods](https://sbi.readthedocs.io/en/latest/how_to_guide/02_multiround_inference.html#leakage-and-truncated-proposals-tsnpe).
 
 - sample with MCMC: `posterior = inference.build_posterior(sample_with="mcmc")`, then
 `samples = posterior.sample((num_samples,), x=x_o)`.
-This approach will make sampling slower, but samples will not "leak".
+MCMC samples only within the prior bounds, so samples will not "leak". At very low
+acceptance rates, it can be faster than rejection sampling. It does not improve a poor
+estimate, though.
 
 - resort to single-round NPE and (if necessary) increase your simulation budget.
 
-- if your prior is either Gaussian (torch.distributions.MultivariateNormal) or Uniform
-(sbi.utils.BoxUniform), you can avoid leakage by using a mixture density network as
-density estimator. Import `MDNConfig` from `sbi.neural_nets` and set
-`density_estimator=MDNConfig()` when creating the `NPE_C` inference object. When
-running inference, there should be a print statement "Using NPE_C with non-atomic
-loss".
-
 - use a different algorithm, e.g., Sequential NRE and Sequential NLE. Note, however,
 that these algorithms can have different issues and potential pitfalls.
+
+A mixture density network as density estimator does not avoid leakage. With a uniform
+prior, and with the direct posterior of an earlier round (the default of
+`build_posterior()`, also with an MDN) as proposal, multi-round NPE then uses a
+closed-form loss ("Using NPE_C with non-atomic loss"), but its estimate can leak as
+well.

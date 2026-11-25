@@ -599,6 +599,11 @@ class NeuralPosterior:
         self.to(actual_device)
 
 
+# Explains the low-acceptance warning of rejection sampling within the prior support.
+_LEAKAGE_HINT = (
+    "A low acceptance rate means that most of the posterior estimate lies outside "
+    "the prior bounds (leakage)."
+)
 _ONE_AT_A_TIME = (
     "For a separate posterior of each observation, pass one observation at a time"
 )

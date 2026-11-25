@@ -1,7 +1,7 @@
 # Can I train my density estimator in an unconstrained space?
 
 Yes. If posterior samples leak outside the prior bounds (see
-[posterior samples outside the prior support](question_01_leakage.md)) and you have
+[the FAQ on leakage](question_01_leakage.md)) and you have
 ruled out simulator issues, you can train a supported density estimator in an
 unbounded space using a logit transformation:
 

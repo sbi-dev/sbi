@@ -10,6 +10,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import (
+    _LEAKAGE_HINT,
     NeuralPosterior,
     _require_one_observation,
 )
@@ -213,9 +214,10 @@ class VectorFieldPosterior(NeuralPosterior):
                 directly from the ODE/SDE sampler without rejection, which is faster but
                 may include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised. Only
-                applies when `reject_outside_prior=True` (no effect otherwise since
-                direct sampling does not use rejection).
+                If exceeded, sampling is aborted and a RuntimeError is raised. The
+                limit is checked between sampling batches, so a running batch is not
+                interrupted. Only applies when `reject_outside_prior=True` (no
+                effect otherwise since direct sampling does not use rejection).
             return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
                 return the samples collected so far instead of raising a RuntimeError.
                 A warning will be issued. Only applies when `reject_outside_prior=True`
@@ -251,6 +253,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
                     return_partial_on_timeout=return_partial_on_timeout,
+                    low_acceptance_hint=_LEAKAGE_HINT,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -276,6 +279,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
                     return_partial_on_timeout=return_partial_on_timeout,
+                    low_acceptance_hint=_LEAKAGE_HINT,
                 )
             else:
                 # Bypass rejection sampling entirely.
@@ -619,8 +623,9 @@ class VectorFieldPosterior(NeuralPosterior):
                 directly from the ODE/SDE sampler without rejection, which is faster but
                 may include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised. Only
-                applies when `reject_outside_prior=True`.
+                If exceeded, sampling is aborted and a RuntimeError is raised. The
+                limit is checked between sampling batches, so a running batch is not
+                interrupted. Only applies when `reject_outside_prior=True`.
             return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
                 return the samples collected so far instead of raising a RuntimeError.
                 A warning will be issued. Only applies when `reject_outside_prior=True`.
@@ -668,6 +673,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     max_sampling_batch_size=max_sampling_batch_size,
                     max_sampling_time=max_sampling_time,
                     return_partial_on_timeout=return_partial_on_timeout,
+                    low_acceptance_hint=_LEAKAGE_HINT,
                 )
             else:
                 # Bypass rejection sampling.
@@ -697,6 +703,7 @@ class VectorFieldPosterior(NeuralPosterior):
                     proposal_sampling_kwargs=proposal_sampling_kwargs,
                     max_sampling_time=max_sampling_time,
                     return_partial_on_timeout=return_partial_on_timeout,
+                    low_acceptance_hint=_LEAKAGE_HINT,
                 )
             else:
                 # Bypass rejection sampling.

@@ -22,7 +22,11 @@ from sbi.utils.conditional_density_utils import (
     compute_corrcoeff,
     extract_and_transform_mog,
 )
-from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
+from sbi.utils.torchutils import (
+    atleast_2d_float32_tensor,
+    ensure_theta_batched,
+    infer_tensor_device,
+)
 
 
 def eval_conditional_density(
@@ -128,11 +132,13 @@ def conditional_corrcoeff(
     Args:
         density: Probability density function with `.log_prob()` function.
         limits: Limits within which to evaluate the `density`.
-        condition: Values to condition the `density` on. If a batch of conditions is
-            passed, we compute the conditional correlation matrix for each of them and
-            return the average conditional correlation matrix.
-        subset: Evaluate the conditional distribution only on a subset of dimensions.
-            If `None` this function uses all dimensions.
+        condition: Values to condition the `density` on, of shape `(num_dim,)` or
+            `(batch_size, num_dim)`. If a batch of conditions is passed, we compute
+            the conditional correlation matrix for each of them and return the average
+            conditional correlation matrix.
+        subset: Evaluate the conditional distribution only on a subset of dimensions,
+            at least two distinct ones. Rows and columns of the returned matrix follow
+            the order of `subset`. If `None` this function uses all dimensions.
         resolution: Number of grid points on which the conditional distribution is
             evaluated. A higher value increases the accuracy of the estimated
             correlation but also increases the computational cost.
@@ -141,9 +147,22 @@ def conditional_corrcoeff(
     or `(len(subset), len(subset))` if `subset` was specified.
     """
 
-    device = density._device if hasattr(density, "_device") else "cpu"
+    device = getattr(density, "_device", None) or infer_tensor_device(density) or "cpu"
 
-    subset_ = subset if subset is not None else range(condition.shape[1])
+    condition = ensure_theta_batched(condition)
+    if condition.ndim != 2 or len(condition) == 0:
+        raise ValueError(
+            "`condition` needs shape (num_dim,) or (batch_size, num_dim) with "
+            f"batch_size > 0, got {tuple(condition.shape)}."
+        )
+    dims = range(condition.shape[1])
+    # Indexing `dims` maps negative indices to their dimension and rejects
+    # out-of-range ones.
+    subset_ = list(dims) if subset is None else [dims[i] for i in subset]
+    if len(set(subset_)) != len(subset_) or len(subset_) < 2:
+        raise ValueError(
+            f"`subset` needs at least two distinct dimensions, got {subset_}."
+        )
 
     correlation_matrices = []
     for cond in condition:
@@ -160,9 +179,8 @@ def conditional_corrcoeff(
                     ),
                     limits[[dim1, dim2]].to(device),
                 )
-                for dim1 in subset_
-                for dim2 in subset_
-                if dim1 < dim2
+                for i, dim1 in enumerate(subset_)
+                for dim2 in subset_[i + 1 :]
             ])
         )
 
