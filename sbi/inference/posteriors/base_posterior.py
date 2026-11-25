@@ -356,7 +356,8 @@ class NeuralPosterior:
         if shape and theta.shape[-len(shape) :] != shape:
             raise ValueError(
                 f"theta has shape {tuple(theta.shape)}, but the prior has "
-                f"{shape.numel()} parameters (shape {tuple(shape)})."
+                f"{shape.numel()} parameters: theta needs shape {tuple(shape)} or "
+                f"(batch_size, {', '.join(map(str, shape))})."
             )
         return ensure_theta_batched(theta)
 
