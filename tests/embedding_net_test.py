@@ -227,6 +227,14 @@ def test_cnn_embedding_rejects_kernel_larger_than_input():
         CNNEmbedding((4, 4), kernel_size=9)
 
 
+def test_causal_cnn_embedding_rejects_dilation_list_longer_than_layers():
+    """Extra dilations must raise instead of being silently dropped."""
+    with pytest.raises(ValueError, match="dilation has 3 entries"):
+        CausalCNNEmbedding(
+            (64,), pool_kernel_size=2, num_conv_layers=2, dilation=[1, 2, 4]
+        )
+
+
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
 @pytest.mark.parametrize("num_layers", [2, 4])
 @pytest.mark.parametrize("num_hiddens", [32, 64])
