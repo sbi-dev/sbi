@@ -345,19 +345,24 @@ class NeuralPosterior:
                 parameter of the prior.
         """
         theta = torch.as_tensor(theta)
-        prior = getattr(self, "_prior", None)
-        if prior is None:
-            prior = getattr(self.potential_fn, "prior", None)
+        if theta.dim() == 0:
+            theta = theta.reshape(1)
+        prior = self._theta_prior
         if isinstance(prior, Distribution):
             # A prior of one parameter can have batch and event shape `()` or `(1,)`.
             num_parameters = (prior.batch_shape + prior.event_shape).numel()
-            if theta.shape[-1:] != (num_parameters,):
+            if theta.shape[-1] != num_parameters:
                 raise ValueError(
                     f"theta has shape {tuple(theta.shape)}, but the prior has "
-                    f"{num_parameters} parameter(s): theta needs shape "
-                    f"({num_parameters},) or (batch_size, {num_parameters})."
+                    f"{num_parameters} parameter(s): the last axis of theta must "
+                    f"have size {num_parameters}."
                 )
         return ensure_theta_batched(theta)
+
+    @property
+    def _theta_prior(self) -> Optional[Distribution]:
+        """The prior that `_theta_batched` checks the width of theta against."""
+        return getattr(self.potential_fn, "prior", None)
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:

@@ -460,6 +460,11 @@ class VIPosterior(NeuralPosterior):
         )
 
     @property
+    def _theta_prior(self) -> Distribution:
+        """The prior given to the constructor, which a callable potential lacks."""
+        return self._prior
+
+    @property
     def q(
         self,
     ) -> Union[
