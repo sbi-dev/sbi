@@ -301,7 +301,7 @@ def test_posterior_parameters_with_param_updates_value():
 
 
 @pytest.mark.xfail(
-    raises=ValueError, reason="steps field does't exist in MCMCPosteriorParameters"
+    raises=ValueError, reason="steps field doesn't exist in MCMCPosteriorParameters"
 )
 def test_posterior_parameters_fails_for_incorrect_parameter():
     """

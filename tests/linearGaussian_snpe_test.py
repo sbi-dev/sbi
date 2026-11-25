@@ -773,7 +773,7 @@ def test_sample_conditional(mcmc_params_accurate: MCMCPosteriorParameters):
 
 
 def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
-    """Test whether the conditional density infered from MDN parameters of a
+    """Test whether the conditional density inferred from MDN parameters of a
     `DirectPosterior` matches analytical results for MVN. This uses a n-D joint and
     conditions on the last m values to generate a conditional.
 
@@ -1001,6 +1001,19 @@ def test_npe_c_warns_if_trained_estimator_has_non_normalizable_pairs(
         inference._warn_if_pairs_not_normalizable(batch_size=50)
 
     assert any("infinite mass" in str(w.message) for w in caught) == warns
+
+
+def test_npe_c_mog_loss_names_non_finite_mixtures():
+    """A non-finite MoG in the closed-form loss raises the error that names it."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    inference, estimator = _npe_c_with_mog_loss_state(prior)
+    proposal = DirectPosterior(estimator, prior).set_default_x(torch.zeros(1, 2))
+    inference._proposal_mog = inference._proposal_mog_in_z_space(proposal)
+
+    with pytest.raises(ValueError, match="float32 round-off"):
+        inference._log_prob_proposal_posterior_mog(
+            torch.zeros(3, 2), torch.full((3, 2), float("nan"))
+        )
 
 
 @pytest.mark.parametrize("force_first_round_loss", (False, True))

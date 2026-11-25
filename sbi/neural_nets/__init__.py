@@ -8,6 +8,8 @@ from sbi.neural_nets.factory import (
     posterior_flow_nn,
     posterior_nn,
     posterior_score_nn,
+    simformer_flow_nn,
+    simformer_score_nn,
 )
 from sbi.neural_nets.net_builders.estimator_configs import (
     ClassifierConfigBase,
@@ -47,6 +49,13 @@ from sbi.neural_nets.net_builders.vector_field_nets import (
     FlowMatchingConfig,
     MLPConfig,
     ScoreConfigBase,
+    SimformerConfigBase,
+    SimformerFlowMatchingConfig,
+    SimformerNetConfig,
+    SimformerScoreConfigBase,
+    SimformerSubVPScoreConfig,
+    SimformerVEScoreConfig,
+    SimformerVPScoreConfig,
     SubVPScoreConfig,
     TransformerConfig,
     VEScoreConfig,
@@ -62,6 +71,8 @@ __all__ = [
     "posterior_nn",
     "posterior_score_nn",
     "posterior_flow_nn",
+    "simformer_score_nn",
+    "simformer_flow_nn",
     # Vector field estimators (FMPE / NPSE).
     "VectorFieldConfigBase",
     "FlowMatchingConfig",
@@ -73,6 +84,14 @@ __all__ = [
     "MLPConfig",
     "AdaMLPConfig",
     "TransformerConfig",
+    # Simformer estimators (Simformer / FlowMatchingSimformer).
+    "SimformerConfigBase",
+    "SimformerFlowMatchingConfig",
+    "SimformerScoreConfigBase",
+    "SimformerVEScoreConfig",
+    "SimformerVPScoreConfig",
+    "SimformerSubVPScoreConfig",
+    "SimformerNetConfig",
     # Conditional density estimators (NPE / NLE).
     "DensityConfigBase",
     "MAFConfig",

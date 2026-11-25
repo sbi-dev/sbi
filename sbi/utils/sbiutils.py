@@ -215,7 +215,11 @@ def z_score_parser(
     Args:
         z_score_flag: str flag for z-scoring method stating whether the data
             dimensions are "structured" or "independent", or does not require z-scoring
-            ("none" or None).
+            ("none" or None). "transform_to_unconstrained" also returns no
+            z-scoring: on the modeled variable, the caller replaces z-scoring with a
+            transform to unconstrained space, derived from the support of a
+            distribution such as the prior. Callers that do not implement this
+            transform must reject the flag.
 
     Returns:
         Flag for whether or not to z-score, and whether data is structured
@@ -348,31 +352,6 @@ def _patch_inverse_transform_pickling() -> None:
 _patch_inverse_transform_pickling()
 
 
-def _contains_inverse_transform(transform: TorchTransform) -> bool:
-    """Return whether a transform tree contains an inverse wrapper."""
-    seen = set()
-
-    def contains_inverse(current: TorchTransform) -> bool:
-        if id(current) in seen:
-            return False
-        seen.add(id(current))
-        if isinstance(current, torch_tf._InverseTransform):
-            return True
-        for key, value in current.__dict__.items():
-            if key == "_inv":
-                continue
-            if isinstance(value, TorchTransform) and contains_inverse(value):
-                return True
-            if isinstance(value, (list, tuple)) and any(
-                isinstance(item, TorchTransform) and contains_inverse(item)
-                for item in value
-            ):
-                return True
-        return False
-
-    return contains_inverse(transform)
-
-
 class CallableTransform(nn.Module):
     """Own a PyTorch transform as a movable, picklable module.
 
@@ -382,15 +361,14 @@ class CallableTransform(nn.Module):
 
     def __init__(self, transform: TorchTransform):
         super().__init__()
-        self._is_inverse = _contains_inverse_transform(transform)
-        self._transform = transform.inv if self._is_inverse else transform
-        if not isinstance(
-            self._transform, TorchTransform
-        ) or _contains_inverse_transform(self._transform):
+        if not isinstance(transform, TorchTransform):
             raise ValueError(
-                "CallableTransform requires one transform orientation without "
-                "nested inverse wrappers."
+                f"CallableTransform requires a torch Transform, got {type(transform)}."
             )
+        # Store an inverse as its forward, so a forward that is an `nn.Module` stays
+        # a registered submodule.
+        self._is_inverse = isinstance(transform, torch_tf._InverseTransform)
+        self._transform = transform.inv if self._is_inverse else transform
 
     @property
     def transform(self) -> TorchTransform:
@@ -400,8 +378,8 @@ class CallableTransform(nn.Module):
     def forward(self) -> TorchTransform:
         return self.transform
 
-    def _apply(self, fn):
-        super()._apply(fn)
+    def _apply(self, fn, *args, **kwargs):
+        super()._apply(fn, *args, **kwargs)
         _apply_to_transform(self._transform, fn)
         return self
 
@@ -410,7 +388,7 @@ def biject_transform_zuko(
     transform: TorchTransform,
 ) -> zuko.flows.UnconditionalTransform:
     """
-    Wraps a pytorch transform in a Zuko unconditional transfrom on a bounded interval.
+    Wraps a pytorch transform in a Zuko unconditional transform on a bounded interval.
 
     Args:
         transform: a bijective transformation for Zuko, depending on the input
@@ -452,8 +430,8 @@ def z_standardization(
         # equivalent to taking mean over per-sample mean, i.e.,
         # `torch.mean(torch.mean(.., dim=1))`.
         t_mean = torch.mean(batch_t[is_valid_t])
-        # Compute std per-sample first.
-        sample_std = torch.std(batch_t[is_valid_t], dim=1)
+        # Compute std per-sample first, over all of its dimensions.
+        sample_std = torch.std(batch_t[is_valid_t].flatten(start_dim=1), dim=1)
         sample_std[sample_std < min_std] = min_std
         # Average over all samples for batch std.
         t_std = torch.mean(sample_std)
@@ -526,8 +504,8 @@ def standardizing_net(
 
     if len(batch_t) > 1:
         if structured_dims:
-            # Compute std per-sample first.
-            sample_std = torch.std(batch_t[is_valid_t], dim=1)
+            # Compute std per-sample first, over all of its dimensions.
+            sample_std = torch.std(batch_t[is_valid_t].flatten(start_dim=1), dim=1)
             sample_std[sample_std < min_std] = min_std
             # Average over all samples for batch std.
             t_std = torch.mean(sample_std)
@@ -550,6 +528,48 @@ def standardizing_net(
                             z-scoring."""
 
     return Standardize(t_mean, t_std)
+
+
+def build_z_scored_embedding_net(
+    batch: Tensor,
+    z_score: Optional[str] = "independent",
+    embedding_net: nn.Module = nn.Identity(),
+) -> nn.Module:
+    """Prepends a z-scoring layer to an embedding net if z-scoring is requested.
+
+    Args:
+        batch: Batch of inputs to the embedding net, used to compute the z-score
+            statistics.
+        z_score: Whether to z-score the inputs, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        embedding_net: Embedding net that receives the (z-scored) inputs.
+
+    Returns:
+        `nn.Sequential(standardizing_net, embedding_net)` if z-scoring is requested,
+        otherwise `embedding_net` itself.
+
+    Raises:
+        ValueError: If `z_score` is `transform_to_unconstrained`. It needs the
+            distribution of the variable it transforms, which an input of an
+            embedding net does not have.
+    """
+    if z_score == "transform_to_unconstrained":
+        raise ValueError(
+            "`transform_to_unconstrained` is not supported for the condition or "
+            "for classifier inputs. It is only implemented for the modeled "
+            "variable of the Zuko flows and the MDN. Use 'none', 'independent' "
+            "or 'structured' instead."
+        )
+    z_score_bool, structured = z_score_parser(z_score)
+    if z_score_bool:
+        embedding_net = nn.Sequential(
+            standardizing_net(batch, structured), embedding_net
+        )
+    return embedding_net
 
 
 def handle_invalid_x(
@@ -587,6 +607,51 @@ def handle_invalid_x(
         z_score_x = 'none' to disable z-scoring."""
 
     return is_valid_x, num_nans, num_infs
+
+
+def handle_invalid_inputs_for_simformer(
+    inputs: Tensor,
+    condition_masks: Optional[Tensor] = None,
+    exclude_invalid_x: bool = True,
+) -> Tuple[Tensor, Optional[Tensor], Tensor]:
+    """Prepare inputs with invalid (NaN or Inf) entries for a masked loss.
+
+    Invalid entries are set to zero and marked latent in the condition mask (a
+    variable with any invalid feature is latent), and the returned validity mask
+    excludes them from the loss, so that the network is never trained to reproduce
+    the placeholder values.
+
+    Note: If `exclude_invalid_x` is False, the tensors are returned as is and every
+    entry counts as valid.
+
+    Args:
+        inputs: Batch of inputs, `(B, T)` or `(B, T, F)`.
+        condition_masks: Optional condition masks, `(B, T)`.
+        exclude_invalid_x: Whether to exclude invalid entries.
+
+    Returns:
+        The cleaned inputs, the updated condition masks, and the boolean validity
+        mask of the shape of `inputs`.
+    """
+    if not exclude_invalid_x:
+        return inputs, condition_masks, torch.ones_like(inputs, dtype=torch.bool)
+
+    valid = torch.isfinite(inputs)
+    if bool(valid.all()):
+        return inputs, condition_masks, valid
+    if not bool(valid.any()):
+        raise ValueError(
+            "No valid data entries left after excluding NaNs and Infs. In case you "
+            "are encoding missing trials with NaNs consider setting "
+            "exclude_invalid_x=False and z_score_x=None to disable z-scoring."
+        )
+
+    # The value is irrelevant: these entries are latent and excluded from the loss.
+    inputs = torch.where(valid, inputs, torch.zeros_like(inputs))
+    if condition_masks is not None:
+        node_valid = valid if valid.shape == condition_masks.shape else valid.all(-1)
+        condition_masks = condition_masks.bool() & node_valid
+    return inputs, condition_masks, valid
 
 
 def npe_msg_on_invalid_x(
@@ -639,6 +704,25 @@ def nle_nre_apt_msg_on_invalid_x(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 f"{algorithm} does not allow invalid simulations. "
                 f"Replace the invalid values with an unreasonably low or high value."
+            )
+
+
+def simformer_msg_on_invalid_x(
+    num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
+) -> None:
+    if num_nans + num_infs > 0:
+        if exclude_invalid_x:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "Samples presenting invalid entries will be forced to be latent in "
+                "the condition mask."
+            )
+        else:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "Training will likely fail, we strongly recommend "
+                f"`exclude_invalid_x=True` for {algorithm}."
             )
 
 
@@ -800,6 +884,8 @@ def prior_support_is_bounded(prior: Any) -> Optional[bool]:
         False if the support is the real space, True otherwise, and None if the prior
         does not define a `support`.
     """
+    if prior is None:
+        return False
     try:
         support = prior.support
     except (NotImplementedError, AttributeError):
@@ -815,7 +901,7 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
 
     If first checks whether the `distribution` has a `support` attribute (as is the
     case for `torch.distribution`). If it does not, it evaluates the log-probabilty and
-    returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
+    returns whether it is finite or not (this handles e.g. `NeuralPosterior`). Only
     checking whether the log-probabilty is not `-inf` will not work because, as of
     torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
     sample is out of the support (see #451). In `process_prior()`, we set
@@ -830,6 +916,9 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     Returns:
         Tensor of bools indicating whether each sample was within the support.
     """
+    if distribution is None:
+        return torch.ones(samples.shape[:-1], dtype=torch.bool, device=samples.device)
+
     # Try to check using the support property, use log prob method otherwise.
     # Before torch v1.7.0, `support.check()` returned bools for every element.
     # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,
@@ -1280,7 +1369,7 @@ def gradient_ascent(
     sorted_inits = inits[sort_indices]
     optimize_inits = sorted_inits[-num_to_optimize:]
 
-    # The `_overall` variables store data accross the iterations, whereas the
+    # The `_overall` variables store data across the iterations, whereas the
     # `_iter` variables contain data exclusively extracted from the current
     # iteration. Slicing keeps the batch dim, so `argmax` is `(1, D)` and `max`
     # is `(1,)` on every return path, as in the loop below.

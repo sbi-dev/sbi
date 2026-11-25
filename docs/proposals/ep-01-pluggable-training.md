@@ -49,7 +49,7 @@ codebase harder to work with.
 - **Type safety**: Prevent entire classes of bugs through static typing
 - **Easier feature integration**: Clean interfaces for community contributions
 - **Future extensibility**: Lightweight interfaces for external tools, e.g., logging and
-  early stoppping.
+  early stopping.
 
 ## Non-Goals
 
@@ -60,7 +60,7 @@ more important than reducing code duplication.
 
 We also want to avoid adding complexity by aiming implementing all possible features.
 E.g., we probably should not implement all kinds of early stopping tools internally
-because this will add maintainance and documentation burden for us, and overhead for the
+because this will add maintenance and documentation burden for us, and overhead for the
 user to understand the API and the docs. Instead, we should implement either a
 lightweight interface that allows to plug external early stopping tool, or implement
 just a basic version in our internal training (like we do now), and refer to the
