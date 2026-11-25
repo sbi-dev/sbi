@@ -3,7 +3,7 @@
 
 import inspect
 import warnings
-from typing import Dict, Optional, Self, Sequence, Union
+from typing import Any, Dict, Optional, Self, Sequence, Union
 
 import torch
 from torch import Tensor, float32
@@ -87,32 +87,35 @@ def get_distribution_parameters(
     return params
 
 
-def move_distribution_to_device(
-    dist: Distribution, device: Union[str, torch.device]
-) -> Distribution:
-    """Move a distribution to the specified device.
+def move_distribution_to_device(dist: Any, device: Union[str, torch.device]) -> Any:
+    """Move a distribution, or any object with a `to()` method, to `device`.
 
-    If the distribution has a `.to()` method (e.g. sbi prior wrappers like
-    ``PytorchReturnTypeWrapper`` or ``BoxUniform``), it is called directly.
-    Otherwise, if its constructor takes only its ``arg_constraints`` parameters, the
-    distribution is rebuilt on the target device. Else its tensors are moved in place,
-    so that its other constructor arguments are kept.
+    If the object has a `.to()` method (e.g. a posterior or sbi prior wrappers like
+    ``PytorchReturnTypeWrapper`` or ``BoxUniform``), it is called directly. Any other
+    object that is not a torch `Distribution`, e.g. a plain function, is returned
+    unchanged. Otherwise, if its constructor takes only its ``arg_constraints``
+    parameters, the distribution is rebuilt on the target device. Else its tensors are
+    moved in place, so that its other constructor arguments are kept.
 
     Args:
-        dist: The distribution to move.
+        dist: The distribution or object to move.
         device: The target device.
 
     Returns:
-        The distribution on the target device. If it moved in place or is already on
-        `device`, this is the same object; otherwise it is a new instance.
+        The object on the target device. If it moved in place, is already on `device`
+        or cannot move, this is the same object; otherwise it is a new instance.
     """
     if hasattr(dist, "to"):
         # sbi priors move in place; a user prior may return a moved copy instead.
-        moved = dist.to(device)  # type: ignore
+        moved = dist.to(device)
         if moved is None or moved is dist:
             return dist
-        set_validate_args(moved, dist._validate_args)
+        # Only torch distributions carry a validation flag.
+        if isinstance(dist, Distribution) and isinstance(moved, Distribution):
+            set_validate_args(moved, dist._validate_args)
         return moved
+    if not isinstance(dist, Distribution):
+        return dist
     if isinstance(dist, Independent):
         dist.base_dist = move_distribution_to_device(dist.base_dist, device)
         return dist
