@@ -989,6 +989,37 @@ def test_rolled_back_step_does_not_end_training(monkeypatch, surrogate: str):
         assert torch.equal(p_snapshot, p_before)
 
 
+def _loss_and_grads(monkeypatch, optimizer_class, kwargs, noise, outside_value):
+    """Gradient loss and its gradients for fixed reparameterized particles, under a
+    target whose log density is `outside_value` for theta < -1.5."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    shifted = MultivariateNormal(ones(1), 0.25 * eye(1))
+
+    def target_log_prob(theta):
+        outside = theta[..., 0] < -1.5
+        return torch.where(outside, outside_value, shifted.log_prob(theta))
+
+    target = SimpleNamespace(log_prob=target_log_prob)
+    optimizer = optimizer_class(
+        potential_fn=make_tractable_potential(target, prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        lr=1e-3,
+        gamma=0.999,
+        **kwargs,
+    )
+    q = optimizer.q
+
+    def sample_and_log_prob(sample_shape):
+        # Reparameterized, so gradients also flow through the potential.
+        samples = q.loc + q.log_scale.exp() * torch.tensor(noise).unsqueeze(-1)
+        return samples, q.log_prob(samples)
+
+    monkeypatch.setattr(q, "sample_and_log_prob", sample_and_log_prob)
+    surrogate, _ = optimizer.loss(zeros(1))
+    return surrogate, torch.autograd.grad(surrogate, list(q.parameters()))
+
+
 @pytest.mark.parametrize(
     "optimizer_class, kwargs",
     [
@@ -1002,41 +1033,33 @@ def test_iw_and_alpha_losses_leave_out_particles_outside_the_support(
     """A particle where the potential is -inf (as a `RestrictedPrior` gives) has
     weight 0 and adds nothing to the IW or alpha gradient loss (0 * log 0 = 0), as a
     particle whose weight underflows to 0."""
-    prior = MultivariateNormal(zeros(1), eye(1))
-    shifted = MultivariateNormal(ones(1), 0.25 * eye(1))
-    noise = torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]).unsqueeze(-1)
-
-    def loss_and_grads(outside_value):
-        def target_log_prob(theta):
-            outside = theta[..., 0] < -1.5
-            return torch.where(outside, outside_value, shifted.log_prob(theta))
-
-        target = SimpleNamespace(log_prob=target_log_prob)
-        optimizer = optimizer_class(
-            potential_fn=make_tractable_potential(target, prior),
-            q=LearnableGaussian(dim=1, full_covariance=False),
-            prior=prior,
-            lr=1e-3,
-            gamma=0.999,
-            **kwargs,
-        )
-        q = optimizer.q
-
-        def sample_and_log_prob(sample_shape):
-            # Reparameterized, so gradients also flow through the potential.
-            samples = q.loc + q.log_scale.exp() * noise
-            return samples, q.log_prob(samples)
-
-        monkeypatch.setattr(q, "sample_and_log_prob", sample_and_log_prob)
-        surrogate, _ = optimizer.loss(zeros(1))
-        return surrogate, torch.autograd.grad(surrogate, list(q.parameters()))
-
-    surrogate, grads = loss_and_grads(-torch.inf)
-    surrogate_underflow, grads_underflow = loss_and_grads(-1e4)
+    noise = [-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]
+    args = (monkeypatch, optimizer_class, kwargs, noise)
+    surrogate, grads = _loss_and_grads(*args, -torch.inf)
+    surrogate_underflow, grads_underflow = _loss_and_grads(*args, -1e4)
     assert torch.allclose(surrogate, surrogate_underflow)
     for grad, grad_underflow in zip(grads, grads_underflow, strict=True):
         assert torch.isfinite(grad).all()
         assert torch.allclose(grad, grad_underflow)
+
+
+def test_iw_loss_leaves_out_groups_entirely_outside_the_support(monkeypatch):
+    """An IW group with every particle outside the support has no estimate, so the
+    loss leaves it out, as if it had not been drawn."""
+    inside = [0.0, 0.5, 1.0, 2.0]
+    surrogate, grads = _loss_and_grads(
+        monkeypatch,
+        IWElboOptimizer,
+        {"n_particles": 3, "K": 2},
+        [-2.0, -1.8, *inside],
+        -torch.inf,
+    )
+    surrogate_ref, grads_ref = _loss_and_grads(
+        monkeypatch, IWElboOptimizer, {"n_particles": 2, "K": 2}, inside, -torch.inf
+    )
+    assert torch.allclose(surrogate, surrogate_ref)
+    for grad, grad_ref in zip(grads, grads_ref, strict=True):
+        assert torch.allclose(grad, grad_ref)
 
 
 def test_rollback_keeps_the_optimizer_settings(monkeypatch):

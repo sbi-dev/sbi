@@ -583,12 +583,18 @@ class IWElboOptimizer(ElboOptimizer):
         elbo_particles = self.generate_elbo_particles(x_o, self.n_particles * self.K)
         elbo_particles = elbo_particles.reshape(self.n_particles, self.K)
         weights = self.get_importance_weight(elbo_particles.clone().detach())
-        # Outside the support, the weight is 0: 0 * log 0 = 0, not 0 * -inf = nan.
-        outside = (weights == 0) & torch.isneginf(elbo_particles.detach())
+        # Outside the support, the weight is 0: 0 * log 0 = 0, not 0 * -inf = nan. A
+        # group with every particle outside has no estimate and is left out; with no
+        # group left, the loss is nan and the step rolls back.
+        outside = torch.isneginf(elbo_particles.detach())
+        empty = outside.all(-1, keepdim=True)
+        weights = torch.where(empty, 0.0, weights)
         elbo_particles_masked = torch.where(outside, 0.0, elbo_particles)
-        surrogate_loss = -(weights * elbo_particles_masked).sum(-1).mean(0)
-        loss = -(torch.logsumexp(elbo_particles, dim=-1) - np.log(self.K)).mean()
-        return surrogate_loss, loss.clone().detach()
+        num_groups = (~empty).sum()
+        surrogate_loss = -(weights * elbo_particles_masked).sum() / num_groups
+        bounds = torch.logsumexp(elbo_particles.detach(), -1, keepdim=True)
+        loss = -torch.where(empty, 0.0, bounds - np.log(self.K)).sum() / num_groups
+        return surrogate_loss, loss
 
     def get_importance_weight(self, elbo_particles: Tensor) -> Tensor:
         """Generates importance weights in a numerically stable fashion.
