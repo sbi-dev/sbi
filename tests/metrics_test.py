@@ -17,6 +17,7 @@ from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import (
     Distance,
+    biased_mmd,
     biased_mmd_hypothesis_test,
     c2st,
     l1,
@@ -271,6 +272,33 @@ def test_mmd_squared_distance(test, sigma):
         assert estimate < threshold, "Rejecting 0-hypothesis even though q=p."
     else:
         assert estimate > threshold, "Accepting 0-hypothesis even though q!=p."
+
+
+def test_biased_mmd_with_repeated_values():
+    """Most pairwise distances are zero for discrete data, so the median bandwidth is
+    zero. The test must still return a finite MMD below the threshold for two samples
+    from the same distribution, and above it for different distributions."""
+    torch.manual_seed(0)
+    x = torch.poisson(torch.full((200, 1), 0.3))
+    y = torch.poisson(torch.full((200, 1), 0.3))
+    estimate, threshold = biased_mmd_hypothesis_test(x, y)
+    assert np.isfinite(estimate)
+    assert estimate < threshold
+
+    y = torch.poisson(torch.full((200, 1), 3.0))
+    estimate, threshold = biased_mmd_hypothesis_test(x, y)
+    assert estimate > threshold
+
+
+def test_biased_mmd_of_permuted_sample_is_finite():
+    """The same sample in a different order has an MMD of zero. Rounding can make the
+    squared estimate slightly negative, which must not give a NaN."""
+    for seed in range(20):
+        torch.manual_seed(seed)
+        x = torch.randn(200, 3)
+        mmd = biased_mmd(x, x[torch.randperm(200)])
+        assert torch.isfinite(mmd)
+        assert mmd < 1e-3
 
 
 @pytest.mark.parametrize(
