@@ -9,6 +9,7 @@ import pytest
 import torch
 from scipy.stats import binomtest
 from sklearn.neural_network import MLPClassifier
+from skorch import NeuralNetBinaryClassifier
 from torch import Tensor
 
 from sbi.diagnostics.lc2st import (
@@ -419,6 +420,22 @@ def test_lc2st_null_training_leaves_global_rng_untouched(cal_data):
     lc2st.train_under_null_hypothesis(verbosity=0)
 
     assert torch.equal(rng_state, torch.get_rng_state())
+
+
+def test_lc2st_skorch_ensemble_trains(cal_data, theta_o, x_o):
+    """An ensemble of skorch classifiers gets the float labels its loss needs."""
+    lc2st = LC2ST(
+        cal_data.thetas,
+        cal_data.xs,
+        cal_data.posterior_samples,
+        classifier=NeuralNetBinaryClassifier,
+        classifier_kwargs={"max_epochs": 2, "verbose": 0},
+        num_ensemble=2,
+    )
+    lc2st.train_on_observed_data()
+
+    statistic = lc2st.get_statistic_on_observed_data(theta_o=theta_o, x_o=x_o)
+    assert statistic >= 0.0
 
 
 def test_lc2st_normalization_handles_constant_dimensions(cal_data):
