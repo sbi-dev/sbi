@@ -359,40 +359,52 @@ class EnsemblePosterior(NeuralPosterior):
         without invoking samplers or drawing samples.
         """
 
-        def _extract_shape_from_dist(dist: Any) -> Optional[torch.Size]:
+        def _extract_shape_and_dtype_from_dist(
+            dist: Any,
+        ) -> Optional[Tuple[torch.Size, torch.dtype]]:
             while dist is not None:
-                shape = getattr(dist, "event_shape", None)
-                if shape is not None and len(shape) > 0:
-                    return torch.Size(shape)
-                batch_shape = getattr(dist, "batch_shape", None)
-                if batch_shape is not None and len(batch_shape) > 0:
-                    return torch.Size(batch_shape)
+                batch_shape = getattr(dist, "batch_shape", torch.Size())
+                event_shape = getattr(dist, "event_shape", torch.Size())
+                combined_shape = torch.Size(batch_shape + event_shape)
+                if len(combined_shape) > 0:
+                    dtype = getattr(dist, "dtype", None)
+                    if dtype is None:
+                        for attr in ("loc", "mean", "logits", "probs", "scale"):
+                            val = getattr(dist, attr, None)
+                            if isinstance(val, Tensor):
+                                dtype = val.dtype
+                                break
+                    if dtype is None:
+                        dtype = torch.float32
+                    return combined_shape, dtype
                 dist = getattr(dist, "_prior", None) or getattr(
                     dist, "full_prior", None
                 )
             return None
 
         if self.prior is not None:
-            shape = _extract_shape_from_dist(self.prior)
-            if shape is not None:
-                return shape, torch.float32
+            res = _extract_shape_and_dtype_from_dist(self.prior)
+            if res is not None:
+                return res
 
         # When the ensemble has no prior, derive event shape from the components.
         for component in self.posteriors:
+            for dist_attr in ("prior", "_prior", "proposal"):
+                dist = getattr(component, dist_attr, None)
+                res = _extract_shape_and_dtype_from_dist(dist)
+                if res is not None:
+                    return res
+
             for attr in ("event_shape", "theta_shape"):
                 shape = getattr(component, attr, None)
                 if shape is not None and len(shape) > 0:
-                    return torch.Size(shape), torch.float32
+                    dtype = getattr(component, "dtype", torch.float32)
+                    return torch.Size(shape), dtype
 
             param_dim = getattr(component, "parameter_dim", None)
             if isinstance(param_dim, int):
-                return torch.Size([param_dim]), torch.float32
-
-            for dist_attr in ("prior", "_prior", "proposal"):
-                dist = getattr(component, dist_attr, None)
-                shape = _extract_shape_from_dist(dist)
-                if shape is not None:
-                    return shape, torch.float32
+                dtype = getattr(component, "dtype", torch.float32)
+                return torch.Size([param_dim]), dtype
 
             estimator = getattr(component, "posterior_estimator", None)
             if estimator is not None:
@@ -400,19 +412,24 @@ class EnsemblePosterior(NeuralPosterior):
                 if callable(shape):
                     shape = shape()
                 if shape is not None and len(shape) > 0:
-                    return torch.Size(shape), torch.float32
+                    try:
+                        dtype = next(estimator.parameters()).dtype
+                    except (StopIteration, AttributeError):
+                        dtype = torch.float32
+                    return torch.Size(shape), dtype
 
             potential = getattr(component, "potential_fn", None)
             if potential is not None:
+                for dist_attr in ("prior", "proposal"):
+                    dist = getattr(potential, dist_attr, None)
+                    res = _extract_shape_and_dtype_from_dist(dist)
+                    if res is not None:
+                        return res
                 for attr in ("theta_shape", "event_shape", "input_shape"):
                     shape = getattr(potential, attr, None)
                     if shape is not None and len(shape) > 0:
-                        return torch.Size(shape), torch.float32
-                for dist_attr in ("prior", "proposal"):
-                    dist = getattr(potential, dist_attr, None)
-                    shape = _extract_shape_from_dist(dist)
-                    if shape is not None:
-                        return shape, torch.float32
+                        dtype = getattr(potential, "dtype", torch.float32)
+                        return torch.Size(shape), dtype
 
         return torch.Size([1]), torch.float32
 

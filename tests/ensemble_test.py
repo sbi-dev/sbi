@@ -469,6 +469,34 @@ def test_ensemble_zero_samples_direct_posterior(method: str):
         assert samples_zero_2d.shape == (0, 4, 3, 2)
 
 
+@pytest.mark.parametrize("method", ["sample", "sample_batched"])
+def test_ensemble_zero_samples_batch_and_event_shape_float64(method: str):
+    """Zero-sample requests on TractablePosteriors with batched float64 distributions
+    must preserve both batch and event dimensions and the float64 dtype.
+    """
+    loc = zeros(2, 3, dtype=torch.float64)
+    cov = eye(3, dtype=torch.float64).expand(2, 3, 3)
+    mvn = MultivariateNormal(loc, cov)
+    posteriors = [TractablePosterior(PosteriorPotential(mvn, mvn)) for _ in range(2)]
+    ensemble = EnsemblePosterior(posteriors)
+    ensemble.set_default_x(zeros(1, 2))
+
+    if method == "sample":
+        samples = ensemble.sample((0,))
+        assert samples.shape == (0, 2, 3)
+        assert samples.dtype == torch.float64
+        samples_2d = ensemble.sample((0, 4))
+        assert samples_2d.shape == (0, 4, 2, 3)
+        assert samples_2d.dtype == torch.float64
+    else:
+        samples = ensemble.sample_batched((0,), x=zeros(5, 2))
+        assert samples.shape == (0, 5, 2, 3)
+        assert samples.dtype == torch.float64
+        samples_2d = ensemble.sample_batched((0, 2), x=zeros(5, 2))
+        assert samples_2d.shape == (0, 2, 5, 2, 3)
+        assert samples_2d.dtype == torch.float64
+
+
 def test_ensemble_sample_preserves_multidimensional_event_shape():
     """`sample()` must preserve multi-dimensional parameter event shapes without
     flattening them to a single dimension.
