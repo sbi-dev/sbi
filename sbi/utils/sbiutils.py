@@ -287,8 +287,8 @@ def standardizing_transform(
     """Builds standardizing transform for nflows
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across
-            first dimension) are computed.
+        batch_t: Batched tensor from which mean and std deviation are computed,
+            across the first dimension or, for structured data, over all values.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which uses one mean and one std over all values of the batch, or
             independent (default), which z-scores dimensions independently.
@@ -311,8 +311,8 @@ def standardizing_transform_zuko(
     """Builds standardizing transform for Zuko flows
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across
-            first dimension) are computed.
+        batch_t: Batched tensor from which mean and std deviation are computed,
+            across the first dimension or, for structured data, over all values.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which uses one mean and one std over all values of the batch, or
             independent (default), which z-scores dimensions independently.
@@ -405,12 +405,12 @@ def z_standardization(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> [Tensor, Tensor]:
+) -> Tuple[Tensor, Tensor]:
     """Computes mean and standard deviation for z-scoring
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across
-            first dimension) are computed.
+        batch_t: Batched tensor from which mean and std deviation are computed,
+            across the first dimension or, for structured data, over all values.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which uses one mean and one std over all values of the batch, or
             independent (default), which z-scores dimensions independently.
@@ -425,7 +425,6 @@ def z_standardization(
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
     valid_t = batch_t[is_valid_t]
 
-    # Structured data gets a single mean over all dimensions.
     t_mean = torch.mean(valid_t) if structured_dims else torch.mean(valid_t, dim=0)
 
     if len(valid_t) == 1:
@@ -502,8 +501,8 @@ def standardizing_net(
     """Builds standardizing network
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across
-            first dimension) are computed.
+        batch_t: Batched tensor from which mean and std deviation are computed,
+            across the first dimension or, for structured data, over all values.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
             images), which uses one mean and one std over all values of the batch, or
             independent (default), which z-scores dimensions independently.
