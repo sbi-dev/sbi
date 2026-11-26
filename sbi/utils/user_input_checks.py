@@ -285,7 +285,7 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     # and use exact formulas for it.
     if prior.log_prob(prior.sample(torch.Size((10,)))).shape == torch.Size([10, 1]):
         wrapped = maybe_wrap_batched_1d_prior(prior)
-        if wrapped is prior:
+        if wrapped is None or wrapped is prior:
             wrapped = OneDimPriorWrapper(prior, validate_args=False)
         prior = wrapped
 
