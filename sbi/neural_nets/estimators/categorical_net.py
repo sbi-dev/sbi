@@ -245,18 +245,11 @@ class CategoricalMADE(MADE):
         # BatchNorm1d always receive 2D `(N, features)` tensors.
         with torch.no_grad():
             if context is not None:
-                embedded_context = self.embedding_net.forward(context)
+                embedded_context: Optional[Tensor] = self.embedding_net.forward(context)
                 embedded_context = (
                     embedded_context.unsqueeze(0)
                     .expand(num_samples, *embedded_context.shape)
                     .reshape(total_batch, *embedded_context.shape[1:])
-                )
-            elif self.context_features is not None:
-                embedded_context = torch.zeros(
-                    total_batch,
-                    self.context_features,
-                    device=device,
-                    dtype=self.mask.dtype,
                 )
             else:
                 embedded_context = None

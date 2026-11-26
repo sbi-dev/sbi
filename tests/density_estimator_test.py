@@ -690,8 +690,39 @@ def test_categorical_made_sample_unconditional_and_edge_shapes():
     assert cond_net.sample(torch.Size([]), context=ctx).shape == (2, 2)
     assert cond_net.sample(torch.Size([0]), context=ctx).shape == (0, 2, 2)
     assert cond_net.sample(torch.Size([2, 3]), context=ctx).shape == (2, 3, 2, 2)
-    # Conditional MADE called with context=None falls back to zero context on net device
+    # Conditional MADE called with context=None uses the same None-context path
+    # as forward/log_prob.
     assert cond_net.sample(torch.Size([5]), context=None).shape == (5, 1, 2)
+
+
+def test_categorical_made_missing_context_consistency_with_nonzero_bias():
+    """sample(..., context=None) and log_prob(..., condition=None) must agree."""
+    torch.manual_seed(0)
+    net = CategoricalMADE(
+        num_categories=torch.tensor([2, 3]),
+        num_hidden_features=16,
+        num_context_features=4,
+        embedding_net=torch.nn.Linear(5, 4),
+    )
+    # Give context layers a large nonzero bias so passing zeros vs None would diverge.
+    with torch.no_grad():
+        net.context_layer.bias.fill_(5.0)
+        for block in net.blocks:
+            if getattr(block, "context_layer", None) is not None:
+                block.context_layer.bias.fill_(5.0)
+    net.eval()
+
+    grid = torch.tensor(
+        [[i, j] for i in range(2) for j in range(3)], dtype=torch.float32
+    )
+    exact_probs = net.log_prob(grid, condition=None).exp()
+    samples = net.sample(torch.Size([4000]), context=None)[:, 0, :]
+    empirical_probs = torch.tensor([
+        ((samples[:, 0] == i) & (samples[:, 1] == j)).float().mean()
+        for i in range(2)
+        for j in range(3)
+    ])
+    assert torch.allclose(empirical_probs, exact_probs, atol=0.04)
 
 
 @pytest.mark.parametrize(
