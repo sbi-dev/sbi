@@ -138,11 +138,12 @@ def warn_if_invalid_for_zscoring(
     if len(constant_dims) > 0:
         warnings.warn(
             f"Data has constant values in dimension(s) {constant_dims.tolist()}. "
-            "These dimensions carry no information and will be mapped to zero after "
-            "z-scoring. Consider removing constant features from your data.",
+            "These dimensions carry no information. Consider removing constant "
+            "features from your data.",
             UserWarning,
             stacklevel=2,
         )
+        return  # Skip outlier check if there are constant features
 
     # Check for extreme outliers using IQR-based detection (robust to outliers)
     q1, q3 = torch.quantile(
@@ -441,6 +442,7 @@ def z_standardization(
 
     t_std = values.std(dim=0)
     constant = values.amax(dim=0) == values.amin(dim=0)
+    t_mean = torch.where(constant, values[0], t_mean)
     t_std = torch.where(constant, torch.ones_like(t_std), t_std)
     return t_mean, t_std.clamp(min=min_std)
 

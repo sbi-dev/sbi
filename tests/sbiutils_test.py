@@ -1040,7 +1040,7 @@ def test_constant_features_are_centred_not_rescaled(stats_fn):
         dim=1,
     )
 
-    _, std = stats_fn(batch, False)
+    mean, std = stats_fn(batch, False)
 
-    assert std[0] == 1.0
+    assert mean[0] == batch[0, 0] and std[0] == 1.0
     assert std[1] < 0.1
