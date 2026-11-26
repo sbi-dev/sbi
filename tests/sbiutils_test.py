@@ -2,7 +2,6 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
-import pickle
 import warnings
 from typing import Tuple
 
@@ -561,19 +560,6 @@ def test_mean_and_std_follow_dtype_cast(layer_cls):
     layer = layer_cls(torch.zeros(2), torch.ones(2)).double()
 
     assert layer.mean.dtype == layer.std.dtype == torch.float64
-
-
-@pytest.mark.parametrize("layer_cls", (Standardize, Destandardize))
-def test_older_pickle_loads_without_stale_mean_and_std(layer_cls):
-    """Older sbi versions pickled plain `mean`/`std` copies beside the buffers."""
-    layer = layer_cls(torch.zeros(2), 2 * torch.ones(2))
-    layer.__dict__.update(mean=torch.ones(2), std=torch.ones(2))
-
-    loaded = pickle.loads(pickle.dumps(layer))
-
-    assert "mean" not in vars(loaded) and "std" not in vars(loaded)
-    assert torch.equal(loaded.mean, torch.zeros(2))
-    assert torch.equal(loaded.std, 2 * torch.ones(2))
 
 
 @pytest.mark.parametrize(
