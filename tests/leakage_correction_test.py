@@ -11,6 +11,7 @@ import torch
 from sbi.inference import DirectPosterior, VectorFieldPosterior
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.neural_nets import posterior_flow_nn, posterior_nn, posterior_score_nn
+from sbi.samplers.rejection.rejection import count_accepted
 from sbi.utils import BoxUniform
 from sbi.utils.torchutils import process_device
 from tests.test_utils import mps_fallback_disabled
@@ -98,36 +99,25 @@ def test_zero_mass_gives_nan_inside_and_minus_inf_outside():
     assert log_prob[0].isnan() and log_prob[1] == float("-inf")
 
 
-@pytest.mark.parametrize("estimator_type, num_xos", [("direct", 60), ("flow", 1)])
-def test_normalizer_draws_stay_within_cap_and_batch_size(
-    estimator_type, num_xos, monkeypatch
-):
-    """Every observation stops at `max_num_draws` draws, and no call of the sampler
-    draws more than the batch size, also for more observations than that."""
-    prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
-    posterior = _posterior(estimator_type, prior)
-    is_vf = isinstance(posterior, VectorFieldPosterior)
-    owner = posterior if is_vf else posterior.posterior_estimator
-    sampler = "sample_via_ode" if is_vf else "sample"
-    sample = getattr(owner, sampler)
+def test_count_accepted_stops_at_target_or_cap_within_batch_size():
+    """Each observation stops at its target of accepted draws or at the cap, and no
+    call of the proposal draws more than the batch size."""
     draws_per_call = []
 
-    def spy(sample_shape, **kwargs):
-        num_conditions = 1 if is_vf else kwargs["condition"].shape[0]
-        draws_per_call.append(torch.Size(sample_shape).numel() * num_conditions)
-        return sample(sample_shape, **kwargs)
+    def proposal(num_draws, indices):
+        draws_per_call.append(num_draws * len(indices))
+        return indices.expand(num_draws, -1)
 
-    monkeypatch.setattr(owner, sampler, spy)
-    posterior.max_sampling_batch_size = 40
-    batch_size = {} if is_vf else {"rejection_sampling_batch_size": 40}
-    posterior.leakage_correction(
-        torch.zeros(num_xos, 2),
-        num_rejection_samples=250,
+    accepted, drawn = count_accepted(
+        proposal,
+        lambda theta: theta == 0,
+        num_xos=2,
+        num_accepted=100,
         max_num_draws=250,
-        **batch_size,
+        max_sampling_batch_size=40,
     )
 
-    assert sum(draws_per_call) == 250 * num_xos
+    assert accepted.tolist() == [100, 0] and drawn.tolist() == [100, 250]
     assert max(draws_per_call) <= 40
 
 

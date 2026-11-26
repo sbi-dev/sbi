@@ -636,20 +636,26 @@ _LEAKAGE_HINT = (
 def _support_mass(num_accepted: Tensor, num_drawn: Tensor) -> Tensor:
     """Return the share of draws inside the prior support, one per observation.
 
-    Warns for observations without any draw inside, whose mass is then 0.
+    Warns for observations with less than 1% of their draws inside, and gives the
+    bound for those without any draw inside, whose mass is then 0.
     """
-    empty = num_accepted == 0
-    if empty.any():
-        num_draws = int(num_drawn[empty].min())
-        warn(
-            f"{int(empty.sum())} of {empty.numel()} observation(s) have no posterior "
-            f"draw inside the prior support in {num_draws} draws: their mass inside "
-            f"is below about {3 / num_draws:.1e}, and `log_prob()` returns NaN inside "
-            "the support. Raise `max_num_draws` in `leakage_correction_params` to "
-            "resolve a smaller mass.",
-            stacklevel=5,
+    mass = num_accepted.float() / num_drawn.float()
+    low, empty = mass < 0.01, num_accepted == 0
+    if low.any():
+        message = (
+            f"{int(low.sum())} of {low.numel()} observation(s) have less than 1% of "
+            f"their posterior draws inside the prior support. {_LEAKAGE_HINT}"
         )
-    return num_accepted.float() / num_drawn.float()
+        if empty.any():
+            num_draws = int(num_drawn[empty].min())
+            message += (
+                f" {int(empty.sum())} have none in {num_draws} draws: their mass is "
+                f"below about {3 / num_draws:.1e}, and `log_prob()` returns NaN "
+                "inside the support. Raise `max_num_draws` in "
+                "`leakage_correction_params` to resolve a smaller mass."
+            )
+        warn(message, stacklevel=5)
+    return mass
 
 
 def _normalize_by_support_mass(log_prob: Tensor, mass: Tensor) -> Tensor:
