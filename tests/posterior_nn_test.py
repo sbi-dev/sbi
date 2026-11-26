@@ -311,6 +311,23 @@ def test_filtered_direct_posterior_defers_max_sampling_batch_size(monkeypatch):
     assert received == [None, 7]
 
 
+def test_filtered_direct_posterior_sets_context_for_leakage_correction(monkeypatch):
+    """A direct `leakage_correction(x)` call draws with the context of this `x`."""
+    events = []
+    monkeypatch.setattr(
+        DirectPosterior, "leakage_correction", lambda self, x: events.append("draw")
+    )
+    posterior = object.__new__(FilteredDirectPosterior)
+    monkeypatch.setattr(posterior, "_x_else_default_x", lambda x: x, raising=False)
+    monkeypatch.setattr(
+        posterior, "_set_context_for_x_o", lambda x: events.append("context"), False
+    )
+
+    posterior.leakage_correction(ones(1, 2))
+
+    assert events == ["context", "draw"]
+
+
 @pytest.mark.parametrize("reject_outside_prior", [True, False])
 def test_npe_a_batched_sample_log_prob_apply_proposal_correction(
     reject_outside_prior: bool,

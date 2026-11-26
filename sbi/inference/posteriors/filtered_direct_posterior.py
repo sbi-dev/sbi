@@ -218,6 +218,14 @@ class FilteredDirectPosterior(DirectPosterior):
             leakage_correction_params=leakage_correction_params,
         )
 
+    def leakage_correction(self, x: Tensor, *args, **kwargs) -> Tensor:
+        """Estimate the leakage correction factor after setting context for `x`.
+
+        Takes the arguments of `DirectPosterior.leakage_correction()`.
+        """
+        self._set_context_for_x_o(self._x_else_default_x(x))
+        return super().leakage_correction(x, *args, **kwargs)
+
     def log_prob_batched(
         self,
         theta: Tensor,
