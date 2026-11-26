@@ -363,8 +363,8 @@ def wasserstein_2_squared(
         raise TypeError(
             f"'x' and 'y' must be float32 or float64, got {x.dtype} and {y.dtype}."
         )
-    if x.shape[-2] == 0 or y.shape[-2] == 0:
-        raise ValueError("'x' and 'y' need at least one point each.")
+    if 0 in (x.shape[-2], y.shape[-2], x.shape[-1]):
+        raise ValueError("'x' and 'y' need at least one point and one feature each.")
 
     # Squared l2 cost from pairwise differences, since cdist's matmul path cancels
     # far from the origin; one feature at a time keeps the memory at (B, m, n).
