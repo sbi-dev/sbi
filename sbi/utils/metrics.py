@@ -452,7 +452,8 @@ def regularized_ot_dual(
         log_row_marginal = torch.logsumexp(-s(f, g), dim=2)
         err = (log_row_marginal.exp() - a).abs().sum(dim=1)
         if i > 0:
-            terminated = torch.logical_or(terminated, err < tol)
+            # A row with a non-finite cost never converges; its result is NaN.
+            terminated = terminated | (err < tol) | err.isnan()
         if torch.all(terminated):
             break
         if i == max_iter:
