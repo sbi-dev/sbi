@@ -83,7 +83,8 @@ def run_tarp(
             ``[0, 1]``, see equation 2 of the paper
 
     Raises:
-        ValueError: if ``references`` does not have the shape of ``thetas``.
+        ValueError: if ``references`` does not have the shape of ``thetas``, or if a
+            distance is NaN, e.g. for NaN posterior samples.
     """
 
     if references is not None:
@@ -201,17 +202,21 @@ def _run_tarp(
     # distances between references and true values
     theta_dists = distance(references, thetas)
 
-    # number of posterior samples closer to the reference than theta (f in algorithm 2
-    # is this count divided by num_posterior_samples); theta takes a random position
-    # among posterior samples at the same distance
-    ties = torch.sum(sample_dists == theta_dists, dim=0)
-    counts = torch.sum(sample_dists < theta_dists, dim=0) + torch.floor(
-        torch.rand_like(ties, dtype=torch.float32) * (ties + 1)
-    )
+    if sample_dists.isnan().any() or theta_dists.isnan().any():
+        raise ValueError(
+            "TARP distances contain NaN. Check the posterior samples, thetas, "
+            "references and the distance function for NaN values."
+        )
 
-    # Under calibration the counts are uniform on 0, ..., num_posterior_samples, so
-    # the noisy counts below are uniform on [0, 1) for any num_posterior_samples.
-    coverage_values = (counts + torch.rand_like(counts)) / (num_posterior_samples + 1)
+    # theta's rank among its posterior samples by distance to the reference (f in
+    # algorithm 2 is the number of closer samples divided by num_posterior_samples).
+    # Under calibration the rank is uniform on 0, ..., num_posterior_samples; one
+    # uniform draw over theta's ties and its rank interval makes the coverage values
+    # uniform on [0, 1) for any num_posterior_samples.
+    closer = torch.sum(sample_dists < theta_dists, dim=0)
+    ties = torch.sum(sample_dists == theta_dists, dim=0)
+    spread = torch.rand_like(ties, dtype=torch.float32) * (ties + 1)
+    coverage_values = (closer + spread) / (num_posterior_samples + 1)
 
     # enforce execution on the CPU due to
     # https://github.com/pytorch/pytorch/issues/69519
@@ -294,10 +299,10 @@ def check_tarp(
             NaN if ``num_tarp_samples`` is not given.
     """
 
-    # get the index of the middle of the alpha grid
-    midindex = alpha.shape[0] // 2
+    # index of the first grid point with alpha > 0.5
+    upper = (alpha.shape[0] - 1) // 2 + 1
     dalpha = alpha[1] - alpha[0]
-    atc = ((ecp[midindex:] - alpha[midindex:]) * dalpha).sum().item()
+    atc = ((ecp[upper:] - alpha[upper:]) * dalpha).sum().item()
 
     if num_tarp_samples is None:
         warnings.warn(
