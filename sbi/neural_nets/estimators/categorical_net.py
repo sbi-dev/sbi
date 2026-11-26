@@ -244,12 +244,13 @@ class CategoricalMADE(MADE):
         # flatten `(num_samples, batch_dim)` into a single batch axis so MADE and
         # BatchNorm1d always receive 2D `(N, features)` tensors.
         with torch.no_grad():
+            embedded_context: Optional[Tensor]
             if context is not None:
-                embedded_context: Optional[Tensor] = self.embedding_net.forward(context)
+                embedded: Tensor = self.embedding_net.forward(context)
                 embedded_context = (
-                    embedded_context.unsqueeze(0)
-                    .expand(num_samples, *embedded_context.shape)
-                    .reshape(total_batch, *embedded_context.shape[1:])
+                    embedded.unsqueeze(0)
+                    .expand(num_samples, *embedded.shape)
+                    .reshape(total_batch, *embedded.shape[1:])
                 )
             else:
                 embedded_context = None
