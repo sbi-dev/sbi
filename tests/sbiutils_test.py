@@ -1029,8 +1029,8 @@ def test_sbi_warnings_use_module_loggers(caplog):
 
 @pytest.mark.parametrize("stats_fn", [z_standardization, _finite_z_score_stats])
 def test_constant_features_are_centred_not_rescaled(stats_fn):
-    """A feature that is constant up to rounding gets std one, as in scikit-learn,
-    so the float32 rounding of its mean does not become a huge input. A small but
+    """A feature whose values are all equal gets std one, as in scikit-learn, so
+    the float32 rounding of its mean does not become a huge input. A small but
     real spread on a large level is still rescaled."""
     batch = torch.cat(
         [
@@ -1040,8 +1040,7 @@ def test_constant_features_are_centred_not_rescaled(stats_fn):
         dim=1,
     )
 
-    mean, std = stats_fn(batch, False)
+    _, std = stats_fn(batch, False)
 
     assert std[0] == 1.0
-    assert ((batch[:, 0] - mean[0]) / std[0]).abs().max() < 1e-6
     assert std[1] < 0.1

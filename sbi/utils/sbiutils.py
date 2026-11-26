@@ -143,7 +143,6 @@ def warn_if_invalid_for_zscoring(
             UserWarning,
             stacklevel=2,
         )
-        return  # Skip outlier check if there are constant features
 
     # Check for extreme outliers using IQR-based detection (robust to outliers)
     q1, q3 = torch.quantile(
@@ -418,19 +417,14 @@ def z_standardization(
             avoid division by zero.
 
     Returns:
-        Mean and standard deviation for z-scoring. Values that are constant up to
-        rounding get std one, as in scikit-learn, so they are centred but not
-        rescaled. From a single valid row, the mean is that row and the std is
-        one, so a net built from one row can load trained weights.
+        Mean and standard deviation for z-scoring. Features whose values are all
+        equal get std one, as in scikit-learn's `StandardScaler`, so they are
+        centred but not rescaled. From a single valid row, the mean is that row and
+        the std is one, so a net built from one row can load trained weights.
     """
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
     valid_t = batch_t[is_valid_t]
-    dtype = batch_t.dtype if batch_t.is_floating_point() else torch.float32
-    as_input = dict(device=batch_t.device, dtype=dtype)
-
-    values = to_float64(valid_t)
-    if structured_dims:
-        values = values.reshape(-1)
+    values = valid_t.reshape(-1) if structured_dims else valid_t
     t_mean = values.mean(dim=0)
 
     if len(valid_t) == 1:
@@ -443,39 +437,12 @@ def z_standardization(
             UserWarning,
             stacklevel=2,
         )
-        t_mean = t_mean.to(**as_input)
         return t_mean, torch.ones_like(t_mean)
 
-    t_std = std_or_one_if_constant(t_mean, values.var(dim=0), len(values))
-    return t_mean.to(**as_input), t_std.clamp(min=min_std).to(**as_input)
-
-
-def to_float64(tensor: Tensor) -> Tensor:
-    """`tensor` in float64, on the CPU if its device has no float64 (MPS)."""
-    device = "cpu" if tensor.device.type == "mps" else tensor.device
-    return tensor.to(device, torch.float64)
-
-
-def std_or_one_if_constant(
-    mean: Tensor, var: Tensor, count: Union[Tensor, int]
-) -> Tensor:
-    """Standard deviation for z-scoring, but one where the values are constant.
-
-    Values count as constant when their variance is below the rounding error of the
-    two-pass variance. This is the bound of scikit-learn's `StandardScaler`, which
-    also leaves constant features unscaled.
-
-    Args:
-        mean: Mean of the values, in float64.
-        var: Variance of the values, in float64.
-        count: Number of values behind each mean and variance.
-
-    Returns:
-        The square root of `var`, with one where the values are constant.
-    """
-    eps = torch.finfo(torch.float64).eps
-    constant = var <= count * eps * var + (count * mean * eps) ** 2
-    return torch.where(constant, torch.ones_like(var), var).sqrt()
+    t_std = values.std(dim=0)
+    constant = values.amax(dim=0) == values.amin(dim=0)
+    t_std = torch.where(constant, torch.ones_like(t_std), t_std)
+    return t_mean, t_std.clamp(min=min_std)
 
 
 class _MeanStdBuffers(nn.Module):

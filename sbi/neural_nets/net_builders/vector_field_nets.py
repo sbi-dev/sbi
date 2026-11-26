@@ -36,8 +36,6 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     build_z_scored_embedding_net,
-    std_or_one_if_constant,
-    to_float64,
     z_score_parser,
     z_standardization,
 )
@@ -1537,15 +1535,17 @@ def _finite_z_score_stats(
 
     Returns:
         Mean and standard deviation, of shape `input_shape` (independent) or
-        scalars (structured). Entries that are constant up to rounding, or have
-        fewer than two finite values, get std one.
+        scalars (structured). Entries whose finite values are all equal, or that
+        have fewer than two finite values, get std one, as in `z_standardization`.
     """
-    as_output = dict(device=batch_x.device, dtype=torch.float32)
-    batch_x = to_float64(batch_x)
+    batch_x = batch_x.float()
     finite = torch.isfinite(batch_x)
     values = torch.where(finite, batch_x, torch.zeros_like(batch_x))
     dims = tuple(range(batch_x.dim())) if structured else (0,)
     count = finite.sum(dim=dims)
+    highest = torch.where(finite, batch_x, -torch.inf).amax(dim=dims)
+    lowest = torch.where(finite, batch_x, torch.inf).amin(dim=dims)
+    unscaled = (highest == lowest) | (count < 2)
     if (count < 2).any():
         warnings.warn(
             "Some entries have fewer than two finite values in the data used for "
@@ -1555,8 +1555,8 @@ def _finite_z_score_stats(
     mean = values.sum(dim=dims) / count.clamp(min=1)
     centered = torch.where(finite, batch_x - mean, torch.zeros_like(batch_x))
     var = centered.pow(2).sum(dim=dims) / (count - 1).clamp(min=1)
-    std = std_or_one_if_constant(mean, var, count).clamp(min=min_std)
-    return mean.to(**as_output), std.to(**as_output)
+    std = torch.where(unscaled, torch.ones_like(var), var).sqrt()
+    return mean, std.clamp(min=min_std)
 
 
 def _simformer_config_from_kwargs(
