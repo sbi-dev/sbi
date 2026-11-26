@@ -304,6 +304,16 @@ def test_log_prob_broadcasting_batch_dims(
     assert log_probs.shape == (2, batch_dim)
 
 
+@pytest.mark.parametrize("density_estimator_build_fn", [build_nsf, build_zuko_nsf])
+def test_log_prob_rejects_input_of_another_width(density_estimator_build_fn):
+    """An input of width 1 must not be broadcast to the event shape."""
+    density_estimator, _, condition, _ = _build_density_estimator_and_tensors(
+        density_estimator_build_fn, (2,), (3,), batch_dim=4
+    )
+    with pytest.raises(ValueError, match="Shape of input"):
+        density_estimator.log_prob(torch.zeros(4, 1), condition=condition)
+
+
 @pytest.mark.parametrize(
     "density_estimator_build_fn",
     [build_nsf, build_zuko_nsf],

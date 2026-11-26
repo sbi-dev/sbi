@@ -357,3 +357,37 @@ def test_potential_rejects_x_of_another_shape(estimator: str):
     assert potential_fn.bind(zeros(3)).x_o.shape == (1, 3)
     with pytest.raises(ValueError, match=r"x has shape \(2, 4\), but one observation"):
         potential_fn.bind(zeros(2, 4))
+
+
+@pytest.mark.parametrize("estimator", ("likelihood", "ratio"))
+def test_potential_pairs_one_observation_with_every_theta(estimator: str):
+    """Without iid trials, one observation pairs with every theta, as for NPE, and
+    gives the iid potential of that observation."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    if estimator == "likelihood":
+        net = likelihood_nn("mdn")(theta, x)
+        potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+    else:
+        net = classifier_nn("mlp")(theta, x)
+        potential_fn, _ = ratio_estimator_based_potential(net, prior, None)
+
+    theta_o = prior.sample((4,))
+    paired = potential_fn.bind(x[:1], x_is_iid=False)(theta_o, track_gradients=False)
+    iid = potential_fn.bind(x[:1], x_is_iid=True)(theta_o, track_gradients=False)
+    assert paired.shape == (4,)
+    assert torch.allclose(paired, iid)
+
+
+def test_posterior_rejects_theta_of_another_width():
+    """A theta with fewer entries than the prior has parameters used to broadcast and
+    return values without an error."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    net = likelihood_nn("maf")(theta, x)
+    potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+    posterior = ImportanceSamplingPosterior(potential_fn, proposal=prior)
+
+    match = r"theta has shape \(4, 1\), but the prior has 2 parameter"
+    with pytest.raises(ValueError, match=match):
+        posterior.potential(zeros(4, 1), x=zeros(1, 3))

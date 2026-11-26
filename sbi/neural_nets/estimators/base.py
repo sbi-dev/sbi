@@ -134,7 +134,9 @@ class ConditionalEstimator(nn.Module, ABC):
                 f"be compatible with condition_shape {exp_condition_shape}."
             )
         else:
-            condition_shape = condition.shape[-len(self.condition_shape) :]
+            condition_shape = condition.shape[
+                condition.dim() - len(self.condition_shape) :
+            ]
             if condition_shape != exp_condition_shape:
                 raise ValueError(
                     f"Shape of condition {condition_shape} does not match the "
@@ -164,7 +166,7 @@ class ConditionalEstimator(nn.Module, ABC):
                 f"be compatible with the provided input_shape {exp_input_shape}."
             )
         else:
-            input_shape = input.shape[-len(self.input_shape) :]
+            input_shape = input.shape[input.dim() - len(self.input_shape) :]
             if input_shape != exp_input_shape:
                 raise ValueError(
                     f"Shape of input {input_shape} does not match the "
@@ -187,7 +189,12 @@ class ConditionalEstimator(nn.Module, ABC):
             input: Expanded to `(sample_dim, batch_dim, *input_event_shape)`.
             condition: Expanded to `(sample_dim, batch_dim, *condition_event_shape)`.
             batch_dim: The broadcast batch dimension.
+
+        Raises:
+            ValueError: If `input` or `condition` does not end in its event shape.
         """
+        self._check_input_shape(input)
+        self._check_condition_shape(condition)
         input_event_dims = len(self.input_shape)
         condition_event_dims = len(self.condition_shape)
 
@@ -1434,7 +1441,7 @@ class UnconditionalEstimator(nn.Module, ABC):
                 f"be compatible with the provided input_shape {exp_input_shape}."
             )
         else:
-            input_shape = input.shape[-len(self.input_shape) :]
+            input_shape = input.shape[input.dim() - len(self.input_shape) :]
             if input_shape != exp_input_shape:
                 raise ValueError(
                     f"Shape of input {input_shape} does not match the "
