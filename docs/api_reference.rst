@@ -34,6 +34,7 @@ Prior and simulator
    sbi.utils.RestrictedPrior
    sbi.utils.RestrictionEstimator
    sbi.inference.simulate_for_sbi
+   sbi.inference.simulate_from_theta
 
 
 Neural nets
