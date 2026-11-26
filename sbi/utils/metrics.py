@@ -52,7 +52,7 @@ class MLPClassifierModule(nn.Module):
         Returns:
             Output logits of shape `(batch, output_dim)`.
         """
-        return self.sequential(X.float())
+        return self.sequential(X.to(self.sequential[0].weight.dtype))
 
 
 def c2st(
@@ -83,7 +83,7 @@ def c2st(
     Note: Both set of samples are normalized (z scored) using the mean and std
     of the samples in <X>. If <z_score> is set to False, no normalization is
     done. If features in <X> are close to constant with std close to zero, the
-    std is set to 1 to avoud division by zero.
+    std is set to 1 to avoid division by zero.
 
     Args:
         X: Samples from one distribution.
@@ -195,6 +195,28 @@ def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
     )
 
 
+def _mmd_lengthscale(
+    scale: Optional[float], *squared_distances: Tensor
+) -> Union[Tensor, float]:
+    """Return `scale`, or the median of the pairwise distances if it is None.
+
+    The median is floored at 1e-8: it is zero when most samples are identical, as
+    in discrete data, and the floor then gives a kernel that is 1 for identical
+    samples and 0 otherwise, instead of NaN.
+
+    Raises:
+        ValueError: If `scale` is zero or negative.
+    """
+    if scale is None:
+        # Square root after the median: its gradient is inf at a zero distance, and
+        # NaN once the median multiplies it by zero.
+        median = torch.median(torch.cat(squared_distances))
+        return torch.sqrt(torch.clamp(median, min=1e-16))
+    if scale <= 0:
+        raise ValueError(f"scale must be positive, got {scale}.")
+    return scale
+
+
 def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     """Unbiased approximation of the squared maximum-mean discrepancy (MMD) [1].
     The sample-based MMD relies on kernel evaluations between x_i and y_i. This
@@ -203,8 +225,8 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     Args:
         x: Data of shape (m, d)
         y: Data of shape (n, d)
-        scale: Lengthscale of the exponential kernel. If not specified,
-            the lengthscale is chosen based on a median heuristic.
+        scale: Lengthscale of the exponential kernel, must be positive. If not
+            specified, the lengthscale is chosen based on a median heuristic.
 
     Return:
         A single scalar for the squared MMD.
@@ -232,9 +254,7 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     xy = f(x, y, diag=True)
     yy = f(y, y)
 
-    s = torch.median(torch.sqrt(torch.cat((xx, xy, yy)))) if scale is None else scale
-    # Add small epsilon to prevent division by zero when distributions are identical
-    s = torch.clamp(s, min=1e-8) if isinstance(s, torch.Tensor) else max(s, 1e-8)
+    s = _mmd_lengthscale(scale, xx, xy, yy)
     c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
@@ -251,18 +271,19 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
 
 
 def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
-    """Biased approximation of the squared maximum-mean discrepancy (MMD) [1].
+    """Biased approximation of the maximum-mean discrepancy (MMD) [1].
     The sample-based MMD relies on kernel evaluations between x_i and y_i. This
     implementation only features a Gaussian kernel with lengthscale `scale`.
 
     Args:
         x: Data of shape (m, d)
         y: Data of shape (n, d)
-        scale: Lengthscale of the exponential kernel. If not specified,
-            the lengthscale is chosen based on a median heuristic.
+        scale: Lengthscale of the exponential kernel, must be positive. If not
+            specified, the lengthscale is chosen based on a median heuristic.
 
     Return:
-        A single scalar for the squared MMD.
+        A single scalar for the MMD, i.e. the square root of the biased estimate of
+        the squared MMD.
 
     References:
         [1] Gretton, A., et al. (2012). A kernel two-sample test.
@@ -276,7 +297,7 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     xy = f(x, y)
     yy = f(y, y)
 
-    s = torch.median(torch.sqrt(torch.cat((xx, xy, yy)))) if scale is None else scale
+    s = _mmd_lengthscale(scale, xx, xy, yy)
     c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
@@ -291,7 +312,9 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     mmd_square = kxx - 2 * kxy + kyy
     del kxx, kxy, kyy
 
-    return torch.sqrt(mmd_square)
+    # The estimate is non-negative, but rounding can make it slightly negative when the
+    # samples are (almost) the same, which would give a NaN from the square root.
+    return torch.sqrt(torch.clamp(mmd_square, min=0.0))
 
 
 def biased_mmd_hypothesis_test(x: Tensor, y: Tensor, alpha=0.05):

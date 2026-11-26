@@ -18,10 +18,9 @@ from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 from sbi.sbi_types import Shape
 from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.sbiutils import (
+    build_z_scored_embedding_net,
     get_simulations_since_round,
     handle_invalid_x,
-    standardizing_net,
-    z_score_parser,
 )
 from sbi.utils.torchutils import (
     ensure_theta_batched,
@@ -58,15 +57,7 @@ def build_input_layer(
     Returns:
         Input layer with optional embedding net and z-scoring.
     """
-    z_score_theta_bool, structured_theta = z_score_parser(z_score_theta)
-    if z_score_theta_bool:
-        input_layer = nn.Sequential(
-            standardizing_net(batch_theta, structured_theta), embedding_net_theta
-        )
-    else:
-        input_layer = embedding_net_theta
-
-    return input_layer
+    return build_z_scored_embedding_net(batch_theta, z_score_theta, embedding_net_theta)
 
 
 class RestrictionEstimator:
@@ -80,9 +71,7 @@ class RestrictionEstimator:
         hidden_features: int = 100,
         num_blocks: int = 2,
         dropout_probability: float = 0.5,
-        z_score: Optional[
-            Literal["independent", "structured", "transform_to_unconstrained", "none"]
-        ] = "independent",
+        z_score: Optional[Literal["independent", "structured", "none"]] = "independent",
         embedding_net: nn.Module = nn.Identity(),
     ) -> None:
         r"""
@@ -768,7 +757,11 @@ class RestrictedPrior(Distribution):
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-                alternative_method="sample_with='sir'",
+                # SIR needs a posterior; `sample()` has no time limit or bypass.
+                alternative_method=(
+                    "sample_with='sir'" if self._posterior is not None else None
+                ),
+                suggest_sampling_options=False,
             )
             # NOTE: This currently requires a float acceptance rate. A previous version
             # of accept_reject_sample returned a float. In favour to batched sampling
@@ -819,7 +812,7 @@ class RestrictedPrior(Distribution):
                 density. The normalizing factor is calculated via rejection sampling,
                 so if you need speedier but unnormalized log probability estimates set
                 here `norm_restricted_prior=False`. The returned log probability is set
-                to -∞ outside of the restriceted prior support regardless of this
+                to -∞ outside of the restricted prior support regardless of this
                 setting.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory

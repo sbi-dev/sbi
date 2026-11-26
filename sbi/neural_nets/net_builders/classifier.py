@@ -12,8 +12,7 @@ from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     assert_transform_to_unconstrained_supported,
-    standardizing_net,
-    z_score_parser,
+    build_z_scored_embedding_net,
 )
 from sbi.utils.user_input_checks import check_data_device
 
@@ -21,34 +20,6 @@ transform_to_unconstrained_suggestion = (
     "Ratio-based classifiers (NRE) do not implement it; "
     "use one of 'none', 'independent', or 'structured' instead."
 )
-
-
-def build_z_scored_embedding_net(
-    batch: Tensor,
-    z_score: Optional[str] = "independent",
-    embedding_net: nn.Module = nn.Identity(),
-) -> nn.Module:
-    """Builds input layer for classifiers that optionally z-scores.
-
-    Args:
-        batch: Batch of xs, used to infer dimensionality and (optional) z-scoring.
-        z_score: Whether to z-score xs passing into the network, can be one of:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean and std
-            over the entire batch, instead of per-dimension. Should be used when each
-            sample is, for example, a time series or an image.
-        embedding_net: Optional embedding network for x.
-
-    Returns:
-        Input layer that optionally z-scores.
-    """
-    z_score_bool, structured = z_score_parser(z_score)
-    if z_score_bool:
-        embedding_net = nn.Sequential(
-            standardizing_net(batch, structured), embedding_net
-        )
-    return embedding_net
 
 
 def build_linear_classifier(

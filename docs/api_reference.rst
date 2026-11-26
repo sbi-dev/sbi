@@ -34,6 +34,7 @@ Prior and simulator
    sbi.utils.RestrictedPrior
    sbi.utils.RestrictionEstimator
    sbi.inference.simulate_for_sbi
+   sbi.inference.simulate_from_theta
 
 
 Neural nets
@@ -48,6 +49,8 @@ Neural nets
    sbi.neural_nets.posterior_flow_nn
    sbi.neural_nets.posterior_nn
    sbi.neural_nets.posterior_score_nn
+   sbi.neural_nets.simformer_flow_nn
+   sbi.neural_nets.simformer_score_nn
 
 
 Estimators
@@ -90,6 +93,7 @@ Training
 
    sbi.inference.BNRE
    sbi.inference.FMPE
+   sbi.inference.FlowMatchingSimformer
    sbi.inference.MarginalTrainer
    sbi.inference.MCABC
    sbi.inference.MNLE
@@ -102,6 +106,7 @@ Training
    sbi.inference.NRE_A
    sbi.inference.NRE_B
    sbi.inference.NRE_C
+   sbi.inference.Simformer
    sbi.inference.SMCABC
 
 

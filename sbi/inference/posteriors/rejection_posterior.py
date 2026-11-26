@@ -12,7 +12,6 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Proposal, Shape, TorchTransform
-from sbi.utils.torchutils import ensure_theta_batched
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -96,7 +95,7 @@ class RejectionPosterior(NeuralPosterior):
 
         self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = self._theta_batched(theta)
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients
         )
@@ -137,9 +136,10 @@ class RejectionPosterior(NeuralPosterior):
                 directly from the proposal without rejection, which is faster but may
                 include samples outside the prior support.
             max_sampling_time: Optional maximum allowed sampling time in seconds.
-                If exceeded, sampling is aborted and a RuntimeError is raised. Only
-                applies when `reject_outside_prior=True` (no effect otherwise since
-                direct sampling from the proposal is fast).
+                If exceeded, sampling is aborted and a RuntimeError is raised. The
+                limit is checked between sampling batches, so a running batch is not
+                interrupted. Only applies when `reject_outside_prior=True` (no
+                effect otherwise since direct sampling from the proposal is fast).
             return_partial_on_timeout: If True and `max_sampling_time` is exceeded,
                 return the samples collected so far instead of raising a RuntimeError.
                 A warning will be issued. Only applies when `reject_outside_prior=True`

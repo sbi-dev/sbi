@@ -55,6 +55,20 @@ def test_uniform_normal_convolution_narrow_box_is_gaussian(scale: float):
     assert torch.allclose(score, -theta.detach(), rtol=1e-5)
 
 
+def test_uniform_normal_convolution_broadcast_batch_shape():
+    dist = UniformNormalConvolution(
+        low=0.0,
+        high=1.0,
+        scale=torch.tensor([[0.5], [2.0]]),
+        noise=torch.tensor([0.1, 0.2, 0.3]),
+    )
+
+    assert dist.batch_shape == (2, 3)
+    samples = dist.sample(torch.Size([5]))
+    assert samples.shape == (5, 2, 3)
+    assert dist.log_prob(samples).shape == samples.shape
+
+
 @pytest.mark.parametrize(
     "x_t, s",
     [
