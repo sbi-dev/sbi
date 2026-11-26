@@ -784,14 +784,6 @@ class UniformNormalPosterior(Distribution):
 
         return self.sigma**2 * variance_adjustment.to(self.sigma.dtype)
 
-    def sample(self, sample_shape: torch.Size = torch.Size()) -> Tensor:
-        # Inverse CDF sampling for a truncated normal
-        u = torch.rand(sample_shape, device=self.low.device) * self.Z + self.a
-        sample = self.mu + self.sigma * self.standard_normal.icdf(
-            u
-        )  # Using icdf for stability
-        return torch.clamp(sample, min=self.low, max=self.high)
-
     def log_prob(self, x: Tensor) -> Tensor:
         normal = Normal(self.mu, self.sigma, validate_args=False)
         lp = normal.log_prob(x) - self.log_Z
