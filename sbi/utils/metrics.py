@@ -355,13 +355,11 @@ def wasserstein_2_squared(
             "if x.ndim=2 or x.ndim=3."
         )
 
-    # Evaluate the cost matrix based on the default l2 cost. The matrix
-    # multiplication shortcut of cdist (|x|^2 + |y|^2 - 2 x.y) cancels for points
-    # far from the origin, e.g. it returns 0 in float32 for 10000 and 10001.
-    # Subtract the points pairwise instead: every backend and dtype supports it
-    # (cdist's direct mode is not available on MPS or in half precision), and a
-    # difference of nearby points is exact, wherever they lie.
-    cost_matrix = (x.unsqueeze(-2) - y.unsqueeze(-3)).pow(2).sum(-1)
+    # Squared l2 cost from pairwise differences, since cdist's matmul path cancels
+    # far from the origin; one feature at a time keeps the memory at (B, m, n).
+    cost_matrix = sum(
+        (x[..., :, None, k] - y[..., None, :, k]) ** 2 for k in range(x.shape[-1])
+    )
 
     coupling = regularized_ot_dual(
         a,
@@ -736,7 +734,7 @@ def wasserstein_distance(
     Returns:
         The squared Wasserstein-2 distance.
     """
-    batched_x_o = x_o.repeat((x.shape[0], *[1] * len(x_o.shape)))
+    batched_x_o = x_o.expand(x.shape[0], *x_o.shape)
     return wasserstein_2_squared(
         batched_x_o, x, relative_epsilon=relative_epsilon, max_iter=max_iter, tol=tol
     )
