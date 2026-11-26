@@ -705,21 +705,18 @@ class UniformNormalPosterior(Distribution):
         self.mu = self.x_t / self.m
         self.sigma = self.s / torch.abs(self.m)
 
-        # In standard units the box is [alpha, beta]. Mirror it to lie mostly above
-        # the mode, and take c, its point closest to the mode.
+        # In standard units the box is [alpha, beta]; c is its point closest to the
+        # mode.
         alpha = (self.low - self.mu) / self.sigma
         beta = (self.high - self.mu) / self.sigma
-        width = (self.high - self.low) / self.sigma
-        self._flip = alpha + beta < 0
-        lower = torch.where(self._flip, -beta, alpha)
-        self._c = torch.where(lower > 0, lower, 0.0)
+        self._c = torch.maximum(alpha, beta.clamp(max=0))
 
         # Moments of y = z - c by quadrature: the density of y is proportional to
         # exp(-c y - y**2 / 2) <= 1, so no terms of order c**2 cancel, and beyond
         # `reach` it is below exp(-32) of its peak.
-        reach = 64 / (torch.sqrt(self._c**2 + 64) + self._c)
-        y_lo = (lower - self._c).clamp(min=-reach)
-        y_hi = (lower - self._c + width).clamp(max=reach)
+        reach = 64 / (torch.sqrt(self._c**2 + 64) + self._c.abs())
+        y_lo = (alpha - self._c).clamp(min=-reach)
+        y_hi = (beta - self._c).clamp(max=reach)
         nodes, weights = (
             torch.as_tensor(t, dtype=y_lo.dtype, device=y_lo.device)
             for t in _GAUSS_LEGENDRE
@@ -732,13 +729,7 @@ class UniformNormalPosterior(Distribution):
         prob = density / total.unsqueeze(-1)
         mean_y = (prob * y).sum(-1)
         var_y = (prob * (y - mean_y.unsqueeze(-1)) ** 2).sum(-1)
-
-        # Measure from the box edge at c (or the mode if c = 0): mu + c sigma would
-        # lose the digits of a narrow box far from the mode.
-        edge = torch.where(self._flip, self.high, self.low)
-        self._anchor = torch.where(self._c > 0, edge, self.mu)
-        shift = self.sigma * mean_y
-        self._mean = self._anchor + torch.where(self._flip, -shift, shift)
+        self._mean = self.mu + self.sigma * (self._c + mean_y)
         self._variance = self.sigma**2 * var_y
 
         batch_shape = torch.broadcast_shapes(
@@ -756,11 +747,9 @@ class UniformNormalPosterior(Distribution):
         return self._variance
 
     def log_prob(self, x: Tensor) -> Tensor:
-        # log pdf(z) - log Z with z = c + d and log Z = log pdf(c) + log mass, so
-        # the terms of order c**2 drop out.
-        d = (x - self._anchor) / self.sigma
-        d = torch.where(self._flip, -d, d)
-        lp = -d * (2 * self._c + d) / 2 - self._log_mass - torch.log(self.sigma)
+        # log pdf(z) - log Z with log Z = log pdf(c) + log mass.
+        z = (x - self.mu) / self.sigma
+        lp = -(z - self._c) * (z + self._c) / 2 - self._log_mass - torch.log(self.sigma)
         return torch.where((x >= self.low) & (x <= self.high), lp, -torch.inf)
 
 
