@@ -170,7 +170,7 @@ class NeuralPosterior:
         """
         self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = self._theta_batched(theta)
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients
         )
@@ -333,6 +333,36 @@ class NeuralPosterior:
     def _resolve_x(self) -> Optional[Tensor]:
         """Return the `x` that methods use when they get none: the default `x`."""
         return self.default_x
+
+    def _theta_batched(self, theta: Array) -> Tensor:
+        """Return `theta` as a tensor with a batch dimension.
+
+        Args:
+            theta: Parameters.
+
+        Raises:
+            ValueError: If the last axis of `theta` does not hold one value per
+                parameter of the prior.
+        """
+        theta = torch.as_tensor(theta)
+        if theta.dim() == 0:
+            theta = theta.reshape(1)
+        prior = self._theta_prior
+        if isinstance(prior, Distribution):
+            # A prior of one parameter can have batch and event shape `()` or `(1,)`.
+            num_parameters = (prior.batch_shape + prior.event_shape).numel()
+            if theta.shape[-1] != num_parameters:
+                raise ValueError(
+                    f"theta has shape {tuple(theta.shape)}, but the prior has "
+                    f"{num_parameters} parameter(s): the last axis of theta must "
+                    f"have size {num_parameters}."
+                )
+        return ensure_theta_batched(theta)
+
+    @property
+    def _theta_prior(self) -> Optional[Distribution]:
+        """The prior that `_theta_batched` checks the width of theta against."""
+        return getattr(self.potential_fn, "prior", None)
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
@@ -594,6 +624,11 @@ class NeuralPosterior:
         self.to(actual_device)
 
 
+# Explains the low-acceptance warning of rejection sampling within the prior support.
+_LEAKAGE_HINT = (
+    "A low acceptance rate means that most of the posterior estimate lies outside "
+    "the prior bounds (leakage)."
+)
 # Advice shared by the errors of posteriors that take one observation.
 _ONE_AT_A_TIME = (
     "For a separate posterior of each observation, pass one observation at a time"

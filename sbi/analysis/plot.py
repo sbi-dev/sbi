@@ -2396,7 +2396,7 @@ def marginal_plot_with_probs_intensity(
         label = "probability"
 
     # get colormap
-    cmap = cm.get_cmap(cmap_name)
+    cmap = plt.get_cmap(cmap_name)
 
     # case of 1d marginal
     if marginal_dim == 1:

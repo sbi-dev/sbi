@@ -415,6 +415,9 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         Returns:
             Tuple of dataloaders for training and validation.
 
+        Raises:
+            ValueError: If `resume_training` is True but the samples differ from those
+                of the last call.
         """
 
         #
@@ -424,17 +427,33 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
 
         # Get total number of training examples.
         num_examples = simulation_data[0].size(0)
-        # Select random train and validation splits from (theta, x) pairs.
-        num_training_examples = int((1 - validation_fraction) * num_examples)
-        num_validation_examples = num_examples - num_training_examples
 
         if not resume_training:
             # Separate indices for training and validation
+            num_training_examples = int((1 - validation_fraction) * num_examples)
             permuted_indices = torch.randperm(num_examples)
             self.train_indices, self.val_indices = (
                 permuted_indices[:num_training_examples],
                 permuted_indices[num_training_examples:],
             )
+            self._split_starting_round = starting_round
+        else:
+            # The saved split indexes the same rows only for the same starting round
+            # and number of rows (objects pickled by an earlier sbi store no round).
+            saved_rows = len(getattr(self, "train_indices", ())) + len(
+                getattr(self, "val_indices", ())
+            )
+            saved_round = getattr(self, "_split_starting_round", starting_round)
+            if saved_rows != num_examples or saved_round != starting_round:
+                raise ValueError(
+                    "`resume_training=True` continues training on the samples of the "
+                    "last `train()` call, but there was no earlier call or the "
+                    "samples changed, for example after appending simulations or "
+                    "changing `discard_prior_samples`. Call `train()` without "
+                    "`resume_training` to train on the current samples."
+                )
+        num_training_examples = len(self.train_indices)
+        num_validation_examples = len(self.val_indices)
 
         # Create training and validation loaders using a subset sampler.
         # Intentionally use dicts to define the default dataloader args

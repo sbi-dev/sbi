@@ -352,31 +352,6 @@ def _patch_inverse_transform_pickling() -> None:
 _patch_inverse_transform_pickling()
 
 
-def _contains_inverse_transform(transform: TorchTransform) -> bool:
-    """Return whether a transform tree contains an inverse wrapper."""
-    seen = set()
-
-    def contains_inverse(current: TorchTransform) -> bool:
-        if id(current) in seen:
-            return False
-        seen.add(id(current))
-        if isinstance(current, torch_tf._InverseTransform):
-            return True
-        for key, value in current.__dict__.items():
-            if key == "_inv":
-                continue
-            if isinstance(value, TorchTransform) and contains_inverse(value):
-                return True
-            if isinstance(value, (list, tuple)) and any(
-                isinstance(item, TorchTransform) and contains_inverse(item)
-                for item in value
-            ):
-                return True
-        return False
-
-    return contains_inverse(transform)
-
-
 class CallableTransform(nn.Module):
     """Own a PyTorch transform as a movable, picklable module.
 
@@ -386,15 +361,14 @@ class CallableTransform(nn.Module):
 
     def __init__(self, transform: TorchTransform):
         super().__init__()
-        self._is_inverse = _contains_inverse_transform(transform)
-        self._transform = transform.inv if self._is_inverse else transform
-        if not isinstance(
-            self._transform, TorchTransform
-        ) or _contains_inverse_transform(self._transform):
+        if not isinstance(transform, TorchTransform):
             raise ValueError(
-                "CallableTransform requires one transform orientation without "
-                "nested inverse wrappers."
+                f"CallableTransform requires a torch Transform, got {type(transform)}."
             )
+        # Store an inverse as its forward, so a forward that is an `nn.Module` stays
+        # a registered submodule.
+        self._is_inverse = isinstance(transform, torch_tf._InverseTransform)
+        self._transform = transform.inv if self._is_inverse else transform
 
     @property
     def transform(self) -> TorchTransform:
@@ -404,8 +378,8 @@ class CallableTransform(nn.Module):
     def forward(self) -> TorchTransform:
         return self.transform
 
-    def _apply(self, fn):
-        super()._apply(fn)
+    def _apply(self, fn, *args, **kwargs):
+        super()._apply(fn, *args, **kwargs)
         _apply_to_transform(self._transform, fn)
         return self
 
@@ -1472,7 +1446,14 @@ def gradient_ascent(
 
 
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
-    """Sets all python, numpy and pytorch seeds."""
+    """Seeds the global random states of Python, numpy and PyTorch.
+
+    It also makes cuDNN use deterministic convolution algorithms for the rest of the
+    session, which can slow down convolutions on a GPU.
+
+    Args:
+        seed: Seed for all random states. If None, it is drawn from PyTorch's.
+    """
 
     # Cast Tensor to int (required by math.random since Python 3.11)
     seed = int(torch.randint(1000000, size=(1,))) if seed is None else int(seed)
