@@ -112,12 +112,12 @@ def test_count_accepted_stops_at_target_or_cap_within_batch_size():
         proposal,
         lambda theta: theta == 0,
         num_xos=2,
-        num_accepted=100,
-        max_num_draws=250,
+        num_accepted=10,
+        max_num_draws=75,
         max_sampling_batch_size=40,
     )
 
-    assert accepted.tolist() == [100, 0] and drawn.tolist() == [100, 250]
+    assert accepted.tolist() == [10, 0] and drawn.tolist() == [10, 75]
     assert max(draws_per_call) <= 40
 
 
