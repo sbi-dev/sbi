@@ -417,9 +417,9 @@ def accept_reject_sample(
         num_accepted = are_accepted.sum(dim=0)
         num_sampled_total += num_accepted.to(num_sampled_total.device)
         num_samples_possible += sampling_batch_size
-        min_num_accepted = num_accepted.min().item()
-        pbar.update(min(min_num_accepted, num_remaining))
-        num_remaining -= min_num_accepted
+        num_collected = min(int(num_sampled_total.min()), num_samples)
+        pbar.update(num_collected - (num_samples - num_remaining))
+        num_remaining = num_samples - num_collected
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.
