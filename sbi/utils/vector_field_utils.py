@@ -712,12 +712,12 @@ class UniformNormalPosterior(Distribution):
         width = (self.high - self.low) / self.sigma
         self._flip = alpha + beta < 0
         lower = torch.where(self._flip, -beta, alpha)
-        self._c = lower.clamp(min=0)
+        self._c = torch.where(lower > 0, lower, 0.0)
 
         # Moments of y = z - c by quadrature: the density of y is proportional to
         # exp(-c y - y**2 / 2) <= 1, so no terms of order c**2 cancel, and beyond
         # `reach` it is below exp(-50) of its peak.
-        reach = 100 / (torch.sqrt(self._c**2 + 100) + self._c)
+        reach = 100 / (torch.hypot(self._c, torch.tensor(10.0)) + self._c)
         y_lo = (lower - self._c).clamp(min=-reach)
         y_hi = (lower - self._c + width).clamp(max=reach)
         nodes, weights = (
