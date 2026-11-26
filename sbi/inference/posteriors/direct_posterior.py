@@ -403,6 +403,15 @@ class DirectPosterior(NeuralPosterior):
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
         # otherwise, the leading is sample.
         num_leading = len(theta.shape) - len(event_shape)
+        if num_leading > 2:
+            flat_theta = theta.reshape(-1, *theta.shape[num_leading - 1 :])
+            return self.log_prob_batched(
+                flat_theta,
+                x,
+                norm_posterior,
+                track_gradients,
+                leakage_correction_params,
+            ).reshape(theta.shape[:num_leading])
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, event_shape, leading_is_sample=(num_leading > 1)
         )
