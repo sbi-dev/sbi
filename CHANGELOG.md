@@ -8,6 +8,7 @@
   * A network trained before this change gives different outputs after it, also when it was saved with `save()` or pickled whole, because the forward pass changed. Retrain it.
 * **Structured z-scoring uses the std over all values** ([#2240](https://github.com/sbi-dev/sbi/pull/2240)): with `z_score_x="structured"` (and `"structured"` for any other z-scored variable), the std is now the std over all valid values of the training batch instead of the mean of the per-simulation stds. The z-scored inputs then have variance one; before, simulations that differ in level or amplitude, or are nearly flat, could give inputs far larger than one. The mean is unchanged.
   * Only newly built networks change. Trained networks keep their z-scoring mean and std in buffers, so saved, pickled or `load_state_dict()`-restored models behave as before. Training again with the same settings gives a different network.
+* **z-scoring leaves constant features unscaled** ([#2240](https://github.com/sbi-dev/sbi/pull/2240)): a feature that is constant up to rounding in the training data now gets std one, as in scikit-learn's `StandardScaler`, so it is centred but not rescaled. Before, its std was raised to `min_std` (1e-14 or 1e-7): float32 rounding of its mean gave training inputs up to 1e8, and an observation 1e-3 away from the constant gave inputs up to 1e11. This holds for all z-scoring modes and estimators, the Simformer included. As above, only newly built networks change.
 
 ## v0.27.0
 

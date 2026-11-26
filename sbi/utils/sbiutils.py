@@ -418,14 +418,20 @@ def z_standardization(
             avoid division by zero.
 
     Returns:
-        Mean and standard deviation for z-scoring. From a single valid row, the
-        mean is that row and the std is one, so a net built from one row can load
-        trained weights.
+        Mean and standard deviation for z-scoring. Values that are constant up to
+        rounding get std one, as in scikit-learn, so they are centred but not
+        rescaled. From a single valid row, the mean is that row and the std is
+        one, so a net built from one row can load trained weights.
     """
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
     valid_t = batch_t[is_valid_t]
+    as_input = dict(device=batch_t.device, dtype=batch_t.dtype)
 
-    t_mean = torch.mean(valid_t) if structured_dims else torch.mean(valid_t, dim=0)
+    # float64 on the CPU, since MPS has no float64.
+    values = valid_t.to("cpu", torch.float64)
+    if structured_dims:
+        values = values.reshape(-1)
+    t_mean = values.mean(dim=0)
 
     if len(valid_t) == 1:
         warnings.warn(
@@ -437,15 +443,33 @@ def z_standardization(
             UserWarning,
             stacklevel=2,
         )
+        t_mean = t_mean.to(**as_input)
         return t_mean, torch.ones_like(t_mean)
 
-    if structured_dims:
-        t_std = torch.std(valid_t).clamp(min=min_std)
-    else:
-        t_std = torch.std(valid_t, dim=0)
-        t_std[t_std < min_std] = min_std
+    t_std = std_or_one_if_constant(t_mean, values.var(dim=0), len(values))
+    return t_mean.to(**as_input), t_std.clamp(min=min_std).to(**as_input)
 
-    return t_mean, t_std
+
+def std_or_one_if_constant(
+    mean: Tensor, var: Tensor, count: Union[Tensor, int]
+) -> Tensor:
+    """Standard deviation for z-scoring, but one where the values are constant.
+
+    Values count as constant when their variance is below the rounding error of the
+    two-pass variance. This is the bound of scikit-learn's `StandardScaler`, which
+    also leaves constant features unscaled.
+
+    Args:
+        mean: Mean of the values, in float64.
+        var: Variance of the values, in float64.
+        count: Number of values behind each mean and variance.
+
+    Returns:
+        The square root of `var`, with one where the values are constant.
+    """
+    eps = torch.finfo(torch.float64).eps
+    constant = var <= count * eps * var + (count * mean * eps) ** 2
+    return torch.where(constant, torch.ones_like(var), var.sqrt())
 
 
 class _MeanStdBuffers(nn.Module):
