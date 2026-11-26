@@ -21,15 +21,19 @@ from sbi.analysis import (
     eval_conditional_density,
     sensitivity_analysis,
 )
+from sbi.analysis.sensitivity_analysis import Destandardize
 from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
+    Standardize,
     clamp_and_warn,
     gradient_ascent,
     mcmc_transform,
+    standardizing_net,
     warn_if_invalid_for_zscoring,
     z_score_parser,
+    z_standardization,
 )
 
 
@@ -550,6 +554,14 @@ def test_z_score_parser_rejects_bool(z_score_flag):
         z_score_parser(z_score_flag)
 
 
+@pytest.mark.parametrize("layer_cls", (Standardize, Destandardize))
+def test_mean_and_std_follow_dtype_cast(layer_cls):
+    """`mean` and `std` must be the buffers that `.to()` casts, not stale copies."""
+    layer = layer_cls(torch.zeros(2), torch.ones(2)).double()
+
+    assert layer.mean.dtype == layer.std.dtype == torch.float64
+
+
 @pytest.mark.parametrize(
     "z_x",
     [
@@ -690,6 +702,19 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
     # plt.plot(x_zstructured.T)
     # plt.title('z-scored: structured dims');
     # plt.show()
+
+
+@pytest.mark.parametrize("event_shape", [(1, 6, 6), (3, 6, 6), (2, 18)])
+def test_structured_z_scoring_uses_all_event_dims(event_shape):
+    """Structured std is the per-sample std over the whole event, whatever its shape."""
+    batch = torch.randn(50, *event_shape) * 3.0 + 1.0
+    expected_std = batch.flatten(start_dim=1).std(dim=1).mean()
+
+    _, t_std = z_standardization(batch, structured_dims=True)
+    z_net = standardizing_net(batch, structured_dims=True)
+
+    assert torch.allclose(t_std, expected_std)
+    assert torch.allclose(z_net._std, expected_std)
 
 
 @pytest.mark.parametrize(
@@ -926,12 +951,18 @@ def test_mdn_prior_transform_is_read_only():
     assert est._prior_transform is not None
 
 
-@pytest.mark.parametrize("orientation", ["concrete", "inverse", "composed_inverse"])
+@pytest.mark.parametrize(
+    "orientation", ["concrete", "inverse", "composed_inverse", "nested_inverse"]
+)
 def test_callable_transform_preserves_orientation_and_dtype(orientation):
     """CallableTransform safely owns concrete and inverse transforms."""
     import pickle
 
-    from torch.distributions.transforms import AffineTransform, ComposeTransform
+    from torch.distributions.transforms import (
+        AffineTransform,
+        ComposeTransform,
+        SigmoidTransform,
+    )
 
     from sbi.utils.sbiutils import CallableTransform
 
@@ -943,6 +974,9 @@ def test_callable_transform_preserves_orientation_and_dtype(orientation):
             transform,
             AffineTransform(torch.ones(2), 3 * torch.ones(2)),
         ]).inv
+    elif orientation == "nested_inverse":
+        # The VI link of a `theta_transform` that ends in a logit.
+        transform = ComposeTransform([transform, SigmoidTransform().inv]).inv
 
     wrapped = pickle.loads(pickle.dumps(CallableTransform(transform)))
     x = torch.ones(2)

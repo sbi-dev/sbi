@@ -144,6 +144,13 @@ how to run each of these methods
   simulation-based inference_](https://proceedings.mlr.press/v202/geffner23a.html).
   (ICML 2023)
 
+- [`Simformer`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.Simformer.html)
+  and
+  [`FlowMatchingSimformer`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.FlowMatchingSimformer.html)
+  from Gloeckler, M., Deistler, M., Weilbach, C., Wood, F., & Macke, J. H.
+  [_All-in-one simulation-based inference_](https://arxiv.org/abs/2404.09636).
+  (ICML 2024)
+
 ### Neural Likelihood Estimation: amortized (NLE) and sequential (SNLE)
 
 - [`(S)NLE`](https://sbi.readthedocs.io/en/latest/api_reference/_autosummary/sbi.inference.NLE_A.html)

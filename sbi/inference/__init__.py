@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from sbi.inference.abc import MCABC, SMCABC
 from sbi.inference.trainers.base import (
+    MaskedNeuralInference,  # noqa: F401
     NeuralInference,  # noqa: F401
     check_if_proposal_has_default_x,
     infer,
@@ -13,7 +14,7 @@ from sbi.inference.trainers.marginal import MarginalTrainer
 from sbi.inference.trainers.nle import MNLE, NLE_A
 from sbi.inference.trainers.npe import MNPE, NPE_A, NPE_B, NPE_C, NPE_PFN  # noqa: F401
 from sbi.inference.trainers.nre import BNRE, NRE_A, NRE_B, NRE_C  # noqa: F401
-from sbi.inference.trainers.vfpe import FMPE, NPSE
+from sbi.inference.trainers.vfpe import FMPE, NPSE, FlowMatchingSimformer, Simformer
 
 NLE = NLE_A
 _nle_family = ["NLE", "NLE_A", "MNLE"]
@@ -43,7 +44,7 @@ from sbi.inference.potentials import (
     vector_field_estimator_based_potential,
 )
 from sbi.utils.removed_names import removed_names_getattr
-from sbi.utils.simulation_utils import simulate_for_sbi
+from sbi.utils.simulation_utils import simulate_for_sbi, simulate_from_theta
 
 __all__ = (
     _npe_family
@@ -51,9 +52,11 @@ __all__ = (
     + _nle_family
     + _abc_family
     + [
+        "FlowMatchingSimformer",
         "FMPE",
         "MarginalTrainer",
         "NPSE",
+        "Simformer",
         "DirectPosterior",
         "EnsemblePosterior",
         "ImportanceSamplingPosterior",
@@ -62,6 +65,7 @@ __all__ = (
         "VIPosterior",
         "VectorFieldPosterior",
         "simulate_for_sbi",
+        "simulate_from_theta",
         "infer",
         "likelihood_estimator_based_potential",
         "mixed_likelihood_estimator_based_potential",

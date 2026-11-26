@@ -165,14 +165,17 @@ def rejection_sample(
                     )
                     samples = torch.cat(accepted)
                     return samples, as_tensor(acceptance_rate)
-                raise RuntimeError(
+                msg = (
                     "Sampling aborted early because rejection sampling exceeded "
-                    "max_sampling_time. This is likely due to extremely low "
-                    "acceptance. You can disable rejection sampling using "
-                    "`reject_outside_prior=False` to draw samples directly from "
-                    "the trained estimator. Consider switching to MCMC or VI, or "
-                    "checking for model misspecification."
+                    "max_sampling_time."
                 )
+                if num_sampled_total > 0 and acceptance_rate < warn_acceptance:
+                    msg += (
+                        " This is likely due to extremely low acceptance. Consider "
+                        "switching to MCMC or VI, or checking for model "
+                        "misspecification."
+                    )
+                raise RuntimeError(msg)
 
             # Sample and reject.
             with nested_pbar_context():
@@ -213,16 +216,13 @@ def rejection_sample(
                 and num_remaining > 0
             ):
                 logger.warning(
-                    f"""Only {acceptance_rate:.3%} proposal samples were accepted. It
-                        may take a long time to collect the remaining {num_remaining}
-                        samples. You can prevent long runtimes by
-                        setting `max_sampling_time` to limit runtime, or disabling
-                        rejection sampling (e.g. via `reject_outside_prior=False` in
-                        `posterior.sample()` when available).
-                        Alternatively, consider interrupting (Ctrl-C) and switching
-                        to a different sampling method with
-                        `build_posterior(..., sample_with='mcmc')`. or
-                        `build_posterior(..., sample_with='vi')`."""
+                    f"Only {acceptance_rate:.3%} proposal samples were accepted. It "
+                    f"may take a long time to collect the remaining {num_remaining} "
+                    "samples. You can prevent long runtimes by setting "
+                    "`max_sampling_time` to limit runtime. Alternatively, consider "
+                    "interrupting (Ctrl-C) and switching to a different sampling "
+                    "method with `build_posterior(..., sample_with='mcmc')` or "
+                    "`build_posterior(..., sample_with='vi')`."
                 )
                 leakage_warning_raised = True  # Ensure warning is raised just once.
 
@@ -251,6 +251,8 @@ def accept_reject_sample(
     alternative_method: Optional[str] = None,
     max_sampling_time: Optional[float] = None,
     return_partial_on_timeout: bool = False,
+    low_acceptance_hint: Optional[str] = None,
+    suggest_sampling_options: bool = True,
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:
     r"""Returns samples from a proposal according to an acceptance criterion.
@@ -298,6 +300,12 @@ def accept_reject_sample(
         return_partial_on_timeout: If True and `max_sampling_time` is exceeded, return
             the samples collected so far instead of raising a RuntimeError. A warning
             will be issued indicating the partial return. Default is False.
+        low_acceptance_hint: What a low acceptance rate means for the caller, e.g.
+            leakage for NPE. Appended to the low-acceptance warnings, and to the
+            timeout error when the acceptance rate is below `warn_acceptance`.
+        suggest_sampling_options: Whether the low-acceptance warning and the timeout
+            error suggest `max_sampling_time` and `reject_outside_prior=False`. Set it
+            to False when the caller does not offer these options.
         kwargs: Absorb additional unused arguments that can be passed to
             `rejection_sample()`. Warn if not empty.
 
@@ -368,14 +376,27 @@ def accept_reject_sample(
                 samples = torch.stack(samples, dim=1)
                 samples = samples.reshape(num_collected, *draw_shape)
                 return samples, as_tensor(acceptance_rate, device=samples.device)
-            raise RuntimeError(
+            msg = (
                 "Sampling aborted early because rejection sampling exceeded "
-                "max_sampling_time. This is likely due to extremely low "
-                "acceptance. You can disable rejection sampling using "
-                "`reject_outside_prior=False` to draw samples directly from "
-                "the trained estimator. Consider switching to MCMC or VI, or "
-                "checking for model misspecification."
+                "max_sampling_time."
             )
+            if (
+                num_samples_possible > 0
+                and acceptance_rate.min().item() < warn_acceptance
+            ):
+                msg += " This is likely due to extremely low acceptance."
+                if suggest_sampling_options:
+                    msg += (
+                        " You can disable rejection sampling using "
+                        "`reject_outside_prior=False` to draw samples directly from "
+                        "the trained estimator."
+                    )
+                if alternative_method is not None:
+                    msg += f" Consider switching to `{alternative_method}`."
+                msg += " Low acceptance can also point to model misspecification."
+                if low_acceptance_hint is not None:
+                    msg += f" {low_acceptance_hint}"
+            raise RuntimeError(msg)
 
         # Sample and reject.
         with nested_pbar_context():
@@ -429,33 +450,42 @@ def accept_reject_sample(
         ):
             if sample_for_correction_factor:
                 idx_min = acceptance_rate.argmin().item()
-                logger.warning(
-                    f"""Drawing samples from posterior to estimate the normalizing
-                        constant for `log_prob()`. However, only
-                        {min_acceptance_rate:.3%} posterior samples are within the
-                        prior support (for condition {idx_min}). It may take a long time
-                        to collect the remaining {num_remaining} samples.
-                        Consider interrupting (Ctrl-C) and either basing the
-                        estimate of the normalizing constant on fewer samples (by
-                        passing `leakage_correction_params={{"num_rejection_samples":
-                        N}}` to `log_prob()`, where `N` is the number of
-                        samples you want to base the
-                        estimate on (default N=10000), or not estimating the
-                        normalizing constant at all
-                        (`log_prob(..., norm_posterior=False)`. The latter will
-                        result in an unnormalized `log_prob()`."""
+                warn_msg = (
+                    "Drawing samples from posterior to estimate the normalizing "
+                    "constant for `log_prob()`. However, only "
+                    f"{min_acceptance_rate:.3%} posterior samples are within the "
+                    f"prior support (for condition {idx_min}). It may take a long "
+                    f"time to collect the remaining {num_remaining} samples. "
+                    "Consider interrupting (Ctrl-C) and either basing the estimate "
+                    "of the normalizing constant on fewer samples (by passing "
+                    '`leakage_correction_params={"num_rejection_samples": N}` to '
+                    "`log_prob()`, where `N` is the number of samples you want to "
+                    "base the estimate on (default N=10000)), or not estimating the "
+                    "normalizing constant at all (`log_prob(..., "
+                    "norm_posterior=False)`). The latter will result in an "
+                    "unnormalized `log_prob()`."
                 )
             else:
-                warn_msg = f"""Only {min_acceptance_rate:.3%} proposal samples are
-                    accepted. It may take a long time to collect the remaining
-                    {num_remaining} samples. You can prevent very long runtimes by
-                    setting `max_sampling_time` to limit runtime, or disabling
-                    rejection sampling (e.g. via `reject_outside_prior=False` in
-                    `posterior.sample()` when available)."""
+                warn_msg = (
+                    f"Only {min_acceptance_rate:.3%} proposal samples are accepted. "
+                    "It may take a long time to collect the remaining "
+                    f"{num_remaining} samples."
+                )
+                if suggest_sampling_options:
+                    warn_msg += (
+                        " You can prevent very long runtimes by setting "
+                        "`max_sampling_time` to limit runtime, or disabling "
+                        "rejection sampling (e.g. via `reject_outside_prior=False` "
+                        "in `posterior.sample()` when available)."
+                    )
                 if alternative_method is not None:
-                    warn_msg += f""" Alternatively, consider interrupting (Ctrl-C)
-                    and switching to `{alternative_method}`."""
-                logger.warning(warn_msg)
+                    warn_msg += (
+                        " Alternatively, consider interrupting (Ctrl-C) and "
+                        f"switching to `{alternative_method}`."
+                    )
+            if low_acceptance_hint is not None:
+                warn_msg += f" {low_acceptance_hint}"
+            logger.warning(warn_msg)
 
             leakage_warning_raised = True  # Ensure warning is raised just once.
 
