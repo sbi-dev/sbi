@@ -95,7 +95,7 @@ def test_destandardize_and_destandardizing_net_forward() -> None:
     # Create a batch with near-zero variance in one dim to exercise min-std flooring
     n, d = 50, 2
     col0 = torch.randn(n, 1)
-    col1 = torch.zeros(n, 1)
+    col1 = 1e-3 * torch.randn(n, 1)
     batch = torch.cat([col0, col1], dim=1)
 
     min_std = 0.5

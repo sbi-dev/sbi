@@ -37,6 +37,7 @@ from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     build_z_scored_embedding_net,
     std_or_one_if_constant,
+    to_float64,
     z_score_parser,
     z_standardization,
 )
@@ -1540,8 +1541,7 @@ def _finite_z_score_stats(
         fewer than two finite values, get std one.
     """
     as_output = dict(device=batch_x.device, dtype=torch.float32)
-    # float64 on the CPU, since MPS has no float64.
-    batch_x = batch_x.to("cpu", torch.float64)
+    batch_x = to_float64(batch_x)
     finite = torch.isfinite(batch_x)
     values = torch.where(finite, batch_x, torch.zeros_like(batch_x))
     dims = tuple(range(batch_x.dim())) if structured else (0,)

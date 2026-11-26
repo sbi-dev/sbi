@@ -425,10 +425,10 @@ def z_standardization(
     """
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
     valid_t = batch_t[is_valid_t]
-    as_input = dict(device=batch_t.device, dtype=batch_t.dtype)
+    dtype = batch_t.dtype if batch_t.is_floating_point() else torch.float32
+    as_input = dict(device=batch_t.device, dtype=dtype)
 
-    # float64 on the CPU, since MPS has no float64.
-    values = valid_t.to("cpu", torch.float64)
+    values = to_float64(valid_t)
     if structured_dims:
         values = values.reshape(-1)
     t_mean = values.mean(dim=0)
@@ -450,6 +450,12 @@ def z_standardization(
     return t_mean.to(**as_input), t_std.clamp(min=min_std).to(**as_input)
 
 
+def to_float64(tensor: Tensor) -> Tensor:
+    """`tensor` in float64, on the CPU if its device has no float64 (MPS)."""
+    device = "cpu" if tensor.device.type == "mps" else tensor.device
+    return tensor.to(device, torch.float64)
+
+
 def std_or_one_if_constant(
     mean: Tensor, var: Tensor, count: Union[Tensor, int]
 ) -> Tensor:
@@ -469,7 +475,7 @@ def std_or_one_if_constant(
     """
     eps = torch.finfo(torch.float64).eps
     constant = var <= count * eps * var + (count * mean * eps) ** 2
-    return torch.where(constant, torch.ones_like(var), var.sqrt())
+    return torch.where(constant, torch.ones_like(var), var).sqrt()
 
 
 class _MeanStdBuffers(nn.Module):
