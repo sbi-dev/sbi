@@ -67,14 +67,17 @@ def maybe_wrap_batched_1d_prior(
         prior: Prior distribution, or None.
 
     Returns:
-        `Independent(prior, 1)` if the prior has batch shape (1,), else the prior
-        unchanged.
+        `Independent(prior, 1)` if the prior has batch shape (1,) and no event shape,
+        else the prior unchanged.
     """
     # `OneDimPriorWrapper` declares batch shape (1,) but returns one value per sample.
+    # A prior with an event shape already returns one value per row of flat (N, D)
+    # parameters; `Independent` would sum over the rows.
     if (
         isinstance(prior, Distribution)
         and not isinstance(prior, OneDimPriorWrapper)
         and prior.batch_shape == torch.Size([1])
+        and prior.event_shape == torch.Size([])
     ):
         return Independent(prior, 1)
     return prior
@@ -284,10 +287,10 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     # for `.log_prob()`. Prefer `Independent`: the vector field methods recognise it
     # and use exact formulas for it.
     if prior.log_prob(prior.sample(torch.Size((10,)))).shape == torch.Size([10, 1]):
-        wrapped = maybe_wrap_batched_1d_prior(prior)
-        if wrapped is None or wrapped is prior:
-            wrapped = OneDimPriorWrapper(prior, validate_args=False)
-        prior = wrapped
+        if prior.batch_shape == torch.Size([1]):
+            prior = Independent(prior, 1, validate_args=False)
+        else:
+            prior = OneDimPriorWrapper(prior, validate_args=False)
 
     theta_numel = prior.sample().numel()
 

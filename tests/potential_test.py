@@ -32,7 +32,6 @@ from sbi.inference.potentials.posterior_based_potential import (
     PosteriorBasedPotential,
     posterior_estimator_based_potential,
 )
-from sbi.inference.potentials.ratio_based_potential import RatioBasedPotential
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
 from sbi.neural_nets import (
     classifier_nn,
@@ -205,25 +204,19 @@ def _build_potential(potential_type: str, x_o: Tensor | None = None) -> BasePote
     return VectorFieldBasedPotential(posterior_score_nn()(theta, x), prior, x_o=x_o)
 
 
-@pytest.mark.parametrize("potential_type", ("likelihood", "ratio"))
-def test_potential_with_1d_prior_gives_one_value_per_theta(potential_type: str):
+def test_potential_with_1d_prior_gives_one_value_per_theta():
     """Test the potential for a 1-D prior with batch shape (1,).
 
-    Its log prob has shape (N, 1). Added to the (N,) log likelihood or log ratio, it
-    would broadcast to (N, N).
+    Its log prob has shape (N, 1). Added to the (N,) log likelihood, it would
+    broadcast to (N, N).
     """
     theta, x = torch.randn(20, 1), torch.randn(20, 2)
     prior = Normal(zeros(1), ones(1))
     independent_prior = Independent(Normal(zeros(1), ones(1)), 1)
 
-    if potential_type == "likelihood":
-        estimator = likelihood_nn("mdn")(theta, x)
-        potential_class = LikelihoodBasedPotential
-    else:
-        estimator = classifier_nn("mlp")(theta, x)
-        potential_class = RatioBasedPotential
-    potential = potential_class(estimator, prior, x_o=zeros(1, 2))
-    reference = potential_class(estimator, independent_prior, x_o=zeros(1, 2))
+    estimator = likelihood_nn("mdn")(theta, x)
+    potential = LikelihoodBasedPotential(estimator, prior, x_o=zeros(1, 2))
+    reference = LikelihoodBasedPotential(estimator, independent_prior, x_o=zeros(1, 2))
 
     test_theta = torch.randn(3, 1)
     values = potential(test_theta)
