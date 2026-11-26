@@ -363,6 +363,11 @@ def wasserstein_2_squared(
     assert x.ndim == y.ndim, (
         "Please make sure that 'x' and 'y' are both either batched or not."
     )
+    if x.dtype != y.dtype or x.dtype not in (torch.float32, torch.float64):
+        raise TypeError(
+            "'x' and 'y' must both be float32 or both float64, got "
+            f"{x.dtype} and {y.dtype}."
+        )
     if x.ndim == 2:
         nx, ny = x.shape[0], y.shape[0]
         a = torch.ones(nx, dtype=x.dtype, device=x.device) / nx
@@ -377,9 +382,19 @@ def wasserstein_2_squared(
             "This implementation of Wasserstein is only implemented, "
             "if x.ndim=2 or x.ndim=3."
         )
+    if x.shape[-1] != y.shape[-1]:
+        raise ValueError(
+            f"'x' and 'y' need the same number of features, got {x.shape[-1]} "
+            f"and {y.shape[-1]}."
+        )
+    if 0 in (x.shape[-2], y.shape[-2], x.shape[-1]):
+        raise ValueError("'x' and 'y' need at least one point and one feature each.")
 
-    # Evaluate the cost matrix based on the default l2 cost
-    cost_matrix = torch.cdist(x, y, 2) ** 2
+    # Squared l2 cost from pairwise differences, since cdist's matmul path cancels
+    # far from the origin; one feature at a time keeps the memory at (B, m, n).
+    cost_matrix = sum(
+        (x[..., :, None, k] - y[..., None, :, k]) ** 2 for k in range(x.shape[-1])
+    )
 
     coupling = regularized_ot_dual(
         a,
@@ -461,7 +476,8 @@ def regularized_ot_dual(
         log_row_marginal = torch.logsumexp(-s(f, g), dim=2)
         err = (log_row_marginal.exp() - a).abs().sum(dim=1)
         if i > 0:
-            terminated = torch.logical_or(terminated, err < tol)
+            # A row with a non-finite cost never converges: stop it, warn below.
+            terminated = terminated | (err < tol) | err.isnan()
         if torch.all(terminated):
             break
         if i == max_iter:
@@ -478,6 +494,13 @@ def regularized_ot_dual(
         )
         f = torch.where(terminated.unsqueeze(-1), f, f_tmp)
         g = torch.where(terminated.unsqueeze(-1), g, g_tmp)
+
+    if err.isnan().any():
+        warnings.warn(
+            "Some optimal transport problems have non-finite costs; their "
+            "couplings are NaN.",
+            stacklevel=2,
+        )
 
     coupling = torch.exp(-s(f, g))
 
@@ -754,7 +777,7 @@ def wasserstein_distance(
     Returns:
         The squared Wasserstein-2 distance.
     """
-    batched_x_o = x_o.repeat((x.shape[0], *[1] * len(x_o.shape)))
+    batched_x_o = x_o.expand(x.shape[0], *x_o.shape)
     return wasserstein_2_squared(
         batched_x_o, x, relative_epsilon=relative_epsilon, max_iter=max_iter, tol=tol
     )

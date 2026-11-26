@@ -251,6 +251,12 @@ def test_wasserstein_2_squared_of_identical_points_is_zero():
     assert wasserstein_2_squared(torch.ones(5, 2), torch.ones(5, 2)) == 0
 
 
+def test_wasserstein_2_squared_far_from_origin_in_float32():
+    """A unit shift far from the origin costs 1, not 0 (float32 cancellation)."""
+    x = torch.full((32, 1), 10000.0)
+    assert wasserstein_2_squared(x, x + 1).item() == pytest.approx(1.0, rel=1e-5)
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "test", (unbiased_mmd_squared_hypothesis_test, biased_mmd_hypothesis_test)
