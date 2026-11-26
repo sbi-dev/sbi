@@ -12,17 +12,23 @@ workflow is: define a prior and simulator, generate simulations, train a neural
 density estimator, build a posterior, and validate with diagnostics (SBC,
 expected coverage, TARP, L-C2ST).
 
+When output is captured, e.g. by a coding agent, set the environment variable
+`TQDM_DISABLE=1`. It turns off sbi's progress bars and progress messages, which
+otherwise make up most of the output.
+
 ## Tutorials
 
 - [Getting Started](https://sbi.readthedocs.io/en/latest/tutorials/00_getting_started.html): Minimal NPE example from prior to posterior
 - [Bayesian Workflow](https://sbi.readthedocs.io/en/latest/tutorials/01_Bayesian_workflow.html): Full workflow with diagnostics and analysis
 - [Implemented Methods](https://sbi.readthedocs.io/en/latest/tutorials/16_implemented_methods.html): All NPE, NLE, NRE, FMPE variants with code
 - [Vector Field Methods](https://sbi.readthedocs.io/en/latest/advanced_tutorials/19_vector_field_methods.html): FMPE and NPSE — flow matching and score matching for SBI
+- [Simformer](https://sbi.readthedocs.io/en/latest/advanced_tutorials/22_simformer.html): One model for the joint of all variables; posteriors, likelihoods and any other conditional from a single training run
 
 ## How-To Guides
 
 - [Custom Priors](https://sbi.readthedocs.io/en/latest/how_to_guide/00_custom_prior.html): MultipleIndependent, process_prior, non-torch priors
 - [Summary Statistics](https://sbi.readthedocs.io/en/latest/how_to_guide/01_crafting_summary_statistics.html): Hand-crafted features for high-dim data
+- [Parallel Simulations](https://sbi.readthedocs.io/en/latest/how_to_guide/28_running_simulations_in_parallel.html): simulate_for_sbi and simulate_from_theta with num_workers, batched vs one-parameter-set simulators, file outputs, failed simulations, seeding, troubleshooting
 - [Multi-Round Inference](https://sbi.readthedocs.io/en/latest/how_to_guide/02_multiround_inference.html): Sequential methods (SNPE, SNLE, SNRE) and monitoring convergence across rounds
 - [Density Estimators](https://sbi.readthedocs.io/en/latest/how_to_guide/03_density_estimators.html): Choosing and configuring neural networks
 - [Estimator Configs](https://sbi.readthedocs.io/en/latest/how_to_guide/27_estimator_configs.html): Per-model configs, z-scoring, embeddings, and migration from factories
@@ -41,7 +47,7 @@ expected coverage, TARP, L-C2ST).
 - [Expected Coverage](https://sbi.readthedocs.io/en/latest/how_to_guide/15_expected_coverage.html): Joint posterior calibration check
 - [Simulation-Based Calibration](https://sbi.readthedocs.io/en/latest/how_to_guide/16_sbc.html): Per-parameter marginal calibration
 - [TARP](https://sbi.readthedocs.io/en/latest/how_to_guide/17_tarp.html): Calibration without density evaluation
-- [L-C2ST](https://sbi.readthedocs.io/en/latest/how_to_guide/13_diagnostics_lc2st.html): Per-observation local coverage test
+- [L-C2ST](https://sbi.readthedocs.io/en/latest/how_to_guide/13_diagnostics_lc2st.html): Per-observation posterior check with a classifier
 - [Model Misspecification](https://sbi.readthedocs.io/en/latest/how_to_guide/18_model_misspecification.html): Detecting if x_o is outside simulator range
 
 ## Advanced Topics

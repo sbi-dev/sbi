@@ -128,7 +128,7 @@ class RotaryEncoder(nn.Module):
 
 
 class FullAttention(nn.Module):
-    # Adapted from https://github.com/huggingface/transformers/main/src/transformers/
+    # Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/
     # models/phi3/modeling_phi3.py
 
     def __init__(self, config):
@@ -272,7 +272,7 @@ class FullAttention(nn.Module):
 
 
 class MLP(nn.Module):
-    # Adapted from https://github.com/huggingface/transformers/main/src/
+    # Adapted from https://github.com/huggingface/transformers/blob/main/src/
     # transformers/models/phi3/modeling_phi3.py
 
     def __init__(self, config):
@@ -719,7 +719,7 @@ class TransformerEmbedding(nn.Module):
         import torch
 
         x = torch.randn(16, 100)       # (batch, seq_len)
-        emb = TransformerEmbedding(feature_space_dim=64)
+        emb = TransformerEmbedding(feature_space_dim=48)
         z = emb(x)
 
     **Image input (ViT-style)**::
@@ -733,7 +733,7 @@ class TransformerEmbedding(nn.Module):
             image_size=64,
             patch_size=8,
             num_channels=3,
-            feature_space_dim=128,
+            feature_space_dim=96,
         )
         z = emb(x)
     """
@@ -771,7 +771,7 @@ class TransformerEmbedding(nn.Module):
         Args:
             pos_emb: position encoding to be used, currently available:
                 {"rotary", "positional", "none"}
-            pos_emb_base: base used to construct the positinal encoding
+            pos_emb_base: base used to construct the positional encoding
             rms_norm_eps: noise added to the rms variance computation
             ffn: feedforward layer after used after computing the attention:
                 {"mlp", "moe"}
@@ -799,7 +799,7 @@ class TransformerEmbedding(nn.Module):
                 preprocessing the images
             image_size: dimension of the squared image used to created
                 the positional encoders
-                a rectagular image can be used at training/inference time by
+                a rectangular image can be used at training/inference time by
                 resampling the encoders
             patch_size: size of the square patches used to create the
                 positional encoders
@@ -923,7 +923,7 @@ class TransformerEmbedding(nn.Module):
         position_ids: Optional[torch.LongTensor] = None,
         cache_attention_mask: Optional[bool] = True,
         **kwargs,
-    ) -> Tuple[torch.Tensor, Optional[Tuple[torch.Tensor, torch.Tensor]]]:
+    ) -> torch.Tensor:
         """
         Args:
             input:
@@ -931,13 +931,17 @@ class TransformerEmbedding(nn.Module):
                 or `(batch, num_channels, height, width)` if using ViT
             attention_mask:
                 attention mask of size `(batch_size, sequence_length)`
-            output_attentions:
-                Whether or not to return the attention tensors
+            position_ids:
+                position ids passed to the positional encoding, by default
+                `0, ..., sequence_length - 1`
             cache_attention_mask:
                 Whether or not to cache the expanded attention mask, useful if using
                 multiple batched with identical input shapes
             kwargs:
                 Arbitrary kwargs
+
+        Returns:
+            Embedding of shape `(batch, final_emb_dimension)`.
         """
 
         input = self.preprocess(input)

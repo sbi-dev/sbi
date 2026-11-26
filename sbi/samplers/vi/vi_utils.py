@@ -3,6 +3,7 @@
 
 from copy import deepcopy
 from typing import (
+    Any,
     Callable,
     Dict,
     Iterable,
@@ -22,11 +23,61 @@ from torch.distributions import (
 )
 from torch.nn import Module
 
-from sbi.neural_nets.estimators.zuko_flow import ZukoUnconditionalFlow
+from sbi.neural_nets.estimators.zuko_flow import ZukoFlow, ZukoUnconditionalFlow
 from sbi.sbi_types import Shape, TorchTransform, VariationalDistribution
+from sbi.utils.sbiutils import CallableTransform, _apply_to_transform
 from sbi.utils.torchutils import _base_recursor
 
 _CopyableT = TypeVar("_CopyableT")
+
+
+def _sum_log_det(log_det: Tensor, like: Tensor) -> Tensor:
+    # Elementwise transforms return per-dimension Jacobians; sum them if needed.
+    return log_det.sum(dim=-1) if log_det.dim() > like.dim() else log_det
+
+
+def _linked_log_prob(
+    theta: Tensor,
+    link_transform: TorchTransform,
+    log_prob_z: Callable[[Tensor], Tensor],
+) -> Tensor:
+    """Log density of constrained θ: log q(z) + log|det dz/dθ| with z = link⁻¹(θ).
+
+    A θ on the edge of a half-open support maps to a non-finite z (e.g. log(0) for a
+    positive prior), where the density of θ is zero. It gets `-inf` instead of the NaN
+    of `-inf + inf`.
+    """
+    z = link_transform.inv(theta)
+    assert isinstance(z, Tensor)
+    finite = torch.isfinite(z).all(dim=-1)
+    log_prob = log_prob_z(torch.where(finite.unsqueeze(-1), z, torch.zeros_like(z)))
+    log_det = link_transform.inv.log_abs_det_jacobian(theta, z)
+    log_prob = log_prob + _sum_log_det(log_det, log_prob)
+    return torch.where(finite, log_prob, torch.full_like(log_prob, -torch.inf))
+
+
+def _linked_sample_and_log_prob(
+    z: Tensor, log_prob_z: Tensor, link_transform: TorchTransform
+) -> tuple[Tensor, Tensor]:
+    """Map z to constrained θ, with log q(θ) = log q(z) - log|det dθ/dz|."""
+    theta = link_transform(z)
+    assert isinstance(theta, Tensor)
+    log_det = link_transform.log_abs_det_jacobian(z, theta)
+    return theta, log_prob_z - _sum_log_det(log_det, log_prob_z)
+
+
+def _restore_plain_link(family: nn.Module) -> None:
+    """Move a link pickled as `_link_transform` (sbi 0.26 and 0.27) into the
+    family's `_link` submodule.
+
+    That attribute is plain, or a registered submodule if the link is a module.
+    """
+    if hasattr(family, "_link_transform"):
+        link_transform = family._link_transform
+        del family._link_transform
+        family._link = (
+            None if link_transform is None else CallableTransform(link_transform)
+        )
 
 
 class TransformedZukoFlow(nn.Module):
@@ -58,7 +109,11 @@ class TransformedZukoFlow(nn.Module):
         """
         super().__init__()
         self._flow = flow
-        self._link_transform = link_transform
+        self._link = CallableTransform(link_transform)
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+        _restore_plain_link(self)
 
     @property
     def net(self):
@@ -81,7 +136,7 @@ class TransformedZukoFlow(nn.Module):
         # Sample in unconstrained space
         unconstrained_samples = self._flow.sample(sample_shape)
         # Transform to constrained space
-        constrained_samples = self._link_transform(unconstrained_samples)
+        constrained_samples = self._link.transform(unconstrained_samples)
         assert isinstance(constrained_samples, Tensor)  # Type narrowing for pyright
         return constrained_samples
 
@@ -97,19 +152,7 @@ class TransformedZukoFlow(nn.Module):
         Returns:
             Log probabilities with shape (*batch_shape,).
         """
-        # Transform to unconstrained space
-        z = self._link_transform.inv(theta)
-        assert isinstance(z, Tensor)  # Type narrowing for pyright
-        # Get flow log prob in unconstrained space
-        log_prob_z = self._flow.log_prob(z)
-        # Add Jacobian correction for the inverse transform
-        # log_abs_det_jacobian gives log|det(dz/dθ)|
-        log_det_jacobian = self._link_transform.inv.log_abs_det_jacobian(theta, z)
-        # Some transforms (e.g. identity) return per-dimension Jacobians,
-        # while IndependentTransform returns summed Jacobians. Sum if needed.
-        if log_det_jacobian.dim() > log_prob_z.dim():
-            log_det_jacobian = log_det_jacobian.sum(dim=-1)
-        return log_prob_z + log_det_jacobian
+        return _linked_log_prob(theta, self._link.transform, self._flow.log_prob)
 
     def sample_and_log_prob(self, sample_shape: Shape) -> tuple[Tensor, Tensor]:
         """Sample from the flow and compute log probabilities efficiently.
@@ -120,20 +163,58 @@ class TransformedZukoFlow(nn.Module):
         Returns:
             Tuple of (samples, log_probs) where samples are in constrained space.
         """
-        # Sample in unconstrained space and get log prob
         z, log_prob_z = self._flow.sample_and_log_prob(torch.Size(sample_shape))
-        # Transform to constrained space
-        theta = self._link_transform(z)
-        assert isinstance(theta, Tensor)  # Type narrowing for pyright
-        # Subtract Jacobian for forward transform (we want log p(θ) not log q(z))
-        # log p(θ) = log q(z) - log|det(dθ/dz)| = log q(z) + log|det(dz/dθ)|
-        log_det_jacobian = self._link_transform.log_abs_det_jacobian(z, theta)
-        # Some transforms (e.g. identity) return per-dimension Jacobians,
-        # while IndependentTransform returns summed Jacobians. Sum if needed.
-        if log_det_jacobian.dim() > log_prob_z.dim():
-            log_det_jacobian = log_det_jacobian.sum(dim=-1)
-        log_prob_theta = log_prob_z - log_det_jacobian
-        return theta, log_prob_theta
+        return _linked_sample_and_log_prob(z, log_prob_z, self._link.transform)
+
+
+class TransformedConditionalZukoFlow(nn.Module):
+    """Conditional counterpart of `TransformedZukoFlow` for amortized VI.
+
+    The wrapped flow q(z|x) lives in unconstrained space. Samples and log-probs of
+    this wrapper are in the prior's (constrained) space, so a bounded prior is never
+    evaluated outside its support.
+    """
+
+    def __init__(self, flow: ZukoFlow, link_transform: TorchTransform):
+        """Initialize the wrapper.
+
+        Args:
+            flow: Conditional Zuko flow operating in unconstrained space.
+            link_transform: Transform from unconstrained to constrained space.
+        """
+        super().__init__()
+        self._flow = flow
+        self._link = CallableTransform(link_transform)
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+        _restore_plain_link(self)
+
+    @property
+    def condition_shape(self) -> torch.Size:
+        """Shape of one observation x that the flow is conditioned on."""
+        return self._flow.condition_shape
+
+    def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
+        """Sample θ ~ q(θ|x) in constrained space."""
+        theta = self._link.transform(self._flow.sample(sample_shape, condition))
+        assert isinstance(theta, Tensor)
+        return theta
+
+    def log_prob(self, theta: Tensor, condition: Tensor) -> Tensor:
+        """Log density of constrained θ, including the Jacobian of the link."""
+        return _linked_log_prob(
+            theta, self._link.transform, lambda z: self._flow.log_prob(z, condition)
+        )
+
+    def sample_and_log_prob(
+        self, sample_shape: Shape, condition: Tensor
+    ) -> tuple[Tensor, Tensor]:
+        """Reparameterized constrained samples and their log density."""
+        z, log_prob_z = self._flow.sample_and_log_prob(
+            torch.Size(sample_shape), condition
+        )
+        return _linked_sample_and_log_prob(z, log_prob_z, self._link.transform)
 
 
 class LearnableGaussian(nn.Module):
@@ -163,7 +244,9 @@ class LearnableGaussian(nn.Module):
         super().__init__()
         self._dim = dim
         self._full_cov = full_covariance
-        self._link_transform = link_transform
+        self._link = (
+            None if link_transform is None else CallableTransform(link_transform)
+        )
 
         # Learnable parameters - create on correct device from the start
         self.loc = nn.Parameter(torch.zeros(dim, device=device))
@@ -173,6 +256,10 @@ class LearnableGaussian(nn.Module):
         else:
             # Log scale for numerical stability
             self.log_scale = nn.Parameter(torch.zeros(dim, device=device))
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+        _restore_plain_link(self)
 
     def _base_dist(self) -> Distribution:
         """Get the base Gaussian distribution with current parameters."""
@@ -206,8 +293,8 @@ class LearnableGaussian(nn.Module):
         """
         # Use sample() not rsample() - this is for inference, not training
         samples = self._base_dist().sample(sample_shape)
-        if self._link_transform is not None:
-            samples = self._link_transform(samples)
+        if self._link is not None:
+            samples = self._link.transform(samples)
             assert isinstance(samples, Tensor)  # Type narrowing for pyright
         return samples
 
@@ -220,16 +307,10 @@ class LearnableGaussian(nn.Module):
         Returns:
             Log probabilities with shape (*batch_shape,).
         """
-        if self._link_transform is not None:
-            # Transform to unconstrained space
-            z = self._link_transform.inv(theta)
-            assert isinstance(z, Tensor)  # Type narrowing for pyright
-            log_prob_z = self._base_dist().log_prob(z)
-            # Add Jacobian correction
-            log_det = self._link_transform.inv.log_abs_det_jacobian(theta, z)
-            if log_det.dim() > log_prob_z.dim():
-                log_det = log_det.sum(dim=-1)
-            return log_prob_z + log_det
+        if self._link is not None:
+            return _linked_log_prob(
+                theta, self._link.transform, self._base_dist().log_prob
+            )
         return self._base_dist().log_prob(theta)
 
     def sample_and_log_prob(self, sample_shape: Shape) -> tuple[Tensor, Tensor]:
@@ -245,14 +326,8 @@ class LearnableGaussian(nn.Module):
         z = dist.rsample(sample_shape)
         log_prob_z = dist.log_prob(z)
 
-        if self._link_transform is not None:
-            theta = self._link_transform(z)
-            assert isinstance(theta, Tensor)  # Type narrowing for pyright
-            # Adjust log_prob for the transformation
-            log_det = self._link_transform.log_abs_det_jacobian(z, theta)
-            if log_det.dim() > log_prob_z.dim():
-                log_det = log_det.sum(dim=-1)
-            return theta, log_prob_z - log_det
+        if self._link is not None:
+            return _linked_sample_and_log_prob(z, log_prob_z, self._link.transform)
         return z, log_prob_z
 
 
@@ -298,11 +373,11 @@ def check_parameters_modules_attribute(q: VariationalDistribution) -> None:
                 trainable += 1
         assert (
             trainable > 0
-        ), """Nothing to train, atleast one of the parameters must have an enabled
+        ), """Nothing to train, at least one of the parameters must have an enabled
             gradient."""
     if not hasattr(q, "modules"):
         raise ValueError(
-            """The variational distribution requires an modules attribute, which returns
+            """The variational distribution requires a modules attribute, which returns
             an iterable of parameters."""
         )
     else:
@@ -331,7 +406,7 @@ def check_sample_shape_and_support(q: Distribution, prior: Distribution) -> None
         "The event shape of q must match that of the prior"
     )
     assert q.batch_shape == prior.batch_shape, (
-        "The batch sahpe of q must match that of the prior"
+        "The batch shape of q must match that of the prior"
     )
 
     sample_shape = torch.Size((1000,))
@@ -482,6 +557,10 @@ class AdaptedVariationalDistribution(Distribution):
             parameter.data = parameter.data.to(device)
             if parameter.grad is not None:
                 parameter.grad.data = parameter.grad.data.to(device)
+        # A copy of `q`, as the initialization snapshot holds, has its own copy of
+        # the link transform.
+        for transform in getattr(self._q, "transforms", []):
+            _apply_to_transform(transform, lambda t: t.to(device))
 
     @property
     def support(self):  # type: ignore[override]

@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-# NOTE: the entire file was drafted by GPT-5 in GH Copilot, then editied by janfb.
+# NOTE: the entire file was drafted by GPT-5 in GH Copilot, then edited by janfb.
 
 from typing import Tuple
 
@@ -118,7 +118,7 @@ def test_destandardize_and_destandardizing_net_forward() -> None:
 
 def test_destandardizing_net_single_sample_branch() -> None:
     """Tests destandardizing_net when batch has a single row."""
-    # When batch has a single row, we enter the else-branch and use t_std = 1
+    # A single row gives that row as the mean and a std of one.
     batch = torch.tensor([[2.0, -3.0]], dtype=torch.float32)
     net = destandardizing_net(batch, min_std=0.5)
     # For standardized input 0, output should equal mean (the single row)

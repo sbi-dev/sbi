@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import logging
 from copy import deepcopy
 from typing import Any, Callable, Optional, Tuple, Union
 from warnings import warn
@@ -15,17 +14,16 @@ from torch.optim.adam import Adam
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from sbi.utils.sbiutils import handle_invalid_x, standardizing_net
+from sbi.utils.pbar import end_progress_line, print_progress
+from sbi.utils.sbiutils import (
+    _MeanStdBuffers,
+    standardizing_net,
+    z_standardization,
+)
 
 
-class Destandardize(nn.Module):
-    def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
-        super(Destandardize, self).__init__()
-        mean, std = map(torch.as_tensor, (mean, std))
-        self.mean = mean
-        self.std = std
-        self.register_buffer("_mean", mean)
-        self.register_buffer("_std", std)
+class Destandardize(_MeanStdBuffers):
+    """Undoes z-scoring: `input * std + mean`."""
 
     def forward(self, tensor):
         return tensor * self._std + self._mean
@@ -44,23 +42,7 @@ def destandardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
         Neural network module for z-scoring
     """
 
-    is_valid_t, *_ = handle_invalid_x(batch_t, True)
-
-    t_mean = torch.mean(batch_t[is_valid_t], dim=0)
-
-    # Use batch size to decide whether a reliable std can be computed.
-    if len(batch_t) > 1:
-        t_std = torch.std(batch_t[is_valid_t], dim=0)
-        t_std[t_std < min_std] = min_std
-    else:
-        t_std = 1
-        logging.warning(
-            """Using a one-dimensional batch will instantiate a Standardize transform
-            with (mean, std) parameters which are not representative of the data. We
-            allow this behavior because you might be loading a pre-trained. If this is
-            not the case, please be sure to use a larger batch."""
-        )
-
+    t_mean, t_std = z_standardization(batch_t, min_std=min_std)
     return Destandardize(t_mean, t_std)
 
 
@@ -112,7 +94,7 @@ class ActiveSubspace:
             Deistler et al. 2021, in preparation.
 
         Args:
-            posterior: Posterior distribution obtained with `SNPE`, `SNLE`, or `SNRE`.
+            posterior: Posterior distribution obtained with NPE, NLE or NRE.
                 Needs to have a `.sample()` method. If we want to analyse the
                 sensitivity of the posterior probability, it also must have a
                 `.potential()` method.
@@ -329,8 +311,9 @@ class ActiveSubspace:
             self._val_log_prob = -val_loss / num_validation_examples
             self._validation_log_probs.append(self._val_log_prob)
 
-            print("\r", "Training neural network. Epochs trained: ", epoch, end="")
+            print_progress(f"Training neural network. Epochs trained: {epoch}")
 
+        end_progress_line()
         return deepcopy(self._regression_net)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
@@ -416,11 +399,11 @@ class ActiveSubspace:
             raise ValueError(
                 "You have not yet passed an emergent property whose "
                 "sensitivity you would like to analyse. Please use "
-                "`.add_emergent_property().train()` to do so. If you want "
+                "`.add_property().train()` to do so. If you want "
                 "to use all features that had also been used to infer the "
                 "posterior distribution (i.e. you want to analyse the "
                 "sensitivity of the posterior probability), use: "
-                "`.find_active(posterior_log_prob_as_property=True)`."
+                "`.find_directions(posterior_log_prob_as_property=True)`."
             )
         if self._emergent_property is not None and posterior_log_prob_as_property:
             warn(

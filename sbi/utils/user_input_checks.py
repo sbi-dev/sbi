@@ -17,7 +17,7 @@ from typing import (
 import torch
 from numpy import ndarray
 from torch import Tensor, float32, nn
-from torch.distributions import Distribution, Uniform
+from torch.distributions import Distribution, Independent, Uniform
 
 from sbi.sbi_types import Array, CustomPrior
 from sbi.utils.sbiutils import within_support
@@ -31,7 +31,7 @@ from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     OneDimPriorWrapper,
-    PytorchReturnTypeWrapper,
+    convert_distribution_to_float32,
 )
 
 if TYPE_CHECKING:
@@ -91,7 +91,7 @@ def process_prior(
             - `theta_numel`: Dimensionality of a single sample from the prior.
             - `prior_returns_numpy`: Whether the prior originally returned NumPy arrays.
 
-    Example:
+    Example
     --------
 
     ::
@@ -245,21 +245,22 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     prior_dtype = prior.sample().dtype
     if prior_dtype != float32:
         warnings.warn(
-            f"Prior has dtype {prior_dtype}. sbi casts the samples and log probs of "
-            "the prior to float32.",
+            f"Prior has dtype {prior_dtype}. sbi rebuilds the prior in float32 or, "
+            "if that fails, casts its samples and log probs to float32.",
             stacklevel=2,
         )
-        prior = PytorchReturnTypeWrapper(
-            prior, return_type=float32, validate_args=False
-        )
+        prior = convert_distribution_to_float32(prior)
 
-    # This will fail for float64 priors.
     check_prior_return_type(prior)
 
     # Potentially required wrapper if the prior returns an additional sample dimension
-    # for `.log_prob()`.
+    # for `.log_prob()`. Prefer `Independent`: the vector field methods recognise it
+    # and use exact formulas for it.
     if prior.log_prob(prior.sample(torch.Size((10,)))).shape == torch.Size([10, 1]):
-        prior = OneDimPriorWrapper(prior, validate_args=False)
+        if prior.batch_shape == torch.Size([1]):
+            prior = Independent(prior, 1, validate_args=False)
+        else:
+            prior = OneDimPriorWrapper(prior, validate_args=False)
 
     theta_numel = prior.sample().numel()
 
@@ -504,7 +505,7 @@ def process_simulator(
             simulator: processed simulator that returns :class:`torch.Tensor` \
                 and can handle batches of parameters.
 
-    Example:
+    Example
     --------
 
     ::
@@ -615,51 +616,44 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
 def process_x(x: Array, x_event_shape: Optional[torch.Size] = None) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
-    This means that `x` is returned with a `batch_dim`.
-
-    If `x_shape` is `None`, the shape is not checked.
+    This means that `x` is returned with a `batch_dim`. With `x_event_shape`, an `x`
+    of exactly that shape is one observation and gets a batch dimension of 1, and any
+    other shape than `(num_observations, *x_event_shape)` raises a ValueError. If
+    `x_event_shape` is `None`, the shape is not checked.
 
     Args:
         x: Observed data as provided by the user.
-        x_event_shape: Prescribed shape - either directly provided by the user at init
-            or inferred by sbi by running a simulation and checking the output. Does not
-            contain a batch dimension.
+        x_event_shape: Shape of one observation, without batch dimension.
 
     Returns:
-        x: Observed data with shape ready for usage in sbi.
+        x: Observed data of shape `(num_observations, *x_event_shape)`.
+
+    Raises:
+        ValueError: If `x` does not match `x_event_shape`.
     """
-
+    input_shape = tuple(torch.as_tensor(x).shape)
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
-    if x_event_shape is not None and len(x_event_shape) > len(x.shape):
-        raise ValueError(
-            f"You passed an `x` of shape {x.shape} but the `x_event_shape` (inferred "
-            f"from simulations) is {x_event_shape}. We are raising this error because "
-            f"len(x_event_shape) > len(x.shape)"
-        )
+    if x_event_shape is None:
+        return x
 
-    # If x_shape is provided, we can fix a missing batch dim for >1D data.
-    if x_event_shape is not None and len(x_event_shape) == len(x.shape):
+    if len(x.shape) == len(x_event_shape):
         x = x.unsqueeze(0)
-
-    input_x_shape = x.shape
-
-    if x_event_shape is not None:
-        # Number of trials can change for every new x, but single trial x shape must
-        # match.
-        assert input_x_shape[1:] == x_event_shape, (
-            f"Observed data shape ({input_x_shape[1:]}) must match "
-            f"the shape of simulated data x ({x_event_shape})."
+    if x.shape[1:] != x_event_shape:
+        event = tuple(x_event_shape)
+        raise ValueError(
+            f"x has shape {input_shape}, but one observation has shape {event}. "
+            f"Pass one observation of shape {event}, or several of shape "
+            f"(num_observations, {', '.join(str(d) for d in event)})."
         )
     return x
 
 
 def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
-    """Assert requirements for simulator, prior and observation for usage in sbi.
+    """Assert requirements for simulator and prior for usage in sbi.
 
     Args:
         simulator: simulator function
         prior: prior (Distribution like)
-        x_shape: Shape of single simulation output $x$.
     """
     check_prior_support(prior)
     num_prior_samples = 1
@@ -711,6 +705,37 @@ def check_estimator_arg(
         )
 
 
+def _validate_tensor_properties_and_device(
+    tensor: Any,
+    name: str,
+    data_device: str,
+    training_device: str,
+    expected_dtype: Union[torch.dtype, Tuple[torch.dtype, ...]],
+) -> Tensor:
+    """Helper to validate a single tensor's type and dtype,
+    and move it to the data_device."""
+    assert isinstance(tensor, Tensor), f"{name} must be a `torch.Tensor`."
+
+    if isinstance(expected_dtype, tuple):
+        assert tensor.dtype in expected_dtype, (
+            f"Type of {name} must be one of {expected_dtype}, but got {tensor.dtype}."
+        )
+    else:
+        assert tensor.dtype == expected_dtype, (
+            f"Type of {name} must be {expected_dtype}, but got {tensor.dtype}."
+        )
+
+    if canonical_device(tensor.device) != canonical_device(data_device):
+        warnings.warn(
+            f"{name} has device '{tensor.device}'. "
+            f"Moving {name} to the data_device '{data_device}'. "
+            f"Training will proceed on device '{training_device}'.",
+            stacklevel=3,
+        )
+        tensor = tensor.to(data_device)
+    return tensor
+
+
 def validate_theta_and_x(
     theta: Any, x: Any, data_device: str = "cpu", training_device: str = "cpu"
 ) -> Tuple[Tensor, Tensor]:
@@ -736,38 +761,53 @@ def validate_theta_and_x(
         data_device: Device where data is stored.
         training_device: Training device for net.
     """
-    assert isinstance(theta, Tensor), "Parameters theta must be a `torch.Tensor`."
-    assert isinstance(x, Tensor), "Simulator output must be a `torch.Tensor`."
+    theta = _validate_tensor_properties_and_device(
+        theta, "theta", data_device, training_device, torch.float32
+    )
+    x = _validate_tensor_properties_and_device(
+        x, "x", data_device, training_device, torch.float32
+    )
 
     assert theta.shape[0] == x.shape[0], (
         f"Number of parameter sets (={theta.shape[0]}) must match the number of "
         f"simulation outputs (={x.shape[0]})"
     )
 
-    # I did not fuse these asserts with the `isinstance(x, Tensor)` asserts in order
-    # to give more explicit errors.
-    assert theta.dtype == float32, "Type of parameters must be float32."
-    assert x.dtype == float32, "Type of simulator outputs must be float32."
-
-    if canonical_device(x.device) != canonical_device(data_device):
-        warnings.warn(
-            f"Data x has device '{x.device}'. "
-            f"Moving x to the data_device '{data_device}'. "
-            f"Training will proceed on device '{training_device}'.",
-            stacklevel=2,
-        )
-        x = x.to(data_device)
-
-    if canonical_device(theta.device) != canonical_device(data_device):
-        warnings.warn(
-            f"Parameters theta has device '{theta.device}'. "
-            f"Moving theta to the data_device '{data_device}'. "
-            f"Training will proceed on device '{training_device}'.",
-            stacklevel=2,
-        )
-        theta = theta.to(data_device)
-
     return theta, x
+
+
+def validate_inputs(
+    inputs: Any,
+    data_device: str = "cpu",
+    training_device: str = "cpu",
+) -> Tensor:
+    r"""Check the inputs of a masked (Simformer-style) trainer and move them to
+    `data_device`.
+
+    Checks that `inputs` is a float32 tensor of shape `(batch_size, num_variables)`
+    or `(batch_size, num_variables, num_features)`.
+
+    Args:
+        inputs: Joint inputs of all variables (latent and observed).
+        data_device: Device where data is stored.
+        training_device: Training device for neural network computations.
+
+    Returns:
+        The validated inputs on `data_device`.
+
+    Raises:
+        ValueError: If `inputs` does not have 2 or 3 dimensions.
+    """
+    inputs = _validate_tensor_properties_and_device(
+        inputs, "inputs", data_device, training_device, torch.float32
+    )
+    if inputs.dim() not in (2, 3):
+        raise ValueError(
+            "inputs must have shape (batch_size, num_variables) or "
+            "(batch_size, num_variables, num_features), but got shape "
+            f"{tuple(inputs.shape)}."
+        )
+    return inputs
 
 
 def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:

@@ -21,7 +21,7 @@ from sbi.neural_nets.estimators.base import (
 from sbi.neural_nets.estimators.mixture_density_estimator import (
     MixtureDensityEstimator,
 )
-from sbi.neural_nets.estimators.mog import MoG
+from sbi.neural_nets.estimators.mog import MoG, MoGNotFiniteError
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -38,6 +38,18 @@ from sbi.utils import (
 )
 from sbi.utils.torchutils import assert_all_finite
 
+_DEGENERATE_MOG_LOSS_MSG = (
+    "The multi-round loss of NPE with a mixture density network gives NaN or Inf: "
+    "some mixture components of the posterior estimate are so ill-conditioned that "
+    "float32 round-off breaks the closed-form loss. With a bounded prior, such "
+    "components can follow strong leakage in earlier rounds, i.e., most of the "
+    "posterior estimate lies outside the prior bounds (see the warning 'Only x% "
+    "proposal samples are accepted' when sampling the proposal). Truncated proposals "
+    "(TSNPE) can keep leakage from growing over rounds, and single-round NPE avoids "
+    "this loss, see "
+    "https://sbi.readthedocs.io/en/latest/faq/question_01_leakage.html"
+)
+
 
 class NPE_C(PosteriorEstimatorTrainer):
     r"""Neural Posterior Estimation algorithm (NPE-C) as in Greenberg et al. (2019) [1].
@@ -47,9 +59,11 @@ class NPE_C(PosteriorEstimatorTrainer):
     specific observation x_o. In the first round, NPE-C is equivalent to other NPE
     methods and is fully amortized (direct inference for any new observation). After
     the first round, NPE-C automatically selects between two loss variants depending
-    on the chosen density estimator: the non-atomic loss (for Mixture of Gaussians)
-    which is stable and avoids leakage, or the atomic loss (for flows) which is more
-    flexible but may suffer from leakage issues.
+    on the chosen density estimator: the non-atomic loss (for Mixture of Gaussians),
+    which computes the proposal posterior in closed form, or the atomic loss (for
+    flows), which approximates it with atoms. With either loss, the posterior estimate
+    can leak more and more mass outside the prior bounds over the rounds. Truncated
+    proposals (TSNPE) can keep it from growing, see the FAQ on leakage.
 
     For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
     plain NLL loss.
@@ -57,7 +71,7 @@ class NPE_C(PosteriorEstimatorTrainer):
     [1] *Automatic Posterior Transformation for Likelihood-free Inference*,
         Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
-    Example:
+    Example
     --------
 
     ::
@@ -282,13 +296,20 @@ class NPE_C(PosteriorEstimatorTrainer):
                     precisions_p, precisions_d
                 )
                 if not normalizable.all():
+                    # Without a prior term, a pair's precision is the sum of two
+                    # positive definite matrices: it fails only numerically.
+                    cause = (
+                        "are not positive definite in float32: their components are "
+                        "extremely ill-conditioned"
+                        if self._prior_mog is None
+                        else "still have infinite mass: the proposal and the density "
+                        "estimator are both wider than the prior"
+                    )
                     warnings.warn(
-                        "After training, some components of the MoG proposal "
-                        "posterior still have infinite mass: the proposal and the "
-                        "density estimator are both wider than the prior. The loss "
-                        "gives them zero weight, so the posterior estimate may be "
-                        "biased. A flow density estimator does not use this "
-                        "closed-form loss.",
+                        f"After training, some components of the MoG proposal "
+                        f"posterior {cause}. The loss gives them zero weight, so the "
+                        "posterior estimate may be biased. A flow density estimator "
+                        "does not use this closed-form loss.",
                         stacklevel=3,
                     )
                     return
@@ -340,8 +361,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return the log-probability of the proposal posterior.
 
         If the proposal is a MoG, the density estimator is a MoG, and the prior is
-        either Gaussian or uniform, we use non-atomic loss. Else, use atomic loss (which
-        suffers from leakage).
+        either Gaussian or uniform, we use non-atomic loss. Else, use atomic loss.
 
         Args:
             theta: Batch of parameters θ.
@@ -448,7 +468,7 @@ class NPE_C(PosteriorEstimatorTrainer):
         """Return log-probability of the proposal posterior for MoG proposal.
 
         For MoG proposals and MoG density estimators, this can be done in closed form
-        and does not require atomic loss (i.e. there will be no leakage issues).
+        and does not require atomic loss.
 
         Notation:
 
@@ -476,43 +496,49 @@ class NPE_C(PosteriorEstimatorTrainer):
         m_p = mog_p.means
         prec_p = mog_p.precisions
 
-        # Get the density estimator MoG at the training data x
         assert isinstance(self._neural_net, MixtureDensityEstimator)
-        mog_d = self._neural_net.get_uncorrected_mog(x)
-        norm_logits_d = mog_d.log_weights  # Already normalized
-        m_d = mog_d.means
-        prec_d = mog_d.precisions
-
         theta = self._neural_net._transform_input(theta)
 
-        # Compute the MoG parameters of the proposal posterior.
-        (
-            logits_pp,
-            m_pp,
-            prec_pp,
-            cov_pp,
-        ) = self._automatic_posterior_transformation(
-            norm_logits_p, m_p, prec_p, norm_logits_d, m_d, prec_d
-        )
+        # Numerical failures (non-finite parameters, matrices that are not positive
+        # definite in float32) get one error that names their usual cause. Other
+        # errors of the network, e.g. of its embedding, keep their own.
+        try:
+            # Get the density estimator MoG at the training data x
+            mog_d = self._neural_net.get_uncorrected_mog(x)
+        except MoGNotFiniteError as e:
+            raise ValueError(_DEGENERATE_MOG_LOSS_MSG) from e
+        try:
+            # Compute the MoG parameters of the proposal posterior.
+            (
+                logits_pp,
+                m_pp,
+                prec_pp,
+                cov_pp,
+            ) = self._automatic_posterior_transformation(
+                norm_logits_p,
+                m_p,
+                prec_p,
+                mog_d.log_weights,  # Already normalized
+                mog_d.means,
+                mog_d.precisions,
+            )
 
-        # Create MoG for proposal posterior and compute log_prob
-        # We need precision_factors for MoG, compute via Cholesky
-        precf_pp = torch.linalg.cholesky(prec_pp, upper=True)
-        mog_pp = MoG(
-            logits=logits_pp,
-            means=m_pp,
-            precisions=prec_pp,
-            precision_factors=precf_pp,
-        )
+            # Create MoG for proposal posterior and compute log_prob
+            # We need precision_factors for MoG, compute via Cholesky
+            precf_pp = torch.linalg.cholesky(prec_pp, upper=True)
+            mog_pp = MoG(
+                logits=logits_pp,
+                means=m_pp,
+                precisions=prec_pp,
+                precision_factors=precf_pp,
+            )
+        except (MoGNotFiniteError, torch.linalg.LinAlgError) as e:
+            raise ValueError(_DEGENERATE_MOG_LOSS_MSG) from e
 
         # Compute the log_prob of theta under the product.
         log_prob_proposal_posterior = mog_pp.log_prob(theta)
-        assert_all_finite(
-            log_prob_proposal_posterior,
-            """the evaluation of the MoG proposal posterior. This is likely due to a
-            numerical instability in the training procedure. Please create an issue on
-            Github.""",
-        )
+        if not torch.isfinite(log_prob_proposal_posterior).all():
+            raise ValueError(_DEGENERATE_MOG_LOSS_MSG)
 
         return log_prob_proposal_posterior
 
@@ -585,6 +611,10 @@ class NPE_C(PosteriorEstimatorTrainer):
         # A pair whose precision is not positive definite has infinite mass; it gets
         # zero weight (MoG rejects -inf logits).
         if not normalizable.any(dim=1).all():
+            if self._prior_mog is None:
+                # Without a prior term, a pair's precision is the sum of two positive
+                # definite matrices: it fails only numerically.
+                raise ValueError(_DEGENERATE_MOG_LOSS_MSG)
             raise ValueError(
                 "No component of the MoG proposal posterior is normalizable for some "
                 "rows: the proposal and the density estimator are both wider than the "

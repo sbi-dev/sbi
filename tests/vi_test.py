@@ -12,33 +12,55 @@ This module tests both:
 from __future__ import annotations
 
 import pickle
+import warnings
 from copy import deepcopy
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import eye, ones, zeros
-from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
+from torch.distributions import Beta, Binomial, Gamma, Independent, MultivariateNormal
 
-from sbi.inference import NLE, NRE, likelihood_estimator_based_potential
+from sbi.inference import (
+    NLE,
+    NPE,
+    NRE,
+    EnsemblePosterior,
+    VectorFieldPosterior,
+    likelihood_estimator_based_potential,
+)
 from sbi.inference.posteriors import VIPosterior, VIPosteriorParameters
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.ratio_based_potential import (
     ratio_estimator_based_potential,
 )
+from sbi.neural_nets import posterior_flow_nn
 from sbi.neural_nets.factory import ZukoFlowType
 from sbi.samplers.vi.vi_divergence_optimizers import (
+    ElboOptimizer,
+    ForwardKLOptimizer,
     IWElboOptimizer,
     RenyiDivergenceOptimizer,
+)
+from sbi.samplers.vi.vi_quality_control import (
+    _METRIC_MESSAGE,
+    _QUALITY_METRIC,
+    QualityControlError,
 )
 from sbi.samplers.vi.vi_utils import AdaptedVariationalDistribution, LearnableGaussian
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import MultipleIndependent
+from sbi.utils import BoxUniform, MultipleIndependent, mcmc_transform
 from sbi.utils.metrics import c2st, check_c2st
+from sbi.utils.sbiutils import (
+    CallableTransform,
+    _apply_to_transform,
+    within_support,
+)
 from sbi.utils.user_input_checks import process_x
 
 # Supported variational families for VI
@@ -60,9 +82,6 @@ class FakePotential(BasePotential):
     def __call__(self, theta, **kwargs):
         return self.prior.log_prob(theta)
 
-    def allow_iid_x(self) -> bool:
-        return True
-
     def bind(self, x_o: torch.Tensor, x_is_iid: bool = True) -> "FakePotential":
         """Create new potential with x bound, without mutable state."""
 
@@ -81,9 +100,6 @@ def make_tractable_potential(target_distribution, prior):
             return target_distribution.log_prob(
                 torch.as_tensor(theta, dtype=torch.float32)
             )
-
-        def allow_iid_x(self) -> bool:
-            return True
 
         def bind(
             self, x_o: torch.Tensor, x_is_iid: bool = True
@@ -445,6 +461,21 @@ def test_every_flow_family_pickles(q: str):
     assert torch.allclose(reloaded._q.sample((3,)), expected)
 
 
+def test_vi_family_pickled_with_plain_link_attribute():
+    """Families pickled by sbi 0.26 and 0.27 held the link as `_link_transform`."""
+    link = mcmc_transform(BoxUniform(zeros(2), ones(2))).inv
+    q = LearnableGaussian(2, link_transform=link)
+    old = deepcopy(q)
+    del old._link
+    old._link_transform = link
+
+    theta = torch.tensor([[0.3, 0.7]])
+    loaded = pickle.loads(pickle.dumps(old))
+    assert torch.equal(loaded.log_prob(theta), q.log_prob(theta))
+    assert isinstance(loaded._link, CallableTransform)
+    assert not hasattr(loaded, "_link_transform")
+
+
 def test_deepcopy_of_trained_posterior_rewires_optimizer():
     """A copy's optimizer must step the copy's own `q`, not the original's."""
     posterior = _make_posterior("gaussian")
@@ -491,6 +522,44 @@ def test_amortized_posterior_survives_roundtrip():
         assert candidate._mode == "amortized"
         assert candidate.sample((5,), x=x_o).shape == (5, num_dim)
     assert clone._amortized_q is not posterior._amortized_q
+
+
+@pytest.mark.parametrize("mode", ["single_x", "amortized"])
+def test_copied_posterior_keeps_trained_link(mode):
+    """A `q=` copy keeps its trained link: a rebuilt one would re-estimate the
+    moments of this prior from samples and shift the density."""
+    num_dim = 2
+    prior = torch.distributions.TransformedDistribution(
+        MultivariateNormal(zeros(num_dim), eye(num_dim)),
+        [torch_tf.AffineTransform(ones(num_dim), 2 * ones(num_dim))],
+    )
+    posterior = _make_posterior("flow", num_dim, prior=prior)
+    x_o = zeros(1, num_dim)
+    if mode == "amortized":
+        posterior.train_amortized(
+            prior.sample((128,)), torch.randn(128, num_dim), max_num_iters=3
+        )
+    else:
+        posterior.set_default_x(x_o)
+        posterior.train(**TRAIN_KWARGS)
+
+    clone = VIPosterior(posterior.potential_fn, prior, q=posterior).to("cpu")
+
+    theta = prior.sample((10,))
+    assert torch.allclose(
+        clone.log_prob(theta, x=x_o), posterior.log_prob(theta, x=x_o)
+    )
+
+
+def test_link_transform_moves_with_its_distribution():
+    """A CDF link moves the tensors of the distribution it holds."""
+    normal = torch.distributions.Normal(zeros(2), ones(2))
+    link = torch_tf.CumulativeDistributionTransform(normal)
+
+    _apply_to_transform(link, lambda t: t.to("meta"))
+
+    assert normal.loc.device.type == "meta"
+    assert normal.scale.device.type == "meta"
 
 
 def test_retrain_from_scratch_with_bounded_prior():
@@ -581,6 +650,112 @@ def test_retrain_fails_after_setting_an_already_built_q():
         posterior.train(**TRAIN_KWARGS, retrain_from_scratch=True)
 
 
+def _count_train_calls(monkeypatch) -> list:
+    """Register the metrics `"always_fails"` and `"fails_once"` and record `train`
+    calls."""
+
+    def always_fails(posterior, N):
+        raise QualityControlError("Broken on purpose.")
+
+    checks = []
+
+    def fails_once(posterior, N):
+        checks.append(None)
+        if len(checks) == 1:
+            raise QualityControlError("Broken on purpose.")
+        return 0.0
+
+    for name, metric in [("always_fails", always_fails), ("fails_once", fails_once)]:
+        monkeypatch.setitem(_QUALITY_METRIC, name, metric)
+        monkeypatch.setitem(_METRIC_MESSAGE, name, "")
+    calls = []
+    train = VIPosterior.train
+
+    def counting_train(self, *args, **kwargs):
+        calls.append(kwargs)
+        return train(self, *args, **kwargs)
+
+    monkeypatch.setattr(VIPosterior, "train", counting_train)
+    return calls
+
+
+def test_quality_control_checks_the_trained_observation():
+    """The checks sampled at the default x, which differs from an `x` passed to
+    `train`, and the failure retrained `q` on the default x instead."""
+    posterior = _make_posterior("flow")
+    x = 3 * ones(1, 2)
+
+    posterior.train(x=x, max_num_iters=10, show_progress_bar=False)
+
+    assert torch.equal(posterior._trained_on, x)
+
+
+def test_failed_quality_control_retrains_once_with_the_callers_settings(monkeypatch):
+    """A check that kept failing retrained until the recursion limit, and each retry
+    dropped the caller's `x` and training settings."""
+    calls = _count_train_calls(monkeypatch)
+    posterior = _make_posterior("flow")
+    x = 3 * ones(1, 2)
+
+    with pytest.warns(UserWarning, match="may be unreliable"):
+        posterior.train(
+            x=x,
+            max_num_iters=10,
+            check_for_convergence=False,
+            show_progress_bar=False,
+            quality_control_metric="always_fails",
+        )
+
+    assert len(calls) == 2
+    assert calls[1]["max_num_iters"] == 10
+    assert calls[1]["learning_rate"] == pytest.approx(1e-4)
+    assert torch.equal(posterior._trained_on, x)
+
+
+def test_failed_quality_control_accepts_a_retrained_q_that_passes(monkeypatch):
+    """A check that fails once retrains once and then accepts the retrained `q`."""
+    calls = _count_train_calls(monkeypatch)
+    posterior = _make_posterior("flow")
+    x = 3 * ones(1, 2)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        posterior.train(
+            x=x,
+            max_num_iters=10,
+            check_for_convergence=False,
+            show_progress_bar=False,
+            quality_control_metric="fails_once",
+        )
+
+    messages = [str(w.message) for w in caught]
+    assert any("Retraining the variational posterior" in m for m in messages)
+    assert not any("may be unreliable" in m for m in messages)
+    assert len(calls) == 2
+    assert torch.equal(posterior._trained_on, x)
+
+
+def test_failed_quality_control_does_not_retrain_an_already_built_q(monkeypatch):
+    """An already-built `q` cannot be rebuilt, so a failed check only warns."""
+    posterior = _make_posterior("flow")
+    posterior.set_q(
+        LearnableGaussian(
+            dim=2, full_covariance=False, link_transform=posterior.link_transform
+        )
+    )
+    calls = _count_train_calls(monkeypatch)
+
+    with pytest.warns(UserWarning, match="may be unreliable"):
+        posterior.train(
+            max_num_iters=10,
+            check_for_convergence=False,
+            show_progress_bar=False,
+            quality_control_metric="always_fails",
+        )
+
+    assert len(calls) == 1
+
+
 @pytest.mark.parametrize("dreg", [False, True])
 @pytest.mark.parametrize("offset", [0.0, 100.0, -100.0])
 def test_iwelbo_optimizer_uses_importance_weighted_loss(
@@ -623,6 +798,179 @@ def test_iwelbo_optimizer_uses_importance_weighted_loss(
     )
     _, loss = optimizer.loss(zeros(1))
     assert torch.allclose(loss, torch.tensor(-offset))
+
+
+class _OffsetPotential(BasePotential):
+    """The prior log probability plus a constant, an unnormalized potential."""
+
+    def __init__(self, prior, offset: float):
+        super().__init__(prior)
+        self.offset = offset
+
+    def __call__(self, theta, track_gradients: bool = True):
+        return self.prior.log_prob(theta) + self.offset
+
+
+class _ZeroPotential(BasePotential):
+    """A constant potential: the ELBO gradient is the one of the entropy alone."""
+
+    def __call__(self, theta, track_gradients: bool = True):
+        return torch.zeros(theta.shape[0])
+
+
+def test_elbo_differentiates_a_vector_field_potential():
+    """The ELBO gradient includes the potential, also for a vector field potential,
+    which does not track gradients by default."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    estimator = posterior_flow_nn(hidden_features=8, num_layers=1)(
+        theta, theta + 0.1 * torch.randn_like(theta)
+    )
+    potentials = {
+        "vector field": VectorFieldPosterior(estimator, prior).potential_fn,
+        "zero": _ZeroPotential(prior),
+    }
+
+    def location_gradient(potential_fn):
+        torch.manual_seed(0)
+        q = LearnableGaussian(dim=2, full_covariance=False)
+        optimizer = ElboOptimizer(
+            potential_fn=potential_fn,
+            q=q,
+            prior=prior,
+            n_particles=8,
+            lr=1e-3,
+            gamma=0.999,
+        )
+        surrogate, _ = optimizer.loss(zeros(1, 2))
+        return torch.autograd.grad(surrogate, next(q.parameters()))[0]
+
+    assert not torch.allclose(
+        location_gradient(potentials["vector field"]),
+        location_gradient(potentials["zero"]),
+    )
+
+
+def test_forward_kl_loss_ignores_a_constant_in_the_potential():
+    """Self-normalized fKL weights do not depend on a constant in the potential.
+
+    With an offset of -200, exp() of every log weight underflows in float32.
+    """
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def loss_with_offset(offset: float):
+        torch.manual_seed(0)
+        optimizer = ForwardKLOptimizer(
+            potential_fn=_OffsetPotential(prior, offset),
+            q=LearnableGaussian(dim=2, full_covariance=False),
+            prior=prior,
+            n_particles=64,
+            lr=1e-3,
+            gamma=0.999,
+        )
+        return optimizer.loss(zeros(2))
+
+    surrogate, loss = loss_with_offset(0.0)
+    surrogate_low, loss_low = loss_with_offset(-200.0)
+    assert torch.isfinite(surrogate_low)
+    assert torch.allclose(surrogate_low, surrogate)
+    assert torch.allclose(loss_low, loss - 200.0)
+
+
+def test_forward_kl_loss_leaves_out_particles_outside_the_support(monkeypatch):
+    """A particle outside the target's support adds nothing to the displayed fKL
+    loss (0 * log 0 = 0), even when `weight_transform` gives it a nonzero weight.
+    `weight_transform` gets weights whose largest is 1, and its output is normalized
+    again."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    shifted = MultivariateNormal(ones(1), 0.25 * eye(1))
+
+    def target_log_prob(theta):
+        outside = theta[..., 0] < -1.5
+        return torch.where(outside, -torch.inf, shifted.log_prob(theta))
+
+    target = SimpleNamespace(log_prob=target_log_prob)
+    weight_maxima = []
+
+    def floor_weights(weights):
+        weight_maxima.append(weights.max())
+        return weights + 0.1
+
+    optimizer = ForwardKLOptimizer(
+        potential_fn=make_tractable_potential(target, prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=6,
+        weight_transform=floor_weights,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    particles = torch.tensor([-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]).unsqueeze(-1)
+    monkeypatch.setattr(optimizer.q, "sample", lambda sample_shape: particles)
+    surrogate_loss, loss = optimizer.loss(zeros(1))
+
+    logq = optimizer.q.log_prob(particles)
+    logweights = target.log_prob(particles) - logq.detach()
+    weights = (logweights - logweights.max()).exp() + 0.1
+    weights /= weights.sum()
+    assert torch.allclose(surrogate_loss, -(weights * logq).sum())
+
+    # The displayed loss averages over the particles inside the support only.
+    inside = logweights[1:]
+    inside_weights = (inside - inside.max()).exp() + 0.1
+    assert torch.allclose(loss, (inside_weights / inside_weights.sum() * inside).sum())
+    assert torch.allclose(torch.stack(weight_maxima), torch.ones(1))
+
+
+def _optimizer_after_losses(losses: list[float]) -> ForwardKLOptimizer:
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = ForwardKLOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=4,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    for loss in losses:
+        optimizer.update_loss_stats(torch.tensor(loss))
+    return optimizer
+
+
+def test_non_finite_losses_are_left_out_of_loss_stats():
+    """Non-finite losses, as from a batch entirely outside the support, neither
+    enter the running statistics nor count towards convergence."""
+    nan = float("nan")
+    before_first_finite = _optimizer_after_losses([nan]).get_loss_stats()
+    assert torch.isnan(torch.stack(before_first_finite)).all()
+
+    assert not _optimizer_after_losses([nan, 2.0, 2.0] + [nan] * 49).converged()
+    assert _optimizer_after_losses([nan, 2.0, 2.0] + [2.0] * 49).converged()
+
+    constant = [50.0] * 60
+    with_nan = constant[:30] + [nan] + constant[30:]
+    assert torch.allclose(
+        torch.stack(_optimizer_after_losses(with_nan).get_loss_stats()),
+        torch.stack(_optimizer_after_losses(constant).get_loss_stats()),
+    )
+
+
+def test_rolled_back_step_does_not_end_training(monkeypatch):
+    """A non-finite gradient loss rolls q back and warms it up towards the prior, so
+    training must not stop on that step."""
+    optimizer = _optimizer_after_losses([2.0] * 60)
+    assert optimizer.converged()
+
+    param = next(optimizer.q.parameters())
+    nan_surrogate = lambda x_o: (param.sum() * float("nan"), torch.tensor(2.0))
+    monkeypatch.setattr(optimizer, "loss", nan_surrogate)
+    optimizer.step(zeros(1))
+    assert not optimizer.converged()
+
+    finite_surrogate = lambda x_o: (param.sum() * 0 + 2.0, torch.tensor(2.0))
+    monkeypatch.setattr(optimizer, "loss", finite_surrogate)
+    optimizer.step(zeros(1))
+    assert optimizer.converged()
 
 
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
@@ -878,6 +1226,42 @@ def test_amortized_vi_batched_sampling(linear_gaussian_setup):
     assert samples.shape == (num_samples, num_obs, setup["num_dim"])
 
 
+@pytest.mark.parametrize("mode", ["single_x", "amortized"])
+@pytest.mark.parametrize(
+    "make_prior, impossible",
+    [
+        (lambda: BoxUniform(-3 * ones(2), 3 * ones(2)), [4.0, 0.0]),  # outside
+        (lambda: Independent(Gamma(2 * ones(2), ones(2)), 1), [0.0, 1.0]),  # edge
+    ],
+    ids=["box_outside", "gamma_edge"],
+)
+def test_vi_with_bounded_prior(mode, make_prior, impossible):
+    """Samples stay in the support, and θ of density zero gets `-inf`, not a value or
+    NaN, also on a `q=` copy whose source moved to another device."""
+    prior = make_prior()  # one per case: moving the posterior moves it in place
+    theta = prior.sample((300,))
+    x = theta + 0.3 * torch.randn_like(theta)
+    nle = NLE(prior, show_progress_bars=False)
+    nle.append_simulations(theta, x).train(max_num_epochs=3)
+    posterior = nle.build_posterior(sample_with="vi")
+    x_o = x[:1]
+    if mode == "amortized":
+        posterior.train_amortized(theta, x, max_num_iters=5, show_progress_bar=False)
+    else:
+        posterior.set_default_x(x_o)
+        posterior.train(max_num_iters=5, quality_control=False, show_progress_bar=False)
+    clone = VIPosterior(posterior.potential_fn, prior, q=posterior)
+
+    samples = posterior.sample((50,), x=x_o, show_progress_bars=False)
+    assert within_support(prior, samples).all()
+    assert torch.isfinite(posterior.log_prob(samples, x=x_o)).all()
+    impossible = torch.tensor([impossible])
+    assert posterior.log_prob(impossible, x=x_o).item() == -torch.inf
+
+    posterior.to("meta")
+    assert clone.log_prob(impossible, x=x_o).item() == -torch.inf
+
+
 @pytest.mark.slow
 def test_amortized_vi_log_prob(linear_gaussian_setup):
     """Test log_prob evaluation in amortized mode."""
@@ -943,6 +1327,108 @@ def test_amortized_vi_requires_training(linear_gaussian_setup):
     posterior.set_default_x(zeros(1, setup["num_dim"]))
     with pytest.raises(ValueError):
         posterior.sample((100,))
+
+
+def _fast_amortized_posterior():
+    """Return a cheaply trained amortized VI posterior and its prior."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior=prior)
+    posterior.train_amortized(
+        theta=theta,
+        x=theta + 0.1 * torch.randn_like(theta),
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    return posterior, prior
+
+
+def test_amortized_vi_takes_one_observation():
+    """Amortized q, like a direct posterior, takes one observation in `sample()`,
+    `log_prob()` and `potential()`, instead of one posterior per observation or iid
+    trials."""
+    posterior, _ = _fast_amortized_posterior()
+    x_3 = zeros(3, 2)
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        posterior.sample((10,), x=x_3)
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        posterior.log_prob(zeros(3, 2), x=x_3)
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        posterior.potential(zeros(4, 2), x=x_3)
+
+
+def test_amortized_vi_checks_a_default_x_set_before_training():
+    """A default x set before `train_amortized()` is checked against the observation
+    shape q was trained on, instead of being broadcast to it."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior=prior)
+    posterior.set_default_x(zeros(1))
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    with pytest.raises(ValueError, match="one observation has shape"):
+        posterior.sample((5,))
+
+
+def test_amortized_vi_log_prob_batched_matches_log_prob():
+    """`log_prob_batched()` scores each theta under the observation at its position,
+    as `log_prob()` does one observation at a time, also for several sample axes."""
+    posterior, prior = _fast_amortized_posterior()
+    x_batch = prior.sample((3,))
+    theta = prior.sample((2, 5, 3))
+
+    batched = posterior.log_prob_batched(theta, x_batch)
+    assert batched.shape == (2, 5, 3)
+    for i in range(3):
+        single = posterior.log_prob(theta[..., i, :], x=x_batch[i])
+        assert torch.allclose(batched[..., i], single, atol=1e-5)
+
+
+def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
+    """Amortized q(theta|x) needs an x; it ignores the x and the MAP of a stale
+    single-x fit."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior._map = zeros(1, 2)
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    assert posterior._map is None
+    with pytest.raises(ValueError, match="Context `x` needed"):
+        posterior.sample((5,))
+
+
+def test_single_x_fit_after_an_amortized_fit_takes_several_observations():
+    """While an amortized q is in place, the posterior takes one observation, but
+    `train(x)` fits a single-x q to all observations in x."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    posterior.train(x=zeros(3, 2), **TRAIN_KWARGS)
+    assert posterior.sample((5,)).shape == (5, 2)
 
 
 @pytest.mark.slow
@@ -1069,3 +1555,120 @@ def test_learnable_gaussian_ignores_the_upper_triangle_of_scale_tril():
 
     scale_tril = q._base_dist().scale_tril
     assert torch.equal(scale_tril, scale_tril.tril())
+
+
+class _CenteredPotential(BasePotential):
+    """A potential with its mode at the bound observation."""
+
+    def __call__(self, theta, track_gradients: bool = True):
+        return -0.5 * ((theta - self.x_o) ** 2).sum(-1)
+
+
+@pytest.mark.parametrize("refit", ["train", "set_q"])
+def test_map_follows_a_refit_on_another_observation(refit):
+    """Without a default x, `map()` uses the x that q was last fit to, not a cached
+    MAP of an earlier fit."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+
+    def make_posterior():
+        return VIPosterior(
+            _CenteredPotential(prior),
+            prior,
+            q="gaussian",
+            theta_transform=torch_tf.identity_transform,
+        )
+
+    posterior = make_posterior()
+    map_kwargs = dict(init_method=zeros(1, 2), num_iter=300, learning_rate=0.1)
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    posterior.map(**map_kwargs)
+    if refit == "train":
+        posterior.train(x=3 * ones(1, 2), **TRAIN_KWARGS)
+    else:
+        other = make_posterior()
+        other.train(x=3 * ones(1, 2), **TRAIN_KWARGS)
+        posterior.set_q(other)
+
+    assert torch.allclose(posterior.map(**map_kwargs), 3 * ones(1, 2), atol=0.3)
+
+
+@pytest.mark.parametrize("vi_method", ["rKL", "IW", "fKL", "alpha"])
+def test_npe_vi_posterior_fits_several_observations(vi_method):
+    """Each VI method binds several observations as iid trials of the NPE potential,
+    instead of pairing them with its particles."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((200,))
+    trainer = NPE(prior, show_progress_bars=False)
+    trainer.append_simulations(theta, theta + 0.3 * torch.randn_like(theta))
+    trainer.train(max_num_epochs=1)
+    posterior = trainer.build_posterior(sample_with="vi", vi_method=vi_method)
+
+    with pytest.warns(UserWarning, match="combined as iid trials"):
+        posterior.train(x=zeros(3, 2), **TRAIN_KWARGS)
+
+    assert posterior.sample((5,)).shape == (5, 2)
+
+
+def test_q_fit_on_one_observation_rejects_copies_of_it():
+    """A q fit on one observation is not the posterior of several iid copies."""
+    posterior = _make_posterior("gaussian")
+    posterior.train(**TRAIN_KWARGS)
+    copies = posterior.default_x.repeat(3, 1)
+
+    with pytest.raises(ValueError, match="not fit on the specified observation"):
+        posterior.sample((5,), x=copies)
+    with pytest.raises(ValueError, match="not fit on the specified observation"):
+        posterior.log_prob(zeros(1, 2), x=copies)
+
+
+def test_ensemble_of_vi_fits_to_different_x_raises():
+    """Without an x, an ensemble of q fit to different observations would mix their
+    posteriors. With one shared x, it uses that x."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    fits = []
+    for x_o in (2 * ones(1, 2), -2 * ones(1, 2)):
+        posterior = VIPosterior(_CenteredPotential(prior), prior, q="gaussian")
+        posterior.train(x=x_o, **TRAIN_KWARGS)
+        fits.append(posterior)
+
+    with pytest.raises(ValueError, match="do not all use the same observation"):
+        EnsemblePosterior(fits).sample((5,))
+    assert EnsemblePosterior([fits[0], fits[0]]).sample((5,)).shape == (5, 2)
+
+    weighted = EnsemblePosterior(fits, weights=[1.0, 0.0])
+    with pytest.raises(ValueError, match="not fit on the specified observation"):
+        weighted.sample((5,), x=2 * ones(1, 2))
+
+
+def test_ensemble_of_amortized_vi_takes_one_observation_in_log_prob():
+    """`log_prob()` of the ensemble raises like `sample()`, instead of pairing each
+    theta with one observation."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    theta = prior.sample((100,))
+    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
+    posterior.train_amortized(
+        theta=theta,
+        x=theta,
+        max_num_iters=3,
+        show_progress_bar=False,
+        num_transforms=1,
+        hidden_features=8,
+    )
+    ensemble = EnsemblePosterior([posterior, posterior])
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        ensemble.log_prob(zeros(3, 2), x=zeros(3, 2))
+
+
+def test_evaluate_scores_q_at_the_x_it_was_fit_to(capsys):
+    """A potential evaluated at another x does not change the quality score of q."""
+    prior = MultivariateNormal(zeros(2), eye(2))
+    posterior = VIPosterior(_CenteredPotential(prior), prior, q="gaussian")
+    posterior.train(x=zeros(1, 2), **TRAIN_KWARGS)
+    torch.manual_seed(0)
+    posterior.evaluate(quality_control_metric="prop", N=1000)
+    expected = capsys.readouterr().out
+
+    posterior.potential(zeros(1, 2), x=3 * ones(1, 2))
+    torch.manual_seed(0)
+    posterior.evaluate(quality_control_metric="prop", N=1000)
+    assert capsys.readouterr().out == expected

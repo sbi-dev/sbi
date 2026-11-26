@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-# This code is based on on the following three papers:
+# This code is based on the following three papers:
 
 # Lingsch et al. (2024) FUSE: Fast Unified Simulation and Estimation for PDEs
 # (https://proceedings.neurips.cc/paper_files/paper/2024/file/266c0f191b04cbbbe529016d0edc847e-Paper-Conference.pdf)
@@ -44,6 +44,8 @@ class VFT:
         point_positions: Grid point positions of shape (batch_size, n_points).
             If not provided, equispaced points are used. Positions have to be
             normalized with domain length.
+        device: Device of the data to transform. Defaults to the device of
+            `point_positions`, else the CPU.
     """
 
     def __init__(
@@ -52,23 +54,30 @@ class VFT:
         n_points: int,
         modes: int,
         point_positions: Optional[Tensor] = None,
+        device: Optional[torch.device] = None,
     ):
+        if device is None and point_positions is not None:
+            device = point_positions.device
         self.number_points = n_points
         self.batch_size = batch_size
         self.modes = modes
 
         if point_positions is not None:
-            new_times = point_positions[:, None, :]
+            new_times = point_positions[:, None, :].to(device)
         else:
             new_times = (
-                (torch.arange(self.number_points) / self.number_points).repeat(
-                    self.batch_size, 1
-                )
+                (
+                    torch.arange(self.number_points, device=device) / self.number_points
+                ).repeat(self.batch_size, 1)
             )[:, None, :]
 
         self.new_times = new_times * 2 * np.pi
 
-        self.X_ = torch.arange(modes).repeat(self.batch_size, 1)[:, :, None].float()
+        self.X_ = (
+            torch.arange(modes, device=device)
+            .repeat(self.batch_size, 1)[:, :, None]
+            .float()
+        )
         # V_fwd: (batch, modes, points) V_inf: (batch, points, modes)
         self.V_fwd, self.V_inv = self.make_matrix()
 
@@ -77,7 +86,8 @@ class VFT:
         Fourier transformation on arbitrary grids
         """
 
-        X_mat = torch.bmm(self.X_, self.new_times)
+        # Elementwise, not bmm: autocast would turn bmm into complex32.
+        X_mat = self.X_ * self.new_times
         forward_mat = torch.exp(-1j * (X_mat))
 
         inverse_mat = torch.conj(forward_mat.clone()).permute(0, 2, 1)
@@ -192,7 +202,7 @@ class SpectralConv1d_SMM(nn.Module):
             Transformed output tensor of shape (batch, 2*modes, out_channels).
         """
 
-        # Compute Fourier coeffcients
+        # Compute Fourier coefficients
         x_ft = transform.forward(x.to(torch.complex64), norm='forward')
         x_ft = x_ft.permute(0, 2, 1)
         x_ft = self.compl_mul1d(x_ft, self.weights1)  # (batch, conv_channels, modes)
@@ -242,7 +252,7 @@ class SpectralConvEmbedding(nn.Module):
         # input channels to number of convolutional channels
         self.fc0 = nn.Linear(self.in_channels, self.conv_channels)
 
-        # Inititalize layers performing convolution in Fourier space
+        # Initialize layers performing convolution in Fourier space
         self.conv_layers = nn.ModuleList([
             SpectralConv1d_SMM(self.conv_channels, self.conv_channels, self.modes)
             for _ in range(self.num_layers)
@@ -325,14 +335,18 @@ class SpectralConvEmbedding(nn.Module):
 
         n_points = x.shape[1]
 
-        assert self.modes <= n_points // 2 + 1, (
-            "Modes should be at most floor(n_points/2) + 1"
-        )
+        if self.modes > n_points // 2 + 1:
+            raise ValueError(
+                f"modes ({self.modes}) must be at most floor(n_points / 2) + 1 "
+                f"= {n_points // 2 + 1} for {n_points} points."
+            )
 
         x = self.fc0(x)  # (batch_size, n_points, in_channels)
 
         # Initialize Fourier transform for arbitrarily spaced points
-        fourier_transform = VFT(batch_size, n_points, self.modes, point_positions)
+        fourier_transform = VFT(
+            batch_size, n_points, self.modes, point_positions, device=x.device
+        )
 
         # Send the data through Fourier layers, output in original space
         for conv, w in zip(self.conv_layers, self.w_layers, strict=False):

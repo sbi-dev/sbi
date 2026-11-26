@@ -9,6 +9,7 @@ import pytest
 import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from matplotlib.pyplot import close, subplots
 from scipy.stats import binom
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -28,6 +29,7 @@ from sbi.analysis.plotting_classes import (
     FigOptions,
     HistDiagOptions,
     HistOffDiagOptions,
+    PlotOffDiagOptions,
 )
 from sbi.inference import NLE, NPE, NRE
 from sbi.utils import BoxUniform
@@ -142,11 +144,99 @@ def test_pairplot_dep(
     samples, labels, legend, offdiag, samples_labels, points_labels, points
 ):
     # uses old style keywords, checks backward compatibility
-    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
+    with pytest.warns(FutureWarning, match="v0.29.0"):
+        fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
 
     assert isinstance(fig, Figure)
     assert isinstance(axs, np.ndarray)
     assert isinstance(axs[0, 0], Axes)
+    close()
+
+
+@pytest.mark.parametrize(
+    "plot_call, expected",
+    [
+        (lambda s: pairplot(s, legend=True), "['legend']"),
+        (lambda s: marginal_plot(s, legend=True), "['legend']"),
+        (
+            lambda s: pairplot(s, legend=True, upper_kwargs={}),
+            "ignores ['upper_kwargs']",
+        ),
+        (
+            lambda s: marginal_plot(s, legend=True, diag_kwargs={}),
+            "ignores ['diag_kwargs']",
+        ),
+        (
+            lambda s: pairplot(LabeledSamples(s, name="a"), legend=True),
+            "ignores ['LabeledSamples names']",
+        ),
+        (lambda s: pairplot(s, legend=True, diag="bar"), "ignores ['diag']"),
+        (
+            lambda s: marginal_plot(s, legend=True, diag="scatter"),
+            "ignores ['diag']",
+        ),
+        (
+            lambda s: pairplot(
+                s, legend=True, diag="scatter", upper="scatter", upper_kwargs={}
+            ),
+            "ignores ['upper_kwargs']",
+        ),
+        (
+            lambda s: pairplot(
+                [s, s],
+                legend=True,
+                diag=["scatter", "hist"],
+                upper=["scatter", "hist"],
+                upper_kwargs={},
+            ),
+            "ignores ['upper_kwargs']",
+        ),
+        (
+            lambda s: pairplot(s, legend=True, diag=None, upper="scatter"),
+            "ignores ['diag']",
+        ),
+        (
+            lambda s: pairplot(
+                s,
+                legend=True,
+                diag="scatter",
+                upper=["scatter", "hist"],
+                upper_kwargs={},
+            ),
+            "ignores ['upper_kwargs']",
+        ),
+        (lambda s: pairplot(s, offdiag="hist"), "`offdiag`"),
+        (lambda s: plt.pairplot_dep(s), "`pairplot_dep`"),
+        (lambda s: plt.marginal_plot_dep(s), "`marginal_plot_dep`"),
+        (lambda s: PlotOffDiagOptions(), "`PlotOffDiagOptions`"),
+    ],
+    ids=[
+        "pairplot",
+        "marginal_plot",
+        "pairplot_ignored",
+        "marginal_plot_ignored",
+        "labeled_samples_ignored",
+        "pairplot_diag_ignored",
+        "marginal_plot_diag_ignored",
+        "pairplot_scatter_diag_drawn",
+        "per_sample_styles_drawn",
+        "no_diag_under_scatter_ignored",
+        "extra_upper_entries_unused",
+        "offdiag",
+        "pairplot_dep",
+        "marginal_plot_dep",
+        "PlotOffDiagOptions",
+    ],
+)
+def test_deprecated_plotting_warns_once_at_the_caller(plot_call, expected):
+    """Each deprecated entry point warns once, names v0.29.0 and points at the
+    caller, so that Python's default warning filters show it."""
+    with pytest.warns(FutureWarning) as record:
+        plot_call(torch.randn(50, 2))
+    ours = [w for w in record if "v0.29.0" in str(w.message)]
+    assert len(ours) == 1
+    assert ours[0].filename == __file__
+    assert expected in str(ours[0].message)
     close()
 
 
@@ -385,6 +475,102 @@ def test_sbc_rank_plot_bands_for_uniform_integer_ranks(plot_type):
     close()
 
 
+@pytest.mark.parametrize("params_in_subplots", (True, False))
+def test_sbc_rank_plot_cdf_diff_axis_fits_large_deviations(params_in_subplots):
+    """The cdf-diff y-axis grows to show deviations beyond 0.5 instead of clipping."""
+    # All ranks 0: the empirical CDF is 1 from the first bin on, about 0.9 above
+    # the uniform CDF there.
+    _, ax = sbc_rank_plot(
+        np.zeros((200, 2)),
+        100,
+        num_bins=10,
+        plot_type="cdf-diff",
+        params_in_subplots=params_in_subplots,
+    )
+    for axis in np.atleast_1d(ax):
+        largest = max(np.abs(line.get_ydata()).max() for line in axis.lines)
+        assert largest == pytest.approx(1 - 10 / 101)
+        assert axis.get_ylim() == (-1.0, 1.0)
+    close()
+
+
+def test_sbc_rank_plot_cdf_diff_axis_keeps_default_for_small_deviations():
+    ranks = np.random.default_rng(0).integers(0, 101, size=(1000, 2))
+    _, ax = sbc_rank_plot(ranks, 100, plot_type="cdf-diff")
+    assert ax.get_ylim() == (-0.5, 0.5)
+    close()
+
+
+def test_sbc_rank_plot_cdf_diff_axis_ignores_hidden_band():
+    # With 5 runs the band reaches beyond 0.5; the curve deviates by 0.4.
+    _, ax = sbc_rank_plot(
+        np.full((5, 1), 50.0),
+        100,
+        num_bins=5,
+        plot_type="cdf-diff",
+        show_uniform_region=False,
+    )
+    assert ax.get_ylim() == (-0.5, 0.5)
+    close()
+
+
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+@pytest.mark.parametrize(
+    "ranks_labels",
+    (["NPE", "NLE"], ["NPE", "NPE"], ["expected under uniformity", "NLE"]),
+)
+def test_sbc_rank_plot_legend_names_each_rank_set(plot_type, ranks_labels):
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 2)) for _ in range(2)]
+    _, ax = sbc_rank_plot(ranks, 100, plot_type=plot_type, ranks_labels=ranks_labels)
+    legend_texts = [text.get_text() for text in ax[0].get_legend().get_texts()]
+    assert legend_texts == [*ranks_labels, "expected under uniformity"]
+    assert ax[1].get_legend() is None
+    close()
+
+
+@pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
+@pytest.mark.parametrize(
+    "legend_kwargs, expected",
+    (
+        ({"labels": ["a", "b", "band"]}, ["a", "b", "band"]),
+        ({"handles": [Line2D([], [], label="reference")]}, ["reference"]),
+    ),
+)
+def test_sbc_rank_plot_legend_kwargs_override_entries(
+    plot_type, legend_kwargs, expected
+):
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 1)) for _ in range(2)]
+    _, ax = sbc_rank_plot(ranks, 100, plot_type=plot_type, legend_kwargs=legend_kwargs)
+    legend_texts = [text.get_text() for text in ax[0].get_legend().get_texts()]
+    assert legend_texts == expected
+    close()
+
+
+@pytest.mark.parametrize("show_uniform_region", (True, False))
+def test_sbc_rank_plot_hist_draws_the_band_once(show_uniform_region):
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 2)) for _ in range(2)]
+    _, ax = sbc_rank_plot(
+        ranks, 100, plot_type="hist", show_uniform_region=show_uniform_region
+    )
+    for axis in ax:
+        assert len(axis.collections) == int(show_uniform_region)
+    close()
+
+
+def test_sbc_rank_plot_legend_keeps_entries_already_on_the_axes():
+    fig, ax = subplots(1, 1)
+    ax.bar([10], [0.5], label="reference")  # a container, not an artist
+    rng = np.random.default_rng(0)
+    ranks = [rng.integers(0, 101, size=(100, 1)) for _ in range(2)]
+    sbc_rank_plot(ranks, 100, plot_type="cdf", fig=fig, ax=np.array([ax]))
+    legend_texts = [text.get_text() for text in ax.get_legend().get_texts()]
+    assert "reference" in legend_texts
+    close()
+
+
 @pytest.mark.parametrize("bad_rank", (-1.0, 11.0, np.nan))
 def test_sbc_rank_plot_rejects_ranks_outside_0_to_n(bad_rank):
     with pytest.raises(ValueError, match="num_posterior_samples"):
@@ -517,6 +703,19 @@ def test_pairplot_legend_labels_from_labeled_samples(samples_labels, expected):
         fig_kwargs=dict(legend=True, samples_labels=samples_labels),
     )
     assert [t.get_text() for t in axes[-1, 0].get_legend().get_texts()] == expected
+    close()
+
+
+@pytest.mark.parametrize(
+    "triangles, legend_cell",
+    ((dict(upper="hist"), (-1, 0)), (dict(upper=None, lower="hist"), (0, -1))),
+)
+def test_pairplot_legend_cell_has_no_axis_labels(triangles, legend_cell):
+    """The legend goes into an empty cell without that cell's axis labels."""
+    _, axes = pairplot(torch.randn(100, 3), fig_kwargs=dict(legend=True), **triangles)
+    legend_ax = axes[legend_cell]
+    assert legend_ax.get_legend() is not None
+    assert (legend_ax.get_xlabel(), legend_ax.get_ylabel()) == ("", "")
     close()
 
 

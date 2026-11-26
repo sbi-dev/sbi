@@ -3,7 +3,7 @@
 
 from copy import deepcopy
 from math import floor
-from typing import Any, Callable, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Literal, Optional, Self, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -16,14 +16,21 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
 from sbi.sbi_types import Shape
+from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.sbiutils import (
+    build_z_scored_embedding_net,
     get_simulations_since_round,
     handle_invalid_x,
-    standardizing_net,
-    z_score_parser,
 )
-from sbi.utils.torchutils import ensure_theta_batched, process_device
+from sbi.utils.torchutils import (
+    ensure_theta_batched,
+    infer_module_device,
+    infer_tensor_device,
+    move_tensors,
+    process_device,
+)
 from sbi.utils.user_input_checks import validate_theta_and_x
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
 def build_input_layer(
@@ -50,15 +57,7 @@ def build_input_layer(
     Returns:
         Input layer with optional embedding net and z-scoring.
     """
-    z_score_theta_bool, structured_theta = z_score_parser(z_score_theta)
-    if z_score_theta_bool:
-        input_layer = nn.Sequential(
-            standardizing_net(batch_theta, structured_theta), embedding_net_theta
-        )
-    else:
-        input_layer = embedding_net_theta
-
-    return input_layer
+    return build_z_scored_embedding_net(batch_theta, z_score_theta, embedding_net_theta)
 
 
 class RestrictionEstimator:
@@ -72,9 +71,7 @@ class RestrictionEstimator:
         hidden_features: int = 100,
         num_blocks: int = 2,
         dropout_probability: float = 0.5,
-        z_score: Optional[
-            Literal["independent", "structured", "transform_to_unconstrained", "none"]
-        ] = "independent",
+        z_score: Optional[Literal["independent", "structured", "none"]] = "independent",
         embedding_net: nn.Module = nn.Identity(),
     ) -> None:
         r"""
@@ -114,7 +111,9 @@ class RestrictionEstimator:
         self._prior = prior
         self._classifier = None
 
-        self._device = "cpu"  # TODO hot fix to prevent the tests from crashing
+        # The classifier trains on the CPU. `AcceptRejectFunction` evaluates it there
+        # for parameters on any device.
+        self._device = "cpu"
 
         if isinstance(model, str):
             self._model = model
@@ -383,14 +382,15 @@ class RestrictionEstimator:
             self._val_log_prob = -val_loss / num_validation_examples
             self._validation_log_probs.append(self._val_log_prob)
 
-            print("Training neural network. Epochs trained: ", epoch, end="\r")
+            print_progress(f"Training neural network. Epochs trained: {epoch}")
 
+        end_progress_line()
         return deepcopy(self._classifier)
 
     def restrict_prior(
         self,
         classifier: Optional[nn.Module] = None,
-        allowed_false_negatives: float = 0.0,
+        allowed_false_negatives: Optional[float] = None,
         reweigh_factor: Optional[float] = None,
     ) -> "RestrictedPrior":
         r"""
@@ -418,10 +418,12 @@ class RestrictionEstimator:
                 potentially `valid` parameter sets will be missed. Inference is only
                 **exact** for `allowed_false_negatives=0.0`. The value specified here
                 corresponds approximately to the fraction of parameter sets that will
-                be systematically missed by the inference procedure.
-            reweigh_factor: Post-hoc correction factor. Should be in [0, 1]. A large
-                reweigh factor will increase the probability of predicting a `invalid`
-                simulation.
+                be systematically missed by the inference procedure. Must be in
+                [0, 1). If None, 0.0 unless `reweigh_factor` is given.
+            reweigh_factor: Post-hoc correction factor, used instead of
+                `allowed_false_negatives`. Must be in [0, 1). A parameter set is
+                accepted if the classifier predicts `valid` with a probability above
+                `reweigh_factor`, so a large factor rejects more parameter sets.
 
         Returns:
             Restricted prior with `.sample()` and `.predict()` methods.
@@ -433,17 +435,19 @@ class RestrictionEstimator:
         else:
             classifier_ = classifier
 
+        classifier_.eval()
         classifier_.zero_grad(set_to_none=True)
 
         accept_reject_fn = AcceptRejectFunction(
-            self._classifier,
+            classifier_,
             self._first_round_validation_theta,
             self._first_round_validation_label,
             allowed_false_negatives=allowed_false_negatives,
             reweigh_factor=reweigh_factor,
         )
 
-        return RestrictedPrior(self._prior, accept_reject_fn)
+        prior_device = infer_tensor_device(self._prior) or "cpu"
+        return RestrictedPrior(self._prior, accept_reject_fn, device=prior_device)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         r"""
@@ -530,6 +534,16 @@ class AcceptRejectFunction:
         print_fp_rate: bool = False,
         safety_margin: Optional[Union[str, float]] = "frequentist",
     ) -> None:
+        if allowed_false_negatives is None and reweigh_factor is None:
+            allowed_false_negatives = 0.0
+        if (
+            allowed_false_negatives is not None
+            and not 0.0 <= allowed_false_negatives < 1.0
+        ):
+            raise ValueError(
+                "`allowed_false_negatives` must be in [0, 1), got "
+                f"{allowed_false_negatives}."
+            )
         self._classifier = classifier
         self._validation_theta = validation_theta
         self._validation_label = validation_label
@@ -538,16 +552,27 @@ class AcceptRejectFunction:
         self._print_fp_rate = print_fp_rate
         self._safety_margin = safety_margin
 
-        assert (
-            allowed_false_negatives is None or reweigh_factor is None
-        ), """Both the `allowed_false_negatives` and the `reweigh_factor` are set. You
-            can only set one of them."""
+        if allowed_false_negatives is not None and reweigh_factor is not None:
+            raise ValueError(
+                "Both `allowed_false_negatives` and `reweigh_factor` are set. You can "
+                "only set one of them."
+            )
+        if reweigh_factor is not None and not 0.0 <= reweigh_factor < 1.0:
+            raise ValueError(
+                f"`reweigh_factor` must be in [0, 1), got {reweigh_factor}. At 1, "
+                "every parameter set is rejected."
+            )
 
         valid_val_theta = validation_theta[validation_label.bool()]
         num_valid = valid_val_theta.shape[0]
-        clf_probs = F.softmax(classifier.forward(valid_val_theta), dim=1)[:, 1]
+        classifier_device = infer_module_device(classifier, str(valid_val_theta.device))
+        with torch.no_grad():
+            logits = classifier.forward(valid_val_theta.to(classifier_device))
+            clf_probs = F.softmax(logits, dim=1)[:, 1]
 
-        if allowed_false_negatives == 0.0:
+        if reweigh_factor is not None:
+            self._classifier_thr = None
+        elif allowed_false_negatives == 0.0:
             if safety_margin is None:
                 self._classifier_thr = torch.min(clf_probs)
             elif isinstance(safety_margin, float):
@@ -562,9 +587,7 @@ class AcceptRejectFunction:
             else:
                 raise NameError(f"`safety_margin` {safety_margin} not supported.")
         else:
-            assert allowed_false_negatives is not None, (
-                "`allowed_false_negatives` must be set."
-            )
+            assert allowed_false_negatives is not None
             quantile_index = floor(num_valid * allowed_false_negatives)
             self._classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
 
@@ -573,16 +596,21 @@ class AcceptRejectFunction:
                 self.__call__, self._validation_theta, self._validation_label
             )
 
-    def __call__(self, theta):
-        pred = F.softmax(self._classifier.forward(theta), dim=1)[:, 1]
+    def __call__(self, theta: Tensor) -> Tensor:
+        classifier_device = infer_module_device(self._classifier, str(theta.device))
+        logits = self._classifier.forward(theta.to(classifier_device))
+        pred = F.softmax(logits, dim=1)[:, 1]
         if self._reweigh_factor is None:
-            threshold = self._classifier_thr
-            predictions = pred > threshold
+            # Inclusive: on the quantile path, the threshold is the
+            # (floor(n * a) + 1)-th smallest P(valid) of the n valid validation
+            # samples, so `>=` rejects at most floor(n * a) of them. A classifier
+            # certain of every valid sample sets it to 1.0.
+            predictions = pred >= self._classifier_thr
         else:
-            probs_invalid = pred * self._reweigh_factor
-            probs_valid = (1 - pred) * (1 - self._reweigh_factor)
-            predictions = probs_valid > probs_invalid
-        return predictions.bool()
+            # Reweighing the odds of `pred` = P(valid) by (1 - r) / r and accepting
+            # above 0.5 reduces to p * (1 - r) > (1 - p) * r  <=>  p > r.
+            predictions = pred > self._reweigh_factor
+        return predictions.bool().to(theta.device)
 
     def print_false_positive_rate(
         self,
@@ -646,6 +674,31 @@ class RestrictedPrior(Distribution):
         self._device = process_device(device)
         self.acceptance_rate = None  # Only defined for rejection sampling.
 
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move the restricted prior to `device` in place.
+
+        Moves the prior and the posterior used for `sir`. The classifier of an
+        `AcceptRejectFunction` stays on its device and evaluates parameters from any
+        device. A user's own accept/reject callable, e.g. from
+        `get_density_thresholder()`, is not moved.
+
+        Args:
+            device: Device to move the restricted prior to.
+
+        Returns:
+            The restricted prior itself.
+        """
+        device = process_device(device)
+        self._prior = move_distribution_to_device(self._prior, device)
+        if isinstance(self._posterior, Distribution):
+            self._posterior = move_distribution_to_device(self._posterior, device)
+        elif self._posterior is not None:
+            self._posterior.to(device)
+        self.acceptance_rate = move_tensors(self.acceptance_rate, device)
+        # Set last: if the prior cannot move, the restricted prior keeps its device.
+        self._device = device
+        return self
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -704,7 +757,11 @@ class RestrictedPrior(Distribution):
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
-                alternative_method="sample_with='sir'",
+                # SIR needs a posterior; `sample()` has no time limit or bypass.
+                alternative_method=(
+                    "sample_with='sir'" if self._posterior is not None else None
+                ),
+                suggest_sampling_options=False,
             )
             # NOTE: This currently requires a float acceptance rate. A previous version
             # of accept_reject_sample returned a float. In favour to batched sampling
@@ -755,7 +812,7 @@ class RestrictedPrior(Distribution):
                 density. The normalizing factor is calculated via rejection sampling,
                 so if you need speedier but unnormalized log probability estimates set
                 here `norm_restricted_prior=False`. The returned log probability is set
-                to -∞ outside of the restriceted prior support regardless of this
+                to -∞ outside of the restricted prior support regardless of this
                 setting.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory

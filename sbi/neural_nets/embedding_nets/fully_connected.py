@@ -5,7 +5,27 @@ from torch import Tensor, nn
 
 
 class FCEmbedding(nn.Module):
-    """Fully-connected multi-layer neural network to be used as embedding network."""
+    """Fully-connected multi-layer neural network to be used as embedding network.
+
+    Examples
+    --------
+
+    ::
+
+        import torch
+        from sbi.neural_nets.embedding_nets import FCEmbedding
+
+        embedding_net = FCEmbedding(
+            input_dim=8,
+            output_dim=20,
+        )
+
+        x = torch.randn(32, 8)
+        embeddings = embedding_net(x)
+
+        print(embeddings.shape)
+        # torch.Size([32, 20])
+    """
 
     def __init__(
         self,
@@ -14,7 +34,7 @@ class FCEmbedding(nn.Module):
         num_layers: int = 2,
         num_hiddens: int = 50,
         enable_layer_norm: bool = False,
-        activation: nn.Module = nn.ReLU,
+        activation: type[nn.Module] = nn.ReLU,
     ):
         """Fully-connected multi-layer neural network to be used as embedding network.
 
@@ -24,7 +44,8 @@ class FCEmbedding(nn.Module):
             num_layers: Number of layers of the embedding network. (Minimum of 2).
             num_hiddens: Number of hidden units in each layer of the embedding network.
             enable_layer_norm: Enable layer normalization. Default is False.
-            activation: Activation function. Default is nn.ReLU.
+            activation: Activation function of the hidden layers. Default is nn.ReLU.
+                The output layer is linear.
         """
         super().__init__()
         layer_norm = nn.LayerNorm if enable_layer_norm else nn.Identity
@@ -34,13 +55,12 @@ class FCEmbedding(nn.Module):
             activation(),
         ]
         # first and last layer is defined by the input and output dimension.
-        # therefor the "number of hidden layeres" is num_layers-2
+        # therefore the "number of hidden layers" is num_layers-2
         for _ in range(num_layers - 2):
             layers.append(nn.Linear(num_hiddens, num_hiddens))
             layers.append(layer_norm(num_hiddens))
             layers.append(activation())
         layers.append(nn.Linear(num_hiddens, output_dim))
-        layers.append(activation())
         self.net = nn.Sequential(*layers)
 
     def forward(self, x: Tensor) -> Tensor:

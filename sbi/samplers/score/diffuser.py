@@ -5,11 +5,10 @@ from typing import Optional, Union
 
 import torch
 from torch import Tensor
-from tqdm.auto import tqdm
 
 from sbi.samplers.score.correctors import Corrector, get_corrector
 from sbi.samplers.score.predictors import Predictor, get_predictor
-from sbi.utils.pbar import is_nested, sampling_desc
+from sbi.utils.pbar import is_nested, sampling_desc, tqdm
 
 
 class Diffuser:
@@ -131,7 +130,7 @@ class Diffuser:
         Args:
             num_samples: Number of samples to draw.
             ts: Time grid to propagate samples forward, or "solve" the SDE.
-            show_progress_bars: Whehter to show progressbar. Defaults to True.
+            show_progress_bars: Whether to show progressbar. Defaults to True.
             save_intermediate: Whether to return samples at all time point, instead of
                 only returning samples at the end. Defaults to False.
 
@@ -156,9 +155,9 @@ class Diffuser:
 
         # Step through the diffusion process from t_max to t_min
         for time_step_idx in pbar:
-            # Get current and next time points (going backwards in time)
-            t_current = ts[time_step_idx - 1]  # Previous time point
-            t_next = ts[time_step_idx]  # Current time point
+            # Step from t_current to the smaller t_next (going backwards in time)
+            t_current = ts[time_step_idx - 1]
+            t_next = ts[time_step_idx]
 
             # Apply predictor step
             samples = self.predictor(samples, t_current, t_next)

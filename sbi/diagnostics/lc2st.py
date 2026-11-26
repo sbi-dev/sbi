@@ -16,9 +16,9 @@ from skorch import NeuralNetBinaryClassifier
 from skorch.callbacks import EarlyStopping
 from skorch.dataset import ValidSplit
 from torch import Tensor
-from tqdm import tqdm
 
 from sbi.utils.metrics import MLPClassifierModule
+from sbi.utils.pbar import tqdm
 from sbi.utils.sbiutils import handle_invalid_x
 
 # Default MLP classifier hyperparameters
@@ -120,7 +120,7 @@ class LC2ST:
         seed: int = 1,
         num_folds: int = 1,
         num_ensemble: int = 1,
-        classifier: Union[str, Type[BaseEstimator]] = MLPClassifier,
+        classifier: Union[str, Type[BaseEstimator]] = "mlp",
         z_score: bool = False,
         classifier_kwargs: Optional[Dict[str, Any]] = None,
         num_trials_null: int = 100,
@@ -466,7 +466,8 @@ class LC2ST:
             Normalized theta if z_score is enabled, otherwise unchanged theta.
         """
         if self.z_score:
-            return (theta - self.theta_p_mean) / self.theta_p_std
+            device = theta.device
+            return (theta - self.theta_p_mean.to(device)) / self.theta_p_std.to(device)
         return theta
 
     def _normalize_x(self, x: Tensor) -> Tensor:
@@ -479,7 +480,7 @@ class LC2ST:
             Normalized x if z_score is enabled, otherwise unchanged x.
         """
         if self.z_score:
-            return (x - self.x_p_mean) / self.x_p_std
+            return (x - self.x_p_mean.to(x.device)) / self.x_p_std.to(x.device)
         return x
 
     @property
@@ -523,7 +524,7 @@ class LC2ST:
         if self.num_folds > 1:
             trained_clfs = []
             kf = KFold(n_splits=self.num_folds, shuffle=True, random_state=self.seed)
-            cv_splits = kf.split(theta_p.numpy())
+            cv_splits = kf.split(theta_p.cpu().numpy())
             for train_idx, _ in tqdm(
                 cv_splits, desc="Cross-validation", disable=verbosity < 1
             ):
@@ -615,8 +616,10 @@ class LC2ST:
         Returns:
             self, for method chaining.
         """
-        # Set random state
-        if seed is not None:
+        # skorch takes no `random_state`: seed the CPU torch and numpy generators it
+        # draws from instead, for this training only.
+        seed_skorch = seed is not None and self.clf_class is NeuralNetBinaryClassifier
+        if seed is not None and not seed_skorch:
             if "random_state" in self.clf_kwargs:
                 warnings.warn(
                     "Overwriting 'random_state' in classifier_kwargs because "
@@ -627,9 +630,18 @@ class LC2ST:
             self.clf_kwargs["random_state"] = seed
 
         # Train the classifier
-        trained_clfs = self._train(
-            self.theta_p, self.theta_q, self.x_p, self.x_q, verbosity=verbosity
-        )
+        np_state = np.random.get_state()
+        with torch.random.fork_rng(devices=[], enabled=seed_skorch):
+            if seed_skorch:
+                torch.default_generator.manual_seed(seed)  # type: ignore[arg-type]
+                np.random.seed(seed)
+            try:
+                trained_clfs = self._train(
+                    self.theta_p, self.theta_q, self.x_p, self.x_q, verbosity=verbosity
+                )
+            finally:
+                if seed_skorch:
+                    np.random.set_state(np_state)
         self.trained_clfs = trained_clfs
 
         # Update state: preserve READY (re-training is a valid workflow, e.g.
@@ -1153,7 +1165,8 @@ def train_lc2st(
 
     # labels - use float32 for skorch NeuralNetBinaryClassifier (BCEWithLogitsLoss),
     # int64 for sklearn classifiers
-    is_skorch = isinstance(clf, NeuralNetBinaryClassifier)
+    base_clf = clf.clf if isinstance(clf, EnsembleClassifier) else clf
+    is_skorch = isinstance(base_clf, NeuralNetBinaryClassifier)
     label_dtype = np.float32 if is_skorch else np.int64
     target = np.concatenate((
         np.zeros((joint_p.shape[0],), dtype=label_dtype),

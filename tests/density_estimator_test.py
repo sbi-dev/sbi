@@ -16,6 +16,7 @@ from sbi.inference.trainers.vfpe.fmpe import FMPE
 from sbi.inference.trainers.vfpe.npse import NPSE
 from sbi.neural_nets import FlowMatchingConfig, VEScoreConfig
 from sbi.neural_nets.embedding_nets import CNNEmbedding
+from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
 from sbi.neural_nets.net_builders import (
@@ -38,7 +39,7 @@ from sbi.neural_nets.net_builders import (
     build_zuko_sospf,
     build_zuko_unaf,
 )
-from sbi.neural_nets.net_builders.flow import build_zuko_flow
+from sbi.neural_nets.net_builders.flow import ContextSplineMap, build_zuko_flow
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils.torchutils import BoxUniform
 
@@ -303,6 +304,16 @@ def test_log_prob_broadcasting_batch_dims(
     assert log_probs.shape == (2, batch_dim)
 
 
+@pytest.mark.parametrize("density_estimator_build_fn", [build_nsf, build_zuko_nsf])
+def test_log_prob_rejects_input_of_another_width(density_estimator_build_fn):
+    """An input of width 1 must not be broadcast to the event shape."""
+    density_estimator, _, condition, _ = _build_density_estimator_and_tensors(
+        density_estimator_build_fn, (2,), (3,), batch_dim=4
+    )
+    with pytest.raises(ValueError, match="Shape of input"):
+        density_estimator.log_prob(torch.zeros(4, 1), condition=condition)
+
+
 @pytest.mark.parametrize(
     "density_estimator_build_fn",
     [build_nsf, build_zuko_nsf],
@@ -403,6 +414,37 @@ def test_correctness_of_batched_vs_seperate_sample_and_log_prob(
     assert torch.allclose(log_probs, log_probs_sep, atol=1e-2, rtol=1e-2), (
         "Batched log_prob is not consistent with separate log_prob."
     )
+
+    # Batched sample_and_log_prob: each log prob belongs to its sample and condition.
+    samples, log_probs = density_estimator.sample_and_log_prob(
+        sample_shape, condition=condition
+    )
+    samples = samples.reshape(-1, batch_dim, *input_event_shape)
+    log_probs = log_probs.reshape(-1, batch_dim)
+    assert torch.allclose(
+        log_probs, density_estimator.log_prob(samples, condition=condition), atol=1e-3
+    ), "Batched sample_and_log_prob is not consistent with log_prob."
+
+
+def test_unconditional_density_estimator_default_methods():
+    """The base class methods work for subclasses that do not override them."""
+
+    class GaussianNet(torch.nn.Module):
+        def log_prob(self, x: Tensor) -> Tensor:
+            return MultivariateNormal(zeros(2), eye(2)).log_prob(x)
+
+        def sample(self, sample_shape: torch.Size) -> Tensor:
+            return MultivariateNormal(zeros(2), eye(2)).sample(sample_shape)
+
+    class GaussianEstimator(UnconditionalDensityEstimator):
+        def loss(self, input: Tensor, **kwargs) -> Tensor:
+            return -self.log_prob(input)
+
+    estimator = GaussianEstimator(GaussianNet(), input_shape=torch.Size((2,)))
+    samples, log_probs = estimator.sample_and_log_prob(torch.Size((5,)))
+    assert samples.shape == (5, 2)
+    assert log_probs.shape == (5,)
+    assert estimator.net.training, "log_prob must leave the train/eval mode as is."
 
 
 def _build_density_estimator_and_tensors(
@@ -549,7 +591,40 @@ def test_mixed_density_estimator(
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
 
 
-@pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
+@pytest.mark.parametrize(
+    "value, dtype",
+    [
+        (-1.0, torch.float32),
+        (1.0, torch.float32),
+        (3.0, torch.float32),
+        (6.0, torch.float32),
+        (2.00000001, torch.float64),  # rounds to 2.0 in float32
+    ],
+)
+def test_categorical_mass_estimator_rejects_unseen_values(value, dtype):
+    estimator = build_categoricalmassestimator(
+        batch_x=torch.tensor([[0.0], [2.0], [5.0]]),
+        batch_y=torch.randn(3, 1),
+        num_categories_per_variable=torch.tensor([3]),
+    )
+    with pytest.raises(ValueError, match="values not seen during training"):
+        estimator.log_prob(
+            torch.tensor([[value]], dtype=dtype), condition=torch.zeros(1, 1)
+        )
+
+
+def test_categorical_mass_estimator_log_prob_of_own_samples():
+    # Integer categories above 2**24 are not exact in float32.
+    estimator = build_categoricalmassestimator(
+        batch_x=torch.tensor([[2**24 + 1], [2**24 + 5]]),
+        batch_y=torch.randn(2, 1),
+        num_categories_per_variable=torch.tensor([2]),
+    )
+    condition = torch.zeros(1, 1)
+    samples = estimator.sample((10,), condition=condition)
+    assert torch.isfinite(estimator.log_prob(samples, condition=condition)).all()
+
+
 @pytest.mark.parametrize(
     "x_dist",
     [
@@ -558,7 +633,7 @@ def test_mixed_density_estimator(
         MultivariateNormal(loc=zeros(5), covariance_matrix=eye(5)),
     ],
 )
-def test_build_zuko_flow_with_valid_unconstrained_transform(which_nf, x_dist):
+def test_build_zuko_flow_with_valid_unconstrained_transform(x_dist):
     """Test that ZukoFlow builds successfully with valid `x_dist`."""
     # input dimension is 5
     batch_x = torch.randn(10, 5)
@@ -566,18 +641,16 @@ def test_build_zuko_flow_with_valid_unconstrained_transform(which_nf, x_dist):
 
     # Test case where x_dist is provided (should not raise an error)
     flow = build_zuko_flow(
-        which_nf=which_nf,
+        which_nf="MAF",
         batch_x=batch_x,
         batch_y=batch_y,
         z_score_x="transform_to_unconstrained",
-        z_score_y="transform_to_unconstrained",
         x_dist=x_dist,
     )
     assert isinstance(flow, ZukoFlow)
 
 
-@pytest.mark.parametrize("which_nf", ["MAF", "CNF"])
-def test_build_zuko_flow_missing_x_dist_raises_error(which_nf):
+def test_build_zuko_flow_missing_x_dist_raises_error():
     """Test that ValueError is raised if `x_dist` is None when required."""
     batch_x = torch.randn(10, 5)
     batch_y = torch.randn(10, 3)
@@ -587,11 +660,10 @@ def test_build_zuko_flow_missing_x_dist_raises_error(which_nf):
         match=r".*distribution.*x_dist.*",
     ):
         build_zuko_flow(
-            which_nf=which_nf,
+            which_nf="MAF",
             batch_x=batch_x,
             batch_y=batch_y,
             z_score_x="transform_to_unconstrained",
-            z_score_y="transform_to_unconstrained",
             x_dist=None,  # No distribution provided
         )
 
@@ -779,3 +851,33 @@ def test_tabpfn_flow_shapes(batch_dim, input_sample_dim):
 
     with pytest.raises(NotImplementedError):
         estimator.loss(inputs[0], condition=condition)
+
+
+def test_context_spline_map_hidden_layers_have_their_own_weights():
+    """Repeating one layer object would make all hidden layers share weights."""
+    net = ContextSplineMap(
+        in_features=1,
+        out_features=4,
+        hidden_features=8,
+        context_features=3,
+        hidden_layers=3,
+    )
+    linears = [m for m in net.spline_predictor if isinstance(m, torch.nn.Linear)]
+
+    assert len({id(m) for m in linears}) == len(linears) == 5
+
+
+@pytest.mark.parametrize("build_fn", [build_maf, build_nsf, build_zuko_maf])
+def test_inverse_transform_maps_samples_to_the_base_distribution(build_fn):
+    """inverse_transform must embed (z-score) the condition, as sample() does."""
+    theta = torch.randn(500, 2)
+    x = 100.0 + 10.0 * torch.randn(500, 2)
+    estimator = build_fn(theta, x, z_score_y="independent")
+    x_o = x[:1]
+
+    with torch.no_grad():
+        samples = estimator.sample((2000,), condition=x_o)[:, 0]
+        noise = estimator.inverse_transform(samples, x_o)
+
+    assert torch.allclose(noise.mean(0), torch.zeros(2), atol=0.15)
+    assert torch.allclose(noise.std(0), torch.ones(2), atol=0.15)

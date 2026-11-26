@@ -18,7 +18,10 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.neural_nets.net_builders.vector_field_nets import (
     FlowMatchingConfig,
+    SimformerFlowMatchingConfig,
     _score_config_from_sde_type,
+    _simformer_config_from_kwargs,
+    _simformer_score_config_cls,
     _vf_config_from_factory_kwargs,
 )
 from sbi.utils.nn_utils import check_net_device
@@ -409,11 +412,9 @@ def posterior_score_nn(
     ] = "mlp",
     sde_type: str = "ve",
     z_score_theta: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        Literal["independent", "structured", "none"]
     ] = "independent",
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -504,11 +505,9 @@ def posterior_flow_nn(
         VectorFieldNet,
     ] = "mlp",
     z_score_theta: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
+        Literal["independent", "structured", "none"]
     ] = "independent",
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 100,
     num_layers: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -593,11 +592,188 @@ def posterior_flow_nn(
     return build_fn
 
 
+def _simformer_builder_kwargs(
+    model: str,
+    z_score_x: Optional[str],
+    hidden_features: int,
+    num_heads: int,
+    num_layers: int,
+    mlp_ratio: int,
+    time_embedding_dim: int,
+    dim_val: int,
+    dim_id: int,
+    dim_cond: int,
+    ada_time: bool,
+    kwargs: dict,
+) -> dict:
+    """Collect the keyword arguments of the masked estimator builders."""
+    if "embedding_net" in kwargs:
+        raise ValueError(
+            "The Simformer does not support an `embedding_net`: every variable is a "
+            "token of the transformer, and the vector field is defined on the raw "
+            "variables. Pass already embedded (summarized) data instead."
+        )
+    return dict(
+        net=model,
+        z_score_x=z_score_x,
+        hidden_features=hidden_features,
+        num_heads=num_heads,
+        num_layers=num_layers,
+        mlp_ratio=mlp_ratio,
+        time_embedding_dim=time_embedding_dim,
+        dim_val=dim_val,
+        dim_id=dim_id,
+        dim_cond=dim_cond,
+        ada_time=ada_time,
+        **kwargs,
+    )
+
+
+def simformer_score_nn(
+    model: str = "simformer",
+    sde_type: str = "ve",
+    z_score_x: Optional[str] = "independent",
+    hidden_features: int = 100,
+    num_heads: int = 4,
+    num_layers: int = 4,
+    mlp_ratio: int = 2,
+    time_embedding_dim: int = 32,
+    dim_val: int = 64,
+    dim_id: int = 32,
+    dim_cond: int = 16,
+    ada_time: bool = False,
+    **kwargs: Any,
+) -> Callable:
+    r"""Returns a function that builds a Score based Simformer
+    for learning arbitrary conditionals.
+
+    The returned function is to be passed to the inference class when using the flexible
+    interface.
+
+    Note that in the scope of the Simformer, there is no theta or x, just inputs with
+    variable condition and edge masks defining relationships between variables.
+
+    Args:
+        model (str): Name of the model architecture to use. Default is "simformer".
+        sde_type (str): Type of stochastic differential equation (SDE) to use.
+        z_score_x (str): Whether to z-score the inputs, "independent" (default),
+            "structured" or None. The standardization is internal to the
+            estimator, as for NPSE.
+        hidden_features (int): Number of hidden features in each layer. Default is 100.
+        num_heads (int): Number of attention heads in the transformer layers.
+        num_layers (int): Number of transformer layers. Default is 4.
+        mlp_ratio (int): Ratio of MLP hidden dimension to embedding dimension.
+        time_embedding_dim (int): Dimension of the time embedding.
+        dim_val (int): Dimension of value embeddings.
+        dim_id (int): Dimension of identifier embeddings.
+        dim_cond (int): Dimension of conditional embeddings.
+        ada_time (bool): Whether to use adaptive time embeddings.
+        **kwargs (Any): Further arguments of the estimator (e.g. `sigma_min`,
+            `sigma_max`, `beta_min`, `beta_max`, `t_min`, `t_max`, `weight_fn`) or
+            of `build_simformer_network`. Unknown arguments raise an error.
+    Returns:
+        Callable: A function that takes batch inputs and returns a masked score
+        matching estimator. It is the `build` method of the equivalent
+        `SimformerVEScoreConfig` (or the config of the chosen SDE); passing that
+        config to `Simformer` directly is preferred.
+    """
+    builder_kwargs = _simformer_builder_kwargs(
+        model,
+        z_score_x,
+        hidden_features,
+        num_heads,
+        num_layers,
+        mlp_ratio,
+        time_embedding_dim,
+        dim_val,
+        dim_id,
+        dim_cond,
+        ada_time,
+        kwargs,
+    )
+
+    net = builder_kwargs.pop("net")
+    z_score = builder_kwargs.pop("z_score_x")
+    config = _simformer_config_from_kwargs(
+        _simformer_score_config_cls(sde_type), net, z_score, builder_kwargs
+    )
+    return config.build
+
+
+def simformer_flow_nn(
+    model: str = "simformer",
+    z_score_x: Optional[str] = "independent",
+    hidden_features: int = 100,
+    num_heads: int = 4,
+    num_layers: int = 4,
+    mlp_ratio: int = 2,
+    time_embedding_dim: int = 32,
+    dim_val: int = 64,
+    dim_id: int = 32,
+    dim_cond: int = 16,
+    ada_time: bool = False,
+    **kwargs: Any,
+) -> Callable:
+    r"""
+    Returns a function that builds a Flow Matching Simformer
+    for learning arbitrary conditionals.
+
+    The returned function is to be passed to the inference class when using the flexible
+    interface.
+
+    Note that in the view of the Simformer, there is no theta or x, just inputs with
+    variable condition and edge masks defining relationships between variables.
+
+    Args:
+        model (str): Name of the model architecture to use. Default is "simformer".
+        z_score_x (str): Whether to z-score the inputs, "independent" (default),
+            "structured" or None. The standardization is internal to the
+            estimator, as for FMPE.
+        hidden_features (int): Number of hidden features in each layer. Default is 100.
+        num_heads (int): Number of attention heads in the transformer layers.
+        num_layers (int): Number of transformer layers. Default is 4.
+        mlp_ratio (int): Ratio of MLP hidden dimension to embedding dimension.
+        time_embedding_dim (int): Dimension of the time embedding.
+        dim_val (int): Dimension of value embeddings.
+        dim_id (int): Dimension of identifier embeddings.
+        dim_cond (int): Dimension of conditional embeddings.
+        ada_time (bool): Whether to use adaptive time embeddings.
+        **kwargs (Any): Further arguments of the estimator (e.g. `noise_scale`,
+            `gaussian_baseline`) or of `build_simformer_network`. Unknown arguments
+            raise an error.
+    Returns:
+        Callable: A function that takes batch inputs and returns a masked flow
+        matching estimator. It is the `build` method of the equivalent
+        `SimformerFlowMatchingConfig`; passing that config to
+        `FlowMatchingSimformer` directly is preferred.
+    """
+    builder_kwargs = _simformer_builder_kwargs(
+        model,
+        z_score_x,
+        hidden_features,
+        num_heads,
+        num_layers,
+        mlp_ratio,
+        time_embedding_dim,
+        dim_val,
+        dim_id,
+        dim_cond,
+        ada_time,
+        kwargs,
+    )
+
+    net = builder_kwargs.pop("net")
+    z_score = builder_kwargs.pop("z_score_x")
+    builder_kwargs.pop("sde_type", None)  # Flow matching has no SDE.
+    config = _simformer_config_from_kwargs(
+        SimformerFlowMatchingConfig, net, z_score, builder_kwargs
+    )
+    return config.build
+
+
 def marginal_nn(
     model: ZukoFlowType,
-    z_score_x: Optional[
-        Literal["independent", "structured", "transform_to_unconstrained", "none"]
-    ] = "independent",
+    z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,

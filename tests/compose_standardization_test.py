@@ -15,6 +15,7 @@ from sbi.neural_nets import FlowMatchingConfig, VEScoreConfig
 from sbi.neural_nets.estimators.flowmatching_estimator import FlowMatchingEstimator
 from sbi.neural_nets.factory import posterior_flow_nn, posterior_score_nn
 from sbi.utils.sbiutils import z_standardization
+from sbi.utils.torchutils import process_device
 
 NUM_DIM = 3
 _COMPOSE_KEYS = ("_theta_shift", "_theta_scale", "_compose_standardization")
@@ -117,12 +118,13 @@ def test_compose_affine_rejects_invalid_values(affine_name, value):
 
 
 @pytest.mark.gpu
-def test_affine_contract_cuda():
-    estimator = _build().cuda()
-    theta = (100.0 + 5.0 * torch.randn(10, NUM_DIM)).cuda()
+def test_affine_contract_gpu():
+    device = torch.device(process_device("gpu"))
+    estimator = _build().to(device)
+    theta = (100.0 + 5.0 * torch.randn(10, NUM_DIM)).to(device)
 
     reconstructed = estimator.from_z(estimator.to_z(theta))
-    assert reconstructed.is_cuda
+    assert reconstructed.device == device
     assert torch.allclose(reconstructed, theta, atol=1e-5)
 
 

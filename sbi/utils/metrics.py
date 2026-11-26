@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, Optional, Sequence, Union
 import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.base import BaseEstimator, clone, is_classifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neural_network import MLPClassifier
@@ -51,7 +52,7 @@ class MLPClassifierModule(nn.Module):
         Returns:
             Output logits of shape `(batch, output_dim)`.
         """
-        return self.sequential(X.float())
+        return self.sequential(X.to(self.sequential[0].weight.dtype))
 
 
 def c2st(
@@ -60,14 +61,13 @@ def c2st(
     seed: int = 1,
     n_folds: int = 5,
     metric: str = "accuracy",
-    classifier: Union[str, Callable] = "rf",
+    classifier: Union[str, BaseEstimator, Callable] = "rf",
     classifier_kwargs: Optional[Dict[str, Any]] = None,
     z_score: bool = True,
     noise_scale: Optional[float] = None,
     verbosity: int = 0,
 ) -> Tensor:
-    """
-    Return classifier based two-sample test accuracy between X and Y.
+    """Return classifier based two-sample test accuracy between X and Y.
 
     For details on the method, see [1,2]. If the returned accuracy is 0.5, <X>
     and <Y> are considered to be from the same generating PDF, i.e. they can not
@@ -83,20 +83,24 @@ def c2st(
     Note: Both set of samples are normalized (z scored) using the mean and std
     of the samples in <X>. If <z_score> is set to False, no normalization is
     done. If features in <X> are close to constant with std close to zero, the
-    std is set to 1 to avoud division by zero.
-
-    If you need a more flexible interface which is able to take a sklearn
-    compatible classifier and more, see the `c2st_` method in this module.
+    std is set to 1 to avoid division by zero.
 
     Args:
-        X: Samples from one distribution. Y: Samples from another distribution.
-        seed: Seed for the sklearn classifier and the KFold cross-validation
-        n_folds: Number of folds to use metric: sklearn compliant metric to use
-        for the scoring parameter of
-            cross_val_score
-        classifier: classification architecture to use. Defaults to "rf" for a
-            RandomForestClassifier. Should be a sklearn classifier, or a
-            Callable that behaves like one.
+        X: Samples from one distribution.
+        Y: Samples from another distribution.
+        seed: Seed for the sklearn classifier and the KFold cross-validation.
+        n_folds: Number of folds to use.
+        metric: sklearn compliant metric to use for the scoring parameter of
+            cross_val_score.
+        classifier: Classifier to use. "rf" (default) for a
+            RandomForestClassifier, "mlp" for an MLPClassifier, a sklearn
+            classifier instance, a sklearn classifier class, or a function that
+            returns a sklearn classifier. An instance is cloned, so it stays
+            unchanged. If the classifier has a `random_state` parameter that is
+            left at None, it is set to `seed`.
+        classifier_kwargs: Keyword arguments for the classifier class or function,
+            or parameters to set on the cloned instance. For "mlp", they replace the
+            default MLP settings instead of updating them.
         z_score: Z-scoring using X, i.e. mean and std deviation of X is
             used to normalize X and Y, i.e. Y=(Y - mean)/std
         noise_scale: If passed, will add Gaussian noise with standard deviation
@@ -135,6 +139,23 @@ def c2st(
             "early_stopping": True,
             "n_iter_no_change": 50,
         }
+    elif isinstance(classifier, BaseEstimator):
+        clf_class = clone(classifier).set_params  # returns the configured copy
+        clf_kwargs = classifier_kwargs or {}
+    elif callable(classifier) and not isinstance(classifier, str):
+        clf_class = classifier
+        clf_kwargs = classifier_kwargs or {}
+    else:
+        raise ValueError(
+            f"Invalid classifier {classifier!r}. Expected 'rf', 'mlp', a sklearn "
+            "classifier or its class, or a function that returns a sklearn classifier."
+        )
+
+    clf = clf_class(**clf_kwargs)
+    if not (isinstance(clf, BaseEstimator) and is_classifier(clf)):
+        raise ValueError(f"classifier must build a sklearn classifier, got {clf!r}.")
+    if clf.get_params().get("random_state", 0) is None:
+        clf.set_params(random_state=seed)
 
     if z_score:
         X_mean = torch.mean(X, dim=0)
@@ -147,13 +168,11 @@ def c2st(
         Y = (Y - X_mean) / X_std
 
     if noise_scale is not None:
-        X += noise_scale * torch.randn(X.shape)
-        Y += noise_scale * torch.randn(Y.shape)
-
-    clf = clf_class(random_state=seed, **clf_kwargs)
+        X = X + noise_scale * torch.randn_like(X)
+        Y = Y + noise_scale * torch.randn_like(Y)
 
     # prepare data, convert to numpy
-    data = np.concatenate((X.cpu().numpy(), Y.cpu().numpy()))
+    data = np.concatenate((X.detach().cpu().numpy(), Y.detach().cpu().numpy()))
     # labels
     target = np.concatenate((np.zeros((X.shape[0],)), np.ones((Y.shape[0],))))
 
@@ -176,6 +195,28 @@ def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
     )
 
 
+def _mmd_lengthscale(
+    scale: Optional[float], *squared_distances: Tensor
+) -> Union[Tensor, float]:
+    """Return `scale`, or the median of the pairwise distances if it is None.
+
+    The median is floored at 1e-8: it is zero when most samples are identical, as
+    in discrete data, and the floor then gives a kernel that is 1 for identical
+    samples and 0 otherwise, instead of NaN.
+
+    Raises:
+        ValueError: If `scale` is zero or negative.
+    """
+    if scale is None:
+        # Square root after the median: its gradient is inf at a zero distance, and
+        # NaN once the median multiplies it by zero.
+        median = torch.median(torch.cat(squared_distances))
+        return torch.sqrt(torch.clamp(median, min=1e-16))
+    if scale <= 0:
+        raise ValueError(f"scale must be positive, got {scale}.")
+    return scale
+
+
 def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     """Unbiased approximation of the squared maximum-mean discrepancy (MMD) [1].
     The sample-based MMD relies on kernel evaluations between x_i and y_i. This
@@ -184,8 +225,8 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     Args:
         x: Data of shape (m, d)
         y: Data of shape (n, d)
-        scale: Lengthscale of the exponential kernel. If not specified,
-            the lengthscale is chosen based on a median heuristic.
+        scale: Lengthscale of the exponential kernel, must be positive. If not
+            specified, the lengthscale is chosen based on a median heuristic.
 
     Return:
         A single scalar for the squared MMD.
@@ -213,9 +254,7 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     xy = f(x, y, diag=True)
     yy = f(y, y)
 
-    s = torch.median(torch.sqrt(torch.cat((xx, xy, yy)))) if scale is None else scale
-    # Add small epsilon to prevent division by zero when distributions are identical
-    s = torch.clamp(s, min=1e-8) if isinstance(s, torch.Tensor) else max(s, 1e-8)
+    s = _mmd_lengthscale(scale, xx, xy, yy)
     c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
@@ -232,18 +271,19 @@ def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
 
 
 def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
-    """Biased approximation of the squared maximum-mean discrepancy (MMD) [1].
+    """Biased approximation of the maximum-mean discrepancy (MMD) [1].
     The sample-based MMD relies on kernel evaluations between x_i and y_i. This
     implementation only features a Gaussian kernel with lengthscale `scale`.
 
     Args:
         x: Data of shape (m, d)
         y: Data of shape (n, d)
-        scale: Lengthscale of the exponential kernel. If not specified,
-            the lengthscale is chosen based on a median heuristic.
+        scale: Lengthscale of the exponential kernel, must be positive. If not
+            specified, the lengthscale is chosen based on a median heuristic.
 
     Return:
-        A single scalar for the squared MMD.
+        A single scalar for the MMD, i.e. the square root of the biased estimate of
+        the squared MMD.
 
     References:
         [1] Gretton, A., et al. (2012). A kernel two-sample test.
@@ -257,7 +297,7 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     xy = f(x, y)
     yy = f(y, y)
 
-    s = torch.median(torch.sqrt(torch.cat((xx, xy, yy)))) if scale is None else scale
+    s = _mmd_lengthscale(scale, xx, xy, yy)
     c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
@@ -272,7 +312,9 @@ def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     mmd_square = kxx - 2 * kxy + kyy
     del kxx, kxy, kyy
 
-    return torch.sqrt(mmd_square)
+    # The estimate is non-negative, but rounding can make it slightly negative when the
+    # samples are (almost) the same, which would give a NaN from the square root.
+    return torch.sqrt(torch.clamp(mmd_square, min=0.0))
 
 
 def biased_mmd_hypothesis_test(x: Tensor, y: Tensor, alpha=0.05):

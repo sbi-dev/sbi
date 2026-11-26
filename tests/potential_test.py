@@ -9,13 +9,15 @@ from dataclasses import asdict
 import pytest
 import torch
 from torch import Tensor, eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import MultivariateNormal, Normal
 
 from sbi.inference import (
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
     VIPosterior,
+    likelihood_estimator_based_potential,
+    ratio_estimator_based_potential,
 )
 from sbi.inference.posteriors.ensemble_posterior import EnsemblePotential
 from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameters
@@ -23,11 +25,22 @@ from sbi.inference.potentials.base_potential import (
     BasePotential,
     CustomPotentialWrapper,
 )
-from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
+from sbi.inference.potentials.posterior_based_potential import (
+    PosteriorBasedPotential,
+    posterior_estimator_based_potential,
+)
 from sbi.inference.potentials.vector_field_potential import VectorFieldBasedPotential
-from sbi.neural_nets import posterior_nn, posterior_score_nn
+from sbi.neural_nets import (
+    classifier_nn,
+    likelihood_nn,
+    posterior_nn,
+    posterior_score_nn,
+)
+from sbi.neural_nets.embedding_nets import FCEmbedding, PermutationInvariantEmbedding
 from sbi.utils import BoxUniform
 from sbi.utils.conditional_density_utils import ConditionedPotential
+from sbi.utils.user_input_checks import process_prior
+from sbi.utils.vector_field_utils import marginalize
 
 
 @pytest.mark.parametrize(
@@ -209,6 +222,20 @@ def test_bind_preserves_estimator(potential_type: str):
     assert bound.x_o is not None
 
 
+def test_vector_field_potential_marginalizes_1d_prior_exactly():
+    """A processed 1-D prior keeps the exact marginal, not a Gaussian mixture fit."""
+    prior, _, _ = process_prior(Normal(zeros(1), ones(1)))
+    theta = prior.sample((20,))
+    potential = VectorFieldBasedPotential(
+        posterior_score_nn()(theta, torch.randn(20, 2)), prior
+    )
+    m, s = torch.tensor(0.7), torch.tensor(0.5)
+    t = torch.linspace(-3, 3, 7).unsqueeze(-1)
+
+    exact = marginalize(Normal(zeros(1), ones(1)), m, s).log_prob(t).sum(-1)
+    assert torch.allclose(marginalize(potential.prior, m, s).log_prob(t), exact)
+
+
 @pytest.mark.parametrize("potential_type", ("posterior", "vector_field"))
 def test_potential_with_x_o_at_construction(potential_type: str):
     """Test that x_o passed to the constructor behaves like a later bind()."""
@@ -283,3 +310,84 @@ def test_set_x_none_clears_observation():
     with pytest.warns(FutureWarning):
         bound.set_x(None)
     assert bound.return_x_o() is None
+
+
+def test_potential_counts_iid_trials_against_the_shape_of_one_observation():
+    """With a permutation-invariant embedding, one observation holds 5 trials. Without
+    batch dimension, it is one observation, not 5 iid trials."""
+    torch.manual_seed(0)
+    prior = BoxUniform(-3 * ones(2), 3 * ones(2))
+    theta = prior.sample((50,))
+    x = theta.unsqueeze(1) + torch.randn(50, 5, 2)
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(2, 8), trial_net_output_dim=8, output_dim=4
+    )
+    estimator = posterior_nn("mdn", embedding_net=embedding)(theta, x)
+    potential_fn, _ = posterior_estimator_based_potential(estimator, prior, None)
+
+    theta_o = torch.tensor([[0.5, -0.5], [1.0, 1.0]])
+    x_o = torch.stack([zeros(5, 2), ones(5, 2), -ones(5, 2)])
+
+    def iid_potential(x_o: Tensor) -> Tensor:
+        return potential_fn.bind(x_o, x_is_iid=True)(theta_o, track_gradients=False)
+
+    singles = torch.stack([iid_potential(x_i.unsqueeze(0)) for x_i in x_o])
+    assert torch.allclose(iid_potential(x_o[0]), singles[0])
+    # iid trials: the sum of single-trial potentials, with the prior counted once.
+    expected = singles.sum(0) - 2 * prior.log_prob(theta_o)
+    assert torch.allclose(iid_potential(x_o), expected, atol=1e-5)
+
+
+@pytest.mark.parametrize("estimator", ("posterior", "likelihood", "ratio"))
+def test_potential_rejects_x_of_another_shape(estimator: str):
+    """Each estimator's potential knows the shape of one observation, so an `x` of
+    another shape raises instead of being reshaped or broadcast."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    if estimator == "posterior":
+        net = posterior_nn("mdn")(theta, x)
+        potential_fn, _ = posterior_estimator_based_potential(net, prior, None)
+    elif estimator == "likelihood":
+        net = likelihood_nn("mdn")(theta, x)
+        potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+    else:
+        net = classifier_nn("mlp")(theta, x)
+        potential_fn, _ = ratio_estimator_based_potential(net, prior, None)
+
+    assert potential_fn.bind(zeros(3)).x_o.shape == (1, 3)
+    with pytest.raises(ValueError, match=r"x has shape \(2, 4\), but one observation"):
+        potential_fn.bind(zeros(2, 4))
+
+
+@pytest.mark.parametrize("estimator", ("likelihood", "ratio"))
+def test_potential_pairs_one_observation_with_every_theta(estimator: str):
+    """Without iid trials, one observation pairs with every theta, as for NPE, and
+    gives the iid potential of that observation."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    if estimator == "likelihood":
+        net = likelihood_nn("mdn")(theta, x)
+        potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+    else:
+        net = classifier_nn("mlp")(theta, x)
+        potential_fn, _ = ratio_estimator_based_potential(net, prior, None)
+
+    theta_o = prior.sample((4,))
+    paired = potential_fn.bind(x[:1], x_is_iid=False)(theta_o, track_gradients=False)
+    iid = potential_fn.bind(x[:1], x_is_iid=True)(theta_o, track_gradients=False)
+    assert paired.shape == (4,)
+    assert torch.allclose(paired, iid)
+
+
+def test_posterior_rejects_theta_of_another_width():
+    """A theta with fewer entries than the prior has parameters used to broadcast and
+    return values without an error."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    net = likelihood_nn("maf")(theta, x)
+    potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+    posterior = ImportanceSamplingPosterior(potential_fn, proposal=prior)
+
+    match = r"theta has shape \(4, 1\), but the prior has 2 parameter"
+    with pytest.raises(ValueError, match=match):
+        posterior.potential(zeros(4, 1), x=zeros(1, 3))

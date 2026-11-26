@@ -22,6 +22,8 @@ from torch.distributions import (
     constraints,
 )
 
+from sbi.utils.user_input_checks_utils import move_distribution_to_device
+
 
 class VectorFieldNet(nn.Module, ABC):
     """Abstract base class for vector field estimation networks.
@@ -40,6 +42,36 @@ class VectorFieldNet(nn.Module, ABC):
 
         Returns:
             Vector field evaluation at the provided points
+        """
+        pass
+
+
+class MaskedVectorFieldNet(nn.Module, ABC):
+    """Abstract base class for vector field networks with masking support.
+
+    Used by models that require conditioning and edge masking, such as Siformer.
+    """
+
+    @abstractmethod
+    def forward(
+        self,
+        inputs: Tensor,
+        t: Tensor,
+        condition_mask: Tensor,
+        edge_mask: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Compute the vector field with support for conditioning and edge masks.
+
+        Args:
+            inputs: Input tensor containing parameters or states.
+            t: Time parameter (scalar or batched).
+            condition_mask: Mask indicating which parts of the input
+            are conditioned (v. latent).
+            edge_mask: Optional mask specifying dependencies between inputs
+            (edges in the DAG). If None, it defaults to a mask of ones.
+
+        Returns:
+            Tensor representing the vector field evaluated at the provided points.
         """
         pass
 
@@ -97,14 +129,8 @@ def _fit_gmm_ratio_impl(
     """Fit a generalized GMM to the prior ratio q(theta) / p(theta)."""
     num_components = int(num_components)
     device = torch.device(device)
-    if hasattr(train_prior, "to"):
-        moved = train_prior.to(device)  # type: ignore
-        if moved is not None:
-            train_prior = moved
-    if hasattr(test_prior, "to"):
-        moved = test_prior.to(device)  # type: ignore
-        if moved is not None:
-            test_prior = moved
+    train_prior = move_distribution_to_device(train_prior, device)
+    test_prior = move_distribution_to_device(test_prior, device)
     with torch.no_grad():
         init_means = test_prior.sample((num_components,)).to(device)
         init_means = init_means.reshape(num_components, -1)
@@ -320,6 +346,11 @@ def denoise_independent(
     Returns:
         The posterior independent distribution.
     """
+    exact_types = (Independent, MixtureSameFamily, Normal, MultivariateNormal, Uniform)
+    if not isinstance(p.base_dist, exact_types):
+        # Fit the whole prior: wrapping a fitted base would fold the batch of x_t
+        # into the event.
+        return denoise_general(p, m, s, x_t)
     denoised_base_dist = denoise(p.base_dist, m, s, x_t)
     batch_shape = denoised_base_dist.batch_shape
     if len(batch_shape) < p.reinterpreted_batch_ndims:
@@ -457,12 +488,12 @@ def denoise_general(
         m: The scaling factor m.
         s: The standard deviation of the noise s.
         x_t: The observed data.
-        num_particles: Number of particles to sample. Defaults to 5000.
 
     Returns:
         The posterior empirical distribution.
     """
-    gmm = fit_gmm(p)
+    # `fit_gmm` caches by prior; a prior moved in place keeps its key.
+    gmm = move_distribution_to_device(fit_gmm(p), x_t.device)
     return denoise_mixture(gmm, m, s, x_t)
 
 
@@ -623,7 +654,8 @@ def marginalize_empirical(
     Returns:
         The marginal empirical distribution.
     """
-    gmm_approx = fit_gmm(p)
+    # `fit_gmm` caches by prior; a prior moved in place keeps its key.
+    gmm_approx = move_distribution_to_device(fit_gmm(p), torch.as_tensor(m).device)
     return marginalize_mixture(gmm_approx, m, s)
 
 
@@ -757,9 +789,9 @@ class UniformNormalConvolution(Distribution):
         self.scale = torch.as_tensor(scale)
         self.noise = torch.as_tensor(noise)
 
-        # Determine batch_shape from broadcasting low and high (assumes low/high
-        # are tensors or scalars)
-        batch_shape = self.low.shape
+        batch_shape = torch.broadcast_shapes(
+            self.low.shape, self.high.shape, self.scale.shape, self.noise.shape
+        )
 
         event_shape = torch.Size()
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
@@ -821,7 +853,7 @@ def fit_gmm(
         distribution: The distribution to fit the GMM to.
         num_components: Number of GMM components. Defaults to 10.
         num_samples: Number of samples to draw from the distribution.
-            Defaults to 10_000.
+            If None, uses 1000 * d * num_components, where d is the dimension.
         random_state: Random state for reproducibility. Defaults to 0.
 
     Returns:

@@ -27,7 +27,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     _factory_defaults,
     _mixed_config_from_factory_kwargs,
 )
-from sbi.utils.sbiutils import standardizing_net, z_score_parser
+from sbi.utils.sbiutils import build_z_scored_embedding_net
 from sbi.utils.user_input_checks import check_data_device
 
 
@@ -72,12 +72,9 @@ def _build_mixed_density_estimator(
         num_disc = len(config.num_categories_per_variable)
     cont_x, disc_x = _separate_input(batch_x, num_discrete_columns=num_disc)
 
-    embedding_net = config.embedding_net
-    z_score_y_bool, structured_y = z_score_parser(config.z_score_condition)
-    if z_score_y_bool:
-        embedding_net = nn.Sequential(
-            standardizing_net(batch_y, structured_y), embedding_net
-        )
+    embedding_net = build_z_scored_embedding_net(
+        batch_y, config.z_score_condition, config.embedding_net
+    )
 
     embedded_batch_y = embedding_net(batch_y)
     combined_condition = torch.cat([disc_x, embedded_batch_y], dim=-1)
@@ -106,7 +103,6 @@ def _build_mixed_density_estimator(
             nn.Linear(combined_condition.shape[-1], _combined_hf),
             nn.ReLU(),
             nn.Linear(_combined_hf, _combined_hf),
-            nn.ReLU(),
         )
 
     # TODO: add support for optional log-transform in flow builders.

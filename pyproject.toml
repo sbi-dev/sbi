@@ -29,7 +29,7 @@ dynamic = ["version"]
 readme = "README.md"
 keywords = ["Bayesian inference", "simulation-based inference", "PyTorch"]
 dependencies = [
-    "joblib>=1.0.0",
+    "joblib>=1.3.0",
     "matplotlib",
     "numpy",
     "pillow",
@@ -105,8 +105,8 @@ extend-include = ["*.ipynb"]
 line-length = 88
 
 [tool.ruff.lint]
-# pycodestyle, Pyflakes, pyupgrade, flake8-bugbear, flake8-simplify, isort
-select = ["E", "F", "W", "B", "SIM", "I"]
+# pycodestyle, Pyflakes, pyupgrade, flake8-bugbear, flake8-simplify, isort, banned imports
+select = ["E", "F", "W", "B", "SIM", "I", "TID251"]
 ignore = [
     "E731",  # allow naming lambda functions.
     "B008",  # allow function calls in default args.
@@ -124,6 +124,9 @@ case-sensitive = true
 lines-between-types = 0  # like isort default.
 relative-imports-order = "furthest-to-closest"  # like isort default.
 known-first-party = ["sbi", "tests", "docs/tutorials", "docs/advanced_tutorials", "docs/how_to_guide"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"tqdm".msg = "Import `tqdm` and `trange` from `sbi.utils.pbar`, which honour `TQDM_DISABLE`."
 
 [tool.ruff.format]
 exclude = ["*.ipynb"]
@@ -143,7 +146,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')",
     "mcmc: marks tests that require MCMC sampling (deselect with '-m \"not mcmc\"')",
-    "benchmark: marks test that are soley for benchmarking purposes"
+    "benchmark: marks test that are solely for benchmarking purposes"
 ]
 xfail_strict = true
 

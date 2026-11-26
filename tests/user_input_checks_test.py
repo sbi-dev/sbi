@@ -20,8 +20,10 @@ from torch.distributions import (
     MixtureSameFamily,
     MultivariateNormal,
     Normal,
+    Pareto,
     Uniform,
 )
+from torch.testing import assert_close
 
 from sbi.analysis import conditional_potential
 from sbi.inference import NPE_A, NPE_C, simulate_for_sbi
@@ -61,13 +63,14 @@ from sbi.utils.user_input_checks_utils import (
     MultipleIndependent,
     OneDimPriorWrapper,
     PytorchReturnTypeWrapper,
+    move_distribution_to_device,
 )
 
 
 class UserNumpyUniform:
     """User defined numpy uniform prior.
 
-    Used for testing to mimick a user-defined prior with valid .sample and .log_prob
+    Used for testing to mimic a user-defined prior with valid .sample and .log_prob
     methods.
     """
 
@@ -90,7 +93,7 @@ class UserNumpyUniform:
 
 def linear_gaussian_no_batch(theta):
     """Identity simulator throwing assertion error when called on a batch."""
-    assert theta.ndim == 1, "cant handle batches."
+    assert theta.ndim == 1, "can't handle batches."
     return MultivariateNormal(theta, eye(theta.numel())).sample()
 
 
@@ -267,17 +270,11 @@ def test_reinterpreted_batch_dim_prior():
             ),
             Uniform(zeros(1), ones(1)),
         ],  # multiple independent prior with mixed dtypes and event shapes
-        pytest.param(
-            [
-                UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
-                UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
-                Uniform(zeros(1), ones(1)),
-            ],  # combination of multiple independent custom priors
-            marks=pytest.mark.xfail(
-                reason="custom priors cannot be used in MultipleIndependent priors "
-                "(unless they support .to)."
-            ),
-        ),
+        [
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
+            Uniform(zeros(1), ones(1)),
+        ],  # combination of multiple independent custom priors
     ),
 )
 def test_process_prior(prior):
@@ -297,11 +294,90 @@ def test_process_prior(prior):
     )
 
 
+def _support_lower_bound(prior):
+    """Return the lower bound of a prior support, unwrapping nested constraints."""
+    support = prior.support
+    while hasattr(support, "base_constraint"):
+        support = support.base_constraint
+    return support.lower_bound
+
+
+@pytest.mark.parametrize(
+    "prior",
+    (
+        pytest.param(
+            Pareto(ones(1, dtype=torch.float64), ones(1, dtype=torch.float64)),
+            id="pareto",
+        ),
+        pytest.param(
+            Independent(
+                Uniform(zeros(2, dtype=torch.float64), ones(2, dtype=torch.float64)),
+                1,
+            ),
+            id="independent-uniform",
+        ),
+    ),
+)
+def test_process_prior_float64_prior_has_float32_support(prior):
+    """A float64 prior comes out with float32 samples and support."""
+    prior, _, _ = process_prior(prior)
+    assert prior.sample().dtype == torch.float32
+    assert _support_lower_bound(prior).dtype == torch.float32
+
+
+def test_rebuild_keeps_constructor_arguments_outside_arg_constraints(monkeypatch):
+    """Float32 conversion and device moves keep `coords`, which has a default."""
+    pytest.importorskip("pyro", minversion="1.9.1")  # adds `StableWithLogProb`
+    import pyro.distributions as pyro_distributions
+
+    def stable(dtype):
+        stability = torch.tensor([1.5], dtype=dtype)
+        skew = torch.tensor([0.9], dtype=dtype)
+        return pyro_distributions.StableWithLogProb(stability, skew, coords="S")
+
+    prior = stable(torch.float64)
+    processed, _, _ = process_prior(prior)
+    theta = torch.tensor([[0.0], [2.0]])
+    expected = prior.log_prob(theta.double()).squeeze(-1).float()
+    assert_close(processed.log_prob(theta), expected)
+
+    # A move to "meta" rebuilds on any machine; argument validation fails there.
+    monkeypatch.setattr(Distribution, "_validate_args", False)
+    assert move_distribution_to_device(stable(torch.float32), "meta").coords == "S"
+
+
+@pytest.mark.parametrize(
+    "prior",
+    (
+        pytest.param(
+            Independent(
+                Bernoulli(logits=torch.tensor([-100.0, 0.0], dtype=torch.float64)), 1
+            ),
+            id="bernoulli-logits",
+        ),
+        pytest.param(
+            MultivariateNormal(
+                zeros(2, dtype=torch.float64),
+                scale_tril=torch.tensor(
+                    [[1.0, 0.0], [1.0, 2.5e-4]], dtype=torch.float64
+                ),
+            ),
+            id="mvn-scale-tril",
+        ),
+    ),
+)
+def test_process_prior_float64_prior_keeps_parametrization(prior):
+    """The float32 rebuild keeps the precision of the prior's parameters."""
+    processed, _, _ = process_prior(prior)
+    theta = torch.tensor([[1.0, 1.0]])
+    assert_close(processed.log_prob(theta), prior.log_prob(theta.double()).float())
+
+
 def test_process_prior_warns_and_keeps_shapes_for_float64_prior():
     prior = MultivariateNormal(
         zeros(3, dtype=torch.float64), eye(3, dtype=torch.float64)
     )
-    with pytest.warns(UserWarning, match="casts the samples and log probs"):
+    with pytest.warns(UserWarning, match="rebuilds the prior in float32"):
         processed, parameter_dim, _ = process_prior(prior)
 
     assert parameter_dim == 3
@@ -985,15 +1061,15 @@ def test_simulate_for_sbi(
     likelihood_cov = 0.3 * eye(num_dim)
     prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    def failing_simulator(theta):
+    def tensor_simulator(theta):
         if isinstance(theta, np.ndarray):
             raise TypeError("This simulator does not support numpy arrays.")
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator = (
-        failing_simulator
+        tensor_simulator
         if not use_process_simulator
-        else process_simulator(failing_simulator, prior, False)
+        else process_simulator(tensor_simulator, prior, False)
     )
 
     if num_simulations == 0:
@@ -1009,29 +1085,19 @@ def test_simulate_for_sbi(
         )
         assert x.numel() == 0, "x should be an empty tensor when num_simulations=0"
     else:
-        if not use_process_simulator and num_workers > 1:
-            with pytest.raises(TypeError, match="For multiprocessing"):
-                simulate_for_sbi(
-                    simulator=simulator,
-                    proposal=prior,
-                    num_simulations=num_simulations,
-                    simulation_batch_size=simulation_batch_size,
-                    num_workers=num_workers,
-                )
-        else:
-            theta, x = simulate_for_sbi(
-                simulator=simulator,
-                proposal=prior,
-                num_simulations=num_simulations,
-                simulation_batch_size=simulation_batch_size,
-                num_workers=num_workers,
-            )
-            assert theta.shape[0] == num_simulations, (
-                "Theta should have num_simulations rows"
-            )
-            assert x.shape[0] == num_simulations, "x should have num_simulations rows"
-            assert theta.shape[1] == num_dim, "Theta should have num_dim columns"
-            assert x.shape[1] == num_dim, "x should have num_dim columns"
+        theta, x = simulate_for_sbi(
+            simulator=simulator,
+            proposal=prior,
+            num_simulations=num_simulations,
+            simulation_batch_size=simulation_batch_size,
+            num_workers=num_workers,
+        )
+        assert theta.shape[0] == num_simulations, (
+            "Theta should have num_simulations rows"
+        )
+        assert x.shape[0] == num_simulations, "x should have num_simulations rows"
+        assert theta.shape[1] == num_dim, "Theta should have num_dim columns"
+        assert x.shape[1] == num_dim, "x should have num_dim columns"
 
 
 def test_proposal_sharing_weights_with_trainer_raises():

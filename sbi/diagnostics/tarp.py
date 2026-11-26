@@ -22,6 +22,7 @@ from sbi.utils.diagnostics_utils import (
     remove_nans_and_infs_in_x,
 )
 from sbi.utils.metrics import l2
+from sbi.utils.sbiutils import handle_invalid_x
 
 
 def run_tarp(
@@ -48,12 +49,13 @@ def run_tarp(
         thetas: ground-truth parameters for tarp, simulated from the prior.
         xs: observed data for tarp, simulated from thetas.
         posterior: a posterior obtained from sbi.
-        references: reference points, one per theta, of shape
-            ``(num_tarp_samples, num_dims)``. Given its x, draw each reference
-            independently of its theta and of the posterior samples, e.g. from the
-            prior or from a distribution that depends on x. If ``None``, they are
-            drawn uniformly from a box that treats ``thetas`` and posterior samples
-            alike, see ``get_tarp_references``.
+        references: reference points, one per theta, of shape ``thetas.shape``.
+            Given its x, draw each reference independently of its theta and of the
+            posterior samples, e.g. from the prior or from a distribution that depends
+            on x. Rows where ``xs`` is NaN or Inf are dropped from ``references``
+            alongside ``thetas`` and ``xs``. If ``None``, they are drawn uniformly
+            from a box that treats ``thetas`` and posterior samples alike, see
+            ``get_tarp_references``.
         num_posterior_samples: number of approximate posterior samples used for ranking.
         num_workers: number of CPU cores to use for running inference in parallel.
         show_progress_bar: whether to display a progress over sbc runs.
@@ -79,7 +81,23 @@ def run_tarp(
             between calls unless the torch seed is fixed.
         alpha: credibility values, ``num_bins + 1`` points evenly spaced over
             ``[0, 1]``, see equation 2 of the paper
+
+    Raises:
+        ValueError: if ``references`` does not have the shape of ``thetas``.
     """
+
+    if references is not None:
+        if references.shape != thetas.shape:
+            raise ValueError(
+                f"references must have the same shape as thetas, but got "
+                f"{tuple(references.shape)} and {tuple(thetas.shape)}. Pass one "
+                f"reference per theta, also for thetas whose xs contain NaN or Inf: "
+                f"run_tarp drops these rows itself."
+            )
+        # Drop the same rows that are dropped from thetas and xs below, so that
+        # each reference stays paired with its theta.
+        is_valid_x, _, _ = handle_invalid_x(xs, exclude_invalid_x=True)
+        references = references[is_valid_x.to(references.device)]
 
     thetas, xs = remove_nans_and_infs_in_x(thetas, xs)
 
