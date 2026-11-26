@@ -290,9 +290,8 @@ def standardizing_transform(
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
-            images), which requires computing mean and std per sample first before
-            aggregating over samples for a single standardization mean and std for the
-            batch, or independent (default), which z-scores dimensions independently.
+            images), which uses one mean and one std over all values of the batch, or
+            independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
@@ -315,9 +314,8 @@ def standardizing_transform_zuko(
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
-            images), which requires computing mean and std per sample first before
-            aggregating over samples for a single standardization mean and std for the
-            batch, or independent (default), which z-scores dimensions independently.
+            images), which uses one mean and one std over all values of the batch, or
+            independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
@@ -414,9 +412,8 @@ def z_standardization(
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
-            images), which requires computing mean and std per sample first before
-            aggregating over samples for a single standardization mean and std for the
-            batch, or independent (default), which z-scores dimensions independently.
+            images), which uses one mean and one std over all values of the batch, or
+            independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
@@ -428,8 +425,7 @@ def z_standardization(
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
     valid_t = batch_t[is_valid_t]
 
-    # Structured data gets a single mean over all dimensions, equivalent to the mean
-    # over per-sample means.
+    # Structured data gets a single mean over all dimensions.
     t_mean = torch.mean(valid_t) if structured_dims else torch.mean(valid_t, dim=0)
 
     if len(valid_t) == 1:
@@ -445,11 +441,7 @@ def z_standardization(
         return t_mean, torch.ones_like(t_mean)
 
     if structured_dims:
-        # Compute std per-sample first, over all of its dimensions.
-        sample_std = torch.std(valid_t.flatten(start_dim=1), dim=1)
-        sample_std[sample_std < min_std] = min_std
-        # Average over all samples for batch std.
-        t_std = torch.mean(sample_std)
+        t_std = torch.std(valid_t).clamp(min=min_std)
     else:
         t_std = torch.std(valid_t, dim=0)
         t_std[t_std < min_std] = min_std
@@ -513,9 +505,8 @@ def standardizing_net(
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
-            images), which requires computing mean and std per sample first before
-            aggregating over samples for a single standardization mean and std for the
-            batch, or independent (default), which z-scores dimensions independently.
+            images), which uses one mean and one std over all values of the batch, or
+            independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 

@@ -706,9 +706,9 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
 
 @pytest.mark.parametrize("event_shape", [(1, 6, 6), (3, 6, 6), (2, 18)])
 def test_structured_z_scoring_uses_all_event_dims(event_shape):
-    """Structured std is the per-sample std over the whole event, whatever its shape."""
+    """Structured std is the std over all values of the batch, whatever its shape."""
     batch = torch.randn(50, *event_shape) * 3.0 + 1.0
-    expected_std = batch.flatten(start_dim=1).std(dim=1).mean()
+    expected_std = batch.std()
 
     _, t_std = z_standardization(batch, structured_dims=True)
     z_net = standardizing_net(batch, structured_dims=True)
