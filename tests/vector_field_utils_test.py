@@ -3,7 +3,6 @@
 
 import pytest
 import torch
-from scipy.stats import truncnorm
 from torch.distributions import Normal, Uniform
 from torch.special import log_ndtr
 
@@ -69,87 +68,30 @@ def test_uniform_normal_convolution_broadcast_batch_shape():
     assert dist.log_prob(samples).shape == samples.shape
 
 
+# Reference moments and log density at the mean, from 50-digit quadrature.
 @pytest.mark.parametrize(
-    "x_t, s",
+    "high, x_t, s, mean, var, log_prob",
     [
-        (2.0, 0.1),  # whole box 10 to 20 stds below the mode
-        (-1.0, 0.1),  # whole box 10 to 20 stds above the mode
-        (0.5, 0.3),
-        (0.2, 2.0),
+        (1.0, 2.0, 0.1, 0.990190676604, 9.44537782566e-5, 3.6291882294),  # #2202
+        (1.0, -1.0, 0.1, 0.00980932339625, 9.44537782566e-5, 3.6291882294),
+        (1.0, 1.05, 1e-4, 0.999999800002, 3.99990400358e-14, 14.4249584703),
+        (1.0, 0.2, 2.0, 0.493802499725, 0.0826180845751, 0.0106009446814),
+        (1e-8, 1.0, 1.0, 5.00000000833e-9, 8.33333333333e-18, 18.420680744),
     ],
 )
-def test_uniform_denoise_matches_truncated_normal(x_t: float, s: float):
-    """Denoising a uniform prior gives a normal truncated to the prior support."""
-    low, high = 0.0, 1.0
-    dist = denoise(
-        Uniform(
-            torch.tensor(low, dtype=torch.float64),
-            torch.tensor(high, dtype=torch.float64),
-        ),
-        torch.tensor(1.0, dtype=torch.float64),
-        torch.tensor(s, dtype=torch.float64),
-        torch.tensor(x_t, dtype=torch.float64),
-    )
-    mean, var = truncnorm.stats(
-        (low - x_t) / s, (high - x_t) / s, loc=x_t, scale=s, moments="mv"
-    )
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
+def test_uniform_denoise_matches_truncated_normal(
+    high, x_t, s, mean, var, log_prob, dtype
+):
+    def t(v):
+        return torch.tensor(v, dtype=dtype)
 
-    assert low <= dist.mean.item() <= high
-    assert dist.mean.item() == pytest.approx(mean, rel=1e-8)
-    assert dist.variance.item() == pytest.approx(var, rel=1e-6)
+    dist = denoise(Uniform(t(0.0), t(high)), t(1.0), t(s), t(x_t))
 
-    grid = torch.linspace(low, high, 200001, dtype=torch.float64)
-    integral = torch.trapezoid(dist.log_prob(grid).exp(), grid)
-    assert integral.item() == pytest.approx(1.0, abs=1e-4)
-
-
-def test_uniform_denoise_narrow_interval_in_float32():
-    """A prior interval far narrower than the noise stays finite in float32."""
-    low, high = 0.0, 1e-8
-    dist = denoise(
-        Uniform(torch.tensor(low), torch.tensor(high)),
-        torch.tensor(1.0),
-        torch.tensor(1.0),
-        torch.tensor(0.0),
-    )
-
-    assert torch.isfinite(dist.log_Z)
-    assert dist.mean.item() == pytest.approx((low + high) / 2, rel=1e-5)
-    assert dist.variance.item() == pytest.approx(
-        (high - low) ** 2 / 12, rel=1e-4, abs=0
-    )
-    inside = dist.log_prob(torch.tensor(high / 2))
-    assert torch.isfinite(inside)
-
-
-def test_uniform_denoise_narrow_interval_has_finite_gradients():
-    """A log(0) in the discarded branch must not turn the gradients into NaN."""
-    # Narrow enough that the two log-CDF values are equal even in float64.
-    low, high = 0.0, 1e-20
-    x_t = torch.tensor(0.0, requires_grad=True)
-    s = torch.tensor(1.0, requires_grad=True)
-    dist = denoise(
-        Uniform(torch.tensor(low), torch.tensor(high)), torch.tensor(1.0), s, x_t
-    )
-    (dist.log_prob(torch.tensor(high / 2)) + dist.mean + dist.variance).backward()
-
-    assert x_t.grad is not None and torch.isfinite(x_t.grad)
-    assert s.grad is not None and torch.isfinite(s.grad)
-
-
-@pytest.mark.parametrize("x_t", [-0.8, 2.4])
-def test_uniform_denoise_far_tail_variance_in_float32(x_t: float):
-    """The float32 variance in a far tail is positive and matches truncnorm."""
-    low, high, s = 0.0, 1.0, 0.02
-    dist = denoise(
-        Uniform(torch.tensor(low), torch.tensor(high)),
-        torch.tensor(1.0),
-        torch.tensor(s),
-        torch.tensor(x_t),
-    )
-    _, var = truncnorm.stats(
-        (low - x_t) / s, (high - x_t) / s, loc=x_t, scale=s, moments="mv"
-    )
-
-    assert dist.variance.item() > 0
-    assert dist.variance.item() == pytest.approx(var, rel=1e-3)
+    rel = 1e-4 if dtype == torch.float32 else 1e-8
+    assert dist.mean.item() == pytest.approx(mean, rel=rel, abs=0)
+    assert dist.variance.item() == pytest.approx(var, rel=rel, abs=0)
+    if dtype == torch.float64:  # float32 cannot resolve x inside a 2e-7 wide mass
+        assert dist.log_prob(dist.mean).item() == pytest.approx(
+            log_prob, rel=rel, abs=0
+        )

@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Optional, Tuple, Union
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from sklearn.mixture import GaussianMixture
@@ -660,6 +661,9 @@ def marginalize_empirical(
 
 
 # Special distributions:
+_GAUSS_LEGENDRE = np.polynomial.legendre.leggauss(32)
+
+
 class UniformNormalPosterior(Distribution):
     """Posterior distribution for a uniform prior and normal likelihood.
 
@@ -701,55 +705,41 @@ class UniformNormalPosterior(Distribution):
         self.mu = self.x_t / self.m
         self.sigma = self.s / torch.abs(self.m)
 
-        # Standard Normal Distribution
-        self.standard_normal = Normal(
-            torch.tensor(0.0, device=self.sigma.device), 1.0, validate_args=False
+        # In standard units the box is [alpha, beta]. Mirror it to lie mostly above
+        # the mode, and take c, its point closest to the mode.
+        alpha = (self.low - self.mu) / self.sigma
+        beta = (self.high - self.mu) / self.sigma
+        width = (self.high - self.low) / self.sigma
+        self._flip = alpha + beta < 0
+        lower = torch.where(self._flip, -beta, alpha)
+        self._c = lower.clamp(min=0)
+
+        # Moments of y = z - c by quadrature: the density of y is proportional to
+        # exp(-c y - y**2 / 2) <= 1, so no terms of order c**2 cancel, and beyond
+        # `reach` it is below exp(-50) of its peak.
+        reach = 100 / (torch.sqrt(self._c**2 + 100) + self._c)
+        y_lo = (lower - self._c).clamp(min=-reach)
+        y_hi = (lower - self._c + width).clamp(max=reach)
+        nodes, weights = (
+            torch.as_tensor(t, dtype=y_lo.dtype, device=y_lo.device)
+            for t in _GAUSS_LEGENDRE
         )
+        half = ((y_hi - y_lo) / 2).unsqueeze(-1)
+        y = y_lo.unsqueeze(-1) + half * (nodes + 1)
+        density = weights * half * torch.exp(-self._c.unsqueeze(-1) * y - y**2 / 2)
+        total = density.sum(-1)
+        self._log_mass = torch.log(total)
+        prob = density / total.unsqueeze(-1)
+        mean_y = (prob * y).sum(-1)
+        var_y = (prob * (y - mean_y.unsqueeze(-1)) ** 2).sum(-1)
 
-        # Standardized truncation limits
-        self.alpha = (self.low - self.mu) / self.sigma
-        self.beta = (self.high - self.mu) / self.sigma
-
-        # Compute normalization constant Z
-        self.a = self.standard_normal.cdf(self.alpha)
-        self.b = self.standard_normal.cdf(self.beta)
-        self.Z = torch.clamp(self.b - self.a, min=1e-8)  # Avoid division by zero
-
-        # The normalizer and the moments are evaluated in float64 (MPS has no
-        # float64): the variance subtracts terms of order alpha**2 in the tails.
-        work_dtype = (
-            self.sigma.dtype if self.sigma.device.type == "mps" else torch.float64
-        )
-        alpha = self.alpha.to(work_dtype)
-        beta = self.beta.to(work_dtype)
-        self._alpha_w, self._beta_w = alpha, beta
-
-        # log Z without cancellation: b - a underflows when the whole interval
-        # lies far in one tail, so mirror it onto the left tail, where
-        # Phi(beta) - Phi(alpha) = Phi(-alpha) - Phi(-beta), and use log_ndtr.
-        flip = alpha + beta > 0
-        lower = torch.where(flip, -beta, alpha)
-        upper = torch.where(flip, -alpha, beta)
-        log_cdf_lower = torch.special.log_ndtr(lower)
-        log_cdf_upper = torch.special.log_ndtr(upper)
-
-        # On an interval much narrower than sigma the density is nearly flat, and
-        # the two log-CDF values can round to the same number. Use the uniform
-        # limit there: Z = width * pdf(midpoint).
-        width = beta - alpha
-        mid = (alpha + beta) / 2
-        self._narrow = width * (1 + mid.abs()) < 1e-4
-        # Each log only sees the inputs of the branch that uses it: a log(0) in
-        # the discarded branch would still make the gradients NaN.
-        one = torch.ones_like(width)
-        tail_gap = torch.where(
-            self._narrow, one, -torch.expm1(log_cdf_lower - log_cdf_upper)
-        )
-        log_Z = log_cdf_upper + torch.log(tail_gap)
-        narrow_width = torch.where(self._narrow, width, one)
-        narrow_log_Z = torch.log(narrow_width) + self.standard_normal.log_prob(mid)
-        self._log_Z_w = torch.where(self._narrow, narrow_log_Z, log_Z)
-        self.log_Z = self._log_Z_w.to(self.sigma.dtype)
+        # Measure from the box edge at c (or the mode if c = 0): mu + c sigma would
+        # lose the digits of a narrow box far from the mode.
+        edge = torch.where(self._flip, self.high, self.low)
+        self._anchor = torch.where(self._c > 0, edge, self.mu)
+        shift = self.sigma * mean_y
+        self._mean = self._anchor + torch.where(self._flip, -shift, shift)
+        self._variance = self.sigma**2 * var_y
 
         batch_shape = torch.broadcast_shapes(
             self.low.shape, self.high.shape, self.m.shape, self.s.shape, self.x_t.shape
@@ -757,36 +747,20 @@ class UniformNormalPosterior(Distribution):
         event_shape = torch.Size()
         super().__init__(batch_shape, event_shape, validate_args=validate_args)
 
-    def _pdf_over_Z(self, z: Tensor) -> Tensor:
-        """Standard normal pdf at ``z`` divided by Z, computed in log space."""
-        return torch.exp(self.standard_normal.log_prob(z) - self._log_Z_w)
-
     @property
     def mean(self) -> Tensor:
-        # Standard normal pdf values, divided by Z
-        alpha, beta = self._alpha_w, self._beta_w
-        shift = self._pdf_over_Z(alpha) - self._pdf_over_Z(beta)
-        shift = torch.where(self._narrow, (alpha + beta) / 2, shift)
-        return self.mu + self.sigma * shift.to(self.sigma.dtype)
+        return self._mean
 
     @property
     def variance(self) -> Tensor:
-        alpha, beta = self._alpha_w, self._beta_w
-        phi_alpha = self._pdf_over_Z(alpha)
-        phi_beta = self._pdf_over_Z(beta)
-
-        term = phi_alpha - phi_beta
-        variance_adjustment = 1 + alpha * phi_alpha - beta * phi_beta - term**2
-        # Uniform limit on a narrow interval: width**2 / 12.
-        variance_adjustment = torch.where(
-            self._narrow, (beta - alpha) ** 2 / 12, variance_adjustment
-        )
-
-        return self.sigma**2 * variance_adjustment.to(self.sigma.dtype)
+        return self._variance
 
     def log_prob(self, x: Tensor) -> Tensor:
-        normal = Normal(self.mu, self.sigma, validate_args=False)
-        lp = normal.log_prob(x) - self.log_Z
+        # log pdf(z) - log Z with z = c + d and log Z = log pdf(c) + log mass, so
+        # the terms of order c**2 drop out.
+        d = (x - self._anchor) / self.sigma
+        d = torch.where(self._flip, -d, d)
+        lp = -d * (2 * self._c + d) / 2 - self._log_mass - torch.log(self.sigma)
         return torch.where((x >= self.low) & (x <= self.high), lp, -torch.inf)
 
 
