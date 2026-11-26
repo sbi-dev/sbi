@@ -340,6 +340,11 @@ def wasserstein_2_squared(
     assert x.ndim == y.ndim, (
         "Please make sure that 'x' and 'y' are both either batched or not."
     )
+    if x.dtype != y.dtype or x.dtype not in (torch.float32, torch.float64):
+        raise TypeError(
+            "'x' and 'y' must both be float32 or both float64, got "
+            f"{x.dtype} and {y.dtype}."
+        )
     if x.ndim == 2:
         nx, ny = x.shape[0], y.shape[0]
         a = torch.ones(nx, dtype=x.dtype, device=x.device) / nx
@@ -358,10 +363,6 @@ def wasserstein_2_squared(
         raise ValueError(
             f"'x' and 'y' need the same number of features, got {x.shape[-1]} "
             f"and {y.shape[-1]}."
-        )
-    if {x.dtype, y.dtype} - {torch.float32, torch.float64}:
-        raise TypeError(
-            f"'x' and 'y' must be float32 or float64, got {x.dtype} and {y.dtype}."
         )
     if 0 in (x.shape[-2], y.shape[-2], x.shape[-1]):
         raise ValueError("'x' and 'y' need at least one point and one feature each.")
@@ -452,7 +453,7 @@ def regularized_ot_dual(
         log_row_marginal = torch.logsumexp(-s(f, g), dim=2)
         err = (log_row_marginal.exp() - a).abs().sum(dim=1)
         if i > 0:
-            # A row with a non-finite cost never converges; its result is NaN.
+            # A row with a non-finite cost never converges: stop it, warn below.
             terminated = terminated | (err < tol) | err.isnan()
         if torch.all(terminated):
             break
@@ -470,6 +471,13 @@ def regularized_ot_dual(
         )
         f = torch.where(terminated.unsqueeze(-1), f, f_tmp)
         g = torch.where(terminated.unsqueeze(-1), g, g_tmp)
+
+    if err.isnan().any():
+        warnings.warn(
+            "Some optimal transport problems have non-finite costs; their "
+            "couplings are NaN.",
+            stacklevel=2,
+        )
 
     coupling = torch.exp(-s(f, g))
 
