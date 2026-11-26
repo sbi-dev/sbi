@@ -184,7 +184,8 @@ def unpaired_batch_error(num_theta: int, num_x: int) -> ValueError:
     observations = "observation" if num_x == 1 else "observations"
     return ValueError(
         f"theta has {num_theta} rows and x has {num_x} {observations}. Without iid "
-        "trials, each theta pairs with one observation, so the numbers must match. "
+        "trials, each theta pairs with one observation, so x needs one observation "
+        "or as many as theta has rows. "
         "To combine the observations as iid trials of one theta, bind x with "
         "`x_is_iid=True`."
     )

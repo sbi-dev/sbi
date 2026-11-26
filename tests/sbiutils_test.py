@@ -21,10 +21,12 @@ from sbi.analysis import (
     eval_conditional_density,
     sensitivity_analysis,
 )
+from sbi.analysis.sensitivity_analysis import Destandardize
 from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
+    Standardize,
     clamp_and_warn,
     gradient_ascent,
     mcmc_transform,
@@ -550,6 +552,14 @@ def test_z_score_parser_rejects_bool(z_score_flag):
     """Booleans were deprecated in v0.18.0 and are no longer accepted."""
     with pytest.raises(ValueError, match="Invalid z-scoring option"):
         z_score_parser(z_score_flag)
+
+
+@pytest.mark.parametrize("layer_cls", (Standardize, Destandardize))
+def test_mean_and_std_follow_dtype_cast(layer_cls):
+    """`mean` and `std` must be the buffers that `.to()` casts, not stale copies."""
+    layer = layer_cls(torch.zeros(2), torch.ones(2)).double()
+
+    assert layer.mean.dtype == layer.std.dtype == torch.float64
 
 
 @pytest.mark.parametrize(

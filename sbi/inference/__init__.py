@@ -44,7 +44,7 @@ from sbi.inference.potentials import (
     vector_field_estimator_based_potential,
 )
 from sbi.utils.removed_names import removed_names_getattr
-from sbi.utils.simulation_utils import simulate_for_sbi
+from sbi.utils.simulation_utils import simulate_for_sbi, simulate_from_theta
 
 __all__ = (
     _npe_family
@@ -65,6 +65,7 @@ __all__ = (
         "VIPosterior",
         "VectorFieldPosterior",
         "simulate_for_sbi",
+        "simulate_from_theta",
         "infer",
         "likelihood_estimator_based_potential",
         "mixed_likelihood_estimator_based_potential",
