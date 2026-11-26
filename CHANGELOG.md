@@ -6,6 +6,9 @@
 
 * **`PermutationInvariantEmbedding` passes log(1 + N) instead of the trial count N** ([#2113](https://github.com/sbi-dev/sbi/pull/2113)): the embedding appended the raw number of real trials N to the aggregated trial embedding before its fully connected net. With 100 trials, that input was about 100 next to inputs of order 1, which scales badly when the number of trials varies. It now appends log(1 + N), which is 0 for an observation without real trials.
   * A network trained before this change gives different outputs after it, also when it was saved with `save()` or pickled whole, because the forward pass changed. Retrain it.
+* **The `log_prob()` normalizer of NPE, FMPE and NPSE always stops, and no longer divides by zero**: `leakage_correction()` of `DirectPosterior` and `VectorFieldPosterior` share one estimator. For each observation it draws until `num_rejection_samples` draws lie inside the prior support or `max_num_draws` draws are made (new; default 1_000_000 for NPE, 10_000 for FMPE and NPSE, which keeps their cost). Before, NPE could draw forever, and `num_rejection_samples` counted all draws for FMPE and NPSE. The batched NPE normalizer now draws at most `rejection_sampling_batch_size` samples at once over all observations, instead of per observation, so many observations no longer run out of memory.
+  * Without any draw inside the prior support, `leakage_correction()` returns 0 with a warning, and `log_prob()` returns NaN for theta inside the prior support, per observation. Before, FMPE and NPSE raised a RuntimeError.
+  * `accept_reject_sample()` no longer takes `sample_for_correction_factor`.
 
 ## v0.27.0
 

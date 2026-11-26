@@ -3,7 +3,7 @@
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Self, Tuple, Union
+from typing import Any, Callable, Dict, Hashable, Optional, Self, Tuple, Union
 from warnings import warn
 
 import torch
@@ -89,7 +89,7 @@ class NeuralPosterior:
             self.theta_transform = theta_transform
 
         self._map = None
-        self._leakage_cache: Optional[Tuple[Tensor, int, Tensor]] = None
+        self._leakage_cache: Optional[Tuple[Tensor, Hashable, Any]] = None
         self._purpose = ""
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
@@ -380,40 +380,42 @@ class NeuralPosterior:
     def _cached_leakage_factor(
         self,
         x: Tensor,
-        num_samples: int,
+        key: Hashable,
         prior: Any,
-        estimate_fn: Callable[[], Tensor],
+        count_fn: Callable[[], Tuple[Tensor, Tensor]],
         force_update: bool = False,
         use_cache: bool = True,
     ) -> Tensor:
-        """Return the leakage correction factor saved for `x`, or estimate it.
+        """Return the leakage correction factor for `x`, from saved or new counts.
 
-        The factor is 1 for priors with unbounded support. Otherwise, one factor is
-        saved, for the last `x` and `num_samples`, unless `use_cache=False`.
+        The factor is the share of the draws of `count_fn` inside the prior support,
+        or 1 for priors with unbounded support. The counts are saved for the last `x`
+        and `key`, unless `use_cache=False`.
         """
         if prior_support_is_bounded(prior) is False:
             return torch.ones((), device=self._device)
+        counts = None
         if use_cache and not force_update:
-            factor = self._cached_value(self._leakage_cache, x, num_samples)
-            if factor is not None:
-                return factor
-        factor = estimate_fn()
-        if use_cache:
-            self._leakage_cache = (x.detach().clone(), num_samples, factor)
-        return factor
+            counts = self._cached_value(self._leakage_cache, x, key)
+        if counts is None:
+            counts = count_fn()
+            if use_cache:
+                self._leakage_cache = (x.detach().clone(), key, counts)
+        return _support_mass(*counts).to(self._device)
 
     @staticmethod
     def _cached_value(
-        cache: Optional[Tuple[Tensor, int, Tensor]], x: Tensor, num_samples: int
-    ) -> Optional[Tensor]:
-        """Return the value of an `(x, num_samples, value)` cache for these arguments.
+        cache: Optional[Tuple[Tensor, Hashable, Any]], x: Tensor, key: Hashable
+    ) -> Any:
+        """Return the value of an `(x, key, value)` cache for these arguments.
 
-        `x` matches on any device and with NaN entries. Returns None on a miss.
+        `key` holds the settings of the estimate, e.g. its number of samples. `x`
+        matches on any device and with NaN entries. Returns None on a miss.
         """
         if cache is None:
             return None
-        cached_x, cached_num_samples, value = cache
-        if cached_num_samples != num_samples or cached_x.shape != x.shape:
+        cached_x, cached_key, value = cache
+        if cached_key != key or cached_x.shape != x.shape:
             return None
         same_x = torch.allclose(
             cached_x, x.to(cached_x.device), rtol=0, atol=0, equal_nan=True
@@ -629,6 +631,37 @@ _LEAKAGE_HINT = (
     "A low acceptance rate means that most of the posterior estimate lies outside "
     "the prior bounds (leakage)."
 )
+
+
+def _support_mass(num_accepted: Tensor, num_drawn: Tensor) -> Tensor:
+    """Return the share of draws inside the prior support, one per observation.
+
+    Warns for observations without any draw inside, whose mass is then 0.
+    """
+    empty = num_accepted == 0
+    if empty.any():
+        num_draws = int(num_drawn[empty].min())
+        warn(
+            f"{int(empty.sum())} of {empty.numel()} observation(s) have no posterior "
+            f"draw inside the prior support in {num_draws} draws: their mass inside "
+            f"is below about {3 / num_draws:.1e}, and `log_prob()` returns NaN inside "
+            "the support. Raise `max_num_draws` in `leakage_correction_params` to "
+            "resolve a smaller mass.",
+            stacklevel=5,
+        )
+    return num_accepted.float() / num_drawn.float()
+
+
+def _normalize_by_support_mass(log_prob: Tensor, mass: Tensor) -> Tensor:
+    """Divide a density that is -inf outside the prior support by its mass inside.
+
+    Where the mass is 0, the result is NaN inside the support and stays -inf
+    outside, instead of +inf and NaN from dividing by 0.
+    """
+    undefined = log_prob.masked_fill(log_prob > float("-inf"), float("nan"))
+    return torch.where(mass > 0, log_prob - mass.log(), undefined)
+
+
 # Advice shared by the errors of posteriors that take one observation.
 _ONE_AT_A_TIME = (
     "For a separate posterior of each observation, pass one observation at a time"
