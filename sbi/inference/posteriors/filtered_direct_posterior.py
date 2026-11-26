@@ -8,7 +8,10 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import _ONE_AT_A_TIME
+from sbi.inference.posteriors.base_posterior import (
+    _ONE_AT_A_TIME,
+    _require_one_observation,
+)
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.sbi_types import Shape
@@ -223,7 +226,13 @@ class FilteredDirectPosterior(DirectPosterior):
 
         Takes the arguments of `DirectPosterior.leakage_correction()`.
         """
-        self._set_context_for_x_o(self._x_else_default_x(x))
+        x_for_context = self._x_else_default_x(x)
+        _require_one_observation(
+            x_for_context.shape[0],
+            "`leakage_correction()` of NPE-PFN",
+            self._one_observation_hint,
+        )
+        self._set_context_for_x_o(x_for_context)
         return super().leakage_correction(x, *args, **kwargs)
 
     def log_prob_batched(
