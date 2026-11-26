@@ -408,7 +408,10 @@ def accept_reject_sample(
         )
 
         for i in range(num_xos):
-            accepted[i].append(candidates_to_reject[are_accepted[:, i], i])
+            num_missing = num_samples - int(num_sampled_total[i])
+            if num_missing > 0:
+                rows = are_accepted[:, i].nonzero()[:num_missing, 0]
+                accepted[i].append(candidates_to_reject[rows, i])
 
         # Update.
         # Note: For any condition of shape (*batch_shape, *condition_shape), the
