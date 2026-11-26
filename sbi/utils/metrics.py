@@ -354,6 +354,17 @@ def wasserstein_2_squared(
             "This implementation of Wasserstein is only implemented, "
             "if x.ndim=2 or x.ndim=3."
         )
+    if x.shape[-1] != y.shape[-1]:
+        raise ValueError(
+            f"'x' and 'y' need the same number of features, got {x.shape[-1]} "
+            f"and {y.shape[-1]}."
+        )
+    if {x.dtype, y.dtype} - {torch.float32, torch.float64}:
+        raise TypeError(
+            f"'x' and 'y' must be float32 or float64, got {x.dtype} and {y.dtype}."
+        )
+    if x.shape[-2] == 0 or y.shape[-2] == 0:
+        raise ValueError("'x' and 'y' need at least one point each.")
 
     # Squared l2 cost from pairwise differences, since cdist's matmul path cancels
     # far from the origin; one feature at a time keeps the memory at (B, m, n).
