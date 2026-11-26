@@ -16,7 +16,7 @@ from sbi.inference.trainers.vfpe.fmpe import FMPE
 from sbi.inference.trainers.vfpe.npse import NPSE
 from sbi.neural_nets import FlowMatchingConfig, VEScoreConfig
 from sbi.neural_nets.embedding_nets import CNNEmbedding
-from sbi.neural_nets.estimators import UnconditionalDensityEstimator
+from sbi.neural_nets.estimators import CategoricalMADE, UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import reshape_to_sample_batch_event
 from sbi.neural_nets.estimators.zuko_flow import ZukoFlow
 from sbi.neural_nets.net_builders import (
@@ -506,16 +506,19 @@ def _build_density_estimator_and_tensors(
     (
         (build_mnle, 1, (2,), (7,), 1),
         (build_mnle, 1, (2,), (7,), 10),
-        # Test with 2D condition with embedding net.
+        # Test with 2D condition with embedding net (including single observation).
+        [build_mnle, 1, (2,), (7, 7), 1],
         [build_mnle, 1, (2,), (7, 7), 10],
         [build_mnle, 1, (2,), (2, 7), 10],
         [build_mnle, 1, (2,), (7, 2), 10],
         # Add MNPE test cases (note: x and y roles are swapped)
         (build_mnpe, 1, (2,), (7,), 1),
         (build_mnpe, 1, (2,), (7,), 10),
+        [build_mnpe, 1, (2,), (7, 7), 1],
         [build_mnpe, 1, (2,), (7, 7), 10],
         [build_mnpe, 1, (2,), (2, 7), 10],
         [build_mnpe, 1, (2,), (7, 2), 10],
+        [build_categoricalmassestimator, 1, (1,), (7, 7), 1],
         [build_categoricalmassestimator, 1, (1,), (7, 7), 10],
         [build_categoricalmassestimator, 2, (1,), (7, 7), 10],
         pytest.param(
@@ -613,6 +616,82 @@ def test_categorical_mass_estimator_log_prob_of_own_samples():
     condition = torch.zeros(1, 1)
     samples = estimator.sample((10,), condition=condition)
     assert torch.isfinite(estimator.log_prob(samples, condition=condition)).all()
+
+
+@pytest.mark.parametrize("batch_dim", [1, 2])
+def test_categorical_made_sample_matches_log_prob_with_2d_condition(batch_dim: int):
+    """Sampling with a 2D condition and embedding net matches exact probabilities."""
+    torch.manual_seed(0)
+    emb = CNNEmbedding(input_shape=(16, 16), output_dim=4)
+    net = CategoricalMADE(
+        num_categories=torch.tensor([2, 3]),
+        num_hidden_features=16,
+        num_context_features=4,
+        embedding_net=emb,
+    )
+    net.eval()
+
+    context = torch.randn(batch_dim, 16, 16)
+    num_samples = 4000
+    samples = net.sample(torch.Size([num_samples]), context=context)
+    assert samples.shape == (num_samples, batch_dim, 2)
+
+    grid = torch.tensor(
+        [[i, j] for i in range(2) for j in range(3)], dtype=torch.float32
+    )
+    for b in range(batch_dim):
+        cond_rep = context[b : b + 1].expand(len(grid), -1, -1)
+        exact_probs = net.log_prob(grid, condition=cond_rep).exp()
+        empirical_probs = torch.tensor([
+            ((samples[:, b, 0] == i) & (samples[:, b, 1] == j)).float().mean()
+            for i in range(2)
+            for j in range(3)
+        ])
+        assert torch.allclose(empirical_probs, exact_probs, atol=0.04)
+
+
+@pytest.mark.parametrize("batch_dim", [1, 4])
+def test_categorical_made_sample_with_batch_norm(batch_dim: int):
+    """CategoricalMADE with BatchNorm1d must sample without 3D channel-dim errors."""
+    torch.manual_seed(0)
+    net = CategoricalMADE(
+        num_categories=torch.tensor([3, 4]),
+        num_hidden_features=16,
+        num_context_features=5,
+        use_batch_norm=True,
+    )
+    net.eval()
+    context = torch.randn(batch_dim, 5)
+    samples = net.sample(torch.Size([7]), context=context)
+    assert samples.shape == (7, batch_dim, 2)
+
+
+def test_categorical_made_sample_unconditional_and_edge_shapes():
+    """Unconditional MADE and empty/zero/multi-dim sample shapes must work cleanly."""
+    torch.manual_seed(0)
+    uncond_net = CategoricalMADE(
+        num_categories=torch.tensor([3, 4]),
+        num_hidden_features=16,
+        num_context_features=None,
+    )
+    samples = uncond_net.sample(torch.Size([7]), context=None)
+    assert samples.shape == (7, 1, 2)
+    log_probs = uncond_net.log_prob(samples.squeeze(1), condition=None)
+    assert log_probs.shape == (7,)
+    assert torch.isfinite(log_probs).all()
+
+    # Empty, zero-sized, and multi-dimensional sample shapes
+    cond_net = CategoricalMADE(
+        num_categories=torch.tensor([2, 3]),
+        num_hidden_features=8,
+        num_context_features=4,
+    )
+    ctx = torch.randn(2, 4)
+    assert cond_net.sample(torch.Size([]), context=ctx).shape == (2, 2)
+    assert cond_net.sample(torch.Size([0]), context=ctx).shape == (0, 2, 2)
+    assert cond_net.sample(torch.Size([2, 3]), context=ctx).shape == (2, 3, 2, 2)
+    # Conditional MADE called with context=None falls back to zero context on net device
+    assert cond_net.sample(torch.Size([5]), context=None).shape == (5, 1, 2)
 
 
 @pytest.mark.parametrize(
