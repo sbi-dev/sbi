@@ -3,10 +3,10 @@
 
 import pytest
 import torch
-from torch.distributions import Normal
+from torch.distributions import Normal, Uniform
 from torch.special import log_ndtr
 
-from sbi.utils.vector_field_utils import UniformNormalConvolution
+from sbi.utils.vector_field_utils import UniformNormalConvolution, denoise
 
 
 @pytest.mark.parametrize("scale", [0.5, 1.0, 2.0])
@@ -66,3 +66,26 @@ def test_uniform_normal_convolution_broadcast_batch_shape():
     samples = dist.sample(torch.Size([5]))
     assert samples.shape == (5, 2, 3)
     assert dist.log_prob(samples).shape == samples.shape
+
+
+# Reference moments from 50-digit quadrature.
+@pytest.mark.parametrize(
+    "x_t, s, mean, var",
+    [
+        (2.0, 0.1, 0.990190676604, 9.44537782566e-5),  # issue #2202
+        (-1.0, 0.1, 0.00980932339625, 9.44537782566e-5),
+        (1.05, 1e-4, 0.999999800002, 3.99990400358e-14),
+        (0.2, 2.0, 0.493802499725, 0.0826180845751),
+        (0.5, 0.01, 0.5, 1e-4),
+    ],
+)
+def test_uniform_denoise_matches_truncated_normal(x_t, s, mean, var):
+    dist = denoise(
+        Uniform(torch.tensor(0.0), torch.tensor(1.0)),
+        torch.tensor(1.0),
+        torch.tensor(s),
+        torch.tensor(x_t),
+    )
+
+    assert dist.mean.item() == pytest.approx(mean, rel=1e-4, abs=0)
+    assert dist.variance.item() == pytest.approx(var, rel=1e-4, abs=0)
