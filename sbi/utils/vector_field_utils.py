@@ -667,6 +667,9 @@ _GAUSS_LEGENDRE = np.polynomial.legendre.leggauss(32)
 class UniformNormalPosterior(Distribution):
     """Posterior distribution for a uniform prior and normal likelihood.
 
+    Only the mean and the variance are implemented: the iid score corrections
+    use nothing else.
+
     Args:
         low: Lower bound of the uniform distribution.
         high: Upper bound of the uniform distribution.
@@ -709,27 +712,25 @@ class UniformNormalPosterior(Distribution):
         # mode.
         alpha = (self.low - self.mu) / self.sigma
         beta = (self.high - self.mu) / self.sigma
-        self._c = torch.maximum(alpha, beta.clamp(max=0))
+        c = torch.maximum(alpha, beta.clamp(max=0))
 
         # Moments of y = z - c by quadrature: the density of y is proportional to
         # exp(-c y - y**2 / 2) <= 1, so no terms of order c**2 cancel, and beyond
         # `reach` it is below exp(-32) of its peak.
-        reach = 64 / (torch.sqrt(self._c**2 + 64) + self._c.abs())
-        y_lo = (alpha - self._c).clamp(min=-reach)
-        y_hi = (beta - self._c).clamp(max=reach)
+        reach = 64 / (torch.sqrt(c**2 + 64) + c.abs())
+        y_lo = (alpha - c).clamp(min=-reach)
+        y_hi = (beta - c).clamp(max=reach)
         nodes, weights = (
             torch.as_tensor(t, dtype=y_lo.dtype, device=y_lo.device)
             for t in _GAUSS_LEGENDRE
         )
         half = ((y_hi - y_lo) / 2).unsqueeze(-1)
         y = y_lo.unsqueeze(-1) + half * (nodes + 1)
-        density = weights * half * torch.exp(-self._c.unsqueeze(-1) * y - y**2 / 2)
-        total = density.sum(-1)
-        self._log_mass = torch.log(total)
-        prob = density / total.unsqueeze(-1)
+        density = weights * torch.exp(-c.unsqueeze(-1) * y - y**2 / 2)
+        prob = density / density.sum(-1, keepdim=True)
         mean_y = (prob * y).sum(-1)
         var_y = (prob * (y - mean_y.unsqueeze(-1)) ** 2).sum(-1)
-        self._mean = self.mu + self.sigma * (self._c + mean_y)
+        self._mean = self.mu + self.sigma * (c + mean_y)
         self._variance = self.sigma**2 * var_y
 
         batch_shape = torch.broadcast_shapes(
@@ -745,12 +746,6 @@ class UniformNormalPosterior(Distribution):
     @property
     def variance(self) -> Tensor:
         return self._variance
-
-    def log_prob(self, x: Tensor) -> Tensor:
-        # log pdf(z) - log Z with log Z = log pdf(c) + log mass.
-        z = (x - self.mu) / self.sigma
-        lp = -(z - self._c) * (z + self._c) / 2 - self._log_mass - torch.log(self.sigma)
-        return torch.where((x >= self.low) & (x <= self.high), lp, -torch.inf)
 
 
 class UniformNormalConvolution(Distribution):
