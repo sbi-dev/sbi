@@ -337,7 +337,7 @@ def accept_reject_sample(
 
     # To cover cases with few samples without leakage:
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
-    num_sampled_total = torch.zeros(num_xos)
+    num_sampled_total = torch.zeros(num_xos, dtype=torch.long)
     num_samples_possible = 0
     # Shape of one draw without the sample dim: `(*event_shape)` for flat proposals,
     # `(num_xos, *event_shape)` for batched ones. Set at each draw.
